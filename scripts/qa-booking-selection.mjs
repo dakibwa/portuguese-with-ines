@@ -88,7 +88,7 @@ try {
       const button = page.getByRole("button", { name: `Confirm these ${count} lessons`, exact: true });
       await button.waitFor();
       assert.equal(await button.isDisabled(), true, "Explicit consent is required for the whole selection");
-      await page.getByRole("checkbox", { name: /^I agree that each lesson price/ }).check();
+      await page.getByRole("checkbox", { name: "I agree to the terms", exact: true }).check();
       assert.equal(await button.isEnabled(), true);
       await button.click();
     }
@@ -131,25 +131,45 @@ try {
     bookings = []; series = [];
     await start(true);
     await choose("2026-09-14");
-    await page.getByRole("button", { name: /Add a second weekly time/ }).click();
+    await page.getByRole("button", { name: /Add another weekly time/ }).click();
     const dates = await page.locator('button[data-date-key]').evaluateAll(nodes => nodes.map(node => node.dataset.dateKey));
     assert.deepEqual(dates, Array.from({ length: 7 }, (_, i) => `2026-09-${14 + i}`), "Only the initial Monday–Sunday week can be chosen");
     await page.locator('button[data-date-key="2026-09-14"]').click();
     assert.equal(await page.getByRole("button", { name: "10:00", exact: true }).count(), 0, "An already selected or overlapping time is unavailable");
     await page.getByRole("button", { name: "Change date", exact: true }).click();
     await choose("2026-09-15");
-    assert.equal(await page.getByRole("button", { name: /Add a second weekly time/ }).count(), 0);
+    await page.getByRole("button", { name: /Add another weekly time/ }).click();
+    await choose("2026-09-16");
+    assert.equal(await page.getByRole("button", { name: /Add another weekly time/ }).count(), 1, "Adding a third time does not impose another cap");
+    await page.getByRole("link", { name: "View terms", exact: true }).click();
+    await page.locator("#booking[open]").waitFor();
+    assert.equal(await page.locator(".booking-information details").count(), 1);
+    assert.ok(await page.getByRole("heading", { name: "Your privacy", exact: true }).isVisible());
+    assert.equal(await page.getByRole("checkbox", { name: "I agree to the terms", exact: true }).isChecked(), false, "Viewing terms does not give consent");
+    await page.locator("#booking > summary").click();
+    await page.locator("#booking-confirmation-stage").scrollIntoViewIfNeeded();
     await checkOverflow();
     await page.locator('.booking-chosen-lessons').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${out}/recurring-${width}.png` });
-    await confirm(8);
+    await confirm(12);
     await page.getByRole("heading", { name: "You’re booked in.", exact: true }).waitFor();
-    assert.equal(requests.at(-1).startAts.length, 2);
+    assert.equal(requests.at(-1).startAts.length, 3);
     assert.equal(requests.at(-1).repeat, 4);
-    assert.equal(requests.at(-1).expectedPriceCents, 1500, "The recurring private rate applies to both weekly times");
+    assert.equal(requests.at(-1).expectedPriceCents, 1500, "The recurring private rate applies to every weekly time");
     await page.getByRole("button", { name: "Back to upcoming lessons", exact: true }).click();
     await page.locator("#account-upcoming-lessons").waitFor();
-    assert.equal(await page.getByRole("button", { name: "Manage recurrence", exact: true }).count(), 2, "Both weekly times remain manageable");
+    assert.equal(await page.getByRole("button", { name: "Manage recurrence", exact: true }).count(), 3, "All weekly times remain manageable");
+    bookings = []; series = [];
+    await start();
+    for (let i = 0; i < 10; i++) {
+      if (i) await page.getByRole("button", { name: /Add another lesson/ }).click();
+      await choose(`2026-09-${14 + Math.floor(i / 4)}`, ["10:00", "11:00", "15:00", "17:00"][i % 4]);
+    }
+    assert.equal(await page.locator('.booking-chosen-lessons li').count(), 10);
+    assert.equal(await page.getByRole("button", { name: /Add another lesson/ }).count(), 1, "Single lessons have no arbitrary add limit");
+    await confirm(10);
+    await page.getByRole("heading", { name: "You’re booked in.", exact: true }).waitFor();
+    assert.equal(requests.at(-1).startAts.length, 10);
     assert.deepEqual(errors, []);
     await context.close();
   }

@@ -40,9 +40,10 @@ export function BookingTermsInformation() {
         confirmation. Times and deadlines use Porto time.
       </p>
       <p>
-        <strong>Payment.</strong> Pay Inês on the lesson day or, if asked, save a card with Stripe for
-        automatic payment after each lesson. Nothing is charged at booking. Complete any card setup to
-        receive your confirmation.
+        <strong>Payment.</strong> When booking with a saved card, agreeing to these terms authorises Stripe
+        to save your card and charge the displayed lesson price automatically when each booked lesson ends.
+        Nothing is charged at booking. Complete any card setup to receive your confirmation. If your booking
+        specifies payment directly to Inês, pay her on the lesson day.
       </p>
       <p>
         <strong>Changes.</strong> Move or cancel before the lesson starts: free until the day before,

@@ -59,7 +59,7 @@ import { findRecurringCode, recurringRates, recurringLessonType, priceForMove, t
 import { bookingSelection, claimSelection } from "./selection.mjs";
 
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" };
-const PAYMENT_CONSENT_VERSION = "2026-09-01-after-lesson-v1";
+const PAYMENT_CONSENT_VERSION = "2026-09-12-combined-terms-v2";
 
 function corsHeaders(request, env) {
   const origin = request.headers.get("Origin") ?? "";
@@ -546,7 +546,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
 
   const cadence = series.occurrences ? `${rows.length} lessons` : "Every week, until you stop it";
   const multipleWeeklyTimes = (series.weeklyTimes ?? 1) > 1;
-  const weeklyTimeCopy = multipleWeeklyTimes ? "both times are" : "the same time is";
+  const weeklyTimeCopy = multipleWeeklyTimes ? "your chosen times are" : "the same time is";
   const skippedNote = skipped.length
     ? `${
         skipped.length === 1
@@ -645,13 +645,13 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
         replyTo: first.student_email,
         calendar: { body: invite({ name: settings.teacherName, email: teacherEmail }), method: "REQUEST" },
         content: {
-          heading: reason === "extended" ? "A weekly slot was extended" : moved ? "A weekly slot was moved" : series.oneOff ? "Lessons were booked" : multipleWeeklyTimes ? "Two weekly times were booked" : "A weekly slot was booked",
+          heading: reason === "extended" ? "A weekly slot was extended" : moved ? "A weekly slot was moved" : series.oneOff ? "Lessons were booked" : multipleWeeklyTimes ? "Weekly times were booked" : "A weekly slot was booked",
           intro:
             reason === "extended"
               ? `${first.student_name}'s open-ended weekly slot has been carried forward. The new lessons are in the calendar attachment.`
               : moved
                 ? `${first.student_name}'s upcoming weekly lessons have moved. The updated events are in the calendar attachment.`
-              : `${first.student_name} booked ${series.oneOff ? "these individual lessons" : multipleWeeklyTimes ? "two times each week" : "the same slot each week"}. Every lesson is in the calendar attachment.`,
+              : `${first.student_name} booked ${series.oneOff ? "these individual lessons" : multipleWeeklyTimes ? `${series.weeklyTimes} times each week` : "the same slot each week"}. Every lesson is in the calendar attachment.`,
           callout:
             skippedNote,
           hero: `${formatInZone(new Date(first.starts_at), PORTO)}, Porto time`,
@@ -1683,29 +1683,10 @@ async function handleCreate(request, env, ctx) {
     return fail("Your lesson price has changed. Please review it before confirming.", 409, request, env);
   }
 
-  // Cheap abuse guard: a real student does not book six lessons in a minute,
-  // and without this one account can fill her whole calendar.
-  // Counts booking *acts*, not rows. A twelve-week series writes twelve rows
-  // for one decision, so its occurrences are excluded here and the series
-  // itself is counted once — otherwise booking a term locks the student out of
-  // their own calendar for an hour.
-  const sinceIso = new Date(now.getTime() - 3600000).toISOString();
-  const recent = await env.DB.prepare(
-    `SELECT (SELECT COUNT(*) FROM bookings WHERE student_id = ?1 AND created_at > ?2 AND series_id IS NULL)
-          + (SELECT COUNT(*) FROM booking_series WHERE student_id = ?1 AND created_at > ?2) AS acts,
-            (SELECT COUNT(*) FROM bookings WHERE student_id = ?1 AND created_at > ?2) AS lessons`
-  )
-    .bind(student.id, sinceIso)
-    .first();
-
-  /*
-   * Two bounds, because one act can write twelve rows. Counting only acts let a
-   * single account take sixty lessons an hour through repeats; counting only
-   * rows would lock someone out of their own term booking. So: five decisions,
-   * and no more than about two terms' worth of lessons, in an hour.
-   */
-  if ((recent?.acts ?? 0) >= 5 || (recent?.lessons ?? 0) >= 26) {
-    return fail("That's several bookings in a short time. Please email Inês directly instead.", 429, request, env);
+  // Bound repeated requests, independently of how many lessons a selection
+  // contains. Three ongoing weekly times already produce 36 lesson rows.
+  if (!await takeRateLimit(env, `booking:${student.id}`, 20)) {
+    return fail("Please wait 15 minutes before trying to book again.", 429, request, env);
   }
 
   const check = await isSlotBookable(env, { startAt: body.startAt, lessonType, now });
@@ -1735,7 +1716,7 @@ async function handleCreate(request, env, ctx) {
   if (selection.starts.length > 1) {
     return handleCreateSelection(request, env, ctx, {
       starts: selection.starts, student, lessonType, now, notes, location, timezone,
-      wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup, recentLessons: recent?.lessons ?? 0
+      wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup
     });
   }
 
@@ -1966,7 +1947,7 @@ async function handleCreate(request, env, ctx) {
 /** Reserve a selection through one card setup and one combined confirmation. */
 async function handleCreateSelection(request, env, ctx, {
   starts, student, lessonType, now, notes, location, timezone,
-  wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup, recentLessons
+  wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup
 }) {
   const timestamp = now.toISOString();
   const holdExpiresAt = needsCardSetup ? new Date(now.getTime() + 35 * 60000).toISOString() : null;
@@ -1981,7 +1962,7 @@ async function handleCreateSelection(request, env, ctx, {
     const plan = wantsRepeat
       ? await planOccurrences(env, { fromKey: slot.dateKey, minuteOfDay: slot.minuteOfDay, count, lessonType, now })
       : { bookable: [{ startAt: new Date(startAt), endAt: check.endAt }], skipped: [] };
-    // Both starting lessons must still be available; only later occurrences
+    // All starting lessons must still be available; only later occurrences
     // may be skipped after the preview has shown their dates.
     if (!plan.bookable.some((entry) => entry.startAt.toISOString() === startAt)) {
       return fail("A starting time has just been taken. Nothing has been booked; please choose again.", 409, request, env);
@@ -2008,9 +1989,6 @@ async function handleCreateSelection(request, env, ctx, {
   plannedRows.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   if (plannedRows.some((row, index) => index && row.starts_at < plannedRows[index - 1].ends_at)) {
     return fail("Those weekly times overlap on a later date. Please choose different times.", 409, request, env);
-  }
-  if (recentLessons + plannedRows.length > 26) {
-    return fail("That's several bookings in a short time. Please wait an hour before adding more.", 429, request, env);
   }
   if (!await claimSelection(env, { rows: plannedRows, series, now })) {
     return fail("A selected time has just been taken. Nothing has been booked; please review your dates.", 409, request, env);
@@ -3091,7 +3069,7 @@ async function confirmCardSetup(env, ctx, session, row) {
 /** A shared setup must confirm every held lesson together, exactly once. */
 async function confirmSelectionCardSetup(env, ctx, session, anchor) {
   const expected = Number(session.metadata.selection_count);
-  if (!Number.isInteger(expected) || expected < 2 || expected > 24) return new Response("Invalid selection.", { status: 400 });
+  if (!Number.isSafeInteger(expected) || expected < 2) return new Response("Invalid selection.", { status: 400 });
   const loadRows = async () => (await env.DB.prepare(
     "SELECT * FROM bookings WHERE stripe_session_id = ? AND student_id = ? ORDER BY starts_at"
   ).bind(session.id, anchor.student_id).all()).results;

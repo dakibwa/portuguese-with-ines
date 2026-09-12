@@ -1494,7 +1494,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             <p>
               {activeChange
                 ? `Changing ${formatLongDate(activeChange.startAt)} at ${formatSlotTime(activeChange.startAt)}.`
-                : bookingKind === "recurring" ? "Choose the second starting time in this same week." : "Choose another date and time."}
+                : bookingKind === "recurring" ? "Choose another starting time in this same week." : "Choose another date and time."}
             </p>
             <div className="booking-selection-progress__actions">
               <button className="text-action" type="button" onClick={reviewSavedLessons}>Back to your selection</button>
@@ -1504,12 +1504,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             </div>
           </div>
         ) : null}
-        {includeSchedule && !payment && bookingKind !== "trial" && bookingChoices.length < (bookingKind === "recurring" ? 2 : 8) ? (
+        {includeSchedule && !payment && bookingKind !== "trial" ? (
           <div className="booking-add-lesson">
             <button type="button" className="text-action" onClick={addAnotherLesson} disabled={submitting}>
-              + {bookingKind === "recurring" ? "Add a second weekly time" : "Add another lesson"}
+              + {bookingKind === "recurring" ? "Add another weekly time" : "Add another lesson"}
             </button>
-            {bookingKind === "recurring" ? <p>Both starting times must be in the same Monday–Sunday week.</p> : null}
+            {bookingKind === "recurring" ? <p>Choose your starting times in the same Monday–Sunday week.</p> : null}
           </div>
         ) : null}
       </div>
@@ -1544,7 +1544,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           <div className="booking-success__series">
             <p><strong>{confirmation.selection.booked.length} lessons booked.</strong>{" "}
               {confirmation.selection.recurring
-                ? confirmation.selection.weeks === null ? "Both weekly times continue until you stop them." : "Both times repeat each week."
+                ? confirmation.selection.weeks === null ? "Your weekly times continue until you stop them." : "Your chosen times repeat each week."
                 : "Each lesson is in your calendar and can be managed individually."}
             </p>
             {confirmation.selection.skipped.length ? <p>{confirmation.selection.skipped.length} unavailable lesson times were left out.</p> : null}
@@ -2781,20 +2781,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   ) : null}
 
                   {needsPaymentConsent ? (
-                    <label className="booking-payment-consent">
-                      <input
-                        checked={paymentConsent}
-                        onChange={(event) => setPaymentConsent(event.target.checked)}
-                        required
-                        type="checkbox"
-                      />
-                      <span>
-                        I agree that each lesson price is charged to my saved card automatically when that lesson ends.
-                        Moving or cancelling on its Porto calendar day costs €5; if Inês records a no-show, only €5 is
-                        charged instead of the lesson price. See the{" "}
-                        <a href="#booking">booking terms</a>.
-                      </span>
-                    </label>
+                    <div className="booking-payment-consent">
+                      <label>
+                        <input
+                          checked={paymentConsent}
+                          onChange={(event) => setPaymentConsent(event.target.checked)}
+                          required
+                          type="checkbox"
+                        />
+                        <span>I agree to the terms</span>
+                      </label>
+                      <a className="text-action booking-view-terms" href="#booking">View terms</a>
+                    </div>
                   ) : null}
 
                   <p className="booking-form-note">

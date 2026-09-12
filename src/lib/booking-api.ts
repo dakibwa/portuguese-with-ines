@@ -171,7 +171,7 @@ export function createBooking(
     notes: string;
     lessonType: string;
     startAt: string;
-    /** Individual dates, or up to two weekly anchors in the same Porto week. */
+    /** Individual dates, or weekly starting times in the same Porto week. */
     startAts?: string[];
     location: "online" | "porto";
     timezone: string;

@@ -1,7 +1,5 @@
 import { PORTO, addDaysToKey, dateKey } from "./time.mjs";
 
-export const MAX_SINGLE_SELECTIONS = 8;
-
 /** Calendar weeks are Monday–Sunday in Porto, including across DST/year changes. */
 export function portoWeekOf(startAt) {
   const key = dateKey(new Date(startAt), PORTO);
@@ -11,10 +9,8 @@ export function portoWeekOf(startAt) {
 
 export function bookingSelection(body, { recurring = false, durationMinutes = 60, trial = false } = {}) {
   const values = "startAts" in body ? body.startAts : [body.startAt];
-  const limit = trial ? 1 : recurring ? 2 : MAX_SINGLE_SELECTIONS;
-  if (!Array.isArray(values) || !values.length || values.length > limit) {
-    return { error: trial ? "A trial is one first lesson." : recurring
-      ? "Choose one or two weekly times." : `Choose between one and ${limit} lessons.` };
+  if (!Array.isArray(values) || !values.length || (trial && values.length !== 1)) {
+    return { error: trial ? "A trial is one first lesson." : "Choose at least one lesson time." };
   }
   if (values.some((value) => typeof value !== "string" || !Number.isFinite(Date.parse(value)))) {
     return { error: "Choose a valid date and time for each lesson." };
@@ -24,7 +20,7 @@ export function bookingSelection(body, { recurring = false, durationMinutes = 60
     return { error: "Choose different times that do not overlap." };
   }
   if (recurring && starts.some((start) => portoWeekOf(start) !== portoWeekOf(starts[0]))) {
-    return { error: "Choose both starting times in the same Monday–Sunday week in Porto." };
+    return { error: "Choose all starting times in the same Monday–Sunday week in Porto." };
   }
   return { starts };
 }

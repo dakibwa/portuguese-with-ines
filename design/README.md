@@ -228,6 +228,14 @@ immediately without animation or smooth scrolling.
 
 ## Booking workspace
 
+The confirmation checkbox reads `I agree to the terms`, with a separate
+`View terms` button beside it. Keep the label in sentence case and the checkbox
+at its natural size, with 44px touch targets. Opening terms never checks the
+box or clears the selected lessons. One `Terms & privacy` disclosure contains
+both the payment/booking terms and privacy information; old booking and privacy
+links still reveal it. Keep automatic charges and fees explicit inside the
+terms and retain the concise nothing-charged-now note at confirmation.
+
 Students can collect several single-lesson dates and confirm them together.
 `Single lessons` starts with the shared length and location, then date/time.
 Each chosen lesson is its own row, the same shape as the choices above it: its
@@ -240,14 +248,14 @@ remains one first lesson. All selected lessons use
 the chosen duration and location; changing duration requires choosing times
 again because availability depends on length.
 
-Recurring bookings start with one date and time and may add a second weekly
-time. Both starting dates must fall in the same Monday–Sunday week in Porto;
-after the first choice, the second calendar shows that week only. The chosen
-times repeat for the common 4/6/8-week or ongoing period. Show both starting
-dates and times together, check later occurrences for both, and name any
+Recurring bookings start with one date and time and may add more weekly
+times without a lesson-count cap. All starting dates must fall in the same Monday–Sunday week in Porto;
+after the first choice, the calendar for each additional time shows that week only. The chosen
+times repeat for the common 4/6/8-week or ongoing period. Show all starting
+dates and times together, check later occurrences for every time, and name any
 unavailable lesson times precisely rather than suggesting the entire week is
 lost. One confirmation and one card setup cover the selection. Every lesson
-keeps its own charge and change rules; the two weekly times remain independently
+keeps its own charge and change rules; the weekly times remain independently
 manageable in Upcoming lessons. A conflict during confirmation retains the
 student's whole selection for correction and never silently books only part.
 

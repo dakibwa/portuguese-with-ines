@@ -651,6 +651,44 @@ await test("failed checkout cleans the entire held selection and both weekly rec
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM booking_series WHERE student_id=?").get(user).n, 0);
   checkoutUnavailable = false;
 });
+
+await test("three ongoing weekly times share one setup and confirm all 36 holds", async () => {
+  const user = await selectionFixture({ savedCard: false });
+  const startAts = [...selectedStarts, "2026-09-16T16:00:00.000Z"];
+  const response = await call("/bookings", { user, body: selectionBody({ startAts, repeat: null }) });
+  assert.equal(response.status, 201, await response.clone().text());
+  assert.equal((await response.json()).selection.booked.length, 36);
+  const event = selectionEvent(user, { count: 36 });
+  assert.equal((await webhook(event)).status, 200);
+  const rows = db.prepare("SELECT * FROM bookings WHERE student_id=?").all(user);
+  assert.equal(rows.length, 36);
+  assert.ok(rows.every(row => row.status === "confirmed" && row.payment_status === "scheduled"));
+  assert.ok(rows.every(row => row.payment_consent_version === "2026-09-12-combined-terms-v2"));
+  assert.equal(new Set(rows.map(row => row.series_id)).size, 3);
+  await drain();
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE kind='student_series_booked'").get().n, 1);
+});
+
+await test("ten lessons in one week have no count cap for single or recurring selections", async () => {
+  const startAts = Array.from({ length: 10 }, (_, i) => new Date(Date.parse(selectedStarts[0]) + i * 3600000).toISOString());
+  for (const recurring of [false, true]) {
+    const user = await selectionFixture();
+    const response = await call("/bookings", { user, body: selectionBody({ startAts, ...(recurring ? { repeat: 4 } : {}) }) });
+    assert.equal(response.status, 201, await response.clone().text());
+    const result = await response.json();
+    assert.equal(result.selection.booked.length, recurring ? 40 : 10);
+    const followup = await call("/bookings", { user, body: selectionBody({ startAts: ["2026-09-15T12:00:00.000Z"] }) });
+    assert.equal(followup.status, 201, "A large selection must not consume the whole account request allowance");
+  }
+});
+
+await test("creation request protection remains independent of lesson count", async () => {
+  const user = await selectionFixture();
+  await call("/bookings", { user, body: selectionBody() });
+  for (let i = 1; i < 20; i++) assert.equal((await call("/bookings", { user, body: selectionBody() })).status, 409);
+  assert.equal((await call("/bookings", { user, body: selectionBody() })).status, 429);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=?").get(user).n, 2);
+});
 await test("two ongoing times create 24 lessons and an abandoned checkout releases both sequences", async () => {
   const user = await selectionFixture({ savedCard: false });
   const response = await call("/bookings", { user, body: selectionBody({ repeat: null }) });

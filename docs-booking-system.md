@@ -227,19 +227,20 @@ depending on them having kept the right confirmation email.
 
 ### Repeating bookings
 
-**Selecting several lessons together** (released 11 September 2026; Worker
-version `09d37a19`): one request can select up to eight
-single-lesson dates, or two weekly starting times within the same Porto
-Monday–Sunday week. Duration, location and repeat period are shared. Trials
-remain single. `POST /bookings` accepts `startAts`; the existing `startAt` route
+**Selecting several lessons together** (12 September 2026 refinement, awaiting
+preview approval and release): one request can select multiple single-lesson
+dates or weekly starting times, without a lesson-count cap. All recurring
+starting dates must share the same Porto Monday–Sunday week. Duration, location
+and repeat period are shared. Trials remain single. `POST /bookings` accepts
+`startAts`; the existing `startAt` route
 still books one lesson. The server normalises instants, rejects overlap and
 enforces the same-week rule independently of the browser.
 
-The two recurring times use separate existing `booking_series` recipes. One
+Recurring times use separate existing `booking_series` recipes. One
 D1 transaction inserts all planned lesson rows after an atomic overlap check,
 or leaves no selection or empty recipes behind if another booking wins the
 race. Later unavailable occurrences are previewed and skipped individually;
-both initial times must still be free. No database migration is needed.
+all initial times must still be free. No database migration is needed.
 Availability excludes occupied single-lesson times as well as recurring ones;
 rescheduling ignores only the specific lesson or series being moved.
 
@@ -250,7 +251,15 @@ held row, refusing a partial or expired selection. Replay/concurrent delivery
 cannot send duplicate confirmations. One email each way carries the combined
 calendar events. Returning payers schedule each lesson's own end charge;
 single lessons and each weekly recipe keep their existing manage controls.
-An abandoned setup releases every held lesson and empty series.
+An abandoned setup releases every held lesson and empty series. Request-rate
+protection allows 20 creation attempts per account per 15-minute window,
+regardless of the number of selected lessons or generated occurrences. Existing
+body-size, availability, overlap, same-week and trial rules still apply.
+
+Consent uses `I agree to the terms` beside a separate `View terms` action. The
+combined disclosure retains explicit saved-card authority, charge timing,
+prices and fees. New consent records use `2026-09-12-combined-terms-v2`;
+existing bookings retain their original consent version.
 
 A student can hold the same slot every week for 4, 6, or 8 weeks, or choose
 `Ongoing` so it continues until they stop it. An open-ended schedule is kept
@@ -460,8 +469,9 @@ lesson above.
 ### Payment
 
 The concise public explanation opens at `/book/#booking`; privacy opens at
-`/book/#privacy`, without requiring sign-in. Both are native disclosures beneath
-the workspace. Sign-up does not repeat them. The footer retains only a quiet `Privacy` link;
+`/book/#privacy`, without requiring sign-in. Both reveal one native
+`Terms & privacy` disclosure beneath the workspace. Sign-up does not repeat
+them. The footer retains one quiet `Terms & privacy` link;
 old policy URLs redirect into booking. Payment and change conditions appear
 before the confirmation button, with the saved-card agreement kept separate.
 Publishing this presentation does not activate payments or change cancellation

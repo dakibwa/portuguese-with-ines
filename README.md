@@ -102,8 +102,9 @@ request only competes with the fonts for no gain.
   future recurring lessons without changing existing bookings or the €5 fees.
   The Worker's `lesson_types` table decides what is actually bookable; the
   lessons page is the copy a visitor reads. Keep the two in step.
-- The booking flow can confirm up to eight selected single-lesson dates at
-  once, or two weekly times starting within the same Porto Monday–Sunday week.
+- The booking flow can confirm selected single-lesson dates at once, or multiple
+  weekly times starting within the same Porto Monday–Sunday week. There is no
+  lesson-count cap; availability determines which times can be chosen.
   The selection shares duration, location and (when recurring) repeat period.
   One card setup and one combined calendar email cover the whole selection;
   each lesson retains its individual payment and management rules. This change

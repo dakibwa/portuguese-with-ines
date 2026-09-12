@@ -5,14 +5,12 @@ import { BookingTermsInformation, PrivacyInformation } from "@/components/Policy
 
 export function BookingInformation() {
   const bookingRef = useRef<HTMLDetailsElement>(null);
-  const privacyRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
     function revealLinkedInformation() {
       const section = window.location.hash.slice(1);
-      const disclosure = section === "booking" || section === "change-booking"
-        ? bookingRef.current
-        : section === "privacy" ? privacyRef.current : null;
+      const disclosure = ["booking", "privacy", "change-booking"].includes(section)
+        ? bookingRef.current : null;
       if (!disclosure) return;
       disclosure.open = true;
       requestAnimationFrame(() => disclosure.scrollIntoView({ behavior: "instant", block: "start" }));
@@ -43,12 +41,13 @@ export function BookingInformation() {
   return (
     <section className="booking-information" id="change-booking" aria-label="Booking information">
       <details className="policy-disclosure" id="booking" ref={bookingRef}>
-        <summary>Booking terms</summary>
+        <summary>Terms &amp; privacy</summary>
+        <h3>Booking terms</h3>
         <BookingTermsInformation />
-      </details>
-      <details className="policy-disclosure" id="privacy" ref={privacyRef}>
-        <summary>Your privacy</summary>
-        <PrivacyInformation />
+        <section id="privacy" aria-label="Your privacy">
+          <h3>Your privacy</h3>
+          <PrivacyInformation />
+        </section>
       </details>
     </section>
   );
