@@ -910,6 +910,25 @@ if (process.env.INES_PRIVATE_RATES_FILE) {
     }
   });
 }
+await test("reset and email-change mail is bounded per recipient and per account, without changing the answer", async () => {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    assert.equal((await call("/auth/forgot", { user: null, body: { email: "outsider@example.invalid" } })).status, 200);
+  }
+  await drain();
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM password_resets WHERE student_id = 'outsider'").get().n, 3);
+  const statuses = [];
+  for (let attempt = 0; attempt < 5; attempt++) {
+    statuses.push((await call("/me/email", { user: "outsider", body: { email: `target-${attempt}@example.invalid` } })).status);
+  }
+  assert.deepEqual(statuses, [200, 200, 200, 429, 429]);
+});
+await test("settings reject a slot interval that would hang availability, and malformed addresses", async () => {
+  const save = (settings) => call("/admin/settings", { user: null, headers: { Authorization: "Bearer isolated-admin" }, body: { settings } });
+  assert.equal((await save({ slot_interval_minutes: 0 })).status, 400);
+  assert.equal((await save({ slot_interval_minutes: -30 })).status, 400);
+  assert.equal((await save({ teacher_email: "not-an-address" })).status, 400);
+  assert.equal((await save({ slot_interval_minutes: 30 })).status, 200);
+});
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;

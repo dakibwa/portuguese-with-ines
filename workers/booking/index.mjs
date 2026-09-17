@@ -1856,6 +1856,16 @@ async function handleCreate(request, env, ctx) {
   const hasSavedCard = Boolean(student.stripe_customer_id && student.stripe_payment_method);
   const needsCardSetup = postpay && !hasSavedCard;
 
+  // A hold blocks its slots for 35 minutes with no card entered, and the hourly
+  // bounds above are per account. Bound them per connection as well, so fresh
+  // accounts cannot keep the calendar held.
+  if (needsCardSetup) {
+    const ip = request.headers.get("CF-Connecting-IP") || "local";
+    if (!await takeRateLimit(env, `hold:${ip}`, 8, 3600)) {
+      return fail("That's several bookings in a short time. Please email Inês directly instead.", 429, request, env);
+    }
+  }
+
   if (selection.starts.length > 1) {
     return handleCreateSelection(request, env, ctx, {
       starts: selection.starts, student, lessonType, now, notes, location, timezone,
@@ -3313,6 +3323,13 @@ async function handleRegister(request, env) {
   const problem = passwordProblem(body.password) ?? nifProblem(nif);
   if (problem) return fail(problem, 400, request, env);
 
+  // Accounts need no email proof, so the address they come from is the only
+  // brake on minting them to hold slots or to send mail.
+  const ip = request.headers.get("CF-Connecting-IP") || "local";
+  if (!await takeRateLimit(env, `register:${ip}`, 5, 3600)) {
+    return fail("Too many new accounts from this connection. Please try again in an hour.", 429, request, env);
+  }
+
   const existing = await env.DB.prepare("SELECT id FROM students WHERE email = ?").bind(email).first();
   if (existing) {
     return fail("There is already an account with that email. Try signing in instead.", 409, request, env);
@@ -3351,7 +3368,7 @@ async function handleLogin(request, env) {
   // One message for both cases, so this cannot be used to discover which
   // addresses have accounts. The password is still verified against a dummy
   // hash when there is no account, so the reply takes the same time either way.
-  const stored = student?.password_hash ?? "pbkdf2$6x100000$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  const stored = student?.password_hash || "pbkdf2$6x100000$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
   const correct = await verifyPassword(String(body.password ?? ""), stored);
 
   if (!student || !correct) {
@@ -3471,7 +3488,10 @@ async function handleForgot(request, env, ctx) {
     ? await env.DB.prepare("SELECT * FROM students WHERE email = ?").bind(email).first()
     : null;
 
-  if (student) {
+  // Three an hour per recipient: the per-address limit on /auth/ alone let one
+  // connection send forty resets to the same inbox. Past the limit the answer
+  // is unchanged, so the throttle reveals nothing either.
+  if (student && await takeRateLimit(env, `forgot:${student.id}`, 3, 3600)) {
     const token = await createResetToken(student.id, env.BOOKING_TOKEN_SECRET);
     const nonce = token.split(".")[2];
     await env.DB.prepare("INSERT OR REPLACE INTO password_resets (nonce, student_id, created_at) VALUES (?, ?, ?)")
@@ -3658,6 +3678,16 @@ async function handleRequestEmailChange(request, env, ctx) {
   if (!isEmail(email)) return fail("That email address doesn't look right.", 400, request, env);
   if (email === student.email) return fail("That's already your email address.", 400, request, env);
 
+  // Each request mails an address the account has not proved it owns, so both
+  // the sender and the recipient are bounded. Checked before the taken/free
+  // fork so the limit says nothing about whether the address has an account.
+  if (
+    !await takeRateLimit(env, `email-change:${student.id}`, 3, 3600) ||
+    !await takeRateLimit(env, `email-change-to:${email}`, 3, 3600)
+  ) {
+    return fail("That's several requests in a short time. Please try again in an hour.", 429, request, env);
+  }
+
   const taken = await env.DB.prepare("SELECT id FROM students WHERE email = ?").bind(email).first();
   const now = new Date().toISOString();
 
@@ -3835,7 +3865,13 @@ async function isAdmin(request, env) {
 
 async function handleAdmin(request, env, ctx, url, path) {
   const admin = await isAdmin(request, env);
-  if (!admin) return fail("Not authorised.", 401, request, env);
+  if (!admin) {
+    const ip = request.headers.get("CF-Connecting-IP") || "local";
+    if (!await takeRateLimit(env, `admin-fail:${ip}`, 20)) {
+      return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
+    }
+    return fail("Not authorised.", 401, request, env);
+  }
 
   if (request.method === "GET" && path === "/admin/google-calendar") {
     return json(await calendarConnectionStatus(env), 200, request, env);
@@ -4164,6 +4200,26 @@ async function handleAdmin(request, env, ctx, url, path) {
       "teacher_email",
       "reply_to_email"
     ]);
+    // A zero or negative slot interval makes the availability loop never end,
+    // so numbers are range-checked and addresses validated before they land.
+    const ranges = {
+      minimum_notice_hours: [0, 336],
+      booking_horizon_days: [1, 365],
+      slot_interval_minutes: [5, 240],
+      same_day_change_fee_cents: [0, 10000]
+    };
+    for (const [key, value] of Object.entries(body.settings ?? {})) {
+      if (ranges[key]) {
+        const number = Number(value);
+        const [min, max] = ranges[key];
+        if (!Number.isInteger(number) || number < min || number > max) {
+          return fail(`${key} must be a whole number from ${min} to ${max}.`, 400, request, env);
+        }
+      }
+      if ((key === "teacher_email" || key === "reply_to_email") && String(value) !== "" && !isEmail(normaliseEmail(value))) {
+        return fail(`${key} must be an email address.`, 400, request, env);
+      }
+    }
     const statements = Object.entries(body.settings ?? {})
       .filter(([key]) => allowed.has(key))
       .map(([key, value]) =>

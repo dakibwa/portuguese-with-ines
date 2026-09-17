@@ -779,7 +779,15 @@ the displayed new price; unchanged-duration rows retain each agreed snapshot.
 
 Writes reject unapproved browser origins and non-JSON content; request bodies
 are bounded while streaming. Authentication has an edge-IP rate limit and
-account failure limits. API responses are not cacheable. Password derivation
+account failure limits. Mail an unproven party can trigger is bounded per
+recipient: three password resets an hour per account (the reply is unchanged
+past the limit), and three email-change requests an hour per account and per
+target address. One connection can register five accounts and open eight
+unpaid card-setup holds an hour, and failed admin-token guesses are throttled
+per connection. `/admin/settings` range-checks its numbers — a zero slot
+interval would hang `/availability` — and validates its addresses. The live
+origin allow-list is the two live domains plus `http://localhost:3000`, which
+CI's journey tests serve the built export from. API responses are not cacheable. Password derivation
 uses six supported 100,000-iteration rounds for new passwords, retaining older
 hash verification. Webhooks check signature, environment, session, customer,
 amount and currency; expired card-setup holds cannot reclaim a slot.

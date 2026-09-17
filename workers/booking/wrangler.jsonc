@@ -20,8 +20,11 @@
     }
   ],
   "vars": {
-    // Origins allowed to call this API. The live domains plus local development.
-    "ALLOWED_ORIGIN": "https://portuguesewithines.com,https://portuguescomaines.com,https://dakibwa.github.io,http://localhost:3002,http://127.0.0.1:3002,http://localhost:3000,http://localhost:3211",
+    // Origins allowed to call the live API: the live domains, plus
+    // localhost:3000 because CI serves the built export there for the journey
+    // tests. Local development sets its own list in .dev.vars and the dev
+    // environment below.
+    "ALLOWED_ORIGIN": "https://portuguesewithines.com,https://portuguescomaines.com,http://localhost:3000",
     "SITE_URL": "https://portuguesewithines.com",
     "MAIL_FROM": "Português com a Inês <bookings@portuguesewithines.com>",
     "MAIL_SENDER_ADDRESS": "bookings@portuguesewithines.com",
