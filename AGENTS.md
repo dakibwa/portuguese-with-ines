@@ -3,18 +3,18 @@
 ## Verification and release
 
 - During implementation, run the smallest relevant check. Use `npm run test:booking` for Worker logic and the focused Playwright smoke test for affected customer journeys.
-- Before pushing, run `npm run check:fast`; it keeps type checking, lint and the booking unit suite in one short local loop. Do not put the live Worker probe, production build or browser journey in the edit loop.
+- `npm run check:fast` combines types, lint, booking and redirect tests. Use the aggregate when changes span those areas or focused checks leave unresolved risk. Isolated copy, styling and documentation use the shared narrow tier; reserve live probes and the production build for the relevant release gate.
 - `npm run check:release` adds the live booking probe and production build. CI runs it once on `main`, then exercises the customer journey against that same built export before automatically publishing it.
 - Run `npm run check:booking` directly only when booking configuration or routing changes, or to diagnose the release gate. If a local environment points it at a localhost Worker, start that Worker first; otherwise let CI exercise the configured live endpoint.
 - Booking changes span two deployables: the static site and the `ines-booking` Worker. Deploy the Worker first — the site's release gate checks its health and will refuse to publish against a broken one.
 - The Playwright journey test now runs in CI against the built export, not only locally. It rotted silently once — the booking container was renamed and nothing noticed for several commits — so if you rename a selector it guards, update `scripts/qa-flow.mjs` in the same change.
 - Markdown and `docs/**`-only changes do not require a build or deployment; the Pages workflow intentionally ignores them.
 
-## Documentation-first, code-native design workflow
+## Design and documentation
 
 - [design/README.md](./design/README.md) is the canonical human-readable contract for the website's visual direction, responsive composition, motion, and important interaction states. Git owns the editable production implementation and delivery; the published site is the acceptance surface; the `ines-booking` Worker and its D1 database own live booking truth.
 - Treat a clear requirement added to the repository documentation as an implementation requirement. Bring the code and live site into line with it, or record the conflict explicitly when provider truth, accessibility, security, or current product behaviour makes the documented requirement unsafe or ambiguous.
-- For meaningful visual changes, describe the intended outcome and important desktop/mobile states in `design/README.md` before or alongside implementation. Then change the code, inspect the running site at representative widths and states, and reconcile any implementation-led adjustment back into the documentation in the same task.
+- Consult the relevant design guidance for visual work and inspect the affected desktop/mobile states. Update `design/README.md` when an accepted, recurring decision changes the durable product contract; keep exact mechanics in components, tokens and styles.
 - Route accepted design corrections to the narrowest owner: product and visual judgement in `design/README.md`, reusable mechanics in tokens/components/styles, and mechanically detectable regressions in focused checks. Add a general rule only after a deliberate product decision or a repeated accepted correction; do not turn one screenshot or one preference into a universal standard.
 - External design tools and mock-ups are optional working material only. They are never a source of truth, a required handoff, or a completion dependency for this website.
 - Keep documentation, implementation and the published site aligned during product work. There is no separate daily alignment automation.
