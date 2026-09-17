@@ -84,18 +84,25 @@ export function GoogleSignInButton({
   const frame = useRef<HTMLDivElement>(null);
   const [available, setAvailable] = useState(false);
 
-  const handleCredential = useCallback(
-    async (credential: string) => {
-      try {
-        const result = await signInWithGoogle(credential, browserTimeZone());
-        storeSession(result.session);
-        onSignedIn(result.student);
-      } catch (caught) {
-        onError(caught instanceof Error ? caught.message : "That Google sign-in didn't work.");
-      }
-    },
-    [onSignedIn, onError]
-  );
+  // Callers pass inline functions, so their identity changes on every parent
+  // render. Read through refs, the effect below runs once: re-running it
+  // re-initialised Google's client and redrew the button each time.
+  const onSignedInRef = useRef(onSignedIn);
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onSignedInRef.current = onSignedIn;
+    onErrorRef.current = onError;
+  });
+
+  const handleCredential = useCallback(async (credential: string) => {
+    try {
+      const result = await signInWithGoogle(credential, browserTimeZone());
+      storeSession(result.session);
+      onSignedInRef.current(result.student);
+    } catch (caught) {
+      onErrorRef.current(caught instanceof Error ? caught.message : "That Google sign-in didn't work.");
+    }
+  }, []);
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;

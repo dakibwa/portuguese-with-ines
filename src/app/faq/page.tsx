@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/page-metadata";
 import Link from "next/link";
 import { AssetMark } from "@/components/BrandMarks";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -6,11 +7,11 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { CONTACT_WHATSAPP_URL, SAME_DAY_RESCHEDULE_FEE_CENTS, formatMoney } from "@/lib/config";
 import { trialLesson } from "@/lib/lesson-products";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "FAQ | Português com a Inês",
-  description:
-    "Answers for anyone nervous about speaking, plus levels, booking, payment and changing a lesson."
-};
+  description: "Answers for anyone nervous about speaking, plus levels, booking, payment and changing a lesson.",
+  path: "/faq/"
+});
 
 const sameDayFee = formatMoney(SAME_DAY_RESCHEDULE_FEE_CENTS);
 

@@ -1,4 +1,4 @@
-import { CONTACT_WHATSAPP_NUMBER, CONTACT_WHATSAPP_URL } from "@/lib/config";
+import { CONTACT_WHATSAPP_NUMBER, CONTACT_WHATSAPP_URL, SAME_DAY_FEE_LABEL } from "@/lib/config";
 
 export function TermsPrivacyInformation() {
   return (
@@ -18,9 +18,9 @@ export function TermsPrivacyInformation() {
       <p>Move or cancel in your calendar before the lesson starts. All deadlines use Porto time.</p>
       <ul>
         <li><strong>Before the lesson day:</strong> free.</li>
-        <li><strong>On the lesson day:</strong> €5 once per lesson.</li>
+        <li><strong>On the lesson day:</strong> {SAME_DAY_FEE_LABEL} once per lesson.</li>
         <li>You still pay for a moved lesson. Cancelling removes the lesson charge.</li>
-        <li><strong>No-show:</strong> €5 instead of the lesson price if recorded by Inês. Any earlier €5 change fee still applies.</li>
+        <li><strong>No-show:</strong> {SAME_DAY_FEE_LABEL} instead of the lesson price if recorded by Inês. Any earlier {SAME_DAY_FEE_LABEL} change fee still applies.</li>
         <li>If Inês moves or cancels, there is no change fee.</li>
       </ul>
       <p>
@@ -33,7 +33,7 @@ export function TermsPrivacyInformation() {
         Email Inês your name and booking reference; she handles these requests personally.
       </p>
       <p>
-        Where this legal right applies, there is no €5 cancellation fee. Any refund you are legally owed
+        Where this legal right applies, there is no {SAME_DAY_FEE_LABEL} cancellation fee. Any refund you are legally owed
         is due within 14 days of your notice.
       </p>
       <p>

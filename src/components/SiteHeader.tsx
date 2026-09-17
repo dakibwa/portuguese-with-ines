@@ -2,13 +2,15 @@ import Link from "next/link";
 import { BrandWordmark } from "@/components/BrandWordmark";
 import { SiteNav } from "@/components/SiteNav";
 
-export type SitePage = "home" | "approach" | "lessons" | "faq" | "book" | "my-lessons" | "terms" | "privacy";
+export type SitePage = "home" | "other" | "approach" | "lessons" | "faq" | "book" | "my-lessons" | "terms" | "privacy";
 
 type SiteHeaderProps = {
   currentPage?: SitePage;
 };
 
-export function SiteHeader({ currentPage = "home" }: SiteHeaderProps) {
+/* No default page: a route that names none (reset password, the schedule) must
+   not mark the brand link as the current page. */
+export function SiteHeader({ currentPage = "other" }: SiteHeaderProps) {
   return (
     <header className="site-header">
       <a className="skip-link" href="#main-content">

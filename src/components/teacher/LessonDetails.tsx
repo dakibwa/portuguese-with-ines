@@ -9,6 +9,7 @@ import {
   type AdminBooking,
 } from "@/lib/admin-api";
 import { formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
+import { SAME_DAY_FEE_LABEL } from "@/lib/config";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { MeetingLink } from "@/components/MeetingLink";
 
@@ -80,7 +81,7 @@ export function LessonDetails({
         onChanged(
           noShow
             ? "No-show removed. The normal lesson price will be charged when it ends."
-            : "Marked as a no-show. Only €5 will be charged when the lesson ends.",
+            : `Marked as a no-show. Only ${SAME_DAY_FEE_LABEL} will be charged when the lesson ends.`,
         );
       }
     } catch (caught) {
@@ -166,12 +167,12 @@ export function LessonDetails({
         <p className="teacher-lesson-note">{booking.notes}</p>
       ) : null}
       {noShow ? (
-        <p className="teacher-inline-notice">No-show · €5 after this lesson</p>
+        <p className="teacher-inline-notice">No-show · {SAME_DAY_FEE_LABEL} after this lesson</p>
       ) : null}
       {booking.same_day_fee_status === "paid" ? (
-        <p className="teacher-inline-notice">€5 same-day fee paid</p>
+        <p className="teacher-inline-notice">{SAME_DAY_FEE_LABEL} same-day fee paid</p>
       ) : booking.same_day_change ? (
-        <p className="teacher-inline-notice">€5 same-day fee due</p>
+        <p className="teacher-inline-notice">{SAME_DAY_FEE_LABEL} same-day fee due</p>
       ) : null}
       {booking.payment_status === "payment_due" ? (
         <p className="teacher-inline-notice">
@@ -276,7 +277,7 @@ export function LessonDetails({
                   ? "The lesson will be removed from the calendar and the student will be emailed."
                   : noShow
                     ? "The normal lesson price will be charged when the lesson ends."
-                    : "Only €5 will be charged when this lesson ends, instead of the full lesson price."}
+                    : `Only ${SAME_DAY_FEE_LABEL} will be charged when this lesson ends, instead of the full lesson price.`}
               </p>
               <button
                 className="button button--coral"

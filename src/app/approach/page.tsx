@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/page-metadata";
 import Link from "next/link";
 import { AssetMark } from "@/components/BrandMarks";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Approach | Português com a Inês",
-  description: "How the lessons work: one to one, no fixed syllabus, built around what you need Portuguese for."
-};
+  description: "How the lessons work: one to one, no fixed syllabus, built around what you need Portuguese for.",
+  path: "/approach/"
+});
 
 const approachItems = [
   {

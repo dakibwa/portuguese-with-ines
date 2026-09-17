@@ -1,4 +1,4 @@
-import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE } from "@/lib/config";
+import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, formatMoney } from "@/lib/config";
 
 export type LessonType = {
   id: string;
@@ -407,9 +407,35 @@ export function portoTimeToUtc(dateKey: string, time: string) {
 }
 
 export function formatMoneyCents(cents: number) {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(
-    cents / 100
-  );
+  return formatMoney(cents, "EUR");
+}
+
+/**
+ * Payment links come from the API, so they are checked before the browser is
+ * sent to one: only an https page on Stripe's own domain is followed.
+ */
+export function stripePaymentUrl(value: string) {
+  let url: URL | null = null;
+  try {
+    url = new URL(value);
+  } catch {
+    url = null;
+  }
+  const onStripe = url !== null && (url.hostname === "stripe.com" || url.hostname.endsWith(".stripe.com"));
+  if (!url || url.protocol !== "https:" || !onStripe || url.username || url.password) {
+    throw new Error("The secure payment page could not be opened. Please try again shortly.");
+  }
+  return url.href;
+}
+
+/**
+ * A booked lesson's time as its student should read it. On Porto's clock that
+ * is the bare time; anywhere else it names both clocks, because "15:00" alone
+ * reads as the student's own 15:00.
+ */
+export function formatSlotTimeForStudent(startAt: string, studentZone: string) {
+  const local = differingLocalTime(startAt, studentZone);
+  return local ? `${formatSlotTime(startAt)} Porto time · ${local} your time` : formatSlotTime(startAt);
 }
 
 /**

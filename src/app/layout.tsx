@@ -6,6 +6,7 @@ import {
   AKIBWA_PROJECT_VIEW_BOOTSTRAP,
   AkibwaProjectBanner
 } from "@/components/AkibwaProjectBanner";
+import { shareImage } from "@/lib/page-metadata";
 import { publicAssetPath, publicAssetUrl } from "@/lib/paths";
 import "./globals.css";
 
@@ -38,12 +39,6 @@ const montserrat = Montserrat({
 // canonical production domain — the Portuguese-spelling domain redirects to it.
 const SITE_URL = "https://portuguesewithines.com";
 const shareDescription = "One-to-one Portuguese lessons, online or in person. Any level.";
-const shareImage = {
-  url: "/og.png?v=20260914",
-  width: 1200,
-  height: 630,
-  alt: "Português com a Inês: one-to-one Portuguese lessons"
-};
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

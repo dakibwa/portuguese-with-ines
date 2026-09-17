@@ -435,8 +435,17 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 /* Next remounts the route template after navigation, so this is an incoming
    dissolve rather than a click delay. The destination starts loading
    immediately; the fade only softens the paint once it is ready. */
+/* A column the height of the window, so a short page (the first booking step)
+   ends on its footer rather than on a strip of paper beneath it. */
 .route-fade {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
   animation: route-fade-in var(--motion-route) var(--motion-ease) both;
+}
+
+.route-fade > main {
+  flex: 1 0 auto;
 }
 
 @keyframes route-fade-in {
@@ -652,7 +661,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 .text-action--on-dark:hover,
 .text-action--on-dark:focus-visible {
-  color: var(--lavender);
+  color: var(--lavender-soft);
 }
 
 .eyebrow {
@@ -1572,25 +1581,20 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 /*
- * The page reads as an interface rather than a document, so dragging across it
- * should not paint a selection. Anything a student may genuinely need to copy —
- * their booking reference, the manage link, an email address, and every form
- * field — opts back in below.
+ * Text is selectable. This is a language site: students select a phrase to
+ * translate it, copy the WhatsApp number, or paste an error message to Inês,
+ * and a page-wide `user-select: none` took all of that away. Only the controls
+ * opt out, where a double-tap or a drag across the calendar would otherwise
+ * paint a stray selection over the thing being pressed.
  */
-body {
+button,
+summary,
+.button,
+.site-nav,
+.site-footer nav,
+.asset-mark {
   -webkit-user-select: none;
   user-select: none;
-}
-
-input,
-textarea,
-.booking-success__reference dd,
-.booking-success__note,
-.lesson-list__reference,
-.manage-booking__facts dd,
-.schedule-bookings__meta {
-  -webkit-user-select: text;
-  user-select: text;
 }
 
 /* Stepped booking: lesson, then day, then time, then details. Each step gets
@@ -2550,8 +2554,8 @@ html.booking-transitioning .booking-confirmation-stage {
   top: 0.8rem;
   right: 0.85rem;
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 0;
   border-radius: 50%;
@@ -4373,7 +4377,7 @@ html.booking-transitioning .booking-confirmation-stage {
    which is how "Edit details" ended up looking like a second Sign out. */
 button.text-action {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   border: 0;
@@ -4682,6 +4686,13 @@ button.text-action {
 
 .upcoming-lessons__title-line .eyebrow {
   margin-bottom: 0;
+}
+
+/* The mark stays 28px; its touch area reaches 44px. */
+.upcoming-lessons__hint::after {
+  position: absolute;
+  inset: -8px;
+  content: "";
 }
 
 .upcoming-lessons__hint {
@@ -5332,6 +5343,50 @@ button.text-action {
 .booking-form-note strong {
   color: var(--coral-action);
   white-space: nowrap;
+}
+
+.booking-recurring-rate {
+  margin-bottom: 1.1rem;
+  border-bottom: 1px solid var(--rule-soft);
+  padding-bottom: 1rem;
+}
+
+.booking-recurring-rate > p {
+  margin: 0 0 0.35rem;
+}
+
+.booking-recurring-rate summary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--lavender-ink);
+  cursor: pointer;
+  font-family: var(--ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.booking-recurring-rate summary:hover,
+.booking-recurring-rate summary:focus-visible {
+  color: var(--coral-action);
+}
+
+.booking-recurring-rate details[open] > summary,
+details.booking-recurring-rate[open] > summary {
+  margin-bottom: 0.6rem;
+}
+
+.booking-payment {
+  display: grid;
+  gap: 1rem;
+}
+
+.booking-payment__summary {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
 }
 
 .booking-agreement {
@@ -6255,7 +6310,7 @@ dialog[open]::backdrop {
 
 .site-footer__nav a:hover,
 .site-footer__contact a:hover {
-  color: var(--lavender);
+  color: var(--lavender-soft);
 }
 
 .site-footer__legal {
@@ -6272,7 +6327,7 @@ dialog[open]::backdrop {
 
 .site-footer__legal a {
   display: inline-flex;
-  min-height: 32px;
+  min-height: 44px;
   align-items: center;
 }
 
@@ -7080,7 +7135,7 @@ dialog[open]::backdrop {
   display: inline-flex;
   width: fit-content;
   max-width: 100%;
-  min-height: 36px;
+  min-height: 44px;
   align-items: center;
   gap: 0.4rem;
   color: var(--blue-deep);

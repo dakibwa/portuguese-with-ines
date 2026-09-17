@@ -62,14 +62,20 @@ async function adminRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(`${BOOKING_API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BOOKING_API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      },
+    });
+  } catch {
+    // The browser's own "Failed to fetch" says nothing useful to Inês.
+    throw new Error("We couldn't reach the booking system. Please check your connection.");
+  }
 
   const data = (await response.json().catch(() => ({}))) as T & {
     error?: string;

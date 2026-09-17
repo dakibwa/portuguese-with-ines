@@ -65,13 +65,23 @@ export const CONTACT_WHATSAPP_NUMBER = "+351 963 161 134";
 export const CONTACT_WHATSAPP_URL = "https://wa.me/351963161134";
 export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "";
 
+/**
+ * Whole euros print bare ("€25"); anything else keeps its cents ("€22.50").
+ * Rounding to whole euros showed a €22.50 private rate as "€23" on the button
+ * that asks the student to agree to the price.
+ */
 export function formatMoney(cents = LESSON_PRICE_CENTS, currency = LESSON_CURRENCY) {
+  const fraction = cents % 100 === 0 ? 0 : 2;
   return new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: currency.toUpperCase(),
-    maximumFractionDigits: 0
+    minimumFractionDigits: fraction,
+    maximumFractionDigits: fraction
   }).format(cents / 100);
 }
+
+/** The same-day change fee, which is also what a no-show costs. */
+export const SAME_DAY_FEE_LABEL = formatMoney(SAME_DAY_RESCHEDULE_FEE_CENTS);
 
 /**
  * Plain minutes, always. Rendering hours split the site against itself: the

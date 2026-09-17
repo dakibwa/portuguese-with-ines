@@ -21,6 +21,7 @@ import {
   browserTimeZone,
   buildBookingWeeks,
   differingLocalTime,
+  formatSlotTimeForStudent,
   formatBookedLessonLabel,
   formatLongDate,
   formatMoneyCents,
@@ -59,7 +60,7 @@ function historyTime(booking: MyBooking) {
   return Date.parse(booking.status === "cancelled" && booking.cancelledAt ? booking.cancelledAt : booking.endAt);
 }
 
-function HistoryLessonCard({ booking }: { booking: MyBooking }) {
+function HistoryLessonCard({ booking, zone }: { booking: MyBooking; zone: string }) {
   const cancelled = booking.status === "cancelled";
 
   return (
@@ -76,7 +77,7 @@ function HistoryLessonCard({ booking }: { booking: MyBooking }) {
             {cancelled ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
             {cancelled ? "Cancelled" : "Completed"}
           </span>
-          <strong>{formatLongDate(booking.startAt)}, {formatSlotTime(booking.startAt)}</strong>
+          <strong>{formatLongDate(booking.startAt)}, {formatSlotTimeForStudent(booking.startAt, zone)}</strong>
           <span>
             {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}
           </span>
@@ -134,6 +135,7 @@ export function MyLessons({
   const [savingName, setSavingName] = useState(false);
   const [savingNif, setSavingNif] = useState(false);
   const [emailPending, setEmailPending] = useState("");
+  const [emailBusy, setEmailBusy] = useState(false);
   const [detailsNote, setDetailsNote] = useState("");
   const [feeCents, setFeeCents] = useState(500);
   const [loading, setLoading] = useState(true);
@@ -345,6 +347,9 @@ export function MyLessons({
   }
 
   async function changeEmail() {
+    // Each request sends two emails, so a double-click must not send four.
+    if (emailBusy) return;
+    setEmailBusy(true);
     setError("");
     setDetailsNote("");
     try {
@@ -352,6 +357,8 @@ export function MyLessons({
       setEmailPending(result.pending);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That could not be sent.");
+    } finally {
+      setEmailBusy(false);
     }
   }
 
@@ -720,7 +727,7 @@ export function MyLessons({
                 of the two: nothing moves until the new address answers. */}
             <button
               className="button button--blue"
-              disabled={!details.email.trim() || details.email.trim() === student.email}
+              disabled={emailBusy || !details.email.trim() || details.email.trim() === student.email}
               onClick={changeEmail}
               type="button"
             >
@@ -832,7 +839,7 @@ export function MyLessons({
                         {isSeries ? <Repeat size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
                         {isSeries ? "Recurring lesson" : "Booked"}
                       </span>
-                      <strong>{isSeries ? "Next: " : ""}{formatLongDate(nextBooking.startAt)}, {formatSlotTime(nextBooking.startAt)}</strong>
+                      <strong>{isSeries ? "Next: " : ""}{formatLongDate(nextBooking.startAt)}, {formatSlotTimeForStudent(nextBooking.startAt, zone)}</strong>
                       <span>
                         {formatBookedLessonLabel(nextBooking.lessonType)} · {nextBooking.location === "porto" ? "In Porto" : "Online"}
                       </span>
@@ -892,7 +899,7 @@ export function MyLessons({
                           type="button"
                         >
                           <span>
-                            <strong>{formatLongDate(booking.startAt)}, {formatSlotTime(booking.startAt)}</strong>
+                            <strong>{formatLongDate(booking.startAt)}, {formatSlotTimeForStudent(booking.startAt, zone)}</strong>
                             <small>{formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}</small>
                           </span>
                           <span className="upcoming-lesson-group__action">
@@ -922,7 +929,7 @@ export function MyLessons({
           </div>
           {past.length ? (
             <div className="my-lessons__history-bookings">
-              {past.map((booking) => <HistoryLessonCard booking={booking} key={booking.reference} />)}
+              {past.map((booking) => <HistoryLessonCard booking={booking} key={booking.reference} zone={zone} />)}
             </div>
           ) : (
             <p className="booking-state-note">No past lessons yet.</p>
@@ -1048,7 +1055,7 @@ export function MyLessons({
         <section className="my-lessons__group">
           <h2>History</h2>
           <div className="my-lessons__history-bookings">
-            {past.map((booking) => <HistoryLessonCard booking={booking} key={booking.reference} />)}
+            {past.map((booking) => <HistoryLessonCard booking={booking} key={booking.reference} zone={zone} />)}
           </div>
         </section>
       ) : null}

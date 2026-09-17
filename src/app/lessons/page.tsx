@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/page-metadata";
 import Link from "next/link";
 import { AssetMark } from "@/components/BrandMarks";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { lessonProducts } from "@/lib/lesson-products";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Lessons | Português com a Inês",
-  description: "Prices for one-to-one Portuguese lessons, online or in person."
-};
+  description: "Prices for one-to-one Portuguese lessons, online or in person.",
+  path: "/lessons/"
+});
 
 export default function LessonsPage() {
   return (

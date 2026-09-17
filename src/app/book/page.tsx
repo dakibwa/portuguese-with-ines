@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/page-metadata";
 import { preconnect } from "react-dom";
 import { BookingFlow } from "@/components/BookingFlow";
 import { BOOKING_API_BASE_URL } from "@/lib/config";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Booking | Português com a Inês",
-  description: "Book a one-to-one Portuguese lesson, online or in person."
-};
+  description: "Book a one-to-one Portuguese lesson, online or in person.",
+  path: "/book/"
+});
 
 /**
  * Ask for the lessons before React exists.

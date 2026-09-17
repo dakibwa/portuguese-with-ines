@@ -16,6 +16,9 @@ export function ResetPassword() {
     const found = new URLSearchParams(window.location.search).get("token");
     if (!found) setError("This page needs the link from your reset email.");
     setToken(found);
+    // The token is held in state from here; it has no reason to stay in the
+    // address bar, the history entry or a screenshot.
+    if (found) window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
   async function submit(event: FormEvent) {

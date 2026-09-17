@@ -41,6 +41,15 @@ export function AuthPanel({
   const [form, setForm] = useState({ name: "", email: "", password: "", nif: "" });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  // A stale error never follows the student to another form. The "reset link is
+  // on its way" notice does stay when they go back to sign in: that is where
+  // they wait for it.
+  function switchMode(next: Mode) {
+    setError("");
+    if (next !== "signin") setNotice("");
+    setMode(next);
+  }
   const [busy, setBusy] = useState(false);
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const introText =
@@ -113,7 +122,7 @@ export function AuthPanel({
           <button
             aria-selected={mode === "register"}
             className={mode === "register" ? "is-active" : ""}
-            onClick={() => setMode("register")}
+            onClick={() => switchMode("register")}
             role="tab"
             type="button"
           >
@@ -122,7 +131,7 @@ export function AuthPanel({
           <button
             aria-selected={mode === "signin"}
             className={mode === "signin" ? "is-active" : ""}
-            onClick={() => setMode("signin")}
+            onClick={() => switchMode("signin")}
             role="tab"
             type="button"
           >
@@ -222,11 +231,11 @@ export function AuthPanel({
 
       <p className="auth-panel__aside">
         {mode === "forgot" ? (
-          <button className="auth-panel__link" onClick={() => setMode("signin")} type="button">
+          <button className="auth-panel__link" onClick={() => switchMode("signin")} type="button">
             Back to signing in
           </button>
         ) : (
-          <button className="auth-panel__link" onClick={() => setMode("forgot")} type="button">
+          <button className="auth-panel__link" onClick={() => switchMode("forgot")} type="button">
             I&rsquo;ve forgotten my password
           </button>
         )}
