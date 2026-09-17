@@ -113,9 +113,10 @@ depending on them having kept the right confirmation email.
   and anything it does not cover is coral that looks like a button and is not.
 - **Only one JavaScript origin is registered**: `https://portuguesewithines.com`.
   Google's ID-token flow consults that list and ignores the redirect URIs, so the
-  button renders anywhere but can only complete there. Local development and the
-  `dakibwa.github.io` preview both ship the client id and both fail on click
-  until their origins are added to the OAuth client.
+  button renders anywhere but can only complete there. Local development ships
+  the client id and fails on click until its origin is added to the OAuth
+  client. (The `dakibwa.github.io` preview behaved the same way until it was
+  retired on 17 September 2026.)
 - **Which tab leads follows who is likely to be there.** At the end of a booking
   the panel opens on *Create an account*, because almost nobody reaching that
   step has booked before; `/my-lessons` and `/schedule` open on *I have an

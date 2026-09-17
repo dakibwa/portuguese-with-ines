@@ -1,9 +1,13 @@
 name: Build and publish site
 
 # Cloudflare Pages is the publication destination — it serves both live custom
-# domains. GitHub Pages is a preview of the same build at dakibwa.github.io and
-# is not what visitors see. Both deploy from one build so the preview cannot
-# drift from what actually shipped.
+# domains, and it is the only place this workflow publishes.
+#
+# Until 17 September 2026 the same build also went to GitHub Pages as a preview
+# at dakibwa.github.io. That only worked while this repository was named
+# dakibwa.github.io and owned the root of that host: the export is built for
+# `/`, so under a project path every asset would 404. The preview went when the
+# repository was renamed to portuguese-with-ines.
 #
 # Before this workflow existed, publishing meant remembering to run
 # `npm run deploy:cloudflare` by hand after merging. Pushing to main updated
@@ -21,8 +25,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -98,16 +100,10 @@ jobs:
           QA_BASE_URL=http://localhost:3000 node scripts/qa-teacher-meet.mjs
           QA_BASE_URL=http://localhost:3000 node scripts/qa-student-nif.mjs
 
-      # Two uploads of one build: the Pages-shaped tarball for the preview, and
-      # the plain directory the Cloudflare deploy needs. Hidden files are kept
+      # The plain directory the Cloudflare deploy needs. Hidden files are kept
       # because the export carries dotfiles the deploy would otherwise lose;
       # _headers is not one of them, but it does have to survive the round trip,
       # since it is the whole cache policy.
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: out
-
       - name: Upload build for Cloudflare
         uses: actions/upload-artifact@v4
         with:
@@ -149,15 +145,3 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy out --project-name=portuguese-with-ines --branch=main
-
-  deploy-preview:
-    name: Deploy preview to GitHub Pages
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4

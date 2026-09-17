@@ -225,8 +225,10 @@ Worker's Custom Domains configuration, separately from the main website build.
 
 **Merging to `main` publishes the site.** `.github/workflows/deploy-pages.yml`
 builds once and deploys that build to Cloudflare Pages, which is what the live
-domains serve. The same build also goes to GitHub Pages at `dakibwa.github.io`
-as a preview, so the two cannot drift.
+domains serve. There is no GitHub Pages preview any more: it needed the root of
+`dakibwa.github.io`, which went when the repository was renamed from
+`dakibwa/dakibwa.github.io` to `dakibwa/portuguese-with-ines` on
+17 September 2026.
 
 This needs two repository secrets, under Settings → Secrets and variables →
 Actions. Without them the publish job fails loudly rather than skipping, because
@@ -246,10 +248,10 @@ npm run deploy:cloudflare
 Until August 2026 that manual command was the *only* way to publish, and it is
 worth knowing the failure it caused. Pushing to `main` updated only the preview,
 so a release could look complete from every angle that is normally checked —
-commit on `main`, Actions green, `dakibwa.github.io` showing the change — while
-visitors were still served the previous build. If you are ever verifying a
-release here, check `https://portuguesewithines.com/` itself, not the workflow
-result and not the preview.
+commit on `main`, Actions green, the old `dakibwa.github.io` preview showing the
+change — while visitors were still served the previous build. If you are ever
+verifying a release here, check `https://portuguesewithines.com/` itself, not
+the workflow result.
 
 The alias is a separate Pages redirect project so it cannot accidentally serve
 a duplicate copy of the site. It is not part of the workflow, since its
