@@ -164,7 +164,7 @@ const faqSections = [
           "You can find prices on the lessons page. You’ll also see the price when you book, before you confirm."
       },
       {
-        question: "What if the trial lesson isn’t for me?",
+        question: "What happens if I don’t want to continue my lessons?",
         answer: `That’s completely fine. The trial costs ${trialLesson.price}, and there’s no obligation to book another lesson.`
       }
     ]
