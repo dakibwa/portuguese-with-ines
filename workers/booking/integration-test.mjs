@@ -251,7 +251,7 @@ await test("recurring booking creation snapshots rate for every occurrence; one-
   assert.equal(one.status, 201);
   assert.equal((await one.json()).booking.amountCents, 2500);
 });
-await test("same-day cancellation records and charges just one separate fee under concurrent retries", async () => {
+await test("a cancellation inside 14 hours records and charges just one separate fee under concurrent retries", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   booking("same-day-cancel", { start: "2026-09-05T12:00:00.000Z", end: "2026-09-05T13:00:00.000Z" });
   const path = `/bookings/${await token("same-day-cancel")}/cancel`;
@@ -291,7 +291,7 @@ await test("opening, unchanged submission and failed move never charge a fee", a
   assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id='no-action'").get().same_day_fee_status, "not_required");
   db.prepare("UPDATE bookings SET status='cancelled' WHERE id='no-action'").run();
 });
-await test("same-day move preserves agreed price, charges once, then lesson only at new end", async () => {
+await test("a move inside 14 hours preserves agreed price, charges once, then lesson only at new end", async () => {
   booking("same-day-move", { start: "2026-09-05T16:00:00.000Z", end: "2026-09-05T17:00:00.000Z" });
   const result = await call(`/bookings/${await token("same-day-move")}/reschedule`, { body: { startAt: "2026-09-08T14:00:00.000Z" } });
   assert.equal(result.status, 200, await result.clone().text());
@@ -300,6 +300,26 @@ await test("same-day move preserves agreed price, charges once, then lesson only
   assert.equal(charges.filter((charge) => charge.key.includes("same-day-move")).length, 1);
   await chargeDueLessons(env, new Date("2026-09-08T15:00:00Z"));
   assert.deepEqual(charges.filter((charge) => charge.key.includes("same-day-move")).map((charge) => charge.amount), [500, 1500]);
+});
+await test("13.5 hours ahead on the next Porto day is late; lesson-day wording keeps its promise", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  // 00:30 Porto on Sunday, from 11:00 Porto on Saturday: another calendar day.
+  booking("next-day-late", { start: "2026-09-05T23:30:00.000Z", end: "2026-09-06T00:30:00.000Z" });
+  booking("next-day-legacy", { start: "2026-09-06T01:00:00.000Z", end: "2026-09-06T02:00:00.000Z" });
+  db.prepare("UPDATE bookings SET payment_consent_version='2026-09-01-after-lesson-v1' WHERE id='next-day-legacy'").run();
+  const opened = await (await call(`/bookings/${await token("next-day-late")}`, { method: "GET" })).json();
+  assert.equal(opened.sameDayFeeApplies, true);
+  const late = await call(`/bookings/${await token("next-day-late")}/cancel`);
+  assert.equal(late.status, 200, await late.clone().text());
+  assert.equal((await late.json()).sameDayFeeApplied, true);
+  const legacy = await call(`/bookings/${await token("next-day-legacy")}/cancel`);
+  assert.equal(legacy.status, 200, await legacy.clone().text());
+  assert.equal((await legacy.json()).sameDayFeeApplied, false);
+  await drain();
+  await chargeDueSameDayFees(env);
+  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id='next-day-late'").get().same_day_fee_status, "paid");
+  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id='next-day-legacy'").get().same_day_fee_status, "not_required");
+  assert.deepEqual(charges.filter((charge) => charge.key.includes("next-day")).map((charge) => charge.amount), [500]);
 });
 await test("teacher move and cancellation have no student action fee and cannot alter processing charges", async () => {
   booking("teacher-action", { start: "2026-09-05T18:00:00.000Z", end: "2026-09-05T19:00:00.000Z" });
@@ -825,7 +845,7 @@ await test("every email Inês gets about a student's lessons carries the NIF her
     const rows = db.prepare("SELECT * FROM bookings WHERE id='teacher-copy-nif'").all();
     await notifySeries(env, {
       rows, lessonType: db.prepare("SELECT * FROM lesson_types WHERE id='single'").get(),
-      settings: { teacherName: "Inês", teacherEmail: "ines@example.invalid", sameDayChangeFeeCents: 500 },
+      settings: { teacherName: "Inês", teacherEmail: "ines@example.invalid", sameDayChangeFeeCents: 500, minimumNoticeHours: 14 },
       series: { id: "series-nif", occurrences: 1 }, manageUrls: { "teacher-copy-nif": "https://lesson.example/book/?manage=x" }, skipped: []
     });
     await drain();
@@ -845,7 +865,7 @@ await test("every email Inês gets about a student's lessons carries the NIF her
     "students' booking emails don't repeat it");
 });
 
-await test("a paid same-day fee reminds Inês to issue its fiscal document once, with the NIF", async () => {
+await test("a paid late change fee reminds Inês to issue its fiscal document once, with the NIF", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   db.prepare("UPDATE students SET nif='123456789' WHERE id='alice'").run();
   booking("fee-receipt", { start: "2026-09-05T15:00:00.000Z", end: "2026-09-05T16:00:00.000Z" });
@@ -870,8 +890,9 @@ await test("a paid same-day fee reminds Inês to issue its fiscal document once,
   assert.match(reminders[0].text, /Portal das Finanças/);
   assert.match(reminders[0].text, /^Reference: fee-receipt$/m);
   assert.match(reminders[0].text, /^NIF: 123456789$/m);
-  const receipt = sentEmails.find((email) => email.to[0] === "alice@example.invalid" && email.subject.startsWith("Same-day change fee paid"));
+  const receipt = sentEmails.find((email) => email.to[0] === "alice@example.invalid" && email.subject.startsWith("Late change fee paid"));
   assert.match(receipt.text, /^NIF: 123456789 · on your receipt from Inês$/m);
+  assert.match(receipt.text, /less than 14 hours before it/);
 });
 
 await test("Inês's lesson list carries each student's NIF, and students cannot read it", async () => {

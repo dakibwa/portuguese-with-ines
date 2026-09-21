@@ -108,11 +108,13 @@ request only competes with the fonts for no gain.
   One card setup and one combined calendar email cover the whole selection;
   each lesson retains its individual payment and management rules. This change
   is implemented locally and awaits preview approval and Worker/site release.
-- The rescheduling rule is free before the lesson day, with a €5 fee charged
-  automatically for a move or cancellation on the lesson day in Porto time.
-  During the lesson window Inês can mark a no-show; that replaces the full
-  lesson charge with €5 when the lesson ends. One booking can incur the
-  same-day action fee only once.
+- One 14-hour rule covers booking, moving and cancelling. Moving or
+  cancelling is free while the lesson is at least 14 elapsed hours away;
+  inside that window it costs €5, charged automatically to the saved card.
+  Bookings made under the earlier "free until the lesson day" wording pay only
+  when both rules would charge. During the lesson window Inês can mark a
+  no-show; that replaces the full lesson charge with €5 when the lesson ends.
+  One booking can incur the late change fee only once.
 
 ## Run and verify
 

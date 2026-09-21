@@ -29,6 +29,7 @@ import { buildCalendarInvite, buildCalendarSeriesInvite, calendarUid } from "./i
 import { normaliseWeeks, occurrenceInstants, outstandingFor, slotOf, SERIES_LENGTHS } from "./series.mjs";
 import { createManageToken, readManageToken, safeEqual, bookingReference } from "./tokens.mjs";
 import {
+  PAYMENT_CONSENT_VERSION,
   amountAfterLessonTypeChange,
   changePolicy,
   lessonTypeChangeProblem,
@@ -1076,7 +1077,8 @@ function seriesEmailFixture() {
       teacherName: "Inês Dias Baía",
       teacherEmail: "ines@example.com",
       replyToEmail: "ines@example.com",
-      sameDayChangeFeeCents: 500
+      sameDayChangeFeeCents: 500,
+      minimumNoticeHours: 14
     },
     manageUrls: {
       one: "https://portuguesewithines.com/book/?manage=one",
@@ -1235,34 +1237,60 @@ await test("a single invitation is unchanged by the series refactor", () => {
   assert.ok(ics.startsWith("BEGIN:VCALENDAR"));
 });
 
-// --- Prepaid change policy --------------------------------------------------
+// --- Change policy ----------------------------------------------------------
 //
-// The one-rule policy: money locks the lesson's own Porto day. These pin the
-// matrix down because every branch is customer-visible — a wrong `locked`
-// either strands a student or lets a paid slot leak, and a wrong
-// `refundOnCancel` is money.
+// One 14-hour rule: inside the window a saved-card change costs EUR 5 and an
+// older paid lesson locks. These pin the matrix down because every branch is
+// customer-visible — a wrong `locked` either strands a student or lets a paid
+// slot leak, and a wrong `feeApplies` or `refundOnCancel` is money.
 
-await test("a paid lesson on its own Porto day is locked, with no refund path", () => {
+await test("a paid lesson inside the 14-hour window is locked, with no refund path", () => {
   const row = { payment_status: "paid", starts_at: "2026-09-09T16:30:00.000Z" };
   const policy = changePolicy(row, new Date("2026-09-09T08:00:00.000Z"));
   assert.equal(policy.locked, true);
   assert.equal(policy.refundOnCancel, false);
 });
 
-await test("a paid lesson cancelled ahead of its day refunds and is not locked", () => {
+await test("a paid lesson cancelled 14 hours or more ahead refunds and is not locked", () => {
   const row = { payment_status: "paid", starts_at: "2026-09-09T16:30:00.000Z" };
-  // Midday Porto time on the 8th — clearly the day before.
+  // Midday Porto time on the 8th — 29.5 hours ahead.
   const policy = changePolicy(row, new Date("2026-09-08T11:00:00.000Z"));
   assert.equal(policy.locked, false);
   assert.equal(policy.refundOnCancel, true);
 });
 
-await test("the day boundary is Porto's, not UTC's", () => {
-  // 23:30 UTC on the 8th is already the 9th in Porto during summer (WEST).
-  const row = { payment_status: "paid", starts_at: "2026-09-09T16:30:00.000Z" };
-  const policy = changePolicy(row, new Date("2026-09-08T23:30:00.000Z"));
-  assert.equal(policy.sameDay, true);
-  assert.equal(policy.locked, true);
+await test("exactly 14 hours ahead is free; any later is a EUR 5 change", () => {
+  const row = { payment_status: "scheduled", starts_at: "2026-09-10T08:00:00.000Z" };
+  const boundary = changePolicy(row, new Date("2026-09-09T18:00:00.000Z"));
+  assert.equal(boundary.late, false);
+  assert.equal(boundary.feeApplies, false);
+  const justInside = changePolicy(row, new Date("2026-09-09T18:00:01.000Z"));
+  assert.equal(justInside.late, true);
+  assert.equal(justInside.feeApplies, true);
+  assert.equal(justInside.locked, false);
+  // The window follows the live notice setting rather than a second number.
+  assert.equal(changePolicy(row, new Date("2026-09-09T08:00:00.000Z"), 24).feeApplies, false);
+  assert.equal(changePolicy(row, new Date("2026-09-09T08:00:01.000Z"), 24).feeApplies, true);
+});
+
+await test("the evening before is inside the window, whatever the calendar day", () => {
+  // 09:00 Porto lesson; 22:00 Porto the night before is 11 hours ahead.
+  const row = { payment_status: "scheduled", payment_consent_version: PAYMENT_CONSENT_VERSION, starts_at: "2026-09-10T08:00:00.000Z" };
+  assert.equal(changePolicy(row, new Date("2026-09-09T21:00:00.000Z")).feeApplies, true);
+  // 22:30 Porto lesson; 08:00 Porto the same day is 14.5 hours ahead.
+  const evening = { ...row, starts_at: "2026-09-10T21:30:00.000Z" };
+  assert.equal(changePolicy(evening, new Date("2026-09-10T07:00:00.000Z")).feeApplies, false);
+});
+
+await test("a booking made under the lesson-day wording is never charged more than it agreed", () => {
+  const legacy = { payment_status: "scheduled", payment_consent_version: "2026-09-01-after-lesson-v1", starts_at: "2026-09-10T08:00:00.000Z" };
+  // 11 hours ahead but the day before: free under the wording they accepted.
+  assert.equal(changePolicy(legacy, new Date("2026-09-09T21:00:00.000Z")).feeApplies, false);
+  // On the day and inside 14 hours: both rules charge.
+  assert.equal(changePolicy(legacy, new Date("2026-09-10T06:00:00.000Z")).feeApplies, true);
+  // On the day but more than 14 hours ahead: the new rule is kinder.
+  const evening = { ...legacy, starts_at: "2026-09-10T21:30:00.000Z" };
+  assert.equal(changePolicy(evening, new Date("2026-09-10T06:00:00.000Z")).feeApplies, false);
 });
 
 await test("an unpaid booking is never locked and never refunded", () => {
@@ -1282,11 +1310,12 @@ await test("a pending payment is not treated as paid", () => {
   assert.equal(policy.locked, false);
 });
 
-await test("a scheduled saved-card lesson stays changeable on its day", () => {
+await test("a scheduled saved-card lesson stays changeable inside the window", () => {
   const row = { payment_status: "scheduled", starts_at: "2026-09-09T16:30:00.000Z" };
   const onDay = changePolicy(row, new Date("2026-09-09T08:00:00.000Z"));
   assert.equal(onDay.locked, false);
-  assert.equal(onDay.sameDay, true);
+  assert.equal(onDay.late, true);
+  assert.equal(onDay.feeApplies, true);
   const ahead = changePolicy(row, new Date("2026-09-08T11:00:00.000Z"));
   assert.equal(ahead.locked, false);
   assert.equal(ahead.refundOnCancel, false);
@@ -1324,7 +1353,7 @@ await test("a no-show can only be changed after the lesson starts and before its
   assert.match(noShowProblem({ ...row, payment_status: "processing" }, new Date("2026-09-09T16:30:00.000Z")), /already started/i);
 });
 
-await test("bulk sequence cancellation keeps today and refunds only paid future lessons", () => {
+await test("bulk sequence cancellation keeps a lesson inside the window and refunds only paid future lessons", () => {
   const today = { id: "today", payment_status: "scheduled", starts_at: "2026-09-09T16:30:00.000Z" };
   const paid = { id: "paid", payment_status: "paid", starts_at: "2026-09-16T16:30:00.000Z" };
   const scheduled = { id: "scheduled", payment_status: "scheduled", starts_at: "2026-09-23T16:30:00.000Z" };

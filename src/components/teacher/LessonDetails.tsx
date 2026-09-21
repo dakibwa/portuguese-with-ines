@@ -170,9 +170,9 @@ export function LessonDetails({
         <p className="teacher-inline-notice">No-show · {SAME_DAY_FEE_LABEL} after this lesson</p>
       ) : null}
       {booking.same_day_fee_status === "paid" ? (
-        <p className="teacher-inline-notice">{SAME_DAY_FEE_LABEL} same-day fee paid</p>
+        <p className="teacher-inline-notice">{SAME_DAY_FEE_LABEL} late change fee paid</p>
       ) : booking.same_day_change ? (
-        <p className="teacher-inline-notice">{SAME_DAY_FEE_LABEL} same-day fee due</p>
+        <p className="teacher-inline-notice">{SAME_DAY_FEE_LABEL} late change fee due</p>
       ) : null}
       {booking.payment_status === "payment_due" ? (
         <p className="teacher-inline-notice">

@@ -27,6 +27,7 @@ import {
   verifyWebhook
 } from "./stripe.mjs";
 import {
+  PAYMENT_CONSENT_VERSION,
   changePolicy,
   lessonTypeChangeProblem,
   planSeriesCancellation
@@ -61,7 +62,6 @@ import { bookingSelection, claimSelection } from "./selection.mjs";
 import { calendarOwnsTeacherInvites, calendarConnectionStatus, startCalendarConnection, finishCalendarConnection, prepareMeeting, meetingUrl, markMeetingNotified, syncPendingMeetings } from "./meeting-service.mjs";
 
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" };
-const PAYMENT_CONSENT_VERSION = "2026-09-01-after-lesson-v1";
 
 function corsHeaders(request, env) {
   const origin = request.headers.get("Origin") ?? "";
@@ -311,10 +311,12 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
     });
 
   const automaticSameDayFee = row.payment_status === "scheduled" || row.payment_status === "processing";
+  const fee = `€${(settings.sameDayChangeFeeCents / 100).toFixed(0)}`;
+  const notice = `${settings.minimumNoticeHours} hours`;
   const sameDayNotice = row.same_day_change
-    ? `This change was made on the day of the lesson, so the €${(settings.sameDayChangeFeeCents / 100).toFixed(
-        0
-      )} same-day fee ${automaticSameDayFee ? "is charged automatically to your saved card" : "applies"}.`
+    ? `This change was made less than ${notice} before the lesson, so the ${fee} fee ${
+        automaticSameDayFee ? "is charged automatically to your saved card" : "applies"
+      }.`
     : "";
 
   // Subjects carry the date, not the reference: "PT-LS29CT" tells the reader
@@ -322,18 +324,11 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const shortWhen = formatShort(start, PORTO);
   const lessonTypeChanged = Boolean(previousLessonType && previousLessonType.id !== lessonType.id);
 
-  // Older already-paid bookings retain their earlier lock/refund promise.
-  // Current saved-card bookings stay changeable on the day for EUR 5.
-  const paidChangeFooter =
-    "Move or cancel free until the day before. No changes or refunds on the lesson day.";
-  const savedCardChangeFooter = `Move or cancel free until the day before (Porto time). Same-day changes or cancellations cost €${(
-    settings.sameDayChangeFeeCents / 100
-  ).toFixed(0)}. A no-show costs €${(
-    settings.sameDayChangeFeeCents / 100
-  ).toFixed(0)} instead of the lesson price.`;
-  const unpaidChangeFooter = `Need to change it? Use the link above. Changing on the day of the lesson costs €${(
-    settings.sameDayChangeFeeCents / 100
-  ).toFixed(0)}; any earlier is free.`;
+  // Older already-paid bookings lock inside the window instead of paying.
+  // Current saved-card bookings stay changeable there for EUR 5.
+  const paidChangeFooter = `Move or cancel free until ${notice} before the lesson. After that, it can't be changed or refunded.`;
+  const savedCardChangeFooter = `Move or cancel free until ${notice} before the lesson. After that, moving or cancelling costs ${fee}. A no-show costs ${fee} instead of the lesson price.`;
+  const unpaidChangeFooter = `Need to change it? Use the link above. It's free until ${notice} before the lesson; after that it costs ${fee}.`;
   const refundNote = wasRefunded
     ? `Your €${((row.amount_cents ?? lessonType.price_cents) / 100).toFixed(0)} is on its way back to your card — refunds usually show within a few days.`
     : "";
@@ -413,13 +408,13 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         ? `You moved ${row.student_name}'s lesson — ${shortWhen}`
         : lessonTypeChanged
           ? `Lesson changed — ${row.student_name}, ${shortWhen}`
-          : `${row.same_day_change ? "Same-day change" : "Lesson moved"} — ${row.student_name}, ${shortWhen}`,
+          : `${row.same_day_change ? "Late change" : "Lesson moved"} — ${row.student_name}, ${shortWhen}`,
       heading: byTeacher
         ? "You moved this lesson"
         : lessonTypeChanged
           ? "Lesson changed"
           : row.same_day_change
-            ? "Changed on the lesson day"
+            ? `Moved less than ${notice} before`
             : "Lesson moved",
       intro: byTeacher
         ? `You moved ${row.student_name}'s lesson${
@@ -433,25 +428,23 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
               previousStartsAt ? ` from ${formatInZone(new Date(previousStartsAt), PORTO)}` : ""
             }. Your calendar has been updated.`,
       callout: row.same_day_change
-        ? `This was changed on the day of the lesson, so the €${(settings.sameDayChangeFeeCents / 100).toFixed(
-            0
-          )} fee ${automaticSameDayFee ? "is charged automatically to the student's saved card" : "is due"}.`
+        ? `This was changed less than ${notice} before the lesson, so the ${fee} fee ${
+            automaticSameDayFee ? "is charged automatically to the student's saved card" : "is due"
+          }.`
         : ""
     },
     cancelled: {
       subject: byTeacher
         ? `You cancelled ${row.student_name}'s lesson — ${shortWhen}`
-        : `${row.same_day_change ? "Same-day cancellation" : "Cancellation"} — ${row.student_name}, ${shortWhen}`,
-      heading: byTeacher ? "You cancelled this lesson" : row.same_day_change ? "Cancelled on the lesson day" : "Lesson cancelled",
+        : `${row.same_day_change ? "Late cancellation" : "Cancellation"} — ${row.student_name}, ${shortWhen}`,
+      heading: byTeacher ? "You cancelled this lesson" : row.same_day_change ? `Cancelled less than ${notice} before` : "Lesson cancelled",
       intro: byTeacher
         ? `You cancelled ${row.student_name}'s lesson on ${formatInZone(start, PORTO)}. They have been told, and it is off your calendar.`
         : `${row.student_name} cancelled their lesson on ${formatInZone(start, PORTO)}. It has been removed from your calendar.`,
       callout: wasRefunded
         ? `€${((row.amount_cents ?? lessonType.price_cents) / 100).toFixed(0)} was refunded automatically — nothing to sort out.`
         : row.same_day_change
-          ? `This was cancelled on the day of the lesson, so the €${(settings.sameDayChangeFeeCents / 100).toFixed(
-              0
-            )} fee applies.`
+          ? `This was cancelled less than ${notice} before the lesson, so the ${fee} fee applies.`
           : ""
     }
   }[event];
@@ -624,13 +617,10 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     },
     ...rowsForBoth.slice(2)
   ];
+  const seriesFee = `€${(settings.sameDayChangeFeeCents / 100).toFixed(0)}`;
   const seriesFooter = seriesOnCard
-    ? `Move or cancel any single lesson free until the day before it. On its Porto calendar day, moving or cancelling costs €${(
-        settings.sameDayChangeFeeCents / 100
-      ).toFixed(0)}. If Inês records a no-show before the lesson ends, only €${(
-        settings.sameDayChangeFeeCents / 100
-      ).toFixed(0)} is charged instead of the lesson price.`
-    : `Changing a lesson on the day it happens costs €${(settings.sameDayChangeFeeCents / 100).toFixed(0)}; any earlier is free.`;
+    ? `Move or cancel any single lesson free until ${settings.minimumNoticeHours} hours before it. After that, moving or cancelling costs ${seriesFee}. If Inês records a no-show before the lesson ends, only ${seriesFee} is charged instead of the lesson price.`
+    : `Moving or cancelling a lesson is free until ${settings.minimumNoticeHours} hours before it; after that it costs ${seriesFee}.`;
   const moved = reason === "moved";
 
   const sends = [];
@@ -1210,7 +1200,7 @@ async function chargeOneSameDayFee(env, bookingId, now = new Date()) {
     bookingId: row.id, purpose: "same-day-fee", customer: student.stripe_customer_id,
     paymentMethod: student.stripe_payment_method,
     amountCents: row.same_day_fee_cents ?? settings.sameDayChangeFeeCents,
-    description: `Same-day lesson change · ${row.reference}`,
+    description: `Late lesson change fee · ${row.reference}`,
     metadata: { booking_reference: row.reference, charge_reason: "same_day_change" }
   };
   await env.DB.prepare("UPDATE bookings SET same_day_fee_request = COALESCE(same_day_fee_request, ?) WHERE id = ?").bind(JSON.stringify(candidate), row.id).run();
@@ -1348,15 +1338,15 @@ async function notifySameDayFeeCharged(env, { row, lessonType, amountCents }) {
   const sends = [
     deliver(env, {
       to: row.student_email,
-      subject: `Same-day change fee paid — ${row.reference}`,
+      subject: `Late change fee paid — ${row.reference}`,
       kind: "student_same_day_fee_paid",
       bookingId: row.id,
       dedupeKey: `same-day-paid:${row.id}`,
       replyTo: settings.replyToEmail || teacherEmail || undefined,
       content: {
-        heading: "Your same-day fee is paid",
+        heading: "Your late change fee is paid",
         preheader: `${lessonType.name} · ${amount}`,
-        intro: `Olá ${row.student_name.split(" ")[0]}, your saved card was charged ${amount} for changing or cancelling this lesson on its Porto calendar day.`,
+        intro: `Olá ${row.student_name.split(" ")[0]}, your saved card was charged ${amount} for moving or cancelling this lesson less than ${settings.minimumNoticeHours} hours before it.`,
         callout: "You will not be charged this fee again for the same lesson.",
         rows: [
           { label: "Reference", value: row.reference },
@@ -1369,6 +1359,9 @@ async function notifySameDayFeeCharged(env, { row, lessonType, amountCents }) {
   ];
 
   // A fee is a payment like any other, so it gets the same fiscal reminder.
+  // Its subject, heading and preheader still say "same-day fee": Inês's
+  // receipt automation classifies payments by those words. Change them only
+  // together with that automation.
   if (teacherEmail) {
     sends.push(
       deliver(env, {
@@ -1381,7 +1374,7 @@ async function notifySameDayFeeCharged(env, { row, lessonType, amountCents }) {
         content: {
           heading: "A same-day fee was paid",
           preheader: `${row.student_name} · same-day fee · ${amount}`,
-          intro: `The ${amount} same-day fee for ${row.student_name}'s lesson was charged successfully.`,
+          intro: `The ${amount} fee for ${row.student_name} moving or cancelling less than ${settings.minimumNoticeHours} hours before their lesson was charged successfully.`,
           callout: "Issue the appropriate Portal das Finanças document for this payment today.",
           rows: [
             { label: "Lesson", value: `${lessonType.name} · ${formatInZone(new Date(row.starts_at), PORTO)}` },
@@ -1415,7 +1408,7 @@ async function recoverySession(env, { row, lessonType, amountCents, purpose }) {
     customer: student?.stripe_customer_id ?? null, forceHosted: true,
     checkoutPurpose: `${purpose}-due`, amountCents,
     recoveryGeneration: previousId ?? "",
-    productName: fee ? "Same-day lesson change fee" : purpose === "no-show" ? "Lesson no-show fee" : lessonType.name,
+    productName: fee ? "Late lesson change fee" : purpose === "no-show" ? "Lesson no-show fee" : lessonType.name,
     productDescription: `${row.reference} · Português com a Inês`,
     successUrl: siteUrl(env, "/book/?view=lessons&paid=1"),
     cancelUrl: studentManageUrl(env, await createManageToken(row.id, env.BOOKING_TOKEN_SECRET))
@@ -1471,7 +1464,7 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
 
   await deliver(env, {
     to: row.student_email,
-    subject: `${isSameDayFee ? "Same-day fee" : isNoShow ? "No-show fee" : "Lesson payment"} — the card didn't go through`,
+    subject: `${isSameDayFee ? "Late change fee" : isNoShow ? "No-show fee" : "Lesson payment"} — the card didn't go through`,
     kind: isSameDayFee ? "student_same_day_fee_due" : "student_payment_due",
     bookingId: row.id,
     dedupeKey: `payment-due:${purpose}:${row.id}`,
@@ -1479,7 +1472,7 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
     content: {
       heading: "The card didn't go through",
       preheader: `${lessonType.name} · ${amount} still to pay`,
-      intro: `Olá ${row.student_name.split(" ")[0]}, we couldn't charge the ${amount} ${isSameDayFee ? "same-day change fee" : isNoShow ? "no-show fee" : "lesson payment"} to your saved card. Please use the secure payment link below.`,
+      intro: `Olá ${row.student_name.split(" ")[0]}, we couldn't charge the ${amount} ${isSameDayFee ? "late change fee" : isNoShow ? "no-show fee" : "lesson payment"} to your saved card. Please use the secure payment link below.`,
       callout: "",
       rows: [
         { label: "Lesson", value: `${lessonType.name} · ${lessonType.duration_minutes} minutes` },
@@ -1503,7 +1496,7 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
       content: {
         heading: "A card didn't go through",
         preheader: `${row.student_name} · ${lessonType.name} · ${amount}`,
-        intro: `${row.student_name}'s ${amount} ${isSameDayFee ? "same-day fee" : isNoShow ? "no-show fee" : "lesson payment"} couldn't be charged automatically. They've been sent a secure payment link.`,
+        intro: `${row.student_name}'s ${amount} ${isSameDayFee ? "late change fee" : isNoShow ? "no-show fee" : "lesson payment"} couldn't be charged automatically. They've been sent a secure payment link.`,
         callout: "",
         rows: [
           { label: "Student", value: `${row.student_name}\n${row.student_email}` },
@@ -2392,10 +2385,10 @@ async function handleStopSeries(request, env, ctx, seriesId) {
       .bind(seriesId, now.toISOString())
       .all();
 
-    // A bulk action must not become a shortcut around the same-day promise.
-    // Keep today's occurrence, even for an older pay-in-person series whose
-    // individual route still uses its original same-day fee terms.
-    const plan = planSeriesCancellation(results ?? [], now);
+    // A bulk action must not become a shortcut around the 14-hour rule. Keep
+    // any occurrence inside the fee window; the student can still cancel it
+    // individually and pay the fee.
+    const plan = planSeriesCancellation(results ?? [], now, (await loadSettings(env)).minimumNoticeHours);
     kept = plan.kept.length;
     cancellationPlan = plan.cancellable;
 
@@ -2475,9 +2468,10 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
   const rows = results ?? [];
   if (!rows.length) return fail("There are no upcoming lessons in this sequence to move.", 409, request, env);
 
-  // Moving a whole run must not become a route around the day-of-lesson rule.
-  if (rows.some((row) => dateKey(now, PORTO) === dateKey(new Date(row.starts_at), PORTO))) {
-    return fail("Today's lesson stays where it is. Move any later lessons individually, or try again after today.", 409, request, env);
+  // Moving a whole run must not become a route around the 14-hour rule.
+  const { minimumNoticeHours } = await loadSettings(env);
+  if (rows.some((row) => changePolicy(row, now, minimumNoticeHours).late)) {
+    return fail(`Your next lesson is less than ${minimumNoticeHours} hours away, so it stays where it is. Move it on its own, or try again after it.`, 409, request, env);
   }
 
   const body = await readJson(request);
@@ -2690,15 +2684,15 @@ async function handleGetBooking(request, env, token) {
   const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
   const settings = await loadSettings(env);
 
-  const policy = changePolicy(row);
+  const policy = changePolicy(row, new Date(), settings.minimumNoticeHours);
 
   return json(
     {
       booking: publicBooking(row, lessonType, settings),
       isPast: new Date(row.starts_at) <= new Date(),
-      // A saved-card booking charges the fee automatically; an older
-      // pay-in-person booking keeps the terms it was made under.
-      sameDayFeeApplies: !policy.paid && policy.sameDay,
+      // The field keeps its original name for the site; it now means "inside
+      // the 14-hour window". A saved-card booking charges the fee automatically.
+      sameDayFeeApplies: policy.feeApplies,
       sameDayFeeAutomatic: policy.scheduled,
       changeLocked: policy.locked,
       refundOnCancel: policy.refundOnCancel,
@@ -2725,9 +2719,11 @@ async function handleReschedule(request, env, ctx, token) {
 
   // Only an older already-paid lesson is locked. A current saved-card lesson
   // stays changeable and the EUR 5 fee is charged below.
-  if (changePolicy(row, now).locked) {
+  const settings = await loadSettings(env);
+  const policy = changePolicy(row, now, settings.minimumNoticeHours);
+  if (policy.locked) {
     return fail(
-      "This lesson is today, so it can't be moved. If something has happened, reply to your confirmation email and Inês will help.",
+      `This lesson is less than ${settings.minimumNoticeHours} hours away, so it can't be moved. If something has happened, reply to your confirmation email and Inês will help.`,
       409,
       request,
       env
@@ -2742,7 +2738,7 @@ async function handleReschedule(request, env, ctx, token) {
   const location = normaliseLocation(body.location, row.location);
 
   if (Number.isFinite(Date.parse(body.startAt)) && Date.parse(body.startAt) === Date.parse(row.starts_at) && lessonType.id === row.lesson_type_id && location === row.location) {
-    return json({ booking: publicBooking(row, lessonType, await loadSettings(env)), sameDayFeeApplied: false }, 200, request, env);
+    return json({ booking: publicBooking(row, lessonType, settings), sameDayFeeApplied: false }, 200, request, env);
   }
 
   const typeChangeProblem = lessonTypeChangeProblem(row, previousLessonType, lessonType);
@@ -2751,16 +2747,15 @@ async function handleReschedule(request, env, ctx, token) {
   const check = await isSlotBookable(env, { startAt: body.startAt, lessonType, now, ignoreBookingId: row.id });
   if (!check.ok) return fail(check.reason, 409, request, env);
 
-  // The fee is for changing on the lesson's own Porto date, judged against the
-  // lesson they are moving away from.
-  const sameDay = dateKey(now, PORTO) === dateKey(new Date(row.starts_at), PORTO) ? 1 : 0;
+  // The fee is for changing inside the 14-hour window, judged against the
+  // lesson they are moving away from. `same_day_change` keeps its column name.
+  const sameDay = policy.late ? 1 : 0;
   const startsAt = new Date(body.startAt).toISOString();
   const endsAt = check.endAt.toISOString();
   const amountCents = await priceForMove(env, row, lessonType);
   if (body.expectedPriceCents !== undefined && body.expectedPriceCents !== amountCents) {
     return fail("Please reload and review the lesson price before confirming.", 409, request, env);
   }
-  const settings = await loadSettings(env);
 
   // Same gap as creating a booking: the check above and this write are two
   // statements, and a lesson can be claimed between them.
@@ -2924,11 +2919,12 @@ async function handleCancel(request, env, ctx, token) {
   if (new Date(row.starts_at) <= now) {
     return fail("That lesson has already started. Please email Inês.", 409, request, env);
   }
-  const policy = changePolicy(row, now);
+  const settings = await loadSettings(env);
+  const policy = changePolicy(row, now, settings.minimumNoticeHours);
 
   if (policy.locked) {
     return fail(
-      "This lesson is today, so it can't be cancelled. If something has happened, reply to your confirmation email and Inês will help.",
+      `This lesson is less than ${settings.minimumNoticeHours} hours away, so it can't be cancelled. If something has happened, reply to your confirmation email and Inês will help.`,
       409,
       request,
       env
@@ -2941,14 +2937,12 @@ async function handleCancel(request, env, ctx, token) {
     const updated = await completeRefund(env, row.id);
     if (!updated) return fail("Your cancellation request is recorded. The refund is being confirmed; the lesson stays reserved and locked until then. Please check back shortly.", 503, request, env);
     const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
-    const settings = await loadSettings(env);
     ctx.waitUntil(notify(env, { event: "cancelled", row: updated, lessonType, settings, manageUrl: "" }));
     return json({ booking: publicBooking(updated, lessonType, settings), sameDayFeeApplied: false }, 200, request, env);
   }
 
-  const sameDay = policy.paid ? 0 : dateKey(now, PORTO) === dateKey(new Date(row.starts_at), PORTO) ? 1 : 0;
+  const sameDay = policy.feeApplies ? 1 : 0;
   const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
-  const settings = await loadSettings(env);
 
   const cancelled = await env.DB.prepare(
     `UPDATE bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'student',
@@ -3618,9 +3612,9 @@ async function handleMe(request, env) {
         priceCents: row.amount_cents ?? row.price_cents
       },
       isPast: new Date(row.starts_at) <= now,
-      sameDayFeeApplies: row.payment_status !== "paid" && dateKey(now, PORTO) === dateKey(new Date(row.starts_at), PORTO),
+      sameDayFeeApplies: changePolicy(row, now, settings.minimumNoticeHours).feeApplies,
       sameDayFeeAutomatic: row.payment_status === "scheduled" || row.payment_status === "processing",
-      changeLocked: changePolicy(row, now).locked,
+      changeLocked: changePolicy(row, now, settings.minimumNoticeHours).locked,
       paymentStatus: row.payment_status,
       seriesId: row.series_id ?? null,
       manageToken: await createManageToken(row.id, env.BOOKING_TOKEN_SECRET)
@@ -4121,8 +4115,8 @@ async function handleAdmin(request, env, ctx, url, path) {
     if (!row) return fail("That booking could not be found.", 404, request, env);
     if (row.status === "cancelled") return fail("That lesson is already cancelled.", 409, request, env);
 
-    // Her cancellation always refunds a paid lesson — same-day included. A
-    // student loses the change window on the lesson day; she never does, and
+    // Her cancellation always refunds a paid lesson — inside the 14-hour window
+    // included. A student loses the free change window; she never does, and
     // the money follows automatically so there is nothing to remember.
     const refunded = 0;
     if (row.payment_status === "paid" && row.stripe_payment_intent) {

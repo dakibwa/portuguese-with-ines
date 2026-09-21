@@ -45,9 +45,10 @@ export type ManagedBooking = {
   durationPrices?: Record<number, number>;
   booking: Booking;
   isPast: boolean;
+  /** Inside the 14-hour window: moving or cancelling now costs the fee. */
   sameDayFeeApplies: boolean;
   sameDayFeeAutomatic?: boolean;
-  /** A paid lesson on its own Porto day: no moves, no cancellation, no refund. */
+  /** An older paid lesson inside the 14-hour window: no moves, no cancellation, no refund. */
   changeLocked?: boolean;
   /** Cancelling now returns the money automatically. */
   refundOnCancel?: boolean;
@@ -224,7 +225,7 @@ export function recoverBookingPayment(token: string, purpose: "lesson" | "same-d
 /**
  * Stop a repeating booking. By default the lessons already in the calendar are
  * kept. The explicit bulk-cancel route returns how many were cancelled,
- * retained under the same-day policy, and refunded.
+ * kept inside the 14-hour window, and refunded.
  */
 export function stopSeries(session: string, seriesId: string, cancelRemaining = false) {
   return request<{ ok: true; stopped: true; cancelled: number; kept: number; refunded: number; pendingRefunds?: number }>(

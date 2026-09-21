@@ -1,45 +1,68 @@
 /**
  * The change policy, in one place.
  *
- * Inês set the current rule on 1 September 2026: a card is saved when the
- * student books, the lesson price is charged when the scheduled lesson ends,
- * and moving or cancelling on the lesson's Porto calendar day costs EUR 5.
- * Therefore a scheduled card charge stays changeable; only an older lesson
- * that has already been paid keeps the earlier prepaid lock/refund behaviour.
+ * Since 21 September 2026 one 14-hour rule covers booking, moving and
+ * cancelling: a student may book, move or cancel for free while the lesson is
+ * at least `minimumNoticeHours` (14) elapsed hours away. Inside that window a
+ * move or cancellation costs EUR 5, charged to the saved card. Elapsed hours
+ * need no time zone, so the rule reads the same wherever the student is.
+ *
+ * Earlier bookings agreed to "free until the lesson's Porto calendar day". Dan
+ * decided those are never charged more than they agreed: they pay the fee only
+ * when both rules would charge. The card itself is still charged the lesson
+ * price when the lesson ends (1 September 2026); only an older lesson that was
+ * already paid keeps the prepaid lock/refund behaviour, inside the same window.
  */
 
+import { DEFAULT_MINIMUM_NOTICE_HOURS } from "./availability.mjs";
 import { dateKey, PORTO } from "./time.mjs";
 
-export function changePolicy(row, now = new Date()) {
+/** The wording a booking made under the 14-hour rule consents to. */
+export const PAYMENT_CONSENT_VERSION = "2026-09-21-fourteen-hours-v1";
+
+/** Wording that promised free changes until the lesson's Porto calendar day. */
+const LESSON_DAY_CONSENT_VERSIONS = new Set(["2026-09-01-after-lesson-v1"]);
+
+/** True when moving or cancelling now falls inside the fee window. */
+export function isLateChange(row, now = new Date(), noticeHours = DEFAULT_MINIMUM_NOTICE_HOURS) {
+  const start = new Date(row.starts_at);
+  const late = start.getTime() - now.getTime() < noticeHours * 3600000;
+  if (!LESSON_DAY_CONSENT_VERSIONS.has(row.payment_consent_version)) return late;
+  return late && dateKey(now, PORTO) === dateKey(start, PORTO);
+}
+
+export function changePolicy(row, now = new Date(), noticeHours = DEFAULT_MINIMUM_NOTICE_HOURS) {
   const paid = row.payment_status === "paid";
   const scheduled = row.payment_status === "scheduled" || row.payment_status === "processing";
-  const sameDay = dateKey(now, PORTO) === dateKey(new Date(row.starts_at), PORTO);
+  const late = isLateChange(row, now, noticeHours);
 
   return {
     paid,
     scheduled,
-    sameDay,
-    // A saved-card lesson can still move or cancel on the day: that action is
-    // what triggers the EUR 5 charge. Older already-paid lessons retain their
-    // original lock. Inês herself never consults this policy.
-    locked: paid && sameDay,
+    late,
+    // A saved-card lesson can still move or cancel inside the window: that
+    // action is what triggers the EUR 5 charge. Older already-paid lessons
+    // retain their lock instead. Inês herself never consults this policy.
+    feeApplies: !paid && late,
+    locked: paid && late,
     // Only money actually taken comes back.
-    refundOnCancel: paid && !sameDay
+    refundOnCancel: paid && !late
   };
 }
 
 /**
- * Split a recurring run for the destructive bulk action. Unlike cancelling one
- * legacy lesson, bulk cancellation never applies a same-day fee behind the
- * scenes: today's occurrence stays and every later occurrence can go.
+ * Split a recurring run for the destructive bulk action. Bulk cancellation
+ * never applies the EUR 5 fee behind the scenes: an occurrence inside the fee
+ * window stays booked and every later occurrence can go.
  */
-export function planSeriesCancellation(rows, now = new Date()) {
+export function planSeriesCancellation(rows, now = new Date(), noticeHours = DEFAULT_MINIMUM_NOTICE_HOURS) {
   const cancellable = [];
   const kept = [];
 
   for (const row of rows) {
-    if (dateKey(now, PORTO) === dateKey(new Date(row.starts_at), PORTO)) kept.push(row);
-    else cancellable.push({ row, refund: changePolicy(row, now).refundOnCancel });
+    const policy = changePolicy(row, now, noticeHours);
+    if (policy.late) kept.push(row);
+    else cancellable.push({ row, refund: policy.refundOnCancel });
   }
 
   return { cancellable, kept };

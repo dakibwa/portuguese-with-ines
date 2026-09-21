@@ -72,6 +72,7 @@ import {
   BOOKING_HORIZON_DAYS_FALLBACK,
   BOOKING_TIME_ZONE,
   CONTACT_WHATSAPP_URL,
+  NOTICE_HOURS,
   SAME_DAY_RESCHEDULE_FEE_CENTS,
   STRIPE_PUBLISHABLE_KEY,
   STRIPE_PUBLISHABLE_READY,
@@ -1164,10 +1165,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             ? "Your upcoming recurring lessons have moved. We’ve emailed you and updated your calendar."
             : refreshed.booking.lessonType.id === previousLessonTypeId
             ? `Your lesson has been moved. We’ve emailed you and updated your calendar.${
-                sameDayFeeApplied ? ` The ${formatMoneyCents(refreshed.booking.sameDayFeeCents)} same-day fee will be charged automatically.` : ""
+                sameDayFeeApplied ? ` The ${formatMoneyCents(refreshed.booking.sameDayFeeCents)} late change fee will be charged automatically.` : ""
               }`
             : `Your lesson is now ${formatBookedLessonLabel(refreshed.booking.lessonType)}. We’ve emailed you and updated your calendar.${
-                sameDayFeeApplied ? ` The ${formatMoneyCents(refreshed.booking.sameDayFeeCents)} same-day fee will be charged automatically.` : ""
+                sameDayFeeApplied ? ` The ${formatMoneyCents(refreshed.booking.sameDayFeeCents)} late change fee will be charged automatically.` : ""
               }`
         );
       });
@@ -1194,7 +1195,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             ? "Your lesson has been cancelled. Your refund is on its way back to your card."
             : `Your lesson has been cancelled. We’ve emailed you and updated your calendar.${
                 result.sameDayFeeApplied
-                  ? ` The ${formatMoneyCents(result.booking.sameDayFeeCents)} same-day fee will be charged automatically.`
+                  ? ` The ${formatMoneyCents(result.booking.sameDayFeeCents)} late change fee will be charged automatically.`
                   : ""
               }`
         );
@@ -1689,8 +1690,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </button>
         </div>
         <p className="booking-success__note">
-          This lesson is now marked on your calendar. You can open it there to move or cancel it. Changing on the day
-          costs {formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}; any earlier is free.
+          This lesson is now marked on your calendar. You can open it there to move or cancel it. It&rsquo;s free up to
+          {" "}{NOTICE_HOURS} hours before; after that it costs {formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.
         </p>
       </section>
     );
@@ -1850,7 +1851,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
                   {!manageOutcome && manageMode === "view" ? (
                     <>
-                      {([ ["lesson", managed.paymentsDue?.lesson, "lesson payment"], ["same-day-fee", managed.paymentsDue?.sameDayFee, "same-day fee"] ] as const).map(([purpose, amount, label]) => amount != null ? (
+                      {([ ["lesson", managed.paymentsDue?.lesson, "lesson payment"], ["same-day-fee", managed.paymentsDue?.sameDayFee, "late change fee"] ] as const).map(([purpose, amount, label]) => amount != null ? (
                         <div className="lesson-calendar__notice" key={purpose}>
                           <p>Your {label} of {formatMoneyCents(amount)} is still to pay.</p>
                           <button className="button button--coral" disabled={manageWorking} type="button" onClick={async () => {
@@ -1867,10 +1868,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         </div>
                       ) : null)}
                       {managed.changeLocked && managed.booking.status !== "cancelled" ? (
-                        <p className="lesson-calendar__notice">This lesson is today and can&rsquo;t be changed or cancelled.</p>
+                        <p className="lesson-calendar__notice">
+                          This lesson is less than {NOTICE_HOURS} hours away and can&rsquo;t be changed or cancelled.
+                        </p>
                       ) : managed.sameDayFeeApplies && managed.booking.status !== "cancelled" ? (
                         <p className="lesson-calendar__notice">
-                          Changing or cancelling today costs {formatMoneyCents(managed.booking.sameDayFeeCents)}
+                          This lesson is less than {NOTICE_HOURS} hours away, so moving or cancelling it now costs{" "}
+                          {formatMoneyCents(managed.booking.sameDayFeeCents)}
                           {managed.sameDayFeeAutomatic ? ", charged automatically" : ""}.
                         </p>
                       ) : null}
@@ -1922,7 +1926,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           ? ` Your ${formatMoneyCents(managed.booking.amountCents)} comes back to your card.`
                           : ""}
                         {managed.sameDayFeeApplies
-                          ? ` The ${formatMoneyCents(managed.booking.sameDayFeeCents)} same-day fee ${
+                          ? ` The ${formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee ${
                               managed.sameDayFeeAutomatic ? "is charged automatically" : "applies"
                             }.`
                           : ""}
@@ -1984,7 +1988,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   {activeManagedSeries && manageMode === "confirm-cancel-sequence" ? (
                     <div className="lesson-manage-dialog__decision">
                       <p>
-                        <strong>Cancel every upcoming lesson in this sequence?</strong> This also stops new lessons being added. Any paid lesson that can still be cancelled is refunded automatically. A lesson happening today stays booked.
+                        <strong>Cancel every upcoming lesson in this sequence?</strong> This also stops new lessons being added. Any paid lesson that can still be cancelled is refunded automatically. A lesson less than {NOTICE_HOURS} hours away stays booked.
                       </p>
                       <div className="lesson-manage-dialog__actions">
                         <button className="button button--coral" disabled={manageWorking} onClick={() => stopManagedSequence(true)} type="button">
@@ -2872,8 +2876,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
                       <p className="booking-form-note" id="booking-payment-summary">
                         {postpay
-                          ? `No payment is taken now. Your card will be charged after each lesson. Same-day changes cost ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}, and a no-show costs ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)} instead of the lesson price.`
-                          : `Pay Inês on the lesson day. Same-day changes cost ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.`}
+                          ? `No payment is taken now. Your card will be charged after each lesson. Moving or cancelling less than ${NOTICE_HOURS} hours before costs ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}, and a no-show costs ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)} instead of the lesson price.`
+                          : `Pay Inês on the lesson day. Moving or cancelling less than ${NOTICE_HOURS} hours before costs ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.`}
                         {form.repeat === null ? " Ongoing lessons repeat until you stop them." : ""}
                       </p>
 

@@ -265,7 +265,7 @@ number of booking rows at once.
   recipe that made them. That is what puts the time in Ines's calendar for real,
   and it means every per-lesson behaviour already built keeps working without
   knowing series exist — the manage link, the iCalendar `UID` and `SEQUENCE`,
-  the same-day fee, moving one week for a dentist appointment.
+  the late change fee, moving one week for a dentist appointment.
 - **The slot is stored as a Porto weekday and minute-of-day, not a UTC time.**
   A run booked in October crosses the change to winter time; holding the UTC
   instant would move every later lesson an hour earlier than the student agreed
@@ -453,9 +453,9 @@ PaymentIntent.
 - **No-show** charges €5 after `ends_at`, instead of the booked lesson price.
 - Bookings without explicit automatic-payment consent remain
   `not_required`; the teacher control is not offered for them.
-- Moving or cancelling on the lesson's Porto calendar day is a separate €5
+- Moving or cancelling less than 14 hours before the lesson is a separate €5
   action fee, stored independently so a retry or second edit cannot duplicate
-  it.
+  it. Its columns keep their original `same_day_*` names.
 - **It is said before booking, not only after.** A charge someone first learns
   about by being charged is the kind that costs a relationship. It appears on the
   booking page's policy band, directly above the confirm button, on the
@@ -486,7 +486,10 @@ including across Porto clock changes. Slots inside that window are omitted from
 availability and rejected again when a booking or move is submitted; exactly
 14 hours is allowed. `settings.minimum_notice_hours` controls the live rule;
 the seed and missing-setting fallback are both 14. Dan requested this change
-from the previous live setting of 24 hours on 13 September 2026.
+from the previous live setting of 24 hours on 13 September 2026. Since
+21 September 2026 the same setting is also the free-change window (see
+*Late changes*), so changing it changes the agreed fee terms as well as the
+booking notice.
 
 `availability_rules.last_start_minute` is the latest a lesson may **begin**, not
 when she finishes. That distinction matters: treating it as a finishing time
@@ -582,12 +585,13 @@ With `postpay` and Stripe configured:
 
 **The after-lesson policy** (Dan, 1 September 2026, `policy.mjs` is the single
 home): booking saves a card but takes no money. A scheduled row charges its
-booked amount only after `ends_at`. Moving or cancelling before the lesson's
-Porto date is free; doing either on that date schedules one €5 action fee and
-prevents the full price from charging if the lesson was cancelled. A no-show
+booked amount only after `ends_at`. Moving or cancelling at least 14 hours
+before the lesson is free; doing either later schedules one €5 action fee and
+prevents the full price from charging if the lesson was cancelled (the 14-hour
+rule, Dan, 21 September 2026). A no-show
 recorded during the lesson changes the end charge from the booked price to €5.
 Inês is never charged a fee for a move or cancellation she makes. Older `paid`
-rows retain their earlier same-day lock/refund promise; `not_required` rows keep
+rows retain their earlier lock/refund promise inside the window; `not_required` rows keep
 their original pay-in-person terms. The card itself never touches the database
 — Stripe keeps it; `students` holds only opaque customer and payment-method ids.
 
@@ -598,7 +602,7 @@ price. A `paid` or `payment_due` lesson is never silently repriced: the student
 must cancel/refund and book the other length, or settle the outstanding payment.
 Trials cannot be converted into ordinary lessons through rescheduling.
 
-Every successful payment (lesson, no-show fee or €5 same-day fee) also sends
+Every successful payment (lesson, no-show fee or €5 late change fee) also sends
 Inês a private "Payment received" reminder to issue the appropriate fiscal
 document in Portal das Finanças, with the student's NIF if they gave one (see
 *NIF for receipts*). Stripe's receipt
@@ -700,21 +704,39 @@ payment in production.
    charge against Stripe, the Worker, email and the public return journey;
    describe production payment observation as outstanding until that happens.
 
-### Same-day changes
+### Late changes
 
-Two regimes, keyed on the booking's own payment status so promises made at
-booking time are kept:
+One 14-hour rule (Dan, 21 September 2026) covers booking, moving and
+cancelling. The window is `settings.minimum_notice_hours` elapsed hours before
+the lesson being moved or cancelled; exactly 14 hours is still free. Elapsed
+hours need no time zone, so the rule reads the same for every student. The
+columns, API fields and Stripe purpose keys keep their original `same_day_*`
+names; they now mean "inside the window".
 
-- **Paid**: there are no same-day changes. `changePolicy` locks the lesson's
-  Porto day — the unified calendar says so instead of offering the
+- **Terms version**: bookings made under this rule record
+  `payment_consent_version = 2026-09-21-fourteen-hours-v1`. Bookings (and their
+  series top-ups) made under `2026-09-01-after-lesson-v1` agreed to "free until
+  the lesson's Porto day"; they are charged only when both rules would charge,
+  so no student pays a fee they didn't agree to.
+- **Paid**: an older prepaid lesson has no late changes. `changePolicy` locks it
+  inside the window — the unified calendar says so instead of offering the
   buttons, and the endpoints refuse with the same words for anyone who kept an
   old tab open. `same_day_change` is never set on a paid row.
 - **Scheduled saved-card booking**: students may move or cancel right up to the
-  lesson start. A change on the lesson's own Porto date atomically schedules
-  one €5 charge to the saved card. A move keeps the later full lesson charge at
-  the new end time; a cancellation removes the full lesson charge. Once the fee
-  is paid, the student and Inês are each emailed once; hers is the fiscal
-  reminder.
+  lesson start. A change inside the window atomically schedules one €5 charge
+  to the saved card. A move keeps the later full lesson charge at the new end
+  time; a cancellation removes the full lesson charge. Once the fee is paid,
+  the student and Inês are each emailed once; hers is the fiscal reminder.
+- **Stripe**: the off-session PaymentIntent is described as `Late lesson change
+  fee · <reference>` and a recovery Checkout names the product `Late lesson
+  change fee`. Metadata keeps `charge_reason = same_day_change` and the
+  idempotency key keeps its `same-day-fee` purpose, so a retry across the
+  change cannot create a second charge.
+- **Inês's fiscal reminder** still says "same-day fee" in its subject, heading
+  and preheader, because her receipt automation classifies payments by those
+  words. Rename them only together with that automation.
+- **Series**: stopping or moving a whole run keeps any occurrence inside the
+  window where it is; the student can still change that one individually.
 - **Booked without automatic payment**: the original pay-in-person promise is
   retained and no new card charge is invented.
 

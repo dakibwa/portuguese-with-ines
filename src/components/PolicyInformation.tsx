@@ -1,10 +1,10 @@
-import { CONTACT_WHATSAPP_NUMBER, CONTACT_WHATSAPP_URL, SAME_DAY_FEE_LABEL } from "@/lib/config";
+import { CONTACT_WHATSAPP_NUMBER, CONTACT_WHATSAPP_URL, NOTICE_HOURS, SAME_DAY_FEE_LABEL } from "@/lib/config";
 
 export function TermsPrivacyInformation() {
   return (
     <div className="policy-information">
       <h2>Booking</h2>
-      <p>Book at least 14 hours ahead. Choose your lessons and check the price before confirming.</p>
+      <p>Book at least {NOTICE_HOURS} hours ahead. Choose your lessons and check the price before confirming.</p>
 
       <h2>Payments</h2>
       <ul>
@@ -15,16 +15,16 @@ export function TermsPrivacyInformation() {
       </ul>
 
       <h2>Changes</h2>
-      <p>Move or cancel in your calendar before the lesson starts. All deadlines use Porto time.</p>
+      <p>Move or cancel in your calendar before the lesson starts.</p>
       <ul>
-        <li><strong>Before the lesson day:</strong> free.</li>
-        <li><strong>On the lesson day:</strong> {SAME_DAY_FEE_LABEL} once per lesson.</li>
+        <li><strong>{NOTICE_HOURS} hours or more before:</strong> free.</li>
+        <li><strong>Less than {NOTICE_HOURS} hours before:</strong> {SAME_DAY_FEE_LABEL} once per lesson.</li>
         <li>You still pay for a moved lesson. Cancelling removes the lesson charge.</li>
         <li><strong>No-show:</strong> {SAME_DAY_FEE_LABEL} instead of the lesson price if recorded by Inês. Any earlier {SAME_DAY_FEE_LABEL} change fee still applies.</li>
         <li>If Inês moves or cancels, there is no change fee.</li>
       </ul>
       <p>
-        Ongoing lessons repeat until you stop them in your calendar. Lessons booked for today stay booked.
+        Ongoing lessons repeat until you stop them in your calendar. Any lesson less than {NOTICE_HOURS} hours away stays booked.
       </p>
 
       <h2>Your rights</h2>

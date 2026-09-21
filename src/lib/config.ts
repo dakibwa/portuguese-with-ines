@@ -6,6 +6,12 @@ export const LESSON_DURATION_MINUTES = Number(process.env.NEXT_PUBLIC_LESSON_DUR
 export const SAME_DAY_RESCHEDULE_FEE_CENTS = Number(
   process.env.NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS ?? 500
 );
+/**
+ * The 14-hour rule: book, move or cancel free with at least this much notice;
+ * a later move or cancellation costs the fee above. The booking Worker's
+ * `minimum_notice_hours` setting enforces both, so keep the two in step.
+ */
+export const NOTICE_HOURS = 14;
 
 /** Her teaching timezone. Every advertised time on the site is Porto time. */
 export const BOOKING_TIME_ZONE = "Europe/Lisbon";
@@ -80,7 +86,7 @@ export function formatMoney(cents = LESSON_PRICE_CENTS, currency = LESSON_CURREN
   }).format(cents / 100);
 }
 
-/** The same-day change fee, which is also what a no-show costs. */
+/** The late change fee (inside the 14-hour window), which is also what a no-show costs. */
 export const SAME_DAY_FEE_LABEL = formatMoney(SAME_DAY_RESCHEDULE_FEE_CENTS);
 
 /**

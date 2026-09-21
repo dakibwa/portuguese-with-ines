@@ -30,7 +30,7 @@ import {
   shortMonth,
   stopSeries
 } from "@/lib/booking-api";
-import { BOOKING_HORIZON_DAYS_FALLBACK, BOOKING_TIME_ZONE } from "@/lib/config";
+import { BOOKING_HORIZON_DAYS_FALLBACK, BOOKING_TIME_ZONE, NOTICE_HOURS } from "@/lib/config";
 
 /** Index matches the Worker's weekday, which is 0 = Sunday. */
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -1031,11 +1031,11 @@ export function MyLessons({
                     ) : null}
                     {booking.changeLocked ? (
                       <small className="lesson-calendar__notice">
-                        This lesson is today and can&rsquo;t be changed.
+                        This lesson is less than {NOTICE_HOURS} hours away and can&rsquo;t be changed.
                       </small>
                     ) : booking.sameDayFeeApplies ? (
                       <small className="lesson-calendar__notice">
-                        Changing it today costs {formatMoneyCents(feeCents)}
+                        Less than {NOTICE_HOURS} hours away: changing it now costs {formatMoneyCents(feeCents)}
                         {booking.sameDayFeeAutomatic ? ", charged automatically" : ""}.
                       </small>
                     ) : null}

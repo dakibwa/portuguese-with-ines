@@ -156,7 +156,7 @@ the same identity or action:
   beneath the workspace. Use five short sections: `Booking`, `Payments`,
   `Changes`, `Your rights` and `Privacy`, with everyday wording and labelled
   points. The opening line explains the 14-hour booking notice. Payment timing,
-  free changes until the previous Porto calendar day, the €5 same-day fee and
+  free changes until 14 hours before, the €5 fee inside that window and
   the €5 recorded no-show replacement charge remain explicit. Consumer rights,
   Inês's sole-trader contact details and the privacy notice follow in the same
   reading column. Use the existing
@@ -522,14 +522,14 @@ upcoming dates as well. The action labels stand alone without an explanatory
 sentence above them. Confirm either destructive action at desktop and mobile
 sizes before changing anything. The bulk-cancel confirmation must state
 that paid cancellable lessons are refunded automatically and that a lesson
-happening today remains booked under the existing same-day policy.
+less than 14 hours away remains booked.
 
 The change workflow has no decorative horizontal dividers. Lesson length uses
 the same sliding two-option control as `Online` / `In Porto`, so changing an
 existing lesson feels like the booking flow rather than a separate tool. The
 policy band follows the Worker's payment mode. Saved-card bookings say that the
-lesson price is charged when it ends, while moving or cancelling on its Porto
-calendar day costs €5. The teacher schedule exposes `Mark no-show` only after
+lesson price is charged when it ends, while moving or cancelling less than
+14 hours before it costs €5. The teacher schedule exposes `Mark no-show` only after
 the lesson starts and before it ends; the marked state remains reversible until
 charging begins and means only €5 is taken instead of the full price.
 

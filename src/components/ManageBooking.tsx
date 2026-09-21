@@ -26,6 +26,7 @@ import {
   BOOKING_HORIZON_DAYS_FALLBACK,
   BOOKING_TIME_ZONE,
   CONTACT_WHATSAPP_URL,
+  NOTICE_HOURS,
   formatLessonDuration
 } from "@/lib/config";
 
@@ -206,12 +207,12 @@ export function ManageBooking({
                 : ""}
               {outcome.sameDayFee
                 ? sameDayFeeAutomatic
-                  ? ` Because this was on the day of the lesson, the ${formatMoneyCents(
+                  ? ` Because this was less than ${NOTICE_HOURS} hours before the lesson, the ${formatMoneyCents(
                       booking.sameDayFeeCents
-                    )} same-day fee will be charged to your saved card.`
-                  : ` Because this was on the day of the lesson, the ${formatMoneyCents(
+                    )} late change fee will be charged to your saved card.`
+                  : ` Because this was less than ${NOTICE_HOURS} hours before the lesson, the ${formatMoneyCents(
                       booking.sameDayFeeCents
-                    )} same-day fee applies. Inês will arrange it with you.`
+                    )} late change fee applies. Inês will arrange it with you.`
                 : ""}
             </p>
           </div>
@@ -314,7 +315,7 @@ export function ManageBooking({
             <div className="booking-alert booking-alert--warn" role="status">
               <AlertCircle size={18} aria-hidden="true" />
               <p>
-                Your lesson is today, and it&rsquo;s already paid, so it can&rsquo;t be moved or cancelled on the day.
+                Your lesson is less than {NOTICE_HOURS} hours away, and it&rsquo;s already paid, so it can&rsquo;t be moved or cancelled now.
                 See you there. If something has happened, reply to your confirmation email and Inês will help.
               </p>
             </div>
@@ -324,8 +325,8 @@ export function ManageBooking({
             <div className="booking-alert booking-alert--warn" role="status">
               <AlertCircle size={18} aria-hidden="true" />
               <p>
-                Your lesson is today. Changing or cancelling now means the{" "}
-                {formatMoneyCents(booking.sameDayFeeCents)} same-day fee{" "}
+                Your lesson is less than {NOTICE_HOURS} hours away. Changing or cancelling now means the{" "}
+                {formatMoneyCents(booking.sameDayFeeCents)} late change fee{" "}
                 {sameDayFeeAutomatic ? "is charged automatically." : "applies."}
               </p>
             </div>

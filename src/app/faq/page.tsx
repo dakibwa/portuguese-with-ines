@@ -4,8 +4,7 @@ import Link from "next/link";
 import { AssetMark } from "@/components/BrandMarks";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { CONTACT_WHATSAPP_URL, SAME_DAY_RESCHEDULE_FEE_CENTS, formatMoney } from "@/lib/config";
-import { trialLesson } from "@/lib/lesson-products";
+import { CONTACT_WHATSAPP_URL, NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS, formatMoney } from "@/lib/config";
 
 export const metadata: Metadata = pageMetadata({
   title: "FAQ | Português com a Inês",
@@ -13,10 +12,8 @@ export const metadata: Metadata = pageMetadata({
   path: "/faq/"
 });
 
-const sameDayFee = formatMoney(SAME_DAY_RESCHEDULE_FEE_CENTS);
-
-const changeBookingInstructions =
-  "Use the link in your confirmation email to change or cancel your booking.";
+const lateFee = formatMoney(SAME_DAY_RESCHEDULE_FEE_CENTS);
+const notice = `${NOTICE_HOURS} hours`;
 
 const faqSections = [
   {
@@ -143,6 +140,10 @@ const faqSections = [
           "You’ll receive an email with your lesson details, an invitation to add it to your calendar, and a link to change or cancel your booking."
       },
       {
+        question: "How far ahead do I need to book?",
+        answer: `At least ${notice} before the lesson starts. For a lesson at 10:00, book by 20:00 the day before.`
+      },
+      {
         question: "Do I have to commit to a block of lessons?",
         answer:
           "No. You can book one lesson or keep the same time each week. There’s no block of lessons to pay for in advance."
@@ -164,8 +165,8 @@ const faqSections = [
           "You can find prices on the lessons page. You’ll also see the price when you book, before you confirm."
       },
       {
-        question: "What happens if I don’t want to continue my lessons?",
-        answer: `That’s completely fine. The trial costs ${trialLesson.price}, and there’s no obligation to book another lesson.`
+        question: "What if a trial isn’t for me?",
+        answer: "Then you don’t need to continue. There’s no obligation to book another lesson."
       }
     ]
   },
@@ -174,26 +175,25 @@ const faqSections = [
     title: "Changing a lesson",
     questions: [
       {
-        question: "Can I change my lesson time?",
-        answer: `Yes. ${changeBookingInstructions} Choose another available time. Changes are free until the day before your lesson. On the day, there’s a ${sameDayFee} fee, using Porto time.`
+        question: `What is the ${NOTICE_HOURS}-hour rule?`,
+        answer: `Give at least ${notice}’ notice to book, move or cancel a lesson. For a lesson at 10:00 on Tuesday, that means by 20:00 on Monday. After that, moving or cancelling costs ${lateFee}.`
       },
       {
-        question: `When does the ${sameDayFee} fee apply?`,
-        answer:
-          `There’s a ${sameDayFee} fee if you change or cancel on the day of your lesson, using Porto time. You only pay this change fee once per lesson. If you later miss the lesson without cancelling, the ${sameDayFee} missed-lesson fee is separate. Fees are charged automatically if you have a saved card.`
+        question: "How do I move or cancel a lesson?",
+        answer: `Use the link in your confirmation email. It’s free if your lesson is at least ${notice} away.`
       },
       {
-        question: "Can I cancel?",
-        answer: `Yes. ${changeBookingInstructions} It’s free until the day before your lesson. On the day, there’s a ${sameDayFee} fee, using Porto time.`
+        question: `What if my lesson is less than ${notice} away?`,
+        answer: `You can still move or cancel it, but it costs ${lateFee}. You only pay this once per lesson. If you saved a card, it’s charged automatically.`
       },
       {
         question: "What if I don’t turn up?",
-        answer: `If you miss your lesson without cancelling, there’s a ${sameDayFee} fee.`,
+        answer: `If you miss your lesson without cancelling, you pay ${lateFee} instead of the lesson price.`
       },
       {
         question: "What if I need to stop for a while?",
         answer:
-          "You can stop your regular lessons from your calendar and choose which future bookings to keep or cancel. If you have a lesson today, it stays booked unless you cancel it separately. You’re welcome to book again whenever you’re ready."
+          `You can stop your regular lessons from your calendar and choose which future lessons to keep or cancel. A lesson less than ${notice} away stays booked unless you cancel it separately. You’re welcome to book again whenever you’re ready.`
       }
     ]
   }
