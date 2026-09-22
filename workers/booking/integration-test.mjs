@@ -1002,6 +1002,60 @@ await test("the teacher calendar replaces one date's time off without touching w
     db.prepare("DELETE FROM availability_exceptions WHERE date = '2026-09-14' OR id = ?").run(lunch);
   }
 });
+await test("login reserves each attempt atomically and a success cannot reopen the window", async () => {
+  const login = (email, password, ip) =>
+    call("/auth/login", { user: null, headers: { "CF-Connecting-IP": ip }, body: { email, password } });
+
+  // A read-then-record count let a burst of parallel guesses all pass the same
+  // check. The atomic fixed-window reservation admits only eight per address.
+  const burst = await Promise.all(Array.from({ length: 12 }, (_, i) => login("burst@example.invalid", `wrong-${i}`, "203.0.113.41")));
+  assert.equal(burst.filter((response) => response.status === 401).length, 8);
+  assert.equal(burst.filter((response) => response.status === 429).length, 4);
+
+  // The eighth attempt is correct, so it succeeds — and must not clear the
+  // window and let the ninth guess back in.
+  const ip = "203.0.113.42";
+  const reg = await call("/auth/register", { user: null, headers: { "CF-Connecting-IP": ip }, body: { email: "seq@example.invalid", name: "Seq Tester", password: "the-real-password" } });
+  assert.equal(reg.status, 201);
+  const early = [];
+  for (let attempt = 0; attempt < 7; attempt++) early.push((await login("seq@example.invalid", `wrong-${attempt}`, ip)).status);
+  assert.deepEqual(early, Array(7).fill(401));
+  assert.equal((await login("seq@example.invalid", "the-real-password", ip)).status, 200, "the eighth attempt, correct, is admitted");
+  assert.equal((await login("seq@example.invalid", "the-real-password", ip)).status, 429, "and does not reopen the window");
+});
+await test("admin-token guessing is throttled before the comparison; a teacher session never is", async () => {
+  const ip = "203.0.113.77";
+  const guess = (bearer) => call("/admin/students", { method: "GET", user: null, headers: { Authorization: `Bearer ${bearer}`, "CF-Connecting-IP": ip } });
+  const guesses = [];
+  for (let attempt = 0; attempt < 20; attempt++) guesses.push((await guess(`wrong-token-${attempt}`)).status);
+  assert.deepEqual(guesses, Array(20).fill(401), "twenty attempts are admitted, each a plain 401");
+  assert.equal((await guess("one-more-wrong")).status, 429, "the connection is then locked out");
+  // The throttle is spent before the token is compared, so even the right token
+  // is refused from a locked-out connection.
+  assert.equal((await guess(env.ADMIN_TOKEN)).status, 429, "the right token is refused while locked out");
+  // A signed-in teacher on the very same connection is served regardless.
+  assert.equal((await call("/admin/students", { method: "GET", user: "teacher", headers: { "CF-Connecting-IP": ip } })).status, 200);
+});
+await test("Inês's calendar copy omits the student's manage link; the student's keeps it", async () => {
+  Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0", TEACHER_NOTIFICATIONS_ENABLED: "1" });
+  sentEmails.length = 0;
+  try {
+    const created = await call("/admin/bookings", { user: "teacher", body: { email: "alice@example.invalid", lessonType: "single", startAt: "2026-11-04T14:00:00.000Z" } });
+    assert.equal(created.status, 201, await created.clone().text());
+    await drain();
+  } finally {
+    Object.assign(env, { EMAIL_DRY_RUN: "1", TEACHER_NOTIFICATIONS_ENABLED: "0" });
+    delete env.TEACHER_EMAIL;
+    delete env.RESEND_API_KEY;
+  }
+  // Unfold RFC 5545 continuation lines before scanning for the token.
+  const ics = (email) => Buffer.from(email.attachments[0].content, "base64").toString("utf8").replace(/\r\n /g, "");
+  const teacherEmail = sentEmails.find((email) => email.to[0] === "ines@example.invalid");
+  const studentEmail = sentEmails.find((email) => email.to[0] === "alice@example.invalid");
+  assert.ok(teacherEmail && studentEmail, "both copies were sent");
+  assert.ok(!ics(teacherEmail).includes("manage="), "Inês's calendar copy carries no per-booking manage link");
+  assert.ok(ics(studentEmail).includes("manage="), "the student's own copy still does");
+});
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;

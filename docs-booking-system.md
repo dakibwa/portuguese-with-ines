@@ -137,9 +137,11 @@ depending on them having kept the right confirmation email.
   sit in the same order everywhere — creating first — so only the selection
   moves, never the layout.
 - Sign-in answers identically for a wrong password and an unknown address, so
-  the endpoint cannot be used to discover who has an account. Repeated failures
-  are throttled for 15 minutes — which does also hold off the real student, the
-  accepted trade against guessing.
+  the endpoint cannot be used to discover who has an account. Each attempt is
+  reserved atomically before the password is checked, so eight tries per address
+  per 15 minutes hold whether they arrive one at a time or all at once, and a
+  correct password inside a burst does not reopen the window — which does also
+  hold off the real student, the accepted trade against guessing.
 - Reset links are single-use and last an hour. A Google-only account has no
   password; using "forgot password" is how such a student sets one.
 - Sessions are signed bearer tokens in `localStorage`, not cookies: the site
@@ -818,8 +820,10 @@ account failure limits. Mail an unproven party can trigger is bounded per
 recipient: three password resets an hour per account (the reply is unchanged
 past the limit), and three email-change requests an hour per account and per
 target address. One connection can register five accounts and open eight
-unpaid card-setup holds an hour, and failed admin-token guesses are throttled
-per connection. `/admin/settings` range-checks its numbers — a zero slot
+unpaid card-setup holds an hour. A signed-in teacher is authorised without ever
+touching the admin-token throttle; every other admin request spends the
+per-connection budget before the token is compared, so a locked-out connection
+is refused even when it finally presents the right token. `/admin/settings` range-checks its numbers — a zero slot
 interval would hang `/availability` — and validates its addresses. The live
 origin allow-list is the two live domains plus `http://localhost:3000`, which
 CI's journey tests serve the built export from. API responses are not cacheable. Password derivation

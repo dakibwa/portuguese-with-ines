@@ -294,20 +294,23 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
 
   const uid = calendarUid(row.id);
   const method = event === "cancelled" ? "CANCEL" : "REQUEST";
-  const invite = (attendees) =>
+  // The manage link is the student's own credential to this booking, so it
+  // belongs only on their copy. Inês's copy is built without it: her calendar
+  // is shared and synced in ways a per-booking bearer link should never reach.
+  const invite = (attendees, showManageUrl = false) =>
     buildCalendarInvite({
       method,
       uid,
       sequence: row.sequence,
       summary: lessonSummary(row, lessonType),
-      description: lessonDescription(row, lessonType, manageUrl),
+      description: lessonDescription(row, lessonType, showManageUrl ? manageUrl : ""),
       location: locationLabel(row),
       startsAt: row.starts_at,
       endsAt: row.ends_at,
       organiserName: settings.teacherName,
       organiserEmail: env.MAIL_SENDER_ADDRESS || "bookings@portuguesewithines.com",
       attendees,
-      url: manageUrl
+      url: showManageUrl ? manageUrl : ""
     });
 
   const automaticSameDayFee = row.payment_status === "scheduled" || row.payment_status === "processing";
@@ -457,7 +460,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       bookingId: row.id,
       dedupeKey: `student:${event}:${row.id}:${row.sequence}`,
       replyTo,
-      calendar: { body: invite([{ name: row.student_name, email: row.student_email }]), method },
+      calendar: { body: invite([{ name: row.student_name, email: row.student_email }], true), method },
       content: {
         heading: student.heading,
         intro: student.intro,
@@ -559,23 +562,32 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   const first = rows[0];
   const studentZone = isValidTimeZone(first.student_timezone) ? first.student_timezone : PORTO;
 
+  // The per-occurrence manage link is added per recipient below, not baked in
+  // here: it is the student's own credential, so only their copy carries it.
+  // Inês's copy leaves it out — her calendar is shared and synced in ways a
+  // per-booking bearer link should never reach.
   const events = rows.map((row) => ({
     uid: calendarUid(row.id),
     sequence: row.sequence,
     summary: lessonSummary(row, lessonType),
-    description: lessonDescription(row, lessonType, manageUrls[row.id] ?? ""),
     location: locationLabel(row),
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     organiserName: settings.teacherName,
     organiserEmail: env.MAIL_SENDER_ADDRESS || "bookings@portuguesewithines.com",
-    url: manageUrls[row.id] ?? ""
+    manageUrl: manageUrls[row.id] ?? "",
+    row
   }));
 
-  const invite = (attendee) =>
+  const invite = (attendee, showManageUrl = false) =>
     buildCalendarSeriesInvite({
       method: "REQUEST",
-      events: events.map((event) => ({ ...event, attendees: [attendee] }))
+      events: events.map(({ manageUrl, row, ...event }) => ({
+        ...event,
+        description: lessonDescription(row, lessonType, showManageUrl ? manageUrl : ""),
+        url: showManageUrl ? manageUrl : "",
+        attendees: [attendee]
+      }))
     });
 
   const dateLines = rows
@@ -643,7 +655,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
           ? `student:series-moved:${series.id}:${first.sequence}`
           : `student:series:${series.id}:${rows[0].id}`,
         replyTo,
-        calendar: { body: invite({ name: first.student_name, email: first.student_email }), method: "REQUEST" },
+        calendar: { body: invite({ name: first.student_name, email: first.student_email }, true), method: "REQUEST" },
         content: {
           heading: moved ? "Your weekly lessons have moved" : series.oneOff ? "Your lessons are booked" : multipleWeeklyTimes ? "Your weekly times are booked" : "Your weekly slot is booked",
           intro: moved
@@ -869,26 +881,6 @@ function publicStudent(row) {
     timezone: row.timezone,
     role: row.role ?? "student"
   };
-}
-
-/**
- * Throttles guessing without letting an attacker lock a real student out: the
- * window is short and keyed on recent failures only.
- */
-async function tooManyFailures(env, email) {
-  const since = new Date(Date.now() - 15 * 60000).toISOString();
-  const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM login_attempts WHERE email = ? AND at > ?")
-    .bind(email, since)
-    .first();
-  return (row?.count ?? 0) >= 8;
-}
-
-async function recordFailure(env, email) {
-  const now = new Date().toISOString();
-  await env.DB.batch([
-    env.DB.prepare("INSERT INTO login_attempts (email, at) VALUES (?, ?)").bind(email, now),
-    env.DB.prepare("DELETE FROM login_attempts WHERE at < ?").bind(new Date(Date.now() - 86400000).toISOString())
-  ]);
 }
 
 async function getBookingByToken(env, token) {
@@ -3353,7 +3345,12 @@ async function handleLogin(request, env) {
 
   if (!isEmail(email)) return fail("Please give a valid email address.", 400, request, env);
 
-  if (await tooManyFailures(env, email)) {
+  // Reserve one attempt atomically, before the expensive password check. A
+  // read-the-count-then-record design let a burst of parallel requests all pass
+  // the same check and slip past the budget, and clearing the count on success
+  // let one correct guess inside a burst reset it. A fixed-window reservation
+  // does neither: eight attempts per 15 minutes per address, whatever they cost.
+  if (!await takeRateLimit(env, `login:${email}`, 8)) {
     return fail("Too many attempts. Please wait a few minutes and try again.", 429, request, env);
   }
 
@@ -3366,14 +3363,14 @@ async function handleLogin(request, env) {
   const correct = await verifyPassword(String(body.password ?? ""), stored);
 
   if (!student || !correct) {
-    await recordFailure(env, email);
     return fail("That email and password do not match.", 401, request, env);
   }
 
-  await env.DB.batch([
-    env.DB.prepare("UPDATE students SET last_login_at = ? WHERE id = ?").bind(new Date().toISOString(), student.id),
-    env.DB.prepare("DELETE FROM login_attempts WHERE email = ?").bind(email)
-  ]);
+  // The reservation above is not cleared on success: a correct password inside a
+  // guessing burst must not reopen the window for the next guesses.
+  await env.DB.prepare("UPDATE students SET last_login_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), student.id)
+    .run();
 
   return json(
     { student: publicStudent(student), session: await createSession(student.id, env.BOOKING_TOKEN_SECRET, student.session_version ?? 0) },
@@ -3849,23 +3846,27 @@ async function handleUpdateMe(request, env) {
  */
 async function isAdmin(request, env) {
   const provided = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (env.ADMIN_TOKEN && safeEqual(provided, env.ADMIN_TOKEN)) return { via: "token", student: null };
 
+  // A signed-in teacher is authorised outright, and is never spent against the
+  // token-guessing budget below — her ordinary work must not throttle itself.
   const student = await currentStudent(request, env);
   if (student?.role === "teacher") return { via: "account", student };
+
+  // Anything else is trying the shared fallback token (or probing). Spend the
+  // per-connection budget BEFORE comparing it, so a locked-out connection is
+  // refused even when it finally holds the right token — the comparison stays
+  // constant-time, and this caps how fast the token can be tried at all.
+  const ip = request.headers.get("CF-Connecting-IP") || "local";
+  if (!await takeRateLimit(env, `admin-fail:${ip}`, 20)) return "throttled";
+  if (env.ADMIN_TOKEN && safeEqual(provided, env.ADMIN_TOKEN)) return { via: "token", student: null };
 
   return null;
 }
 
 async function handleAdmin(request, env, ctx, url, path) {
   const admin = await isAdmin(request, env);
-  if (!admin) {
-    const ip = request.headers.get("CF-Connecting-IP") || "local";
-    if (!await takeRateLimit(env, `admin-fail:${ip}`, 20)) {
-      return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
-    }
-    return fail("Not authorised.", 401, request, env);
-  }
+  if (admin === "throttled") return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
+  if (!admin) return fail("Not authorised.", 401, request, env);
 
   if (request.method === "GET" && path === "/admin/google-calendar") {
     return json(await calendarConnectionStatus(env), 200, request, env);
