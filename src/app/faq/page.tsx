@@ -176,7 +176,7 @@ const faqSections = [
     questions: [
       {
         question: `What is the ${NOTICE_HOURS}-hour rule?`,
-        answer: `Give at least ${notice}’ notice to book, cancel or change a lesson. For a lesson at 10:00 on Tuesday, that means by 20:00 on Monday. After that, cancelling or changing costs ${lateFee}.`
+        answer: `Give at least ${notice}’ notice to book, cancel or change a lesson. For a lesson at 10:00 on Tuesday, that means by 20:00 on Monday. After that, cancelling or changing costs ${lateFee}. If you don’t turn up, you’ll also be charged ${lateFee} instead of the full lesson price.`
       },
       {
         question: "How do I cancel or change a lesson?",
@@ -192,7 +192,7 @@ const faqSections = [
       },
       {
         question: "What if I don’t turn up?",
-        answer: `If you miss your lesson without cancelling, you pay ${lateFee} instead of the lesson price.`
+        answer: `If you miss your lesson without cancelling, you’ll be charged ${lateFee} instead of the full lesson price. That’s the same amount as a late cancellation or change. Any earlier late-change fee still applies.`
       },
       {
         question: "What if I need to stop for a while?",
