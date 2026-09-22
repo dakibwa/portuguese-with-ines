@@ -1392,6 +1392,10 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   font-size: 1.05rem;
 }
 
+.faq-row__answer p + p {
+  margin-top: 0.8rem;
+}
+
 .faq-contact {
   padding: clamp(3rem, 5vw, 5rem) var(--page-pad);
   text-align: center;

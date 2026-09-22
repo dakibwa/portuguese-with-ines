@@ -176,15 +176,19 @@ const faqSections = [
     questions: [
       {
         question: `What is the ${NOTICE_HOURS}-hour rule?`,
-        answer: `Give at least ${notice}’ notice to book, move or cancel a lesson. For a lesson at 10:00 on Tuesday, that means by 20:00 on Monday. After that, moving or cancelling costs ${lateFee}.`
+        answer: `Give at least ${notice}’ notice to book, cancel or change a lesson. For a lesson at 10:00 on Tuesday, that means by 20:00 on Monday. After that, cancelling or changing costs ${lateFee}.`
       },
       {
-        question: "How do I move or cancel a lesson?",
-        answer: `Use the link in your confirmation email. It’s free if your lesson is at least ${notice} away.`
+        question: "How do I cancel or change a lesson?",
+        answer: `Use the link in your confirmation email. Cancel or change your lesson at least ${notice} before it starts and there’s no charge.`
       },
       {
         question: `What if my lesson is less than ${notice} away?`,
-        answer: `You can still move or cancel it, but it costs ${lateFee}. You only pay this once per lesson. If you saved a card, it’s charged automatically.`
+        answer: [
+          `Cancel or change your lesson with less than ${notice}’ notice for ${lateFee}. You must do this before the lesson starts.`,
+          "If you cancel, you won’t also be charged the full lesson price. If you change the time, you’ll still pay for the lesson after it takes place.",
+          `The ${lateFee} change fee is charged only once per lesson. If you’ve saved a card, it’s charged automatically.`
+        ]
       },
       {
         question: "What if I don’t turn up?",
@@ -244,7 +248,9 @@ export default function FAQPage() {
                       <span className="faq-row__symbol" aria-hidden="true" />
                     </summary>
                     <div className="faq-row__answer">
-                      <p>{item.answer}</p>
+                      {(Array.isArray(item.answer) ? item.answer : [item.answer]).map((paragraph) => (
+                        <p key={paragraph}>{paragraph}</p>
+                      ))}
                     </div>
                   </details>
                 ))}
