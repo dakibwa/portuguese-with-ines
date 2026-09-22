@@ -129,28 +129,29 @@ try {
   await accountAction("View lessons");
   await page.locator("#upcoming-lessons-heading").waitFor();
   await page.locator(".lesson-overview__book").click();
-  await page.getByRole("heading", { name: "How would you like to book?", exact: true }).waitFor();
+  await page.locator("#lesson-calendar .booking-bar").waitFor();
   await page.getByRole("button", { name: "Your lessons", exact: true }).click();
   await page.locator("#upcoming-lessons-heading").waitFor();
-  assert.equal(await page.locator("#booking-journey-start").count(), 0);
+  assert.equal(await page.locator(".booking-bar").count(), 0);
 
   // This part checks first-time booking links. The completed-history fixture
   // above makes a trial ineligible once /me finishes loading.
   bookings = bookings.map(booking => ({ ...booking, status: "cancelled" }));
   await page.goto(`${base}/`);
   await page.getByRole("link", { name: "Book a lesson", exact: true }).click();
-  await page.getByRole("heading", { name: "How would you like to book?", exact: true }).waitFor();
+  await page.getByRole("radio", { name: "Trial", exact: true }).waitFor({ state: "attached" });
   assert.equal(await page.locator("#upcoming-lessons-heading").count(), 0);
   await page.goto(`${base}/approach/`);
   await page.getByRole("link", { name: "Book a trial lesson", exact: true }).click();
   await page.getByRole("radio", { name: "Online", exact: true }).waitFor();
   assert.ok(page.url().includes("lesson=trial"));
-  assert.equal(await page.locator("#booking-journey-start").count(), 0);
+  assert.equal(await page.getByRole("radio", { name: "Trial", exact: true }).isChecked(), true, "A trial link opens on the trial");
 
   bookings = [{ ...bookings[0], status: "confirmed", isPast: false, startAt: "2026-09-14T16:00:00Z", endAt: "2026-09-14T17:00:00Z" }];
   await page.goto(`${base}/book/?lesson=trial`);
-  await page.getByRole("heading", { name: "How would you like to book?", exact: true }).waitFor();
-  assert.equal(await page.getByRole("button", { name: /Trial lesson/ }).count(), 0, "Returning students get eligible ordinary choices");
+  await page.getByRole("radio", { name: "Single", exact: true }).waitFor({ state: "attached" });
+  await page.getByRole("radio", { name: "Trial", exact: true }).waitFor({ state: "detached" });
+  assert.equal(await page.getByRole("radio", { name: "Single", exact: true }).isChecked(), true, "Returning students get eligible ordinary choices");
 
   bookings = Array.from({ length: 8 }, (_, index) => ({
     ...bookings[0], reference: `UPCOMING-${index}`, manageToken: `upcoming-preview-${index}`,

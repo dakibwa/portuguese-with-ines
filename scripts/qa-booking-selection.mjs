@@ -76,8 +76,7 @@ try {
     await page.clock.setFixedTime(new Date("2026-09-11T12:00:00Z"));
     async function start(recurring = false) {
       await page.goto(`${base}/book/?view=book`);
-      await page.getByRole("button", { name: recurring ? "Recurring lessons · choose your weekly times" : "Single lessons · choose one or more dates", exact: true }).click();
-      await page.getByRole("button", { name: "Choose a date", exact: true }).click();
+      await page.getByRole("radio", { name: recurring ? "Weekly" : "Single", exact: true }).check();
     }
     async function choose(date, time = "10:00") {
       await page.locator(`button[data-date-key="${date}"]`).click();
@@ -125,8 +124,9 @@ try {
     const selectionBeforeChangingDay = await page.locator('.booking-chosen-lessons').innerText();
     await page.getByRole("button", { name: "Change lesson 2", exact: true }).click();
     await page.locator('button[data-date-key="2026-09-23"]').click();
-    assert.equal(await page.locator('.booking-date-summary button').count(), 1, "The selected date has one Change action");
-    await page.getByRole("button", { name: "Change date", exact: true }).click();
+    assert.equal(await page.locator(".unified-calendar__change-date").count(), 1, "The selected date has one Change action");
+    // A phone swaps the calendar for the day's times; a wide screen shows both.
+    if (width < 700) await page.getByRole("button", { name: "Change date", exact: true }).click();
     await page.locator('button[data-date-key="2026-09-23"]').waitFor();
     await page.getByRole("button", { name: "Back to your selection", exact: true }).click();
     assert.equal(await page.locator('.booking-chosen-lessons').innerText(), selectionBeforeChangingDay, "Changing the date then backing out keeps the original lessons");
@@ -162,7 +162,7 @@ try {
     assert.deepEqual(dates, Array.from({ length: 7 }, (_, i) => `2026-09-${14 + i}`), "Only the initial Monday–Sunday week can be chosen");
     await page.locator('button[data-date-key="2026-09-14"]').click();
     assert.equal(await page.getByRole("button", { name: "10:00", exact: true }).count(), 0, "An already selected or overlapping time is unavailable");
-    await page.getByRole("button", { name: "Change date", exact: true }).click();
+    if (width < 700) await page.getByRole("button", { name: "Change date", exact: true }).click();
     await choose("2026-09-15");
     assert.equal(await page.getByRole("button", { name: /Add a second weekly time/ }).count(), 0);
     await checkOverflow();

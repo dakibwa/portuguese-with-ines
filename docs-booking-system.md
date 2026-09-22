@@ -157,36 +157,39 @@ depending on them having kept the right confirmation email.
 - The emailed manage link still works on its own, so a forgotten password never
   blocks someone from changing a lesson.
 - **Booking, the learner's calendar, and lesson changes share one workspace.**
-  A signed-out visitor's first screen at `/book` asks only whether they want to
-  book a new lesson or view existing lessons. A returning signed-in student
-  opens directly on their lessons calendar, whose top-right `Book a lesson`
-  starts a new booking. Booking asks for one lesson or a recurring
-  lesson first. Both ordinary routes then keep Online/In Porto and the 60/90-minute
-  choices together as compact sliding selectors on one setup screen; recurring
-  adds 4, 6, 8 weeks, or `Ongoing` on that same screen. After the starting time
-  is chosen, the journey goes straight to confirmation while later weeks are
-  checked. A fully available repeat stays quiet; only clashing weeks or a failed
-  availability check take space before booking. Duration remains ahead of the
-  calendar because 60- and 90-minute lessons do not share every valid start. The first-time
-  trial remains a separate fixed-length route with its own location choice.
+  Anyone signed out lands on the booking calendar at `/book`, ready to book,
+  beneath one pre-filled choices bar: `Trial` (for an eligible first lesson, and
+  then the default), `Single` or `Weekly`; Online or In Porto; the 60/90-minute
+  length with its price (the trial's fixed length instead); and for weekly
+  lessons 4, 6, 8 weeks or `Ongoing`. Each choice changes in place and the free
+  days follow it, so duration is always settled before times are offered.
+  A returning signed-in student opens directly on their lessons calendar, whose
+  top-right `Book a lesson` opens the same bar and calendar. After the starting
+  time is chosen, the journey goes straight to confirmation while later weeks
+  are checked. A fully available repeat stays quiet; only clashing weeks or a
+  failed availability check take space before booking.
   Viewing lessons is one calendar card beneath the account bar: `Upcoming
   lessons` with a `?` tooltip and `Book a lesson`, the next lesson with its
   Meet link, then the calendar four weeks at a time, without free-time
   choices. There is no separate list to keep in step with it.
   Signed-out visitors can browse lesson types, dates, and times before they are
-  asked to sign in; `View your lessons` asks immediately because the data is
-  private, while booking asks only at confirmation.
+  asked to sign in; `Already booked? Sign in` asks immediately because the
+  data is private, while booking asks only at confirmation.
   Every booked lesson is marked there, weekly lessons in lilac and one-off
   lessons in coral. Choosing a date with one lesson opens that lesson; a date
-  with several lists them in `Your lessons`; a free future date asks `Do you
-  want to book?`. It never creates a second selected-day panel. In the
-  new-booking flow, choosing a free day
-  replaces the calendar with a compact selected-date summary and a `Change
-  date` action, while keeping available times immediately beneath it on a phone.
+  with several lists them in `Your lessons`; a free future date opens booking
+  on that day with its times. It never creates a second selected-day panel.
+  While booking, a chosen free day's times sit beside the calendar on wide
+  screens and take its place on a phone, headed by the date and a `Change`
+  back to it. Before a day is chosen, wide screens offer the soonest free time
+  on each of the next three free days.
   Available times use one compact grid, without part-of-day headings, and fit
-  three accessible time buttons across on a phone. Each
-  completed choice becomes a compact summary and the page moves the next
-  decision into view. Both calendars page four weeks at a time; `Later weeks`
+  three accessible time buttons across on a phone. The confirmation keeps the
+  choices bar beside the chosen lessons, so kind, place, length and repeat still
+  change there; a chosen time is kept when it is still free for the new lesson
+  and otherwise the times return with a note. `Add another lesson` or `Add a
+  second weekly time` is a dashed card beneath the lessons, and while one is
+  added the bar gives way to the lessons chosen so far and `Back`. Both calendars page four weeks at a time; `Later weeks`
   counts the booked lessons beyond the page, and the lessons view pages as far
   as the last booked lesson. Choosing an
   individual booking opens move and cancel in place. The emailed token still
@@ -205,17 +208,16 @@ depending on them having kept the right confirmation email.
   full workspace without the future calendar. Profile editing also hides the
   calendar; `Done editing` returns to Upcoming lessons.
   `Past lessons` stays in the menu throughout every signed-in
-  booking state, including before `View your lessons` is chosen and while a
+  booking state, including while booking and while a
   recurring occurrence is open; an empty history gets an empty state rather
   than losing the menu item. History returns through `Upcoming lessons`.
   There is only one `Booking`
   destination in the site navigation — no separate `My lessons` tab — because
   booking and managing lessons are the same workspace.
-- **Upcoming lessons is the calendar.** It opens first when a signed-in
-  student chooses `View your lessons` and remains available as `View lessons`.
+- **Upcoming lessons is the calendar.** It opens first for a signed-in student
+  and remains available as `View lessons`.
   After a successful booking, `Back to upcoming lessons` opens this same
-  calendar, with the new lesson on its day, rather than returning to the
-  generic start choice. The next lesson leads the card. Weekly lessons are
+  calendar, with the new lesson on its day. The next lesson leads the card. Weekly lessons are
   lilac and one-off lessons coral; a weekly lesson's dialog offers `Manage
   sequence` for the whole run, and `View lessons` counts an active repeat once.
   The `?` tooltip explains that booked lessons open and other days start a
@@ -395,10 +397,9 @@ that window four weeks at a time rather than as one long scroll. It was 56
   after the trial was selected (for example after signing in at confirmation),
   the trial choice dissolves and the valid lesson choices return without a
   warning banner or a failed booking.
-- The confirmation recap contains the chosen location and length without
-  repeating their controls below it. `Change details` returns to the one-screen
-  setup with those choices retained, then the student chooses a date and time
-  through the same booking calendar.
+- The confirmation carries the same choices bar as the calendar, so location,
+  length, kind and repeat change in place there; there is no separate
+  `Change details` route or setup screen to return to.
 - **When she moves a lesson, the emails say so.** They used to go out in the
   student's own voice — "that's done" — and tell her the student had moved it.
 
@@ -550,14 +551,13 @@ the reschedule endpoints accept both.
 Once availability has loaded, the date picker omits complete leading weeks with
 no free slots. That means a weekend with nothing left to book opens directly on
 the next usable week; closed weeks later in the booking window remain visible.
-Selecting a free day while booking collapses the date picker into a compact
-selected-date summary, so the available times are directly below it on a phone.
-`Change date` returns to the four weeks that held the date. In the lesson view
-a booked date opens its lesson, or lists several in `Your lessons` with `Book
-another lesson`; other future dates highlight on hover/focus and open `Do you
-want to book?`, with no separate Book labels on the tiles. Continuing carries
-the date through lesson selection, then checks availability for the chosen
-length.
+Selecting a free day while booking keeps the four weeks beside its times on
+wide screens; on a phone the times replace the calendar and the date's `Change`
+returns to the four weeks that held it. In the lesson view a booked date opens
+its lesson, or lists several in `Your lessons` with `Book another lesson`; other
+future dates highlight on hover/focus and open booking on that day directly,
+with no separate Book labels on the tiles and no question first. Availability
+is always checked for the chosen length.
 
 ### Payment
 

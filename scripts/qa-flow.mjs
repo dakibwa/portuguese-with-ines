@@ -52,26 +52,44 @@ page.on("console", (message) => {
 // Exercise it before the route matrix so the bundle is tested from a clean
 // browser cache rather than behind ten screenshot navigations.
 const localMotionPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+const localMotionStart = new Date(Date.now() + 3 * 86_400_000);
+localMotionStart.setUTCHours(10, 0, 0, 0);
+const localMotionDate = localMotionStart.toISOString().slice(0, 10);
+await localMotionPage.route("**/availability?*", (route) =>
+  route.fulfill({
+    contentType: "application/json",
+    headers: { "Access-Control-Allow-Origin": "*" },
+    body: JSON.stringify({
+      slotsByDate: {
+        [localMotionDate]: [
+          { startAt: localMotionStart.toISOString(), endAt: new Date(localMotionStart.getTime() + 60 * 60_000).toISOString() }
+        ]
+      },
+      timeZone: "Europe/Lisbon",
+      minimumNoticeHours: 24,
+      horizonDays: 84
+    })
+  })
+);
 await localMotionPage.goto(`${base}/book/`, { waitUntil: "domcontentloaded" });
-await localMotionPage
-  .getByRole("button", { name: "Book a new lesson", exact: true })
-  .waitFor({ state: "visible", timeout: 10_000 });
-await localMotionPage.getByRole("button", { name: "Book a new lesson", exact: true }).click();
-await localMotionPage.getByRole("button", { name: "Single lessons · choose one or more dates", exact: true }).click();
-await localMotionPage.getByRole("heading", { name: "Choose your lesson", exact: true }).waitFor();
-const localMotionSingleLesson = localMotionPage.getByRole("radio", {
-  name: "60 minutes lesson · €25",
-  exact: true
-});
-await localMotionSingleLesson.waitFor({ state: "visible", timeout: 10_000 });
-await localMotionSingleLesson.check();
+// A visitor lands ready to book: the lesson is already chosen in the bar above
+// the calendar, and every choice changes in place.
+const localMotionSingle = localMotionPage.getByRole("radio", { name: "Single", exact: true });
+try {
+  await localMotionSingle.waitFor({ state: "visible", timeout: 10_000 });
+} catch (error) {
+  throw new Error(`The booking bar did not open: ${await localMotionPage.locator("body").innerText()}`, { cause: error });
+}
+if (!(await localMotionPage.getByRole("radio", { name: "Trial", exact: true }).isChecked())) {
+  throw new Error("A first booking should start from the trial lesson.");
+}
 await localMotionPage.evaluate(() => {
   document.documentElement.dataset.qaFallbackTransitionSeen = "false";
   const observer = new MutationObserver(() => {
     if (!document.documentElement.classList.contains("booking-transitioning")) return;
     requestAnimationFrame(() => {
-      const summary = document.querySelector(".booking-selection-stack");
-      const style = summary ? getComputedStyle(summary) : null;
+      const weeks = document.querySelector(".calendar-weeks");
+      const style = weeks ? getComputedStyle(weeks) : null;
       document.documentElement.dataset.qaFallbackTransitionSeen = "true";
       document.documentElement.dataset.qaFallbackAnimationName = style?.animationName ?? "";
       document.documentElement.dataset.qaFallbackAnimationDuration = style?.animationDuration ?? "";
@@ -80,8 +98,10 @@ await localMotionPage.evaluate(() => {
   });
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
 });
-await localMotionPage.getByRole("button", { name: "Choose a date", exact: true }).click();
-await localMotionPage.locator(".booking-selection-stack").waitFor({ state: "visible" });
+await localMotionSingle.check();
+await localMotionPage.getByRole("radio", { name: "60 minutes lesson · €25", exact: true }).waitFor({ state: "attached" });
+await localMotionPage.waitForFunction(() => document.documentElement.dataset.qaFallbackTransitionSeen === "true", null, { timeout: 2_000 })
+  .catch(() => {});
 const localBookingMotion = await localMotionPage.evaluate(() => ({
   animationDuration: document.documentElement.dataset.qaFallbackAnimationDuration,
   animationName: document.documentElement.dataset.qaFallbackAnimationName,
@@ -94,6 +114,9 @@ if (
 ) {
   throw new Error("Booking decisions should receive the lightweight local surface transition.");
 }
+await localMotionPage.locator(`#lesson-calendar [data-date-key="${localMotionDate}"]`).click();
+await localMotionPage.locator("#lesson-calendar .slot-grid button").first().click();
+await localMotionPage.locator(".booking-selection-stack").waitFor({ state: "visible" });
 
 for (const viewport of [
   { id: "mobile", width: 390, height: 844 },
@@ -102,7 +125,7 @@ for (const viewport of [
   await localMotionPage.setViewportSize({ width: viewport.width, height: viewport.height });
   const summaryStyles = await localMotionPage.evaluate(() => {
     const elements = [
-      ...document.querySelectorAll(".booking-choice-summary__copy .eyebrow, .booking-choice-summary__change")
+      ...document.querySelectorAll(".booking-choice-summary__copy strong, .booking-choice-summary__change")
     ];
     return {
       background: getComputedStyle(document.documentElement).getPropertyValue("--lavender").trim(),
@@ -118,6 +141,7 @@ for (const viewport of [
     };
   });
 
+  if (!summaryStyles.entries.length) throw new Error("The confirmation should show the chosen lesson with its change action.");
   for (const entry of summaryStyles.entries) {
     const ratio = contrastRatio(entry.colour, summaryStyles.background);
     if (entry.fontSize < 14 || ratio < 4.5 || entry.overflow) {
@@ -178,13 +202,10 @@ await calendarZonePage.route("**/availability?*", async (route) => {
 });
 await calendarZonePage.goto(`${base}/book/`, { waitUntil: "domcontentloaded" });
 try {
-  await calendarZonePage.getByRole("button", { name: "Book a new lesson", exact: true }).click();
+  await calendarZonePage.getByRole("radio", { name: "60 minutes lesson · €25", exact: true }).waitFor({ state: "attached", timeout: 10_000 });
 } catch (error) {
   throw new Error(`The calendar fixture did not open: ${await calendarZonePage.locator("body").innerText()}`, { cause: error });
 }
-await calendarZonePage.getByRole("button", { name: "Single lessons · choose one or more dates", exact: true }).click();
-await calendarZonePage.getByRole("radio", { name: "60 minutes lesson · €25", exact: true }).check();
-await calendarZonePage.getByRole("button", { name: "Choose a date", exact: true }).click();
 await calendarZonePage.locator("#booking-calendar-weeks").waitFor({ state: "visible", timeout: 10_000 });
 
 // The calendar shows four weeks at a time; the end of September and October
@@ -489,34 +510,30 @@ if (!bookingCalendar && !bookingPlaceholder) {
 }
 
 if (bookingCalendar) {
-  await page.getByRole("heading", { name: "What would you like to do?", exact: true }).waitFor({ timeout: 10_000 });
-  if ((await page.locator("#lesson-calendar").count()) !== 0) {
-    throw new Error("The booking calendar should wait for the student's first decision.");
-  }
-  await page.getByRole("button", { name: "Book a new lesson", exact: true }).click();
+  // Anyone signed out lands ready to book: the lesson choices sit above the
+  // calendar, already filled in, with no fork or setup screen first.
   try {
-    await page.waitForSelector(".lesson-card", { timeout: 10_000 });
+    await page.locator("#lesson-calendar .booking-bar").waitFor({ timeout: 10_000 });
   } catch {
     const alert = await page.locator(".booking-alert").innerText().catch(() => "");
     throw new Error(
-      `The booking flow rendered no lesson types. This is usually the booking API refusing the origin ${base} ` +
+      `The booking flow rendered no lesson choices. This is usually the booking API refusing the origin ${base} ` +
         `via CORS, or being unreachable.${alert ? ` The page said: ${alert.replace(/\s+/g, " ").trim()}` : ""}`
     );
   }
 
   const bookingText = (await page.locator(".booking-composition").innerText()).toLowerCase();
-  assertIncludes(bookingText, "how would you like to book?", "booking pattern heading");
-  assertIncludes(bookingText, "single lessons", "one-off booking choice");
-  assertIncludes(bookingText, "recurring lessons", "recurring booking choice");
+  assertIncludes(bookingText, "book a lesson", "booking bar heading");
+  assertIncludes(bookingText, "trial", "trial lesson choice");
+  assertIncludes(bookingText, "single", "one-off booking choice");
+  assertIncludes(bookingText, "weekly", "weekly booking choice");
+  assertIncludes(bookingText, "already booked?", "sign-in route for booked students");
   assertIncludes(bookingText, "porto time", "booking timezone note");
   if (bookingText.includes("booked lessons and free times share the same calendar")) {
     throw new Error("The unified calendar still repeats its own purpose above the booking controls.");
   }
   if ((await page.locator(".unified-booking__head .booking-step-heading").count()) !== 0) {
     throw new Error("The unified calendar still has a redundant visible heading.");
-  }
-  if ((await page.locator("#lesson-calendar").count()) !== 0) {
-    throw new Error("The calendar should wait until the lesson type has been chosen.");
   }
 
   // The mobile menu replaces the inline nav below 820px; both must work.
@@ -1061,16 +1078,8 @@ await accountActions.waitFor({ state: "visible" });
 
 async function bookQaLessonAndReturnToUpcoming({ recurring }) {
   await accountPage.locator(".lesson-overview__book").click();
-  await accountPage
-    .getByRole("button", {
-      name: recurring
-        ? "Recurring lessons · choose your weekly times"
-        : "Single lessons · choose one or more dates",
-      exact: true
-    })
-    .click();
+  await accountPage.getByRole("radio", { name: recurring ? "Weekly" : "Single", exact: true }).check();
   await accountPage.getByRole("radio", { name: "60 minutes lesson · €25", exact: true }).check();
-  await accountPage.getByRole("button", { name: "Choose a date", exact: true }).click();
   await accountPage.getByRole("button", { name: /times free/ }).first().click();
   const recurrencePreview = recurring
     ? accountPage.waitForResponse(
@@ -1145,11 +1154,8 @@ if (await accountPage.locator(".booking-history").count()) {
   throw new Error("The old detached history disclosure is still rendered below the calendar.");
 }
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
-if (await accountPage.locator("#booking-journey-start").count()) {
-  throw new Error("A returning signed-in student should open on their lessons, not the book-or-view fork.");
-}
-if (await accountPage.locator(".unified-booking__lesson-picker").count()) {
-  throw new Error("Lesson types should wait until the student chooses to book.");
+if (await accountPage.locator(".booking-bar").count()) {
+  throw new Error("A returning signed-in student should open on their lessons; the booking choices wait for Book.");
 }
 for (const hiddenUntilViewing of [/Stop repeating/, /Cancel all booked lessons/]) {
   if (await accountPanel.getByRole("button", { name: hiddenUntilViewing }).count()) {
@@ -2027,29 +2033,27 @@ if (restoredCalendarWeekCount !== defaultCalendarWeekCount) {
 }
 
 await accountPage.locator(".lesson-overview__book").click();
-await accountPage.getByRole("heading", { name: "How would you like to book?", exact: true }).waitFor();
-await accountPage.screenshot({ path: path.join(outDir, "booking-pattern-mobile.png"), fullPage: true });
-if (await accountPage.locator("#lesson-calendar").count()) {
-  throw new Error("The calendar should wait until the booking pattern and lesson length have been chosen.");
-}
-if (await accountPage.getByRole("button", { name: /Trial lesson/ }).count()) {
+// Booking opens on the same calendar, already filled in.
+const bookingBar = accountPage.locator("#lesson-calendar .booking-bar");
+await bookingBar.waitFor({ state: "visible" });
+await accountPage.screenshot({ path: path.join(outDir, "booking-bar-mobile.png"), fullPage: true });
+if (await accountPage.getByRole("radio", { name: "Trial", exact: true }).count()) {
   throw new Error("A student with any non-cancelled booking should not be offered the trial.");
 }
 if (await accountPage.getByText(/The trial is for a first lesson/i).count()) {
   throw new Error("Trial ineligibility should restore the valid choices without a warning banner.");
 }
-const lessonCardCount = await accountPage.locator(".unified-booking__lesson-picker .lesson-card").count();
-if (lessonCardCount !== 2) throw new Error(`Expected one-off and recurring choices; found ${lessonCardCount}.`);
-await accountPage.getByRole("button", { name: "Recurring lessons · choose your weekly times", exact: true }).click();
-await accountPage.getByRole("heading", { name: "Choose your lesson", exact: true }).waitFor();
-if ((await accountPage.locator(".booking-setup .segmented").count()) !== 3) {
-  throw new Error("Initial recurring choices should use the same compact sliders as lesson management.");
+const kindChoiceCount = await bookingBar.locator("input[name='booking-kind']").count();
+if (kindChoiceCount !== 2) throw new Error(`Expected single and weekly choices; found ${kindChoiceCount}.`);
+if (!(await accountPage.getByRole("radio", { name: "Single", exact: true }).isChecked())) {
+  throw new Error("A returning student should start from a single lesson.");
+}
+await accountPage.getByRole("radio", { name: "Weekly", exact: true }).check();
+if ((await bookingBar.locator(".segmented").count()) !== 4) {
+  throw new Error("Weekly booking should add its repeat to the same compact sliders as lesson management.");
 }
 if (await accountPage.getByText("Choose a time and we'll check every week before you book.", { exact: true }).count()) {
-  throw new Error("Recurring setup should not explain a later availability check before a first date exists.");
-}
-if (await accountPage.getByText("Recurring lessons", { exact: true }).count()) {
-  throw new Error("The setup should not repeat the recurring-lessons label above Choose your lesson.");
+  throw new Error("Weekly booking should not explain a later availability check before a first date exists.");
 }
 await accountPage.getByRole("radio", { name: "In Porto", exact: true }).check();
 if ((await accountPage.locator("input[name='booking-repeat']").count()) !== 4) {
@@ -2059,7 +2063,6 @@ await accountPage.getByRole("radio", { name: "Ongoing", exact: true }).check();
 await accountPage.getByRole("radio", { name: "4 weeks", exact: true }).check();
 await accountPage.screenshot({ path: path.join(outDir, "booking-repeat-length-mobile.png"), fullPage: true });
 previewHasClash = true;
-await accountPage.getByRole("button", { name: "Choose a date", exact: true }).click();
 await accountPage.getByRole("button", { name: /times free/ }).first().click();
 await accountPage.locator("#lesson-calendar .unified-calendar__availability .slot-grid button").first().click();
 await accountPage.getByRole("heading", { name: "Confirm your recurring lessons", exact: true }).waitFor();
@@ -2069,37 +2072,29 @@ if ((await accountPage.locator(".booking-confirmation-stage .booking-skipped li"
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-recurring-clash-mobile.png"), fullPage: true });
 previewHasClash = false;
-if ((await accountPage.locator(".booking-confirmation-stage .booking-selection-summary").count()) !== 6) {
-  throw new Error("Recurring confirmation should add its repeat choice to the unified review.");
+// The confirmation keeps the same choices above the lesson, changed in place.
+const reviewBar = accountPage.locator("#booking-confirmation-stage .booking-bar");
+if (
+  (await reviewBar.locator(".segmented").count()) !== 4 ||
+  (await accountPage.locator(".booking-confirmation-stage .booking-selection-summary").count()) !== 1
+) {
+  throw new Error("Weekly confirmation should keep its choices in the bar above one lesson row.");
 }
-await accountPage.getByRole("button", { name: "Change repeat", exact: true }).click();
-await accountPage.getByRole("heading", { name: "Change repeat", exact: true }).waitFor();
-if ((await accountPage.locator(".booking-setup .segmented").count()) !== 1) {
-  throw new Error("Changing repeat should open only the repeat choice.");
-}
-await accountPage.getByRole("radio", { name: "6 weeks", exact: true }).check();
-await accountPage.getByRole("button", { name: "Save repeat", exact: true }).click();
+const sixWeekPreview = accountPage.waitForRequest(
+  (request) => request.url().includes("/bookings/series/preview") && request.method() === "POST" && request.postDataJSON()?.weeks === 6
+);
+await reviewBar.getByRole("radio", { name: "6 weeks", exact: true }).check();
+await sixWeekPreview;
 await accountPage.getByRole("heading", { name: "Confirm your recurring lessons", exact: true }).waitFor();
-await accountPage.getByRole("button", { name: "Change lesson", exact: true }).click();
-await accountPage.getByRole("heading", { name: "How would you like to book?", exact: true }).waitFor();
-await accountPage.getByRole("button", { name: "Single lessons · choose one or more dates", exact: true }).click();
-await accountPage.getByRole("heading", { name: "Choose your lesson", exact: true }).waitFor();
-await accountPage.getByRole("radio", { name: "Online", exact: true }).check();
-if ((await accountPage.locator(".booking-setup .segmented input[name='booking-duration']").count()) !== 2) {
+// A single lesson at the same length keeps the chosen time.
+await reviewBar.getByRole("radio", { name: "Single", exact: true }).check();
+await accountPage.getByRole("heading", { name: "Confirm your lesson", exact: true }).waitFor();
+await reviewBar.getByRole("radio", { name: "Online", exact: true }).check();
+if ((await reviewBar.locator("input[name='booking-duration']").count()) !== 2) {
   throw new Error("One-off booking should offer 60 and 90 minutes in the compact slider.");
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-duration-mobile.png"), fullPage: true });
-await accountPage.getByRole("radio", { name: "60 minutes lesson · €25", exact: true }).check();
-await accountPage.getByRole("button", { name: "Choose a date", exact: true }).click();
-const lessonSummary = accountPage.locator(".booking-selection-stack");
-await lessonSummary.waitFor({ state: "visible" });
-if (await accountPage.locator(".unified-booking__lesson-picker .lesson-card").count()) {
-  throw new Error("Choosing a lesson type should collapse the large lesson cards.");
-}
-if ((await lessonSummary.locator(".booking-selection-summary").count()) !== 3) {
-  throw new Error("A one-off choice should collapse into separate lesson, location, and length rows.");
-}
-const changeLesson = accountPage.getByRole("button", { name: "Change lesson", exact: true });
+const lessonSummary = accountPage.locator("#booking-confirmation-stage .booking-selection-stack");
 const lessonSummaryLayout = await lessonSummary.locator('[aria-label="Selected lesson"]').evaluate((summary) => {
   const copy = summary.querySelector(".booking-choice-summary__copy")?.getBoundingClientRect();
   const action = summary.querySelector(".booking-choice-summary__change")?.getBoundingClientRect();
@@ -2115,35 +2110,34 @@ if (
   lessonSummaryLayout.actionLeft < lessonSummaryLayout.copyRight - 1 ||
   lessonSummaryLayout.summaryRight - lessonSummaryLayout.actionRight > 18
 ) {
-  throw new Error(`Each selected choice should keep its change action aligned on the right: ${JSON.stringify(lessonSummaryLayout)}.`);
+  throw new Error(`The chosen lesson should keep its change action aligned on the right: ${JSON.stringify(lessonSummaryLayout)}.`);
 }
-await changeLesson.click();
-await accountPage.getByRole("button", { name: "Single lessons · choose one or more dates", exact: true }).click();
-await accountPage.getByRole("radio", { name: "60 minutes lesson · €25", exact: true }).waitFor();
-await accountPage.getByRole("radio", { name: "60 minutes lesson · €25", exact: true }).check();
-await accountPage.getByRole("button", { name: "Choose a date", exact: true }).click();
-await lessonSummary.waitFor({ state: "visible" });
+const changeLessonTime = accountPage.getByRole("button", { name: "Change date or time", exact: true });
+await changeLessonTime.click();
+// On a phone a chosen day's times take the calendar's place; its date and the
+// way back to the calendar head the times.
+const changeDate = accountPage.getByRole("button", { name: "Change date", exact: true });
+await changeDate.waitFor({ state: "visible" });
+await changeDate.click();
+await accountPage.locator("#lesson-calendar .calendar-week").first().waitFor({ state: "visible" });
 const freeDay = accountPage.getByRole("button", { name: /5 times free/ }).first();
 await freeDay.waitFor({ state: "visible" });
 await freeDay.click();
-const selectedDateSummary = accountPage.locator(".booking-date-summary");
-await selectedDateSummary.waitFor({ state: "visible" });
-const changeDate = accountPage.getByRole("button", { name: "Change date", exact: true });
 await changeDate.waitFor({ state: "visible" });
-const selectedDateSummaryLayout = await selectedDateSummary.evaluate((summary) => {
-  const rectangle = summary.getBoundingClientRect();
-  const action = summary.querySelector(".booking-choice-summary__change")?.getBoundingClientRect();
+const selectedDateHeadLayout = await accountPage.locator("#booking-next-step .unified-calendar__panel-head").evaluate((head) => {
+  const rectangle = head.getBoundingClientRect();
+  const action = head.querySelector(".unified-calendar__change-date")?.getBoundingClientRect();
   return {
     actionRight: action?.right ?? 0,
     height: rectangle.height,
-    summaryRight: rectangle.right
+    headRight: rectangle.right
   };
 });
 if (
-  selectedDateSummaryLayout.height > 130 ||
-  selectedDateSummaryLayout.summaryRight - selectedDateSummaryLayout.actionRight > 18
+  selectedDateHeadLayout.height > 130 ||
+  selectedDateHeadLayout.headRight - selectedDateHeadLayout.actionRight > 18
 ) {
-  throw new Error(`The chosen date should collapse into a compact row with its change action on the right: ${JSON.stringify(selectedDateSummaryLayout)}.`);
+  throw new Error(`The chosen date should head its times with the change action on the right: ${JSON.stringify(selectedDateHeadLayout)}.`);
 }
 await waitForOrientation(accountPage);
 await accountPage.waitForFunction(
@@ -2154,17 +2148,14 @@ await accountPage.waitForFunction(
   null,
   { timeout: 2_000 }
 );
-const freeCompactWeekCount = await accountPage
-  .locator("#lesson-calendar .unified-calendar__grid .calendar-week")
-  .count();
-if (freeCompactWeekCount !== 0) {
-  throw new Error(`Selecting a free day should collapse the calendar into its date summary; found ${freeCompactWeekCount} calendar rows.`);
+if (await accountPage.locator("#lesson-calendar .unified-calendar__grid").isVisible()) {
+  throw new Error("On a phone, a chosen day's times should take the calendar's place.");
 }
 const availableTimeCount = await accountPage
   .locator("#lesson-calendar .unified-calendar__availability .slot-grid button")
   .count();
 if (availableTimeCount !== 5) {
-  throw new Error(`The free-day details should appear below the compact calendar; found ${availableTimeCount} times.`);
+  throw new Error(`The free day's times should appear once it is chosen; found ${availableTimeCount} times.`);
 }
 const compactTimeGrid = await accountPage
   .locator("#lesson-calendar .unified-calendar__availability .slot-grid")
@@ -2209,7 +2200,7 @@ if (
   nextStepOrientation.top >= nextStepOrientation.viewportHeight ||
   nextStepOrientation.bottom <= 0
 ) {
-  throw new Error(`Choosing a day should keep the selected choices and reveal the available times: ${JSON.stringify(nextStepOrientation)}.`);
+  throw new Error(`Choosing a day should reveal the available times: ${JSON.stringify(nextStepOrientation)}.`);
 }
 await waitForOrientation(accountPage);
 await accountPage.screenshot({ path: path.join(outDir, "booking-calendar-free-day-mobile.png"), fullPage: true });
@@ -2223,7 +2214,7 @@ if (
   throw new Error("Change date should restore the four weeks that held the chosen date.");
 }
 await accountPage.getByRole("button", { name: /5 times free/ }).first().click();
-await selectedDateSummary.waitFor({ state: "visible" });
+await changeDate.waitFor({ state: "visible" });
 await waitForOrientation(accountPage);
 
 await accountPage
@@ -2277,8 +2268,8 @@ for (const duplicateIdentity of ["Signed in as", "Booking as", "Not you?"]) {
 if (await accountPage.locator("#lesson-calendar").count()) {
   throw new Error("Choosing a time should collapse the calendar before the confirmation step.");
 }
-if (await accountPage.locator(".unified-booking__lesson-picker").count()) {
-  throw new Error("Choosing a time should collapse the earlier lesson choice before confirmation.");
+if ((await accountPage.locator(".booking-bar").count()) !== 1) {
+  throw new Error("The confirmation should carry the one choices bar, not a second copy.");
 }
 if (confirmOrientation.top >= confirmOrientation.viewportHeight || confirmOrientation.bottom <= 0) {
   throw new Error("Choosing a time did not bring the unified booking review into the mobile viewport.");
@@ -2289,67 +2280,66 @@ await accountPage.setViewportSize({ width: 1440, height: 1000 });
 await accountPage.waitForTimeout(200);
 await accountPage.screenshot({ path: path.join(outDir, "booking-confirm-desktop.png"), fullPage: true });
 const desktopConfirmationLayout = await accountPage.locator("#booking-confirmation-stage").evaluate((stage) => {
+  const summary = stage.querySelector(".booking-confirmation-summary")?.getBoundingClientRect();
+  const main = stage.querySelector(".booking-confirmation-main")?.getBoundingClientRect();
   const cards = [...stage.querySelectorAll(".booking-selection-summary")].map((card) => card.getBoundingClientRect());
   return {
     cardWidths: cards.map((card) => card.width),
     clientWidth: document.documentElement.clientWidth,
-    scrollWidth: document.documentElement.scrollWidth
+    scrollWidth: document.documentElement.scrollWidth,
+    sideBySide: Boolean(summary && main && main.left >= summary.right && Math.abs(main.top - summary.top) < 2)
   };
 });
 if (
   desktopConfirmationLayout.scrollWidth !== desktopConfirmationLayout.clientWidth ||
-  desktopConfirmationLayout.cardWidths.some((width) => width < 700)
+  desktopConfirmationLayout.cardWidths.some((width) => width < 600) ||
+  !desktopConfirmationLayout.sideBySide
 ) {
-  throw new Error(`The unified confirmation should stay full-width and overflow-free on desktop: ${JSON.stringify(desktopConfirmationLayout)}.`);
+  throw new Error(`The desktop confirmation should set the lesson beside the details without overflow: ${JSON.stringify(desktopConfirmationLayout)}.`);
 }
 await accountPage.setViewportSize({ width: 390, height: 844 });
 const confirmationChoices = accountPage.locator(".booking-confirmation-stage .booking-selection-summary");
-if ((await confirmationChoices.count()) !== 5) {
-  throw new Error(`One-off confirmation should show five individually editable choices; found ${await confirmationChoices.count()}.`);
+if ((await confirmationChoices.count()) !== 1) {
+  throw new Error(`One-off confirmation should show one editable lesson row; found ${await confirmationChoices.count()}.`);
 }
 if (await accountPage.locator(".booking-recap").count()) {
   throw new Error("Confirmation should use the selected-choice rows themselves, not a second recap card.");
 }
-const selectedDateTitle = await accountPage
-  .locator('.booking-confirmation-stage [aria-label="Selected date"] strong')
+const selectedLessonTitle = await accountPage
+  .locator('.booking-confirmation-stage [aria-label="Selected lesson"] strong')
   .innerText();
-if (!selectedDateTitle.includes("2026")) {
-  throw new Error(`The selected date should remain visible in the unified review: ${selectedDateTitle}.`);
+if (!selectedLessonTitle.includes("2026")) {
+  throw new Error(`The selected date should remain visible in the unified review: ${selectedLessonTitle}.`);
 }
 
 if (await accountPage.locator(".booking-location-choice").count()) {
   throw new Error("Confirmation should not repeat the location selector beneath the recap.");
 }
-await accountPage.getByRole("button", { name: "Change location", exact: true }).click();
-await accountPage.getByRole("heading", { name: "Change location", exact: true }).waitFor();
-if ((await accountPage.locator(".booking-setup .segmented").count()) !== 1) {
-  throw new Error("Changing location should open only the location choice.");
+await reviewBar.getByRole("radio", { name: "In Porto", exact: true }).check();
+await confirmHeading.waitFor();
+if (!(await reviewBar.getByRole("radio", { name: "In Porto", exact: true }).isChecked())) {
+  throw new Error("Changing location on the confirmation should apply in place.");
 }
-if (!(await accountPage.getByRole("radio", { name: "Online", exact: true }).isChecked())) {
-  throw new Error("Changing location should retain the current choice.");
+await reviewBar.getByRole("radio", { name: "Online", exact: true }).check();
+if (!(await reviewBar.getByRole("radio", { name: "60 minutes lesson · €25", exact: true }).isChecked())) {
+  throw new Error("The confirmation should retain the chosen length.");
 }
-await accountPage.getByRole("button", { name: "Save location", exact: true }).click();
-await accountPage.getByRole("heading", { name: "Confirm your lesson", exact: true }).waitFor();
-await accountPage.getByRole("button", { name: "Change length", exact: true }).click();
-await accountPage.getByRole("heading", { name: "Change lesson length", exact: true }).waitFor();
-if ((await accountPage.locator(".booking-setup .segmented").count()) !== 1) {
-  throw new Error("Changing lesson length should open only the length choice.");
+// A longer lesson that still fits keeps the chosen time.
+await reviewBar.getByRole("radio", { name: "90 minutes lesson · €35", exact: true }).check();
+await accountPage.waitForFunction(() => document.querySelector(".booking-confirm-button")?.disabled === false, null, { timeout: 5_000 });
+if (await accountPage.locator("#lesson-calendar").count()) {
+  throw new Error("A longer lesson that still fits should keep the chosen time on the confirmation.");
 }
-if (!(await accountPage.getByRole("radio", { name: "60 minutes lesson · €25", exact: true }).isChecked())) {
-  throw new Error("Changing length should retain the current choice.");
+if ((await accountPage.locator('.booking-confirmation-stage [aria-label="Selected lesson"] strong').innerText()) !== selectedLessonTitle) {
+  throw new Error("Changing the length should keep the chosen date and time.");
 }
-await accountPage.getByRole("radio", { name: "90 minutes lesson · €35", exact: true }).check();
-await accountPage.getByRole("button", { name: "Choose a time", exact: true }).click();
-await selectedDateSummary.waitFor({ state: "visible" });
+await changeLessonTime.click();
+await changeDate.waitFor({ state: "visible" });
 await accountPage.locator("#lesson-calendar .unified-calendar__availability .slot-grid button").first().click();
-await accountPage.getByRole("heading", { name: "Confirm your lesson", exact: true }).waitFor();
-await accountPage.getByRole("button", { name: "Change time", exact: true }).click();
-await selectedDateSummary.waitFor({ state: "visible" });
-await accountPage.locator("#lesson-calendar .unified-calendar__availability .slot-grid button").first().click();
-await accountPage.getByRole("heading", { name: "Confirm your lesson", exact: true }).waitFor();
-await accountPage.getByRole("button", { name: "Change lesson", exact: true }).click();
-await accountPage.getByRole("heading", { name: "How would you like to book?", exact: true }).waitFor();
+await confirmHeading.waitFor();
+await changeLessonTime.click();
 await accountPage.getByRole("button", { name: "Your lessons", exact: true }).click();
+await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 await bookQaLessonAndReturnToUpcoming({ recurring: false });
 await bookQaLessonAndReturnToUpcoming({ recurring: true });
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
@@ -2464,9 +2454,8 @@ await sequenceDialog.getByRole("button", { name: "Done", exact: true }).click();
 // Reading the terms must never accept them or discard an unfinished booking.
 qaPostpay = true;
 await accountPage.goto(`${base}/book/?view=book`, { waitUntil: "domcontentloaded" });
-await accountPage.getByRole("button", { name: "Single lessons · choose one or more dates", exact: true }).click();
+await accountPage.getByRole("radio", { name: "Single", exact: true }).check();
 await accountPage.getByRole("radio", { name: "60 minutes lesson · €25", exact: true }).check();
-await accountPage.getByRole("button", { name: "Choose a date", exact: true }).click();
 await accountPage.getByRole("button", { name: /times free/ }).first().click();
 await accountPage.locator("#lesson-calendar .slot-grid button").first().click();
 const agreement = accountPage.getByRole("button", { name: "Agree to terms & privacy", exact: true });
@@ -2505,21 +2494,16 @@ for (const width of [1440, 390]) {
   if (await accountPage.locator(".calendar-week").getByText("Book", { exact: true }).count()) {
     throw new Error("The overview must keep plain dates without separate Book labels.");
   }
+  // A free day goes straight to booking on that day, with no question first.
   await freeDateCell.focus();
   await freeDateCell.press("Enter");
-  const bookingQuestion = accountPage.getByRole("dialog", { name: "Do you want to book?", exact: true });
-  await bookingQuestion.waitFor();
-  await bookingQuestion.getByRole("button", { name: "Not now", exact: true }).click();
-  if (!await freeDateCell.evaluate((element) => document.activeElement === element)) {
-    throw new Error("Dismissing the booking question must return focus to the date.");
-  }
-  await freeDateCell.click();
-  await bookingQuestion.getByRole("button", { name: "Choose a lesson", exact: true }).click();
   await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "detached" });
-  await accountPage.getByRole("button", { name: "Single lessons · choose one or more dates", exact: true }).click();
-  await accountPage.getByRole("button", { name: "Choose a time", exact: true }).click();
+  await accountPage.locator("#lesson-calendar .booking-bar").waitFor();
   await accountPage.locator("#lesson-calendar .slot-grid button").first().waitFor();
-  if (!await accountPage.locator(".booking-date-summary").innerText().then((text) => text.includes(String(qaFreeStart.getUTCDate())))) {
+  if (await accountPage.getByRole("dialog", { name: "Do you want to book?", exact: true }).count()) {
+    throw new Error("A free day should open its times without asking first.");
+  }
+  if (!await accountPage.locator("#booking-next-step .unified-calendar__panel-head h3").innerText().then((text) => text.includes(String(qaFreeStart.getUTCDate())))) {
     throw new Error("Booking from the overview lost the chosen date.");
   }
   await accountPage.locator("#lesson-calendar .slot-grid button").first().click();
@@ -2531,19 +2515,18 @@ for (const width of [1440, 390]) {
   const emptyDateKey = new Date(qaFreeStart.getTime() + 24 * 60 * 60_000).toISOString().slice(0, 10);
   const emptyDateButton = accountPage.locator(`#lesson-calendar .can-start-booking:not(.has-booking)[data-date-key="${emptyDateKey}"]`);
   await emptyDateButton.click();
-  await bookingQuestion.getByRole("button", { name: "Choose a lesson", exact: true }).click();
-  await accountPage.getByRole("button", { name: "Single lessons · choose one or more dates", exact: true }).click();
-  await accountPage.getByRole("button", { name: "Choose a time", exact: true }).click();
   await accountPage.getByText("No free times on this day.", { exact: true }).waitFor();
-  await accountPage.getByRole("button", { name: "Change date", exact: true }).click();
+  // Beside the times on a wide screen; behind Change date on a phone.
+  if (width < 700) await accountPage.getByRole("button", { name: "Change date", exact: true }).click();
   const unavailableDate = accountPage.locator(`#lesson-calendar [data-date-key="${emptyDateKey}"]`);
+  await unavailableDate.waitFor({ state: "visible" });
   if (await unavailableDate.isEnabled()) throw new Error("The actual availability check must keep a full day unavailable.");
 }
 await accountPage.setViewportSize({ width: 390, height: 844 });
 
 await accountMenuButton.click();
 await accountPanel.getByRole("button", { name: "Sign out", exact: true }).click();
-await accountPage.getByRole("button", { name: "Book a new lesson", exact: true }).waitFor();
+await accountPage.locator("#lesson-calendar .booking-bar__sign-in").waitFor();
 await accountPanel.waitFor({ state: "detached" });
 await accountPage.close();
 await accountBrowser.close();
@@ -2552,7 +2535,7 @@ await accountBrowser.close();
 const legacyBrowser = await chromium.launch({ headless: true });
 const legacyPage = await legacyBrowser.newPage({ viewport: { width: 390, height: 844 } });
 await legacyPage.goto(`${base}/booking`, { waitUntil: "domcontentloaded" });
-await legacyPage.waitForSelector("#booking-journey-start", { timeout: 10_000 });
+await legacyPage.waitForSelector("#lesson-calendar .booking-bar", { timeout: 10_000 });
 await legacyPage.waitForFunction(() => window.location.pathname === "/book/", null, { timeout: 10_000 });
 if (new URL(legacyPage.url()).pathname !== "/book/") {
   throw new Error(`The legacy management route did not normalise to /book/: ${legacyPage.url()}`);
@@ -2589,7 +2572,6 @@ console.log(
           defaultWeekCount: defaultCalendarWeekCount,
           overviewWeekCountAfterSelection: compactCalendarWeekCount,
           lessonPromptPlacement: bookedDayOrientation,
-          freeCompactWeekCount,
           availableTimeCount
         },
         stopRepeatCalls: stopRepeatPayloads.length,
