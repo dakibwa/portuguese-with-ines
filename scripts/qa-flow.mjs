@@ -1564,12 +1564,13 @@ const promptLessonDetails = await promptLessons.evaluateAll((buttons) =>
     detail: button.querySelector("small")?.textContent?.trim() ?? ""
   }))
 );
+// Titles lead with the Porto time; a visitor elsewhere also sees their own.
 if (
-  JSON.stringify(promptLessonDetails) !==
-  JSON.stringify([
-    { title: formatQaTime(qaStart), detail: "60 mins · Online · Weekly" },
-    { title: formatQaTime(qaSecondStart), detail: "60 mins · Online" }
-  ])
+  promptLessonDetails.length !== 2 ||
+  !promptLessonDetails[0].title.startsWith(formatQaTime(qaStart)) ||
+  promptLessonDetails[0].detail !== "60 mins · Online · Weekly" ||
+  !promptLessonDetails[1].title.startsWith(formatQaTime(qaSecondStart)) ||
+  promptLessonDetails[1].detail !== "60 mins · Online"
 ) {
   throw new Error(`A two-lesson day should list both lessons to open: ${JSON.stringify(promptLessonDetails)}.`);
 }
