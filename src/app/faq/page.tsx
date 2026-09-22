@@ -157,7 +157,7 @@ const faqSections = [
       {
         question: "How do I pay?",
         answer:
-          "You’ll see the payment arrangements when you book. You may be asked to pay me on the day or securely save a card for payment after your lesson. Saving your card doesn’t charge it."
+          "You’ll securely save a card when you book. Nothing is charged at booking. Your card is charged automatically after each lesson."
       },
       {
         question: "How much does a lesson cost?",
@@ -187,7 +187,7 @@ const faqSections = [
         answer: [
           `Cancel or change your lesson with less than ${notice}’ notice for ${lateFee}. You must do this before the lesson starts.`,
           "If you cancel, you won’t also be charged the full lesson price. If you change the time, you’ll still pay for the lesson after it takes place.",
-          `The ${lateFee} change fee is charged only once per lesson. If you’ve saved a card, it’s charged automatically.`
+          `The ${lateFee} change fee is charged automatically to your saved card, once per lesson.`
         ]
       },
       {

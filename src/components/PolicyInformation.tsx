@@ -9,8 +9,7 @@ export function TermsPrivacyInformation() {
       <h2>Payments</h2>
       <ul>
         <li>No payment is taken when you book.</li>
-        <li><strong>Saved card.</strong> Stripe charges it after each lesson and collects any fees automatically. Complete any card setup to confirm your booking.</li>
-        <li><strong>Direct payment.</strong> Pay Inês on the lesson day.</li>
+        <li><strong>Automatic payment.</strong> Securely save a card to confirm your booking. Stripe charges it after each lesson and collects any fees automatically.</li>
         <li>Each recurring lesson is paid separately. Prepaid bookings follow the rules shown in your calendar.</li>
       </ul>
 
