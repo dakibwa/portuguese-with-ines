@@ -5702,8 +5702,9 @@ dialog[open]::backdrop {
     grid-template-columns: 1fr;
   }
 
-  /* Stacked, the fan comes down from the top corner beside the heading
-     instead of sitting alone beneath the text in its own empty screen. */
+  /* Stacked, the fan rises into the top corner beside the heading instead of
+     sitting alone beneath the text. It keeps its own orientation: mirrored,
+     it reads as upside down. */
   .approach-intro {
     min-height: 0;
     padding-top: 2.4rem;
@@ -5711,11 +5712,10 @@ dialog[open]::backdrop {
   }
 
   .approach-intro__splat {
-    top: -8%;
+    top: -14%;
     right: -22%;
     bottom: auto;
-    width: min(62%, 320px);
-    transform: scaleY(-1);
+    width: min(60%, 300px);
   }
 
   .teacher-band {
