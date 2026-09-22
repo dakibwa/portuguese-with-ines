@@ -452,6 +452,9 @@ await page.locator(".faq-index").getByRole("link", { name: /Payment/ }).click();
 await page.locator("#faq-payment:not([hidden])").waitFor();
 const faqAfterSwitch = await page.evaluate(() => ({
   scrollY: window.scrollY,
+  viewport: [window.innerWidth, window.innerHeight],
+  headingTop: Math.round(document.getElementById("faq-payment-title")?.getBoundingClientRect().top ?? -1),
+  indexBottom: Math.round(document.querySelector(".faq-index")?.getBoundingClientRect().bottom ?? -1),
   hash: window.location.hash,
   visible: [...document.querySelectorAll(".faq-group:not([hidden])")].map((group) => group.id),
   current: document.querySelector(".faq-index a[aria-current='true']")?.getAttribute("href")

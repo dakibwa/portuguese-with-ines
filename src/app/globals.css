@@ -1614,6 +1614,10 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   }
 }
 
+.faq-group__header h2 {
+  scroll-margin-top: 1.25rem;
+}
+
 .faq-group__header h2:focus {
   outline: none;
 }

@@ -43,16 +43,18 @@ export function FaqSections({ sections, indexMark }: { sections: FaqSection[]; i
 
   function choose(id: string, event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
+    const index = event.currentTarget.closest(".faq-index");
     setActive(id);
     window.history.replaceState(window.history.state, "", `#faq-${id}`);
     requestAnimationFrame(() => {
       const heading = document.getElementById(`faq-${id}-title`);
       if (!heading) return;
       heading.focus({ preventScroll: true });
-      // Beside the index nothing needs to move. Where the index sits above the
-      // questions (phones), the section is below it: bring its heading up.
-      const { top } = heading.getBoundingClientRect();
-      if (top < 0 || top > window.innerHeight * 0.7) {
+      // Beside the index (desktop) the page never moves: the section replaces
+      // the last one where it stood. Stacked beneath the index (phones), the
+      // section starts below it, so bring its heading up.
+      const stacked = index ? index.getBoundingClientRect().bottom <= heading.getBoundingClientRect().top : false;
+      if (stacked) {
         heading.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
       }
     });
