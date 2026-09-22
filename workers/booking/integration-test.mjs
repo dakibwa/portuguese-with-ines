@@ -28,6 +28,9 @@ let checkoutUnavailable = false;
 let decline = false;
 const setupIntents = new Map();
 let duringSetupRead = null;
+const expiredSessions = [];
+const completedSessions = new Set();
+let expiryUnavailable = false;
 // Only reached while a test sets RESEND_API_KEY and turns dry run off.
 const sentEmails = [];
 globalThis.fetch = async (url, options) => {
@@ -50,9 +53,18 @@ globalThis.fetch = async (url, options) => {
     return Response.json({ id: `re_${refunds.length}`, status: refundStatus });
   }
   if (String(url) === "https://www.googleapis.com/oauth2/v3/certs") return Response.json({ keys: [googleJwk] });
+  if (/^https:\/\/api\.stripe\.com\/v1\/checkout\/sessions\/[^/]+\/expire$/.test(String(url))) {
+    if (checkoutUnavailable || expiryUnavailable) throw new Error("Isolated expiry outage");
+    const id = String(url).split("/").at(-2);
+    expiredSessions.push(id);
+    // Stripe only expires an open session.
+    if (completedSessions.has(id)) return Response.json({ error: { message: "Isolated session already complete", type: "invalid_request_error" } }, { status: 400 });
+    return Response.json({ id, status: "expired" });
+  }
   if (String(url).startsWith("https://api.stripe.com/v1/checkout/sessions/")) {
     if (checkoutUnavailable) throw new Error("Isolated lookup outage");
-    return Response.json({ id: String(url).split("/").at(-1), status: checkoutStatus, url: "https://checkout.stripe.com/c/pay/mock" });
+    const id = String(url).split("/").at(-1);
+    return Response.json({ id, status: completedSessions.has(id) ? "complete" : checkoutStatus, url: "https://checkout.stripe.com/c/pay/mock" });
   }
   if (String(url) === "https://api.stripe.com/v1/checkout/sessions") {
     checkoutRequests.push({ body: options.body, key: options.headers["Idempotency-Key"] });
@@ -1055,6 +1067,225 @@ await test("Inês's calendar copy omits the student's manage link; the student's
   assert.ok(teacherEmail && studentEmail, "both copies were sent");
   assert.ok(!ics(teacherEmail).includes("manage="), "Inês's calendar copy carries no per-booking manage link");
   assert.ok(ics(studentEmail).includes("manage="), "the student's own copy still does");
+});
+// A student who backs out of the card form keeps one unfinished setup, not a lockout.
+function unsavedCardStudent(id) {
+  student(id);
+  db.prepare("UPDATE students SET stripe_customer_id=NULL,stripe_payment_method=NULL WHERE id=?").run(id);
+  return createSession(id, env.BOOKING_TOKEN_SECRET).then((session) => { sessions[id] = session; return id; });
+}
+const backedOutTrial = { lessonType: "trial", startAt: "2026-11-10T10:00:00.000Z", paymentConsent: true, expectedPriceCents: 2000 };
+await test("a new booking replaces the student's own unfinished card setup instead of refusing them", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  db.prepare("DELETE FROM request_limits WHERE key LIKE 'hold:%'").run();
+  const user = await unsavedCardStudent("backs-out");
+  const holds = () => db.prepare("SELECT id, stripe_session_id FROM bookings WHERE student_id=?").all(user);
+  assert.equal((await call("/bookings", { user, body: backedOutTrial })).status, 201);
+  const [abandoned] = holds();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const again = await call("/bookings", { user, body: backedOutTrial });
+    assert.equal(again.status, 201, await again.clone().text());
+  }
+  assert.equal(holds().length, 1, "one unfinished setup per student");
+  assert.notEqual(holds()[0].id, abandoned.id);
+  assert.ok(expiredSessions.includes(abandoned.stripe_session_id), "the released Checkout Session is expired with Stripe");
+
+  setupIntents.set("seti_backs_out", { status: "succeeded", customer: "cus_backs_out", payment_method: "pm_backs_out" });
+  const late = await webhook({ id: "evt_backs_out", type: "checkout.session.completed", livemode: false, data: { object: {
+    id: abandoned.stripe_session_id, client_reference_id: abandoned.id, customer: "cus_backs_out", mode: "setup",
+    status: "complete", setup_intent: "seti_backs_out", metadata: { purpose: "card_setup" }
+  } } });
+  assert.equal(late.status, 200);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND status='confirmed'").get(user).n, 0);
+  assert.equal(db.prepare("SELECT stripe_payment_method FROM students WHERE id=?").get(user).stripe_payment_method, null);
+});
+await test("a card setup Stripe already completed keeps its hold, its trial claim and its webhook confirmation", async () => {
+  const [finished] = db.prepare("SELECT id, stripe_session_id FROM bookings WHERE student_id='backs-out'").all();
+  completedSessions.add(finished.stripe_session_id);
+  const trial = await call("/bookings", { user: "backs-out", body: backedOutTrial });
+  assert.equal(trial.status, 400);
+  assert.match(await trial.text(), /first lesson/);
+  assert.equal((await call("/bookings", { user: "backs-out", body: { ...backedOutTrial, lessonType: "single", expectedPriceCents: 2500 } })).status, 409);
+  setupIntents.set("seti_finished", { status: "succeeded", customer: "cus_finished", payment_method: "pm_finished" });
+  const confirmed = await webhook({ id: "evt_finished", type: "checkout.session.completed", livemode: false, data: { object: {
+    id: finished.stripe_session_id, client_reference_id: finished.id, customer: "cus_finished", mode: "setup",
+    status: "complete", setup_intent: "seti_finished", metadata: { purpose: "card_setup" }
+  } } });
+  assert.equal(confirmed.status, 200, await confirmed.clone().text());
+  assert.equal(db.prepare("SELECT status FROM bookings WHERE id=?").get(finished.id).status, "confirmed");
+});
+await test("a lapsed hold always goes, and an open one only once Stripe confirms its session expired", async () => {
+  db.prepare("DELETE FROM request_limits WHERE key LIKE 'hold:%'").run();
+  const user = await unsavedCardStudent("stale-hold");
+  for (const [id, start, expires] of [["stale-lapsed", "2026-11-13T17:00:00.000Z", "2026-09-05T09:30:00.000Z"], ["stale-open", "2026-11-13T18:00:00.000Z", "2026-09-05T10:20:00.000Z"]]) {
+    booking(id, { owner: user, payment: "pending", start, end: new Date(Date.parse(start) + 3600000).toISOString() });
+    db.prepare("UPDATE bookings SET status='pending_payment', hold_expires_at=?, stripe_session_id=? WHERE id=?").run(expires, `cs_${id}`, id);
+  }
+  const trial = { ...backedOutTrial, startAt: "2026-11-11T17:00:00.000Z" };
+  expiryUnavailable = true;
+  try {
+    assert.equal((await call("/bookings", { user, body: trial })).status, 400, "an open setup Stripe could not expire may still become a lesson");
+  } finally {
+    expiryUnavailable = false;
+  }
+  await drain();
+  assert.deepEqual(db.prepare("SELECT id FROM bookings WHERE student_id=?").all(user).map((row) => row.id), ["stale-open"]);
+  const booked = await call("/bookings", { user, body: trial });
+  assert.equal(booked.status, 201, await booked.clone().text());
+  assert.ok(expiredSessions.includes("cs_stale-open"));
+  assert.ok(!db.prepare("SELECT id FROM bookings WHERE student_id=?").all(user).some((row) => row.id.startsWith("stale-")));
+});
+await test("replacing an unfinished weekly setup removes its held lessons and its empty recipe", async () => {
+  db.prepare("DELETE FROM request_limits WHERE key LIKE 'hold:%'").run();
+  const user = await unsavedCardStudent("weekly-backs-out");
+  const weekly = { lessonType: "single", startAt: "2026-11-12T17:00:00.000Z", repeat: 4, paymentConsent: true, expectedPriceCents: 2500 };
+  assert.equal((await call("/bookings", { user, body: weekly })).status, 201);
+  const [first] = db.prepare("SELECT id FROM booking_series WHERE student_id=?").all(user);
+  const again = await call("/bookings", { user, body: weekly });
+  assert.equal(again.status, 201, await again.clone().text());
+  const series = db.prepare("SELECT id FROM booking_series WHERE student_id=?").all(user);
+  assert.equal(series.length, 1);
+  assert.notEqual(series[0].id, first.id);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND series_id=?").get(user, series[0].id).n, 4);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=?").get(user).n, 4);
+});
+
+await test("availability ignores the lesson being changed only for its manage link or its owner's session", async () => {
+  booking("avail-own", { start: "2026-11-16T10:00:00.000Z", end: "2026-11-16T11:00:00.000Z" });
+  const starts = async (query, user = null) => ((await (await call(`/availability?from=2026-11-16&to=2026-11-16&lessonType=${query}`, { method: "GET", user })).json())
+    .slotsByDate["2026-11-16"] ?? []).map((slot) => slot.startAt.slice(11, 16));
+  const manage = encodeURIComponent(await token("avail-own"));
+  assert.ok(!(await starts("single")).includes("10:30"));
+  assert.ok((await starts(`single&manage=${manage}`)).includes("10:30"), "half an hour later is offered");
+  assert.ok((await starts(`long&manage=${manage}`)).includes("10:00"), "a longer lesson at the same start is offered");
+  assert.ok(!(await starts(`long&manage=avail-own.forged`)).includes("10:00"), "a forged link gets the public answer");
+
+  const at = new Date().toISOString();
+  db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('avail-series','alice','single',1,720,?,?)").run(at, at);
+  booking("avail-weekly", { series: "avail-series", start: "2026-11-16T12:00:00.000Z", end: "2026-11-16T13:00:00.000Z" });
+  assert.ok(!(await starts("single&series=avail-series")).includes("12:30"), "no session");
+  assert.ok(!(await starts("single&series=avail-series", "outsider")).includes("12:30"), "someone else's session");
+  assert.ok((await starts("single&series=avail-series", "alice")).includes("12:30"), "the owner moving their sequence");
+  db.prepare("UPDATE booking_series SET status='ended' WHERE id='avail-series'").run();
+  assert.ok(!(await starts("single&series=avail-series", "alice")).includes("12:30"), "an ended sequence cannot be moved");
+});
+
+await test("switching only between online and Porto inside 14 hours is a late change, not a new time", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  booking("switch-late", { start: "2026-09-05T18:00:00.000Z", end: "2026-09-05T19:00:00.000Z" });
+  const path = `/bookings/${await token("switch-late")}/reschedule`;
+  const fees = () => charges.filter((charge) => charge.key.includes("switch-late")).map((charge) => charge.amount);
+  const switched = await call(path, { body: { startAt: "2026-09-05T18:00:00.000Z", location: "porto" } });
+  assert.equal(switched.status, 200, await switched.clone().text());
+  const result = await switched.json();
+  assert.equal(result.booking.location, "porto");
+  assert.equal(result.sameDayFeeApplied, true);
+  await drain();
+  assert.deepEqual({ ...db.prepare("SELECT starts_at, ends_at, location, same_day_change FROM bookings WHERE id='switch-late'").get() },
+    { starts_at: "2026-09-05T18:00:00.000Z", ends_at: "2026-09-05T19:00:00.000Z", location: "porto", same_day_change: 1 });
+  assert.deepEqual(fees(), [500], "one late change fee, as for any change inside the window");
+  assert.equal((await call(path, { body: { startAt: "2026-09-05T18:00:00.000Z", location: "online" } })).status, 200);
+  await drain();
+  assert.deepEqual(fees(), [500], "the fee applies once per lesson");
+  for (const body of [{ startAt: "2026-09-05T18:30:00.000Z" }, { startAt: "2026-09-05T18:00:00.000Z", lessonType: "long" }]) {
+    const refused = await call(path, { body });
+    assert.equal(refused.status, 409);
+    assert.match(await refused.text(), /at least 14 hours' notice/);
+  }
+  // Inês may place a lesson outside her published hours; its student can still switch where it happens.
+  booking("switch-outside-hours", { start: "2026-09-16T20:00:00.000Z", end: "2026-09-16T21:00:00.000Z" });
+  const outside = await call(`/bookings/${await token("switch-outside-hours")}/reschedule`, { body: { startAt: "2026-09-16T20:00:00.000Z", location: "porto" } });
+  assert.equal(outside.status, 200, await outside.clone().text());
+});
+
+await test("a pay-in-person lesson cancelled late says the fee applies, never that a card is charged", async () => {
+  booking("in-person-late", { payment: "not_required", start: "2026-09-05T19:00:00.000Z", end: "2026-09-05T20:00:00.000Z" });
+  Object.assign(env, { RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0" });
+  sentEmails.length = 0;
+  const chargesBefore = charges.length;
+  try {
+    const cancelled = await call(`/bookings/${await token("in-person-late")}/cancel`);
+    assert.equal(cancelled.status, 200, await cancelled.clone().text());
+    const result = await cancelled.json();
+    assert.equal(result.sameDayFeeApplied, true);
+    assert.equal(result.booking.sameDayFeeAutomatic, false);
+    await drain();
+  } finally {
+    Object.assign(env, { EMAIL_DRY_RUN: "1" });
+    delete env.RESEND_API_KEY;
+  }
+  const email = sentEmails.find((sent) => sent.to[0] === "alice@example.invalid" && sent.subject.endsWith("is cancelled"));
+  assert.match(email.text, /less than 14 hours before the lesson, so the €5 fee applies\./);
+  assert.ok(!/saved card|automatically/.test(email.text));
+  assert.equal(charges.length, chargesBefore);
+  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id='in-person-late'").get().same_day_fee_status, "not_required");
+});
+
+await test("emails keep an agreed rate's cents instead of rounding to whole euros", async () => {
+  student("cents-rate"); sessions["cents-rate"] = await createSession("cents-rate", env.BOOKING_TOKEN_SECRET);
+  db.prepare("INSERT INTO student_recurring_rates (student_id, duration_minutes, amount_cents, redeemed_at) VALUES ('cents-rate', 60, 2250, ?)").run(new Date().toISOString());
+  Object.assign(env, { RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0" });
+  sentEmails.length = 0;
+  try {
+    const booked = await call("/bookings", { user: "cents-rate", body: { lessonType: "single", startAt: "2026-10-15T16:00:00.000Z", repeat: 4, paymentConsent: true, expectedPriceCents: 2250 } });
+    assert.equal(booked.status, 201, await booked.clone().text());
+    await drain();
+  } finally {
+    Object.assign(env, { EMAIL_DRY_RUN: "1" });
+    delete env.RESEND_API_KEY;
+  }
+  const email = sentEmails.find((sent) => sent.to[0] === "cents-rate@example.invalid");
+  assert.match(email.text, /^Price: €22\.50 a lesson · charged to your saved card when each lesson ends$/m);
+});
+
+await test("moving a recurrence leaves a lesson inside 14 hours where it is and moves the rest together", async () => {
+  const at = new Date().toISOString();
+  db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('keep-late','alice','single',6,1140,?,?)").run(at, at);
+  for (const [id, start] of [["keep-late-1", "2026-09-05T18:00:00.000Z"], ["keep-late-2", "2026-09-12T18:00:00.000Z"], ["keep-late-3", "2026-09-19T18:00:00.000Z"]]) {
+    booking(id, { series: "keep-late", start, end: new Date(Date.parse(start) + 3600000).toISOString() });
+  }
+  const moved = await call("/series/keep-late/reschedule", { body: { startAt: "2026-11-17T12:00:00.000Z" } });
+  assert.equal(moved.status, 200, await moved.clone().text());
+  const result = await moved.json();
+  assert.equal(result.moved, 2);
+  assert.deepEqual(result.kept, ["2026-09-05T18:00:00.000Z"]);
+  assert.deepEqual(db.prepare("SELECT id, starts_at, sequence FROM bookings WHERE series_id='keep-late' ORDER BY id").all().map((row) => ({ ...row })), [
+    { id: "keep-late-1", starts_at: "2026-09-05T18:00:00.000Z", sequence: 0 },
+    { id: "keep-late-2", starts_at: "2026-11-17T12:00:00.000Z", sequence: 1 },
+    { id: "keep-late-3", starts_at: "2026-11-24T12:00:00.000Z", sequence: 1 }
+  ]);
+  assert.deepEqual({ ...db.prepare("SELECT weekday, minute_of_day FROM booking_series WHERE id='keep-late'").get() }, { weekday: 2, minute_of_day: 720 });
+});
+await test("a moved recurrence cannot land on the lesson it leaves inside the window", async () => {
+  const at = new Date().toISOString();
+  db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('keep-clash','alice','single',6,1410,?,?)").run(at, at);
+  booking("keep-clash-1", { series: "keep-clash", start: "2026-09-05T23:30:00.000Z", end: "2026-09-06T01:00:00.000Z" });
+  db.prepare("UPDATE bookings SET lesson_type_id='long' WHERE id='keep-clash-1'").run();
+  booking("keep-clash-2", { series: "keep-clash", start: "2026-09-12T23:30:00.000Z", end: "2026-09-13T00:30:00.000Z" });
+  const extra = db.prepare("INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,created_at) VALUES ('2026-09-06','extra',60,60,?)").run(at).lastInsertRowid;
+  try {
+    const clash = await call("/series/keep-clash/reschedule", { body: { startAt: "2026-09-06T00:00:00.000Z" } });
+    assert.equal(clash.status, 409);
+    assert.match(await clash.text(), /overlaps your lesson on .+, which stays where it is/);
+    assert.equal(db.prepare("SELECT starts_at FROM bookings WHERE id='keep-clash-2'").get().starts_at, "2026-09-12T23:30:00.000Z");
+  } finally {
+    db.prepare("DELETE FROM availability_exceptions WHERE id=?").run(extra);
+  }
+});
+await test("a time claimed while a recurrence is being moved moves none of it", async () => {
+  const at = new Date().toISOString();
+  db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('move-race','alice','single',2,900,?,?)").run(at, at);
+  booking("move-race-1", { series: "move-race", start: "2026-11-17T15:00:00.000Z", end: "2026-11-17T16:00:00.000Z" });
+  booking("move-race-2", { series: "move-race", start: "2026-11-24T15:00:00.000Z", end: "2026-11-24T16:00:00.000Z" });
+  beforeRun = (sql) => {
+    if (!sql.startsWith("WITH proposed")) return;
+    beforeRun = null;
+    booking("move-race-rival", { owner: "bob", start: "2026-11-30T16:00:00.000Z", end: "2026-11-30T17:00:00.000Z" });
+  };
+  const moved = await call("/series/move-race/reschedule", { body: { startAt: "2026-11-23T16:00:00.000Z" } });
+  assert.equal(moved.status, 409, await moved.clone().text());
+  assert.deepEqual(db.prepare("SELECT starts_at FROM bookings WHERE series_id='move-race' ORDER BY starts_at").all().map((row) => row.starts_at),
+    ["2026-11-17T15:00:00.000Z", "2026-11-24T15:00:00.000Z"]);
 });
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;

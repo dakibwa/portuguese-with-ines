@@ -23,7 +23,7 @@ function overlaps(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
 }
 
-export const DEFAULT_BOOKING_HORIZON_DAYS = 56;
+export const DEFAULT_BOOKING_HORIZON_DAYS = 84;
 export const DEFAULT_MINIMUM_NOTICE_HOURS = 14;
 
 function mergeStartRanges(ranges) {
