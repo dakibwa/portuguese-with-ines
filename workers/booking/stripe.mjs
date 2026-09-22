@@ -93,6 +93,11 @@ export function retrieveCheckoutSession(env, sessionId) {
   return stripeGet(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`);
 }
 
+/** Stripe only expires an open session; one that completed first stays completed. */
+export function expireCheckoutSession(env, sessionId) {
+  return stripeRequest(env, `/checkout/sessions/${encodeURIComponent(sessionId)}/expire`, {});
+}
+
 export function retrieveRefund(env, refundId) {
   return stripeGet(env, `/refunds/${encodeURIComponent(refundId)}`);
 }

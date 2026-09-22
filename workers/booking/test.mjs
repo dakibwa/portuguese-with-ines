@@ -14,6 +14,7 @@ import {
   checkoutSessionProblem,
   createCardSetupSession,
   createCheckoutSession,
+  expireCheckoutSession,
   isTestMode,
   refundPayment,
   setupSessionProblem,
@@ -25,6 +26,7 @@ import {
 import { verifyGoogleIdToken } from "./google.mjs";
 import { hashPassword, verifyPassword, passwordProblem } from "./auth.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
+import { formatEuros } from "./money.mjs";
 import { buildCalendarInvite, buildCalendarSeriesInvite, calendarUid } from "./ics.mjs";
 import { normaliseWeeks, occurrenceInstants, outstandingFor, slotOf, SERIES_LENGTHS } from "./series.mjs";
 import { createManageToken, readManageToken, safeEqual, bookingReference } from "./tokens.mjs";
@@ -115,7 +117,7 @@ await test("date arithmetic crosses month and year boundaries", () => {
   assert.equal(addDaysToKey("2026-03-01", -1), "2026-02-28");
 });
 
-await test("the default booking window is eight weeks and clamps later availability", async () => {
+await test("the default booking window is twelve weeks and clamps later availability", async () => {
   const env = {
     DB: {
       prepare(sql) {
@@ -141,10 +143,10 @@ await test("the default booking window is eight weeks and clamps later availabil
     now: new Date("2026-08-30T08:00:00.000Z")
   });
 
-  assert.equal(DEFAULT_BOOKING_HORIZON_DAYS, 56);
-  assert.equal(settings.bookingHorizonDays, 56);
-  assert.ok(slotsByDate["2026-10-19"]?.length, "the final Monday inside eight weeks should be offered");
-  assert.equal(slotsByDate["2026-10-26"], undefined, "the first Monday outside eight weeks must stay closed");
+  assert.equal(DEFAULT_BOOKING_HORIZON_DAYS, 84);
+  assert.equal(settings.bookingHorizonDays, 84);
+  assert.ok(slotsByDate["2026-11-16"]?.length, "the final Monday inside twelve weeks should be offered");
+  assert.equal(slotsByDate["2026-11-23"], undefined, "the first Monday outside twelve weeks must stay closed");
 });
 
 await test("moving a recurrence ignores only that sequence's existing lessons", async () => {
@@ -611,6 +613,23 @@ await test("card setup saves for off-session use and never creates a charge", as
   assert.equal(body.has("setup_intent_data[usage]"), false);
   assert.equal(body.has("line_items[0][price_data][unit_amount]"), false);
   assert.equal(request.options.headers["Idempotency-Key"], "ines:setup:booking_setup");
+});
+
+await test("an abandoned card setup is expired through Stripe's own endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let request;
+  globalThis.fetch = async (url, options) => {
+    request = { url, options };
+    return Response.json({ id: "cs_test_abandoned", status: "expired" });
+  };
+  try {
+    assert.equal((await expireCheckoutSession({ STRIPE_SECRET_KEY: "rk_test_example" }, "cs_test_abandoned")).status, "expired");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(request.url, "https://api.stripe.com/v1/checkout/sessions/cs_test_abandoned/expire");
+  assert.equal(request.options.method, "POST");
+  assert.equal(request.options.headers["Stripe-Version"], "2026-08-26.dahlia");
 });
 
 await test("a paid Checkout Session must match the booking exactly", () => {
@@ -1403,6 +1422,14 @@ await test("a trial cannot be converted into a standard lesson", () => {
   const trial = { id: "trial", price_cents: 2000 };
   const single = { id: "single", price_cents: 2500 };
   assert.match(lessonTypeChangeProblem(row, trial, single), /trial lesson/i);
+});
+
+await test("email amounts keep their cents and print whole euros bare, as the site does", () => {
+  assert.equal(formatEuros(2500), "€25");
+  assert.equal(formatEuros(500), "€5");
+  assert.equal(formatEuros(2250), "€22.50");
+  assert.equal(formatEuros(1999), "€19.99");
+  assert.equal(formatEuros(3505), "€35.05");
 });
 
 await test("Meet email links are clickable, present in plain text, and reject other hosts", () => {

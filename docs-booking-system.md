@@ -23,6 +23,7 @@ See [Google Calendar and Meet setup](#google-calendar-and-meet-setup) for activa
 ```
 Student on /book                                     (browse without an account)
   → GET  /lesson-types, GET /availability            public
+  → GET  /availability?manage=:token | ?series=:id   a lesson being changed may reuse its own time
   → POST /auth/register | /auth/login | /auth/google → session token
   → POST /bookings                    (Bearer)       → D1 row, emails, ICS invite
   → GET  /me                          (Bearer)       → their calendar and series
@@ -288,8 +289,8 @@ number of booking rows at once.
   must not stop someone booking the other eleven.
 - **Series occurrences ignore `booking_horizon_days`.** That horizon stops a
   stranger reaching in and taking a slot months out; a student keeping their own
-  standing time is the case it is meant to allow. At the current 56 days, a
-  twelve-week booking would otherwise have quietly become an eight-week one.
+  standing time is the case it is meant to allow. Even at the current 84 days,
+  a run starting a few weeks out would otherwise quietly lose its last weeks.
 - **One initial email each way, carrying every current lesson in one calendar
   file**, each event under its own booking's UID so a later change to one week
   still matches the entry already in her calendar. Twelve lessons must not mean
@@ -305,7 +306,7 @@ number of booking rows at once.
   cancelling those silently would be the worse of the two mistakes. Passing
   `cancelRemaining` cancels them too. It applies the same payment policy as an
   individual cancellation: a future paid lesson is refunded, an uncharged one
-  is never charged, and a lesson on its own Porto day remains booked. A selected
+  is never charged, and a lesson inside the 14-hour window remains booked. A selected
   recurring occurrence exposes `Manage sequence`, keeps both outcomes visibly
   distinct, and asks for confirmation before calling the stop endpoint.
 - **Moving a recurrence moves every future confirmed occurrence together.**
@@ -313,7 +314,9 @@ number of booking rows at once.
   same compact change-booking controls. Every proposed week is checked before
   one guarded database update moves the run and its series recipe; a newly
   claimed slot or concurrent individual change moves none of it. Past lessons
-  and any lesson on its own Porto day are left alone. Each booking keeps its
+  are left alone, and a lesson inside the 14-hour window stays where it is while
+  the rest of the run moves; the new weekly time may not overlap it, and the
+  response lists its start under `kept`. Each booking keeps its
   calendar UID, increments its sequence, and the student receives one combined
   updated calendar email. Inês's copy follows the existing development pause.
 - **A run saves a card once and charges each lesson after it.** Stripe Checkout
@@ -376,21 +379,24 @@ number of booking rows at once.
 
 ### How far ahead you can book
 
-`booking_horizon_days` is **56**: students can choose a lesson up to eight weeks
-ahead without browsing a full three-month calendar.
+`booking_horizon_days` is **84** (Dan, 22 September 2026, migration 0018):
+students can choose a lesson up to twelve weeks ahead, and the calendar shows
+that window four weeks at a time rather than as one long scroll. It was 56
+(eight weeks) from 30 August 2026.
 
 - The front end asks for a window wider than the horizon and lets the Worker
   clamp it. It used to ask for a fixed 62 days while sizing the grid from whatever
   horizon the API reported, so raising the horizon past 62 would have drawn weeks
   of empty cells saying "no times free" — a lie rather than a gap.
-- The visible calendar contains exactly eight Monday-to-Sunday rows at most.
-  The Worker's inclusive 56-day boundary can mathematically touch a ninth row;
-  that padding row is not shown. A repeating series may already own lessons
-  beyond the visible window, but those lessons no longer stretch the calendar;
-  they remain available from `Upcoming lessons` in the account bar and still
-  open the same in-place move/cancel interface.
+- The calendar pages through the window four Monday-to-Sunday weeks at a time.
+  A repeating series may already own lessons beyond the window, but those
+  lessons do not stretch the calendar; they remain available from `Upcoming
+  lessons` in the account bar and still open the same in-place move/cancel
+  interface.
 - A signed-in student with any non-cancelled booking is never offered the trial,
-  matching the Worker's booking rule exactly. If that eligibility becomes known
+  matching the Worker's booking rule. An unfinished card setup of their own
+  (`status: "pending_payment"` in `/me`) is the exception: their next booking
+  replaces it before the trial check (see *Payment*). If that eligibility becomes known
   after the trial was selected (for example after signing in at confirmation),
   the trial choice dissolves and the valid lesson choices return without a
   warning banner or a failed booking.
@@ -422,6 +428,8 @@ different students were confirmed into the same lesson in testing.
   the complete action link in that button; the plain-text alternative includes
   the URL. The price row carries payment timing and the footer keeps the
   applicable cancellation/no-show rules without repeating payment timing.
+  Amounts are written as the site writes them: whole euros bare (€25), anything
+  else with its cents (€22.50), never rounded.
 - `email/receipt-kit/README.md` and `scripts/build-receipt-email-kit.mjs` provide
   the matching Gmail/Codex receipt-email kit. It attaches the original fiscal
   PDF issued by Inês's separate automation; it does not issue documents or send
@@ -497,7 +505,10 @@ time, so the rules survive DST instead of drifting an hour twice a year. The
 Student bookings and moves require at least **14 elapsed hours** of notice,
 including across Porto clock changes. Slots inside that window are omitted from
 availability and rejected again when a booking or move is submitted; exactly
-14 hours is allowed. `settings.minimum_notice_hours` controls the live rule;
+14 hours is allowed. Switching only between online and Porto, at the same start
+and length, is not a new time and is not refused by this rule; inside the window
+it is a late change like any other (see *Late changes*).
+`settings.minimum_notice_hours` controls the live rule;
 the seed and missing-setting fallback are both 14. Dan requested this change
 from the previous live setting of 24 hours on 13 September 2026. Since
 21 September 2026 the same setting is also the free-change window (see
@@ -512,6 +523,14 @@ silently shortened the 90-minute format to an 18:30 last start while the
 Blocked exceptions are real spans of time, so a lesson is withheld when it would
 **overlap** one rather than only when it starts inside it — which correctly
 withholds a 90-minute lesson earlier than a 60-minute one.
+
+A lesson being changed may reuse the time it already holds. `GET /availability`
+takes `manage=<manage token>`, which ignores that one booking once the token
+verifies, and `series=<series id>`, which ignores an active weekly sequence only
+for a request carrying its owner's session. Anything invalid quietly gets the
+public answer, in the same response shape. Without this a student could not
+move a lesson half an hour later or change its length at the same start, though
+the reschedule endpoints accept both.
 
 Once availability has loaded, the date picker omits complete leading weeks with
 no free slots. That means a weekend with nothing left to book opens directly on
@@ -586,6 +605,14 @@ With `postpay` and Stripe configured:
 - the slot is held as `pending_payment` while Checkout saves a reusable card in
   setup mode; no money is taken and nothing is emailed until the webhook proves
   the card setup succeeded;
+- a student's next `POST /bookings` replaces their own unfinished card setup,
+  so backing out of the form, reloading or closing the tab never leaves them
+  refused by their own hold or treated as having had a trial. The replaced
+  hold is deleted only once Stripe's expire call (or a read after it) reports
+  the Checkout Session `expired`, which Stripe does only to a session that can
+  no longer complete; a lapsed hold goes regardless. A completed setup, or one
+  Stripe cannot answer for, keeps its hold for the webhook. Should a released
+  session's completion still arrive, it finds no booking and confirms nothing;
 - the webhook signature is verified before the payload is trusted for anything,
   and events are recorded so each is handled exactly once;
 - Checkout creation, saved-card charges and refunds use a stable booking-based
@@ -624,7 +651,9 @@ while her IVA basis remains an owner/accountant decision.
 
 **Trial lessons are first lessons.** Anyone with a booking that wasn't
 cancelled is refused the trial at creation, kindly, and pointed at a single
-lesson. This is live now, independent of payment mode.
+lesson. Their own unfinished card setup is released before that check, so it
+still counts only if Stripe has completed it or cannot confirm it expired. This
+is live now, independent of payment mode.
 
 Stripe is used because Square does not serve Portugal and Stripe supports
 reusable cards with explicit off-session setup. A least-privilege `rk_test_`
@@ -750,8 +779,13 @@ names; they now mean "inside the window".
   words. Rename them only together with that automation.
 - **Series**: stopping or moving a whole run keeps any occurrence inside the
   window where it is; the student can still change that one individually.
+- **Online ⇄ In Porto**: switching only where a lesson happens, at the same
+  start and length, is a change like any other. It is never refused for
+  notice, since the time is not new, and inside the window it applies the same
+  once-per-lesson €5 fee as a move.
 - **Booked without automatic payment**: the original pay-in-person promise is
-  retained and no new card charge is invented.
+  retained and no new card charge is invented. Emails say the fee applies (to
+  Inês, that it is due) rather than that a card is charged.
 
 ### Private recurring rates and security
 

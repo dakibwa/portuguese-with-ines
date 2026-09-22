@@ -21,9 +21,8 @@ INSERT INTO availability_rules (weekday, start_minute, last_start_minute, active
 
 INSERT OR REPLACE INTO settings (key, value) VALUES
   ('minimum_notice_hours', '14'),
-  -- Eight weeks: enough room to plan without turning the calendar into a
-  -- three-month trawl.
-  ('booking_horizon_days', '56'),
+  -- Twelve weeks ahead, which the calendar shows four weeks at a time.
+  ('booking_horizon_days', '84'),
   ('slot_interval_minutes', '30'),
   ('same_day_change_fee_cents', '500'),
   ('teacher_name', 'Inês Dias Baía'),
