@@ -23,7 +23,7 @@ export default function LessonsPage() {
           <div className="lessons-hero__title">
             <h1 id="lessons-title">
               Lessons, and<br />
-              what they <em>cost.</em>
+              <span className="display-second-line">what they <em>cost.</em></span>
             </h1>
           </div>
           <div className="lessons-hero__art">

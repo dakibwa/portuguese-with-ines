@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/page-metadata";
 import Link from "next/link";
 import { AssetMark } from "@/components/BrandMarks";
+import { FaqSections } from "@/components/FaqSections";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { CONTACT_WHATSAPP_URL, NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS, formatMoney } from "@/lib/config";
@@ -210,53 +211,15 @@ export default function FAQPage() {
 
       <main className="faq-page" id="main-content">
         <section className="faq-hero" aria-labelledby="faq-title">
-          <h1 id="faq-title">Questions<br />before booking?</h1>
+          <h1 id="faq-title">Questions<br /><span className="display-second-line">before booking?</span></h1>
           <AssetMark asset="/visuals/v2-splats/faq-answers-splat-v2.svg" className="faq-hero__mark" priority />
         </section>
 
         <section className="faq-reference" aria-label="Frequently asked questions">
-          <nav className="faq-index" aria-label="FAQ categories">
-            <p className="eyebrow">Index</p>
-            <ol>
-              {faqSections.map((section, index) => (
-                <li key={section.id}>
-                  <a href={`#faq-${section.id}`}>
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    {section.title}
-                  </a>
-                </li>
-              ))}
-            </ol>
-            <AssetMark asset="/visuals/v2-splats/faq-answers-splat-v2.svg" className="faq-index__answer-index" />
-          </nav>
-
-          <div className="faq-groups">
-            {faqSections.map((section, sectionIndex) => (
-              <section className="faq-group" id={`faq-${section.id}`} key={section.id}>
-                <header className="faq-group__header">
-                  <span>{String(sectionIndex + 1).padStart(2, "0")}</span>
-                  <h2>{section.title}</h2>
-                </header>
-                {section.questions.map((item, questionIndex) => (
-                  <details
-                    className="faq-row"
-                    key={item.question}
-                    open={sectionIndex === 0 && questionIndex === 0}
-                  >
-                    <summary>
-                      <span>{item.question}</span>
-                      <span className="faq-row__symbol" aria-hidden="true" />
-                    </summary>
-                    <div className="faq-row__answer">
-                      {(Array.isArray(item.answer) ? item.answer : [item.answer]).map((paragraph) => (
-                        <p key={paragraph}>{paragraph}</p>
-                      ))}
-                    </div>
-                  </details>
-                ))}
-              </section>
-            ))}
-          </div>
+          <FaqSections
+            indexMark={<AssetMark asset="/visuals/v2-splats/faq-answers-splat-v2.svg" className="faq-index__answer-index" />}
+            sections={faqSections}
+          />
         </section>
 
         <section className="faq-contact">

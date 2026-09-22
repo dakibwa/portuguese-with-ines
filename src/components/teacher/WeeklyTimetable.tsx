@@ -86,7 +86,10 @@ export function WeeklyTimetable({
     [bookings, weekStart],
   );
   const offDays = useMemo(() => daysOff(exceptions), [exceptions]);
-  const step = [15, 30, 60].includes(interval) ? interval : 30;
+  // Rows stay half-hourly even when lessons can start every 15 minutes: a
+  // lesson at :15 or :45 still sits at its exact time, and her week stays one
+  // screen tall instead of doubling. The exact-time editor covers quarter hours.
+  const step = interval === 60 ? 60 : 30;
   const allWindows = Object.values(hours)
     .flat()
     .filter(
@@ -532,17 +535,20 @@ export function WeeklyTimetable({
                           <button
                             key={`${booking.id}-${position}`}
                             type="button"
-                            className={`teacher-calendar-lesson ${booking.location === "porto" ? "teacher-calendar-lesson--porto" : ""}`}
+                            className={`teacher-calendar-lesson ${booking.location === "porto" ? "teacher-calendar-lesson--porto" : ""}${booking.attendance_status === "no_show" ? " teacher-calendar-lesson--no-show" : ""}`}
                             style={{
                               top: `calc(${(bookingStart - start) / step} * var(--teacher-slot-height) + 2px)`,
                               height: `max(38px, calc(${(bookingEnd - bookingStart) / step} * var(--teacher-slot-height) - 4px))`,
                             }}
-                            aria-label={`${booking.student_name}, ${dateLabel(date)}, ${formatSlotTime(booking.starts_at)} to ${formatSlotTime(booking.ends_at)}, ${booking.location === "porto" ? "in Porto" : "online"}. View lesson`}
+                            aria-label={`${booking.student_name}, ${dateLabel(date)}, ${formatSlotTime(booking.starts_at)} to ${formatSlotTime(booking.ends_at)}, ${booking.location === "porto" ? "in Porto" : "online"}${booking.attendance_status === "no_show" ? ", marked as a no-show" : ""}. View lesson`}
                             onClick={() => onSelectBooking(booking)}
                           >
                             <span className="teacher-lesson-time">
                               {formatSlotTime(booking.starts_at)}–
                               {formatSlotTime(booking.ends_at)}
+                              {booking.attendance_status === "no_show" ? (
+                                <em className="teacher-lesson-no-show">No-show</em>
+                              ) : null}
                             </span>
                             <strong>{booking.student_name}</strong>
                             <span className="teacher-lesson-location">

@@ -524,6 +524,10 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   width: 100%;
   height: 72px;
   aspect-ratio: auto;
+  /* The artwork is narrower than its box: start it on the page's edge, as the
+     footer logo does, not floating in the middle. */
+  -webkit-mask-position: left center;
+  mask-position: left center;
 }
 
 .site-nav {
@@ -788,9 +792,22 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 .home-title__script {
+  margin-top: 0.06em;
   color: var(--lavender);
   font-style: italic;
   letter-spacing: -0.04em;
+}
+
+/*
+ * Beth Ellen's descenders reach about 0.4em below the baseline and its
+ * capitals rise almost a full em above it, so at the tight line heights of the
+ * display headings a descender on one line runs into the letters of the next.
+ * The second line of a two-line heading sits lower by that much.
+ */
+.display-second-line {
+  display: inline-block;
+  margin-top: 0.4em;
+  line-height: 1.14;
 }
 
 .home-hero__copy > p {
@@ -906,7 +923,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   font-size: clamp(3rem, 5.6vw, 6.2rem);
   font-weight: 400;
   letter-spacing: -0.045em;
-  line-height: 1;
+  line-height: 1.05;
   word-spacing: 0.08em;
 }
 
@@ -916,6 +933,8 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
  * the same tonal relationship the home hero already uses for lilac on blue.
  */
 .approach-intro h1 em {
+  display: inline-block;
+  margin-top: 0.46em;
   color: var(--blue);
   font-style: normal;
 }
@@ -1040,12 +1059,20 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 .editorial-callout h2 {
-  margin-bottom: 1rem;
+  /* Room for the descenders, so "Beginners" never reaches the text below. */
+  margin-bottom: 0.5em;
   font-family: var(--display);
   font-size: clamp(2.4rem, 4.6vw, 4.4rem);
   font-weight: 400;
   letter-spacing: -0.045em;
   line-height: 1.08;
+}
+
+@media (max-width: 560px) {
+  /* "Beginners welcome." wraps on a phone; the second line clears the g. */
+  .editorial-callout h2 {
+    line-height: 1.45;
+  }
 }
 
 .editorial-callout > p:not(.eyebrow) {
@@ -1188,18 +1215,32 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   content: "";
 }
 
-.lesson-product__link,
-.lesson-product__link:hover {
-  transform: none;
+.lesson-product__link {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 220ms var(--motion-ease),
+    transform 220ms var(--motion-ease);
 }
 
-.lesson-product:hover .lesson-product__link.button--coral {
+/* The button answers too, apart from the card's wash: it lifts and fills. */
+.lesson-product:hover .lesson-product__link,
+.lesson-product:focus-within .lesson-product__link {
+  box-shadow: 0 6px 14px rgba(26, 49, 105, 0.16);
+  transform: translateY(-2px);
+}
+
+.lesson-product:hover .lesson-product__link.button--coral,
+.lesson-product:focus-within .lesson-product__link.button--coral {
   background: #95301f;
 }
 
-.lesson-product:hover .lesson-product__link.button--outline {
+.lesson-product:hover .lesson-product__link.button--outline,
+.lesson-product:focus-within .lesson-product__link.button--outline {
   border-color: var(--ink);
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--ink);
+  color: var(--paper-light);
 }
 
 .lesson-product__pricing {
@@ -1292,13 +1333,11 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 @media (max-width: 1100px) {
-  .lessons-closing {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
+  /* Narrower, the two buttons stack on the right rather than dropping to a
+     row of their own and leaving that side empty. */
   .lessons-closing__actions {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
@@ -1388,7 +1427,6 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   }
 
   .lessons-closing {
-    grid-template-columns: auto minmax(0, 1fr);
     border-radius: var(--squiggle-card);
   }
 
@@ -1396,17 +1434,34 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
     width: 58px;
     height: 50px;
   }
+}
+
+@media (max-width: 640px) {
+  .lessons-closing {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
 
   .lessons-closing__actions {
     display: grid;
+    grid-column: 1 / -1;
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .lesson-product,
-  .lesson-product__mark {
+  .lesson-product__mark,
+  .lesson-product__link {
     transition: none;
+  }
+
+  .lesson-product:hover .lesson-product__link,
+  .lesson-product:focus-within .lesson-product__link {
+    transform: none;
+  }
+
+  .faq-group {
+    animation: none;
   }
 }
 
@@ -1459,7 +1514,6 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 .faq-index {
   position: relative;
   overflow: hidden;
-  min-height: 660px;
   border-right: 1px solid var(--rule);
   padding: 3rem var(--page-pad);
 }
@@ -1491,6 +1545,10 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   text-transform: uppercase;
 }
 
+.faq-index a[aria-current="true"] {
+  color: var(--coral-action);
+}
+
 .faq-index a:hover {
   color: var(--coral-action);
 }
@@ -1500,11 +1558,13 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   color: var(--lavender-ink);
 }
 
+/* Below the list, in the flow: one section at a time can be shorter than the
+   index, and a mark pinned to the bottom then sat on the last entry. */
 .faq-index__answer-index {
-  position: absolute;
-  right: 12%;
-  bottom: 2rem;
-  width: min(68%, 220px);
+  position: relative;
+  display: block;
+  width: min(60%, 170px);
+  margin: 2.4rem 0 0 auto;
   aspect-ratio: 1;
   opacity: 0.9;
 }
@@ -1515,21 +1575,27 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 .faq-group {
   scroll-margin-top: calc(var(--header-height) + 20px);
+  animation: faq-group-in 240ms var(--motion-ease);
 }
 
+/* Choosing a section in the index fades it in where the last one was. */
+@keyframes faq-group-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.faq-group__header h2:focus {
+  outline: none;
+}
+
+/* The index numbers the sections, so the heading needs no number of its own. */
 .faq-group__header {
   display: flex;
   align-items: baseline;
   border-bottom: 2px solid var(--green);
-  padding: 2.7rem 0 1.2rem;
-  gap: 1.3rem;
-}
-
-.faq-group__header span {
-  color: var(--lavender-ink);
-  font-family: var(--ui);
-  font-size: 0.78rem;
-  font-weight: 700;
+  padding: 1.3rem 0 0.9rem;
 }
 
 .faq-group__header h2 {
@@ -1548,11 +1614,11 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 78px;
+  min-height: 66px;
   cursor: pointer;
   padding: 1rem 0;
   font-family: var(--body);
-  font-size: clamp(1.12rem, 1.7vw, 1.4rem);
+  font-size: clamp(1.02rem, 1.25vw, 1.15rem);
   list-style: none;
   gap: 2rem;
 }
@@ -1670,6 +1736,10 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 .booking-intro h1 br {
   display: none;
+}
+
+.booking-intro h1 .display-second-line {
+  margin-top: 0;
 }
 
 .booking-intro > .editorial-rule {
@@ -5786,6 +5856,10 @@ dialog[open]::backdrop {
 
   .booking-intro h1 br {
     display: initial;
+  }
+
+  .booking-intro h1 .display-second-line {
+    margin-top: 0.5em;
   }
 
   .booking-intro > .editorial-rule {

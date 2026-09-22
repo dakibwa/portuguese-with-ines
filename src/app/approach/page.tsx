@@ -14,7 +14,7 @@ export const metadata: Metadata = pageMetadata({
 const approachItems = [
   {
     title: "Any Portuguese is welcome",
-    body: "Whatever variety you already know, we start from there.",
+    body: "I teach European Portuguese. Whatever variety you already know, we start from there.",
     asset: "/visuals/v2-splats/european-portuguese-splat-v2.svg"
   },
   {
@@ -79,7 +79,6 @@ export default function ApproachPage() {
         </section>
 
         <section className="editorial-callout">
-          <p className="eyebrow">Any level</p>
           <h2>Beginners welcome.</h2>
           <p>
             If you’ve never said a word of Portuguese, we can start there. If you’ve been stuck at the same level for

@@ -22,7 +22,7 @@ import {
   type AdminBooking,
   type AvailabilityException,
 } from "@/lib/admin-api";
-import { fetchMe, readSession, type Student } from "@/lib/auth-api";
+import { clearSession, fetchMe, readSession, type Student } from "@/lib/auth-api";
 import { portoTimeToUtc } from "@/lib/booking-api";
 import { BOOKING_CONFIGURED } from "@/lib/config";
 import { SITE_BASE_PATH } from "@/lib/paths";
@@ -409,8 +409,34 @@ export function TeacherSchedule() {
       </p>
     );
 
+  function signOut() {
+    if (hoursDirty && !window.confirm("Sign out and lose the weekly hours you haven’t saved?")) return;
+    clearSession();
+    setToken("");
+    setMe(null);
+    setInitialised(false);
+    setEditing(false);
+    setSelectedBooking(null);
+    setStatus("");
+    setError("");
+  }
+
   return (
     <div className="teacher-workspace">
+      <section className="teacher-account" aria-label="Your account">
+        <p>
+          <span className="teacher-eyebrow">Signed in as</span>
+          <strong>{me?.name || me?.email}</strong>
+        </p>
+        <button
+          className="button button--quiet"
+          disabled={savingDays || savingHours}
+          onClick={signOut}
+          type="button"
+        >
+          Sign out
+        </button>
+      </section>
       <TeacherMeetConnection token={token} />
       {paymentReview.length ? (
         <div className="teacher-inline-notice" role="status">

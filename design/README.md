@@ -203,7 +203,24 @@ Dan's 22 September review tightened the public pages:
   Their rows align across the cards: name and mark, price and length,
   description, then one full-width button, so no card has an empty foot. The
   whole card opens booking with that lesson chosen. Hover and keyboard focus
-  add a quiet colour wash and tilt the mark, without lifting the card;
+  add a quiet colour wash and tilt the mark, without lifting the card, and the
+  button answers on its own: it lifts slightly and fills. The closing blue card
+  keeps its two buttons on the right, stacked when the width tightens, and
+  moves them beneath the copy only on phones;
+- the header logo starts on the page's left edge, like the footer logo and the
+  headings beneath it, rather than floating inside a wider box;
+- no handwritten descender may cross other text. Beth Ellen sits low in its
+  line box, with descenders about 0.4em below the baseline, so a display
+  heading leaves that room before the text that follows. The second line of a
+  two-line heading drops by the same amount, as `talking.`, `Lessons` and
+  `before booking?` do. On phones, `Beginners welcome.` wraps with the same
+  clearance;
+- the FAQ shows one section at a time. The index switches sections in place,
+  fading the chosen one in without scrolling the page, and the address keeps
+  `#faq-<section>` so links open the right section; on phones, where the index
+  sits above, the chosen section is brought into view. Section headings carry
+  no number because the index already does, and questions sit close to body
+  size;
 - text is not selectable by default, so a tap or drag never paints the page
   blue. Anything a visitor may reasonably copy stays selectable: form fields,
   the terms and privacy text, booking references, alerts and error messages,
@@ -281,6 +298,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - Every booked lesson shows its time, student and explicit `Online` or `In Porto`
   label in both layouts, including 60-minute blocks. Keep the location icons and
   coral marker for Porto lessons.
+- The workspace opens with a quiet bar naming who is signed in, with `Sign
+  out`, in the same form as the student account bar.
+- A lesson marked as a no-show turns lavender in the calendar and carries a
+  small coral `No-show` tag beside its time, so she can see it at a glance.
 - Selecting a booked lesson opens its details and the existing move, cancel,
   attendance and payment-status controls. Keep cancellation confirmation,
   permission checks and server error handling intact. The details always
@@ -294,8 +315,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
 
 Use `Portuguese Lessons` on the home page and `Your Lessons` in booking.
 Marketing copy describes Portuguese lessons without repeated European/Portugal
-positioning. Retain actual location choices, addresses, qualifications and Porto
-time where they help someone attend a lesson or understand a deadline.
+positioning. The one statement of it is on Approach: Inês teaches European
+Portuguese, and any variety a student already knows is welcome. Retain actual
+location choices, addresses, qualifications and Porto time where they help
+someone attend a lesson or understand a deadline.
 
 Keep booking confirmation in one column at every width: a compact optional notes
 box, the payment summary underneath, then the agreement and final action. Limit
@@ -461,9 +484,10 @@ Preserve these desktop and mobile states:
   calendar into a compact selected-date row with a `Change date` action, while
   the available times stay beside it on desktop and immediately below it on
   mobile. A free day shows the available times without redundant “no lesson
-  booked” or lesson-summary copy. Those times form one compact grid without
-  morning, afternoon, or evening subheadings; buttons keep an accessible touch
-  target while fitting three across on a phone. `Change date` returns to the
+  booked” or lesson-summary copy. Those times form a small timetable without
+  morning, afternoon, or evening subheadings: one row per hour, one column per
+  start minute the day offers (four for quarter hours), so a gap reads as a gap
+  and buttons keep an accessible touch target on a phone. `Change date` returns to the
   four weeks that held the date. Opening any
   lesson keeps the calendar in place and adds a compact overlay asking
   whether to change or cancel it. `Change` keeps the page dimmed and lifts that

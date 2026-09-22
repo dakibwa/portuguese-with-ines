@@ -485,6 +485,21 @@
   border-left: 3px solid var(--coral);
   padding-left: 6px;
 }
+/* A marked no-show keeps its place but reads as settled, and says so. */
+.teacher-calendar-lesson--no-show {
+  background: var(--lavender-ink);
+}
+.teacher-lesson-no-show {
+  margin-left: 0.35rem;
+  border-radius: 999px;
+  padding: 0 0.35rem;
+  background: var(--coral-action);
+  color: #fff;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .teacher-calendar-lesson:hover {
   background: var(--blue);
   box-shadow: 0 3px 0 rgba(32, 62, 130, 0.15);
@@ -1087,6 +1102,34 @@
   .teacher-lesson-dialog * {
     transition: none !important;
   }
+}
+
+/* Who is signed in, as on the student side: one quiet bar above her tools. */
+.teacher-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.75rem 0.6rem 1.2rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-tile);
+  background: rgba(170, 164, 230, 0.1);
+}
+.teacher-account p {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+}
+.teacher-account strong {
+  overflow: hidden;
+  font: 700 0.95rem/1.35 var(--ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teacher-account > .button {
+  flex: 0 0 auto;
+  width: auto;
 }
 
 .teacher-meet {

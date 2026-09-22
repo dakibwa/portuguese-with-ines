@@ -441,6 +441,32 @@ await firstFaq.locator("summary").click();
 if (await firstFaq.evaluate((element) => element.hasAttribute("open"))) {
   throw new Error("The FAQ disclosure did not close.");
 }
+// The index shows one section at a time, in place, without scrolling the page.
+if ((await page.locator(".faq-group:not([hidden])").count()) !== 1) {
+  throw new Error("The FAQ should show one section at a time.");
+}
+const faqScrollBefore = await page.evaluate(() => window.scrollY);
+await page.locator(".faq-index").getByRole("link", { name: /Payment/ }).click();
+await page.locator("#faq-payment:not([hidden])").waitFor();
+const faqAfterSwitch = await page.evaluate(() => ({
+  scrollY: window.scrollY,
+  hash: window.location.hash,
+  visible: [...document.querySelectorAll(".faq-group:not([hidden])")].map((group) => group.id),
+  current: document.querySelector(".faq-index a[aria-current='true']")?.getAttribute("href")
+}));
+if (
+  Math.abs(faqAfterSwitch.scrollY - faqScrollBefore) > 1 ||
+  faqAfterSwitch.hash !== "#faq-payment" ||
+  JSON.stringify(faqAfterSwitch.visible) !== JSON.stringify(["faq-payment"]) ||
+  faqAfterSwitch.current !== "#faq-payment"
+) {
+  throw new Error(`Choosing a FAQ section should replace the one shown, in place: ${JSON.stringify({ faqScrollBefore, ...faqAfterSwitch })}.`);
+}
+await page.goto(`${base}/faq/#faq-rescheduling`, { waitUntil: "domcontentloaded" });
+await page.locator("#faq-rescheduling:not([hidden])").waitFor({ timeout: 10_000 });
+if ((await page.locator(".faq-group:not([hidden])").count()) !== 1) {
+  throw new Error("A link to a FAQ section should open that section alone.");
+}
 
 await page.goto(`${base}/book`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector(".booking-provider", { timeout: 10_000 });
@@ -2134,22 +2160,30 @@ if (availableTimeCount !== 5) {
 const compactTimeGrid = await accountPage
   .locator("#lesson-calendar .unified-calendar__availability .slot-grid")
   .evaluate((grid) => {
-    const buttons = [...grid.querySelectorAll("button")].map((button) => button.getBoundingClientRect());
+    const buttons = [...grid.querySelectorAll("button")].map((button) => {
+      const box = button.getBoundingClientRect();
+      const time = (button.textContent ?? "").trim().slice(0, 5);
+      return { hour: time.slice(0, 2), minute: time.slice(3, 5), top: Math.round(box.top), left: Math.round(box.left), height: box.height };
+    });
     return {
       buttonHeight: buttons[0]?.height ?? 0,
-      firstRowTops: buttons.slice(0, 3).map((button) => button.top),
-      fourthTop: buttons[3]?.top ?? 0,
+      buttons,
       headingCount: grid.parentElement?.querySelectorAll("h3, h4").length ?? -1
     };
   });
+// A small timetable: one row per hour, and each start minute keeps its column.
+const timesShareHourRows = compactTimeGrid.buttons.every((a) =>
+  compactTimeGrid.buttons.every((b) => (a.hour === b.hour) === (Math.abs(a.top - b.top) <= 1)));
+const timesShareMinuteColumns = compactTimeGrid.buttons.every((a) =>
+  compactTimeGrid.buttons.every((b) => a.minute !== b.minute || Math.abs(a.left - b.left) <= 1));
 if (
   compactTimeGrid.headingCount !== 0 ||
   compactTimeGrid.buttonHeight < 44 ||
   compactTimeGrid.buttonHeight > 54 ||
-  compactTimeGrid.firstRowTops.some((top) => Math.abs(top - compactTimeGrid.firstRowTops[0]) > 1) ||
-  compactTimeGrid.fourthTop <= compactTimeGrid.firstRowTops[0] + 1
+  !timesShareHourRows ||
+  !timesShareMinuteColumns
 ) {
-  throw new Error(`Available times should use a compact, three-across mobile grid: ${JSON.stringify(compactTimeGrid)}.`);
+  throw new Error(`Available times should form one row per hour, with each start minute in its own column: ${JSON.stringify(compactTimeGrid)}.`);
 }
 if (
   (await accountPage.getByText("No lesson booked on this day.", { exact: true }).count()) ||
