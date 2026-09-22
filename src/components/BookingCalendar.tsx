@@ -1874,8 +1874,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       ) : managed.sameDayFeeApplies && managed.booking.status !== "cancelled" ? (
                         <p className="lesson-calendar__notice">
                           This lesson is less than {NOTICE_HOURS} hours away, so moving or cancelling it now costs{" "}
-                          {formatMoneyCents(managed.booking.sameDayFeeCents)}
-                          {managed.sameDayFeeAutomatic ? ", charged automatically" : ""}.
+                          {formatMoneyCents(managed.booking.sameDayFeeCents)}.
+                          {managed.sameDayFeeAutomatic ? " Your saved card is charged when you confirm." : ""}
+                          {" "}This fee applies once per lesson.
                         </p>
                       ) : null}
 
@@ -1926,9 +1927,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           ? ` Your ${formatMoneyCents(managed.booking.amountCents)} comes back to your card.`
                           : ""}
                         {managed.sameDayFeeApplies
-                          ? ` The ${formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee ${
-                              managed.sameDayFeeAutomatic ? "is charged automatically" : "applies"
-                            }.`
+                          ? managed.sameDayFeeAutomatic
+                            ? ` Your saved card is charged the ${formatMoneyCents(managed.booking.sameDayFeeCents)} fee when you confirm the cancellation. This fee applies once per lesson. There’s no lesson charge.`
+                            : ` The ${formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee applies once per lesson.`
                           : ""}
                       </p>
                       <div className="lesson-manage-dialog__actions">
@@ -2645,8 +2646,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 ) : (
                   <p className="booking-state-note">Choose a day marked free.</p>
                 )}
+                {manageMode === "reschedule" && managed.sameDayFeeApplies ? (
+                  <p className="lesson-calendar__notice" id="managed-change-fee">
+                    Changing this lesson with less than {NOTICE_HOURS} hours&rsquo; notice costs{" "}
+                    {formatMoneyCents(managed.booking.sameDayFeeCents)}.
+                    {managed.sameDayFeeAutomatic ? " Your saved card is charged when you confirm the change." : ""}
+                    {" "}This fee applies once per lesson.
+                    {managed.sameDayFeeAutomatic ? " The lesson price is charged after the rescheduled lesson." : ""}
+                  </p>
+                ) : null}
                 <div className="manage-booking__actions">
                   <button
+                    aria-describedby={manageMode === "reschedule" && managed.sameDayFeeApplies ? "managed-change-fee" : undefined}
                     className="button button--coral"
                     disabled={!selectedSlot || manageWorking}
                     onClick={moveManagedLesson}
@@ -2876,7 +2887,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
                       <p className="booking-form-note" id="booking-payment-summary">
                         {postpay
-                          ? `No payment is taken now. Your card will be charged after each lesson. Moving or cancelling less than ${NOTICE_HOURS} hours before costs ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}, and a no-show costs ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)} instead of the lesson price.`
+                          ? `No payment is taken now. Your card will be charged after each lesson. Moving or cancelling less than ${NOTICE_HOURS} hours before costs ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}, charged when you confirm the change or cancellation. A no-show costs ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)} instead of the lesson price.`
                           : `Pay Inês on the lesson day. Moving or cancelling less than ${NOTICE_HOURS} hours before costs ${formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.`}
                         {form.repeat === null ? " Ongoing lessons repeat until you stop them." : ""}
                       </p>
