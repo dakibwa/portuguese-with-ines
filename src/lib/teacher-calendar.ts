@@ -39,26 +39,6 @@ export function mondayOf(key: string) {
   return shiftDate(key, -((day + 6) % 7));
 }
 
-export function shiftMonth(key: string, amount: number) {
-  const date = new Date(`${key.slice(0, 7)}-01T12:00:00Z`);
-  date.setUTCMonth(date.getUTCMonth() + amount);
-  return date.toISOString().slice(0, 10);
-}
-
-export function monthDates(month: string) {
-  const first = `${month.slice(0, 7)}-01`;
-  const start = mondayOf(first);
-  const last = shiftDate(shiftMonth(first, 1), -1);
-  const count =
-    Math.ceil(
-      (new Date(`${last}T12:00:00Z`).getTime() -
-        new Date(`${start}T12:00:00Z`).getTime() +
-        86400000) /
-        (7 * 86400000),
-    ) * 7;
-  return Array.from({ length: count }, (_, index) => shiftDate(start, index));
-}
-
 export function dateLabel(
   key: string,
   options: Intl.DateTimeFormatOptions = {
@@ -203,10 +183,93 @@ export function isWholeDayOff(exception: AvailabilityException) {
   );
 }
 
+/** Each date taken wholly off, with its note ("Holiday"). */
 export function daysOff(exceptions: AvailabilityException[]) {
-  return new Set(
-    exceptions.filter(isWholeDayOff).map((exception) => exception.date),
+  const days = new Map<string, string>();
+  for (const { date, note } of exceptions.filter(isWholeDayOff))
+    if (date)
+      days.set(date, [days.get(date), note].filter(Boolean).join(" · "));
+  return days;
+}
+
+/** A stretch of time in Porto minutes from midnight; `end` is exclusive. */
+export type Span = { start: number; end: number };
+export type WeeklyBlock = Span & { note: string };
+
+/** Sorted and merged, as the Worker stores them. */
+export function mergeSpans(spans: Span[]): Span[] {
+  const merged: Span[] = [];
+  for (const span of [...spans].sort((a, b) => a.start - b.start)) {
+    const last = merged.at(-1);
+    if (last && span.start <= last.end) last.end = Math.max(last.end, span.end);
+    else merged.push({ ...span });
+  }
+  return merged;
+}
+
+export function addSpan(spans: Span[], span: Span) {
+  return mergeSpans([...spans, span]);
+}
+
+/** Cutting out a stretch keeps whatever precise times lie either side of it. */
+export function removeSpan(spans: Span[], cut: Span) {
+  return spans.flatMap((span) =>
+    cut.end <= span.start || cut.start >= span.end
+      ? [span]
+      : [
+          ...(span.start < cut.start
+            ? [{ start: span.start, end: cut.start }]
+            : []),
+          ...(cut.end < span.end ? [{ start: cut.end, end: span.end }] : []),
+        ],
   );
+}
+
+export function overlapsSpan(spans: Span[], start: number, end: number) {
+  return spans.some((span) => span.start < end && start < span.end);
+}
+
+export function spanLabel(span: Span) {
+  return `${minuteLabel(span.start)}–${minuteLabel(span.end)}`;
+}
+
+/** One date's blocked hours, not counting a whole day off. */
+export function dateBlocks(
+  exceptions: AvailabilityException[],
+  date: string,
+): Span[] {
+  return mergeSpans(
+    exceptions
+      .filter(
+        (exception) =>
+          exception.kind === "blocked" &&
+          exception.weekday == null &&
+          exception.date === date &&
+          !isWholeDayOff(exception),
+      )
+      .map((exception) => ({
+        start: exception.start_minute ?? 0,
+        end: exception.end_minute ?? 1440,
+      })),
+  );
+}
+
+/** Time blocked every week on this weekday, such as lunch. */
+export function weeklyBlocks(
+  exceptions: AvailabilityException[],
+  weekday: number,
+): WeeklyBlock[] {
+  return exceptions
+    .filter(
+      (exception) =>
+        exception.kind === "blocked" && exception.weekday === weekday,
+    )
+    .map((exception) => ({
+      start: exception.start_minute ?? 0,
+      end: exception.end_minute ?? 1440,
+      note: exception.note,
+    }))
+    .sort((a, b) => a.start - b.start);
 }
 
 function localMinute(value: string) {
@@ -220,6 +283,49 @@ function localMinute(value: string) {
     Number(parts.find((p) => p.type === "hour")!.value) * 60 +
     Number(parts.find((p) => p.type === "minute")!.value)
   );
+}
+
+/**
+ * The calendar's view of the Worker's rows while a date's change is still
+ * saving, with the same rules the Worker applies: a day off and the hours
+ * blocked within it are replaced independently, weekly blocks never.
+ */
+export function withDayChanges(
+  exceptions: AvailabilityException[],
+  changes: Map<string, { dayOff?: boolean; blocks?: Span[] }>,
+) {
+  let rows = exceptions;
+  for (const [date, change] of changes) {
+    const oneOff = (row: AvailabilityException) =>
+      row.date === date && row.weekday == null && row.kind === "blocked";
+    const dayOffRow = (row: AvailabilityException) =>
+      oneOff(row) && isWholeDayOff(row);
+    if (change.dayOff === false) rows = rows.filter((row) => !dayOffRow(row));
+    if (change.dayOff && !rows.some(dayOffRow))
+      rows = [...rows, oneOffRow(date, null, null)];
+    if (change.blocks)
+      rows = [
+        ...rows.filter((row) => !oneOff(row) || isWholeDayOff(row)),
+        ...change.blocks.map((span) => oneOffRow(date, span.start, span.end)),
+      ];
+  }
+  return rows;
+}
+
+function oneOffRow(
+  date: string,
+  start: number | null,
+  end: number | null,
+): AvailabilityException {
+  return {
+    id: 0,
+    date,
+    weekday: null,
+    kind: "blocked",
+    note: "",
+    start_minute: start,
+    end_minute: end,
+  };
 }
 
 export type BookingSegment = {

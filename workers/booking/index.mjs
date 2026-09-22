@@ -1,4 +1,4 @@
-import { computeAvailability, isSlotBookable, listLessonTypes, loadLessonType, loadSettings } from "./availability.mjs";
+import { computeAvailability, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans } from "./availability.mjs";
 import {
   OPEN_ENDED_HORIZON_WEEKS,
   SERIES_LENGTHS,
@@ -3903,7 +3903,9 @@ async function handleAdmin(request, env, ctx, url, path) {
   if (request.method === "GET" && path === "/admin/availability") {
     const [rules, exceptions] = await Promise.all([
       env.DB.prepare("SELECT * FROM availability_rules ORDER BY weekday, start_minute").all(),
-      env.DB.prepare("SELECT * FROM availability_exceptions WHERE date >= ? ORDER BY date")
+      // Weekly blocks (lunch) too: the calendar has to show every time students
+      // cannot book, not only the one-off dates.
+      env.DB.prepare("SELECT * FROM availability_exceptions WHERE date >= ? OR weekday IS NOT NULL ORDER BY date")
         .bind(dateKey(new Date(), PORTO))
         .all()
     ]);
@@ -3941,20 +3943,70 @@ async function handleAdmin(request, env, ctx, url, path) {
       return json({ ok: true }, 200, request, env);
     }
     if (!parseDateKey(body.date)) return fail("Invalid date.", 400, request, env);
+    const kind = body.kind === "extra" ? "extra" : "blocked";
+    const start = body.startMinute ?? null;
+    const end = body.endMinute ?? null;
+    const minute = (value) => value === null || (Number.isInteger(value) && value >= 0 && value <= 1440);
+    // A blocked span ends when she is free again; an extra window ends at its last start.
+    if (!minute(start) || !minute(end) || (start !== null && end !== null && (kind === "blocked" ? end <= start : end < start))) {
+      return fail("Invalid time range.", 400, request, env);
+    }
 
     await env.DB.prepare(
       "INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) VALUES (?, ?, ?, ?, ?, ?)"
     )
-      .bind(
-        body.date,
-        body.kind === "extra" ? "extra" : "blocked",
-        body.startMinute ?? null,
-        body.endMinute ?? null,
-        cleanText(body.note, 200),
-        new Date().toISOString()
-      )
+      .bind(body.date, kind, start, end, cleanText(body.note, 200), new Date().toISOString())
       .run();
     return json({ ok: true }, 200, request, env);
+  }
+
+  // One date's time off, from the teacher calendar. `dayOff` and `blocks` are
+  // independent and each replaces only its own rows, so taking the whole day
+  // off never discards the hours blocked within it. Weekly blocks and extra
+  // hours are never touched here.
+  if (request.method === "POST" && path === "/admin/exceptions/day") {
+    const body = await readJson(request);
+    if (!parseDateKey(body.date)) return fail("Invalid date.", 400, request, env);
+    if (body.date < dateKey(new Date(), PORTO)) return fail("That date has already passed.", 400, request, env);
+    const dayOff = typeof body.dayOff === "boolean" ? body.dayOff : undefined;
+    const blocks = "blocks" in body ? normaliseBlockedSpans(body.blocks) : undefined;
+    if (blocks === null) return fail("Those times could not be saved. Please reload and try again.", 400, request, env);
+    if (dayOff === undefined && blocks === undefined) return fail("Nothing to change.", 400, request, env);
+
+    const oneOff = "date = ? AND weekday IS NULL AND kind = 'blocked'";
+    const wholeDay = "(start_minute IS NULL OR start_minute <= 0) AND (end_minute IS NULL OR end_minute >= 1440)";
+    const created = new Date().toISOString();
+    const statements = [];
+    if (dayOff === false) {
+      statements.push(env.DB.prepare(`DELETE FROM availability_exceptions WHERE ${oneOff} AND ${wholeDay}`).bind(body.date));
+    } else if (dayOff) {
+      // Idempotent, and an existing day off keeps its note ("Holiday").
+      statements.push(
+        env.DB.prepare(
+          `INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at)
+           SELECT ?, 'blocked', NULL, NULL, '', ?
+           WHERE NOT EXISTS (SELECT 1 FROM availability_exceptions WHERE ${oneOff} AND ${wholeDay})`
+        ).bind(body.date, created, body.date)
+      );
+    }
+    if (blocks) {
+      statements.push(env.DB.prepare(`DELETE FROM availability_exceptions WHERE ${oneOff} AND NOT (${wholeDay})`).bind(body.date));
+      for (const block of blocks) {
+        statements.push(
+          env.DB.prepare(
+            "INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) VALUES (?, 'blocked', ?, ?, '', ?)"
+          ).bind(body.date, block.start, block.end, created)
+        );
+      }
+    }
+    await env.DB.batch(statements);
+
+    const { results } = await env.DB.prepare(
+      "SELECT * FROM availability_exceptions WHERE date = ? AND weekday IS NULL ORDER BY start_minute"
+    )
+      .bind(body.date)
+      .all();
+    return json({ ok: true, exceptions: results ?? [] }, 200, request, env);
   }
 
   // --- Bookings on a student's behalf --------------------------------------

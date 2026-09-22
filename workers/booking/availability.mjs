@@ -43,6 +43,31 @@ function mergeStartRanges(ranges) {
 }
 
 /**
+ * One date's blocked spans as the teacher calendar sends them: whole minutes in
+ * Porto time, sorted and merged. Anything malformed rejects the whole request
+ * rather than being dropped, so the calendar never shows time off that was not
+ * saved. A span covering the whole day is refused too — that is a day off, and
+ * stored as a partial block it would outlive the next change to the day's times.
+ */
+export function normaliseBlockedSpans(blocks) {
+  if (!Array.isArray(blocks) || blocks.length > 96) return null;
+  const spans = [];
+  for (const block of blocks) {
+    const start = block?.startMinute;
+    const end = block?.endMinute;
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end > 1440 || end <= start) return null;
+    spans.push({ start, end });
+  }
+  const merged = [];
+  for (const span of spans.sort((a, b) => a.start - b.start)) {
+    const last = merged.at(-1);
+    if (last && span.start <= last.end) last.end = Math.max(last.end, span.end);
+    else merged.push(span);
+  }
+  return merged.some((span) => span.start === 0 && span.end === 1440) ? null : merged;
+}
+
+/**
  * Candidate start times (minutes from midnight, Porto) for one day.
  *
  * `startRanges` are {start, lastStart} — both are *start* times, so a lesson

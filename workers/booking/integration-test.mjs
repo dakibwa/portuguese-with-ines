@@ -950,6 +950,58 @@ await test("settings reject a slot interval that would hang availability, and ma
   assert.equal((await save({ teacher_email: "not-an-address" })).status, 400);
   assert.equal((await save({ slot_interval_minutes: 30 })).status, 200);
 });
+await test("the teacher calendar replaces one date's time off without touching weekly blocks, extra hours or the day off", async () => {
+  const at = new Date().toISOString();
+  const lunch = db.prepare("INSERT INTO availability_exceptions (weekday,kind,start_minute,end_minute,note,created_at) VALUES (1,'blocked',750,810,'Lunch',?)").run(at).lastInsertRowid;
+  db.prepare("INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,created_at) VALUES ('2026-09-14','extra',1200,1200,?)").run(at);
+  db.prepare("INSERT INTO availability_exceptions (date,kind,note,created_at) VALUES ('2026-09-14','blocked','Holiday',?)").run(at);
+  const day = (body) => call("/admin/exceptions/day", { user: "teacher", body: { date: "2026-09-14", ...body } });
+  const rows = () => db.prepare(`SELECT kind, start_minute AS s, end_minute AS e, note FROM availability_exceptions
+    WHERE date = '2026-09-14' ORDER BY kind, start_minute`).all().map((row) => `${row.kind}:${row.s ?? ""}-${row.e ?? ""}${row.note ? `:${row.note}` : ""}`);
+  const starts = async () => ((await (await call("/availability?lessonType=single&from=2026-09-14&to=2026-09-14", { method: "GET", user: null })).json())
+    .slotsByDate["2026-09-14"] ?? []).map((slot) => slot.startAt.slice(11, 16));
+  try {
+    assert.equal((await call("/admin/exceptions/day", { user: "outsider", body: { date: "2026-09-14", blocks: [] } })).status, 401);
+    for (const body of [
+      { date: "2026-09-04", blocks: [] },
+      {},
+      { blocks: "14:00-15:00" },
+      { blocks: [{ startMinute: 840, endMinute: 840 }] },
+      { blocks: [{ startMinute: "840", endMinute: 900 }] },
+      { blocks: [{ startMinute: 840, endMinute: 1500 }] },
+      { blocks: [{ startMinute: 0, endMinute: 720 }, { startMinute: 720, endMinute: 1440 }] }
+    ]) assert.equal((await day(body)).status, 400, JSON.stringify(body));
+    assert.deepEqual(rows(), ["blocked:-:Holiday", "extra:1200-1200"], "a refused request writes nothing");
+
+    const saved = await day({ blocks: [{ startMinute: 870, endMinute: 900 }, { startMinute: 840, endMinute: 870 }, { startMinute: 600, endMinute: 630 }] });
+    assert.equal(saved.status, 200);
+    assert.deepEqual(rows(), ["blocked:-:Holiday", "blocked:600-630", "blocked:840-900", "extra:1200-1200"]);
+    assert.equal((await saved.json()).exceptions.length, 4, "returns the date's rows so the calendar can reconcile");
+    assert.deepEqual(await starts(), [], "the day off still wins");
+
+    assert.equal((await day({ dayOff: false })).status, 200);
+    assert.deepEqual(rows(), ["blocked:600-630", "blocked:840-900", "extra:1200-1200"], "reopening the day keeps its blocked hours");
+    const open = await starts();
+    // 14:00-15:00 Porto (UTC+1) is off: a 60-minute lesson may not start at 13:30 or 14:30, but may at 15:00.
+    for (const withheld of ["12:30", "13:00", "13:30"]) assert.ok(!open.includes(withheld), withheld);
+    assert.ok(open.includes("14:00"), "15:00 Porto is free again");
+    assert.ok(!open.includes("11:30"), "weekly lunch still applies");
+
+    assert.equal((await day({ dayOff: true })).status, 200);
+    assert.equal((await day({ dayOff: true, blocks: [{ startMinute: 600, endMinute: 630 }] })).status, 200);
+    assert.deepEqual(rows(), ["blocked:-", "blocked:600-630", "extra:1200-1200"], "one day off, however often it is switched on");
+    assert.equal((await day({ blocks: [] })).status, 200);
+    assert.deepEqual(rows(), ["blocked:-", "extra:1200-1200"], "clearing the hours keeps the day off");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM availability_exceptions WHERE id = ?").get(lunch).n, 1);
+
+    const schedule = await (await call("/admin/availability", { method: "GET", user: "teacher" })).json();
+    assert.ok(schedule.exceptions.some((row) => row.weekday === 1 && row.note === "Lunch"), "weekly blocks reach the calendar");
+    assert.equal((await call("/admin/exceptions", { user: "teacher", body: { date: "2026-09-15", startMinute: 900, endMinute: 840 } })).status, 400);
+    assert.equal((await call("/admin/exceptions", { user: "teacher", body: { date: "2026-09-15", startMinute: "x" } })).status, 400);
+  } finally {
+    db.prepare("DELETE FROM availability_exceptions WHERE date = '2026-09-14' OR id = ?").run(lunch);
+  }
+});
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;

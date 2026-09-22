@@ -61,6 +61,15 @@ async function fixture(width, options = {}) {
       },
       { id: 3, date: "2026-09-22", kind: "extra", note: "Extra hours" },
       { id: 4, date: "2026-09-21", kind: "blocked", note: "Duplicate day" },
+      {
+        id: 5,
+        date: null,
+        weekday: 1,
+        kind: "blocked",
+        start_minute: 750,
+        end_minute: 810,
+        note: "Lunch",
+      },
     ],
     bookings: [
       lesson("now", "Alex", "2026-09-07T10:00:00Z"),
@@ -70,6 +79,8 @@ async function fixture(width, options = {}) {
     errors: [],
     failHours: 0,
     failDay: "",
+    delay: 0,
+    nextId: 1000,
     failMove: 0,
     failBookings: false,
   };
@@ -118,17 +129,52 @@ async function fixture(width, options = {}) {
         },
       });
     }
-    if (path === "/admin/exceptions") {
+    if (path === "/admin/exceptions/day") {
+      // Mirrors the Worker: a day off and hour blocks replace only their own rows.
+      if (state.delay)
+        await new Promise((done) => setTimeout(done, state.delay));
       if (data.date === state.failDay) {
         state.failDay = "";
-        return fail("Day could not be saved.");
+        return fail("The booking system is busy. Please try again.");
       }
-      if (data.remove)
+      const oneOff = (row) =>
+        row.date === data.date && row.weekday == null && row.kind === "blocked";
+      const whole = (row) =>
+        (row.start_minute == null || row.start_minute <= 0) &&
+        (row.end_minute == null || row.end_minute >= 1440);
+      const row = (start, end) => ({
+        id: ++state.nextId,
+        date: data.date,
+        weekday: null,
+        kind: "blocked",
+        note: "",
+        start_minute: start,
+        end_minute: end,
+      });
+      if (data.dayOff === false)
         state.exceptions = state.exceptions.filter(
-          (entry) => entry.id !== data.remove,
+          (entry) => !(oneOff(entry) && whole(entry)),
         );
-      else state.exceptions.push({ id: 100 + state.writes.length, ...data });
-      return route.fulfill({ json: { ok: true } });
+      if (
+        data.dayOff === true &&
+        !state.exceptions.some((entry) => oneOff(entry) && whole(entry))
+      )
+        state.exceptions.push(row(null, null));
+      if (data.blocks)
+        state.exceptions = [
+          ...state.exceptions.filter((entry) => !oneOff(entry) || whole(entry)),
+          ...data.blocks.map((block) =>
+            row(block.startMinute, block.endMinute),
+          ),
+        ];
+      return route.fulfill({
+        json: {
+          ok: true,
+          exceptions: state.exceptions.filter(
+            (entry) => entry.date === data.date && entry.weekday == null,
+          ),
+        },
+      });
     }
     if (path === "/admin/bookings") {
       if (!data) {
@@ -171,13 +217,27 @@ async function fixture(width, options = {}) {
   return { page, state };
 }
 
-const byDay = (page, date) => page.locator(`[data-day-off="${date}"]`);
 const slot = (page, day, minute) =>
   page.locator(`[data-slot-day="${day}"][data-slot-minute="${minute}"]`);
 const showHours = (page) =>
-  page.getByRole("button", { name: /^Teaching hours/ }).click();
+  page.getByRole("button", { name: /^Weekly hours/ }).click();
 const showLessons = (page) =>
-  page.getByRole("button", { name: "Lessons", exact: true }).click();
+  page.getByRole("button", { name: "Back to calendar", exact: true }).click();
+const dayWrites = (state, date) =>
+  state.writes
+    .filter((entry) => entry.path === "/admin/exceptions/day")
+    .map((entry) => entry.data)
+    .filter((entry) => !date || entry.date === date);
+async function dragDown(page, from, to) {
+  const start = await from.boundingBox();
+  const end = await to.boundingBox();
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, {
+    steps: 8,
+  });
+  await page.mouse.up();
+}
 const noOverflow = async (page) =>
   assert.equal(
     await page.evaluate(
@@ -259,14 +319,7 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await showHours(page);
-  const from = await slot(page, 1, 480).boundingBox();
-  const to = await slot(page, 1, 540).boundingBox();
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, {
-    steps: 8,
-  });
-  await page.mouse.up();
+  await dragDown(page, slot(page, 1, 480), slot(page, 1, 540));
   for (const minute of [480, 510, 540])
     await expect(slot(page, 1, minute)).toHaveAttribute("aria-pressed", "true");
   await slot(page, 1, 510).click();
@@ -362,54 +415,136 @@ try {
     "Move must use Porto time across the UTC date boundary",
   );
 
-  // Partial saves reconcile completed writes, retain remaining selections and
-  // never delete an extra-hours or partial-day exception.
-  await byDay(page, "2026-09-21").click();
-  await byDay(page, "2026-09-23").click();
-  await byDay(page, "2026-09-24").click();
-  state.failDay = "2026-09-24";
-  await page
-    .getByRole("button", { name: "Save days off", exact: true })
-    .click();
+  // Time off is taken on the calendar itself and saves as she clicks.
+  const note = page.locator(".teacher-save-state");
+  await slot(page, 2, 960).click();
+  await expect(slot(page, 2, 960)).toHaveAttribute("aria-pressed", "true");
+  await expect(note).toHaveText("16:00–16:30 on Tue 8 Sept is off.");
+  await slot(page, 2, 990).click();
+  await expect(note).toHaveText("16:30–17:00 on Tue 8 Sept is off.");
+  assert.deepEqual(dayWrites(state).at(-1), {
+    date: "2026-09-08",
+    blocks: [{ startMinute: 960, endMinute: 1020 }],
+  });
+  await expect(
+    page.locator(".teacher-block-label", { hasText: "Off 16:00–17:00" }),
+  ).toBeVisible();
+  await slot(page, 2, 960).click();
+  await expect(slot(page, 2, 960)).toHaveAttribute("aria-pressed", "false");
+  await expect(note).toHaveText("16:00–16:30 on Tue 8 Sept is open again.");
+  assert.deepEqual(dayWrites(state).at(-1), {
+    date: "2026-09-08",
+    blocks: [{ startMinute: 990, endMinute: 1020 }],
+  });
+
+  await dragDown(page, slot(page, 3, 1020), slot(page, 3, 1050));
+  for (const minute of [1020, 1050])
+    await expect(slot(page, 3, minute)).toHaveAttribute("aria-pressed", "true");
+  await expect(note).toHaveText("17:00–18:00 on Wed 9 Sept is off.");
+  await slot(page, 3, 1050).focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Space");
+  await expect(note).toHaveText("18:00–18:30 on Wed 9 Sept is off.");
+  assert.deepEqual(dayWrites(state).at(-1), {
+    date: "2026-09-09",
+    blocks: [{ startMinute: 1020, endMinute: 1110 }],
+  });
+
+  // Weekly lunch is shown and cannot be toggled per date.
+  const writesBefore = state.writes.length;
+  await expect(slot(page, 1, 750)).toHaveAttribute("aria-disabled", "true");
+  await expect(
+    page
+      .locator(".teacher-block-label.is-weekly", { hasText: "Lunch" })
+      .first(),
+  ).toBeVisible();
+  await slot(page, 1, 750).click({ force: true });
+  assert.equal(state.writes.length, writesBefore, "Lunch must not be written");
+
+  const mondayOff = page.getByRole("switch", {
+    name: "Day off, Monday 7 September",
+  });
+  await mondayOff.click();
+  await expect(mondayOff).toHaveAttribute("aria-checked", "true");
+  await expect(note).toHaveText(
+    "Mon 7 Sept is a day off. The lesson already booked stays in place.",
+  );
+  assert.deepEqual(dayWrites(state).at(-1), {
+    date: "2026-09-07",
+    dayOff: true,
+  });
+  await expect(
+    page.getByRole("button", { name: /^Alex,.*View lesson$/ }),
+  ).toBeVisible();
+  await expect(slot(page, 1, 600)).toHaveAttribute("aria-disabled", "true");
+  await mondayOff.click();
+  await expect(mondayOff).toHaveAttribute("aria-checked", "false");
+  await expect(note).toHaveText("Mon 7 Sept is open again.");
+
+  // A failed save puts the date back as it is actually saved.
+  state.failDay = "2026-09-11";
+  await slot(page, 5, 600).click();
   await page
     .getByRole("alert")
-    .filter({ hasText: "Not all days off could be saved" })
+    .filter({ hasText: "Fri 11 Sept was not changed." })
     .waitFor();
-  await expect(byDay(page, "2026-09-24")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await page
-    .getByRole("button", { name: "Save days off", exact: true })
-    .click();
-  await page
-    .getByRole("status")
-    .filter({ hasText: "Days off saved" })
-    .waitFor();
+  await expect(slot(page, 5, 600)).toHaveAttribute("aria-pressed", "false");
+
+  // Quick clicks while a save is in flight coalesce into the latest choice.
+  state.delay = 400;
+  for (const minute of [900, 930, 960]) await slot(page, 5, minute).click();
+  await expect(note).toHaveText("16:00–16:30 on Fri 11 Sept is off.");
+  state.delay = 0;
+  assert.deepEqual(dayWrites(state, "2026-09-11").slice(-2), [
+    { date: "2026-09-11", blocks: [{ startMinute: 900, endMinute: 930 }] },
+    { date: "2026-09-11", blocks: [{ startMinute: 900, endMinute: 990 }] },
+  ]);
   assert.deepEqual(
-    state.exceptions.filter((entry) => entry.id < 100).map((entry) => entry.id),
-    [2, 3],
+    state.exceptions
+      .filter((entry) => entry.date === "2026-09-11")
+      .map((entry) => [entry.start_minute, entry.end_minute]),
+    [[900, 990]],
   );
-  assert.equal(
-    state.exceptions.filter((entry) => entry.date === "2026-09-23").length,
-    1,
-    "Retry must not duplicate completed days",
+
+  await page.getByRole("button", { name: "Previous week" }).click();
+  await expect(
+    page.getByRole("switch", { name: "Day off, Monday 31 August" }),
+  ).toBeDisabled();
+  await expect(slot(page, 1, 600)).toHaveAttribute("aria-disabled", "true");
+
+  // Reopening a holiday removes only whole-day rows; its hours and extras stay.
+  await page.getByRole("button", { name: "This week" }).click();
+  await page.getByRole("button", { name: "Next week" }).click();
+  await page.getByRole("button", { name: "Next week" }).click();
+  await expect(page.locator(".teacher-off-label")).toHaveText(
+    "Day off · Holiday · Duplicate day",
+  );
+  const holiday = page.getByRole("switch", {
+    name: "Day off, Monday 21 September",
+  });
+  await expect(holiday).toHaveAttribute("aria-checked", "true");
+  await holiday.click();
+  await expect(holiday).toHaveAttribute("aria-checked", "false");
+  await expect(
+    page.locator(".teacher-block-label", { hasText: "Off 10:00–11:00" }),
+  ).toBeVisible();
+  assert.deepEqual(
+    state.exceptions
+      .filter((entry) => ["2026-09-21", "2026-09-22"].includes(entry.date))
+      .map((entry) => entry.id),
+    [2, 3],
   );
   assert.equal(
     state.bookings.filter((entry) => entry.status === "confirmed").length,
     2,
   );
-  await page.getByRole("button", { name: "Next month" }).click();
-  await expect(
-    page.getByRole("heading", { name: "October 2026" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Previous month" }).click();
+  await page.getByRole("button", { name: "This week" }).click();
 
   const manual = page.locator(".teacher-manual");
   assert.equal(await manual.getAttribute("open"), null);
   assert.equal(
     await manual.evaluate((node) =>
-      node.previousElementSibling?.classList.contains("teacher-days-off"),
+      node.previousElementSibling?.classList.contains("teacher-week"),
     ),
     true,
   );
@@ -461,20 +596,36 @@ try {
   await page.close();
 
   const mobile = await fixture(390);
-  await byDay(mobile.page, "2026-09-08").tap();
   await mobile.page
-    .getByRole("status")
-    .filter({ hasText: "1 booked lesson falls" })
-    .waitFor();
-  await mobile.page.getByRole("button", { name: "View those lessons" }).click();
+    .getByRole("button", { name: "Tuesday 8 September, show lessons" })
+    .tap();
+  const tuesdayOff = mobile.page.getByRole("switch", {
+    name: "Day off, Tuesday 8 September",
+  });
   await expect(
-    mobile.page.getByRole("button", {
-      name: "Tuesday 8 September, show lessons",
-    }),
-  ).toHaveAttribute("aria-pressed", "true");
+    mobile.page.getByRole("switch", { name: "Day off, Monday 7 September" }),
+  ).toBeHidden();
+  await tuesdayOff.tap();
+  await expect(tuesdayOff).toHaveAttribute("aria-checked", "true");
+  await mobile.page
+    .locator(".teacher-save-state")
+    .filter({ hasText: "The lesson already booked stays in place." })
+    .waitFor();
   await expect(
     mobile.page.getByRole("button", { name: /^Sam,.*View lesson$/ }),
   ).toBeVisible();
+  await noOverflow(mobile.page);
+  await tuesdayOff.tap();
+  await expect(tuesdayOff).toHaveAttribute("aria-checked", "false");
+  await slot(mobile.page, 2, 1080).tap();
+  await expect(slot(mobile.page, 2, 1080)).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await mobile.page
+    .locator(".teacher-save-state")
+    .filter({ hasText: "18:00–18:30 on Tue 8 Sept is off." })
+    .waitFor();
   await showHours(mobile.page);
   await mobile.page
     .getByRole("button", { name: "Saturday, show teaching hours" })
@@ -507,7 +658,7 @@ try {
   assert.deepEqual(student.state.writes, []);
   await student.page.close();
   console.log(
-    "Teacher calendar passed: visible locations in 60/90-minute blocks, drag/keyboard/touch, exact hours, retries, partial saves, protected exceptions, drafts, Porto moves, attendance, cancellation, manual fallback, responsive layout and access gate.",
+    "Teacher calendar passed: visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, manual fallback, responsive layout and access gate.",
   );
 } finally {
   await browser.close();

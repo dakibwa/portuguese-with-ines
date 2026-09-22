@@ -16,7 +16,8 @@ export type AvailabilityRule = {
 };
 export type AvailabilityException = {
   id: number;
-  date: string;
+  /** Null for a block that repeats every week on `weekday`, such as lunch. */
+  date: string | null;
   kind: "blocked" | "extra";
   note: string;
   start_minute?: number | null;
@@ -117,18 +118,30 @@ export function saveRules(
   );
 }
 
-export function addException(token: string, date: string, note: string) {
-  return adminRequest<{ ok: true }>(token, "/admin/exceptions", {
-    method: "POST",
-    body: JSON.stringify({ date, kind: "blocked", note }),
-  });
-}
-
-export function removeException(token: string, id: number) {
-  return adminRequest<{ ok: true }>(token, "/admin/exceptions", {
-    method: "POST",
-    body: JSON.stringify({ remove: id }),
-  });
+/**
+ * Replaces one date's time off. `dayOff` and `blocks` are independent: each
+ * replaces only its own rows, and weekly blocks are never touched.
+ */
+export function saveDayOff(
+  token: string,
+  date: string,
+  change: { dayOff?: boolean; blocks?: { start: number; end: number }[] },
+) {
+  return adminRequest<{ ok: true; exceptions: AvailabilityException[] }>(
+    token,
+    "/admin/exceptions/day",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        date,
+        dayOff: change.dayOff,
+        blocks: change.blocks?.map((block) => ({
+          startMinute: block.start,
+          endMinute: block.end,
+        })),
+      }),
+    },
+  );
 }
 
 export function fetchStudents(token: string) {

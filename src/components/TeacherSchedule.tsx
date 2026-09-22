@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -10,15 +11,13 @@ import {
 } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
-import { DaysOffCalendar } from "@/components/teacher/DaysOffCalendar";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
 import { ManualLessonForm } from "@/components/teacher/ManualLessonForm";
 import {
-  addException,
   fetchBookings,
   fetchSchedule,
-  removeException,
+  saveDayOff,
   saveRules,
   type AdminBooking,
   type AvailabilityException,
@@ -28,19 +27,31 @@ import { portoTimeToUtc } from "@/lib/booking-api";
 import { BOOKING_CONFIGURED } from "@/lib/config";
 import { SITE_BASE_PATH } from "@/lib/paths";
 import {
+  addSpan,
+  bookingSegments,
+  dateBlocks,
   dateKey,
   dateLabel,
-  daysOff,
   hoursFromRules,
   hoursProblem,
-  isWholeDayOff,
   mondayOf,
+  removeSpan,
   serialiseHours,
   shiftDate,
+  spanLabel,
+  withDayChanges,
+  type Span,
   type WeekHours,
 } from "@/lib/teacher-calendar";
 
 const emptyWeek = hoursFromRules([]);
+
+/** A date's time off as last chosen, until the Worker confirms it. */
+type DayChange = { dayOff?: boolean; blocks?: Span[]; version: number };
+
+function shortDate(date: string) {
+  return dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
+}
 
 export function TeacherSchedule() {
   const [token, setToken] = useState("");
@@ -58,8 +69,11 @@ export function TeacherSchedule() {
   const [savedHours, setSavedHours] = useState<WeekHours>(emptyWeek);
   const [draftHours, setDraftHours] = useState<WeekHours>(emptyWeek);
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
-  const [draftDaysOff, setDraftDaysOff] = useState<Set<string>>(new Set());
-  const [dayOffNote, setDayOffNote] = useState("");
+  const [dayChanges, setDayChanges] = useState<Map<string, DayChange>>(
+    () => new Map(),
+  );
+  const [savingDays, setSavingDays] = useState(false);
+  const [dayNote, setDayNote] = useState<{ error: boolean; text: string }>();
   const [interval, setIntervalMinutes] = useState(30);
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(
@@ -74,26 +88,16 @@ export function TeacherSchedule() {
   const [bookingsLoading, setBookingsLoading] = useState(true);
   const [bookingsError, setBookingsError] = useState("");
   const [savingHours, setSavingHours] = useState(false);
-  const [savingDays, setSavingDays] = useState(false);
-  const [daysNeedRefresh, setDaysNeedRefresh] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const bookingRequest = useRef(0);
-  const topRef = useRef<HTMLElement>(null);
-  const savedDaysOff = useMemo(() => daysOff(exceptions), [exceptions]);
-  const dayOffNotes = useMemo(() => {
-    const notes = new Map<string, string>();
-    for (const exception of exceptions.filter(isWholeDayOff)) {
-      if (exception.note)
-        notes.set(
-          exception.date,
-          [notes.get(exception.date), exception.note]
-            .filter(Boolean)
-            .join(" · "),
-        );
-    }
-    return notes;
-  }, [exceptions]);
+  const dayChangesRef = useRef(dayChanges);
+  const dayVersion = useRef(0);
+  const sendingDays = useRef(false);
+  const shownExceptions = useMemo(
+    () => withDayChanges(exceptions, dayChanges),
+    [exceptions, dayChanges],
+  );
   const hoursDirty = serialiseHours(savedHours) !== serialiseHours(draftHours);
   const invalidHours = hoursProblem(draftHours);
 
@@ -140,7 +144,6 @@ export function TeacherSchedule() {
         setSavedHours(hours);
         setDraftHours(hours);
         setExceptions(schedule.exceptions);
-        setDraftDaysOff(daysOff(schedule.exceptions));
         setIntervalMinutes(schedule.settings?.slotIntervalMinutes ?? 30);
         setInitialised(true);
       })
@@ -194,11 +197,7 @@ export function TeacherSchedule() {
   }, [reloadBookings]);
 
   useEffect(() => {
-    const dirty =
-      hoursDirty ||
-      [...new Set([...savedDaysOff, ...draftDaysOff])].some(
-        (date) => savedDaysOff.has(date) !== draftDaysOff.has(date),
-      );
+    const dirty = hoursDirty || dayChanges.size > 0;
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -206,7 +205,7 @@ export function TeacherSchedule() {
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [hoursDirty, savedDaysOff, draftDaysOff]);
+  }, [hoursDirty, dayChanges]);
 
   async function saveHours() {
     if (savingHours || invalidHours) return;
@@ -238,59 +237,102 @@ export function TeacherSchedule() {
     }
   }
 
-  async function refreshDays() {
-    const schedule = await fetchSchedule(token);
-    setExceptions(schedule.exceptions);
-    setDaysNeedRefresh(false);
-    return daysOff(schedule.exceptions);
+  function updateDayChanges(update: (changes: Map<string, DayChange>) => void) {
+    const next = new Map(dayChangesRef.current);
+    update(next);
+    dayChangesRef.current = next;
+    setDayChanges(next);
   }
 
-  async function saveDays() {
-    if (savingDays || daysNeedRefresh) return;
+  /**
+   * Time off saves as she clicks. Changes go one at a time and each sends the
+   * date's latest choice, so quick clicks coalesce and never race each other.
+   * A failure puts that date back as saved rather than leaving it looking done.
+   */
+  async function sendDayChanges() {
+    if (sendingDays.current) return;
+    sendingDays.current = true;
     setSavingDays(true);
-    setError("");
-    setStatus("");
     try {
-      const changed = [...new Set([...savedDaysOff, ...draftDaysOff])]
-        .filter(
-          (date) =>
-            date >= today && savedDaysOff.has(date) !== draftDaysOff.has(date),
-        )
-        .sort();
-      for (const date of changed) {
-        if (draftDaysOff.has(date)) await addException(token, date, dayOffNote);
-        else
-          for (const exception of exceptions.filter(
-            (item) => item.date === date && isWholeDayOff(item),
-          ))
-            await removeException(token, exception.id);
+      while (dayChangesRef.current.size) {
+        const [date, change] = dayChangesRef.current.entries().next().value!;
+        try {
+          const result = await saveDayOff(token, date, change);
+          setExceptions((current) => [
+            ...current.filter((row) => row.date !== date),
+            ...result.exceptions,
+          ]);
+          updateDayChanges((changes) => {
+            if (changes.get(date)?.version === change.version)
+              changes.delete(date);
+          });
+        } catch (caught) {
+          updateDayChanges((changes) => changes.delete(date));
+          setDayNote({
+            error: true,
+            text: `${shortDate(date)} was not changed. ${caught instanceof Error ? caught.message : "Please try again."}`,
+          });
+        }
       }
-      setDraftDaysOff(await refreshDays());
-      setDayOffNote("");
-      setStatus("Days off saved. Existing lessons are unchanged.");
-    } catch {
-      // Reconcile completed writes before retrying a partly saved selection.
-      // Keep the intended draft, and never remove partial-day/extra-hour rows.
-      try {
-        await refreshDays();
-      } catch {
-        setDaysNeedRefresh(true);
-      }
-      setError(
-        "Not all days off could be saved. Your remaining changes are still selected. Reload if needed, then try again.",
-      );
     } finally {
+      sendingDays.current = false;
       setSavingDays(false);
     }
   }
 
-  const bookedCounts = new Map<string, number>();
-  for (const booking of bookings) {
-    const first = dateKey(new Date(booking.starts_at));
-    const last = dateKey(new Date(Date.parse(booking.ends_at) - 1));
-    for (let day = first; day <= last; day = shiftDate(day, 1))
-      bookedCounts.set(day, (bookedCounts.get(day) ?? 0) + 1);
+  function changeDay(
+    date: string,
+    change: Omit<DayChange, "version">,
+    text: string,
+  ) {
+    updateDayChanges((changes) =>
+      changes.set(date, {
+        ...changes.get(date),
+        ...change,
+        version: ++dayVersion.current,
+      }),
+    );
+    setDayNote({ error: false, text });
+    void sendDayChanges();
   }
+
+  function lessonsDuring(date: string, span: Span = { start: 0, end: 1440 }) {
+    return bookingSegments(bookings, mondayOf(date)).filter(
+      (segment) =>
+        segment.date === date &&
+        segment.start < span.end &&
+        span.start < segment.end,
+    ).length;
+  }
+
+  function stayBooked(count: number) {
+    if (!count) return "";
+    return count === 1
+      ? " The lesson already booked stays in place."
+      : ` The ${count} lessons already booked stay in place.`;
+  }
+
+  function takeDayOff(date: string, off: boolean) {
+    changeDay(
+      date,
+      { dayOff: off },
+      off
+        ? `${shortDate(date)} is a day off.${stayBooked(lessonsDuring(date))}`
+        : `${shortDate(date)} is open again.`,
+    );
+  }
+
+  function blockTime(date: string, span: Span, blocked: boolean) {
+    const current = dateBlocks(shownExceptions, date);
+    changeDay(
+      date,
+      { blocks: blocked ? addSpan(current, span) : removeSpan(current, span) },
+      blocked
+        ? `${spanLabel(span)} on ${shortDate(date)} is off.${stayBooked(lessonsDuring(date, span))}`
+        : `${spanLabel(span)} on ${shortDate(date)} is open again.`,
+    );
+  }
+
   const weekEnd = shiftDate(weekStart, 6);
   const weekCount = bookings.filter(
     (booking) =>
@@ -396,11 +438,7 @@ export function TeacherSchedule() {
         </div>
       ) : null}
 
-      <section
-        className="teacher-week"
-        aria-labelledby="teacher-week-title"
-        ref={topRef}
-      >
+      <section className="teacher-week" aria-labelledby="teacher-week-title">
         <div className="teacher-week-toolbar">
           <div className="teacher-week-title">
             <span className="teacher-eyebrow">
@@ -412,24 +450,23 @@ export function TeacherSchedule() {
                 : `${dateLabel(weekStart, { day: "numeric", month: "short" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}`}
             </h2>
           </div>
-          <div
-            className="teacher-view-switch"
-            role="group"
-            aria-label="Calendar view"
-          >
+          {editing ? (
             <button
+              className="teacher-mode-button"
               type="button"
-              aria-pressed={!editing}
               onClick={() => setEditing(false)}
             >
-              Lessons
+              <CalendarDays size={16} aria-hidden="true" />
+              Back to calendar
             </button>
+          ) : (
             <button
+              className="teacher-mode-button"
               type="button"
-              aria-pressed={editing}
               onClick={() => setEditing(true)}
             >
-              Teaching hours
+              <Repeat2 size={16} aria-hidden="true" />
+              Weekly hours
               {hoursDirty ? (
                 <span
                   className="teacher-unsaved-dot"
@@ -437,13 +474,23 @@ export function TeacherSchedule() {
                 />
               ) : null}
             </button>
-          </div>
+          )}
         </div>
         <div className="teacher-week-subbar">
           <p>
-            {editing
-              ? "Click or drag down a day to mark lesson start times."
-              : "Choose a lesson to see its details, move it or cancel."}
+            {editing ? (
+              "Click or drag down a day to mark lesson start times."
+            ) : (
+              <>
+                <span className="teacher-hint-mouse">
+                  Click a time to take it off, or drag across several. Click it
+                  again to reopen it.
+                </span>
+                <span className="teacher-hint-touch">
+                  Tap a time to take it off, and tap it again to reopen it.
+                </span>
+              </>
+            )}
           </p>
           {editing ? (
             <span className="teacher-repeat-note">
@@ -498,16 +545,37 @@ export function TeacherSchedule() {
             weekStart={weekStart}
             hours={editing ? draftHours : savedHours}
             bookings={bookings}
-            blockedDays={savedDaysOff}
+            exceptions={shownExceptions}
             editing={editing}
             interval={interval}
             disabled={savingHours}
             mobileDay={mobileDay}
+            status={
+              editing ? null : (
+                <p
+                  className={`teacher-save-state ${dayNote?.error ? "is-error" : ""}`}
+                  role={dayNote?.error ? "alert" : "status"}
+                >
+                  {savingDays ? (
+                    "Saving…"
+                  ) : dayNote ? (
+                    <>
+                      {dayNote.error ? null : (
+                        <Check size={15} aria-hidden="true" />
+                      )}
+                      {dayNote.text}
+                    </>
+                  ) : null}
+                </p>
+              )
+            }
             onSelectDay={setMobileDay}
             onChange={(day, windows) => {
               setDraftHours((current) => ({ ...current, [day]: windows }));
               setStatus("");
             }}
+            onDayOff={takeDayOff}
+            onBlockTime={blockTime}
             onSelectBooking={setSelectedBooking}
           />
         )}
@@ -554,49 +622,6 @@ export function TeacherSchedule() {
           </p>
         ) : null}
       </section>
-
-      <DaysOffCalendar
-        today={today}
-        saved={savedDaysOff}
-        selected={draftDaysOff}
-        bookedCounts={bookedCounts}
-        notes={dayOffNotes}
-        busy={savingDays}
-        needsRefresh={daysNeedRefresh}
-        note={dayOffNote}
-        onNote={setDayOffNote}
-        onToggle={(date) => {
-          setDraftDaysOff((current) => {
-            const next = new Set(current);
-            if (next.has(date)) next.delete(date);
-            else next.add(date);
-            return next;
-          });
-          setStatus("");
-        }}
-        onSave={() => void saveDays()}
-        onDiscard={() => {
-          setDraftDaysOff(savedDaysOff);
-          setDayOffNote("");
-        }}
-        onRefresh={() => {
-          setSavingDays(true);
-          void refreshDays()
-            .catch(() =>
-              setError("Days off could not be reloaded. Please try again."),
-            )
-            .finally(() => setSavingDays(false));
-        }}
-        onViewLessons={(date) => {
-          setMobileDay((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7);
-          setWeekStart(mondayOf(date));
-          setEditing(false);
-          topRef.current?.scrollIntoView({
-            block: "start",
-            behavior: "instant",
-          });
-        }}
-      />
 
       <ManualLessonForm token={token} onCreated={() => void reloadBookings()} />
       {selectedBooking ? (

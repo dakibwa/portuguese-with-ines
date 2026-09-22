@@ -32,6 +32,7 @@ Student on /book                                     (browse without an account)
 Legacy /my-lessons and /booking links resolve into /book without losing state
 Inês on /schedule                     (her own account, role=teacher)
   → GET/POST /admin/availability, /admin/exceptions
+  → POST /admin/exceptions/day                       one date's day off and blocked hours
   → GET  /admin/bookings, /admin/students
   → POST /admin/bookings                             add a lesson for someone
   → POST /admin/bookings/:id/reschedule | /cancel
@@ -75,18 +76,30 @@ booking range, including lessons that cross midnight. A failed range load is
 shown as an error, never as an empty calendar. Mobile shows one selected day
 under the same seven-day header.
 
-`Teaching hours` edits the usual weekly pattern with click/drag, touch or
-keyboard input. `Save teaching hours` writes the existing first-start and
+The week itself is where Inês takes time off. Clicking, tapping or dragging
+across times on a date blocks them for that date only, and doing so again
+reopens them; the `Day off` switch above each date blocks the whole day. Each
+change saves as she makes it, one request at a time, so quick clicks coalesce
+into the date's latest choice; a failed save puts that date back as saved and
+says so. Past dates and weekly blocks such as lunch are shown but not toggled.
+Existing lessons are never cancelled by time off — they stay on the calendar
+and need their own move or cancel.
+
+`POST /admin/exceptions/day` takes `{ date, dayOff?, blocks? }`. The two parts
+are independent and each replaces only its own one-off rows in one batch:
+switching the day off never discards the hours blocked within it, reopening it
+brings them back, and an existing day off keeps its note. Weekly blocks and
+extra hours are never touched there. Malformed or whole-day `blocks`, and past
+dates, are refused rather than partly saved. `GET /admin/availability` returns
+weekly blocks alongside the upcoming one-off rows so the calendar shows every
+time students cannot book.
+
+`Weekly hours`, top right, edits the usual weekly pattern with click/drag,
+touch or keyboard input. `Save teaching hours` writes the existing first-start and
 last-start rule format; it does not reinterpret the last start as a finishing
 time. Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
-
-The days-off month calendar supports selecting several dates and saving them
-together. Blocking a date prevents new bookings without cancelling existing
-ones. Removing a whole day off deletes only its whole-day blocked rows, leaving
-partial blocks and extra hours intact. A partly failed save reloads the actual
-exceptions before retrying the remaining draft.
 
 Manual lesson entry is a collapsed backup at the bottom, with online/in-Porto
 location. All teacher actions still use the authenticated admin endpoints and

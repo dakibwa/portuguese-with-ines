@@ -227,16 +227,22 @@ type in dates, times and lesson details. Use colour to distinguish booked lesson
 usual lesson starts and days off; avoid a wall of administration forms.
 
 - Open on the current Porto week with booked lessons placed at their actual
-  times. A second `Teaching hours` view edits the repeating weekly pattern.
-  Clicking or dragging marks lesson start times; keyboard and touch input must
-  work without dragging. Preserve exact existing first/last-start values and
-  provide an exact-time editor. The last start is not a finishing time.
-- Availability edits remain a draft until `Save teaching hours`. Days off use a
-  month calendar with explicit save/discard actions. Booking activity must never
-  silently discard either draft. A blocked date prevents new bookings; existing
-  lessons remain visible and need their own deliberate move/cancel action.
+  times. One calendar holds everything: clicking or dragging a time on a date
+  takes it off for that date only, and a `Day off` switch above each date
+  takes the whole day. Time off is hatched, labelled with its times, and saves
+  as she clicks; the line under the calendar says what changed or what failed.
+  Weekly blocks such as lunch are shown but not toggled per date. Keyboard and
+  touch input must work without dragging.
+- `Weekly hours`, top right, opens the repeating weekly pattern. Clicking or
+  dragging marks lesson start times. Preserve exact existing first/last-start
+  values and provide an exact-time editor. The last start is not a finishing
+  time. Weekly edits remain a draft until `Save teaching hours`, and booking
+  activity must never silently discard that draft.
+- Time off prevents new bookings; existing lessons remain visible and need
+  their own deliberate move/cancel action.
 - Show the full week on desktop. On small screens, keep a seven-day selector
-  above a spacious single-day timetable, with no horizontal page overflow.
+  above a spacious single-day timetable and that day's `Day off` switch, with
+  no horizontal page overflow.
   Dates and timed lessons always use Porto time, including at DST boundaries.
 - The timetable spans 08:00–20:00 and widens to fit any teaching hours or
   lessons outside it. There is no 24-hour view; early or late hours are set

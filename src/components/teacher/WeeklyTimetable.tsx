@@ -8,21 +8,28 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import { Plus, Trash2, Video, MapPin } from "lucide-react";
-import type { AdminBooking } from "@/lib/admin-api";
+import type { AdminBooking, AvailabilityException } from "@/lib/admin-api";
 import { formatSlotTime } from "@/lib/booking-api";
 import {
   WEEKDAYS,
   bookingSegments,
   canPaintHours,
+  dateBlocks,
   dateKey,
   dateLabel,
+  daysOff,
   lessonStarts,
   minuteLabel,
+  overlapsSpan,
   paintHours,
   parseMinute,
   shiftDate,
+  spanLabel,
+  weeklyBlocks,
+  type Span,
   type TeachingWindow,
   type WeekHours,
 } from "@/lib/teacher-calendar";
@@ -31,29 +38,36 @@ type Props = {
   weekStart: string;
   hours: WeekHours;
   bookings: AdminBooking[];
-  blockedDays: Set<string>;
+  exceptions: AvailabilityException[];
   editing: boolean;
   interval: number;
   disabled: boolean;
   mobileDay: number;
+  status?: ReactNode;
   onSelectDay: (index: number) => void;
   onChange: (day: number, windows: TeachingWindow[]) => void;
+  onDayOff: (date: string, off: boolean) => void;
+  onBlockTime: (date: string, span: Span, blocked: boolean) => void;
   onSelectBooking: (booking: AdminBooking) => void;
 };
 
-type Drag = { day: number; from: number; to: number; available: boolean };
+/** `paint` marks lesson starts while editing, and takes time off on dates. */
+type Drag = { day: number; from: number; to: number; paint: boolean };
 
 export function WeeklyTimetable({
   weekStart,
   hours,
   bookings,
-  blockedDays,
+  exceptions,
   editing,
   interval,
   disabled,
   mobileDay,
+  status,
   onSelectDay,
   onChange,
+  onDayOff,
+  onBlockTime,
   onSelectBooking,
 }: Props) {
   const today = dateKey(new Date());
@@ -71,6 +85,7 @@ export function WeeklyTimetable({
     () => bookingSegments(bookings, weekStart),
     [bookings, weekStart],
   );
+  const offDays = useMemo(() => daysOff(exceptions), [exceptions]);
   const step = [15, 30, 60].includes(interval) ? interval : 30;
   const allWindows = Object.values(hours)
     .flat()
@@ -123,8 +138,43 @@ export function WeeklyTimetable({
     }
   }
 
+  function dateOf(day: number) {
+    return shiftDate(
+      weekStart,
+      WEEKDAYS.findIndex((entry) => entry.value === day),
+    );
+  }
+
+  /** Past dates, days off and weekly blocks such as lunch are not toggled here. */
+  function locked(day: number, minute: number) {
+    const date = dateOf(day);
+    return (
+      date < today ||
+      offDays.has(date) ||
+      overlapsSpan(weeklyBlocks(exceptions, day), minute, minute + step)
+    );
+  }
+
+  function takenOff(day: number, minute: number) {
+    return overlapsSpan(
+      dateBlocks(exceptions, dateOf(day)),
+      minute,
+      minute + step,
+    );
+  }
+
   function toggle(day: number, minute: number) {
     if (disabled) return;
+    if (!editing) {
+      setFocus({ day, minute });
+      if (!locked(day, minute))
+        onBlockTime(
+          dateOf(day),
+          { start: minute, end: minute + step },
+          !takenOff(day, minute),
+        );
+      return;
+    }
     if (!canPaintHours(hours[day] ?? [], interval)) return openExact(day);
     setFocus({ day, minute });
     onChange(
@@ -146,7 +196,10 @@ export function WeeklyTimetable({
   ) {
     pointerType.current = event.pointerType;
     if (event.pointerType !== "mouse" || event.button !== 0 || disabled) return;
-    if (!canPaintHours(hours[day] ?? [], interval)) return;
+    if (
+      editing ? !canPaintHours(hours[day] ?? [], interval) : locked(day, minute)
+    )
+      return;
     event.preventDefault();
     event.currentTarget.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -155,7 +208,9 @@ export function WeeklyTimetable({
       day,
       from: minute,
       to: minute,
-      available: !lessonStarts(hours[day] ?? [], interval).includes(minute),
+      paint: editing
+        ? !lessonStarts(hours[day] ?? [], interval).includes(minute)
+        : !takenOff(day, minute),
     });
   }
 
@@ -170,16 +225,26 @@ export function WeeklyTimetable({
 
   function finishDrag() {
     if (!drag) return;
-    onChange(
-      drag.day,
-      paintHours(
-        hours[drag.day] ?? [],
-        drag.from,
-        drag.to,
-        drag.available,
-        interval,
-      ),
-    );
+    if (editing)
+      onChange(
+        drag.day,
+        paintHours(
+          hours[drag.day] ?? [],
+          drag.from,
+          drag.to,
+          drag.paint,
+          interval,
+        ),
+      );
+    else
+      onBlockTime(
+        dateOf(drag.day),
+        {
+          start: Math.min(drag.from, drag.to),
+          end: Math.max(drag.from, drag.to) + step,
+        },
+        drag.paint,
+      );
     setDrag(null);
   }
 
@@ -260,10 +325,44 @@ export function WeeklyTimetable({
             );
           })}
         </div>
+        {!editing ? (
+          <div className="teacher-day-toggles">
+            <span aria-hidden="true" />
+            {WEEKDAYS.map((day, index) => {
+              const date = shiftDate(weekStart, index);
+              const off = offDays.has(date);
+              return (
+                <div
+                  className="teacher-day-toggle-cell"
+                  data-mobile-active={mobileDay === index}
+                  key={day.value}
+                >
+                  <button
+                    className="teacher-day-toggle"
+                    type="button"
+                    role="switch"
+                    aria-checked={off}
+                    aria-label={`Day off, ${dateLabel(date)}`}
+                    disabled={date < today}
+                    onClick={() => onDayOff(date, !off)}
+                  >
+                    <span
+                      className="teacher-day-toggle__track"
+                      aria-hidden="true"
+                    />
+                    Day off
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
         <div
           className="teacher-timetable-scroll"
           aria-label={
-            editing ? "Weekly teaching hours" : "Booked lessons this week"
+            editing
+              ? "Weekly teaching hours"
+              : "Your lessons and time off this week"
           }
         >
           <div
@@ -286,75 +385,144 @@ export function WeeklyTimetable({
             </div>
             {WEEKDAYS.map((day, index) => {
               const date = shiftDate(weekStart, index);
-              const off = !editing && blockedDays.has(date);
+              const off = !editing && offDays.has(date);
+              const past = date < today;
               const windows = hours[day.value] ?? [];
               const starts = lessonStarts(windows, interval);
+              const weekly = weeklyBlocks(exceptions, day.value);
+              const blocks = editing ? [] : dateBlocks(exceptions, date);
               const daySegments = segments.filter(
                 (segment) => segment.date === date,
               );
+              const labels = off
+                ? []
+                : [
+                    ...blocks.map((span) => ({
+                      ...span,
+                      text: `Off ${spanLabel(span)}`,
+                      weekly: false,
+                    })),
+                    ...weekly.map((span) => ({
+                      ...span,
+                      text: span.note || "Blocked every week",
+                      weekly: true,
+                    })),
+                  ].filter((span) => span.end > start && span.start < end);
               return (
                 <div
                   key={day.value}
                   data-mobile-active={mobileDay === index}
-                  className={`teacher-time-day ${off ? "teacher-time-day--off" : ""}`}
+                  className={`teacher-time-day ${off ? "teacher-time-day--off" : ""} ${!editing && past ? "teacher-time-day--past" : ""}`}
                 >
                   {off ? (
-                    <span className="teacher-off-label">Day off</span>
+                    <span className="teacher-off-label">
+                      Day off
+                      {offDays.get(date) ? ` · ${offDays.get(date)}` : ""}
+                    </span>
                   ) : null}
                   {minutes.map((minute) => {
-                    const selected =
+                    const cellEnd = minute + step;
+                    const dragging =
                       drag?.day === day.value &&
                       minute >= Math.min(drag.from, drag.to) &&
-                      minute <= Math.max(drag.from, drag.to)
-                        ? drag.available
-                        : starts.some(
-                            (value) => value >= minute && value < minute + step,
-                          );
-                    const className = `teacher-time-slot ${selected && !off ? "is-available" : ""} ${minute % 60 === 0 ? "is-hour" : ""}`;
-                    return editing ? (
+                      minute <= Math.max(drag.from, drag.to);
+                    const usual = starts.some(
+                      (value) => value >= minute && value < cellEnd,
+                    );
+                    const inWeekly = overlapsSpan(weekly, minute, cellEnd);
+                    const focusable =
+                      WEEKDAYS[mobileDay].value === day.value &&
+                      focusMinute === minute;
+                    const pointer = {
+                      tabIndex: focusable ? 0 : -1,
+                      "data-slot-day": day.value,
+                      "data-slot-minute": minute,
+                      onPointerDown: (event: PointerEvent<HTMLButtonElement>) =>
+                        beginDrag(event, day.value, minute),
+                      onPointerMove: continueDrag,
+                      onPointerUp: finishDrag,
+                      onPointerCancel: () => setDrag(null),
+                      onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) =>
+                        moveFocus(event, day.value, minute),
+                    };
+                    const hourClass = minute % 60 === 0 ? "is-hour" : "";
+                    const weeklyClass = inWeekly && !off ? "is-weekly" : "";
+                    if (editing) {
+                      const selected = dragging ? drag.paint : usual;
+                      return (
+                        <button
+                          key={minute}
+                          type="button"
+                          className={`teacher-time-slot ${selected ? "is-available" : ""} ${weeklyClass} ${hourClass}`}
+                          aria-pressed={selected}
+                          disabled={disabled}
+                          aria-label={`${day.name} ${minuteLabel(minute)}, ${selected ? "lesson start available" : "unavailable"}`}
+                          {...pointer}
+                          onClick={(event) => {
+                            if (
+                              event.detail === 0 ||
+                              pointerType.current !== "mouse" ||
+                              !canPaintHours(windows, interval)
+                            )
+                              toggle(day.value, minute);
+                          }}
+                        >
+                          <span>{minuteLabel(minute)}</span>
+                        </button>
+                      );
+                    }
+                    const blocked = dragging
+                      ? drag.paint
+                      : overlapsSpan(blocks, minute, cellEnd);
+                    const labelled = labels.some(
+                      (span) =>
+                        Math.max(span.start, start) >= minute &&
+                        Math.max(span.start, start) < cellEnd,
+                    );
+                    const fixed = past || off || inWeekly;
+                    const reason = past
+                      ? "past"
+                      : off
+                        ? "day off"
+                        : `${weekly.find((span) => span.start < cellEnd && minute < span.end)?.note || "blocked"} every week`;
+                    return (
                       <button
                         key={minute}
                         type="button"
-                        className={className}
-                        aria-pressed={selected}
-                        disabled={disabled}
-                        aria-label={`${day.name} ${minuteLabel(minute)}, ${selected ? "lesson start available" : "unavailable"}`}
-                        tabIndex={
-                          WEEKDAYS[mobileDay].value === day.value &&
-                          focusMinute === minute
-                            ? 0
-                            : -1
+                        className={`teacher-time-slot ${usual && !off && !blocked ? "is-available" : ""} ${blocked && !off ? "is-blocked" : ""} ${labelled ? "is-labelled" : ""} ${weeklyClass} ${hourClass}`}
+                        aria-pressed={fixed ? undefined : blocked}
+                        aria-disabled={fixed || undefined}
+                        aria-label={
+                          fixed
+                            ? `${minuteLabel(minute)}, ${dateLabel(date)}, ${reason}`
+                            : `Take ${minuteLabel(minute)}–${minuteLabel(cellEnd)} off, ${dateLabel(date)}${usual ? ", usual teaching time" : ""}`
                         }
-                        data-slot-day={day.value}
-                        data-slot-minute={minute}
-                        onPointerDown={(event) =>
-                          beginDrag(event, day.value, minute)
-                        }
-                        onPointerMove={continueDrag}
-                        onPointerUp={finishDrag}
-                        onPointerCancel={() => setDrag(null)}
+                        {...pointer}
                         onClick={(event) => {
                           if (
                             event.detail === 0 ||
-                            pointerType.current !== "mouse" ||
-                            !canPaintHours(windows, interval)
+                            pointerType.current !== "mouse"
                           )
                             toggle(day.value, minute);
                         }}
-                        onKeyDown={(event) =>
-                          moveFocus(event, day.value, minute)
-                        }
                       >
                         <span>{minuteLabel(minute)}</span>
                       </button>
-                    ) : (
-                      <span
-                        className={className}
-                        key={minute}
-                        aria-hidden="true"
-                      />
                     );
                   })}
+                  {/* After the cells, so a focused cell never hides it; lessons still cover it. */}
+                  {labels.map((span) => (
+                    <span
+                      className={`teacher-block-label ${span.weekly ? "is-weekly" : ""}`}
+                      key={`${span.weekly}-${span.start}`}
+                      aria-hidden="true"
+                      style={{
+                        top: `calc(${(Math.max(span.start, start) - start) / step} * var(--teacher-slot-height) + 3px)`,
+                      }}
+                    >
+                      {span.text}
+                    </span>
+                  ))}
                   {!editing
                     ? daySegments.map(
                         (
@@ -412,11 +580,12 @@ export function WeeklyTimetable({
               </span>
               <span>
                 <i className="teacher-key-off" />
-                Day off
+                Time off
               </span>
             </>
           ) : null}
         </div>
+        {status}
       </div>
 
       {editing ? (
