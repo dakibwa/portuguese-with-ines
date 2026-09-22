@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/page-metadata";
 import Link from "next/link";
 import { AssetMark } from "@/components/BrandMarks";
+import { LessonMark } from "@/components/LessonMarks";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { lessonProducts } from "@/lib/lesson-products";
@@ -39,40 +40,50 @@ export default function LessonsPage() {
           </div>
         </section>
 
-        <section className="lesson-programme" aria-labelledby="programme-title">
-          <p className="lesson-programme__intro" id="programme-title">
-            One to one, online or in person. An hour, or an hour and a half if you want longer.
-          </p>
+        <section className="lesson-programme" aria-label="Lessons and prices">
           <div className="lesson-programme__grid">
             {lessonProducts.map((product) => (
-              <article className="lesson-product" key={product.id}>
-                <p className="eyebrow">{product.title}</p>
-                <p className="lesson-product__price">{product.price}</p>
-                <p className="lesson-product__duration">{product.duration}</p>
-                <span className="lesson-product__rule" aria-hidden="true" />
+              <article className={`lesson-product lesson-product--${product.id}`} key={product.id}>
+                <div className="lesson-product__head">
+                  <p className="eyebrow">{product.title}</p>
+                  <LessonMark
+                    className="lesson-product__mark"
+                    durationMinutes={product.durationMinutes}
+                    lessonTypeId={product.id}
+                  />
+                </div>
+                <div className="lesson-product__pricing">
+                  <p className="lesson-product__price">{product.price}</p>
+                  <p className="lesson-product__duration">{product.duration}</p>
+                </div>
                 <p className="lesson-product__description">{product.description}</p>
-                <div className="lesson-product__note">
-                  <span>{product.note ?? ""}</span>
+                <div className="lesson-product__action">
+                  {/* The link stretches over the whole card, so the card itself is the target. */}
+                  <Link
+                    className={`button button--compact lesson-product__link ${product.id === "trial" ? "button--coral" : "button--outline"}`}
+                    href={`/book/?lesson=${product.id}`}
+                  >
+                    {product.bookingLabel}
+                  </Link>
                 </div>
               </article>
             ))}
           </div>
         </section>
 
-        <div className="lessons-closing">
-          <section className="lesson-location-band">
-            <div>
-              <AssetMark asset="/visuals/v2-splats/in-porto-or-online-splat-v2.svg" className="lesson-location-band__mark" />
-              <p>In Porto or online</p>
-            </div>
-            <Link className="button button--coral" href="/book/?view=book">Book a lesson</Link>
-          </section>
-
-          <section className="lessons-note">
+        <section className="lessons-closing" aria-label="Where lessons happen and paying">
+          <AssetMark asset="/visuals/v2-splats/in-porto-or-online-splat-v2.svg" className="lessons-closing__mark" />
+          <div className="lessons-closing__copy">
+            <p className="lessons-closing__title">In Porto or online</p>
             <p>You’ll see the price and how to pay before you confirm your lesson.</p>
-            <Link className="text-action" href="/faq#faq-payment">Payment questions</Link>
-          </section>
-        </div>
+          </div>
+          <div className="lessons-closing__actions">
+            <Link className="button button--coral button--compact" href="/book/?view=book">Book a lesson</Link>
+            <Link className="button button--outline-light button--compact" href="/faq#faq-payment">
+              Payment questions
+            </Link>
+          </div>
+        </section>
       </main>
 
       <SiteFooter />

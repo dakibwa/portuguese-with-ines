@@ -16,13 +16,13 @@ export function SiteFooter() {
           <Link href="/faq">FAQ</Link>
           <Link href="/book">Booking</Link>
         </nav>
+        <nav className="site-footer__legal" aria-label="Terms and privacy">
+          <a aria-haspopup="dialog" data-terms-privacy href={publicAssetPath("/book/#terms-privacy")}>Terms &amp; privacy</a>
+        </nav>
         <div className="site-footer__contact">
           <BackToTop />
         </div>
       </div>
-      <nav className="site-footer__legal" aria-label="Terms and privacy">
-        <a aria-haspopup="dialog" data-terms-privacy href={publicAssetPath("/book/#terms-privacy")}>Terms &amp; privacy</a>
-      </nav>
     </footer>
   );
 }

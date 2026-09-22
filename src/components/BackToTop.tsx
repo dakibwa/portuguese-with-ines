@@ -14,7 +14,7 @@ import { Menu } from "lucide-react";
 export function BackToTop() {
   return (
     <button
-      className="site-footer__top site-footer__menu"
+      className="site-footer__menu"
       onClick={() => window.dispatchEvent(new CustomEvent("ines:open-menu"))}
       type="button"
     >

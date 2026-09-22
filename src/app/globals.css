@@ -613,6 +613,46 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   background: var(--ink);
 }
 
+/*
+ * The second choice beside a coral one. Same hand, same type, outlined rather
+ * than filled, so "How I teach" or "Payment questions" reads as something to
+ * press instead of a caption under the real button. The mirrored squiggle
+ * keeps a pair of buttons from looking stamped out of one mould.
+ */
+.button--outline {
+  border: 1.5px solid rgba(26, 49, 105, 0.55);
+  border-radius: var(--squiggle-button-alt);
+  background: transparent;
+  color: var(--ink);
+}
+
+.button--outline:hover,
+.button--outline:focus-visible {
+  border-color: var(--ink);
+  background: rgba(170, 164, 230, 0.2);
+}
+
+.button--outline-light {
+  border: 1.5px solid rgba(245, 236, 217, 0.62);
+  border-radius: var(--squiggle-button-alt);
+  background: rgba(245, 236, 217, 0.05);
+  color: var(--paper);
+}
+
+.button--outline-light:hover,
+.button--outline-light:focus-visible {
+  border-color: var(--paper);
+  background: rgba(245, 236, 217, 0.15);
+}
+
+/* For a supporting pair beside or beneath the page's main action. */
+.button--compact {
+  min-height: 50px;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+}
+
 .text-action {
   position: relative;
   display: inline-flex;
@@ -648,20 +688,6 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 .text-action:hover::after,
 .text-action:focus-visible::after {
   transform: scaleX(1);
-}
-
-.text-action--on-dark {
-  border-color: rgba(245, 236, 217, 0.42);
-  color: var(--paper);
-}
-
-.text-action--on-dark::after {
-  background: var(--lavender);
-}
-
-.text-action--on-dark:hover,
-.text-action--on-dark:focus-visible {
-  color: var(--lavender-soft);
 }
 
 .eyebrow {
@@ -717,8 +743,16 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 /* Home */
 
+/* The hero fills whatever the snug footer leaves, so home never ends on a
+   strip of bare paper above the footer. */
+.home-page {
+  display: flex;
+  flex-direction: column;
+}
+
 .home-hero {
   display: grid;
+  flex: 1 0 auto;
   grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
   min-height: min(660px, calc(100vh - var(--header-height)));
 }
@@ -765,20 +799,39 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   line-height: 1.25;
 }
 
+/* Booking first, then the two ways to read more, on one row where it fits. */
 .home-hero__actions {
   display: flex;
-  width: min(100%, 470px);
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1.25rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
 }
 
 .home-hero__links {
   display: flex;
-  width: 100%;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem 1.6rem;
+  gap: 0.9rem;
+}
+
+@media (max-width: 560px) {
+  .home-hero__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  /* Two halves of one row under the full-width booking button. */
+  .home-hero__links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+
+  .home-hero__links .button {
+    padding-right: 0.6rem;
+    padding-left: 0.6rem;
+    letter-spacing: 0.1em;
+  }
 }
 
 .principles-strip {
@@ -1005,14 +1058,14 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 .lessons-hero {
   display: grid;
-  grid-template-columns: 59% 41%;
-  min-height: 300px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  min-height: 230px;
 }
 
 .lessons-hero__title {
   display: flex;
   align-items: center;
-  padding: 2.8rem var(--page-pad);
+  padding: 2rem var(--page-pad);
   background-color: var(--lavender);
   background-image: var(--paper-texture);
 }
@@ -1020,7 +1073,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 .lessons-hero h1 {
   margin: 0;
   font-family: var(--display);
-  font-size: clamp(3rem, 5.3vw, 5.6rem);
+  font-size: clamp(2.5rem, 4.4vw, 4.6rem);
   font-weight: 400;
   letter-spacing: -0.035em;
   line-height: 1.02;
@@ -1033,7 +1086,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 .lessons-hero__art {
   position: relative;
   overflow: hidden;
-  background-color: var(--green);
+  background-color: var(--blue);
   background-image: var(--paper-texture);
 }
 
@@ -1048,183 +1101,324 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 .lesson-programme {
-  padding: 2rem var(--page-pad) 2.5rem;
-}
-
-.lesson-programme__intro {
-  margin-bottom: 2rem;
-  font-size: clamp(1.25rem, 2vw, 1.7rem);
+  padding: clamp(2.25rem, 4vw, 3.5rem) var(--page-pad);
 }
 
 .lesson-programme__grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: clamp(1.5rem, 2.6vw, 2.5rem);
 }
 
 /*
- * Subgrid pins title / price / duration / rule / description / note to shared
- * rows, so the three prices sit on one line and the descriptions start
- * together — otherwise a longer title in one column pushes everything below it
- * out of step with its neighbours.
+ * Three cards from the same hand: one family of wobbly edge, never the same
+ * one twice, each carrying the lesson's own mark. It is the mark that lesson
+ * wears later, in the booking flow and on booked lessons, so the same splat
+ * means the same lesson wherever a student meets it. The whole card is the
+ * way into booking that lesson; hovering it warms the colour and tips the
+ * mark, without lifting or shifting anything.
  */
-@media (min-width: 821px) {
-  /*
-   * No reserved height here any more.
-   *
-   * It existed so the panel did not resize as a student stepped through, and
-   * for choosing a lesson, a day and a time it is unnecessary: those three are
-   * all shorter than the intro panel beside them, so the grid's stretch already
-   * holds them to one height.
-   *
-   * Confirming is genuinely taller — it carries a sign-in form, a Google
-   * button and the recap. Reserving that height for every step would have left
-   * roughly 500px of empty panel on the other three, which is worse than one
-   * change of size at the last step.
-   */
-
-  .lesson-programme__grid {
-    grid-template-rows: auto auto auto auto auto auto;
-  }
-
-  .lesson-product {
-    display: grid;
-    grid-row: span 6;
-    grid-template-rows: subgrid;
-    align-content: start;
-  }
-}
-
 .lesson-product {
   position: relative;
-  min-height: 330px;
-  border-right: 1px solid var(--rule);
-  padding: 0 clamp(1.4rem, 3vw, 2.8rem);
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border: 1.5px solid var(--rule-soft);
+  border-radius: 58px 24px 52px 30px / 27px 56px 25px 50px;
+  padding: clamp(1.4rem, 2.2vw, 1.9rem) clamp(1.4rem, 2.3vw, 2.1rem) clamp(1.5rem, 2.3vw, 2rem);
+  background-color: var(--paper-light);
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease;
 }
 
-.lesson-product:first-child {
-  padding-left: 0;
+.lesson-product--trial {
+  border-color: rgba(85, 79, 145, 0.4);
+  border-radius: 30px 60px 26px 54px / 55px 26px 58px 29px;
+  background-color: var(--lavender-soft);
 }
 
-.lesson-product:last-child {
-  border-right: 0;
-  padding-right: 0;
+.lesson-product--long {
+  border-radius: 46px 30px 60px 22px / 34px 58px 24px 52px;
+}
+
+.lesson-product:hover,
+.lesson-product:focus-within {
+  border-color: var(--lavender);
+  background-color: #f1eaf1;
+}
+
+.lesson-product--trial:hover,
+.lesson-product--trial:focus-within {
+  border-color: var(--lavender-ink);
+  background-color: #cfc9f1;
+}
+
+.lesson-product__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.lesson-product__head .eyebrow {
+  margin: 0;
+}
+
+/* One box for every mark, so the three header rows line up exactly. */
+.lesson-product__mark {
+  flex: none;
+  width: 60px;
+  height: 60px;
+  margin: -0.5rem -0.25rem -0.5rem 0;
+  transition: transform 260ms var(--motion-ease);
+}
+
+.lesson-product:hover .lesson-product__mark,
+.lesson-product:focus-within .lesson-product__mark {
+  transform: rotate(8deg) scale(1.08);
+}
+
+/* The card is the target: the link's hit area covers it, and the card, not
+   the button, answers the hover. */
+.lesson-product__link::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+
+.lesson-product__link,
+.lesson-product__link:hover {
+  transform: none;
+}
+
+.lesson-product:hover .lesson-product__link.button--coral {
+  background: #95301f;
+}
+
+.lesson-product:hover .lesson-product__link.button--outline {
+  border-color: var(--ink);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.lesson-product__pricing {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.6rem;
 }
 
 .lesson-product__price {
-  margin: 0.35rem 0 0;
+  margin: 0;
   font-family: var(--display);
-  font-size: clamp(3rem, 4.6vw, 4.6rem);
+  font-size: clamp(3rem, 4.3vw, 4.3rem);
   letter-spacing: -0.035em;
-  line-height: 1.05;
+  line-height: 1;
 }
 
 .lesson-product__duration {
   margin: 0.35rem 0 0;
-  font-size: clamp(1.15rem, 1.75vw, 1.45rem);
+  font-size: clamp(1.05rem, 1.5vw, 1.25rem);
   line-height: 1.25;
 }
 
-.lesson-product__rule {
-  display: block;
-  width: 100%;
-  height: 1px;
-  margin: 0.8rem 0 1rem;
-  background: var(--rule);
-}
-
 .lesson-product__description {
-  max-width: 380px;
-  margin: 0;
-  font-size: 1.08rem;
+  margin: 1.1rem 0 0;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 1.05rem;
+  font-size: 1.04rem;
+  line-height: 1.5;
 }
 
-.lesson-product__note {
-  display: flex;
-  align-items: center;
-  margin-top: 0.5rem;
-  color: var(--coral-action);
-  font-family: var(--ui);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+/* Pinned to the foot of the card and full width, so the three buttons form
+   one row whatever the length of the description above them. */
+.lesson-product__action {
+  margin-top: auto;
+  padding-top: 1.4rem;
 }
 
+.lesson-product__action .button {
+  width: 100%;
+}
+
+/*
+ * The page closes on one blue card in the same hand as the lessons above:
+ * where lessons happen, what a visitor sees before paying, and where the
+ * payment questions are answered. Booking itself lives on each card.
+ */
 .lessons-closing {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
-  border-bottom: 1px solid var(--rule-soft);
-}
-
-.lessons-closing .button,
-.faq-contact .button {
-  min-height: 52px;
-  padding: 0.8rem 1.65rem;
-  letter-spacing: 0.13em;
-}
-
-.lesson-location-band {
-  display: flex;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  min-height: 112px;
-  padding: 1rem var(--page-pad);
-  background-color: var(--green);
+  margin: 0 var(--page-pad) clamp(2.5rem, 4.5vw, 3.75rem);
+  border-radius: var(--squiggle-panel);
+  padding: clamp(1.25rem, 2.2vw, 1.75rem) clamp(1.5rem, 3vw, 2.75rem);
+  background-color: var(--blue);
   background-image: var(--paper-texture);
   color: var(--paper);
-  gap: 2rem;
+  gap: 1rem clamp(1.25rem, 2.6vw, 2.5rem);
 }
 
-.lesson-location-band > div {
-  display: flex;
-  align-items: center;
-  gap: 1.8rem;
+.lessons-closing__mark {
+  width: 76px;
+  height: 64px;
 }
 
-.lesson-location-band__mark {
-  width: 96px;
-  height: 76px;
-}
-
-.lesson-location-band p {
+.lessons-closing__copy p {
   margin: 0;
+}
+
+.lessons-closing__title {
   font-family: var(--ui);
-  font-size: clamp(1rem, 2vw, 1.45rem);
+  font-size: clamp(0.95rem, 1.5vw, 1.2rem);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.lesson-location-band .button {
-  white-space: nowrap;
+.lessons-closing__copy p + p {
+  max-width: 48ch;
+  margin-top: 0.35rem;
+  color: var(--lavender-soft);
+  font-size: 0.98rem;
+  line-height: 1.45;
 }
 
-.lessons-note {
+.lessons-closing__actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 1.5rem var(--page-pad);
-  border-left: 1px solid var(--rule-soft);
-  background-color: var(--lavender-soft);
-  background-image: var(--paper-texture);
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.75rem;
 }
 
-.lessons-note p {
-  max-width: 38ch;
-  margin: 0;
+@media (max-width: 1100px) {
+  .lessons-closing {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .lessons-closing__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 900px) {
+  .lesson-programme__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.4rem;
+  }
+
+  /* Stacked, price and length share a line so each card stays short. */
+  .lesson-product__pricing {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 0.75rem;
+  }
+}
+
+@media (max-width: 820px) {
+  /* Title and splat side by side: one band, not a lilac screen and a blue one. */
+  .lessons-hero {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    min-height: 170px;
+  }
+
+  .lessons-hero__title {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .lessons-hero__art .lessons-hero__field {
+    right: -22%;
+    width: 150%;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Two columns squeezed the title into four broken lines. The title takes
+     the band instead, and the splat peeks in from the edge in its blue blob. */
+  .lessons-hero {
+    position: relative;
+    display: block;
+    min-height: 0;
+    overflow: hidden;
+    background-color: var(--lavender);
+    background-image: var(--paper-texture);
+  }
+
+  .lessons-hero__title {
+    position: relative;
+    z-index: 2;
+    padding-top: 1.6rem;
+    padding-right: 28%;
+    padding-bottom: 1.6rem;
+    background: none;
+  }
+
+  .lessons-hero h1 {
+    font-size: clamp(1.6rem, 8vw, 2.7rem);
+  }
+
+  .lessons-hero__art {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    right: -58px;
+    width: 152px;
+    height: 152px;
+    border-radius: 48% 52% 44% 56% / 55% 45% 55% 45%;
+    transform: translateY(-50%);
+  }
+
+  .lessons-hero__art .lessons-hero__field {
+    right: -8%;
+    bottom: -8%;
+    width: 116%;
+    height: 116%;
+  }
+
+  .lesson-product__mark {
+    width: 58px;
+    height: 58px;
+  }
+
+  .lesson-product__price {
+    font-size: 3rem;
+  }
+
+  .lessons-closing {
+    grid-template-columns: auto minmax(0, 1fr);
+    border-radius: var(--squiggle-card);
+  }
+
+  .lessons-closing__mark {
+    width: 58px;
+    height: 50px;
+  }
+
+  .lessons-closing__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-product,
+  .lesson-product__mark {
+    transition: none;
+  }
 }
 
 /* FAQ */
 
 .faq-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(64px, 18vw, 240px);
+  grid-template-columns: minmax(0, 1fr) clamp(64px, 13vw, 180px);
   align-items: center;
-  min-height: 280px;
+  min-height: 200px;
   overflow: hidden;
-  padding: 3.5rem var(--page-pad);
+  padding: 2rem var(--page-pad);
   background-color: var(--lavender);
   background-image: var(--paper-texture);
   gap: clamp(0.75rem, 3vw, 3rem);
@@ -1233,7 +1427,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 .faq-hero h1 {
   margin: 0;
   font-family: var(--display);
-  font-size: clamp(3rem, 5.6vw, 5.8rem);
+  font-size: clamp(2.5rem, 4.6vw, 4.7rem);
   font-weight: 400;
   letter-spacing: -0.035em;
   line-height: 1.08;
@@ -1242,6 +1436,18 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 .faq-hero__mark {
   width: 100%;
   aspect-ratio: 1;
+}
+
+@media (max-width: 560px) {
+  .faq-hero {
+    min-height: 150px;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .faq-hero h1 {
+    font-size: clamp(2.1rem, 9.6vw, 3rem);
+  }
 }
 
 .faq-reference {
@@ -1397,7 +1603,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 .faq-contact {
-  padding: clamp(3rem, 5vw, 5rem) var(--page-pad);
+  padding: clamp(2.5rem, 4.5vw, 4rem) var(--page-pad);
   text-align: center;
 }
 
@@ -1409,25 +1615,30 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   letter-spacing: -0.04em;
 }
 
+/* WhatsApp and booking sit together on one row, wrapping on a phone. */
 .faq-contact__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 1rem 1.75rem;
-}
-
-.faq-contact__book {
-  margin: 0;
+  gap: 0.8rem;
 }
 
 /* Booking */
 
+/* The workspace runs down to the footer. With a short first step it used to
+   stop early and leave its bottom border floating across empty paper. */
+.book-page {
+  display: flex;
+  flex-direction: column;
+}
+
 .booking-composition {
   display: grid;
+  flex: 1 0 auto;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
   align-items: stretch;
-  border-bottom: 1px solid var(--rule);
   background-color: var(--green);
   background-image: var(--paper-texture);
 }
@@ -1516,21 +1727,6 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   opacity: 0.96;
 }
 
-/*
- * Holds the height the sign-in panel needs before it arrives, so the page below
- * does not jump when hydration replaces the loading line with the whole card.
- * Only on the account column — the booking flow's own column is never this shape.
- */
-.booking-provider--account {
-  min-height: 640px;
-}
-
-@media (max-width: 820px) {
-  .booking-provider--account {
-    min-height: 750px;
-  }
-}
-
 .booking-provider {
   --booking-control-height: 52px;
   --booking-control-font-size: 0.7rem;
@@ -1585,20 +1781,28 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 /*
- * Text is selectable. This is a language site: students select a phrase to
- * translate it, copy the WhatsApp number, or paste an error message to Inês,
- * and a page-wide `user-select: none` took all of that away. Only the controls
- * opt out, where a double-tap or a drag across the calendar would otherwise
- * paint a stray selection over the thing being pressed.
+ * Dan, 22 September 2026: the site behaves like an app, so headings, labels
+ * and buttons never light up under a stray drag or double-tap. Only what
+ * someone is likely to copy stays selectable: anything they type, error
+ * messages they might send to Inês, booking references, the terms with her
+ * contact details, and the student details in the teacher's lesson dialog.
  */
-button,
-summary,
-.button,
-.site-nav,
-.site-footer nav,
-.asset-mark {
+body {
   -webkit-user-select: none;
   user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.policy-information,
+.booking-alert,
+.booking-success__reference,
+.history-lesson-card__reference,
+.teacher-inline-error,
+.teacher-lesson-facts {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* Stepped booking: lesson, then day, then time, then details. Each step gets
@@ -1610,47 +1814,6 @@ summary,
 .booking-state-note--initial {
   min-height: 110px;
   padding: 1.25rem;
-}
-
-/* Returning students get a real dashboard at wide desktop sizes: identity is
-   the shared header row, then commitments and the four-week visual calendar
-   use the reclaimed width together. The DOM order stays account, lessons,
-   calendar, which is also the intended mobile reading order. */
-@container booking (min-width: 1040px) {
-  .booking-stage--lessons {
-    display: grid;
-    grid-template-columns: minmax(420px, 0.9fr) minmax(560px, 1.1fr);
-    align-items: stretch;
-    gap: 1rem clamp(1rem, 2vw, 1.4rem);
-  }
-
-  .booking-stage--lessons > .unified-account-area,
-  .booking-stage--lessons > .unified-account-area > .my-lessons--embedded {
-    display: contents;
-  }
-
-  .booking-stage--lessons .unified-account-controls {
-    grid-row: 1;
-    grid-column: 1 / -1;
-  }
-
-  .booking-stage--lessons .my-lessons__account-section--detached {
-    grid-row: 2;
-    grid-column: 1;
-    min-width: 0;
-    margin: 0;
-  }
-
-  .booking-stage--lessons > .unified-calendar-shell {
-    display: grid;
-    grid-row: 2;
-    grid-column: 2;
-  }
-
-  .booking-stage--lessons .unified-calendar--overview {
-    align-items: stretch;
-    align-content: stretch;
-  }
 }
 
 /* The booking page opens with one decision, not four sections competing for
@@ -1813,7 +1976,6 @@ html.booking-transitioning .booking-confirmation-stage {
    settles into place, and controls remain usable throughout the transition. */
 .my-lessons__account-section--detached,
 .my-lessons__details,
-.upcoming-lesson-occurrences,
 .my-lessons__menu-panel.is-open {
   animation: booking-content-in var(--motion-surface) var(--motion-ease) both;
 }
@@ -1880,15 +2042,6 @@ html.booking-transitioning .booking-confirmation-stage {
  * the way out for the minority who are already booked, and at full width it read
  * as the main thing to do on the booking page.
  */
-.booking-step-head .booking-existing-link {
-  width: auto;
-  align-self: flex-start;
-  min-height: 46px;
-  margin-top: 0.2rem;
-  padding: 0.6rem 1.3rem;
-  font-size: 0.7rem;
-  letter-spacing: 0.14em;
-}
 
 .booking-step-head {
   display: flex;
@@ -1897,21 +2050,6 @@ html.booking-transitioning .booking-confirmation-stage {
   margin-bottom: 0.2rem;
   gap: 0.35rem 1rem;
 }
-
-/*
- * Stacked, not beside. Baseline-aligning a button against a script face with a
- * long descender never sat right — the "?" of "Which lesson?" drops well below
- * the line the button was aligning to, so the two always looked a few pixels
- * out however they were nudged. Underneath, with room, it reads as its own
- * thing rather than a label that failed to line up.
- */
-.booking-step-head--lesson {
-  flex-direction: column;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-  gap: 1.5rem;
-}
-
 
 .booking-step-head .booking-step-heading {
   margin: 0;
@@ -1937,26 +2075,6 @@ html.booking-transitioning .booking-confirmation-stage {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-/* The control sits on the note's line, not on the heading's: a long date wraps
-   to two lines and left it stranded beside the second. */
-.booking-step-note-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  margin: 0.6rem 0 1.5rem;
-  gap: 0.75rem 1.75rem;
-}
-
-.booking-step-note-row .booking-step-note {
-  margin: 0;
-}
-
-.booking-step-note {
-  margin-bottom: 1.5rem;
-  font-size: 0.95rem;
-  opacity: 0.8;
 }
 
 /* Step 1 — lesson */
@@ -2084,16 +2202,6 @@ html.booking-transitioning .booking-confirmation-stage {
   color: var(--lavender-ink);
 }
 
-/* One workspace rather than a booking wizard beside a separate account page. */
-.unified-booking__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  width: 100%;
-  margin: 0 0 0.65rem;
-  gap: 1rem 1.5rem;
-}
-
 .unified-booking__lesson-picker {
   margin-bottom: 1.6rem;
 }
@@ -2211,11 +2319,6 @@ html.booking-transitioning .booking-confirmation-stage {
   gap: 0.75rem;
 }
 
-.booking-choice-summary__mark {
-  width: 44px;
-  height: 44px;
-}
-
 .booking-choice-summary__copy {
   display: flex;
   min-width: 0;
@@ -2262,14 +2365,6 @@ html.booking-transitioning .booking-confirmation-stage {
 
 .booking-choice-summary__change-short {
   display: none;
-}
-
-.unified-calendar__empty-summary {
-  margin: -0.35rem 0 1rem;
-  border-left: 3px solid var(--coral-action);
-  padding: 0.55rem 0 0.55rem 0.8rem;
-  font-size: 0.88rem;
-  line-height: 1.45;
 }
 
 .unified-calendar-shell {
@@ -2362,6 +2457,300 @@ html.booking-transitioning .booking-confirmation-stage {
 
 .unified-calendar__legend .is-free {
   background: var(--lavender);
+}
+
+/*
+ * Your lessons is one calendar card. Its header names the view, explains it
+ * behind the question mark and offers booking at the top right; the next
+ * lesson sits beneath it, one tap from its details and its Meet link. Booked
+ * days open their lesson directly, so there is no second list to keep in step.
+ */
+.lesson-overview {
+  display: grid;
+  margin-bottom: 1rem;
+  gap: 0.85rem;
+}
+
+.lesson-overview__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.lesson-overview__header .eyebrow {
+  margin: 0;
+}
+
+.lesson-overview__header h2:focus {
+  outline: none;
+}
+
+.lesson-overview__book {
+  min-height: 44px;
+  padding: 0.6rem 1.15rem;
+  gap: 0.35rem;
+}
+
+.lesson-overview__next {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--squiggle-tile);
+  padding: 0.55rem 1rem 0.55rem 0.75rem;
+  background: rgba(251, 244, 229, 0.72);
+  gap: 0.25rem 0.9rem;
+}
+
+.lesson-overview__next-mark {
+  width: 46px;
+  height: 46px;
+}
+
+.lesson-overview__next-open {
+  display: grid;
+  min-width: 0;
+  justify-items: start;
+  border: 0;
+  padding: 0.2rem 0;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  gap: 0.12rem;
+}
+
+.lesson-overview__next-open .eyebrow {
+  font-size: 0.62rem;
+}
+
+.lesson-overview__next-open strong {
+  font-size: 0.98rem;
+}
+
+.lesson-overview__next-open > span:last-child {
+  color: var(--lavender-ink);
+  font-size: 0.85rem;
+}
+
+.lesson-overview__next-open:hover strong,
+.lesson-overview__next-open:focus-visible strong {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.lesson-overview__empty {
+  margin: 0;
+  color: var(--lavender-ink);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 560px) {
+  /* Booking keeps the calendar's top right on a phone: a short visible label
+     rather than the full-width button phones use elsewhere. */
+  .lesson-overview__header .lesson-overview__book {
+    width: auto;
+    min-height: 44px;
+    margin-left: auto;
+    padding: 0.5rem 1rem;
+  }
+
+  .lesson-overview__book svg {
+    display: none;
+  }
+
+  .lesson-overview__book-more {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .lesson-overview__next {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .lesson-overview__next .meeting-link {
+    grid-column: 2;
+  }
+
+  /* The key on one line, the pager across the width beneath it. */
+  .unified-calendar__toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .unified-calendar__range-actions {
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .unified-calendar__range-actions .calendar-pager {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Four weeks at a time, with arrows to the rest of the booking window. */
+.calendar-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.calendar-pager .unified-calendar__range {
+  min-width: 8.6rem;
+  text-align: center;
+}
+
+.calendar-pager__step {
+  position: relative;
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--rule-soft);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.calendar-pager__step:hover:not(:disabled),
+.calendar-pager__step:focus-visible {
+  border-color: var(--lavender-ink);
+  background: var(--lavender-soft);
+}
+
+.calendar-pager__step:disabled {
+  cursor: default;
+  opacity: 0.32;
+}
+
+/* How many booked lessons lie beyond the four weeks on show. */
+.calendar-pager__count {
+  position: absolute;
+  top: -6px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  padding: 0 4px;
+  background: var(--coral-action);
+  color: #fff;
+  font-family: var(--ui);
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.unified-calendar__legend .is-weekly {
+  background: var(--lavender-ink);
+}
+
+/* A weekly lesson in lilac beside the coral one-offs, as in the booking flow. */
+.unified-calendar .calendar-week button.has-booking.has-weekly-booking {
+  background: rgba(170, 164, 230, 0.42);
+  color: var(--lavender-ink);
+}
+
+.unified-calendar .calendar-week button.has-booking.has-weekly-booking:hover,
+.unified-calendar .calendar-week button.has-booking.has-weekly-booking:focus-visible {
+  background: var(--lavender-ink);
+  color: #fff;
+}
+
+.unified-calendar .calendar-week button.has-booking:not(.has-weekly-booking) .calendar-booking-times .is-weekly {
+  color: var(--lavender-ink);
+}
+
+/* A day with several lessons lists them to open, and can still book another. */
+.calendar-booking-prompt__lessons {
+  display: grid;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  list-style: none;
+  gap: 0.5rem;
+}
+
+.calendar-booking-prompt__lesson {
+  display: flex;
+  width: 100%;
+  min-height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-tile);
+  padding: 0.6rem 0.9rem;
+  background: var(--paper-light);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  gap: 0.75rem;
+}
+
+.calendar-booking-prompt__lesson span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.calendar-booking-prompt__lesson small {
+  color: var(--lavender-ink);
+  font-size: 0.82rem;
+}
+
+.calendar-booking-prompt__lesson:hover,
+.calendar-booking-prompt__lesson:focus-visible {
+  border-color: var(--lavender-ink);
+  background: var(--lavender-soft);
+}
+
+/* Back from saving a card: what is happening until the booking confirms. */
+.booking-card-return {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-tile);
+  padding: 0.75rem 0.9rem 0.75rem 1rem;
+  background: var(--lavender-soft);
+  color: var(--ink);
+  gap: 0.75rem;
+}
+
+.booking-card-return > svg {
+  flex: none;
+  color: var(--lavender-ink);
+}
+
+.booking-card-return--confirmed > svg {
+  color: var(--blue);
+}
+
+.booking-card-return p {
+  flex: 1;
+  margin: 0;
+}
+
+.booking-card-return__close {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.booking-card-return__close:hover {
+  background: rgba(170, 164, 230, 0.35);
 }
 
 /* Coral is already booked; lilac is free. A split tile truthfully carries both. */
@@ -2754,91 +3143,13 @@ html.booking-transitioning .booking-confirmation-stage {
   margin-left: auto;
 }
 
-.unified-calendar__lesson-facts {
-  display: grid;
-  margin: 0 0 1.1rem;
-  gap: 0;
-}
-
-.unified-calendar__lesson-facts > div {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  border-top: 1px solid var(--rule-soft);
-  padding: 0.55rem 0;
-  gap: 0.65rem;
-}
-
-.unified-calendar__lesson-facts dt {
-  font-family: var(--ui);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.68;
-}
-
-.unified-calendar__lesson-facts dd {
-  margin: 0;
-  font-size: 0.86rem;
-  line-height: 1.4;
-}
-
-.managed-lesson__series-context {
-  display: grid;
-  margin-top: 1rem;
-  border-top: 1px solid var(--rule-soft);
-  padding-top: 0.9rem;
-  gap: 0.75rem;
-}
-
-.managed-lesson__series-heading {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 0.6rem;
-}
-
-.managed-lesson__series-heading > svg {
-  margin-top: 0.08rem;
-  color: var(--lavender-ink);
-}
-
-.managed-lesson__series-heading .eyebrow {
-  margin-bottom: 0.2rem;
-}
-
-.managed-lesson__series-heading p:last-child,
-.managed-lesson__series-manage > p {
-  font-size: 0.78rem;
-  line-height: 1.45;
-  opacity: 0.78;
-}
-
-.managed-lesson__series-context > .text-action {
-  justify-self: end;
-}
-
-.managed-lesson__series-manage {
-  display: grid;
-  min-width: 0;
-  border-top: 1px solid var(--rule-soft);
-  padding-top: 0.75rem;
-  gap: 0.7rem;
-}
-
-.managed-lesson__series-manage > p {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 .unified-calendar__bookings,
 .unified-calendar__availability,
 .unified-calendar__move {
   margin-top: 1rem;
 }
 
-.unified-calendar__bookings,
-.my-lessons__account-bookings {
+.unified-calendar__bookings {
   display: grid;
   gap: 0.55rem;
 }
@@ -2858,55 +3169,6 @@ html.booking-transitioning .booking-confirmation-stage {
 .lesson-calendar__lesson.lesson-calendar__lesson--booked:focus-visible {
   border-color: var(--coral-action);
   background: rgba(194, 58, 39, 0.14);
-}
-
-/* A recurring commitment needs to read as a schedule, not as one more single
-   booking. Lilac separates the series while coral remains the booked one-off. */
-.upcoming-lesson-group {
-  overflow: hidden;
-  border: 1px solid rgba(194, 58, 39, 0.26);
-  border-radius: var(--squiggle-field);
-  background: rgba(194, 58, 39, 0.075);
-  transition: border-color 220ms cubic-bezier(0.22, 1, 0.36, 1), background 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.upcoming-lesson-group--single:hover,
-.upcoming-lesson-group--single:focus-within {
-  border-color: rgba(194, 58, 39, 0.44);
-  background: rgba(194, 58, 39, 0.12);
-}
-
-.upcoming-lesson-group--series {
-  border-color: rgba(82, 74, 150, 0.42);
-  background:
-    linear-gradient(115deg, rgba(170, 164, 230, 0.24), rgba(255, 255, 255, 0.16)),
-    var(--paper-light);
-  box-shadow: inset 4px 0 0 rgba(82, 74, 150, 0.72);
-}
-
-.upcoming-lesson-group--series:hover,
-.upcoming-lesson-group--series:focus-within {
-  border-color: rgba(82, 74, 150, 0.62);
-  background:
-    linear-gradient(115deg, rgba(170, 164, 230, 0.42), rgba(255, 255, 255, 0.28)),
-    var(--paper-light);
-  box-shadow: inset 4px 0 0 rgba(82, 74, 150, 0.8), 0 9px 24px rgba(82, 74, 150, 0.12);
-}
-
-.upcoming-lesson-group.is-calendar-target,
-.upcoming-lesson-occurrence.is-calendar-target {
-  border-color: rgba(82, 74, 150, 0.68);
-  background: rgba(170, 164, 230, 0.3);
-  box-shadow: 0 9px 24px rgba(82, 74, 150, 0.14);
-}
-
-.upcoming-lesson-group--series .lesson-calendar__status--recurring {
-  background: var(--lavender-ink);
-}
-
-.upcoming-lesson-group--series .lesson-calendar__lesson-copy > small > span {
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 .my-lessons__history-bookings {
@@ -2959,146 +3221,7 @@ html.booking-transitioning .booking-confirmation-stage {
   gap: 0.75rem;
 }
 
-.upcoming-lesson-group__action {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: flex-end;
-  color: var(--coral-action);
-  gap: 0.18rem;
-  font-family: var(--ui);
-  font-size: 0.61rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1.25;
-  text-align: right;
-  text-transform: uppercase;
-}
-
-.upcoming-lesson-group__actions {
-  display: flex;
-  min-width: max-content;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 0.1rem;
-}
-
-.upcoming-lesson-group__actions .text-action {
-  min-height: 34px;
-  font-size: 0.62rem;
-}
-
-.upcoming-lesson-group__dates-toggle {
-  color: var(--lavender-ink);
-}
-
-.upcoming-lesson-group__recurrence-action {
-  color: var(--coral-action);
-}
-
-.upcoming-lesson-occurrences {
-  display: grid;
-  margin: -0.1rem 0 0.25rem clamp(0.6rem, 3vw, 1.6rem);
-  gap: 0.42rem;
-}
-
-.upcoming-lesson-occurrence {
-  display: grid;
-  width: 100%;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  border: 1px solid rgba(82, 74, 150, 0.24);
-  border-radius: var(--squiggle-field);
-  padding: 0.72rem 0.8rem;
-  background: rgba(170, 164, 230, 0.09);
-  color: inherit;
-  cursor: pointer;
-  gap: 0.75rem;
-  text-align: left;
-  transition: background 180ms var(--motion-ease), border-color 180ms var(--motion-ease);
-}
-
-.upcoming-lesson-occurrence:hover,
-.upcoming-lesson-occurrence:focus-visible {
-  border-color: rgba(82, 74, 150, 0.5);
-  background: rgba(170, 164, 230, 0.2);
-}
-
-.upcoming-lesson-occurrence > span:first-child {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.16rem;
-}
-
-.upcoming-lesson-occurrence strong {
-  font-family: var(--ui);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.upcoming-lesson-occurrence small {
-  font-size: 0.7rem;
-  line-height: 1.35;
-  opacity: 0.72;
-}
-
-.upcoming-lesson-group__dates {
-  border-top: 1px solid var(--rule-soft);
-  padding: 0 0.75rem 0.35rem;
-  background: rgba(255, 255, 255, 0.24);
-}
-
-.upcoming-lesson-group__date {
-  display: grid;
-  width: 100%;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  border: 0;
-  border-bottom: 1px solid var(--rule-soft);
-  padding: 0.72rem 0.05rem;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  gap: 0.75rem;
-  text-align: left;
-  transition: background 180ms ease, color 180ms ease;
-}
-
-.upcoming-lesson-group__date:last-child {
-  border-bottom: 0;
-}
-
-.upcoming-lesson-group__date:hover,
-.upcoming-lesson-group__date:focus-visible {
-  background: rgba(170, 164, 230, 0.12);
-  color: var(--coral-action);
-}
-
-.upcoming-lesson-group__date > span:first-child {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.16rem;
-}
-
-.upcoming-lesson-group__date strong {
-  font-family: var(--ui);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.upcoming-lesson-group__date small {
-  font-size: 0.7rem;
-  line-height: 1.35;
-  opacity: 0.72;
-}
-
 @container booking (max-width: 480px) {
-  .upcoming-lesson-occurrences {
-    margin-left: 0.45rem;
-  }
 
   .upcoming-lesson-group__summary {
     grid-template-columns: 38px minmax(0, 1fr);
@@ -3113,41 +3236,6 @@ html.booking-transitioning .booking-confirmation-stage {
 
   .upcoming-lesson-group__summary .lesson-calendar__lesson-copy {
     grid-area: copy;
-  }
-
-  .upcoming-lesson-group__summary .upcoming-lesson-group__actions {
-    grid-area: actions;
-    width: 100%;
-    min-width: 0;
-    flex-direction: column;
-    align-items: stretch;
-    margin-top: 0.38rem;
-  }
-
-  .upcoming-lesson-group__summary .upcoming-lesson-group__actions .text-action {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .upcoming-lesson-group--single .upcoming-lesson-group__summary {
-    grid-template-columns: 38px minmax(0, 1fr) auto;
-    grid-template-areas: "mark copy actions";
-    padding-right: 0.55rem;
-  }
-
-  .upcoming-lesson-group--single .upcoming-lesson-group__summary .upcoming-lesson-group__actions {
-    width: auto;
-    min-width: max-content;
-    align-items: flex-end;
-    align-self: center;
-    margin-top: 0;
-  }
-
-  .upcoming-lesson-group--single .upcoming-lesson-group__summary .upcoming-lesson-group__actions .text-action {
-    width: auto;
-    min-height: 42px;
-    justify-content: flex-end;
-    padding-inline: 0.2rem;
   }
 
   .history-lesson-card__summary {
@@ -3172,6 +3260,11 @@ html.booking-transitioning .booking-confirmation-stage {
   line-height: 1.2;
   margin: 0;
   text-transform: uppercase;
+}
+
+/* A weekly lesson keeps the weekly colour it has on the calendar. */
+.lesson-calendar__status--recurring {
+  background: var(--lavender-ink);
 }
 
 .unified-calendar__availability {
@@ -3221,15 +3314,6 @@ html.booking-transitioning .booking-confirmation-stage {
   gap: 1rem;
 }
 
-.unified-account-controls .my-lessons__series {
-  margin: 0.9rem 0 0;
-  border: 0;
-  border-top: 1px solid var(--rule-soft);
-  border-radius: 0;
-  padding: 0.9rem 0 0;
-  background: transparent;
-}
-
 @container booking (min-width: 700px) {
   .unified-calendar {
     grid-template-areas: "calendar panel";
@@ -3240,10 +3324,6 @@ html.booking-transitioning .booking-confirmation-stage {
   .unified-calendar__panel {
     position: sticky;
     top: 1rem;
-  }
-
-  .unified-calendar__empty-summary {
-    display: none;
   }
 }
 
@@ -3263,12 +3343,6 @@ html.booking-transitioning .booking-confirmation-stage {
 }
 
 @container booking (max-width: 680px) {
-  .unified-booking__head {
-    align-items: flex-start;
-    flex-direction: column;
-    width: 100%;
-    margin-left: 0;
-  }
 
   .unified-account-controls {
     width: 100%;
@@ -3301,11 +3375,6 @@ html.booking-transitioning .booking-confirmation-stage {
   .booking-date-summary__mark {
     width: 44px;
     height: 44px;
-  }
-
-  .booking-choice-summary__mark {
-    width: 38px;
-    height: 38px;
   }
 
   .booking-date-summary .booking-choice-summary__change {
@@ -3356,12 +3425,9 @@ html.booking-transitioning .booking-confirmation-stage {
   }
 }
 
-
-
 /* Step 2 — day */
 
-.booking-step-head + .calendar-panel,
-.booking-step-note + .calendar-panel {
+.booking-step-head + .calendar-panel {
   margin-top: 0.9rem;
 }
 
@@ -3377,7 +3443,6 @@ html.booking-transitioning .booking-confirmation-stage {
   padding: clamp(1rem, 2.4vw, 1.75rem);
 }
 
-.calendar-section-heading h2,
 .student-details-form h3 {
   margin-bottom: 0.3rem;
   font-family: var(--ui);
@@ -3386,7 +3451,6 @@ html.booking-transitioning .booking-confirmation-stage {
   text-transform: uppercase;
 }
 
-.calendar-section-heading p,
 .booking-state-note {
   margin-bottom: 1rem;
   font-size: 0.92rem;
@@ -3536,13 +3600,6 @@ html.booking-transitioning .booking-confirmation-stage {
   color: var(--paper);
 }
 
-/* Dates from the neighbouring month. They are real and bookable, but must not
-   read as part of the month on screen. */
-.calendar-week button .is-muted {
-  opacity: 0.45;
-  font-weight: 400;
-}
-
 .calendar-week button.can-start-booking:hover,
 .calendar-week button.can-start-booking:focus-visible {
   background: rgba(170, 164, 230, 0.26);
@@ -3648,146 +3705,6 @@ html.booking-transitioning .booking-confirmation-stage {
   .slot-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-}
-
-/* Rounded to match the sign-in card it sits beside; two cards side by side
-   with different corners read as two unrelated things. */
-.booking-recap {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--rule);
-  /* It sits directly beside the sign-in card, so it takes the same hand. Left
-     on a plain 18px it was the one square corner in a card of drawn ones, which
-     read as unfinished rather than restrained. */
-  border-radius: var(--squiggle-panel);
-  padding: 1.5rem;
-  background: rgba(170, 164, 230, 0.14);
-}
-
-/* As on the sign-in card: behind the words, bleeding off the corner. */
-.booking-recap__mark {
-  position: absolute;
-  top: -18px;
-  right: -22px;
-  z-index: 0;
-  width: 128px;
-  height: 128px;
-  opacity: 0.3;
-  pointer-events: none;
-}
-
-.booking-recap > *:not(.booking-recap__mark) {
-  position: relative;
-  z-index: 1;
-}
-
-.booking-recap h3 {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  margin: 0.5rem 0 0.9rem;
-  gap: 0.6rem;
-  font-family: var(--display);
-  font-size: 1.7rem;
-  font-weight: 400;
-  line-height: 1.1;
-}
-
-/*
- * One rule, not a generic `.booking-recap button` plus overrides.
- *
- * The recap's only control is this one now, and the two rules were fighting on
- * specificity: `.booking-recap button` is (0,1,1) and beat the (0,1,0) class
- * here, so its `display: inline` stacked the icon above the label and its
- * `border: 0` erased the outline. Merging them removes the conflict rather than
- * papering over it with !important.
- *
- * It carries the action colour permanently rather than waiting for a hover to
- * reveal that it is one, since it is the only route back from this step.
- */
-.booking-recap__change {
-  display: inline-flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
-  min-height: 40px;
-  border: 1px solid var(--coral);
-  border-radius: var(--squiggle-pill);
-  padding: 0 0.95rem;
-  background: transparent;
-  color: var(--coral-action);
-  cursor: pointer;
-  gap: 0.35rem;
-  font-family: var(--ui);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  white-space: nowrap;
-  text-transform: uppercase;
-  transition: background 160ms ease, color 160ms ease;
-}
-
-.booking-recap__change::after {
-  display: none;
-}
-
-.booking-recap__change:hover,
-.booking-recap__change:focus-visible {
-  background: var(--coral-action);
-  color: #fff;
-}
-
-/* Price left, the one control right, on the card's bottom line. */
-.booking-recap__foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-top: 1rem;
-  gap: 0.75rem;
-}
-
-.booking-recap__foot strong {
-  margin-top: 0;
-}
-
-.booking-recap p > span {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.booking-recap p {
-  display: flex;
-  align-items: flex-start;
-  margin-bottom: 0.55rem;
-  gap: 0.5rem;
-  font-size: 0.92rem;
-  line-height: 1.45;
-}
-
-/* Length and place are short facts; they sat on two lines with a lot of empty
-   space beside each. */
-.booking-recap__pair {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1.4rem;
-}
-
-.booking-recap__pair p {
-  margin-bottom: 0;
-}
-
-.booking-recap p svg {
-  flex: none;
-  margin-top: 0.15rem;
-}
-
-.booking-recap strong {
-  display: block;
-  font-family: var(--display);
-  font-size: 2.1rem;
 }
 
 .student-details-form label {
@@ -4219,9 +4136,6 @@ html.booking-transitioning .booking-confirmation-stage {
    not to another page about the lessons. */
 /* Set apart from the four content links: it goes to the student's own area,
    not to another page about the lessons. */
-.site-nav__link--account {
-  color: var(--lavender-ink);
-}
 
 /* The menu shares the header's geometry so its wordmark stays still. Only
    the links drop down. Its own scroll area also works from a footer opener. */
@@ -4358,10 +4272,6 @@ html.booking-transitioning .booking-confirmation-stage {
 .nav-mobile__link[aria-current="page"]::after {
   opacity: 1;
   transform: scaleX(1);
-}
-
-.nav-mobile__link--account {
-  color: var(--lavender-ink);
 }
 
 /* /my-lessons */
@@ -4530,17 +4440,6 @@ button.text-action {
   color: var(--coral-action);
 }
 
-.my-lessons__menu-panel > .my-lessons__menu-book {
-  background: var(--coral-action);
-  color: #fff;
-}
-
-.my-lessons__menu-panel > .my-lessons__menu-book:hover,
-.my-lessons__menu-panel > .my-lessons__menu-book:focus-visible {
-  background: var(--coral);
-  color: #fff;
-}
-
 .my-lessons__menu-panel > button > span {
   display: inline-grid;
   min-width: 1.35rem;
@@ -4584,29 +4483,6 @@ button.text-action {
   font-size: 0.8rem;
   line-height: 1.45;
   opacity: 0.72;
-}
-
-.my-lessons__account-section-heading--upcoming {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-}
-
-.booking-provider .upcoming-lessons__book-action {
-  min-height: 42px;
-  border: 1px solid var(--coral-action);
-  padding: 0.58rem 0.85rem;
-  background: var(--coral-action);
-  box-shadow: 0 6px 16px rgba(194, 58, 39, 0.14);
-  color: #fff;
-  gap: 0.42rem;
-}
-
-.booking-provider .upcoming-lessons__book-action:hover,
-.booking-provider .upcoming-lessons__book-action:focus-visible {
-  border-color: var(--coral);
-  background: var(--coral);
-  color: #fff;
 }
 
 @container booking (min-width: 1040px) {
@@ -4658,23 +4534,6 @@ button.text-action {
   .unified-account-controls .my-lessons__details-note {
     grid-column: 1 / -1;
     margin-bottom: 0;
-  }
-
-  .my-lessons__menu-panel > .my-lessons__menu-book {
-    min-height: 42px;
-    padding-right: 0.88rem;
-    padding-left: 0.88rem;
-    background: var(--coral-action);
-    box-shadow: 0 6px 16px rgba(194, 58, 39, 0.14);
-  }
-
-  .my-lessons__menu-panel > .my-lessons__menu-book:hover,
-  .my-lessons__menu-panel > .my-lessons__menu-book:focus-visible {
-    background: var(--coral);
-  }
-
-  .upcoming-lessons__book-action {
-    display: none;
   }
 }
 
@@ -4765,18 +4624,6 @@ button.text-action {
   visibility: visible;
 }
 
-.my-lessons__account-section .lesson-list {
-  margin-top: 0.55rem;
-}
-
-.my-lessons__account-section .lesson-list li:last-child {
-  margin-bottom: 0;
-}
-
-.text-action--muted {
-  color: var(--ink);
-}
-
 /* Deliberately quiet. It is a thing a student changes once, sitting above the
    lessons they came to the page for. */
 .my-lessons__details {
@@ -4858,57 +4705,11 @@ button.text-action {
   opacity: 1;
 }
 
-.my-lessons__group {
-  margin-bottom: 2.5rem;
-}
-
-.my-lessons__group h2 {
-  margin-bottom: 0.9rem;
-  font-family: var(--display);
-  font-size: clamp(1.6rem, 3.6vw, 2.1rem);
-  font-weight: 400;
-}
-
-.lesson-calendar__heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-  gap: 0.8rem 1.25rem;
-}
-
-.lesson-calendar__heading h2 {
-  margin-bottom: 0.15rem;
-}
-
-.lesson-calendar__heading p {
-  max-width: 48ch;
-  font-size: 0.88rem;
-  opacity: 0.76;
-}
-
-.lesson-calendar__heading .button {
-  width: auto;
-  min-height: 44px;
-  padding: 0.65rem 1.15rem;
-  font-size: 0.66rem;
-}
-
 .lesson-calendar {
   display: grid;
   min-width: 0;
   gap: 1rem;
   align-items: start;
-}
-
-.lesson-calendar__grid {
-  width: 100%;
-  max-width: none;
-}
-
-.lesson-calendar__week + .lesson-calendar__week {
-  margin-top: 7px;
 }
 
 /*
@@ -4940,22 +4741,6 @@ button.text-action {
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.lesson-calendar__agenda {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-panel);
-  padding: 1.2rem;
-  background: rgba(170, 164, 230, 0.13);
-}
-
-.lesson-calendar__agenda > h3 {
-  margin: 0.25rem 0 0.9rem;
-  font-family: var(--ui);
-  font-size: 1rem;
-  line-height: 1.35;
 }
 
 .lesson-calendar__lesson {
@@ -5022,133 +4807,6 @@ button.text-action {
   .lesson-calendar {
     grid-template-columns: minmax(0, 1fr) minmax(245px, 0.62fr);
   }
-
-  .lesson-calendar__agenda {
-    position: sticky;
-    top: 1rem;
-  }
-}
-
-/* margin/padding zeroed: the UA's 40px list indent pushed every card out of
-   line with the heading and panel above it. */
-.lesson-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/*
- * Two columns, two rows: the mark down the side, the lesson across the top, and
- * the action along the bottom. As three columns the button took the width the
- * date needed, so "Wednesday, 9 September 2026, 17:00" broke over three lines
- * while the bottom half of the card sat empty.
- */
-.lesson-list li {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  grid-template-areas:
-    "mark body"
-    "mark actions";
-  align-items: start;
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-tile);
-  margin-bottom: 0.75rem;
-  padding: 1.15rem 1.4rem;
-  gap: 0 1rem;
-}
-
-.lesson-list__mark {
-  grid-area: mark;
-  width: 48px;
-  height: 32px;
-  color: var(--coral);
-}
-
-.lesson-list__body {
-  grid-area: body;
-}
-
-/*
- * The UI face, not the script one. The heading is a date now, and Beth Ellen at
- * display size broke "Wednesday, 2 September 2026, 19:00" across three lines and
- * left "Porto time" on a fourth. A date is information; it should be set like it.
- */
-.lesson-list__body h3 {
-  margin-bottom: 0.4rem;
-  font-family: var(--ui);
-  font-size: 1.02rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  line-height: 1.35;
-  text-wrap: balance;
-}
-
-.lesson-list__body h3 em {
-  font-family: var(--ui);
-  font-size: 0.78rem;
-  font-style: normal;
-  letter-spacing: 0.02em;
-  /* 0.6 took this to 3.56:1 over the card. It is secondary, not decorative. */
-  opacity: 0.72;
-}
-
-.lesson-list__body p {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  margin-bottom: 0.25rem;
-  gap: 0.4rem;
-  font-size: 0.9rem;
-}
-
-/* Each icon is bound to the words it labels, so a long date wraps under itself
-   rather than leaving the calendar icon alone on the line above it. */
-.lesson-list__body p > span {
-  display: inline-flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 0.4rem;
-}
-
-.lesson-list__body p svg {
-  flex: none;
-  align-self: center;
-}
-
-.lesson-list__fee {
-  margin-top: 0.5rem;
-  color: var(--coral-action);
-  font-weight: 700;
-}
-
-.lesson-list__actions {
-  display: flex;
-  grid-area: actions;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 1rem;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-/* Sits at the far end of the row, where a code belongs — present if you need it
-   and never the first thing read. */
-.lesson-list__actions .lesson-list__reference {
-  margin-left: auto;
-}
-
-.lesson-list__reference {
-  font-family: var(--ui);
-  font-size: 0.72rem;
-  letter-spacing: 0.07em;
-  opacity: 0.6;
-}
-
-.lesson-list--past li {
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  border-color: var(--rule-soft);
-  opacity: 0.78;
 }
 
 .booking-repeat-choice {
@@ -5192,125 +4850,6 @@ button.text-action {
 
 .booking-skipped li {
   margin-top: 0.15rem;
-}
-
-/* Repeats, on the student's own page. Set above the list rather than inside it,
-   because a repeat is one thing that owns several lessons — putting the control
-   on a lesson would suggest stopping it cancels that lesson. */
-.my-lessons__series {
-  margin-bottom: 1.6rem;
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-panel);
-  padding: 1.1rem 1.25rem;
-  background: rgba(170, 164, 230, 0.14);
-}
-
-.my-lessons__series h2 {
-  margin-bottom: 0.6rem;
-  font-family: var(--ui);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--lavender-ink);
-}
-
-.my-lessons__series-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 1rem;
-}
-
-.my-lessons__series-row p {
-  display: flex;
-  align-items: center;
-  margin-bottom: 0;
-  gap: 0.45rem;
-  font-size: 0.95rem;
-}
-
-@container booking (max-width: 680px) {
-  .my-lessons__series-row > p {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-}
-
-.my-lessons__series-confirmation {
-  display: flex;
-  flex: 1 0 100%;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem 1.5rem;
-  border: 1px solid rgba(239, 93, 60, 0.42);
-  border-radius: var(--squiggle-field);
-  padding: 1rem 1.1rem;
-  background: rgba(245, 236, 217, 0.78);
-  grid-column: 1 / -1;
-}
-
-.my-lessons__series-confirmation h3 {
-  margin: 0;
-  font-family: var(--ui);
-  font-size: 0.95rem;
-  line-height: 1.35;
-}
-
-.my-lessons__series-confirmation p {
-  display: block;
-  max-width: 58ch;
-  margin-top: 0.28rem;
-  font-size: 0.84rem;
-  line-height: 1.5;
-  opacity: 0.82;
-}
-
-.my-lessons__series-confirmation-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 1rem;
-}
-
-.my-lessons__series-confirmation-actions .button {
-  min-height: 44px;
-  padding: 0.72rem 1rem;
-  white-space: nowrap;
-}
-
-.my-lessons__series-confirmation-actions button:disabled {
-  cursor: wait;
-  opacity: 0.55;
-}
-
-@media (max-width: 680px) {
-  .my-lessons__series-confirmation {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .my-lessons__series-confirmation-actions {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.65rem;
-    width: 100%;
-  }
-
-  .my-lessons__series-confirmation-actions .button {
-    width: 100%;
-  }
-}
-
-.lesson-list__repeats {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--lavender-ink);
-  font-family: var(--ui);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
 }
 
 .student-details-form label em,
@@ -5648,22 +5187,19 @@ details.booking-recurring-rate[open] > summary {
  * replaced, leaving the icon with no flex context — which is why it floated
  * above the words instead of sitting on the first line of them.
  */
-.booking-alert,
-.booking-form-status {
+.booking-alert {
   display: flex;
   align-items: flex-start;
   gap: 0.55rem;
   text-align: left;
 }
 
-.booking-alert svg,
-.booking-form-status svg {
+.booking-alert svg {
   flex: none;
   margin-top: 0.14em;
 }
 
-.booking-alert p,
-.booking-form-status p {
+.booking-alert p {
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.5;
@@ -5671,60 +5207,6 @@ details.booking-recurring-rate[open] > summary {
 
 .manage-booking {
   margin-top: 1.75rem;
-}
-
-.manage-booking__back {
-  margin-bottom: 1rem;
-}
-
-.manage-booking__card {
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-panel);
-  padding: 1.5rem 1.7rem;
-}
-
-.manage-booking__card h2 {
-  margin-bottom: 0.9rem;
-  font-family: var(--display);
-  font-size: clamp(1.7rem, 4vw, 2.3rem);
-  line-height: 1.1;
-}
-
-.manage-booking__facts > div {
-  display: grid;
-  grid-template-columns: minmax(120px, 0.5fr) 1fr;
-  align-items: baseline;
-  border-top: 1px solid var(--rule-soft);
-  padding: 0.6rem 0;
-  gap: 1rem;
-}
-
-.manage-booking__facts dt {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: var(--ui);
-  font-size: 0.7rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.manage-booking__facts dd {
-  font-size: 0.98rem;
-}
-
-.manage-booking__facts dd.is-struck {
-  opacity: 0.6;
-  text-decoration: line-through;
-}
-
-/* Where to go once the thing is done. */
-.manage-booking__onward {
-  display: flex;
-  align-items: center;
-  margin-top: 1.4rem;
-  gap: 1.4rem;
-  flex-wrap: wrap;
 }
 
 .manage-booking__actions {
@@ -5754,22 +5236,6 @@ details.booking-recurring-rate[open] > summary {
   border-color: var(--green);
 }
 
-.manage-booking__confirm,
-.manage-booking__reschedule {
-  margin-top: 1.4rem;
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-tile);
-  padding: 1.4rem;
-}
-
-.manage-booking__reschedule .calendar-week:last-of-type {
-  margin-bottom: 1.2rem;
-}
-
-.manage-booking__reschedule .slot-grid {
-  margin-bottom: 0.4rem;
-}
-
 .booking-outcome {
   display: flex;
   align-items: flex-start;
@@ -5789,303 +5255,6 @@ details.booking-recurring-rate[open] > summary {
 .booking-outcome p {
   margin-top: 0.2rem;
   font-size: 0.9rem;
-}
-
-/* /schedule — Inês's own view. Not linked from the site and not indexed. */
-
-.schedule-signin {
-  max-width: 380px;
-  margin-top: 1.5rem;
-  border: 1px solid var(--rule);
-  padding: 1.5rem;
-}
-
-.schedule-signin label {
-  display: block;
-  margin-bottom: 0.9rem;
-}
-
-.schedule-signin label span {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-family: var(--ui);
-  font-size: 0.72rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.schedule-signin input {
-  width: 100%;
-  border: 1px solid var(--rule);
-  padding: 0.7rem;
-  background: rgba(255, 255, 255, 0.45);
-}
-
-.schedule-block {
-  margin-top: 2.4rem;
-  border-top: 1px solid var(--rule);
-  padding-top: 1.6rem;
-}
-
-.schedule-block h2 {
-  margin-bottom: 0.5rem;
-  font-family: var(--display);
-  font-size: clamp(1.6rem, 3.6vw, 2.1rem);
-  line-height: 1.1;
-}
-
-.schedule-bookings {
-  list-style: none;
-}
-
-.schedule-bookings li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--rule-soft);
-  padding: 0.8rem 0;
-  gap: 0.6rem;
-}
-
-.schedule-bookings strong {
-  display: block;
-  font-family: var(--ui);
-  font-size: 0.95rem;
-}
-
-.schedule-bookings span {
-  font-size: 0.88rem;
-  opacity: 0.82;
-}
-
-.schedule-bookings em {
-  display: block;
-  margin-top: 0.2rem;
-  font-size: 0.85rem;
-  opacity: 0.7;
-}
-
-.schedule-bookings__meta {
-  text-align: right;
-  font-size: 0.82rem;
-}
-
-.schedule-bookings__meta a {
-  text-decoration: underline;
-}
-
-.schedule-flag {
-  display: block;
-  margin-top: 0.2rem;
-  color: var(--coral-action);
-  font-weight: 700;
-}
-
-.schedule-week {
-  margin: 1.2rem 0 1.4rem;
-}
-
-.schedule-day {
-  display: grid;
-  grid-template-columns: minmax(110px, 0.4fr) 1fr;
-  align-items: start;
-  border-top: 1px solid var(--rule-soft);
-  padding: 0.7rem 0;
-  gap: 1rem;
-}
-
-.schedule-day h3 {
-  font-family: var(--ui);
-  font-size: 0.78rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.schedule-day__windows {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.schedule-window {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--rule);
-  padding: 0.25rem 0.35rem;
-  gap: 0.35rem;
-}
-
-.schedule-window input {
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 0.9rem;
-}
-
-.schedule-window span {
-  font-size: 0.78rem;
-  opacity: 0.7;
-}
-
-.schedule-window button,
-.schedule-exceptions button {
-  display: grid;
-  min-width: 32px;
-  min-height: 32px;
-  place-items: center;
-  border: 0;
-  background: transparent;
-  color: var(--coral-action);
-  cursor: pointer;
-}
-
-.schedule-add {
-  display: inline-flex;
-  align-items: center;
-  border: 1px dashed var(--rule);
-  padding: 0.4rem 0.65rem;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  gap: 0.3rem;
-  font-family: var(--ui);
-  font-size: 0.8rem;
-}
-
-/* Adding a lesson for someone who booked another way. */
-.schedule-add-lesson {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  align-items: end;
-  margin: 1rem 0 0.5rem;
-  gap: 0.75rem;
-}
-
-.schedule-add-lesson label {
-  display: block;
-}
-
-.schedule-add-lesson label span {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-family: var(--ui);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.75;
-}
-
-.schedule-add-lesson input,
-.schedule-add-lesson select {
-  width: 100%;
-  min-height: 46px;
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-field);
-  padding: 0 0.7rem;
-  background: rgba(255, 255, 255, 0.6);
-  font: inherit;
-}
-
-.schedule-add-lesson .button {
-  min-height: 46px;
-  border-radius: var(--squiggle-pill);
-}
-
-.schedule-move,
-.schedule-cancel {
-  display: block;
-  margin-left: auto;
-  border: 0;
-  /* Inês runs her day from a phone: these were 16px-tall text and the two
-     controls she uses most. Padded to a real thumb target, kept visually
-     word-sized by the transparent background. */
-  min-height: 44px;
-  padding: 0.7rem 0.5rem 0.7rem 1rem;
-  background: transparent;
-  color: var(--coral-action);
-  cursor: pointer;
-  font-family: var(--ui);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-decoration: underline;
-  text-transform: uppercase;
-}
-
-.schedule-move {
-  color: var(--lavender-ink);
-}
-
-/* Revealed under the lesson it belongs to, so it is obvious which is moving. */
-.schedule-move-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  align-items: end;
-  width: 100%;
-  margin-top: 0.85rem;
-  border-top: 1px solid var(--rule-soft);
-  padding-top: 0.85rem;
-  gap: 0.7rem;
-}
-
-.schedule-move-form label span {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-family: var(--ui);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.75;
-}
-
-.schedule-move-form input {
-  width: 100%;
-  min-height: 46px;
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-field);
-  padding: 0 0.7rem;
-  background: rgba(255, 255, 255, 0.6);
-  font: inherit;
-}
-
-.schedule-move-form .button {
-  min-height: 46px;
-  border-radius: var(--squiggle-pill);
-}
-
-.schedule-dayoff {
-  display: flex;
-  flex-wrap: wrap;
-  margin: 1rem 0;
-  gap: 0.5rem;
-}
-
-.schedule-dayoff input {
-  border: 1px solid var(--rule);
-  padding: 0.6rem;
-  background: rgba(255, 255, 255, 0.45);
-  font: inherit;
-}
-
-.schedule-exceptions {
-  list-style: none;
-}
-
-.schedule-exceptions li {
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid var(--rule-soft);
-  padding: 0.55rem 0;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.schedule-exceptions li span {
-  flex: 1;
 }
 
 /* Native pop-ups and their backdrops share the lesson overlays' entrance. */
@@ -6261,24 +5430,26 @@ dialog[open]::backdrop {
   font-weight: 400;
 }
 
-/* Footer */
-
+/*
+ * The footer is a sign-off, so it hugs its contents: the wordmark on the left,
+ * then the four destinations and Terms & privacy on one row on the right. On a
+ * phone the destinations are behind Menu, and Terms & privacy sits directly
+ * under it instead of on a row of its own.
+ */
 .site-footer {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(0, auto);
+  display: flex;
   align-items: center;
-  min-height: 0;
-  padding: 1.35rem var(--page-pad);
-  background-color: var(--green-deep);
+  justify-content: space-between;
+  padding: 0.85rem var(--page-pad);
+  background-color: var(--blue-deep);
   background-image: var(--paper-texture);
   color: var(--paper);
-  column-gap: clamp(2.5rem, 5vw, 7rem);
-  row-gap: 0.2rem;
+  gap: 1rem clamp(2rem, 4vw, 4rem);
 }
 
 .site-footer__brand {
-  grid-row: 1 / 3;
-  width: min(240px, 100%);
+  flex: 0 0 auto;
+  width: clamp(150px, 12.5vw, 188px);
 }
 
 .footer-wordmark {
@@ -6288,17 +5459,17 @@ dialog[open]::backdrop {
 .site-footer__actions {
   display: flex;
   min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
+  gap: 0 clamp(1.1rem, 2.2vw, 2.4rem);
 }
 
-/* Flex, not a four-column grid: the account link made five items, and the
-   fifth wrapped to a second row, which is what made the footer look stacked. */
 .site-footer__nav {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0 clamp(1rem, 2.2vw, 2.6rem);
+  gap: 0 clamp(1rem, 2.2vw, 2.4rem);
   font-family: var(--ui);
   font-size: 0.72rem;
   font-weight: 700;
@@ -6306,33 +5477,35 @@ dialog[open]::backdrop {
   text-transform: uppercase;
 }
 
-.site-footer__nav a {
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-}
-
-.site-footer__nav a:hover,
-.site-footer__contact a:hover {
-  color: var(--lavender-soft);
-}
-
-.site-footer__legal {
-  display: flex;
-  grid-column: 2;
-  justify-content: flex-end;
-  gap: 1.25rem;
-  color: var(--lavender-soft);
-  font-family: var(--ui);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
+.site-footer__nav a,
 .site-footer__legal a {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
+}
+
+.site-footer__nav a:hover,
+.site-footer__nav a:focus-visible {
+  color: var(--lavender-soft);
+}
+
+/* Quieter than the destinations, set apart by one short lilac stroke. */
+.site-footer__legal {
+  display: flex;
+  align-items: center;
+  color: var(--lavender-soft);
+  font-family: var(--ui);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  gap: clamp(1.1rem, 2.2vw, 2.4rem);
+}
+
+.site-footer__legal::before {
+  width: 1px;
+  height: 16px;
+  background: rgba(220, 216, 245, 0.4);
+  content: "";
 }
 
 .site-footer__legal a:hover,
@@ -6342,106 +5515,66 @@ dialog[open]::backdrop {
   text-underline-offset: 3px;
 }
 
+/* Menu repeats the destinations, so it exists only where they are hidden. */
 .site-footer__contact {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: clamp(0.9rem, 1.8vw, 1.8rem);
-  text-align: right;
-  white-space: nowrap;
+  display: none;
 }
 
-/* Quieter than "Message Inês", which is the one thing here worth acting on. */
-.site-footer__top {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  border: 0;
-  padding: 0 0 2px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  gap: 0.35rem;
-  font-family: var(--ui);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  transition: color 160ms ease;
-}
-
-/* The same coral underline the rest of the site's links grow on hover. */
-.site-footer__top::after {
-  position: absolute;
-  right: 0;
-  bottom: 8px;
-  left: 0;
-  height: 1.5px;
-  background: var(--coral);
-  content: "";
-  opacity: 0;
-  transform: scaleX(0.4);
-  transition: opacity 160ms ease, transform 160ms ease;
-}
-
-.site-footer__top:hover::after,
-.site-footer__top:focus-visible::after {
-  opacity: 1;
-  transform: scaleX(1);
-}
-
-/*
- * Both of these are things to press, so they are shaped like it. As underlined
- * text on a phone they sat bottom-left looking like a footnote, and the one
- * that reaches every other page was the least visible thing on the screen.
- */
-.site-footer__contact a,
-.site-footer__contact .site-footer__top {
+.site-footer__menu {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
-  justify-content: center;
   border: 1px solid rgba(245, 236, 217, 0.45);
   border-radius: var(--squiggle-thumb);
   padding: 0 1rem;
   background: rgba(245, 236, 217, 0.06);
+  color: inherit;
+  cursor: pointer;
+  gap: 0.4rem;
   font-family: var(--ui);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition: background 160ms ease, border-color 160ms ease;
 }
 
-.site-footer__contact a:hover,
-.site-footer__contact a:focus-visible,
-.site-footer__contact .site-footer__top:hover,
-.site-footer__contact .site-footer__top:focus-visible {
+.site-footer__menu:hover,
+.site-footer__menu:focus-visible {
   border-color: var(--paper);
   background: rgba(245, 236, 217, 0.16);
-  color: var(--paper);
-}
-
-/* The block carries the affordance now; the growing underline inside it read
-   as a second, competing one. */
-.site-footer__contact .site-footer__top::after {
-  display: none;
-}
-
-/*
- * Hidden above the breakpoint, where the footer already lists every page across
- * one row — a button to reveal a menu you can already read is noise. After the
- * block styling above rather than before it: both are two-class selectors, so
- * source order decides which wins.
- */
-.site-footer__contact .site-footer__menu {
-  display: none;
 }
 
 @media (max-width: 820px) {
-  .site-footer__contact .site-footer__menu {
-    display: inline-flex;
+  .site-footer {
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+  }
+
+  .site-footer__brand {
+    width: 150px;
+  }
+
+  .site-footer__nav {
+    display: none;
+  }
+
+  .site-footer__actions {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .site-footer__contact {
+    display: flex;
+    order: -1;
+  }
+
+  .site-footer__legal::before {
+    display: none;
+  }
+
+  .site-footer__legal a {
+    min-height: 36px;
   }
 }
 
@@ -6477,18 +5610,6 @@ dialog[open]::backdrop {
   .approach-item {
     grid-template-columns: 105px 1fr;
   }
-
-  .site-footer {
-    grid-template-columns: minmax(200px, 1fr) minmax(0, auto);
-    gap: 2rem;
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-  }
-
-  .site-footer__nav {
-    justify-content: flex-end;
-    gap: clamp(1rem, 3vw, 2.25rem);
-  }
 }
 
 @media (min-width: 821px) and (max-width: 1100px) {
@@ -6507,32 +5628,6 @@ dialog[open]::backdrop {
 
   .booking-intro__time-window {
     display: none;
-  }
-
-  .lessons-closing {
-    grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
-  }
-
-  .lesson-location-band {
-    align-items: flex-start;
-    flex-direction: column;
-    justify-content: center;
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-    gap: 1.4rem;
-  }
-
-  .lesson-location-band > div {
-    gap: 1rem;
-  }
-
-  .lesson-location-band__mark {
-    width: 72px;
-    height: 64px;
-  }
-
-  .lesson-location-band p {
-    font-size: 1rem;
   }
 }
 
@@ -6603,24 +5698,24 @@ dialog[open]::backdrop {
     grid-template-columns: 76px 1fr;
   }
 
-  .lessons-closing {
-    grid-template-columns: 1fr;
-  }
-
-  .lessons-note {
-    align-items: flex-start;
-    flex-direction: column;
-    justify-content: flex-start;
-    border-top: 1px solid var(--rule-soft);
-    border-left: 0;
-  }
-
   .approach-composition {
     grid-template-columns: 1fr;
   }
 
+  /* Stacked, the fan comes down from the top corner beside the heading
+     instead of sitting alone beneath the text in its own empty screen. */
   .approach-intro {
-    min-height: 650px;
+    min-height: 0;
+    padding-top: 2.4rem;
+    padding-bottom: 2.6rem;
+  }
+
+  .approach-intro__splat {
+    top: -8%;
+    right: -22%;
+    bottom: auto;
+    width: min(62%, 320px);
+    transform: scaleY(-1);
   }
 
   .teacher-band {
@@ -6636,84 +5731,6 @@ dialog[open]::backdrop {
 
   .teacher-band p {
     padding-left: 0;
-  }
-
-  .lessons-hero {
-    grid-template-columns: 1fr;
-  }
-
-  .lessons-hero__art {
-    min-height: 220px;
-  }
-
-  .lesson-programme__grid {
-    grid-template-columns: 1fr;
-  }
-
-  /*
-   * The price and the words about it, side by side. Stacked, the rule between
-   * them read as a divider between two lessons rather than inside one, so a
-   * description could as easily be taken for the price below it as the price
-   * above. Turning that rule on its end puts it between the pair instead: this
-   * money buys this lesson, and the eye has nowhere else to go.
-   */
-  .lesson-product,
-  .lesson-product:first-child,
-  .lesson-product:last-child {
-    display: grid;
-    min-height: auto;
-    grid-template-areas:
-      "eyebrow  rule description"
-      "price    rule description"
-      "duration rule description"
-      ".        rule note";
-    grid-template-columns: minmax(5.5rem, 0.74fr) 1px minmax(0, 1.26fr);
-    border-right: 0;
-    border-bottom: 1px solid var(--rule);
-    padding: 1.5rem 0;
-    align-content: start;
-    column-gap: clamp(0.9rem, 3.6vw, 1.5rem);
-  }
-
-  /* Tightened just enough that "Single lesson" holds one line in the narrower
-     column — the alternative was taking that width off the description, which
-     is the half doing the work here. */
-  .lesson-product > .eyebrow {
-    grid-area: eyebrow;
-    font-size: 0.72rem;
-    letter-spacing: 0.09em;
-  }
-
-  .lesson-product__price {
-    grid-area: price;
-  }
-
-  .lesson-product__duration {
-    grid-area: duration;
-    font-size: 1.02rem;
-  }
-
-  /* Now a divider between the two columns rather than a break across them. */
-  .lesson-product__rule {
-    grid-area: rule;
-    width: 1px;
-    height: auto;
-    margin: 0;
-    align-self: stretch;
-  }
-
-  .lesson-product__description {
-    grid-area: description;
-    font-size: 1rem;
-  }
-
-  .lesson-product__note {
-    grid-area: note;
-    margin-top: 0.35rem;
-  }
-
-  .lesson-product:last-child {
-    border-bottom: 0;
   }
 
   .faq-reference {
@@ -6753,11 +5770,14 @@ dialog[open]::backdrop {
    * booking — and most students book on a phone. The panel stays, as it should,
    * but tightened so the flow starts near the fold instead of below it.
    */
+  /* One compact band: the title on the left and the availability splat
+     cropped over the right edge, as on desktop. No rule under the title. */
   .booking-intro {
     position: relative;
     display: block;
-    padding-top: 1.9rem;
-    padding-bottom: 1.9rem;
+    min-height: 124px;
+    padding-top: 1.35rem;
+    padding-bottom: 1.35rem;
   }
 
   .booking-intro h1 {
@@ -6769,7 +5789,7 @@ dialog[open]::backdrop {
   }
 
   .booking-intro > .editorial-rule {
-    display: block;
+    display: none;
   }
 
   .booking-intro > p {
@@ -6782,89 +5802,20 @@ dialog[open]::backdrop {
     display: none;
   }
 
-  /* Purely decorative, and it costs a third of a phone screen. */
+  /* Beside the title rather than beneath it, so it costs no height. */
   .booking-intro__time-window {
-    display: none;
+    top: -34px;
+    right: -40px;
+    width: clamp(150px, 42vw, 210px);
   }
 
   .booking-provider {
     padding-top: 1.75rem;
   }
 
-  .manage-booking__facts > div {
-    grid-template-columns: 1fr;
-    gap: 0.15rem;
-  }
-
   .manage-booking__actions .button {
     width: 100%;
     text-align: center;
-  }
-
-  .schedule-day {
-    grid-template-columns: 1fr;
-    gap: 0.4rem;
-  }
-
-  .schedule-bookings__meta {
-    text-align: left;
-  }
-
-  /* The mark is hidden on a phone, so the two rows become one column. */
-  .lesson-list li {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "body"
-      "actions";
-  }
-
-  /* row-reverse would put the button on the right of a reversed DOM order —
-     now the order is already button-then-reference, so leave it alone. */
-  .lesson-list__actions {
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .lesson-list__actions .button {
-    flex: 1;
-    text-align: center;
-  }
-
-  .lesson-list__mark {
-    display: none;
-  }
-
-  .site-footer {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.75rem;
-  }
-
-  .site-footer__brand {
-    grid-row: auto;
-  }
-
-  .site-footer__legal {
-    grid-column: 2;
-    justify-content: flex-end;
-  }
-
-  .site-footer__legal a {
-    min-height: 44px;
-  }
-
-  /* Main destinations stay in Menu on a phone; policy links remain quietly
-     available in the footer itself. */
-  .site-footer__nav {
-    display: none;
-  }
-
-  .site-footer__actions {
-    justify-content: flex-end;
-  }
-
-  .site-footer__contact {
-    justify-content: flex-end;
-    text-align: right;
   }
 
 }
@@ -6913,27 +5864,8 @@ dialog[open]::backdrop {
     gap: 1.2rem;
   }
 
-  .home-hero__actions {
-    align-items: stretch;
-  }
-
-  .home-hero__links {
-    justify-content: space-between;
-    gap: 0.4rem 1.15rem;
-  }
-
-  .approach-intro {
-    min-height: 590px;
-  }
-
   .approach-intro h1 {
     font-size: clamp(2.6rem, 12vw, 4.4rem);
-  }
-
-  .approach-intro__splat {
-    right: -10%;
-    bottom: -7%;
-    width: min(68%, 330px);
   }
 
   .approach-list {
@@ -6958,29 +5890,6 @@ dialog[open]::backdrop {
   .teacher-band {
     padding-top: 2rem;
     padding-bottom: 2rem;
-  }
-
-  .lessons-hero__title {
-    min-height: 310px;
-  }
-
-  .lessons-hero h1 {
-    font-size: clamp(2.1rem, 10vw, 4rem);
-  }
-
-  .lesson-location-band {
-    align-items: stretch;
-    flex-direction: column;
-    padding-top: 1.5rem;
-    padding-bottom: 1.5rem;
-  }
-
-  .faq-hero {
-    min-height: 230px;
-  }
-
-  .faq-hero h1 {
-    font-size: clamp(2.4rem, 11vw, 4rem);
   }
 
   .faq-index ol {
@@ -7011,8 +5920,9 @@ dialog[open]::backdrop {
   }
 
   .booking-intro__time-window {
-    width: min(38%, 190px);
-    margin-top: 1.8rem;
+    top: -30px;
+    right: -46px;
+    width: 168px;
   }
 
   .booking-intro h1 {
@@ -7021,27 +5931,6 @@ dialog[open]::backdrop {
 
   .slot-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .site-footer {
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding-top: 1.75rem;
-    padding-bottom: 1.75rem;
-  }
-
-  .site-footer__brand {
-    width: min(220px, 100%);
-  }
-
-  .site-footer__nav {
-    width: min(100%, 320px);
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 1rem;
-  }
-
-  .site-footer__contact {
-    flex-wrap: wrap;
-    gap: 0 1rem;
   }
 }
 
@@ -7116,7 +6005,6 @@ dialog[open]::backdrop {
   .booking-selection-stack,
   .my-lessons__account-section--detached,
   .my-lessons__details,
-  .upcoming-lesson-occurrences,
   .my-lessons__menu-panel.is-open,
   .booking-choice-summary,
   .booking-journey-start,

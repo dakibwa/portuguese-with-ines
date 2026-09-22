@@ -39,7 +39,7 @@ try {
       if (path === "/me") return route.fulfill({ json: { student, bookings, series: [], sameDayFeeCents: 500 } });
       if (path === "/me/recurring-rates") return route.fulfill({ json: { rates: {} } });
       if (path === "/lesson-types") return route.fulfill({ json: { lessonTypes: [{ id: "single-60", name: "Single lesson", duration_minutes: 60, price_cents: 2500 }], postpay: false } });
-      if (path === "/availability") return route.fulfill({ json: { slotsByDate: {}, horizonDays: 56 } });
+      if (path === "/availability") return route.fulfill({ json: { slotsByDate: {}, horizonDays: 84 } });
       if (path.startsWith("/bookings/")) {
         const booking = bookings.find(entry => entry.manageToken === path.split("/")[2]);
         if (booking.reference === "LATE") lateReads++;
@@ -50,10 +50,11 @@ try {
       return route.abort();
     });
     await page.goto(`${base}/book/`);
-    const upcoming = page.locator("#account-upcoming-lessons");
+    // The next lesson leads the calendar, with its Meet link one tap away.
+    const upcoming = page.locator(".lesson-overview__next");
     await expect(upcoming.getByRole("link", { name: "Join Google Meet", exact: true })).toHaveCount(1);
     await expect(upcoming.getByRole("link", { name: "Join Google Meet", exact: true })).toHaveAttribute("href", meetingUrl);
-    await upcoming.screenshot({ path: `tmp/qa/meet/upcoming-${width}.png` });
+    await page.locator(".lesson-overview").screenshot({ path: `tmp/qa/meet/upcoming-${width}.png` });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Overflow at ${width}`);
     for (const booking of bookings) {
       await page.goto(`${base}/book/?manage=${booking.manageToken}`);

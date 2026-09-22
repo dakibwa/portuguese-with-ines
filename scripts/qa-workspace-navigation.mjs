@@ -64,7 +64,7 @@ async function openMenuWithStationaryHeader(label) {
 
 try {
   await page.goto(`${base}/book/`);
-  await page.locator("#account-upcoming-lessons").waitFor();
+  await page.locator("#upcoming-lessons-heading").waitFor();
   const layouts = [];
   for (const width of [1920, 1440, 1280, 1101, 1100, 900, 821, 820, 390, 320]) {
     await page.setViewportSize({ width, height: width < 500 ? 844 : 1100 });
@@ -73,9 +73,9 @@ try {
       const bounds = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
       return {
         width: innerWidth, pageWidth: document.documentElement.scrollWidth,
-        columns: getComputedStyle(document.querySelector(".booking-stage")).display === "grid",
-        account: bounds(".unified-account-controls"), list: bounds("#account-upcoming-lessons"),
+        account: bounds(".unified-account-controls"),
         calendar: bounds("#lesson-calendar .calendar-panel"),
+        book: bounds(".lesson-overview__book"),
         introLabels: [...document.querySelectorAll(".booking-intro__points li")]
           .filter(item => item.getClientRects().length)
           .map(item => {
@@ -91,14 +91,13 @@ try {
       assert.ok(label.ink.left >= label.box.left - 1 && label.ink.right <= label.box.right + 1,
         `Booking label overflows its column at ${width}: ${label.text}`);
     }
-    aligned(layout.account.left, layout.list.left, "Account and lesson left edges");
+    // One calendar holds the lessons: it shares the account bar's edges at
+    // every width, with booking at its own top right.
+    aligned(layout.account.left, layout.calendar.left, "Account and calendar left edges");
     aligned(layout.account.right, layout.calendar.right, "Account and visible calendar right edges");
-    if (layout.columns) {
-      aligned(layout.list.top, layout.calendar.top, "Panel top edges");
-      aligned(layout.list.bottom, layout.calendar.bottom, "Panel bottom edges");
-    } else {
-      assert.ok(layout.calendar.top > layout.list.bottom, "Stacked calendar follows lessons");
-    }
+    assert.ok(layout.calendar.top > layout.account.bottom, "The calendar follows the account bar");
+    assert.ok(layout.book.top < layout.calendar.top + 120 && layout.book.right <= layout.calendar.right + 1,
+      `Book a lesson sits at the calendar's top right at ${width}`);
     layouts.push(layout);
     if ([1920, 390].includes(width)) await page.screenshot({ path: `${out}/upcoming-${width}.png`, fullPage: true });
   }
@@ -122,17 +121,17 @@ try {
   await page.setViewportSize({ width: 1920, height: 1100 });
   await accountAction("Edit details");
   await page.getByLabel("Your name", { exact: true }).waitFor();
-  assert.equal(await page.locator("#lesson-calendar, #account-past-lessons, #account-upcoming-lessons").count(), 0);
+  assert.equal(await page.locator("#lesson-calendar, #account-past-lessons").count(), 0);
   await settle();
   await page.screenshot({ path: `${out}/profile-desktop.png`, fullPage: true });
   await accountAction("Done editing");
   await accountAction("View lessons");
   await accountAction("View lessons");
-  await page.locator("#account-upcoming-lessons").waitFor();
-  await accountAction("Book a lesson");
+  await page.locator("#upcoming-lessons-heading").waitFor();
+  await page.locator(".lesson-overview__book").click();
   await page.getByRole("heading", { name: "How would you like to book?", exact: true }).waitFor();
   await page.getByRole("button", { name: "Your lessons", exact: true }).click();
-  await page.locator("#account-upcoming-lessons").waitFor();
+  await page.locator("#upcoming-lessons-heading").waitFor();
   assert.equal(await page.locator("#booking-journey-start").count(), 0);
 
   // This part checks first-time booking links. The completed-history fixture
@@ -141,7 +140,7 @@ try {
   await page.goto(`${base}/`);
   await page.getByRole("link", { name: "Book a lesson", exact: true }).click();
   await page.getByRole("heading", { name: "How would you like to book?", exact: true }).waitFor();
-  assert.equal(await page.locator("#account-upcoming-lessons").count(), 0);
+  assert.equal(await page.locator("#upcoming-lessons-heading").count(), 0);
   await page.goto(`${base}/approach/`);
   await page.getByRole("link", { name: "Book a trial lesson", exact: true }).click();
   await page.getByRole("radio", { name: "Online", exact: true }).waitFor();
@@ -159,11 +158,11 @@ try {
     endAt: new Date(Date.UTC(2026, 8, 7 + index, 17)).toISOString()
   }));
   await page.goto(`${base}/book/`);
-  await page.locator("#account-upcoming-lessons").waitFor();
+  await page.locator("#upcoming-lessons-heading").waitFor();
   await settle();
-  const tallList = await page.locator("#account-upcoming-lessons").boundingBox();
-  const tallCalendar = await page.locator("#lesson-calendar .calendar-panel").boundingBox();
-  aligned(tallList.y + tallList.height, tallCalendar.y + tallCalendar.height, "A long lesson list keeps the calendar border aligned");
+  // Every booked day is marked on the calendar and the nearest one leads.
+  assert.equal(await page.locator("#lesson-calendar .calendar-week button.has-booking").count(), 8);
+  assert.match(await page.locator(".lesson-overview__next").innerText(), /Monday, 7 September 2026/);
   await page.screenshot({ path: `${out}/upcoming-long-desktop.png`, fullPage: true });
 
   for (const width of [320, 390, 820]) {

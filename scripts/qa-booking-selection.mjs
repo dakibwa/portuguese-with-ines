@@ -40,7 +40,7 @@ try {
           endAt: new Date(Date.UTC(2026, 8, 14 + index, hour, type.duration_minutes)).toISOString()
         }));
       }
-      return json(route, { slotsByDate, timeZone: "Europe/Lisbon", minimumNoticeHours: 14, horizonDays: 56, lessonType: type });
+      return json(route, { slotsByDate, timeZone: "Europe/Lisbon", minimumNoticeHours: 14, horizonDays: 84, lessonType: type });
     });
     await context.route("**/bookings/series/preview", route => {
       const body = route.request().postDataJSON();
@@ -174,8 +174,13 @@ try {
     assert.equal(requests.at(-1).repeat, 4);
     assert.equal(requests.at(-1).expectedPriceCents, 1500, "The recurring private rate applies to both weekly times");
     await page.getByRole("button", { name: "Back to upcoming lessons", exact: true }).click();
-    await page.locator("#account-upcoming-lessons").waitFor();
-    assert.equal(await page.getByRole("button", { name: "Manage recurrence", exact: true }).count(), 2, "Both weekly times remain manageable");
+    await page.locator("#upcoming-lessons-heading").waitFor();
+    // Both weekly times are on the calendar as weekly lessons; each opens into
+    // its own lesson, where Manage sequence owns the repeat.
+    for (const day of ["2026-09-14", "2026-09-15"]) {
+      assert.equal(await page.locator(`#lesson-calendar button[data-date-key="${day}"].has-weekly-booking`).count(), 1, `Weekly time on ${day} is marked`);
+    }
+    assert.equal(await page.locator(".unified-calendar__legend").getByText("Weekly lesson", { exact: true }).count(), 1);
     assert.deepEqual(errors, []);
     await context.close();
   }

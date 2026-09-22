@@ -99,11 +99,10 @@ The intended production state reflects Inês's 31 August feedback:
   unchanged;
 - the browser favicon is a generated cream-and-lavender organic mark with a
   coral accent on dark blue, replacing the flower symbol;
-- from 821px upwards, the Lessons page combines its closing booking prompt and
-  payment note as one asymmetric blue and soft-lavender composition rather
-  than two full-width bars. Between 821px and 1100px, the blue panel arranges
-  its own contents vertically so the joined composition fits a narrower
-  desktop window; only at 820px and below do the two panels stack;
+- the Lessons page closes with one compact blue card rather than two bars: the
+  `In Porto or online` splat and title, the payment sentence, then `Book a
+  lesson` and `Payment questions` as a pair of buttons. On narrow screens its
+  parts stack inside the same card rather than becoming separate bands;
 - above 820px, the same soft-lavender rail treatment separates the Approach
   teaching list and the FAQ index from their cream content columns. At 820px
   and below those sections keep their simpler cream stacked treatment. From
@@ -133,8 +132,8 @@ the same identity or action:
   repeat the same call to action simply to fill a closing band;
 - on Home, the display heading is `Portuguese Lessons` and the
   supporting line describes one-to-one lessons, online or in person. `Book a lesson` appears
-  once. The quieter `How I teach` and `Lessons and prices` routes sit with that
-  introduction rather than occupying a second strip beneath the hero;
+  once. `How I teach` and `Lessons and prices` sit beside it as quieter outline
+  buttons rather than plain links or a second strip beneath the hero;
 - Approach, Lessons, FAQ, and Booking follow the same hierarchy: the brand
   anchors the shared header and footer, while each page owns a task-specific
   heading and only the actions that meaningfully advance its reading path.
@@ -181,6 +180,34 @@ the same identity or action:
   number of lessons and says `agree to pay`, even though no money is taken
   at booking. A payment configuration failure replaces action with a
   visible inline error instead of confirming without a usable payment method.
+
+## Public polish — 22 September 2026
+
+Dan's 22 September review tightened the public pages:
+
+- every secondary action is a button: an outline on cream, a light outline on
+  blue, at the compact size beside a coral primary action. Underlined text is
+  kept for links inside sentences and the quiet `Terms & privacy` footer link;
+- the footer hugs its content. On desktop it is one row, no taller than about
+  120 px: the wordmark, the four destinations, a thin divider, then `Terms &
+  privacy` at the right. On phones the destinations live behind the footer
+  `Menu`, with `Terms & privacy` beneath it;
+- banners give the page back to the task. The Lessons banner is about 230 px
+  on desktop; on phones it becomes a lavender band with the splat on a blue
+  blob cropped at its right edge. The FAQ banner is about 200 px, 150 px on
+  phones. On phones the Approach splat sits at the banner's top right beside
+  the heading rather than trailing beneath it, and the booking banner keeps
+  its splat at the right in a band of about 124 px, without an editorial rule;
+- the three Lessons cards each have their own squiggle outline and their own
+  splat inside the card, beside the lesson name; the trial card is lavender.
+  Their rows align across the cards: name and mark, price and length,
+  description, then one full-width button, so no card has an empty foot. The
+  whole card opens booking with that lesson chosen. Hover and keyboard focus
+  add a quiet colour wash and tilt the mark, without lifting the card;
+- text is not selectable by default, so a tap or drag never paints the page
+  blue. Anything a visitor may reasonably copy stays selectable: form fields,
+  the terms and privacy text, booking references, alerts and error messages,
+  and the lesson facts in Inês's schedule.
 
 ## References retained in this repository
 
@@ -326,7 +353,7 @@ dates and times together, check later occurrences for both, and name any
 unavailable lesson times precisely rather than suggesting the entire week is
 lost. One confirmation and one card setup cover the selection. Every lesson
 keeps its own charge and change rules; the two weekly times remain independently
-manageable in Upcoming lessons. A conflict during confirmation retains the
+manageable from the lessons calendar. A conflict during confirmation retains the
 student's whole selection for correction and never silently books only part.
 
 Preserve these desktop and mobile states:
@@ -353,32 +380,32 @@ Preserve these desktop and mobile states:
   90-minute lesson has fewer valid start times than a 60-minute one. An eligible
   first-time student also sees the separate fixed-length trial route, followed
   by its Online/In Porto choice;
-  a returning signed-in student opens directly on the upcoming-lesson list
-  rather than the book-or-view fork. On a wide desktop the account bar spans
-  the workspace above a two-column overview: upcoming lessons on the left and
-  the same four-week visual calendar on the right. Those two panels share their
-  top and bottom edges even when the upcoming list is short or empty. The visible
-  calendar border, not only its wrapper, reaches the account bar's right edge
-  at wide desktop sizes. At narrower widths they keep
-  the accessible stacked order of account, lessons, then calendar. Free times
-  do not appear in this lesson overview.
+  a returning signed-in student opens directly on their lessons rather than
+  the book-or-view fork. Their lessons are one calendar card beneath the
+  account bar, sharing its left and right edges at every width; there is no
+  separate list to keep in step with it. The card's header reads `Upcoming
+  lessons`, with a `?` tooltip, and puts the coral `Book a lesson` at its top
+  right (`Book` on phones, keeping the full name for assistive technology).
+  Beneath the header, the next lesson, or `Happening now`, shows its date,
+  time, length, location, `Weekly` when it repeats and its Meet link, and opens
+  that lesson directly. With nothing booked, one line says so above the same
+  calendar. Free times do not appear in this lesson overview.
   A signed-out visitor can browse lesson types, dates, and times first; sign-in
   is requested only when they open their lessons or confirm a booking.
   Completed decisions collapse into a compact row, so account tools,
   lesson cards, the calendar, and confirmation never compete at once;
 - the signed-in identity appears once, inside a generously padded account bar.
-  On wide desktop, `Book a lesson`, `View lessons`, `Past lessons`, `Edit
-  details`, and `Sign out` sit directly in that bar, in that order; narrower
-  layouts retain them inside a small `Menu`. `Book a lesson` uses the coral
-  primary-action treatment rather than blending into the account utilities.
-  `View lessons` may show the useful
+  On wide desktop, `View lessons`, `Past lessons`, `Edit details`, and `Sign
+  out` sit directly in that bar, in that order; narrower layouts retain them
+  inside a small `Menu`. Booking is not repeated there: its one coral action
+  belongs to the calendar. `View lessons` may show the useful
   upcoming count; `Past lessons` deliberately has no count competing for
   attention. It remains present even before the student chooses
   `View your lessons`, while booking, and while an individual lesson is open;
-  an empty history says so instead of removing the shortcut. The Upcoming
-  lessons panel contains every future commitment. Account destinations open
-  consistently: selecting the current view again keeps it open. Upcoming lessons
-  owns the four-week calendar. History uses the full width beneath the account
+  an empty history says so instead of removing the shortcut. The lessons
+  calendar reaches every future commitment. Account destinations open
+  consistently: selecting the current view again keeps it open. History uses
+  the full width beneath the account
   bar, with two readable columns of records on wide desktop and one on mobile;
   order records by when each lesson ended or was cancelled, newest first,
   so cancelled future dates do not bury recently completed lessons.
@@ -386,38 +413,31 @@ Preserve these desktop and mobile states:
   Profile editing uses the account bar on its own, with paired fields on wide
   desktop; `Done editing` returns to Upcoming lessons. History and profile
   editing never leave a future calendar floating beside or underneath them.
-  Below the wide-desktop account-bar layout,
-  the more useful top-right action in Upcoming lessons remains `Book a lesson`,
-  uses the same coral emphasis, and opens the booking choices directly.
   Future calendar dates keep their plain date tiles, with a hover/focus highlight
-  and no separate `Book` label. Clicking or tapping opens `Do you want to book?`
-  with the chosen date, `Choose a lesson` and `Not now`. Booked dates also offer
-  `View booked lessons`. Continuing carries the date into lesson selection and
-  then checks times for that length; an unchecked date does not imply availability.
-  A date with no free times offers the normal change-date route without losing
-  the chosen lesson. Dismissing the question restores focus to the date.
-  A repeating schedule appears once in Upcoming lessons,
-  led by its nearest date and distinguished from coral one-off bookings with a
-  lilac recurring treatment and a subtle lilac hover/focus wash.
-  `Manage recurrence` opens the schedule-level choices directly, including
-  moving every upcoming occurrence to a new weekly slot;
-  `View next 6 lessons` reveals no more than six separate occurrence cards,
-  each with its own `Manage` action. A small accessible
-  tooltip explains that individual lessons can be modified up to six weeks in
-  advance; it opens over the lesson list on a dark blue floating surface, so it
-  never moves the cards beneath it. Stopping a repeat immediately returns every retained date to the
-  ordinary individual lesson cards; only an active repeat is grouped. In these
-  already-booked summaries, ordinary lesson product names are
+  and no separate `Book` label. A free date opens `Do you want to book?` with
+  the chosen date, `Choose a lesson` and `Not now`. A date with one lesson opens
+  that lesson directly; a date with several opens `Your lessons`, listing each
+  lesson's time, length, location and `Weekly` when it repeats, with `Book
+  another lesson` and `Not now`. Continuing carries the date into lesson
+  selection and then checks times for that length; an unchecked date does not
+  imply availability. A date with no free times offers the normal change-date
+  route without losing the chosen lesson. Dismissing the question, or closing
+  a lesson, restores focus to the date.
+  Weekly lessons are lilac on the calendar and one-off lessons coral; a day
+  holding both keeps each time in its own colour, and the key names the two
+  kinds only when a weekly lesson exists. A weekly lesson opens with a lavender
+  `Recurring lesson` status and `Manage sequence`, which moves, stops or cancels
+  the whole run. Stopping a repeat turns every retained date back into an
+  ordinary coral lesson; `View lessons` counts an active repeat once and each
+  retained date on its own. The `?` tooltip says that a booked lesson opens its
+  details, move and cancel choices, and that any other day starts a booking; it
+  floats over the card on a dark blue surface without moving anything beneath
+  it. In these already-booked summaries, ordinary lesson product names are
   replaced by their useful compact duration (`60 mins` or `90 mins`), while a
-  trial stays named. The recurring line states its weekly time without repeating
-  the number of booked dates. One-off and stopped-sequence lessons remain
-  individual entries. Each card gains a quiet colour wash on hover or keyboard
-  focus without lifting, jumping, or shifting the list. One-off `Manage` stays
-  in the card's far-right column on a phone instead of becoming a full-width
-  row. Booked marks vary by 60/90 minutes and Online/In Porto; a repeating
-  schedule has its own fifth mark. Do not reuse the stacked-wave emblem in
-  booked lesson cards.
-  Past and cancelled lessons reuse this same card anatomy: organic lesson mark,
+  trial stays named. Booked marks vary by 60/90 minutes and Online/In Porto; a
+  repeating schedule has its own fifth mark. Do not reuse the stacked-wave
+  emblem for booked lessons.
+  Past and cancelled lessons are cards with a consistent anatomy: organic lesson mark,
   clear status pill, date, compact duration and location, then a quiet booking
   reference. They have no hover lift or management affordance because they are
   records rather than actions.
@@ -428,22 +448,24 @@ Preserve these desktop and mobile states:
   the available width permits. Profile inputs use the same single blue focus
   boundary as the booking notes field;
 - after a successful one-off or recurring booking, the confirmation's primary
-  back action opens `Upcoming lessons` so the new booking is immediately visible;
-- the calendar is the stable visual surface beneath the lesson-management
-  content. Viewing lessons owns a fixed four-week overview; it never expands to
-  absorb later booked dates because the complete list lives above it. It has no
-  second context strip or selected-day panel: selecting a booked date expands
-  its recurring group when needed, scrolls the exact occurrence into Upcoming
-  lessons, and briefly highlights it. The new-booking journey still uses its
-  full eight-week availability horizon. Choosing a free day collapses that
+  back action opens the lessons calendar so the new booking is immediately
+  visible on its day;
+- the calendar shows four Monday-to-Sunday weeks at a time, never one long
+  scroll. `Earlier weeks` and `Later weeks` arrows sit either side of the range
+  label, and `Later weeks` carries a small coral count of the booked lessons
+  beyond the page, so nothing booked is out of sight without a sign. A new
+  booking pages through the whole twelve-week booking window; the lessons view
+  pages from this week through the same window, or to the last booked lesson
+  when that is later. The lessons view has no second context strip or
+  selected-day panel. Choosing a free day collapses the booking
   calendar into a compact selected-date row with a `Change date` action, while
   the available times stay beside it on desktop and immediately below it on
   mobile. A free day shows the available times without redundant “no lesson
   booked” or lesson-summary copy. Those times form one compact grid without
   morning, afternoon, or evening subheadings; buttons keep an accessible touch
-  target while fitting three across on a phone. The four-week lesson overview stops before later repeating dates;
-  those future lessons remain in the list instead of stretching the calendar. Opening any
-  lesson keeps the list and calendar in place and adds a compact overlay asking
+  target while fitting three across on a phone. `Change date` returns to the
+  four weeks that held the date. Opening any
+  lesson keeps the calendar in place and adds a compact overlay asking
   whether to change or cancel it. `Change` keeps the page dimmed and lifts that
   same calendar and time picker into the overlay; it never dismisses the modal
   or scrolls the student down the underlying page. The overlay is one surface,
@@ -451,10 +473,9 @@ Preserve these desktop and mobile states:
   between the same compact `60 mins` and `90 mins` choices and Online/In Porto
   there, with the current date and time already selected; a paid lesson is never silently
   repriced. Cancellation stays inside the overlay until explicitly confirmed.
-  The booking overview says `Next 8
-  weeks`
-  explicitly and contains no more than eight Monday-to-Sunday rows; the
-  calendar key and range label share one visual centre. Completed booking
+  On desktop the calendar key and the pager share one visual centre; on phones
+  the key keeps its own line with the pager across the width beneath it.
+  Completed booking
   decisions are the review: lesson kind, location, length, repeat when relevant,
   date, and time each keep the same compact selected-row anatomy with their own
   precise change action. Their leading artwork uses distinct existing V2 splats
@@ -472,8 +493,9 @@ Preserve these desktop and mobile states:
   availability differs. The notes and final confirmation action follow this
   unified stack, with no second
   recap page or combined `Change details` route. The optional notes textarea
-  uses one clear blue focus boundary rather than stacking coral and blue rings. The inclusive 56-day API boundary must
-  not create a ninth visible row;
+  uses one clear blue focus boundary rather than stacking coral and blue rings.
+  The inclusive 84-day API boundary must not add a thirteenth week: a partial
+  row beyond the window is not shown;
 - calendar month headings and spillover abbreviations come from the Porto date
   key itself, so a visitor behind UTC sees `31 AUG` rather than `31 JUL`; this
   date-label rule does not alter the separate Porto/visitor slot times;
@@ -491,8 +513,8 @@ Preserve these desktop and mobile states:
   change instead of waiting for decoration to finish, and the page scrolls only
   when the next decision is not already comfortably visible. Loading copy and
   its replacement controls dissolve into one another rather than snapping.
-  The account bar stays still while the opened history, lesson list, profile
-  fields or recurring occurrences settle into place. Buttons stay responsive
+  The account bar stays still while the opened history, calendar page or
+  profile fields settle into place. Buttons stay responsive
   during motion. Reduced motion removes both the transitions and smooth scrolling;
 - preserve the current mobile reading order and full-width stacked lesson
   choices. The mobile calendar must keep all seven columns and its legend inside
@@ -513,9 +535,11 @@ Preserve these desktop and mobile states:
 
 Public `Book a lesson` calls to action explicitly open new booking, including
 for returning students. `Book a trial lesson` opens the trial's location choice;
-existing students receive their eligible ordinary choices. The main `Booking`
-navigation still opens a returning student's schedule. Old `/my-lessons` and
-emailed `/booking` links retain their destination and tokens in `/book/`.
+existing students receive their eligible ordinary choices. `Book a single
+lesson` and `Book a longer lesson` open booking with that length already
+chosen. The main `Booking` navigation still opens a returning student's
+schedule. Old `/my-lessons` and emailed `/booking` links retain their
+destination and tokens in `/book/`.
 
 ## Account interaction states
 

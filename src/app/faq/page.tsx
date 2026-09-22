@@ -266,7 +266,7 @@ export default function FAQPage() {
             <a className="button button--coral" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
               Message on WhatsApp
             </a>
-            <Link className="text-action faq-contact__book" href="/book/?view=book">
+            <Link className="button button--outline" href="/book/?view=book">
               Go to booking
             </Link>
           </div>

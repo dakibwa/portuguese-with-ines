@@ -43,8 +43,8 @@ export default function Home() {
                 Book a lesson
               </Link>
               <nav className="home-hero__links" aria-label="Learn more about lessons">
-                <Link className="text-action text-action--on-dark" href="/approach">How I teach</Link>
-                <Link className="text-action text-action--on-dark" href="/lessons">Lessons and prices</Link>
+                <Link className="button button--outline-light button--compact" href="/approach">How I teach</Link>
+                <Link className="button button--outline-light button--compact" href="/lessons">Lessons and prices</Link>
               </nav>
             </div>
           </div>

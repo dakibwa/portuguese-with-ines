@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from "react";
 
-export function keepDialogFocus(event: KeyboardEvent<HTMLDialogElement>) {
+export function keepDialogFocus(event: KeyboardEvent<HTMLElement>) {
   if (event.key !== "Tab") return;
   const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
     'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'

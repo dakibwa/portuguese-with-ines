@@ -159,8 +159,8 @@ depending on them having kept the right confirmation email.
 - **Booking, the learner's calendar, and lesson changes share one workspace.**
   A signed-out visitor's first screen at `/book` asks only whether they want to
   book a new lesson or view existing lessons. A returning signed-in student
-  opens directly on Upcoming lessons; the account menu remains the shortcut to
-  start a new booking. Booking asks for one lesson or a recurring
+  opens directly on their lessons calendar, whose top-right `Book a lesson`
+  starts a new booking. Booking asks for one lesson or a recurring
   lesson first. Both ordinary routes then keep Online/In Porto and the 60/90-minute
   choices together as compact sliding selectors on one setup screen; recurring
   adds 4, 6, 8 weeks, or `Ongoing` on that same screen. After the starting time
@@ -169,37 +169,36 @@ depending on them having kept the right confirmation email.
   availability check take space before booking. Duration remains ahead of the
   calendar because 60- and 90-minute lessons do not share every valid start. The first-time
   trial remains a separate fixed-length route with its own location choice.
-  Viewing lessons leads with the upcoming-lesson list and keeps the calendar as
-  a four-week visual without free-time choices. On a wide desktop, the compact
-  blue introduction runs across the top and the upcoming list and calendar sit
-  alongside one another beneath the full-width account bar, sharing the same
-  top and bottom edges even when only one lesson is upcoming. Narrow layouts keep
-  the same information in account, lessons, calendar reading order.
+  Viewing lessons is one calendar card beneath the account bar: `Upcoming
+  lessons` with a `?` tooltip and `Book a lesson`, the next lesson with its
+  Meet link, then the calendar four weeks at a time, without free-time
+  choices. There is no separate list to keep in step with it.
   Signed-out visitors can browse lesson types, dates, and times before they are
   asked to sign in; `View your lessons` asks immediately because the data is
   private, while booking asks only at confirmation.
-  Every booked lesson is marked there. In lesson-view mode the calendar is a
-  visual index only: choosing a booked date scrolls back to its exact Upcoming
-  lesson and expands the recurring group when necessary. It does not create a
-  second selected-day panel. In the new-booking flow, choosing a free day
+  Every booked lesson is marked there, weekly lessons in lilac and one-off
+  lessons in coral. Choosing a date with one lesson opens that lesson; a date
+  with several lists them in `Your lessons`; a free future date asks `Do you
+  want to book?`. It never creates a second selected-day panel. In the
+  new-booking flow, choosing a free day
   replaces the calendar with a compact selected-date summary and a `Change
   date` action, while keeping available times immediately beneath it on a phone.
   Available times use one compact grid, without part-of-day headings, and fit
   three accessible time buttons across on a phone. Each
   completed choice becomes a compact summary and the page moves the next
-  decision into view. Viewing lessons stays within a four-week calendar while
-  `Upcoming lessons` contains every future booking, including dates beyond it.
-  Choosing an
+  decision into view. Both calendars page four weeks at a time; `Later weeks`
+  counts the booked lessons beyond the page, and the lessons view pages as far
+  as the last booked lesson. Choosing an
   individual booking opens move and cancel in place. The emailed token still
   opens that same interface without requiring sign-in, so a forgotten password
   never blocks a change. The old `/my-lessons` and `/booking` paths remain valid
   for links already in the world, then normalise to `/book`.
 - **Signed-in account controls stay in the shared workspace.** They sit above
   the active workflow rather than behind an Account/Close disclosure. The account
-  bar names the student once and keeps `Book a lesson`, `View lessons`, past
-  lessons, profile editing and sign out directly in the bar on wide desktop and
-  inside one compact menu at narrower widths. `Book a lesson` is the coral
-  primary action. The upcoming count may
+  bar names the student once and keeps `View lessons`, past lessons, profile
+  editing and sign out directly in the bar on wide desktop and inside one
+  compact menu at narrower widths. Booking lives on the calendar, not in the
+  bar. The upcoming count may
   sit beside `View lessons`; Past lessons has no badge. Choosing view or past lessons opens a
   complete view and switches away from any active booking or lesson-management
   detail. Clicking the current destination keeps it open. History occupies the
@@ -208,33 +207,28 @@ depending on them having kept the right confirmation email.
   `Past lessons` stays in the menu throughout every signed-in
   booking state, including before `View your lessons` is chosen and while a
   recurring occurrence is open; an empty history gets an empty state rather
-  than losing the menu item. History returns through `Upcoming lessons`; below the
-  wide-desktop bar layout, Upcoming lessons instead offers the same coral
-  `Book a lesson` shortcut, opening the booking choices directly.
+  than losing the menu item. History returns through `Upcoming lessons`.
   There is only one `Booking`
   destination in the site navigation — no separate `My lessons` tab — because
   booking and managing lessons are the same workspace.
-- **Upcoming lessons groups a repeating schedule as one thing.** It opens first
-  when a signed-in student chooses `View your lessons` and remains available as
-  a menu shortcut. After a successful booking, `Back to upcoming lessons` opens
-  this same list rather than returning to the generic start choice. Recurring
-  schedules use a distinct lilac treatment, a visible lilac hover/focus state,
-  and lead with their next occurrence; one-off bookings remain coral cards.
-  `Manage recurrence` opens the schedule-level move/stop/cancel choices directly,
-  while `View next 6 lessons` reveals at most six separate occurrence cards,
-  each with its own `Manage` action. An accessible tooltip explains the six-week individual-change
-  window. Once booked, ordinary lessons use the compact duration label (`60
+- **Upcoming lessons is the calendar.** It opens first when a signed-in
+  student chooses `View your lessons` and remains available as `View lessons`.
+  After a successful booking, `Back to upcoming lessons` opens this same
+  calendar, with the new lesson on its day, rather than returning to the
+  generic start choice. The next lesson leads the card. Weekly lessons are
+  lilac and one-off lessons coral; a weekly lesson's dialog offers `Manage
+  sequence` for the whole run, and `View lessons` counts an active repeat once.
+  The `?` tooltip explains that booked lessons open and other days start a
+  booking. Once booked, ordinary lessons use the compact duration label (`60
   mins` or `90 mins`) instead of repeating the product name; trial lessons keep
-  their name. Active recurring summaries show the weekly time without repeating
-  a booked-date count. The calendar remains underneath as supporting context,
-  without another context strip or selected-day detail card. Opening an
-  occurrence leaves the list and calendar where they are and shows a compact
+  their name. There is no other context strip or selected-day detail card.
+  Opening a lesson leaves the calendar where it is and shows a compact
   `Change` or `Cancel` overlay. `Change` reuses the existing calendar date and
   time picker and, when payment state permits, offers the ordinary `60 mins`
   and `90 mins` lengths plus Online/In Porto in matching sliding controls.
 - **Past and cancelled lessons keep the same readable card hierarchy.** Their
-  status, mark, date, compact duration, location and booking reference mirror
-  Upcoming lessons, without an action treatment that suggests they can still
+  status, mark, date, compact duration, location and booking reference sit on
+  one readable card, without an action treatment that suggests they can still
   be managed.
   The current date and time are selected when it opens, and the calendar and
   choices sit on one modal surface without nested framed panels. `Cancel` stays in the overlay for
@@ -242,8 +236,7 @@ depending on them having kept the right confirmation email.
   occurrences are identified there as part of a sequence: either action affects
   only that lesson. Stopping prevents future top-ups
   without cancelling dates that are already booked, and those retained dates
-  then return to the ordinary individual lesson cards instead of remaining a
-  grouped `Booked sequence`.
+  then show as ordinary one-off lessons on the calendar.
 
 ### Repeating bookings
 
@@ -391,10 +384,10 @@ that window four weeks at a time rather than as one long scroll. It was 56
   horizon the API reported, so raising the horizon past 62 would have drawn weeks
   of empty cells saying "no times free" — a lie rather than a gap.
 - The calendar pages through the window four Monday-to-Sunday weeks at a time.
-  A repeating series may already own lessons beyond the window, but those
-  lessons do not stretch the calendar; they remain available from `Upcoming
-  lessons` in the account bar and still open the same in-place move/cancel
-  interface.
+  A repeating series may already own lessons beyond the window. The lessons
+  view keeps paging until its last booked lesson, `Later weeks` counts what
+  lies beyond the page on show, and those lessons open the same in-place
+  move/cancel interface.
 - A signed-in student with any non-cancelled booking is never offered the trial,
   matching the Worker's booking rule. An unfinished card setup of their own
   (`status: "pending_payment"` in `/me`) is the exception: their next booking
@@ -539,12 +532,12 @@ no free slots. That means a weekend with nothing left to book opens directly on
 the next usable week; closed weeks later in the booking window remain visible.
 Selecting a free day while booking collapses the date picker into a compact
 selected-date summary, so the available times are directly below it on a phone.
-`Change date` returns to the full eight-week availability window. The lesson-view
-calendar stays at four weeks and sends booked-date selections to the matching
-lesson above. Future dates highlight on hover/focus; clicking or tapping opens
-`Do you want to book?`, with no separate Book labels on the tiles. Continuing
-carries the date through lesson selection, then checks availability for the
-chosen length. Booked dates also offer `View booked lessons` in the question.
+`Change date` returns to the four weeks that held the date. In the lesson view
+a booked date opens its lesson, or lists several in `Your lessons` with `Book
+another lesson`; other future dates highlight on hover/focus and open `Do you
+want to book?`, with no separate Book labels on the tiles. Continuing carries
+the date through lesson selection, then checks availability for the chosen
+length.
 
 ### Payment
 
@@ -857,7 +850,10 @@ target address. One connection can register five accounts and open eight
 unpaid card-setup holds an hour. A signed-in teacher is authorised without ever
 touching the admin-token throttle; every other admin request spends the
 per-connection budget before the token is compared, so a locked-out connection
-is refused even when it finally presents the right token. `/admin/settings` range-checks its numbers — a zero slot
+is refused even when it finally presents the right token. That budget is 20
+admin requests per 15 minutes per connection, which makes the shared token an
+emergency route into `/schedule`: a long session on it can reach the cap, while
+Inês's own teacher sign-in never does. `/admin/settings` range-checks its numbers — a zero slot
 interval would hang `/availability` — and validates its addresses. The live
 origin allow-list is the two live domains plus `http://localhost:3000`, which
 CI's journey tests serve the built export from. API responses are not cacheable. Password derivation
@@ -879,7 +875,7 @@ Secrets, each via `npx wrangler secret put <NAME> --config workers/booking/wrang
 | Secret | What it is |
 |---|---|
 | `BOOKING_TOKEN_SECRET` | Signs manage links. Any long random string. **Changing it invalidates every link already emailed.** |
-| `ADMIN_TOKEN` | Fallback way into `/schedule` if she is locked out of her account. |
+| `ADMIN_TOKEN` | Fallback way into `/schedule` if she is locked out of her account; capped at 20 admin requests per 15 minutes per connection. |
 | `RESEND_API_KEY` | Transactional email. |
 | `TEACHER_EMAIL` | Where her booking notifications go. |
 | `STRIPE_SECRET_KEY` | Optional. A least-privilege restricted key; only required when `payment_mode` is `postpay`. |

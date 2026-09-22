@@ -106,8 +106,7 @@ request only competes with the fonts for no gain.
   once, or two weekly times starting within the same Porto Monday–Sunday week.
   The selection shares duration, location and (when recurring) repeat period.
   One card setup and one combined calendar email cover the whole selection;
-  each lesson retains its individual payment and management rules. This change
-  is implemented locally and awaits preview approval and Worker/site release.
+  each lesson retains its individual payment and management rules.
 - One 14-hour rule covers booking, moving and cancelling. Moving or
   cancelling is free while the lesson is at least 14 elapsed hours away;
   inside that window it costs €5, charged automatically to the saved card.

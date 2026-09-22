@@ -118,11 +118,26 @@ export function listLessonTypes() {
   return request<LessonTypesResponse>("/lesson-types");
 }
 
-export function fetchAvailability(lessonType: string, from: string, to: string, signal?: AbortSignal) {
-  return request<AvailabilityResponse>(
-    `/availability?${new URLSearchParams({ lessonType, from, to })}`,
-    { signal }
-  );
+/**
+ * Free times for one lesson length. Moving a lesson names it — by its manage
+ * token, or for a weekly run by the series and the student's session — so the
+ * lesson being moved does not count as busy against itself, and a 17:00 lesson
+ * can move to 17:30 or grow to 90 minutes in place.
+ */
+export function fetchAvailability(
+  lessonType: string,
+  from: string,
+  to: string,
+  signal?: AbortSignal,
+  moving?: { manageToken?: string; seriesId?: string; session?: string }
+) {
+  const query = new URLSearchParams({ lessonType, from, to });
+  if (moving?.manageToken) query.set("manage", moving.manageToken);
+  if (moving?.seriesId) query.set("series", moving.seriesId);
+  return request<AvailabilityResponse>(`/availability?${query}`, {
+    signal,
+    ...(moving?.seriesId && moving.session ? { headers: { Authorization: `Bearer ${moving.session}` } } : {})
+  });
 }
 
 /** A weekly run. `null` means it keeps going until the student stops it. */
@@ -247,7 +262,8 @@ export function rescheduleSeries(
   location?: "online" | "porto",
   expectedPriceCents?: number
 ) {
-  return request<{ ok: true; moved: number; bookings: Booking[] }>(
+  // `kept`: start times of lessons left where they were, inside the 14-hour window.
+  return request<{ ok: true; moved: number; kept?: string[]; bookings: Booking[] }>(
     `/series/${encodeURIComponent(seriesId)}/reschedule`,
     {
       method: "POST",

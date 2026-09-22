@@ -17,7 +17,7 @@ export const NOTICE_HOURS = 14;
 export const BOOKING_TIME_ZONE = "Europe/Lisbon";
 
 /** Used only while the API response is absent or from an older Worker. */
-export const BOOKING_HORIZON_DAYS_FALLBACK = 56;
+export const BOOKING_HORIZON_DAYS_FALLBACK = 84;
 
 function normalizePublicHttpUrl(value: string) {
   const trimmed = value.trim();

@@ -4,7 +4,8 @@ export type LessonProduct = {
   price: string;
   duration: string;
   description: string;
-  note?: string;
+  /** What the card's button says; it opens booking with this lesson chosen. */
+  bookingLabel: string;
   /** The same two numbers the Worker's lesson_types table holds. */
   durationMinutes: number;
   priceCents: number;
@@ -28,7 +29,7 @@ export const lessonProducts: LessonProduct[] = [
     price: "\u20ac20",
     duration: "60 minutes",
     description: "We find out where your Portuguese is and what you want to do with it.",
-    note: "Start here"
+    bookingLabel: "Book a trial lesson"
   },
   {
     id: "single",
@@ -37,7 +38,8 @@ export const lessonProducts: LessonProduct[] = [
     title: "Single lesson",
     price: "\u20ac25",
     duration: "60 minutes",
-    description: "Book one at a time, or keep the same slot each week."
+    description: "Book one at a time, or keep the same slot each week.",
+    bookingLabel: "Book a single lesson"
   },
   {
     id: "long",
@@ -46,7 +48,8 @@ export const lessonProducts: LessonProduct[] = [
     title: "Longer lesson",
     price: "\u20ac35",
     duration: "90 minutes",
-    description: "An hour and a half, if you want more time to talk."
+    description: "An hour and a half, if you want more time to talk.",
+    bookingLabel: "Book a longer lesson"
   }
 ];
 
