@@ -198,13 +198,14 @@ Dan's 22 September review tightened the public pages:
   phones. On phones the Approach splat sits at the banner's top right beside
   the heading rather than trailing beneath it, and the booking banner keeps
   its splat at the right in a band of about 124 px, without an editorial rule;
-- the three Lessons cards each have their own squiggle outline and their own
-  splat inside the card, beside the lesson name; the trial card is lavender.
-  Their rows align across the cards: name and mark, price and length,
-  description, then one full-width button, so no card has an empty foot. The
-  whole card opens booking with that lesson chosen. Hover and keyboard focus
-  add a quiet colour wash and tilt the mark, without lifting the card, and the
-  button answers on its own: it lifts slightly and fills. The closing blue card
+- the three Lessons cards each have their own squiggle outline, and their own
+  splat comes in large from the card's top-right corner, cropped by its edge
+  and still; the trial card is lavender. Their rows align across the cards:
+  name, the price with its length as a small tag beside it (`60 min`),
+  a one-line description, then one full-width button, so no card has an empty
+  foot. The whole card opens booking with that lesson chosen. Hover and
+  keyboard focus add a quiet colour wash to the card, and the button answers
+  on its own: it lifts slightly and fills. The closing blue card
   keeps its two buttons on the right, stacked when the width tightens, and
   moves them beneath the copy only on phones;
 - the header logo starts on the page's left edge, like the footer logo and the
@@ -215,6 +216,15 @@ Dan's 22 September review tightened the public pages:
   two-line heading drops by the same amount, as `talking.`, `Lessons` and
   `before booking?` do. On phones, `Beginners welcome.` wraps with the same
   clearance;
+- the FAQ's question splat comes in large from the banner's top-right corner.
+  Opening a question is one motion: the answer grows and fades in while the
+  plus makes a half turn into a minus; where a browser cannot animate to the
+  answer's height it simply appears;
+- the phone menu gives each of the four destinations its mark and a short note
+  of what the page is for, then a small blue card with `Book a lesson` and
+  `Message on WhatsApp`; a large splat is cropped into the foot of the screen
+  so the menu never reads as an empty page. Links are named by destination,
+  with the note as their description;
 - the FAQ shows one section at a time. The index switches sections in place,
   fading the chosen one in without scrolling the page, and the address keeps
   `#faq-<section>` so links open the right section; on phones, where the index

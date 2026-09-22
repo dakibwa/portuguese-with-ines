@@ -6,15 +6,18 @@ import Link from "next/link";
 import { X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { BrandWordmark } from "@/components/BrandWordmark";
+import { AssetMark } from "@/components/BrandMarks";
+import { CONTACT_WHATSAPP_URL } from "@/lib/config";
 import type { SitePage } from "@/components/SiteHeader";
 
-type NavItem = { href: string; id: SitePage; label: string };
+type NavItem = { href: string; id: SitePage; label: string; note: string; mark: string };
 
+// On a phone the menu says what each page is for, beside its own mark.
 const navigation: NavItem[] = [
-  { href: "/approach", id: "approach", label: "Approach" },
-  { href: "/lessons", id: "lessons", label: "Lessons" },
-  { href: "/faq", id: "faq", label: "FAQ" },
-  { href: "/book", id: "book", label: "Booking" }
+  { href: "/approach", id: "approach", label: "Approach", note: "How the lessons work", mark: "/visuals/v2-splats/conversation-splat-generated-v2.webp" },
+  { href: "/lessons", id: "lessons", label: "Lessons", note: "Prices and lesson lengths", mark: "/visuals/v2-splats/lesson-format-splat-v2.svg" },
+  { href: "/faq", id: "faq", label: "FAQ", note: "Questions before booking", mark: "/visuals/v2-splats/faq-answers-splat-v2.svg" },
+  { href: "/book", id: "book", label: "Booking", note: "Book or manage your lessons", mark: "/visuals/v2-splats/booking-availability-splat-v2.svg" }
 ];
 
 export function SiteNav({ currentPage }: { currentPage: SitePage }) {
@@ -174,15 +177,33 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
             {navigation.map((item) => (
               <Link
                 aria-current={currentPage === item.id ? "page" : undefined}
+                aria-describedby={`nav-mobile-note-${item.id}`}
+                aria-label={item.label}
                 className="nav-mobile__link"
                 href={item.href}
                 key={item.id}
                 onClick={() => setOpen(false)}
               >
-                {item.label}
+                <AssetMark asset={item.mark} className="nav-mobile__mark" />
+                <span className="nav-mobile__text">
+                  <span className="nav-mobile__label">{item.label}</span>
+                  <span className="nav-mobile__note" id={`nav-mobile-note-${item.id}`}>{item.note}</span>
+                </span>
               </Link>
             ))}
           </div>
+          <div className="nav-mobile__cta">
+            <p>One to one, online or in Porto.</p>
+            <div className="nav-mobile__cta-actions">
+              <Link className="button button--coral button--compact" href="/book/?view=book" onClick={() => setOpen(false)}>
+                Book a lesson
+              </Link>
+              <a className="button button--outline-light button--compact" href={CONTACT_WHATSAPP_URL} rel="noreferrer" target="_blank">
+                Message on WhatsApp
+              </a>
+            </div>
+          </div>
+          <AssetMark asset="/visuals/generated-splats/open-centre-lavender-splat.webp" className="nav-mobile__splat" />
         </div>
       </div>, document.body) : null}
     </>

@@ -184,9 +184,14 @@ try {
   await menu.getByRole("img", { name: "Português com a Inês", exact: true }).waitFor();
   await settle();
   aligned(before, await page.evaluate(() => scrollY), "Footer menu preserves page position");
-  assert.equal(await menu.getByRole("link").count(), 4);
+  // Four destinations, each with its note, then the two common actions.
+  assert.equal(await menu.locator(".nav-mobile__link").count(), 4);
+  assert.deepEqual(
+    (await menu.locator(".nav-mobile__cta a").allTextContents()).map((text) => text.trim()),
+    ["Book a lesson", "Message on WhatsApp"]
+  );
   await page.keyboard.press("Shift+Tab");
-  assert.equal(await page.evaluate(() => document.activeElement.textContent), "Booking");
+  assert.equal(await page.evaluate(() => document.activeElement.textContent.trim()), "Message on WhatsApp");
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement.getAttribute("aria-label")), "Close menu");
   await page.screenshot({ path: `${out}/menu-mobile.png` });

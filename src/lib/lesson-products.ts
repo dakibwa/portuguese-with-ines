@@ -27,8 +27,8 @@ export const lessonProducts: LessonProduct[] = [
     priceCents: 2000,
     title: "Trial lesson",
     price: "\u20ac20",
-    duration: "60 minutes",
-    description: "We find out where your Portuguese is and what you want to do with it.",
+    duration: "60 min",
+    description: "We find out where you are and where you want to go.",
     bookingLabel: "Book a trial lesson"
   },
   {
@@ -37,7 +37,7 @@ export const lessonProducts: LessonProduct[] = [
     priceCents: 2500,
     title: "Single lesson",
     price: "\u20ac25",
-    duration: "60 minutes",
+    duration: "60 min",
     description: "Book one at a time, or keep the same slot each week.",
     bookingLabel: "Book a single lesson"
   },
@@ -47,7 +47,7 @@ export const lessonProducts: LessonProduct[] = [
     priceCents: 3500,
     title: "Longer lesson",
     price: "\u20ac35",
-    duration: "90 minutes",
+    duration: "90 min",
     description: "An hour and a half, if you want more time to talk.",
     bookingLabel: "Book a longer lesson"
   }
