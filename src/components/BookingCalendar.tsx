@@ -101,6 +101,26 @@ function formatDayMonth(key: string) {
   return dayMonth.format(new Date(`${key}T12:00:00Z`));
 }
 
+/**
+ * Times read as a small timetable: one row per hour, one column per start
+ * minute the day offers (four for quarter hours, two for half hours), so a
+ * gap reads as a gap and a long day stays short. Finer grids fall back to
+ * wrapping.
+ */
+function slotLayout(slots: Slot[]) {
+  const clock = (slot: Slot) => formatSlotTime(slot.startAt);
+  const minutes = [...new Set(slots.map((slot) => clock(slot).slice(3, 5)))].sort();
+  const hours = [...new Set(slots.map((slot) => clock(slot).slice(0, 2)))];
+  if (minutes.length > 4) return { grid: undefined, place: () => undefined };
+  return {
+    grid: { gridTemplateColumns: `repeat(${minutes.length}, minmax(0, 1fr))` },
+    place: (slot: Slot) => ({
+      gridColumn: minutes.indexOf(clock(slot).slice(3, 5)) + 1,
+      gridRow: hours.indexOf(clock(slot).slice(0, 2)) + 1
+    })
+  };
+}
+
 function daysBetween(fromKey: string, toKey: string) {
   return Math.round((Date.parse(`${toKey}T12:00:00Z`) - Date.parse(`${fromKey}T12:00:00Z`)) / 86_400_000);
 }
@@ -410,6 +430,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [setupFocus, setSetupFocus] = useState<SetupFocus>(null);
   const [todayKey, setTodayKey] = useState("");
   const [horizonDays, setHorizonDays] = useState(BOOKING_HORIZON_DAYS_FALLBACK);
+  // The free time after each lesson, so two picked lessons keep it between
+  // them just as the Worker will insist when they are booked.
+  const [lessonGapMinutes, setLessonGapMinutes] = useState(0);
   const [slotsByDate, setSlotsByDate] = useState<Record<string, Slot[]>>({});
   const [selectedDate, setSelectedDate] = useState("");
   const [bookingPromptDate, setBookingPromptDate] = useState("");
@@ -809,6 +832,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         .then((data) => {
           setSlotsByDate(data.slotsByDate);
           setHorizonDays(data.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
+          setLessonGapMinutes(Math.max(0, Number(data.bufferMinutes) || 0));
         })
         .catch((error: Error) => {
           if (signal?.aborted) return;
@@ -949,9 +973,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   }, {});
   const selectionWeek = !managed && bookingKind === "recurring" && savedChoices.length
     ? portoWeekKey(savedChoices[0].startAt) : "";
+  const lessonGapMs = lessonGapMinutes * 60000;
   const selectableSlots = (date: string) => (slotsByDate[date] ?? []).filter((slot) => managed || intent !== "book" || (
     (!selectionWeek || portoWeekKey(slot.startAt) === selectionWeek) &&
-    !savedChoices.some((choice) => choice.startAt < slot.endAt && choice.endAt > slot.startAt)
+    !savedChoices.some((choice) =>
+      Date.parse(choice.startAt) < Date.parse(slot.endAt) + lessonGapMs &&
+      Date.parse(choice.endAt) + lessonGapMs > Date.parse(slot.startAt))
   ));
   const rawDaySlots = selectedDate ? selectableSlots(selectedDate) : [];
   const managedDate = managed ? portoDateKey(new Date(managed.booking.startAt)) : "";
@@ -968,6 +995,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         { startAt: managed.booking.startAt, endAt: managed.booking.endAt }
       ].sort((a, b) => a.startAt.localeCompare(b.startAt))
     : rawDaySlots;
+  const timeLayout = slotLayout(daySlots);
   // A refreshed availability response must not erase a date from the review
   // after a failed submission. Keep it visible so the student can change it.
   const reviewedSlot = useMemo(() => step === "details" && selectedSlot && lessonType && !managed
@@ -2944,13 +2972,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 {loadingSlots ? (
                   <p className="booking-state-note">Checking what&rsquo;s free…</p>
                 ) : daySlots.length ? (
-                  <div className="slot-grid">
+                  <div className="slot-grid" style={timeLayout.grid}>
                     {daySlots.map((slot) => (
                       <button
                         aria-pressed={selectedSlot === slot.startAt}
                         className={selectedSlot === slot.startAt ? "is-selected" : ""}
                         key={slot.startAt}
                         onClick={() => setSelectedSlot(slot.startAt)}
+                        style={timeLayout.place(slot)}
                         type="button"
                       >
                         {formatSlotTime(slot.startAt)}
@@ -3062,12 +3091,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     ) : loadingSlots ? (
                       <p className="booking-state-note">Checking what&rsquo;s free…</p>
                     ) : daySlots.length ? (
-                      <div className="slot-grid" key={selectedDate}>
+                      <div className="slot-grid" key={selectedDate} style={timeLayout.grid}>
                         {daySlots.map((slot) => {
                           const local = differingLocalTime(slot.startAt, studentZone);
                           return (
                             <button
                               key={slot.startAt}
+                              style={timeLayout.place(slot)}
                               onClick={() =>
                                 transitionBooking(() => {
                                   setChangingChoice(null);

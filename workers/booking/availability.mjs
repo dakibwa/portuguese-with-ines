@@ -98,6 +98,9 @@ export async function loadSettings(env) {
     // a database missing the row behaved differently from every real one.
     bookingHorizonDays: Number(settings.booking_horizon_days ?? DEFAULT_BOOKING_HORIZON_DAYS),
     slotIntervalMinutes: Number(settings.slot_interval_minutes ?? 30),
+    // Free time kept after every lesson before a student's next one can start.
+    // Missing means none, which is how every booking behaved before it existed.
+    lessonBufferMinutes: Math.max(0, Number(settings.lesson_buffer_minutes ?? 0) || 0),
     sameDayChangeFeeCents: Number(settings.same_day_change_fee_cents ?? 500),
     // 'off' preserves the original pay-in-person flow. 'postpay' saves a card
     // at booking and charges it only when the lesson ends. The retired
@@ -134,6 +137,9 @@ export async function computeAvailability(
   const settings = await loadSettings(env);
   const duration = Number(lessonType.duration_minutes);
   const interval = settings.slotIntervalMinutes;
+  // Each lesson, booked or proposed, reaches this far past its end, so two
+  // lessons always keep the gap between them whichever one comes first.
+  const bufferMs = settings.lessonBufferMinutes * 60000;
 
   const todayKey = dateKey(now, PORTO);
   /*
@@ -170,7 +176,11 @@ export async function computeAvailability(
        WHERE ends_at > ? AND starts_at < ?
          AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))`
     )
-      .bind(windowStart, windowEnd, now.toISOString())
+      .bind(
+        new Date(Date.parse(windowStart) - bufferMs).toISOString(),
+        new Date(Date.parse(windowEnd) + bufferMs).toISOString(),
+        now.toISOString()
+      )
       .all()
   ]);
 
@@ -199,7 +209,7 @@ export async function computeAvailability(
 
   const busy = (booked.results ?? [])
     .filter((row) => (!ignoreBookingId || row.id !== ignoreBookingId) && (!ignoreSeriesId || row.series_id !== ignoreSeriesId))
-    .map((row) => ({ start: new Date(row.starts_at).getTime(), end: new Date(row.ends_at).getTime() }));
+    .map((row) => ({ start: new Date(row.starts_at).getTime(), end: new Date(row.ends_at).getTime() + bufferMs }));
 
   const slotsByDate = {};
 
@@ -234,7 +244,7 @@ export async function computeAvailability(
       const slotEnd = new Date(slotStart.getTime() + duration * 60000);
 
       if (slotStart < earliest) continue;
-      if (busy.some((entry) => overlaps(slotStart.getTime(), slotEnd.getTime(), entry.start, entry.end))) continue;
+      if (busy.some((entry) => overlaps(slotStart.getTime(), slotEnd.getTime() + bufferMs, entry.start, entry.end))) continue;
 
       daySlots.push({ startAt: slotStart.toISOString(), endAt: slotEnd.toISOString() });
     }

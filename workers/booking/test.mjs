@@ -260,6 +260,20 @@ await test("lastStart is a start time, so lesson length does not shorten the day
   assert.deepEqual(hour, longer);
 });
 
+await test("a 15-minute interval offers every quarter hour, and blocks still remove overlaps", () => {
+  const range = [{ start: 600, lastStart: 720 }];
+  const starts = candidateStartMinutes({ startRanges: range, duration: 60, interval: 15 }).map(asTime);
+  assert.deepEqual(starts, ["10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:30", "11:45", "12:00"]);
+  // Time off from 11:00 to 11:30 withholds every start whose hour would touch it.
+  const blocked = candidateStartMinutes({
+    startRanges: range,
+    blockedSpans: [{ start: 660, end: 690 }],
+    duration: 60,
+    interval: 15
+  }).map(asTime);
+  assert.deepEqual(blocked, ["10:00", "11:30", "11:45", "12:00"]);
+});
+
 await test("a blocked span withholds every lesson that would overlap it", () => {
   const range = [{ start: 600, lastStart: 1140 }];
   // She is out 13:00-14:00.

@@ -411,9 +411,11 @@ different students were confirmed into the same lesson in testing.
 - **The decision and the write are one statement.** A booking row is inserted
   only if nothing overlapping exists, and zero rows affected is the 409. The
   same guard is on rescheduling and on every occurrence of a series.
-- **Overlap, not equality.** Lessons are 60 and 90 minutes on a 30-minute grid,
-  so a 90-minute lesson at 17:00 and a 60-minute one at 17:30 collide while
-  starting at different times. A unique index on the start time would miss that.
+- **Overlap, not equality.** Lessons are 60 and 90 minutes and can start on
+  any quarter hour, so a 90-minute lesson at 17:00 and a 60-minute one at 17:30
+  collide while starting at different times. A unique index on the start time
+  would miss that. For a student's lesson the guard widens each lesson by the
+  free gap on both sides, which keeps that gap between any two lessons.
 - A series occurrence that loses the race becomes a skipped week rather than a
   failed booking: the rest of the run is still worth having.
 
@@ -514,6 +516,24 @@ booking notice.
 when she finishes. That distinction matters: treating it as a finishing time
 silently shortened the 90-minute format to an 18:30 last start while the
 60-minute one kept 19:00.
+
+`settings.lesson_buffer_minutes` is **15** (Dan, 22 September 2026, migration
+0019): the 15 minutes after every lesson stay free. A student cannot book a
+lesson that starts within 15 minutes of another ending, or that would end
+within 15 minutes of the next one starting. Availability, every write guard for
+a student's lesson (single, several at once, weekly runs and moves) and the
+booking page's check between a student's own picks all apply it; `/availability`
+reports it as `bufferMinutes`. Inês's own bookings and moves are exempt, so she
+can still place a lesson straight after another. A lesson keeping its time, such
+as a switch between online and Porto, is not held to a gap its neighbours were
+booked without. A missing setting means no gap.
+
+`settings.slot_interval_minutes` is **15** (same migration): within her hours a
+lesson can start on any quarter hour, so the next lesson can begin as soon as
+the free 15 minutes end, where starts used to fall only on the hour and half
+hour. Inês's schedule keeps half-hour rows; a lesson at :15 or :45 sits at its
+exact time there, and the exact-time editor sets quarter-hour first and last
+starts.
 
 Blocked exceptions are real spans of time, so a lesson is withheld when it would
 **overlap** one rather than only when it starts inside it — which correctly

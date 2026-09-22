@@ -663,6 +663,55 @@ await test("several single dates confirm together, retain individual prices and 
   await drain();
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE kind='student_series_booked'").get().n, 1);
 });
+await test("the 15 minutes after every lesson stay free for students, while Inês can still use them", async () => {
+  const user = await selectionFixture();
+  // Monday 5 October, Porto summer time: another student's lesson runs 11:00–12:00.
+  booking("gap-anchor", { owner: "bob", start: "2026-10-05T10:00:00.000Z", end: "2026-10-05T11:00:00.000Z" });
+  const available = await (await call("/availability?lessonType=single&from=2026-10-05&to=2026-10-05", { method: "GET", user: null })).json();
+  assert.equal(available.bufferMinutes, 15);
+  const starts = available.slotsByDate["2026-10-05"].map((slot) => slot.startAt);
+  assert.ok(!starts.includes("2026-10-05T09:00:00.000Z"), "a lesson ending as another starts would leave no free time after it");
+  assert.ok(!starts.includes("2026-10-05T11:00:00.000Z"), "nobody can start in the 15 minutes after a lesson");
+  assert.deepEqual(starts.slice(0, 3), ["2026-10-05T11:15:00.000Z", "2026-10-05T11:30:00.000Z", "2026-10-05T11:45:00.000Z"],
+    "the next start is 15 minutes after the lesson ends, then every quarter hour");
+
+  // The write re-checks it, whatever an older page offered.
+  const tooSoon = await call("/bookings", { user, body: selectionBody({ startAts: ["2026-10-05T11:00:00.000Z"] }) });
+  assert.equal(tooSoon.status, 409);
+  const afterGap = await call("/bookings", { user, body: selectionBody({ startAts: ["2026-10-05T11:15:00.000Z"] }) });
+  assert.equal(afterGap.status, 201, await afterGap.clone().text());
+
+  // A lesson claimed between the check and the write counts, gap included.
+  beforeRun = (sql) => {
+    if (sql.startsWith("INSERT INTO bookings")) {
+      beforeRun = null;
+      booking("gap-race", { owner: "bob", start: "2026-10-05T14:45:00.000Z", end: "2026-10-05T15:45:00.000Z" });
+    }
+  };
+  const raced = await call("/bookings", { user, body: selectionBody({ startAts: ["2026-10-05T13:45:00.000Z"] }) });
+  assert.equal(raced.status, 409);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE starts_at='2026-10-05T13:45:00.000Z'").get().n, 0);
+
+  // A student's own picks keep the same gap between them.
+  const backToBack = await call("/bookings", { user, body: selectionBody({ startAts: ["2026-10-06T09:00:00.000Z", "2026-10-06T10:00:00.000Z"] }) });
+  assert.equal(backToBack.status, 409);
+  assert.match(await backToBack.text(), /15 minutes free after each lesson/);
+
+  // Inês decides her own day and can still place a lesson straight after another.
+  const hers = await call("/admin/bookings", { user: "teacher", body: { email: "alice@example.invalid", lessonType: "single", startAt: "2026-10-05T15:45:00.000Z" } });
+  assert.equal(hers.status, 201, await hers.clone().text());
+
+  // A lesson booked back to back before the gap existed can still switch
+  // between online and Porto, but a new time must respect the gap.
+  booking("gap-legacy", { owner: "bob", start: "2026-10-06T14:00:00.000Z", end: "2026-10-06T15:00:00.000Z" });
+  booking("gap-legacy-next", { owner: "bob", start: "2026-10-06T15:00:00.000Z", end: "2026-10-06T16:00:00.000Z" });
+  const legacyPath = `/bookings/${await token("gap-legacy")}/reschedule`;
+  const switched = await call(legacyPath, { body: { startAt: "2026-10-06T14:00:00.000Z", location: "porto" } });
+  assert.equal(switched.status, 200, await switched.clone().text());
+  assert.equal((await call(legacyPath, { body: { startAt: "2026-10-06T16:00:00.000Z" } })).status, 409);
+  const moved = await call(legacyPath, { body: { startAt: "2026-10-06T16:15:00.000Z" } });
+  assert.equal(moved.status, 200, await moved.clone().text());
+});
 await test("two weekly starts must share a week, snapshot private rates and keep both Porto times through DST", async () => {
   const user = await selectionFixture();
   await call("/me/recurring-rates", { user, body: { code: "TEST15", durationMinutes: 60 } });

@@ -46,8 +46,18 @@ const SERIES_COLUMNS = [
  * the first candidate as a competing booking. A concurrent claimant is checked
  * inside the write, rather than trusted from the earlier availability preview.
  * Existing tables and per-lesson payment/management semantics stay the owners.
+ *
+ * Each candidate is checked across its lesson plus `bufferMinutes` either side,
+ * which keeps that much free time between it and every other lesson. Only the
+ * booking columns are inserted, so the guard span never reaches the table.
  */
-export async function claimSelection(env, { rows, series, now }) {
+export async function claimSelection(env, { rows, series, now, bufferMinutes = 0 }) {
+  const gapMs = bufferMinutes * 60000;
+  const candidates = rows.map((row) => ({
+    ...row,
+    guard_start: new Date(Date.parse(row.starts_at) - gapMs).toISOString(),
+    guard_end: new Date(Date.parse(row.ends_at) + gapMs).toISOString()
+  }));
   const statements = series.map((entry) => env.DB.prepare(
     `INSERT INTO booking_series (${SERIES_COLUMNS.join(", ")}) VALUES (${SERIES_COLUMNS.map(() => "?").join(", ")})`
   ).bind(...SERIES_COLUMNS.map((column) => entry[column] ?? null)));
@@ -58,14 +68,14 @@ export async function claimSelection(env, { rows, series, now }) {
          SELECT NOT EXISTS (
            SELECT 1 FROM bookings occupied, candidates proposed
            WHERE (occupied.status = 'confirmed' OR (occupied.status = 'pending_payment' AND occupied.hold_expires_at > ?2))
-             AND occupied.starts_at < json_extract(proposed.value, '$.ends_at')
-             AND occupied.ends_at > json_extract(proposed.value, '$.starts_at')
+             AND occupied.starts_at < json_extract(proposed.value, '$.guard_end')
+             AND occupied.ends_at > json_extract(proposed.value, '$.guard_start')
          ) AS available
        )
      INSERT INTO bookings (${BOOKING_COLUMNS.join(", ")})
      SELECT ${BOOKING_COLUMNS.map((column) => `json_extract(value, '$.${column}')`).join(", ")}
      FROM candidates WHERE (SELECT available FROM free)`
-  ).bind(JSON.stringify(rows), now.toISOString()));
+  ).bind(JSON.stringify(candidates), now.toISOString()));
   // If the whole claim lost a race, remove only this request's empty recipes
   // before committing. A SQL error rolls the entire D1 batch back.
   for (const entry of series) statements.push(env.DB.prepare(

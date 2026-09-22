@@ -16,6 +16,8 @@ export type AvailabilityResponse = {
   timeZone: string;
   minimumNoticeHours: number;
   horizonDays: number;
+  /** Free time Inês keeps after every lesson; absent from an older Worker. */
+  bufferMinutes?: number;
   lessonType: { id: string; name: string; durationMinutes: number; priceCents: number };
 };
 

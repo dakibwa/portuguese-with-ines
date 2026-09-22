@@ -739,11 +739,16 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
  * and SQLite settles it — a row is written only if nothing overlapping exists,
  * and zero rows affected means somebody won the race.
  *
- * Overlap, not equality: her lessons are 60 and 90 minutes on a 30-minute grid,
- * so a 90-minute lesson at 17:00 and a 60-minute one at 17:30 collide while
- * starting at different times. A unique index on the start time would miss it.
+ * Overlap, not equality: her lessons are 60 and 90 minutes and start on any
+ * quarter hour, so a 90-minute lesson at 17:00 and a 60-minute one at 17:30
+ * collide while starting at different times. A unique index on the start time
+ * would miss it.
+ *
+ * `bufferMinutes` widens the lesson on both sides for the check only, which is
+ * the same as requiring that much free time between it and any other lesson.
+ * Students' lessons pass the setting; Inês's own bookings pass nothing.
  */
-async function claimSlot(env, { columns, values, startAt, endAt, studentId = null }) {
+async function claimSlot(env, { columns, values, startAt, endAt, studentId = null, bufferMinutes = 0 }) {
   const placeholders = columns.map(() => "?").join(", ");
   const seriesId = values[columns.indexOf("series_id")] ?? null;
   // A pending setup reserves its slot for everyone, including its owner.
@@ -761,7 +766,17 @@ async function claimSlot(env, { columns, values, startAt, endAt, studentId = nul
        SELECT 1 FROM bookings prior WHERE prior.student_id = ? AND prior.status != 'cancelled'
      )) AND (? IS NULL OR EXISTS (SELECT 1 FROM booking_series WHERE id = ? AND status = 'active'))`
   )
-    .bind(...values, new Date().toISOString(), endAt, startAt, values[columns.indexOf("lesson_type_id")], studentId, studentId, seriesId, seriesId)
+    .bind(
+      ...values,
+      new Date().toISOString(),
+      new Date(Date.parse(endAt) + bufferMinutes * 60000).toISOString(),
+      new Date(Date.parse(startAt) - bufferMinutes * 60000).toISOString(),
+      values[columns.indexOf("lesson_type_id")],
+      studentId,
+      studentId,
+      seriesId,
+      seriesId
+    )
     .run();
 
   return (result?.meta?.changes ?? 0) > 0;
@@ -1744,6 +1759,7 @@ async function handleAvailability(request, env, url) {
       timeZone: PORTO,
       minimumNoticeHours: settings.minimumNoticeHours,
       horizonDays: settings.bookingHorizonDays,
+      bufferMinutes: settings.lessonBufferMinutes,
       lessonType: {
         id: lessonType.id,
         name: lessonType.name,
@@ -1924,7 +1940,8 @@ async function handleCreate(request, env, ctx) {
     ],
     startAt: startsAt,
     endAt: endsAt,
-    studentId: student.id
+    studentId: student.id,
+    bufferMinutes: settings.lessonBufferMinutes
   });
 
   if (!claimed) {
@@ -2150,13 +2167,23 @@ async function handleCreateSelection(request, env, ctx, {
     });
   }
   plannedRows.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-  if (plannedRows.some((row, index) => index && row.starts_at < plannedRows[index - 1].ends_at)) {
-    return fail("Those weekly times overlap on a later date. Please choose different times.", 409, request, env);
+  // The student's own lessons keep the same free time after each one as
+  // anyone else's do.
+  const gapMs = settings.lessonBufferMinutes * 60000;
+  if (plannedRows.some((row, index) => index && Date.parse(row.starts_at) < Date.parse(plannedRows[index - 1].ends_at) + gapMs)) {
+    return fail(
+      gapMs
+        ? `Two of those lessons are too close together. Inês keeps ${settings.lessonBufferMinutes} minutes free after each lesson, so please choose different times.`
+        : "Those weekly times overlap on a later date. Please choose different times.",
+      409,
+      request,
+      env
+    );
   }
   if (recentLessons + plannedRows.length > 26) {
     return fail("That's several bookings in a short time. Please wait an hour before adding more.", 429, request, env);
   }
-  if (!await claimSelection(env, { rows: plannedRows, series, now })) {
+  if (!await claimSelection(env, { rows: plannedRows, series, now, bufferMinutes: settings.lessonBufferMinutes })) {
     return fail("A selected time has just been taken. Nothing has been booked; please review your dates.", 409, request, env);
   }
   const ids = JSON.stringify(plannedRows.map((row) => row.id));
@@ -2213,7 +2240,7 @@ async function notifySelection(env, { rows, lessonType, settings, series, skippe
  * pay-in-person run, 'hold' while its first card setup is open, and 'scheduled'
  * for a lesson that will charge the saved card after its end.
  */
-async function insertOccurrence(env, { seriesId, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null }) {
+async function insertOccurrence(env, { seriesId, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null, bufferMinutes = 0 }) {
   const id = crypto.randomUUID();
   const timestamp = now.toISOString();
   const startsAt = new Date(startAt).toISOString();
@@ -2252,7 +2279,8 @@ async function insertOccurrence(env, { seriesId, student, lessonType, timezone, 
     ],
     startAt: startsAt,
     endAt: endsAt,
-    studentId: student.id
+    studentId: student.id,
+    bufferMinutes
   });
 
   // Losing the race is a skipped week, not a failed booking: the rest of the
@@ -2271,6 +2299,7 @@ async function insertOccurrence(env, { seriesId, student, lessonType, timezone, 
  */
 async function fillSeries(env, { series, student, lessonType, fromKey, count, now, paymentState = "none", holdExpiresAt = null }) {
   lessonType = await recurringLessonType(env, student.id, lessonType);
+  const { lessonBufferMinutes } = await loadSettings(env);
   const { bookable, skipped } = await planOccurrences(env, {
     fromKey,
     minuteOfDay: series.minute_of_day,
@@ -2295,7 +2324,8 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
       paymentState,
       holdExpiresAt,
       paymentConsentAt: series.payment_consent_at ?? null,
-      paymentConsentVersion: series.payment_consent_version ?? null
+      paymentConsentVersion: series.payment_consent_version ?? null,
+      bufferMinutes: lessonBufferMinutes
     });
 
     if (row) rows.push(row);
@@ -2484,7 +2514,8 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     .all();
   // Moving a whole run must not become a route around the 14-hour rule: a
   // lesson inside the window stays where it is, and the rest of the run moves.
-  const { minimumNoticeHours } = await loadSettings(env);
+  const { minimumNoticeHours, lessonBufferMinutes } = await loadSettings(env);
+  const gapMs = lessonBufferMinutes * 60000;
   const kept = (results ?? []).filter((row) => changePolicy(row, now, minimumNoticeHours).late);
   const rows = (results ?? []).filter((row) => !kept.includes(row));
   if (!rows.length) {
@@ -2552,7 +2583,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     }
     // The availability check ignored the whole sequence, including a lesson
     // that is staying where it is.
-    const clash = kept.find((late) => Date.parse(late.starts_at) < check.endAt.getTime() && Date.parse(late.ends_at) > occurrence.startAt.getTime());
+    const clash = kept.find((late) => Date.parse(late.starts_at) < check.endAt.getTime() + gapMs && Date.parse(late.ends_at) + gapMs > occurrence.startAt.getTime());
     if (clash) {
       return fail(
         `${formatShort(occurrence.startAt, PORTO)} overlaps your lesson on ${formatShort(new Date(clash.starts_at), PORTO)}, which stays where it is. Choose another day or time.`,
@@ -2577,7 +2608,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     });
   }
 
-  const proposedValues = planned.map(() => "(?, ?, ?, ?, ?, ?, ?)").join(", ");
+  const proposedValues = planned.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
   const proposedBindings = planned.flatMap((entry) => [
     entry.id,
     entry.oldStart,
@@ -2585,13 +2616,16 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     entry.oldLocation,
     entry.startAt,
     entry.endAt,
-    entry.amountCents
+    entry.amountCents,
+    // The span that must be clear of other lessons: the lesson plus its gap.
+    new Date(Date.parse(entry.startAt) - gapMs).toISOString(),
+    new Date(Date.parse(entry.endAt) + gapMs).toISOString()
   ]);
   const expectedValues = planned.map(() => "(?, ?, ?)").join(", ");
   const expectedBindings = planned.flatMap((entry) => [entry.id, entry.startAt, entry.endAt]);
 
   const moveBookings = env.DB.prepare(
-    `WITH proposed(id, old_start, old_lesson_type, old_location, new_start, new_end, new_amount) AS (
+    `WITH proposed(id, old_start, old_lesson_type, old_location, new_start, new_end, new_amount, guard_start, guard_end) AS (
        VALUES ${proposedValues}
      )
      UPDATE bookings
@@ -2618,7 +2652,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
          AND processing.status = 'confirmed' AND processing.payment_status = 'processing')
        AND NOT EXISTS (
          SELECT 1 FROM bookings other JOIN proposed p
-           ON other.starts_at < p.new_end AND other.ends_at > p.new_start
+           ON other.starts_at < p.guard_end AND other.ends_at > p.guard_start
          WHERE (other.status = 'confirmed'
                 OR (other.status = 'pending_payment' AND other.hold_expires_at > ?))
            AND other.id NOT IN (SELECT id FROM proposed)
@@ -2800,6 +2834,13 @@ async function handleReschedule(request, env, ctx, token) {
     return fail("Please reload and review the lesson price before confirming.", 409, request, env);
   }
 
+  // A new time keeps the free gap from other lessons. A lesson keeping its own
+  // time (a location-only change) is not held to a gap its neighbours were
+  // booked without.
+  const gapMs = sameTime ? 0 : settings.lessonBufferMinutes * 60000;
+  const guardStart = new Date(Date.parse(startsAt) - gapMs).toISOString();
+  const guardEnd = new Date(Date.parse(endsAt) + gapMs).toISOString();
+
   // Same gap as creating a booking: the check above and this write are two
   // statements, and a lesson can be claimed between them.
   /*
@@ -2850,8 +2891,8 @@ async function handleReschedule(request, env, ctx, token) {
       row.lesson_type_id,
       row.sequence,
       now.toISOString(),
-      endsAt,
-      startsAt
+      guardEnd,
+      guardStart
     )
     .run();
 
@@ -4354,6 +4395,7 @@ async function handleAdmin(request, env, ctx, url, path) {
       "minimum_notice_hours",
       "booking_horizon_days",
       "slot_interval_minutes",
+      "lesson_buffer_minutes",
       "same_day_change_fee_cents",
       "teacher_name",
       "teacher_email",
@@ -4365,6 +4407,7 @@ async function handleAdmin(request, env, ctx, url, path) {
       minimum_notice_hours: [0, 336],
       booking_horizon_days: [1, 365],
       slot_interval_minutes: [5, 240],
+      lesson_buffer_minutes: [0, 120],
       same_day_change_fee_cents: [0, 10000]
     };
     for (const [key, value] of Object.entries(body.settings ?? {})) {

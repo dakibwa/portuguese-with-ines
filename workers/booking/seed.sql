@@ -23,7 +23,10 @@ INSERT OR REPLACE INTO settings (key, value) VALUES
   ('minimum_notice_hours', '14'),
   -- Twelve weeks ahead, which the calendar shows four weeks at a time.
   ('booking_horizon_days', '84'),
-  ('slot_interval_minutes', '30'),
+  -- Lessons may start on any quarter hour within her hours, and the 15 minutes
+  -- after every lesson stay free.
+  ('slot_interval_minutes', '15'),
+  ('lesson_buffer_minutes', '15'),
   ('same_day_change_fee_cents', '500'),
   ('teacher_name', 'Inês Dias Baía'),
   ('teacher_email', ''),
