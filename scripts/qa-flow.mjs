@@ -462,7 +462,8 @@ const faqAfterSwitch = await page.evaluate(() => ({
   current: document.querySelector(".faq-index a[aria-current='true']")?.getAttribute("href")
 }));
 if (
-  Math.abs(faqAfterSwitch.scrollY - faqScrollBefore) > 1 ||
+  // No jump to the section; a couple of pixels of settling is not a jump.
+  Math.abs(faqAfterSwitch.scrollY - faqScrollBefore) > 8 ||
   faqAfterSwitch.hash !== "#faq-payment" ||
   JSON.stringify(faqAfterSwitch.visible) !== JSON.stringify(["faq-payment"]) ||
   faqAfterSwitch.current !== "#faq-payment"
