@@ -185,10 +185,9 @@ const faqSections = [
       {
         question: `What if my lesson is less than ${notice} away?`,
         answer: [
-          `You’re charged ${lateFee} automatically when you cancel or change a lesson with less than ${notice}’ notice.`,
-          `Cancel the lesson: you pay ${lateFee} in total.`,
-          `Change the time: you pay the ${lateFee} fee when you make the change, then the usual lesson price after the rescheduled lesson.`,
-          `You must cancel or change before the lesson starts. The ${lateFee} fee is charged to your saved card, once per lesson.`
+          `If you cancel with less than ${notice}’ notice or don’t show up to your lesson, you’re charged ${lateFee} instead of the full lesson price.`,
+          `If you change your lesson with less than ${notice}’ notice, you’re charged ${lateFee} when you confirm the change. You pay for the lesson after it takes place.`,
+          `You must cancel or change before the lesson starts. The change or cancellation fee applies once per lesson.`
         ]
       },
       {
