@@ -185,10 +185,10 @@ const faqSections = [
       {
         question: `What if my lesson is less than ${notice} away?`,
         answer: [
-          `Cancel or change your lesson with less than ${notice}’ notice for ${lateFee}. You must do this before the lesson starts.`,
+          `You’re charged ${lateFee} automatically when you cancel or change a lesson with less than ${notice}’ notice.`,
           `Cancel the lesson: you pay ${lateFee} in total.`,
-          `Change the time: you pay the ${lateFee} fee plus the usual lesson price. The lesson price is charged after the rescheduled lesson.`,
-          `The ${lateFee} change fee is charged automatically to your saved card, once per lesson.`
+          `Change the time: you pay the ${lateFee} fee when you make the change, then the usual lesson price after the rescheduled lesson.`,
+          `You must cancel or change before the lesson starts. The ${lateFee} fee is charged to your saved card, once per lesson.`
         ]
       },
       {
