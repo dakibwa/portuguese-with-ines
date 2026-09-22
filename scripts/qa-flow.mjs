@@ -445,6 +445,8 @@ if (await firstFaq.evaluate((element) => element.hasAttribute("open"))) {
 if ((await page.locator(".faq-group:not([hidden])").count()) !== 1) {
   throw new Error("The FAQ should show one section at a time.");
 }
+// Before hydration the index is plain anchors; switching in place needs the page ready.
+await page.locator('.faq-index[data-ready="true"]').waitFor();
 const faqScrollBefore = await page.evaluate(() => window.scrollY);
 await page.locator(".faq-index").getByRole("link", { name: /Payment/ }).click();
 await page.locator("#faq-payment:not([hidden])").waitFor();

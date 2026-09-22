@@ -15,6 +15,8 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
  */
 export function FaqSections({ sections, indexMark }: { sections: FaqSection[]; indexMark: ReactNode }) {
   const [active, setActive] = useState(sections[0]?.id ?? "");
+  // Until this is set the index links are ordinary anchors; tests wait for it.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const fromAddress = (bringIntoView: boolean) => {
@@ -33,6 +35,7 @@ export function FaqSections({ sections, indexMark }: { sections: FaqSection[]; i
       }
     };
     fromAddress(true);
+    setReady(true);
     const onHashChange = () => fromAddress(false);
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
@@ -57,7 +60,7 @@ export function FaqSections({ sections, indexMark }: { sections: FaqSection[]; i
 
   return (
     <>
-      <nav className="faq-index" aria-label="FAQ categories">
+      <nav className="faq-index" aria-label="FAQ categories" data-ready={ready ? "true" : undefined}>
         <p className="eyebrow">Index</p>
         <ol>
           {sections.map((section, index) => (
