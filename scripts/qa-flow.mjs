@@ -448,7 +448,9 @@ if ((await page.locator(".faq-group:not([hidden])").count()) !== 1) {
 // Before hydration the index is plain anchors; switching in place needs the page ready.
 await page.locator('.faq-index[data-ready="true"]').waitFor();
 const faqScrollBefore = await page.evaluate(() => window.scrollY);
-await page.locator(".faq-index").getByRole("link", { name: /Payment/ }).click();
+// Dispatched directly: Playwright's own scroll-into-view before a click is not
+// the page moving, and on a slower runner it scrolled this link to centre.
+await page.locator(".faq-index").getByRole("link", { name: /Payment/ }).dispatchEvent("click");
 await page.locator("#faq-payment:not([hidden])").waitFor();
 const faqAfterSwitch = await page.evaluate(() => ({
   scrollY: window.scrollY,
