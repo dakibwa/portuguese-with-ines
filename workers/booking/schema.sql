@@ -78,6 +78,11 @@ CREATE TABLE IF NOT EXISTS students (
   -- pasting a shared token, though ADMIN_TOKEN remains as a way back in.
   role          TEXT NOT NULL DEFAULT 'student',
   session_version INTEGER NOT NULL DEFAULT 0,
+  -- When the current address was proven to receive mail: a Google sign-in, a
+  -- completed password reset or a confirmed email change (migration 0020).
+  -- Registration leaves it empty, and a lesson Inês books for an unproven
+  -- address with a password first clears that password and its sessions.
+  email_verified_at TEXT,
   -- Stripe's opaque identifiers for charging a saved card again (migration
   -- 0009). The card itself lives at Stripe; these are references, not secrets.
   stripe_customer_id    TEXT,

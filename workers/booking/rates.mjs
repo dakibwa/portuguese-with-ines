@@ -31,6 +31,33 @@ export async function priceForMove(env, row, lessonType) {
   return priced.price_cents;
 }
 
+/**
+ * The rate-limit key for a connecting address. IPv4 is used as it is. An IPv6
+ * client is usually given a whole /64 and can rotate through it at will, so it
+ * counts as that prefix; an IPv4-mapped address is the IPv4 client it carries.
+ * The URL parser reads the IPv6, so every spelling of one address (compressed,
+ * zero-padded, upper case, dotted tail) lands on the same key.
+ */
+export function rateLimitAddress(value) {
+  const address = String(value ?? "").trim();
+  if (!address.includes(":")) return address || "local";
+  let host = "";
+  try {
+    if (/^[0-9a-f:.]+$/i.test(address)) host = new URL(`http://[${address}]`).hostname.slice(1, -1);
+  } catch {
+    // Not a valid IPv6 address after all, so it is keyed as it came.
+  }
+  if (!host) return address;
+  const [head, tail = ""] = host.split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const pieces = [...left, ...Array(8 - left.length - right.length).fill("0"), ...right].map((piece) => parseInt(piece, 16));
+  if (pieces.slice(0, 5).every((piece) => piece === 0) && pieces[5] === 0xffff) {
+    return [pieces[6] >> 8, pieces[6] & 255, pieces[7] >> 8, pieces[7] & 255].join(".");
+  }
+  return `${pieces.slice(0, 4).map((piece) => piece.toString(16)).join(":")}::/64`;
+}
+
 /** Atomic fixed windows bound parallel guesses as well as sequential requests. */
 export async function takeRateLimit(env, key, limit, seconds = 900, now = Date.now()) {
   const window = Math.floor(now / (seconds * 1000));

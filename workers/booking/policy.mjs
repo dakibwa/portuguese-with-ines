@@ -10,8 +10,9 @@
  * Earlier bookings agreed to "free until the lesson's Porto calendar day". Dan
  * decided those are never charged more than they agreed: they pay the fee only
  * when both rules would charge. The card itself is still charged the lesson
- * price when the lesson ends (1 September 2026); only an older lesson that was
- * already paid keeps the prepaid lock/refund behaviour, inside the same window.
+ * price after the lesson (1 September 2026), once its no-show window below has
+ * closed; only an older lesson that was already paid keeps the prepaid
+ * lock/refund behaviour, inside the same window.
  */
 
 import { DEFAULT_MINIMUM_NOTICE_HOURS } from "./availability.mjs";
@@ -19,6 +20,13 @@ import { dateKey, PORTO } from "./time.mjs";
 
 /** The wording a booking made under the 14-hour rule consents to. */
 export const PAYMENT_CONSENT_VERSION = "2026-09-21-fourteen-hours-v1";
+
+/**
+ * How long after a lesson's scheduled end Inês can still record or undo a
+ * no-show (Dan, 23 September 2026). A no-show turns the lesson price into the
+ * EUR 5 fee, so the lesson's own charge waits until this has closed.
+ */
+export const NO_SHOW_WINDOW_HOURS = 6;
 
 /** Wording that promised free changes until the lesson's Porto calendar day. */
 const LESSON_DAY_CONSENT_VERSIONS = new Set(["2026-09-01-after-lesson-v1"]);

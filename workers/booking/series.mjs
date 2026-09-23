@@ -79,7 +79,7 @@ export function occurrenceInstants({ fromKey, minuteOfDay, count }) {
  * booking the other eleven. The skipped dates are returned so the student is
  * told before they commit, never after.
  */
-export async function planOccurrences(env, { fromKey, minuteOfDay, count, lessonType, now, ignoreBookingId = null }) {
+export async function planOccurrences(env, { fromKey, minuteOfDay, count, lessonType, now, ignoreBookingId = null, ignoreHoldsOf = null }) {
   const wanted = occurrenceInstants({ fromKey, minuteOfDay, count: Math.min(count, MAX_OCCURRENCES_PER_RUN) });
 
   const bookable = [];
@@ -90,6 +90,7 @@ export async function planOccurrences(env, { fromKey, minuteOfDay, count, lesson
       lessonType,
       now,
       ignoreBookingId,
+      ignoreHoldsOf,
       // A weekly slot is checked against her real teaching hours, not against
       // the 30-day counter that governs walk-up bookings. Without this a
       // twelve-week booking would quietly become a four-week one.
