@@ -2188,7 +2188,8 @@ html.booking-transitioning .booking-confirmation-stage {
   border-radius: var(--squiggle-field);
   padding: 0.7rem 0.9rem;
   background: transparent;
-  color: var(--coral-action);
+  /* Blue, the colour of the choices: coral is kept for what went wrong. */
+  color: var(--blue);
   cursor: pointer;
   font-family: var(--ui);
   font-size: 0.72rem;
@@ -2206,14 +2207,14 @@ html.booking-transitioning .booking-confirmation-stage {
   height: 56px;
   place-items: center;
   border-radius: var(--squiggle-thumb);
-  background: rgba(239, 93, 60, 0.12);
+  background: rgba(170, 164, 230, 0.34);
   transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .booking-add-lesson:hover,
 .booking-add-lesson:focus-visible {
   border-style: solid;
-  border-color: var(--coral);
+  border-color: var(--blue);
   background: rgba(255, 255, 255, 0.45);
 }
 

@@ -404,8 +404,8 @@ of sight until there is a day to show.
 Students can collect several single-lesson dates and confirm them together.
 Each chosen lesson is its own row: its own splat, the date and time, Porto time
 named once, and one `Change`. Beneath the rows a dashed card of the same shape,
-with a plus mark, offers `Add another lesson`, or `Add a second weekly time` for
-weekly lessons; it is absent for a trial and once the limit is reached, and it
+in the choices' blue with a plus mark (coral is kept for clashes), offers `Add
+another lesson`, or `Add a second weekly time` for weekly lessons; it is absent for a trial and once the limit is reached, and it
 needs no explanatory sentence. While a lesson is added or changed the lesson
 itself is settled, so the choices bar gives way to a selection bar: its heading
 (`Add another lesson`, `Add a second weekly time` or `Change a lesson`), the
