@@ -30,6 +30,7 @@ import { formatEuros } from "./money.mjs";
 import { buildCalendarInvite, buildCalendarSeriesInvite, calendarUid } from "./ics.mjs";
 import { normaliseWeeks, occurrenceInstants, outstandingFor, slotOf, SERIES_LENGTHS } from "./series.mjs";
 import { createManageToken, readManageToken, safeEqual, bookingReference } from "./tokens.mjs";
+import { rateLimitAddress } from "./rates.mjs";
 import {
   PAYMENT_CONSENT_VERSION,
   amountAfterLessonTypeChange,
@@ -464,6 +465,27 @@ await test("booking references avoid ambiguous glyphs", () => {
     const reference = bookingReference();
     assert.match(reference, /^PT-[ACDEFGHJKLMNPQRSTUVWXYZ2345679]{6}$/);
   }
+});
+
+// --- Rate-limit keys ----------------------------------------------------------
+
+await test("an IPv6 client is keyed by its /64, however the address is written", () => {
+  const key = "2001:db8:0:0::/64";
+  assert.equal(rateLimitAddress("2001:0db8:0000:0000:0000:0000:0000:0001"), key, "full form");
+  assert.equal(rateLimitAddress("2001:db8::1"), key, "compressed");
+  assert.equal(rateLimitAddress("2001:DB8::FFFF:FFFF:FFFF:FFFE"), key, "upper case, far end of the same /64");
+  assert.equal(rateLimitAddress("2001:db8:0:1::1"), "2001:db8:0:1::/64", "the next /64 is another client");
+  assert.equal(rateLimitAddress("::1"), "0:0:0:0::/64");
+});
+
+await test("an IPv4 client keeps its own key, also when mapped into IPv6", () => {
+  assert.equal(rateLimitAddress("203.0.113.41"), "203.0.113.41");
+  assert.equal(rateLimitAddress("::ffff:203.0.113.41"), "203.0.113.41", "dotted IPv4-mapped");
+  assert.equal(rateLimitAddress("::FFFF:CB00:7129"), "203.0.113.41", "hex IPv4-mapped");
+  assert.notEqual(rateLimitAddress("::ffff:203.0.113.42"), rateLimitAddress("::ffff:203.0.113.41"), "not pooled as one /64");
+  assert.equal(rateLimitAddress(null), "local");
+  assert.equal(rateLimitAddress(""), "local");
+  assert.equal(rateLimitAddress("not:an:address"), "not:an:address", "anything unreadable is keyed as it came");
 });
 
 // --- Stripe webhook signature ------------------------------------------------
@@ -1382,7 +1404,9 @@ await test("a no-show can only be changed after the lesson starts and before its
   assert.match(noShowProblem(row, new Date("2026-09-09T15:59:59.000Z")), /starts/i);
   assert.equal(noShowProblem(row, new Date("2026-09-09T16:00:00.000Z")), "");
   assert.equal(noShowProblem(row, new Date("2026-09-09T16:59:59.000Z")), "");
-  assert.match(noShowProblem(row, new Date("2026-09-09T17:00:00.000Z")), /ended/i);
+  assert.equal(noShowProblem(row, new Date("2026-09-09T17:00:00.000Z")), "", "the scheduled end is inside the window");
+  assert.equal(noShowProblem(row, new Date("2026-09-09T22:59:59.000Z")), "", "which lasts six hours after it");
+  assert.match(noShowProblem(row, new Date("2026-09-09T23:00:00.000Z")), /6 hours after the lesson ends/);
   assert.match(noShowProblem({ ...row, payment_status: "processing" }, new Date("2026-09-09T16:30:00.000Z")), /already started/i);
 });
 

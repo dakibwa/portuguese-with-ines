@@ -629,10 +629,11 @@ The change workflow has no decorative horizontal dividers. Lesson length uses
 the same sliding two-option control as `Online` / `In Porto`, so changing an
 existing lesson feels like the booking flow rather than a separate tool. The
 policy band follows the Worker's payment mode. Saved-card bookings say that the
-lesson price is charged when it ends, while moving or cancelling less than
-14 hours before it costs €5. The teacher schedule exposes `Mark no-show` only after
-the lesson starts and before it ends; the marked state remains reversible until
-charging begins and means only €5 is taken instead of the full price.
+lesson price is charged after it ends, while moving or cancelling less than
+14 hours before it costs €5. The teacher schedule exposes `Mark no-show` from
+the lesson's start until six hours after it ends; the marked state remains
+reversible until then, when charging begins, and means only €5 is taken instead
+of the full price.
 
 ## Superseded work
 

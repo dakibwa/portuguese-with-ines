@@ -129,10 +129,12 @@ export async function listLessonTypes(env) {
  *        occupies, instead of the student's own lesson blocking their move.
  * @param ignoreSeriesId does the same for every future occurrence while a
  *        whole weekly sequence is being moved.
+ * @param ignoreHoldsOf a signed-in student whose own unfinished card setups
+ *        do not count as busy for them: their next booking replaces them.
  */
 export async function computeAvailability(
   env,
-  { fromKey, toKey, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHorizon = false }
+  { fromKey, toKey, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false }
 ) {
   const settings = await loadSettings(env);
   const duration = Number(lessonType.duration_minutes);
@@ -172,7 +174,7 @@ export async function computeAvailability(
     // checkout that has not been abandoned yet — otherwise two students could
     // pay for the same time. An expired hold stops counting automatically.
     env.DB.prepare(
-      `SELECT id, series_id, starts_at, ends_at FROM bookings
+      `SELECT id, series_id, student_id, status, starts_at, ends_at FROM bookings
        WHERE ends_at > ? AND starts_at < ?
          AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))`
     )
@@ -208,7 +210,8 @@ export async function computeAvailability(
   }
 
   const busy = (booked.results ?? [])
-    .filter((row) => (!ignoreBookingId || row.id !== ignoreBookingId) && (!ignoreSeriesId || row.series_id !== ignoreSeriesId))
+    .filter((row) => (!ignoreBookingId || row.id !== ignoreBookingId) && (!ignoreSeriesId || row.series_id !== ignoreSeriesId)
+      && !(ignoreHoldsOf && row.status === "pending_payment" && row.student_id === ignoreHoldsOf))
     .map((row) => ({ start: new Date(row.starts_at).getTime(), end: new Date(row.ends_at).getTime() + bufferMs }));
 
   const slotsByDate = {};
@@ -262,7 +265,7 @@ export async function computeAvailability(
  */
 export async function isSlotBookable(
   env,
-  { startAt, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHorizon = false }
+  { startAt, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false }
 ) {
   const start = new Date(startAt);
   if (Number.isNaN(start.getTime())) return { ok: false, reason: "That time could not be understood." };
@@ -275,6 +278,7 @@ export async function isSlotBookable(
     now,
     ignoreBookingId,
     ignoreSeriesId,
+    ignoreHoldsOf,
     ignoreHorizon
   });
 

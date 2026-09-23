@@ -28,6 +28,7 @@ import {
   verifyWebhook
 } from "./stripe.mjs";
 import {
+  NO_SHOW_WINDOW_HOURS,
   PAYMENT_CONSENT_VERSION,
   changePolicy,
   lessonTypeChangeProblem,
@@ -57,7 +58,7 @@ import {
   parseDateKey
 } from "./time.mjs";
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
-import { findRecurringCode, recurringRates, recurringLessonType, priceForMove, takeRateLimit } from "./rates.mjs";
+import { findRecurringCode, recurringRates, recurringLessonType, priceForMove, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
 import { formatEuros } from "./money.mjs";
 import { bookingSelection, claimSelection } from "./selection.mjs";
@@ -240,7 +241,7 @@ function teacherNotificationsEnabled(env) {
  * Every student-facing and teacher-facing message for one lifecycle event.
  * Kept in one place so a change to wording cannot drift between the two sides.
  */
-async function notify(env, { event, row, lessonType, settings, manageUrl, previousStartsAt, previousLessonType, byTeacher = false }) {
+async function notify(env, { event, row, lessonType, settings, manageUrl, previousStartsAt, previousLessonType, byTeacher = false, reclaimed = false }) {
   const notifyingSequence = row.sequence;
   const notifyingStatus = row.status;
   row = await prepareMeeting(env, row).catch(() => row);
@@ -287,7 +288,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const priceValue = isPaid
     ? `${formatEuros(lessonType.price_cents)} · paid`
     : isOnCard
-      ? `${formatEuros(lessonType.price_cents)} · charged to your saved card when the lesson ends`
+      ? `${formatEuros(lessonType.price_cents)} · charged to your saved card after the lesson`
       : `${formatEuros(lessonType.price_cents)} · pay on the day, in person`;
   const studentRows =
     event === "cancelled"
@@ -345,7 +346,10 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       intro: `Olá ${row.student_name.split(" ")[0]}, your lesson with Inês is ${
         isPaid ? "paid and confirmed" : "confirmed"
       }. A calendar invitation is attached.`,
-      callout: "",
+      // Only when Inês's booking has just cleared an unproven password.
+      callout: reclaimed
+        ? "To see this lesson in your account, sign in with Google or choose a new password with “I’ve forgotten my password” on the sign-in page."
+        : "",
       footer: isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
     },
     rescheduled: byTeacher
@@ -618,7 +622,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   ];
 
   // Price on the student's copy only, per lesson — Inês doesn't need her own
-  // prices repeated to her. Current runs charge each lesson separately when
+  // prices repeated to her. Current runs charge each lesson separately after
   // it ends; an older run keeps the pay-on-the-day terms it was booked under.
   const seriesOnCard = rows.some((row) => row.payment_status === "paid" || row.payment_status === "scheduled");
   const studentSeriesRows = [
@@ -626,14 +630,14 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     {
       label: "Price",
       value: seriesOnCard
-        ? `${formatEuros(lessonType.price_cents)} a lesson · charged to your saved card when each lesson ends`
+        ? `${formatEuros(lessonType.price_cents)} a lesson · charged to your saved card after each lesson`
         : `${formatEuros(lessonType.price_cents)} a lesson · pay on the day, in person`
     },
     ...rowsForBoth.slice(2)
   ];
   const seriesFee = formatEuros(settings.sameDayChangeFeeCents);
   const seriesFooter = seriesOnCard
-    ? `Move or cancel any single lesson free until ${settings.minimumNoticeHours} hours before it. After that, moving or cancelling costs ${seriesFee}. If Inês records a no-show before the lesson ends, only ${seriesFee} is charged instead of the lesson price.`
+    ? `Move or cancel any single lesson free until ${settings.minimumNoticeHours} hours before it. After that, moving or cancelling costs ${seriesFee}. A no-show costs ${seriesFee} instead of the lesson price.`
     : `Moving or cancelling a lesson is free until ${settings.minimumNoticeHours} hours before it; after that it costs ${seriesFee}.`;
   const moved = reason === "moved";
 
@@ -900,9 +904,16 @@ function publicStudent(row) {
   };
 }
 
+/*
+ * Every booking id is a UUID. Sessions are signed with the same key, so a
+ * session token also verifies as a manage token, for "<student>.<expiry>.<version>";
+ * only a UUID is looked up, so no other signed value can ever name a booking.
+ */
+const BOOKING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function getBookingByToken(env, token) {
   const bookingId = await readManageToken(token, env.BOOKING_TOKEN_SECRET);
-  if (!bookingId) return null;
+  if (!bookingId || !BOOKING_ID.test(bookingId)) return null;
   return env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(bookingId).first();
 }
 
@@ -930,7 +941,7 @@ const worker = {
         if (Number(request.headers.get("Content-Length") || 0) > 32768) return fail("Request too large.", 413, request, env);
         // Cloudflare supplies this trusted edge header. It cannot be replaced
         // with an arbitrary body/email key to bypass unauthenticated limits.
-        const ip = request.headers.get("CF-Connecting-IP") || "local";
+        const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
         if (path.startsWith("/auth/") && !await takeRateLimit(env, `auth:${ip}`, 40)) {
           return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
         }
@@ -1058,9 +1069,11 @@ const worker = {
 };
 
 /**
- * Charge only after the scheduled lesson end instant. All instants are stored
- * in UTC after being resolved from Porto wall-clock time, so a 17:00–18:00
- * lesson is due at 18:00 Porto time across both winter and summer time.
+ * Charge only once the lesson's no-show window has closed, NO_SHOW_WINDOW_HOURS
+ * elapsed hours after its scheduled end: until then Inês may still record a
+ * no-show, which changes the amount. All instants are stored in UTC after being
+ * resolved from Porto wall-clock time, so a 17:00–18:00 lesson is due six hours
+ * after 18:00 Porto time across both winter and summer time.
  *
  * A decline is a fact of card networks, not an exception: the lesson stays
  * confirmed, the student gets a pay-now link, Inês gets a note, and the row
@@ -1071,6 +1084,8 @@ export async function chargeDueLessons(env, now = new Date()) {
   if (settings.paymentMode !== "postpay" || !stripeReady(env)) return;
 
   const nowIso = now.toISOString();
+  // Lessons that ended at or before this have a closed no-show window.
+  const endedBy = new Date(now.getTime() - NO_SHOW_WINDOW_HOURS * 3600000).toISOString();
   const staleProcessing = new Date(now.getTime() - 10 * 60000).toISOString();
   const retryCutoff = new Date(now.getTime() - 23 * 3600000).toISOString();
   const unresolved = await env.DB.prepare("SELECT COUNT(*) AS count FROM bookings WHERE payment_status = 'processing' AND (charge_started_at IS NULL OR charge_started_at < ?)").bind(retryCutoff).first();
@@ -1082,7 +1097,7 @@ export async function chargeDueLessons(env, now = new Date()) {
        AND (payment_status = 'scheduled' OR (payment_status = 'processing' AND updated_at < ? AND charge_started_at >= ?))
      ORDER BY ends_at LIMIT 50`
   )
-    .bind(nowIso, staleProcessing, retryCutoff)
+    .bind(endedBy, staleProcessing, retryCutoff)
     .all();
 
   for (const row of results ?? []) {
@@ -1096,7 +1111,7 @@ export async function chargeDueLessons(env, now = new Date()) {
            AND NOT EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = bookings.id AND status = 'pending')
            AND (payment_status = 'scheduled' OR (payment_status = 'processing' AND updated_at < ? AND charge_started_at >= ?))`
       )
-        .bind(nowIso, nowIso, row.id, nowIso, staleProcessing, new Date(now.getTime() - 23 * 3600000).toISOString())
+        .bind(nowIso, nowIso, row.id, endedBy, staleProcessing, new Date(now.getTime() - 23 * 3600000).toISOString())
         .run();
       if ((claimed?.meta?.changes ?? 0) === 0) continue;
 
@@ -1176,7 +1191,10 @@ export function noShowProblem(row, now = new Date()) {
     return "That lesson's payment has already started, so its attendance can no longer be changed.";
   }
   if (now < new Date(row.starts_at)) return "Wait until the lesson starts before marking a no-show.";
-  if (now >= new Date(row.ends_at)) return "That lesson has ended and its payment is already being processed.";
+  // The lesson's charge waits for this window, so the two never overlap.
+  if (now.getTime() >= Date.parse(row.ends_at) + NO_SHOW_WINDOW_HOURS * 3600000) {
+    return `Attendance can be changed until ${NO_SHOW_WINDOW_HOURS} hours after the lesson ends, and that time has passed.`;
+  }
   return "";
 }
 
@@ -1666,8 +1684,9 @@ async function handleHealth(request, env) {
   try {
     const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM lesson_types WHERE active = 1").first();
     lessonTypes = row?.count ?? 0;
-    // Sign-up writes this column (migration 0017), so its absence is an outage.
-    await env.DB.prepare("SELECT nif FROM students LIMIT 0").first();
+    // Sign-up writes nif (migration 0017) and every Google sign-in and password
+    // reset writes email_verified_at (0020), so the absence of either is an outage.
+    await env.DB.prepare("SELECT nif, email_verified_at FROM students LIMIT 0").first();
     const settings = await loadSettings(env);
     teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
   } catch {
@@ -1736,12 +1755,14 @@ async function handleAvailability(request, env, url) {
   // A lesson being changed may reuse the time it occupies, so moving it by half
   // an hour or changing its length at the same start is offered. A valid manage
   // link ignores its one booking; a weekly sequence is ignored only for its
-  // owner's session. Anything else quietly gets the public answer.
+  // owner's session. Anything else quietly gets the public answer. A signed-in
+  // student's own unfinished card setup is not busy for them either, since
+  // their next booking replaces it; everyone else still sees it held.
+  const student = await currentStudent(request, env);
   const ignoreBookingId = await readManageToken(url.searchParams.get("manage") ?? "", env.BOOKING_TOKEN_SECRET);
   let ignoreSeriesId = null;
   const seriesId = url.searchParams.get("series");
   if (seriesId) {
-    const student = await currentStudent(request, env);
     const owned = student
       ? await env.DB.prepare("SELECT id FROM booking_series WHERE id = ? AND student_id = ? AND status = 'active'")
           .bind(seriesId, student.id)
@@ -1751,7 +1772,9 @@ async function handleAvailability(request, env, url) {
   }
 
   ctx_releaseHolds(env);
-  const { slotsByDate, settings } = await computeAvailability(env, { fromKey, toKey, lessonType, now, ignoreBookingId, ignoreSeriesId });
+  const { slotsByDate, settings } = await computeAvailability(env, {
+    fromKey, toKey, lessonType, now, ignoreBookingId, ignoreSeriesId, ignoreHoldsOf: student?.id ?? null
+  });
 
   return json(
     {
@@ -1886,7 +1909,7 @@ async function handleCreate(request, env, ctx) {
   // bounds above are per account. Bound them per connection as well, so fresh
   // accounts cannot keep the calendar held.
   if (needsCardSetup) {
-    const ip = request.headers.get("CF-Connecting-IP") || "local";
+    const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
     if (!await takeRateLimit(env, `hold:${ip}`, 8, 3600)) {
       return fail("That's several bookings in a short time. Please email Inês directly instead.", 429, request, env);
     }
@@ -2358,7 +2381,8 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
 /**
  * What a repeat would actually book, without booking it. Availability is
  * already public, so this preview is public too; identity is still required by
- * the create route where a lesson is actually written.
+ * the create route where a lesson is actually written. As in /availability, a
+ * signed-in student's own unfinished card setup does not count against them.
  *
  * The student sees the skipped weeks before they commit rather than after, so
  * "eight weeks" never quietly turns into seven in their inbox.
@@ -2379,13 +2403,15 @@ async function handleSeriesPreview(request, env) {
   const slot = slotOf(start);
   const now = new Date();
   const count = weeks ?? OPEN_ENDED_HORIZON_WEEKS;
+  const student = await currentStudent(request, env);
 
   const { bookable, skipped } = await planOccurrences(env, {
     fromKey: slot.dateKey,
     minuteOfDay: slot.minuteOfDay,
     count,
     lessonType,
-    now
+    now,
+    ignoreHoldsOf: student?.id ?? null
   });
 
   return json(
@@ -3464,7 +3490,7 @@ async function handleRegister(request, env) {
 
   // Accounts need no email proof, so the address they come from is the only
   // brake on minting them to hold slots or to send mail.
-  const ip = request.headers.get("CF-Connecting-IP") || "local";
+  const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
   if (!await takeRateLimit(env, `register:${ip}`, 5, 3600)) {
     return fail("Too many new accounts from this connection. Please try again in an hour.", 429, request, env);
   }
@@ -3587,22 +3613,25 @@ async function handleGoogleSignIn(request, env) {
       // password or sessions. This first-link transition is atomic under two
       // concurrent Google callbacks; subsequent Google logins change neither.
       await env.DB.batch([
-        env.DB.prepare(`UPDATE students SET google_sub = ?, password_hash = '', session_version = session_version + 1, last_login_at = ?
-          WHERE id = ? AND google_sub IS NULL`).bind(profile.sub, now, student.id),
+        env.DB.prepare(`UPDATE students SET google_sub = ?, password_hash = '', session_version = session_version + 1, last_login_at = ?,
+          email_verified_at = COALESCE(email_verified_at, ?)
+          WHERE id = ? AND google_sub IS NULL`).bind(profile.sub, now, now, student.id),
         env.DB.prepare("DELETE FROM password_resets WHERE student_id = ?").bind(student.id),
         env.DB.prepare("DELETE FROM email_changes WHERE student_id = ?").bind(student.id)
       ]);
     } else {
-      await env.DB.prepare("UPDATE students SET last_login_at = ? WHERE id = ? AND google_sub = ?")
-        .bind(now, student.id, profile.sub).run();
+      // Each sign-in is Google vouching for the address again, which also marks
+      // an account linked before that was recorded.
+      await env.DB.prepare("UPDATE students SET last_login_at = ?, email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ? AND google_sub = ?")
+        .bind(now, now, student.id, profile.sub).run();
     }
     student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(student.id).first();
     if (student.google_sub !== profile.sub) return fail("That address is linked to another Google account.", 409, request, env);
   } else {
     const id = crypto.randomUUID();
     await env.DB.prepare(
-      `INSERT INTO students (id, email, name, phone, timezone, password_hash, google_sub, created_at, last_login_at)
-       VALUES (?, ?, ?, '', ?, '', ?, ?, ?)`
+      `INSERT INTO students (id, email, name, phone, timezone, password_hash, google_sub, created_at, last_login_at, email_verified_at)
+       VALUES (?, ?, ?, '', ?, '', ?, ?, ?, ?)`
     )
       .bind(
         id,
@@ -3610,6 +3639,7 @@ async function handleGoogleSignIn(request, env) {
         profile.name || profile.email.split("@")[0],
         isValidTimeZone(body.timezone) ? body.timezone : PORTO,
         profile.sub,
+        now,
         now,
         now
       )
@@ -3683,10 +3713,13 @@ async function handleReset(request, env) {
     .first();
   if (!record) return fail("That reset link has already been used. Please request a new one.", 400, request, env);
 
+  // The link reached the address on file, so a completed reset proves it.
   const reset = await env.DB.batch([
-    env.DB.prepare(`UPDATE students SET password_hash = ?, session_version = session_version + 1
+    env.DB.prepare(`UPDATE students SET password_hash = ?, session_version = session_version + 1,
+      email_verified_at = COALESCE(email_verified_at, ?)
       WHERE id = ? AND EXISTS (SELECT 1 FROM password_resets WHERE nonce = ? AND student_id = students.id)`).bind(
       await hashPassword(body.password),
+      new Date().toISOString(),
       parsed.studentId,
       parsed.nonce
     ),
@@ -3939,9 +3972,10 @@ async function handleConfirmEmailChange(request, env) {
 
   try {
     const changed = await env.DB.batch([
-      env.DB.prepare(`UPDATE students SET email = ?, google_sub = NULL, session_version = session_version + 1
+      env.DB.prepare(`UPDATE students SET email = ?, google_sub = NULL, session_version = session_version + 1,
+        email_verified_at = COALESCE(email_verified_at, ?)
         WHERE id = ? AND session_version = ? AND EXISTS (SELECT 1 FROM email_changes WHERE nonce = ? AND student_id = students.id)`)
-        .bind(pending.new_email, student.id, student.session_version ?? 0, nonce),
+        .bind(pending.new_email, now, student.id, student.session_version ?? 0, nonce),
       env.DB.prepare("DELETE FROM email_changes WHERE student_id = ?").bind(student.id),
       env.DB.prepare("DELETE FROM password_resets WHERE student_id = ?").bind(student.id)
     ]);
@@ -4009,7 +4043,7 @@ async function isAdmin(request, env) {
   // per-connection budget BEFORE comparing it, so a locked-out connection is
   // refused even when it finally holds the right token — the comparison stays
   // constant-time, and this caps how fast the token can be tried at all.
-  const ip = request.headers.get("CF-Connecting-IP") || "local";
+  const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
   if (!await takeRateLimit(env, `admin-fail:${ip}`, 20)) return "throttled";
   if (env.ADMIN_TOKEN && safeEqual(provided, env.ADMIN_TOKEN)) return { via: "token", student: null };
 
@@ -4216,6 +4250,26 @@ async function handleAdmin(request, env, ctx, url, path) {
       student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(id).first();
     }
 
+    /*
+     * Registering proves nothing about an address, so whoever registered this
+     * one first may not be the student Inês means. An unproven account with a
+     * password gets the first Google link's transition — password, sessions and
+     * pending reset or address change all go — before the lesson exists, so no
+     * earlier session can ever read its manage link. The mailbox's owner gets
+     * back in with Google or a reset. Teachers, proven addresses and the
+     * password-less accounts created here are never touched.
+     */
+    let reclaimed = false;
+    if (student.role !== "teacher" && !student.email_verified_at && student.password_hash) {
+      const [cleared] = await env.DB.batch([
+        env.DB.prepare(`UPDATE students SET password_hash = '', session_version = session_version + 1
+          WHERE id = ? AND role != 'teacher' AND email_verified_at IS NULL AND password_hash != ''`).bind(student.id),
+        env.DB.prepare("DELETE FROM password_resets WHERE student_id = ?").bind(student.id),
+        env.DB.prepare("DELETE FROM email_changes WHERE student_id = ?").bind(student.id)
+      ]);
+      reclaimed = (cleared?.meta?.changes ?? 0) > 0;
+    }
+
     const id = crypto.randomUUID();
     const reference = bookingReference();
     const claimed = await claimSlot(env, {
@@ -4245,14 +4299,16 @@ async function handleAdmin(request, env, ctx, url, path) {
     const settings = await loadSettings(env);
     const token = await createManageToken(id, env.BOOKING_TOKEN_SECRET);
 
-    // The student is told, exactly as if they had booked it themselves.
+    // The student is told, exactly as if they had booked it themselves, and
+    // how to get into an account whose password was just cleared.
     ctx.waitUntil(
       notify(env, {
         event: "booked",
         row,
         lessonType,
         settings,
-        manageUrl: studentManageUrl(env, token)
+        manageUrl: studentManageUrl(env, token),
+        reclaimed
       })
     );
 

@@ -24,6 +24,7 @@ See [Google Calendar and Meet setup](#google-calendar-and-meet-setup) for activa
 Student on /book                                     (browse without an account)
   → GET  /lesson-types, GET /availability            public
   → GET  /availability?manage=:token | ?series=:id   a lesson being changed may reuse its own time
+  → GET  /availability (optional Bearer)             a student's own card-setup holds are not busy
   → POST /auth/register | /auth/login | /auth/google → session token
   → POST /bookings                    (Bearer)       → D1 row, emails, ICS invite
   → GET  /me                          (Bearer)       → their calendar and series
@@ -67,6 +68,17 @@ Adding a lesson for someone who booked another way creates their account if it
 does not exist, with no password — they set one through "forgot password" when
 they first want to manage the lesson themselves. They receive the same
 confirmation, calendar invitation and manage link as if they had booked it.
+
+Registering proves nothing about an address, so an existing account may belong
+to whoever registered the address first rather than to the student Inês means.
+When the account's address has never been proven (see *Accounts*) and it has a
+password, adding the lesson first applies the transition a first Google link
+makes: the password, every session and any pending reset or address change are
+cleared, before the lesson exists, so no earlier session can read it or its
+manage link. The mailbox's owner gets back in with Google or by choosing a new
+password through "I’ve forgotten my password", and only that booking's
+confirmation adds one sentence saying so. A proven address, a teacher account
+and the password-less accounts created here are never touched.
 
 ## Teacher calendar
 
@@ -145,6 +157,18 @@ depending on them having kept the right confirmation email.
   hold off the real student, the accepted trade against guessing.
 - Reset links are single-use and last an hour. A Google-only account has no
   password; using "forgot password" is how such a student sets one.
+- **An address counts as proven once it has received mail.**
+  `students.email_verified_at` (migration 0020) is set by any Google sign-in,
+  a completed password reset or a confirmed email change; registering with a
+  password leaves it empty. The migration marks every Google-linked account as
+  proven and every other existing account as not. It decides whether a lesson
+  Inês adds for that address clears a password first (see *Who can do what*),
+  so the first lesson she adds for an existing password-only student signs
+  them out once, and that confirmation tells them how to get back in. Apply
+  `workers/booking/migrations/0020-verified-email.sql` to both databases before
+  deploying the Worker that writes the column: sign-in, password reset and
+  email confirmation fail without it, and `/health` reports `schema` until it
+  exists.
 - Sessions are signed bearer tokens in `localStorage`, not cookies: the site
   and the API are different origins, so a cookie would need `SameSite=None` and
   would be dropped by any browser blocking third-party cookies. Signing out
@@ -152,7 +176,10 @@ depending on them having kept the right confirmation email.
   verified email changes increment the account session version, invalidating
   older sessions. Email changes also unlink the old Google identity. Legacy
   sessions remain version zero until revoked; emailed manage links keep their
-  existing scheme. Offline sign-out clears this device but cannot reach the
+  existing scheme. Sessions and manage links share one signing key, so a
+  session token also verifies as a manage token; a manage link is looked up
+  only when it names a UUID, as every booking id is, so no session can ever
+  open a booking. Offline sign-out clears this device but cannot reach the
   revocation endpoint.
 - The emailed manage link still works on its own, so a forgotten password never
   blocks someone from changing a lesson.
@@ -329,7 +356,8 @@ number of booking rows at once.
   runs in setup mode, so no money is taken while the run is booked. The whole
   run is held until its webhook proves a reusable card exists, then every
   occurrence becomes `scheduled`. The minute cron charges an occurrence
-  only once `ends_at` has passed. Open-ended top-ups inherit the same consent
+  only once its no-show window has closed, six hours after `ends_at` (see
+  *The no-show policy*). Open-ended top-ups inherit the same consent
   and scheduled state. A declined charge marks the row `payment_due`, emails
   the student a hosted pay-now link, and tells Inês.
 
@@ -473,20 +501,30 @@ Email is best-effort, but "best effort" used to mean "one attempt, and silence".
 
 ### The no-show policy
 
-During a confirmed saved-card lesson, the teacher schedule offers `Mark
-no-show` from the scheduled start until the scheduled end. The same control can
-undo the mark during that window. The endpoint accepts the change only while
-`payment_status = 'scheduled'`; the charge sweep first claims the row as
-`processing`, then reads attendance, so the teacher decision cannot race the
-PaymentIntent.
+For a confirmed saved-card lesson, the teacher schedule offers `Mark no-show`
+from the scheduled start until **six hours after the scheduled end** (Dan,
+23 September 2026; `NO_SHOW_WINDOW_HOURS` in `policy.mjs`), so Inês can record
+it after the lesson rather than during it. The same control can undo the mark
+during that window. `POST /admin/bookings/:id/no-show` (`{ "noShow": false }`
+undoes) accepts the change only inside that window and only while
+`payment_status = 'scheduled'`; from six hours after the end it answers 409.
+Because a no-show changes the amount, the lesson's own charge waits for the
+window to close: nothing about the lesson's payment — the charge attempt, the
+move off `scheduled`, the receipt, a declined card's pay-now email — happens
+before `ends_at` plus six hours. The charge sweep then claims the row as
+`processing` before reading attendance, so the teacher decision cannot race the
+PaymentIntent. Until the charge, a lesson inside the window is still an
+ordinary `scheduled` one, so Inês's own move and cancel still reach it.
 
-- **Expected attendance** charges the booked lesson price after `ends_at`.
-- **No-show** charges €5 after `ends_at`, instead of the booked lesson price.
+- **Expected attendance** charges the booked lesson price six hours after
+  `ends_at`, on the first minute sweep once the window has closed.
+- **No-show** charges €5 at the same point, instead of the booked lesson price.
 - Bookings without explicit automatic-payment consent remain
   `not_required`; the teacher control is not offered for them.
 - Moving or cancelling less than 14 hours before the lesson is a separate €5
   action fee, stored independently so a retry or second edit cannot duplicate
-  it. Its columns keep their original `same_day_*` names.
+  it, and still charged when the change is made. Its columns keep their
+  original `same_day_*` names.
 - **It is said before booking, not only after.** A charge someone first learns
   about by being charged is the kind that costs a relationship. It appears on the
   booking page's policy band, directly above the confirm button, on the
@@ -559,6 +597,14 @@ for a request carrying its owner's session. Anything invalid quietly gets the
 public answer, in the same response shape. Without this a student could not
 move a lesson half an hour later or change its length at the same start, though
 the reschedule endpoints accept both.
+
+A request carrying a valid student session (`Authorization: Bearer`) also stops
+that student's own unfinished card setups (`pending_payment` holds) counting as
+busy, since their next booking replaces them (see *Payment*); everyone else,
+anonymous or signed in, still sees them held. `POST /bookings/series/preview`
+does the same. A missing, malformed, expired, revoked or out-of-date bearer is
+exactly an anonymous request — the same 200 and the same answer, never a 401 —
+so an old session on the device can never blank the calendar.
 
 Once availability has loaded, the date picker omits complete leading weeks with
 no free slots. That means a weekend with nothing left to book opens directly on
@@ -639,7 +685,9 @@ With `postpay` and Stripe configured:
   the Checkout Session `expired`, which Stripe does only to a session that can
   no longer complete; a lapsed hold goes regardless. A completed setup, or one
   Stripe cannot answer for, keeps its hold for the webhook. Should a released
-  session's completion still arrive, it finds no booking and confirms nothing;
+  session's completion still arrive, it finds no booking and confirms nothing.
+  Availability and the weekly preview, asked with the student's session,
+  already show their own held times as free;
 - the webhook signature is verified before the payload is trusted for anything,
   and events are recorded so each is handled exactly once;
 - Checkout creation, saved-card charges and refunds use a stable booking-based
@@ -652,11 +700,12 @@ With `postpay` and Stripe configured:
 
 **The after-lesson policy** (Dan, 1 September 2026, `policy.mjs` is the single
 home): booking saves a card but takes no money. A scheduled row charges its
-booked amount only after `ends_at`. Moving or cancelling at least 14 hours
+booked amount only once its no-show window has closed, six hours after
+`ends_at` (Dan, 23 September 2026). Moving or cancelling at least 14 hours
 before the lesson is free; doing either later schedules one €5 action fee and
 prevents the full price from charging if the lesson was cancelled (the 14-hour
-rule, Dan, 21 September 2026). A no-show
-recorded during the lesson changes the end charge from the booked price to €5.
+rule, Dan, 21 September 2026). A no-show recorded between the lesson's start
+and six hours after its end changes the end charge from the booked price to €5.
 Inês is never charged a fee for a move or cancellation she makes. Older `paid`
 rows retain their earlier lock/refund promise inside the window; `not_required` rows keep
 their original pay-in-person terms. The card itself never touches the database
@@ -793,8 +842,8 @@ names; they now mean "inside the window".
   old tab open. `same_day_change` is never set on a paid row.
 - **Scheduled saved-card booking**: students may move or cancel right up to the
   lesson start. A change inside the window atomically schedules one €5 charge
-  to the saved card. A move keeps the later full lesson charge at the new end
-  time; a cancellation removes the full lesson charge. Once the fee is paid,
+  to the saved card. A move keeps the later full lesson charge, due six hours
+  after the new end; a cancellation removes the full lesson charge. Once the fee is paid,
   the student and Inês are each emailed once; hers is the fiscal reminder.
 - **Stripe**: the off-session PaymentIntent is described as `Late lesson change
   fee · <reference>` and a recovery Checkout names the product `Late lesson
@@ -860,6 +909,8 @@ retains the same account and lessons but clears the unverified password and
 invalidates all earlier sessions and pending account-change/reset requests.
 Subsequent logins match the stable Google id without repeating that transition.
 The sign-in page explains that an email password reset can restore a password.
+A lesson Inês adds for an unproven address with a password applies the same
+transition first (see *Who can do what*).
 
 Paid cancellations first create a durable `booking_refunds` operation and lock
 the booking atomically. Only then is the frozen refund request sent to Stripe.
@@ -879,7 +930,9 @@ account failure limits. Mail an unproven party can trigger is bounded per
 recipient: three password resets an hour per account (the reply is unchanged
 past the limit), and three email-change requests an hour per account and per
 target address. One connection can register five accounts and open eight
-unpaid card-setup holds an hour. A signed-in teacher is authorised without ever
+unpaid card-setup holds an hour. Every per-connection budget keys an IPv4
+address as it is and an IPv6 one by its /64, which one client can rotate
+through freely; an IPv4-mapped IPv6 address counts as its IPv4. A signed-in teacher is authorised without ever
 touching the admin-token throttle; every other admin request spends the
 per-connection budget before the token is compared, so a locked-out connection
 is refused even when it finally presents the right token. That budget is 20

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import worker, { chargeDueLessons, chargeDueSameDayFees, notifySeries, retryPaymentRecovery, retryRefunds } from "./index.mjs";
-import { createSession, createResetToken, sessionVersion } from "./auth.mjs";
-import { createManageToken } from "./tokens.mjs";
+import { createSession, createResetToken, hashPassword, sessionVersion } from "./auth.mjs";
+import { createManageToken, readManageToken } from "./tokens.mjs";
 import { findRecurringCode, recurringLessonType, priceForMove } from "./rates.mjs";
 import { bookingSelection, portoWeekOf } from "./selection.mjs";
 import { computeAvailability } from "./availability.mjs";
@@ -97,7 +97,10 @@ const DB = {
       run() {
         beforeRun?.(sql, values);
         const result = db.prepare(sql).run(...values);
-        return { meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } };
+        const outcome = { meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } };
+        // A promise, as D1's is (the email-change confirmation chains `.catch`
+        // on one), still carrying `meta` for batch() below to read directly.
+        return Object.assign(Promise.resolve(outcome), outcome);
       }
     };
     return statement;
@@ -143,19 +146,40 @@ async function call(path, { user = "alice", method = "POST", body = {}, origin =
     ...(method === "POST" ? { body: raw ?? JSON.stringify(body) } : {})
   }), env, ctx);
 }
-function booking(id, { start = "2026-09-07T09:00:00.000Z", end = "2026-09-07T10:00:00.000Z", payment = "scheduled", owner = "alice", series = null } = {}) {
+function booking(id, { start = "2026-09-07T09:00:00.000Z", end = "2026-09-07T10:00:00.000Z", payment = "scheduled", owner = "alice", series = null, reference = id } = {}) {
   db.prepare(`INSERT INTO bookings (id,reference,lesson_type_id,student_id,student_name,student_email,student_phone,
     student_timezone,location,notes,starts_at,ends_at,status,sequence,created_at,updated_at,payment_status,amount_cents,series_id)
     VALUES (?,?,'single',?,'Test Student',?,'','Europe/Lisbon','online','',?,?,'confirmed',0,?,?,?,1500,?)`)
-    .run(id, id, owner, `${owner}@example.invalid`, start, end, new Date().toISOString(), new Date().toISOString(), payment, series);
+    .run(id, reference, owner, `${owner}@example.invalid`, start, end, new Date().toISOString(), new Date().toISOString(), payment, series);
 }
 async function token(id) { return createManageToken(id, env.BOOKING_TOKEN_SECRET); }
+// A manage link opens only a UUID id, as every real booking has, so a lesson a
+// test opens through its link gets one and keeps its name as the reference.
+function linkedBooking(name, options = {}) {
+  const id = crypto.randomUUID();
+  booking(id, { ...options, reference: name });
+  return id;
+}
 async function webhook(event) {
   const raw = JSON.stringify(event);
   const timestamp = Math.floor(Date.now() / 1000);
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.STRIPE_WEBHOOK_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const signature = [...new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${timestamp}.${raw}`)))].map((value) => value.toString(16).padStart(2, "0")).join("");
   return call("/stripe/webhook", { user: null, raw, headers: { "Stripe-Signature": `t=${timestamp},v1=${signature}` } });
+}
+// One isolated Google signing key serves every sign-in here: the Worker caches
+// Google's published keys, so a second key would never be fetched.
+let googleKeys = null;
+async function googleCredential(claims) {
+  if (!googleKeys) {
+    googleKeys = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
+    googleJwk = { ...await crypto.subtle.exportKey("jwk", googleKeys.publicKey), kid: "isolated-google" };
+    env.GOOGLE_CLIENT_ID = "isolated-client";
+  }
+  const encode = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const payload = `${encode({ alg: "RS256", kid: googleJwk.kid })}.${encode({ email_verified: true, iss: "https://accounts.google.com", aud: env.GOOGLE_CLIENT_ID, exp: Date.now() / 1000 + 3600, ...claims })}`;
+  const signature = Buffer.from(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", googleKeys.privateKey, new TextEncoder().encode(payload))).toString("base64url");
+  return `${payload}.${signature}`;
 }
 
 await test("the seeded 14-hour rule filters availability and protects booking and move submissions", async () => {
@@ -265,18 +289,18 @@ await test("recurring booking creation snapshots rate for every occurrence; one-
 });
 await test("a cancellation inside 14 hours records and charges just one separate fee under concurrent retries", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
-  booking("same-day-cancel", { start: "2026-09-05T12:00:00.000Z", end: "2026-09-05T13:00:00.000Z" });
-  const path = `/bookings/${await token("same-day-cancel")}/cancel`;
+  const id = linkedBooking("same-day-cancel", { start: "2026-09-05T12:00:00.000Z", end: "2026-09-05T13:00:00.000Z" });
+  const path = `/bookings/${await token(id)}/cancel`;
   const responses = await Promise.all([call(path), call(path)]);
   assert.deepEqual(responses.map((res) => res.status).sort(), [200, 409]);
   await drain();
   await chargeDueSameDayFees(env);
   await chargeDueLessons(env, new Date("2026-09-06T10:00:00Z"));
-  const row = db.prepare("SELECT * FROM bookings WHERE id='same-day-cancel'").get();
+  const row = db.prepare("SELECT * FROM bookings WHERE reference='same-day-cancel'").get();
   assert.equal(row.status, "cancelled");
   assert.equal(row.same_day_fee_status, "paid");
-  assert.equal(charges.filter((charge) => charge.key.includes("same-day-cancel")).length, 1);
-  assert.equal(charges.find((charge) => charge.key.includes("same-day-cancel")).amount, 500);
+  assert.equal(charges.filter((charge) => charge.key.includes(id)).length, 1);
+  assert.equal(charges.find((charge) => charge.key.includes(id)).amount, 500);
 });
 await test("duplicate slot claims have one winner, and pending setup reserves its owner's slot", async () => {
   const body = { lessonType: "single", startAt: "2026-09-10T16:00:00.000Z", paymentConsent: true };
@@ -288,8 +312,8 @@ await test("duplicate slot claims have one winner, and pending setup reserves it
   assert.equal((await call("/bookings", { user: "outsider", body: { ...body, lessonType: "trial", repeat: 4 } })).status, 400);
 });
 await test("opening, unchanged submission and failed move never charge a fee", async () => {
-  booking("no-action", { start: "2026-09-05T14:00:00.000Z", end: "2026-09-05T15:00:00.000Z" });
-  const path = `/bookings/${await token("no-action")}`;
+  const id = linkedBooking("no-action", { start: "2026-09-05T14:00:00.000Z", end: "2026-09-05T15:00:00.000Z" });
+  const path = `/bookings/${await token(id)}`;
   assert.equal((await call(path, { method: "GET" })).status, 200);
   const unchanged = await call(`${path}/reschedule`, { body: { startAt: "2026-09-05T14:00:00.000Z" } });
   assert.equal(unchanged.status, 200);
@@ -300,38 +324,38 @@ await test("opening, unchanged submission and failed move never charge a fee", a
     assert.equal((await alias.json()).sameDayFeeApplied, false);
   }
   assert.equal((await call(`${path}/reschedule`, { body: { startAt: "invalid" } })).status, 409);
-  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id='no-action'").get().same_day_fee_status, "not_required");
-  db.prepare("UPDATE bookings SET status='cancelled' WHERE id='no-action'").run();
+  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE reference='no-action'").get().same_day_fee_status, "not_required");
+  db.prepare("UPDATE bookings SET status='cancelled' WHERE reference='no-action'").run();
 });
-await test("a move inside 14 hours preserves agreed price, charges once, then lesson only at new end", async () => {
-  booking("same-day-move", { start: "2026-09-05T16:00:00.000Z", end: "2026-09-05T17:00:00.000Z" });
-  const result = await call(`/bookings/${await token("same-day-move")}/reschedule`, { body: { startAt: "2026-09-08T14:00:00.000Z" } });
+await test("a move inside 14 hours preserves agreed price, charges once, then lesson only after its new end", async () => {
+  const id = linkedBooking("same-day-move", { start: "2026-09-05T16:00:00.000Z", end: "2026-09-05T17:00:00.000Z" });
+  const result = await call(`/bookings/${await token(id)}/reschedule`, { body: { startAt: "2026-09-08T14:00:00.000Z" } });
   assert.equal(result.status, 200, await result.clone().text());
   await drain();
   await chargeDueLessons(env, new Date("2026-09-05T18:00:00Z"));
-  assert.equal(charges.filter((charge) => charge.key.includes("same-day-move")).length, 1);
-  await chargeDueLessons(env, new Date("2026-09-08T15:00:00Z"));
-  assert.deepEqual(charges.filter((charge) => charge.key.includes("same-day-move")).map((charge) => charge.amount), [500, 1500]);
+  assert.equal(charges.filter((charge) => charge.key.includes(id)).length, 1);
+  await chargeDueLessons(env, new Date("2026-09-08T21:00:00Z"));
+  assert.deepEqual(charges.filter((charge) => charge.key.includes(id)).map((charge) => charge.amount), [500, 1500]);
 });
 await test("13.5 hours ahead on the next Porto day is late; lesson-day wording keeps its promise", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   // 00:30 Porto on Sunday, from 11:00 Porto on Saturday: another calendar day.
-  booking("next-day-late", { start: "2026-09-05T23:30:00.000Z", end: "2026-09-06T00:30:00.000Z" });
-  booking("next-day-legacy", { start: "2026-09-06T01:00:00.000Z", end: "2026-09-06T02:00:00.000Z" });
-  db.prepare("UPDATE bookings SET payment_consent_version='2026-09-01-after-lesson-v1' WHERE id='next-day-legacy'").run();
-  const opened = await (await call(`/bookings/${await token("next-day-late")}`, { method: "GET" })).json();
+  const lateId = linkedBooking("next-day-late", { start: "2026-09-05T23:30:00.000Z", end: "2026-09-06T00:30:00.000Z" });
+  const legacyId = linkedBooking("next-day-legacy", { start: "2026-09-06T01:00:00.000Z", end: "2026-09-06T02:00:00.000Z" });
+  db.prepare("UPDATE bookings SET payment_consent_version='2026-09-01-after-lesson-v1' WHERE reference='next-day-legacy'").run();
+  const opened = await (await call(`/bookings/${await token(lateId)}`, { method: "GET" })).json();
   assert.equal(opened.sameDayFeeApplies, true);
-  const late = await call(`/bookings/${await token("next-day-late")}/cancel`);
+  const late = await call(`/bookings/${await token(lateId)}/cancel`);
   assert.equal(late.status, 200, await late.clone().text());
   assert.equal((await late.json()).sameDayFeeApplied, true);
-  const legacy = await call(`/bookings/${await token("next-day-legacy")}/cancel`);
+  const legacy = await call(`/bookings/${await token(legacyId)}/cancel`);
   assert.equal(legacy.status, 200, await legacy.clone().text());
   assert.equal((await legacy.json()).sameDayFeeApplied, false);
   await drain();
   await chargeDueSameDayFees(env);
-  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id='next-day-late'").get().same_day_fee_status, "paid");
-  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id='next-day-legacy'").get().same_day_fee_status, "not_required");
-  assert.deepEqual(charges.filter((charge) => charge.key.includes("next-day")).map((charge) => charge.amount), [500]);
+  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE reference='next-day-late'").get().same_day_fee_status, "paid");
+  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE reference='next-day-legacy'").get().same_day_fee_status, "not_required");
+  assert.deepEqual(charges.filter((charge) => charge.key.includes(lateId) || charge.key.includes(legacyId)).map((charge) => charge.amount), [500]);
 });
 await test("teacher move and cancellation have no student action fee and cannot alter processing charges", async () => {
   booking("teacher-action", { start: "2026-09-05T18:00:00.000Z", end: "2026-09-05T19:00:00.000Z" });
@@ -405,7 +429,7 @@ await test("fifty stale ambiguous payments cannot starve fresh lesson and action
     booking(`stale-${i}`, { payment: "processing", start: "2026-01-01T09:00:00.000Z", end: "2026-01-01T10:00:00.000Z" });
     db.prepare("UPDATE bookings SET charge_started_at='2026-01-01T10:00:00.000Z',same_day_fee_status='processing',same_day_fee_started_at='2026-01-01T10:00:00.000Z',updated_at='2026-01-01T10:00:00.000Z' WHERE id=?").run(`stale-${i}`);
   }
-  booking("fresh-charge", { start: "2026-09-05T08:00:00.000Z", end: "2026-09-05T09:00:00.000Z" });
+  booking("fresh-charge", { start: "2026-09-05T02:00:00.000Z", end: "2026-09-05T03:00:00.000Z" });
   db.prepare("UPDATE bookings SET same_day_fee_status='scheduled',same_day_fee_cents=500 WHERE id='fresh-charge'").run();
   const count = charges.length;
   await chargeDueLessons(env); await chargeDueSameDayFees(env);
@@ -415,7 +439,7 @@ await test("fifty stale ambiguous payments cannot starve fresh lesson and action
   assert.equal(admin.manualPaymentReconciliation.length, 51);
 });
 await test("ambiguous retry freezes card and money; idempotency errors never open a second payment path", async () => {
-  booking("ambiguous-snapshot", { start: "2026-09-05T08:00:00.000Z", end: "2026-09-05T09:00:00.000Z" });
+  booking("ambiguous-snapshot", { start: "2026-09-05T02:00:00.000Z", end: "2026-09-05T03:00:00.000Z" });
   db.prepare("UPDATE bookings SET same_day_fee_status='scheduled',same_day_fee_cents=500 WHERE id='ambiguous-snapshot'").run();
   const before = charges.length;
   const checkouts = checkoutRequests.length;
@@ -434,9 +458,9 @@ await test("ambiguous retry freezes card and money; idempotency errors never ope
   chargeError = null;
 });
 await test("durable recovery only replaces a provider-expired session and remains single-path under concurrency", async () => {
-  booking("expired-recovery", { payment: "payment_due" });
-  db.prepare("UPDATE bookings SET stripe_session_id='cs_old' WHERE id='expired-recovery'").run();
-  const path = `/bookings/${await token("expired-recovery")}/payment`;
+  const id = linkedBooking("expired-recovery", { payment: "payment_due" });
+  db.prepare("UPDATE bookings SET stripe_session_id='cs_old' WHERE reference='expired-recovery'").run();
+  const path = `/bookings/${await token(id)}/payment`;
   const start = checkoutRequests.length;
   assert.equal((await call("/bookings/forged/payment", { body: { purpose: "lesson" } })).status, 404);
   checkoutUnavailable = true;
@@ -449,11 +473,11 @@ await test("durable recovery only replaces a provider-expired session and remain
   checkoutStatus = "expired";
   const responses = await Promise.all([1, 2].map(() => call(path, { body: { purpose: "lesson" } })));
   assert.deepEqual(responses.map((res) => res.status), [200, 200]);
-  assert.equal(db.prepare("SELECT stripe_session_id FROM bookings WHERE id='expired-recovery'").get().stripe_session_id, "cs_new");
+  assert.equal(db.prepare("SELECT stripe_session_id FROM bookings WHERE reference='expired-recovery'").get().stripe_session_id, "cs_new");
   assert.equal(new Set(checkoutRequests.slice(start).map((request) => request.key)).size, 1);
   assert.equal(new Set(checkoutRequests.slice(start).map((request) => request.body)).size, 1);
   assert.equal(new URLSearchParams(checkoutRequests.at(-1).body).has("expires_at"), false);
-  db.prepare("UPDATE bookings SET payment_status='paid' WHERE id='expired-recovery'").run();
+  db.prepare("UPDATE bookings SET payment_status='paid' WHERE reference='expired-recovery'").run();
   assert.equal((await call(path, { body: { purpose: "lesson" } })).status, 409);
   checkoutStatus = "open";
 });
@@ -461,21 +485,17 @@ await test("verified Google first-link removes preregistration password and sess
   const registered = await call("/auth/register", { user: null, body: { email: "victim@example.invalid", name: "Victim", password: "attacker-known-password" } });
   assert.equal(registered.status, 201);
   const attacker = await registered.json();
-  const keys = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
-  googleJwk = { ...await crypto.subtle.exportKey("jwk", keys.publicKey), kid: "isolated-google" };
-  env.GOOGLE_CLIENT_ID = "isolated-client";
-  const encode = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
-  const payload = `${encode({ alg: "RS256", kid: googleJwk.kid })}.${encode({ sub: "verified-victim", email: "victim@example.invalid", email_verified: true, iss: "https://accounts.google.com", aud: env.GOOGLE_CLIENT_ID, exp: Date.now() / 1000 + 3600 })}`;
-  const signature = Buffer.from(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", keys.privateKey, new TextEncoder().encode(payload))).toString("base64url");
-  const linked = await call("/auth/google", { user: null, body: { credential: `${payload}.${signature}` } });
+  const credential = await googleCredential({ sub: "verified-victim", email: "victim@example.invalid" });
+  const linked = await call("/auth/google", { user: null, body: { credential } });
   assert.equal(linked.status, 200);
   const victim = await linked.json();
   assert.equal(victim.student.id, attacker.student.id);
   assert.equal(sessionVersion(victim.session), 1);
+  assert.ok(db.prepare("SELECT email_verified_at FROM students WHERE id=?").get(victim.student.id).email_verified_at, "the link proves the address");
   assert.equal((await call("/me", { method: "GET", token: attacker.session })).status, 401);
   assert.equal((await call("/auth/login", { user: null, body: { email: "victim@example.invalid", password: "attacker-known-password" } })).status, 401);
   assert.equal((await call("/me", { method: "GET", token: victim.session })).status, 200);
-  const again = await (await call("/auth/google", { user: null, body: { credential: `${payload}.${signature}` } })).json();
+  const again = await (await call("/auth/google", { user: null, body: { credential } })).json();
   assert.equal(sessionVersion(again.session), 1);
 });
 await test("logout revokes only the presented session and reset invalidates previous sessions", async () => {
@@ -507,17 +527,16 @@ await test("teacher creation atomically loses to a concurrent student claim", as
 await test("expired setup holds do not block either student or teacher moves", async () => {
   booking("old-hold", { start: "2026-09-17T16:00:00.000Z", end: "2026-09-17T17:00:00.000Z", payment: "pending" });
   db.prepare("UPDATE bookings SET status='pending_payment',hold_expires_at='2026-09-05T09:00:00.000Z' WHERE id='old-hold'").run();
-  booking("move-past-hold", { start: "2026-09-17T12:00:00.000Z", end: "2026-09-17T13:00:00.000Z" });
-  const response = await call(`/bookings/${await token("move-past-hold")}/reschedule`, { body: { startAt: "2026-09-17T16:00:00.000Z" } });
+  const id = linkedBooking("move-past-hold", { start: "2026-09-17T12:00:00.000Z", end: "2026-09-17T13:00:00.000Z" });
+  const response = await call(`/bookings/${await token(id)}/reschedule`, { body: { startAt: "2026-09-17T16:00:00.000Z" } });
   assert.equal(response.status, 200, await response.clone().text());
-  db.prepare("UPDATE bookings SET status='cancelled' WHERE id='move-past-hold'").run();
+  db.prepare("UPDATE bookings SET status='cancelled' WHERE reference='move-past-hold'").run();
   booking("teacher-past-hold", { start: "2026-09-17T12:00:00.000Z", end: "2026-09-17T13:00:00.000Z" });
   assert.equal((await call("/admin/bookings/teacher-past-hold/reschedule", { user: "teacher", body: { startAt: "2026-09-17T16:00:00.000Z" } })).status, 200);
 });
 await test("paid student and teacher cancellation claim before refund; concurrent move cannot escape", async () => {
   for (const actor of ["student", "teacher"]) {
-    const id = `refund-${actor}`;
-    booking(id, { payment: "paid", start: "2026-09-25T12:00:00.000Z", end: "2026-09-25T13:00:00.000Z" });
+    const id = linkedBooking(`refund-${actor}`, { payment: "paid", start: "2026-09-25T12:00:00.000Z", end: "2026-09-25T13:00:00.000Z" });
     db.prepare("UPDATE bookings SET stripe_payment_intent=? WHERE id=?").run(`pi_${id}`, id);
     duringRefund = async () => {
       const moved = await call(`/admin/bookings/${id}/reschedule`, { user: "teacher", body: { startAt: "2026-09-24T11:00:00.000Z" } });
@@ -531,53 +550,53 @@ await test("paid student and teacher cancellation claim before refund; concurren
   }
 });
 await test("a move winning before the refund claim prevents any refund call", async () => {
-  booking("refund-lost", { payment: "paid" });
-  db.prepare("UPDATE bookings SET stripe_payment_intent='pi_refund_lost' WHERE id='refund-lost'").run();
+  const id = linkedBooking("refund-lost", { payment: "paid" });
+  db.prepare("UPDATE bookings SET stripe_payment_intent='pi_refund_lost' WHERE reference='refund-lost'").run();
   beforeRun = (sql) => {
     if (sql.startsWith("INSERT OR IGNORE INTO booking_refunds")) {
       beforeRun = null;
-      db.prepare("UPDATE bookings SET sequence=sequence+1,starts_at='2026-09-09T08:00:00.000Z',ends_at='2026-09-09T09:00:00.000Z' WHERE id='refund-lost'").run();
+      db.prepare("UPDATE bookings SET sequence=sequence+1,starts_at='2026-09-09T08:00:00.000Z',ends_at='2026-09-09T09:00:00.000Z' WHERE reference='refund-lost'").run();
     }
   };
   const count = refunds.length;
-  assert.equal((await call(`/bookings/${await token("refund-lost")}/cancel`)).status, 409);
+  assert.equal((await call(`/bookings/${await token(id)}/cancel`)).status, 409);
   assert.equal(refunds.length, count);
 });
 await test("ambiguous refund stays reserved and reconciles same immutable request before cancelling", async () => {
-  booking("refund-ambiguous", { payment: "paid" });
-  db.prepare("UPDATE bookings SET stripe_payment_intent='pi_refund_ambiguous' WHERE id='refund-ambiguous'").run();
+  const id = linkedBooking("refund-ambiguous", { payment: "paid" });
+  db.prepare("UPDATE bookings SET stripe_payment_intent='pi_refund_ambiguous' WHERE reference='refund-ambiguous'").run();
   refundUnavailable = true;
   const count = refunds.length;
-  const response = await call(`/bookings/${await token("refund-ambiguous")}/cancel`);
+  const response = await call(`/bookings/${await token(id)}/cancel`);
   assert.equal(response.status, 503);
-  assert.equal(db.prepare("SELECT status FROM bookings WHERE id='refund-ambiguous'").get().status, "confirmed");
+  assert.equal(db.prepare("SELECT status FROM bookings WHERE reference='refund-ambiguous'").get().status, "confirmed");
   // A paid postpay lesson retains its original charge timestamp. The refund
   // lock must never be mistaken for an abandoned lesson-charge claim.
-  db.prepare("UPDATE bookings SET charge_started_at='2026-09-05T09:00:00.000Z',updated_at='2026-09-05T09:00:00.000Z' WHERE id='refund-ambiguous'").run();
+  db.prepare("UPDATE bookings SET charge_started_at='2026-09-05T09:00:00.000Z',updated_at='2026-09-05T09:00:00.000Z' WHERE reference='refund-ambiguous'").run();
   const chargeCount = charges.length;
   await chargeDueLessons(env);
   assert.equal(charges.length, chargeCount);
-  assert.equal((await call("/admin/bookings/refund-ambiguous/reschedule", { user: "teacher", body: { startAt: "2026-09-24T11:00:00.000Z" } })).status, 409);
-  db.prepare("UPDATE bookings SET amount_cents=9900 WHERE id='refund-ambiguous'").run();
-  db.prepare("UPDATE booking_refunds SET attempted_at='2026-09-05T09:00:00.000Z' WHERE booking_id='refund-ambiguous'").run();
+  assert.equal((await call(`/admin/bookings/${id}/reschedule`, { user: "teacher", body: { startAt: "2026-09-24T11:00:00.000Z" } })).status, 409);
+  db.prepare("UPDATE bookings SET amount_cents=9900 WHERE reference='refund-ambiguous'").run();
+  db.prepare("UPDATE booking_refunds SET attempted_at='2026-09-05T09:00:00.000Z' WHERE booking_id=?").run(id);
   refundUnavailable = false;
   await retryRefunds(env);
   assert.deepEqual(refunds[count], refunds[count + 1]);
-  assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id='refund-ambiguous'").get().payment_status, "refunded");
+  assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE reference='refund-ambiguous'").get().payment_status, "refunded");
 });
 await test("pending provider refunds reconcile by id, never create another refund", async () => {
-  booking("refund-pending", { payment: "paid" });
-  db.prepare("UPDATE bookings SET stripe_payment_intent='pi_refund_pending' WHERE id='refund-pending'").run();
+  const id = linkedBooking("refund-pending", { payment: "paid" });
+  db.prepare("UPDATE bookings SET stripe_payment_intent='pi_refund_pending' WHERE reference='refund-pending'").run();
   refundStatus = "pending";
-  assert.equal((await call(`/bookings/${await token("refund-pending")}/cancel`)).status, 503);
+  assert.equal((await call(`/bookings/${await token(id)}/cancel`)).status, 503);
   const count = refunds.length;
   const lookups = refundLookups;
-  db.prepare("UPDATE booking_refunds SET attempted_at='2026-09-05T09:00:00.000Z' WHERE booking_id='refund-pending'").run();
+  db.prepare("UPDATE booking_refunds SET attempted_at='2026-09-05T09:00:00.000Z' WHERE booking_id=?").run(id);
   refundStatus = "succeeded";
   await retryRefunds(env);
   assert.equal(refunds.length, count);
   assert.equal(refundLookups, lookups + 1);
-  assert.equal(db.prepare("SELECT status FROM bookings WHERE id='refund-pending'").get().status, "cancelled");
+  assert.equal(db.prepare("SELECT status FROM bookings WHERE reference='refund-pending'").get().status, "cancelled");
 });
 await test("whole-series duration changes require the displayed rate while unchanged durations preserve mixed prices", async () => {
   db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('mixed-series','alice','single',1,660,?,?)").run(new Date().toISOString(), new Date().toISOString());
@@ -703,9 +722,9 @@ await test("the 15 minutes after every lesson stay free for students, while Inê
 
   // A lesson booked back to back before the gap existed can still switch
   // between online and Porto, but a new time must respect the gap.
-  booking("gap-legacy", { owner: "bob", start: "2026-10-06T14:00:00.000Z", end: "2026-10-06T15:00:00.000Z" });
+  const legacyId = linkedBooking("gap-legacy", { owner: "bob", start: "2026-10-06T14:00:00.000Z", end: "2026-10-06T15:00:00.000Z" });
   booking("gap-legacy-next", { owner: "bob", start: "2026-10-06T15:00:00.000Z", end: "2026-10-06T16:00:00.000Z" });
-  const legacyPath = `/bookings/${await token("gap-legacy")}/reschedule`;
+  const legacyPath = `/bookings/${await token(legacyId)}/reschedule`;
   const switched = await call(legacyPath, { body: { startAt: "2026-10-06T14:00:00.000Z", location: "porto" } });
   assert.equal(switched.status, 200, await switched.clone().text());
   assert.equal((await call(legacyPath, { body: { startAt: "2026-10-06T16:00:00.000Z" } })).status, 409);
@@ -813,18 +832,18 @@ await test("Meet settings require teacher identity and keep disabled setup inert
 
 await test("Meet links follow booking ownership and disappear for Porto or cancellation", async () => {
   student("meet-owner"); sessions["meet-owner"] = await createSession("meet-owner", env.BOOKING_TOKEN_SECRET);
-  booking("meet-owned", { owner: "meet-owner", start: "2026-10-05T09:00:00.000Z", end: "2026-10-05T10:00:00.000Z" });
-  db.prepare("UPDATE bookings SET meeting_url='https://meet.google.com/abc-defg-hij' WHERE id='meet-owned'").run();
+  const id = linkedBooking("meet-owned", { owner: "meet-owner", start: "2026-10-05T09:00:00.000Z", end: "2026-10-05T10:00:00.000Z" });
+  db.prepare("UPDATE bookings SET meeting_url='https://meet.google.com/abc-defg-hij' WHERE reference='meet-owned'").run();
   let mine = await call("/me", { method: "GET", user: "meet-owner" });
   assert.equal((await mine.json()).bookings[0].meetingUrl, "https://meet.google.com/abc-defg-hij");
   const other = await call("/me", { method: "GET", user: "outsider" });
   assert.ok(!(await other.json()).bookings.some(row => row.reference === "meet-owned"));
-  const managed = await call(`/bookings/${await token("meet-owned")}`, { method: "GET", user: "meet-owner" });
+  const managed = await call(`/bookings/${await token(id)}`, { method: "GET", user: "meet-owner" });
   assert.equal((await managed.json()).booking.meetingUrl, "https://meet.google.com/abc-defg-hij");
-  db.prepare("UPDATE bookings SET location='porto' WHERE id='meet-owned'").run();
+  db.prepare("UPDATE bookings SET location='porto' WHERE reference='meet-owned'").run();
   mine = await call("/me", { method: "GET", user: "meet-owner" });
   assert.equal((await mine.json()).bookings[0].meetingUrl, null);
-  db.prepare("UPDATE bookings SET location='online',status='cancelled' WHERE id='meet-owned'").run();
+  db.prepare("UPDATE bookings SET location='online',status='cancelled' WHERE reference='meet-owned'").run();
   mine = await call("/me", { method: "GET", user: "meet-owner" });
   assert.equal((await mine.json()).bookings[0].meetingUrl, null);
 });
@@ -872,7 +891,7 @@ await test("payment emails carry the NIF: Inês's reminder always, the student's
   Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0" });
   sentEmails.length = 0;
   try {
-    await chargeDueLessons(env, new Date("2026-09-04T13:00:00Z"));
+    await chargeDueLessons(env, new Date("2026-09-04T18:00:00Z"));
   } finally {
     Object.assign(env, { EMAIL_DRY_RUN: "1" });
     delete env.TEACHER_EMAIL;
@@ -929,11 +948,11 @@ await test("every email Inês gets about a student's lessons carries the NIF her
 await test("a paid late change fee reminds Inês to issue its fiscal document once, with the NIF", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   db.prepare("UPDATE students SET nif='123456789' WHERE id='alice'").run();
-  booking("fee-receipt", { start: "2026-09-05T15:00:00.000Z", end: "2026-09-05T16:00:00.000Z" });
+  const id = linkedBooking("fee-receipt", { start: "2026-09-05T15:00:00.000Z", end: "2026-09-05T16:00:00.000Z" });
   Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0" });
   sentEmails.length = 0;
   try {
-    const cancelled = await call(`/bookings/${await token("fee-receipt")}/cancel`);
+    const cancelled = await call(`/bookings/${await token(id)}/cancel`);
     assert.equal(cancelled.status, 200, await cancelled.clone().text());
     await drain();
     await chargeDueSameDayFees(env);
@@ -943,7 +962,7 @@ await test("a paid late change fee reminds Inês to issue its fiscal document on
     delete env.RESEND_API_KEY;
     db.prepare("UPDATE students SET nif='' WHERE id='alice'").run();
   }
-  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id='fee-receipt'").get().same_day_fee_status, "paid");
+  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE reference='fee-receipt'").get().same_day_fee_status, "paid");
   // Teacher booking copies are paused in this suite; the fiscal reminder is not.
   const reminders = sentEmails.filter((email) => email.to[0] === "ines@example.invalid" && email.subject.startsWith("Payment received"));
   assert.equal(reminders.length, 1, "one reminder per fee, even after the sweep runs again");
@@ -1221,16 +1240,16 @@ await test("availability ignores the lesson being changed only for its manage li
 
 await test("switching only between online and Porto inside 14 hours is a late change, not a new time", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
-  booking("switch-late", { start: "2026-09-05T18:00:00.000Z", end: "2026-09-05T19:00:00.000Z" });
-  const path = `/bookings/${await token("switch-late")}/reschedule`;
-  const fees = () => charges.filter((charge) => charge.key.includes("switch-late")).map((charge) => charge.amount);
+  const id = linkedBooking("switch-late", { start: "2026-09-05T18:00:00.000Z", end: "2026-09-05T19:00:00.000Z" });
+  const path = `/bookings/${await token(id)}/reschedule`;
+  const fees = () => charges.filter((charge) => charge.key.includes(id)).map((charge) => charge.amount);
   const switched = await call(path, { body: { startAt: "2026-09-05T18:00:00.000Z", location: "porto" } });
   assert.equal(switched.status, 200, await switched.clone().text());
   const result = await switched.json();
   assert.equal(result.booking.location, "porto");
   assert.equal(result.sameDayFeeApplied, true);
   await drain();
-  assert.deepEqual({ ...db.prepare("SELECT starts_at, ends_at, location, same_day_change FROM bookings WHERE id='switch-late'").get() },
+  assert.deepEqual({ ...db.prepare("SELECT starts_at, ends_at, location, same_day_change FROM bookings WHERE reference='switch-late'").get() },
     { starts_at: "2026-09-05T18:00:00.000Z", ends_at: "2026-09-05T19:00:00.000Z", location: "porto", same_day_change: 1 });
   assert.deepEqual(fees(), [500], "one late change fee, as for any change inside the window");
   assert.equal((await call(path, { body: { startAt: "2026-09-05T18:00:00.000Z", location: "online" } })).status, 200);
@@ -1242,18 +1261,18 @@ await test("switching only between online and Porto inside 14 hours is a late ch
     assert.match(await refused.text(), /at least 14 hours' notice/);
   }
   // Inês may place a lesson outside her published hours; its student can still switch where it happens.
-  booking("switch-outside-hours", { start: "2026-09-16T20:00:00.000Z", end: "2026-09-16T21:00:00.000Z" });
-  const outside = await call(`/bookings/${await token("switch-outside-hours")}/reschedule`, { body: { startAt: "2026-09-16T20:00:00.000Z", location: "porto" } });
+  const outsideId = linkedBooking("switch-outside-hours", { start: "2026-09-16T20:00:00.000Z", end: "2026-09-16T21:00:00.000Z" });
+  const outside = await call(`/bookings/${await token(outsideId)}/reschedule`, { body: { startAt: "2026-09-16T20:00:00.000Z", location: "porto" } });
   assert.equal(outside.status, 200, await outside.clone().text());
 });
 
 await test("a pay-in-person lesson cancelled late says the fee applies, never that a card is charged", async () => {
-  booking("in-person-late", { payment: "not_required", start: "2026-09-05T19:00:00.000Z", end: "2026-09-05T20:00:00.000Z" });
+  const id = linkedBooking("in-person-late", { payment: "not_required", start: "2026-09-05T19:00:00.000Z", end: "2026-09-05T20:00:00.000Z" });
   Object.assign(env, { RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0" });
   sentEmails.length = 0;
   const chargesBefore = charges.length;
   try {
-    const cancelled = await call(`/bookings/${await token("in-person-late")}/cancel`);
+    const cancelled = await call(`/bookings/${await token(id)}/cancel`);
     assert.equal(cancelled.status, 200, await cancelled.clone().text());
     const result = await cancelled.json();
     assert.equal(result.sameDayFeeApplied, true);
@@ -1267,7 +1286,7 @@ await test("a pay-in-person lesson cancelled late says the fee applies, never th
   assert.match(email.text, /less than 14 hours before the lesson, so the €5 fee applies\./);
   assert.ok(!/saved card|automatically/.test(email.text));
   assert.equal(charges.length, chargesBefore);
-  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id='in-person-late'").get().same_day_fee_status, "not_required");
+  assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE reference='in-person-late'").get().same_day_fee_status, "not_required");
 });
 
 await test("emails keep an agreed rate's cents instead of rounding to whole euros", async () => {
@@ -1284,7 +1303,7 @@ await test("emails keep an agreed rate's cents instead of rounding to whole euro
     delete env.RESEND_API_KEY;
   }
   const email = sentEmails.find((sent) => sent.to[0] === "cents-rate@example.invalid");
-  assert.match(email.text, /^Price: €22\.50 a lesson · charged to your saved card when each lesson ends$/m);
+  assert.match(email.text, /^Price: €22\.50 a lesson · charged to your saved card after each lesson$/m);
 });
 
 await test("moving a recurrence leaves a lesson inside 14 hours where it is and moves the rest together", async () => {
@@ -1335,6 +1354,297 @@ await test("a time claimed while a recurrence is being moved moves none of it", 
   assert.equal(moved.status, 409, await moved.clone().text());
   assert.deepEqual(db.prepare("SELECT starts_at FROM bookings WHERE series_id='move-race' ORDER BY starts_at").all().map((row) => row.starts_at),
     ["2026-11-17T15:00:00.000Z", "2026-11-24T15:00:00.000Z"]);
+});
+// Registration proves nothing about an address; Inês's booking for it must not
+// reach whoever registered it first.
+const reclaimNotice = /To see this lesson in your account, sign in with Google or choose a new password with “I’ve forgotten my password” on the sign-in page\./;
+function captureEmail() {
+  Object.assign(env, { RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0" });
+  sentEmails.length = 0;
+}
+function releaseEmail() {
+  Object.assign(env, { EMAIL_DRY_RUN: "1" });
+  delete env.RESEND_API_KEY;
+}
+const bookedEmailFor = (reference) => sentEmails.find((sent) => sent.subject.startsWith("Your Portuguese lesson is booked") && sent.text.includes(`Reference: ${reference}`));
+await test("Inês booking an address someone registered first shuts that registrant out and lets the mailbox's owner in", async () => {
+  const ip = { "CF-Connecting-IP": "198.51.100.61" };
+  const email = "squatted@example.invalid";
+  const resetLinks = () => sentEmails.filter((sent) => sent.to[0] === email && sent.subject.startsWith("Reset your password"))
+    .map((sent) => decodeURIComponent(/reset-password\/\?token=(\S+)/.exec(sent.text)[1]));
+  captureEmail();
+  try {
+    const registered = await call("/auth/register", { user: null, headers: ip, body: { email, name: "First Registrant", password: "registrant-password" } });
+    assert.equal(registered.status, 201, await registered.clone().text());
+    const squatter = await registered.json();
+    const id = squatter.student.id;
+    assert.equal(db.prepare("SELECT email_verified_at FROM students WHERE id=?").get(id).email_verified_at, null, "registering proves nothing");
+    assert.equal((await call("/me/email", { token: squatter.session, body: { email: "registrant-elsewhere@example.invalid" } })).status, 200);
+    assert.equal((await call("/auth/forgot", { user: null, headers: ip, body: { email } })).status, 200);
+    await drain();
+    const [earlierReset] = resetLinks();
+
+    const first = await call("/admin/bookings", { user: "teacher", body: { email, lessonType: "single", startAt: "2026-12-07T10:00:00.000Z" } });
+    assert.equal(first.status, 201, await first.clone().text());
+    const { booking: lesson } = await first.json();
+    await drain();
+    assert.equal((await call("/me", { method: "GET", token: squatter.session })).status, 401, "the registrant's session is gone");
+    assert.equal((await call("/auth/login", { user: null, headers: ip, body: { email, password: "registrant-password" } })).status, 401, "and so is their password");
+    assert.deepEqual({ ...db.prepare("SELECT password_hash, session_version, email_verified_at FROM students WHERE id=?").get(id) },
+      { password_hash: "", session_version: 1, email_verified_at: null });
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_changes WHERE student_id=?").get(id).n, 0, "their pending address change went too");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM password_resets WHERE student_id=?").get(id).n, 0);
+    assert.equal((await call("/auth/reset", { user: null, headers: ip, body: { token: earlierReset, password: "an-earlier-link" } })).status, 400);
+    assert.match(bookedEmailFor(lesson.reference).text, reclaimNotice, "the confirmation says how to get in");
+
+    // The mailbox's owner chooses a new password from the link sent to it.
+    assert.equal((await call("/auth/forgot", { user: null, headers: ip, body: { email } })).status, 200);
+    await drain();
+    const reset = await call("/auth/reset", { user: null, headers: ip, body: { token: resetLinks().at(-1), password: "the-owners-password" } });
+    assert.equal(reset.status, 200, await reset.clone().text());
+    const owner = await reset.json();
+    assert.ok(db.prepare("SELECT email_verified_at FROM students WHERE id=?").get(id).email_verified_at, "a completed reset proves the address");
+    const mine = await call("/me", { method: "GET", token: owner.session });
+    assert.equal(mine.status, 200);
+    assert.ok((await mine.json()).bookings.some((row) => row.reference === lesson.reference && row.manageToken));
+
+    // Proven now, so her next booking leaves the owner's password, session and requests alone.
+    assert.equal((await call("/me/email", { token: owner.session, body: { email: "owner-elsewhere@example.invalid" } })).status, 200);
+    sentEmails.length = 0;
+    const second = await call("/admin/bookings", { user: "teacher", body: { email, lessonType: "single", startAt: "2026-12-08T10:00:00.000Z" } });
+    assert.equal(second.status, 201, await second.clone().text());
+    const { booking: next } = await second.json();
+    await drain();
+    assert.equal((await call("/me", { method: "GET", token: owner.session })).status, 200);
+    assert.equal((await call("/auth/login", { user: null, headers: ip, body: { email, password: "the-owners-password" } })).status, 200);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_changes WHERE student_id=?").get(id).n, 1, "the owner's own request stays");
+    assert.ok(!reclaimNotice.test(bookedEmailFor(next.reference).text), "only a booking that cleared a password says so");
+  } finally {
+    releaseEmail();
+  }
+});
+await test("a Google-verified account keeps its sessions and password when Inês books for it", async () => {
+  const ip = { "CF-Connecting-IP": "198.51.100.62" };
+  const credential = await googleCredential({ sub: "google-booked", email: "google-booked@example.invalid", name: "Gloria Google" });
+  const signedIn = await call("/auth/google", { user: null, headers: ip, body: { credential } });
+  assert.equal(signedIn.status, 200, await signedIn.clone().text());
+  const { student: account, session } = await signedIn.json();
+  assert.ok(db.prepare("SELECT email_verified_at FROM students WHERE id=?").get(account.id).email_verified_at, "a new Google account is proven");
+  // An account linked before proof was recorded is marked by its next sign-in.
+  db.prepare("UPDATE students SET email_verified_at=NULL WHERE id=?").run(account.id);
+  assert.equal((await call("/auth/google", { user: null, headers: ip, body: { credential } })).status, 200);
+  assert.ok(db.prepare("SELECT email_verified_at FROM students WHERE id=?").get(account.id).email_verified_at, "a later sign-in proves it again");
+  // A password added later, as a reset would, is protected by that proof.
+  db.prepare("UPDATE students SET password_hash=? WHERE id=?").run(await hashPassword("google-then-password"), account.id);
+  const before = { ...db.prepare("SELECT password_hash, session_version FROM students WHERE id=?").get(account.id) };
+  captureEmail();
+  try {
+    const booked = await call("/admin/bookings", { user: "teacher", body: { email: "google-booked@example.invalid", lessonType: "single", startAt: "2026-12-14T10:00:00.000Z" } });
+    assert.equal(booked.status, 201, await booked.clone().text());
+    const { booking: lesson } = await booked.json();
+    await drain();
+    assert.ok(!reclaimNotice.test(bookedEmailFor(lesson.reference).text));
+  } finally {
+    releaseEmail();
+  }
+  assert.deepEqual({ ...db.prepare("SELECT password_hash, session_version FROM students WHERE id=?").get(account.id) }, before);
+  assert.equal((await call("/me", { method: "GET", token: session })).status, 200);
+  assert.equal((await call("/auth/login", { user: null, headers: ip, body: { email: "google-booked@example.invalid", password: "google-then-password" } })).status, 200);
+});
+await test("a confirmed address change proves the new address, so Inês's booking for it changes nothing", async () => {
+  const registered = await call("/auth/register", { user: null, headers: { "CF-Connecting-IP": "198.51.100.64" }, body: { email: "moving-from@example.invalid", name: "Mo Ving", password: "moving-password" } });
+  assert.equal(registered.status, 201, await registered.clone().text());
+  const { student: account, session } = await registered.json();
+  captureEmail();
+  try {
+    assert.equal((await call("/me/email", { token: session, body: { email: "moving-to@example.invalid" } })).status, 200);
+    await drain();
+    const link = sentEmails.find((sent) => sent.to[0] === "moving-to@example.invalid");
+    const confirmed = await call("/me/email/confirm", { token: session, body: { token: decodeURIComponent(/emailToken=(\S+)/.exec(link.text)[1]) } });
+    assert.equal(confirmed.status, 200, await confirmed.clone().text());
+    const moved = await confirmed.json();
+    assert.ok(db.prepare("SELECT email_verified_at FROM students WHERE id=?").get(account.id).email_verified_at, "the new address proved itself");
+    const booked = await call("/admin/bookings", { user: "teacher", body: { email: "moving-to@example.invalid", lessonType: "single", startAt: "2026-12-15T10:00:00.000Z" } });
+    assert.equal(booked.status, 201, await booked.clone().text());
+    await drain();
+    assert.ok(!reclaimNotice.test(bookedEmailFor((await booked.json()).booking.reference).text));
+    assert.equal((await call("/me", { method: "GET", token: moved.session })).status, 200);
+  } finally {
+    releaseEmail();
+  }
+});
+await test("Inês's bookings never alter a password-less account she created, or a teacher's account", async () => {
+  const email = "no-password@example.invalid";
+  captureEmail();
+  try {
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { email, name: "Nadia Nopass", lessonType: "single", startAt: "2026-12-09T10:00:00.000Z" } })).status, 201);
+    const created = db.prepare("SELECT * FROM students WHERE email=?").get(email);
+    assert.equal(created.password_hash, "");
+    assert.equal(created.email_verified_at, null);
+    // Choosing a first password is under way when she books again.
+    db.prepare("INSERT INTO password_resets (nonce, student_id, created_at) VALUES ('first-password', ?, ?)").run(created.id, new Date().toISOString());
+    const session = await createSession(created.id, env.BOOKING_TOKEN_SECRET);
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { email, lessonType: "single", startAt: "2026-12-10T10:00:00.000Z" } })).status, 201);
+    assert.deepEqual({ ...db.prepare("SELECT password_hash, session_version, email_verified_at FROM students WHERE id=?").get(created.id) },
+      { password_hash: "", session_version: 0, email_verified_at: null });
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM password_resets WHERE student_id=?").get(created.id).n, 1, "the reset under way survives");
+    assert.equal((await call("/me", { method: "GET", token: session })).status, 200);
+
+    // Her own account, even holding a password, no recorded proof and a reset under way.
+    db.prepare("UPDATE students SET password_hash='pbkdf2$kept-by-the-teacher' WHERE id='teacher'").run();
+    db.prepare("INSERT INTO password_resets (nonce, student_id, created_at) VALUES ('teacher-reset', 'teacher', ?)").run(new Date().toISOString());
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { email: "teacher@example.invalid", lessonType: "single", startAt: "2026-12-11T10:00:00.000Z" } })).status, 201);
+    assert.deepEqual({ ...db.prepare("SELECT password_hash, session_version FROM students WHERE id='teacher'").get() },
+      { password_hash: "pbkdf2$kept-by-the-teacher", session_version: 0 });
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM password_resets WHERE student_id='teacher'").get().n, 1);
+    assert.equal((await call("/admin/students", { method: "GET", user: "teacher" })).status, 200, "her session still works");
+    await drain();
+    assert.equal(sentEmails.filter((sent) => sent.subject.startsWith("Your Portuguese lesson is booked")).length, 3);
+    assert.ok(!sentEmails.some((sent) => reclaimNotice.test(sent.text)), "no confirmation asks anyone to sign in again");
+  } finally {
+    releaseEmail();
+    db.prepare("UPDATE students SET password_hash='' WHERE id='teacher'").run();
+    db.prepare("DELETE FROM password_resets WHERE nonce='teacher-reset'").run();
+  }
+});
+await test("an address proven between Inês's read and the transition keeps its password and sessions", async () => {
+  const registered = await call("/auth/register", { user: null, headers: { "CF-Connecting-IP": "198.51.100.65" }, body: { email: "proving@example.invalid", name: "Pro Ving", password: "proving-password" } });
+  assert.equal(registered.status, 201, await registered.clone().text());
+  const { student: account, session } = await registered.json();
+  beforeRun = (sql) => {
+    if (!sql.includes("SET password_hash = ''")) return;
+    beforeRun = null;
+    db.prepare("UPDATE students SET email_verified_at=? WHERE id=?").run(new Date().toISOString(), account.id);
+  };
+  captureEmail();
+  try {
+    const booked = await call("/admin/bookings", { user: "teacher", body: { email: "proving@example.invalid", lessonType: "single", startAt: "2026-12-16T10:00:00.000Z" } });
+    assert.equal(booked.status, 201, await booked.clone().text());
+    await drain();
+    assert.ok(!reclaimNotice.test(bookedEmailFor((await booked.json()).booking.reference).text));
+  } finally {
+    releaseEmail();
+  }
+  assert.equal(db.prepare("SELECT session_version FROM students WHERE id=?").get(account.id).session_version, 0);
+  assert.equal((await call("/me", { method: "GET", token: session })).status, 200);
+  assert.equal((await call("/auth/login", { user: null, headers: { "CF-Connecting-IP": "198.51.100.65" }, body: { email: "proving@example.invalid", password: "proving-password" } })).status, 200);
+});
+
+await test("availability and the weekly preview ignore a student's own unfinished card setup, and nobody else's", async () => {
+  const user = await unsavedCardStudent("own-hold");
+  const held = "2026-11-27T17:00:00.000Z";
+  booking("own-hold-lesson", { owner: user, payment: "pending", start: held, end: "2026-11-27T18:00:00.000Z" });
+  db.prepare("UPDATE bookings SET status='pending_payment', hold_expires_at='2026-09-05T10:35:00.000Z' WHERE id='own-hold-lesson'").run();
+  booking("own-hold-confirmed", { owner: user, start: "2026-11-27T18:30:00.000Z", end: "2026-11-27T19:30:00.000Z" });
+  const bearer = (value) => (value === undefined ? {} : { Authorization: `Bearer ${value}` });
+  const availability = async (value) => {
+    const response = await call("/availability?lessonType=single&from=2026-11-27&to=2026-11-27", { method: "GET", user: null, headers: bearer(value) });
+    assert.equal(response.status, 200, "a bearer never turns availability into a refusal");
+    return response.json();
+  };
+  const preview = async (value) => {
+    const response = await call("/bookings/series/preview", { user: null, headers: bearer(value), body: { weeks: 4, lessonType: "single", startAt: held } });
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  const offered = (body, at = held) => (body.slotsByDate["2026-11-27"] ?? []).map((slot) => slot.startAt).includes(at);
+  try {
+    const anonymous = await availability();
+    assert.ok(!offered(anonymous), "held for everyone who is not its owner");
+    const owners = await availability(sessions[user]);
+    assert.ok(offered(owners), "its owner can choose that time again");
+    assert.ok(!offered(owners, "2026-11-27T19:00:00.000Z"), "while their confirmed lesson still counts");
+    assert.ok(!offered(await availability(sessions.outsider)), "another student still sees it held");
+
+    const publicPreview = await preview();
+    assert.ok(publicPreview.skipped.includes(held) && !publicPreview.bookable.includes(held));
+    assert.ok((await preview(sessions[user])).bookable.includes(held));
+    assert.ok((await preview(sessions.outsider)).skipped.includes(held));
+
+    // Anything short of a valid session is an anonymous request, never a 401.
+    const frozenNow = Date.now;
+    Date.now = () => frozenNow() - 91 * 86400000;
+    const expired = await createSession(user, env.BOOKING_TOKEN_SECRET).finally(() => { Date.now = frozenNow; });
+    const revoked = await createSession(user, env.BOOKING_TOKEN_SECRET);
+    assert.equal((await call("/auth/logout", { token: revoked, headers: { "CF-Connecting-IP": "198.51.100.63" } })).status, 200);
+    const invalid = ["", "not-a-session", `${sessions[user]}x`, expired, revoked, await createSession(user, env.BOOKING_TOKEN_SECRET, 7)];
+    for (const value of invalid) {
+      assert.deepEqual(await availability(value), anonymous, `availability with ${JSON.stringify(value.slice(0, 12))}`);
+      assert.deepEqual(await preview(value), publicPreview, `preview with ${JSON.stringify(value.slice(0, 12))}`);
+    }
+  } finally {
+    db.prepare("DELETE FROM bookings WHERE id IN ('own-hold-lesson','own-hold-confirmed')").run();
+  }
+});
+
+await test("two addresses in one IPv6 /64 share a registration budget, which the next /64 does not touch", async () => {
+  const register = (ip, n) => call("/auth/register", {
+    user: null, headers: { "CF-Connecting-IP": ip }, body: { email: `six-${n}@example.invalid`, name: "Six Tester", password: "a-long-password" }
+  });
+  const sameNetwork = ["2001:db8:6:4::1", "2001:0DB8:0006:0004:0000:0000:0000:0002", "2001:db8:6:4:ffff:ffff:ffff:fffe", "2001:db8:6:4::a", "2001:db8:6:4:1::"];
+  const statuses = [];
+  for (const [n, ip] of sameNetwork.entries()) statuses.push((await register(ip, n)).status);
+  assert.deepEqual(statuses, [201, 201, 201, 201, 201]);
+  assert.equal((await register("2001:db8:6:4:abcd::99", 5)).status, 429, "a sixth address in the same /64 is over the budget");
+  assert.equal(db.prepare("SELECT attempts FROM request_limits WHERE key='register:2001:db8:6:4::/64'").get().attempts, 5);
+  assert.equal((await register("2001:db8:6:5::1", 6)).status, 201, "the neighbouring /64 has its own");
+});
+
+await test("a session presented as a manage link opens nothing, even a row keyed by what it signs", async () => {
+  const session = await createSession("bob", env.BOOKING_TOKEN_SECRET);
+  const signed = session.slice(0, session.lastIndexOf("."));
+  // One key signs both, so the session verifies as a manage token for its own
+  // payload; only a UUID booking id may be looked up.
+  assert.equal(await readManageToken(session, env.BOOKING_TOKEN_SECRET), signed);
+  booking(signed, { owner: "bob", start: "2026-12-02T10:00:00.000Z", end: "2026-12-02T11:00:00.000Z" });
+  try {
+    for (const [suffix, method, body] of [["", "GET"], ["/reschedule", "POST", { startAt: "2026-12-02T12:00:00.000Z" }], ["/cancel", "POST", {}], ["/payment", "POST", { purpose: "lesson" }]]) {
+      const viaSession = await call(`/bookings/${session}${suffix}`, { method, body, user: null });
+      const viaUnknown = await call(`/bookings/${await token(crypto.randomUUID())}${suffix}`, { method, body, user: null });
+      assert.equal(viaSession.status, 404, suffix || "GET");
+      assert.equal(viaUnknown.status, 404);
+      assert.deepEqual(await viaSession.json(), await viaUnknown.json());
+    }
+    assert.deepEqual({ ...db.prepare("SELECT status, starts_at FROM bookings WHERE id=?").get(signed) }, { status: "confirmed", starts_at: "2026-12-02T10:00:00.000Z" });
+  } finally {
+    db.prepare("DELETE FROM bookings WHERE id=?").run(signed);
+  }
+});
+await test("Inês can record a no-show until six hours after the lesson ends, and no lesson is charged before then", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  // It is 10:00: one lesson ended 5h59m ago, one 6h01m ago, one an hour ago.
+  booking("absent-in-time", { start: "2026-09-05T03:01:00.000Z", end: "2026-09-05T04:01:00.000Z" });
+  booking("absent-too-late", { start: "2026-09-05T02:59:00.000Z", end: "2026-09-05T03:59:00.000Z" });
+  booking("attended-recently", { start: "2026-09-05T08:00:00.000Z", end: "2026-09-05T09:00:00.000Z" });
+  const mark = (id, noShow = true) => call(`/admin/bookings/${id}/no-show`, { user: "teacher", body: { noShow } });
+  const charged = (id) => charges.filter((charge) => charge.key.includes(`:${id}:`)).map((charge) => charge.amount);
+  const status = (id) => db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(id).payment_status;
+
+  const inTime = await mark("absent-in-time");
+  assert.equal(inTime.status, 200, await inTime.clone().text());
+  assert.equal((await mark("absent-in-time", false)).status, 200, "and it can be undone");
+  assert.equal((await mark("absent-in-time")).status, 200);
+  const tooLate = await mark("absent-too-late");
+  assert.equal(tooLate.status, 409);
+  assert.match(await tooLate.text(), /until 6 hours after the lesson ends/);
+  assert.equal(db.prepare("SELECT attendance_status FROM bookings WHERE id='absent-too-late'").get().attendance_status, "expected");
+
+  await chargeDueLessons(env);
+  await chargeDueLessons(env, new Date("2026-09-05T10:00:59.999Z"));
+  assert.deepEqual(charged("absent-in-time"), [], "nothing is attempted while the no-show can still change");
+  assert.deepEqual(charged("attended-recently"), []);
+  assert.deepEqual([status("absent-in-time"), status("attended-recently")], ["scheduled", "scheduled"]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE booking_id IN ('absent-in-time','attended-recently')").get().n, 0, "no receipt or payment email yet");
+  assert.deepEqual(charged("absent-too-late"), [1500], "an unmarked lesson whose window has closed is charged the full price");
+
+  await chargeDueLessons(env, new Date("2026-09-05T10:01:00.000Z"));
+  assert.deepEqual(charged("absent-in-time"), [500], "the no-show fee, once its window closes");
+  assert.equal(status("absent-in-time"), "paid");
+  assert.equal((await mark("absent-in-time", false)).status, 409, "and attendance is settled with it");
+  await chargeDueLessons(env, new Date("2026-09-05T14:59:59.999Z"));
+  assert.deepEqual(charged("attended-recently"), []);
+  await chargeDueLessons(env, new Date("2026-09-05T15:00:00.000Z"));
+  assert.deepEqual(charged("attended-recently"), [1500]);
 });
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
