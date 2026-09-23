@@ -5224,8 +5224,8 @@ button.text-action {
 }
 
 /* The weeks a student will NOT have: a card shaped like the lesson rows above
-   it, in coral, with each clashing lesson struck through as a chip, so it
-   reads as part of the selection rather than a footnote to it. */
+   it, in coral, with each clashing lesson a coral chip, so it reads as part of
+   the selection rather than a footnote to it. */
 .booking-skipped {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
@@ -5276,15 +5276,14 @@ button.text-action {
 }
 
 .booking-skipped li {
-  border: 1px solid rgba(239, 93, 60, 0.5);
+  border: 1px solid var(--coral);
   border-radius: var(--squiggle-chip);
   padding: 0.3rem 0.7rem;
   background: rgba(255, 255, 255, 0.6);
+  color: var(--coral-action);
   font-family: var(--ui);
   font-size: 0.85rem;
   font-weight: 700;
-  text-decoration: line-through;
-  text-decoration-color: rgba(194, 58, 39, 0.65);
 }
 
 .student-details-form label em,

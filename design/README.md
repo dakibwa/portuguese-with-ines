@@ -555,7 +555,7 @@ Preserve these desktop and mobile states:
   changes and whether or not the student has signed in: a coral card shaped
   like the lesson rows, with its own mark, the count as its title, the plain
   consequence that those lessons won't be booked while the rest go ahead, and
-  each clashing lesson as a struck-through chip. Each row's `Change` is a small
+  each clashing lesson as a coral chip. Each row's `Change` is a small
   outline button, of a piece with the date's `Change`. On wide screens the bar and
   lessons sit on the left and the account or final details on the right, in the
   calendar step's proportions; phones stack them in that order. Name Porto time
