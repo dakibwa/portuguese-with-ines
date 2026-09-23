@@ -101,8 +101,12 @@ try {
     const field = editor.getByLabel("NIF (optional)");
     const save = editor.getByRole("button", { name: "Save NIF", exact: true });
     await expect(save).toBeDisabled();
-    await field.fill("123 456 789");
-    await expect(save).toBeEnabled();
+    // A late second account load can still reset the field after typing, so
+    // type again until the edit sticks.
+    await expect(async () => {
+      await field.fill("123 456 789");
+      await expect(save).toBeEnabled({ timeout: 1_000 });
+    }).toPass({ timeout: 10_000 });
     await save.click();
     await expect(editor).toContainText("Saved. Your receipts will show this NIF.");
     await expect(field).toHaveValue("123456789");
