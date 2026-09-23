@@ -374,8 +374,9 @@ length with its price (`60 min · €25`, `90 min · €35`; a trial's fixed
 lessons 4, 6 or 8 weeks or `Ongoing`. Each choice changes in place without moving the page, and the free
 days follow it; there is no fork, setup screen or `Continue` step. A returning
 student starts from a single lesson at their usual location. A student who is
-signed in, or who has signed in on this browser before, is not offered the
-trial; that is settled as booking opens, so creating an account at the
+signed in, or on a browser where a student with a booked lesson has signed in
+before, is not offered the trial (Inês signing in, or an account made and never
+booked, does not count); that is settled as booking opens, so creating an account at the
 confirmation never takes away the trial being booked. The bar's head offers
 `Your lessons` to a signed-in student and a coral `Already booked? Sign in`
 (`Sign in` alone on a phone) to a returning browser. A first-time visitor sees
@@ -391,10 +392,11 @@ option labels never wrap. Below 361 px the four repeat options sit two by
 two.
 
 Choosing a free day keeps the four weeks in view on wide screens, with the day
-highlighted and its times beside it under `Choose a time` and the date. On a
-phone the times take the calendar's place: an outline `Change date` beside
-`Choose a time` returns to the calendar, and the date has the line beneath to
-itself. Before a day is chosen, the panel beside the
+highlighted and its times beside it under the date, with no eyebrow above it
+to say what the times already say. On a phone the times take the calendar's
+place, headed by a short date (`Thu 24 Sept 2026`) with an outline `Change`
+beside it on the same row, which returns to the calendar (named `Change date`
+for assistive technology). Before a day is chosen, the panel beside the
 calendar offers `Soonest times`: the first free time on each of the next three
 free days, each one tap from the confirmation. On a phone that panel stays out
 of sight until there is a day to show.
@@ -522,7 +524,7 @@ Preserve these desktop and mobile states:
   when that is later. The lessons view has no second context strip or
   selected-day panel. Choosing a free day while booking keeps the four weeks
   beside its times on desktop; on a phone the times replace the calendar, with
-  `Change date` returning to it. A free day shows the available times
+  the date's `Change` returning to it. A free day shows the available times
   without redundant “no lesson booked” or lesson-summary copy. A day's times
   come in two fixed halves, chosen with a two-way toggle that reads the same
   every day: from Inês's earliest start to 14:00, and from 14:00 to her latest
@@ -531,8 +533,8 @@ Preserve these desktop and mobile states:
   says so; the half holding a chosen time, or else the first with times, opens
   first. Never a wall of every quarter hour. Each half is a small timetable without subheadings: one row per hour, one column
   per start minute the day offers (four for quarter hours), so a gap reads as a
-  gap and buttons keep an accessible touch target on a phone. `Change date` returns
-  to the four weeks that held the date. Opening any
+  gap and buttons keep an accessible touch target on a phone. The date's
+  `Change` returns to the four weeks that held the date. Opening any
   lesson keeps the calendar in place and adds a compact overlay asking
   whether to change or cancel it. `Change` keeps the page dimmed and lifts that
   same calendar and time picker into the overlay; it never dismisses the modal
@@ -549,10 +551,12 @@ Preserve these desktop and mobile states:
   with a short note saying so. Beneath the bar, each lesson is one row with its
   date, time and `Change` (named `Change date or time` for assistive technology),
   then the add card when another lesson is allowed. For weekly lessons any
-  clashing weeks are listed right beneath, by date and time, as soon as the
-  repeat or length changes and whether or not the student has signed in, with
-  the plain consequence that those weeks won't be booked. Each row's `Change` is
-  a small outline button, of a piece with `Change date`. On wide screens the bar and
+  clashing weeks are listed right beneath, as soon as the repeat or length
+  changes and whether or not the student has signed in: a coral card shaped
+  like the lesson rows, with its own mark, the count as its title, the plain
+  consequence that those lessons won't be booked while the rest go ahead, and
+  each clashing lesson as a struck-through chip. Each row's `Change` is a small
+  outline button, of a piece with the date's `Change`. On wide screens the bar and
   lessons sit on the left and the account or final details on the right, in the
   calendar step's proportions; phones stack them in that order. Name Porto time
   once with the selected time and add the visitor's local time only when it

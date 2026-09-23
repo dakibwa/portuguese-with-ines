@@ -47,7 +47,7 @@ export type LessonSeries = {
 };
 
 const SESSION_KEY = "ines-student-session";
-// Outlives the session: someone has signed in on this browser before.
+// Outlives the session: a student with a booked lesson has signed in here.
 const RETURNING_KEY = "ines-returning-student";
 export const SESSION_CHANGE_EVENT = "ines:student-session-change";
 
@@ -68,7 +68,6 @@ export function readSession() {
 export function storeSession(token: string) {
   try {
     window.localStorage.setItem(SESSION_KEY, token);
-    window.localStorage.setItem(RETURNING_KEY, "1");
     window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
   } catch {
     // A student in private browsing simply signs in again next visit.
@@ -83,7 +82,6 @@ export function clearSession() {
     });
   }
   try {
-    if (token) window.localStorage.setItem(RETURNING_KEY, "1");
     window.localStorage.removeItem(SESSION_KEY);
     window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
   } catch {
@@ -92,10 +90,20 @@ export function clearSession() {
 }
 
 /**
- * Whether someone has signed in on this browser before. Booking uses it only
- * to choose what to offer first, sign-in rather than a trial; it grants
- * nothing, and a cleared browser simply looks new again.
+ * Whether a student with a booked lesson has been signed in on this browser,
+ * or anyone is now. Booking uses it only to choose what to offer first,
+ * sign-in rather than a trial; it grants nothing, and a cleared browser simply
+ * looks new again. Inês signing in, or an account made and never booked,
+ * leaves a newcomer on the same browser their trial.
  */
+export function rememberReturningStudent() {
+  try {
+    window.localStorage.setItem(RETURNING_KEY, "1");
+  } catch {
+    // Private browsing: the next visit simply looks new.
+  }
+}
+
 export function isReturningDevice() {
   try {
     return Boolean(window.localStorage.getItem(RETURNING_KEY) || window.localStorage.getItem(SESSION_KEY));

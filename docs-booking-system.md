@@ -175,8 +175,9 @@ depending on them having kept the right confirmation email.
   Signed-out visitors can browse lesson types, dates, and times before they are
   asked to sign in; `Already booked? Sign in` asks immediately because the
   data is private, while booking asks only at confirmation. It is a coral
-  button in the bar's head on a browser where someone has signed in before
-  (a local flag that outlives the session and grants nothing), and a quiet
+  button in the bar's head on a browser where a student with a booked lesson
+  has signed in before (a local flag that outlives the session and grants
+  nothing; Inês or an unused account does not set it), and a quiet
   line beneath the calendar for anyone else. It opens the `Your account` card
   on its own, with `Back` above it.
   Every booked lesson is marked there, weekly lessons in lilac and one-off
@@ -184,8 +185,8 @@ depending on them having kept the right confirmation email.
   with several lists them in `Your lessons`; a free future date opens booking
   on that day with its times. It never creates a second selected-day panel.
   While booking, a chosen free day's times sit beside the calendar on wide
-  screens and take its place on a phone, under `Choose a time` with
-  `Change date` beside it and the date beneath. The times come in two fixed
+  screens and take its place on a phone, headed by a short date with `Change`
+  beside it on one row. The times come in two fixed
   halves, from Inês's earliest start across the loaded weeks to 14:00 and from
   14:00 to her latest, so the toggle's labels are the same every day. Before a day is chosen, wide screens offer the soonest free time
   on each of the next three free days.
@@ -405,8 +406,8 @@ that window four weeks at a time rather than as one long scroll. It was 56
   after the trial was selected (for example after signing in at confirmation),
   the trial choice dissolves and the valid lesson choices return without a
   warning banner or a failed booking. The site also leaves the trial out for a
-  student already signed in, or on a browser where someone has signed in
-  before; that is decided as booking opens, so an account created at the
+  student already signed in, or on a browser where a student with a booked
+  lesson has signed in before; that is decided as booking opens, so an account created at the
   confirmation keeps the trial being booked. The Worker's rule is unchanged.
 - The confirmation carries the same choices bar as the calendar, so location,
   length, kind and repeat change in place there; there is no separate
@@ -563,7 +564,7 @@ Once availability has loaded, the date picker omits complete leading weeks with
 no free slots. That means a weekend with nothing left to book opens directly on
 the next usable week; closed weeks later in the booking window remain visible.
 Selecting a free day while booking keeps the four weeks beside its times on
-wide screens; on a phone the times replace the calendar and `Change date`
+wide screens; on a phone the times replace the calendar and the date's `Change`
 returns to the four weeks that held it. In the lesson view a booked date opens
 its lesson, or lists several in `Your lessons` with `Book another lesson`; other
 future dates highlight on hover/focus and open booking on that day directly,

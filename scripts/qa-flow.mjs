@@ -2124,23 +2124,25 @@ const freeDay = accountPage.getByRole("button", { name: /5 times free/ }).first(
 await freeDay.waitFor({ state: "visible" });
 await freeDay.click();
 await changeDate.waitFor({ state: "visible" });
-const selectedDateHeadLayout = await accountPage.locator("#booking-next-step .unified-calendar__panel-top").evaluate((top) => {
-  const rectangle = top.getBoundingClientRect();
-  const action = top.querySelector(".unified-calendar__change-date")?.getBoundingClientRect();
-  const date = top.nextElementSibling?.getBoundingClientRect();
+const selectedDateHeadLayout = await accountPage.locator("#booking-next-step .unified-calendar__panel-head").evaluate((head) => {
+  const rectangle = head.getBoundingClientRect();
+  const action = head.querySelector(".unified-calendar__change-date")?.getBoundingClientRect();
+  const date = head.querySelector("h3")?.getBoundingClientRect();
   return {
     actionRight: action?.right ?? 0,
     dateHeight: date?.height ?? 0,
-    height: rectangle.height,
-    topRight: rectangle.right
+    eyebrows: head.parentElement?.querySelectorAll(":scope > .eyebrow").length ?? -1,
+    headRight: rectangle.right,
+    height: rectangle.height
   };
 });
 if (
   selectedDateHeadLayout.height > 60 ||
   selectedDateHeadLayout.dateHeight > 32 ||
-  selectedDateHeadLayout.topRight - selectedDateHeadLayout.actionRight > 18
+  selectedDateHeadLayout.eyebrows !== 0 ||
+  selectedDateHeadLayout.headRight - selectedDateHeadLayout.actionRight > 18
 ) {
-  throw new Error(`The chosen date should sit on one line beneath Change date, which keeps to the right: ${JSON.stringify(selectedDateHeadLayout)}.`);
+  throw new Error(`The chosen date should share one row with Change, with no eyebrow above: ${JSON.stringify(selectedDateHeadLayout)}.`);
 }
 await waitForOrientation(accountPage);
 await accountPage.waitForFunction(
@@ -2502,7 +2504,7 @@ for (const width of [1440, 390]) {
   if (await accountPage.getByRole("dialog", { name: "Do you want to book?", exact: true }).count()) {
     throw new Error("A free day should open its times without asking first.");
   }
-  if (!await accountPage.locator("#booking-next-step .unified-calendar__panel-content > h3").innerText().then((text) => text.includes(String(qaFreeStart.getUTCDate())))) {
+  if (!await accountPage.locator("#booking-next-step .unified-calendar__panel-head h3").innerText().then((text) => text.includes(String(qaFreeStart.getUTCDate())))) {
     throw new Error("Booking from the overview lost the chosen date.");
   }
   await accountPage.locator("#lesson-calendar .slot-grid button").first().click();

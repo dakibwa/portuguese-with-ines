@@ -1981,27 +1981,8 @@ textarea,
   margin: 0;
 }
 
-.booking-workflow-sign-in__back {
-  display: inline-flex;
-  align-items: center;
+.booking-workflow-sign-in > .booking-back {
   justify-self: start;
-  min-height: 44px;
-  border: 0;
-  padding: 0 0.15rem;
-  background: none;
-  color: var(--coral-action);
-  cursor: pointer;
-  font-family: var(--ui);
-  font-size: 0.74rem;
-  font-weight: 700;
-  gap: 0.35rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.booking-workflow-sign-in__back:hover,
-.booking-workflow-sign-in__back:focus-visible {
-  color: #95301f;
 }
 
 /* The quiet way in for a student booked on another browser: a first visit
@@ -2114,12 +2095,12 @@ html.booking-transitioning .booking-confirmation-stage {
 
 /* Navigation back within the same surface is tertiary, not another large
    outlined call to action competing with Move and Cancel. */
+/* No rule beneath: at a 44px target it floated well below the word. */
 .booking-provider .booking-back--tertiary {
-  min-height: 40px;
+  min-height: 44px;
   border: 0;
-  border-bottom: 1px solid rgba(194, 58, 39, 0.3);
   border-radius: 0;
-  padding: 0.35rem 0.1rem 0.28rem;
+  padding: 0 0.15rem;
 }
 
 .booking-provider .booking-back--tertiary:hover,
@@ -2496,7 +2477,7 @@ html.booking-transitioning .booking-confirmation-stage {
       "calendar panel";
   }
 
-  .unified-calendar__panel-top > .unified-calendar__change-date {
+  .unified-calendar__panel-head > .unified-calendar__change-date {
     display: none;
   }
 }
@@ -2508,28 +2489,48 @@ html.booking-transitioning .booking-confirmation-stage {
   .unified-calendar__panel.unified-calendar__panel--waiting {
     display: none;
   }
+
+  /* "Thu 24 Sept 2026" leaves room for Change on the same row. */
+  .unified-calendar__panel-head .unified-calendar__date-long {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .unified-calendar__panel-head .unified-calendar__date-short {
+    display: inline;
+  }
 }
 
-/* The eyebrow, and on a phone the way back to the calendar beside it, so the
-   date beneath keeps the panel's full width. */
-.unified-calendar__panel-top {
+/* The date, and on a phone the way back to the calendar beside it. */
+.unified-calendar__panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.78rem;
+  margin: 0.2rem 0 0.8rem;
   gap: 0.75rem;
 }
 
-.unified-calendar__panel-top .eyebrow {
+.unified-calendar__panel-head > h3 {
   min-width: 0;
   margin: 0;
+  font-family: var(--ui);
+  font-size: 1rem;
+  line-height: 1.4;
 }
 
-.unified-calendar__panel-top .button {
+.unified-calendar__panel-head .button {
   width: auto;
   min-height: 44px;
   flex: none;
   padding: 0.5rem 1rem;
+}
+
+.unified-calendar__date-short {
+  display: none;
 }
 
 .booking-state-note--notice {
@@ -5222,26 +5223,68 @@ button.text-action {
   padding: 0.15rem 0 0.15rem 0.85rem;
 }
 
-/* The weeks a student will NOT have. Given its own block and its own list,
-   because as a trailing clause it was the quietest thing on a panel whose whole
-   job at that moment is saying what you are about to get. */
+/* The weeks a student will NOT have: a card shaped like the lesson rows above
+   it, in coral, with each clashing lesson struck through as a chip, so it
+   reads as part of the selection rather than a footnote to it. */
 .booking-skipped {
-  align-self: stretch;
-  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: start;
+  border: 1.5px solid var(--coral);
+  border-radius: var(--squiggle-field);
+  padding: 0.85rem 0.95rem;
+  background: rgba(239, 93, 60, 0.08);
+  gap: 0.75rem;
+}
+
+.booking-skipped__mark {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: var(--squiggle-thumb);
+  background: rgba(239, 93, 60, 0.16);
+  color: var(--coral-action);
+}
+
+.booking-skipped__copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
 }
 
 .booking-skipped p {
   margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.booking-skipped .booking-skipped__title {
+  color: var(--coral-action);
+  font-family: var(--ui);
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .booking-skipped ul {
-  margin: 0.35rem 0 0;
-  padding-left: 1.1rem;
-  font-size: 0.88rem;
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  gap: 0.4rem;
 }
 
 .booking-skipped li {
-  margin-top: 0.15rem;
+  border: 1px solid rgba(239, 93, 60, 0.5);
+  border-radius: var(--squiggle-chip);
+  padding: 0.3rem 0.7rem;
+  background: rgba(255, 255, 255, 0.6);
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: line-through;
+  text-decoration-color: rgba(194, 58, 39, 0.65);
 }
 
 .student-details-form label em,
