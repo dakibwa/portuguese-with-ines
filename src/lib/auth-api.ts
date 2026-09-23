@@ -47,6 +47,8 @@ export type LessonSeries = {
 };
 
 const SESSION_KEY = "ines-student-session";
+// Outlives the session: someone has signed in on this browser before.
+const RETURNING_KEY = "ines-returning-student";
 export const SESSION_CHANGE_EVENT = "ines:student-session-change";
 
 /**
@@ -66,6 +68,7 @@ export function readSession() {
 export function storeSession(token: string) {
   try {
     window.localStorage.setItem(SESSION_KEY, token);
+    window.localStorage.setItem(RETURNING_KEY, "1");
     window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
   } catch {
     // A student in private browsing simply signs in again next visit.
@@ -80,11 +83,35 @@ export function clearSession() {
     });
   }
   try {
+    if (token) window.localStorage.setItem(RETURNING_KEY, "1");
     window.localStorage.removeItem(SESSION_KEY);
     window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
   } catch {
     // Nothing to clear.
   }
+}
+
+/**
+ * Whether someone has signed in on this browser before. Booking uses it only
+ * to choose what to offer first, sign-in rather than a trial; it grants
+ * nothing, and a cleared browser simply looks new again.
+ */
+export function isReturningDevice() {
+  try {
+    return Boolean(window.localStorage.getItem(RETURNING_KEY) || window.localStorage.getItem(SESSION_KEY));
+  } catch {
+    return false;
+  }
+}
+
+/** For useSyncExternalStore: the session changed here or in another tab. */
+export function subscribeToSession(onChange: () => void) {
+  window.addEventListener(SESSION_CHANGE_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(SESSION_CHANGE_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
 }
 
 async function post<T>(path: string, body: unknown, token?: string): Promise<T> {

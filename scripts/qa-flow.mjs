@@ -2124,20 +2124,23 @@ const freeDay = accountPage.getByRole("button", { name: /5 times free/ }).first(
 await freeDay.waitFor({ state: "visible" });
 await freeDay.click();
 await changeDate.waitFor({ state: "visible" });
-const selectedDateHeadLayout = await accountPage.locator("#booking-next-step .unified-calendar__panel-head").evaluate((head) => {
-  const rectangle = head.getBoundingClientRect();
-  const action = head.querySelector(".unified-calendar__change-date")?.getBoundingClientRect();
+const selectedDateHeadLayout = await accountPage.locator("#booking-next-step .unified-calendar__panel-top").evaluate((top) => {
+  const rectangle = top.getBoundingClientRect();
+  const action = top.querySelector(".unified-calendar__change-date")?.getBoundingClientRect();
+  const date = top.nextElementSibling?.getBoundingClientRect();
   return {
     actionRight: action?.right ?? 0,
+    dateHeight: date?.height ?? 0,
     height: rectangle.height,
-    headRight: rectangle.right
+    topRight: rectangle.right
   };
 });
 if (
-  selectedDateHeadLayout.height > 130 ||
-  selectedDateHeadLayout.headRight - selectedDateHeadLayout.actionRight > 18
+  selectedDateHeadLayout.height > 60 ||
+  selectedDateHeadLayout.dateHeight > 32 ||
+  selectedDateHeadLayout.topRight - selectedDateHeadLayout.actionRight > 18
 ) {
-  throw new Error(`The chosen date should head its times with the change action on the right: ${JSON.stringify(selectedDateHeadLayout)}.`);
+  throw new Error(`The chosen date should sit on one line beneath Change date, which keeps to the right: ${JSON.stringify(selectedDateHeadLayout)}.`);
 }
 await waitForOrientation(accountPage);
 await accountPage.waitForFunction(
@@ -2151,40 +2154,36 @@ await accountPage.waitForFunction(
 if (await accountPage.locator("#lesson-calendar .unified-calendar__grid").isVisible()) {
   throw new Error("On a phone, a chosen day's times should take the calendar's place.");
 }
-const availableTimeCount = await accountPage
-  .locator("#lesson-calendar .unified-calendar__availability .slot-grid button")
-  .count();
-if (availableTimeCount !== 5) {
-  throw new Error(`The free day's times should appear once it is chosen; found ${availableTimeCount} times.`);
-}
-const compactTimeGrid = await accountPage
-  .locator("#lesson-calendar .unified-calendar__availability .slot-grid")
-  .evaluate((grid) => {
-    const buttons = [...grid.querySelectorAll("button")].map((button) => {
+// A day with times either side of 14:00 shows one part at a time; each part is
+// a small timetable, one row per hour, each start minute in its own column.
+const timePicker = accountPage.locator("#lesson-calendar .unified-calendar__availability .time-picker");
+const partInputs = timePicker.locator(".time-picker__parts input");
+const partCount = await partInputs.count();
+const shownTimes = [];
+for (let index = 0; index < Math.max(partCount, 1); index++) {
+  if (partCount) await partInputs.nth(index).check();
+  shownTimes.push(...await timePicker.locator(".slot-grid").evaluate((grid, part) =>
+    [...grid.querySelectorAll("button")].map((button) => {
       const box = button.getBoundingClientRect();
       const time = (button.textContent ?? "").trim().slice(0, 5);
-      return { hour: time.slice(0, 2), minute: time.slice(3, 5), top: Math.round(box.top), left: Math.round(box.left), height: box.height };
-    });
-    return {
-      buttonHeight: buttons[0]?.height ?? 0,
-      buttons,
-      headingCount: grid.parentElement?.querySelectorAll("h3, h4").length ?? -1
-    };
-  });
-// A small timetable: one row per hour, and each start minute keeps its column.
-const timesShareHourRows = compactTimeGrid.buttons.every((a) =>
-  compactTimeGrid.buttons.every((b) => (a.hour === b.hour) === (Math.abs(a.top - b.top) <= 1)));
-const timesShareMinuteColumns = compactTimeGrid.buttons.every((a) =>
-  compactTimeGrid.buttons.every((b) => a.minute !== b.minute || Math.abs(a.left - b.left) <= 1));
+      return { part, hour: time.slice(0, 2), minute: time.slice(3, 5), top: Math.round(box.top), left: Math.round(box.left), height: box.height };
+    }), index));
+}
+const timesShareHourRows = shownTimes.every((a) => shownTimes.every((b) =>
+  a.part !== b.part || (a.hour === b.hour) === (Math.abs(a.top - b.top) <= 1)));
+const timesShareMinuteColumns = shownTimes.every((a) => shownTimes.every((b) => a.minute !== b.minute || Math.abs(a.left - b.left) <= 1));
+const headingCount = await timePicker.evaluate((picker) => picker.parentElement?.querySelectorAll("h3, h4").length ?? -1);
 if (
-  compactTimeGrid.headingCount !== 0 ||
-  compactTimeGrid.buttonHeight < 44 ||
-  compactTimeGrid.buttonHeight > 54 ||
+  shownTimes.length !== 5 ||
+  shownTimes.some((time) => (time.hour < "14") !== (partCount < 2 ? shownTimes[0].hour < "14" : time.part === 0)) ||
+  headingCount !== 0 ||
+  shownTimes.some((time) => time.height < 44 || time.height > 54) ||
   !timesShareHourRows ||
   !timesShareMinuteColumns
 ) {
-  throw new Error(`Available times should form one row per hour, with each start minute in its own column: ${JSON.stringify(compactTimeGrid)}.`);
+  throw new Error(`A free day's times should split at 14:00, each part a small timetable: ${JSON.stringify({ partCount, shownTimes })}.`);
 }
+if (partCount) await partInputs.first().check();
 if (
   (await accountPage.getByText("No lesson booked on this day.", { exact: true }).count()) ||
   (await accountPage.getByText(/Free for a single lesson/i).count())
@@ -2503,7 +2502,7 @@ for (const width of [1440, 390]) {
   if (await accountPage.getByRole("dialog", { name: "Do you want to book?", exact: true }).count()) {
     throw new Error("A free day should open its times without asking first.");
   }
-  if (!await accountPage.locator("#booking-next-step .unified-calendar__panel-head h3").innerText().then((text) => text.includes(String(qaFreeStart.getUTCDate())))) {
+  if (!await accountPage.locator("#booking-next-step .unified-calendar__panel-content > h3").innerText().then((text) => text.includes(String(qaFreeStart.getUTCDate())))) {
     throw new Error("Booking from the overview lost the chosen date.");
   }
   await accountPage.locator("#lesson-calendar .slot-grid button").first().click();
@@ -2572,7 +2571,7 @@ console.log(
           defaultWeekCount: defaultCalendarWeekCount,
           overviewWeekCountAfterSelection: compactCalendarWeekCount,
           lessonPromptPlacement: bookedDayOrientation,
-          availableTimeCount
+          availableTimeCount: shownTimes.length
         },
         stopRepeatCalls: stopRepeatPayloads.length,
         stopRepeatPayloads,

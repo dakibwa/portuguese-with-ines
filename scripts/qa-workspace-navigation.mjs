@@ -134,18 +134,20 @@ try {
   await page.locator("#upcoming-lessons-heading").waitFor();
   assert.equal(await page.locator(".booking-bar").count(), 0);
 
-  // This part checks first-time booking links. The completed-history fixture
-  // above makes a trial ineligible once /me finishes loading.
+  // A signed-in student is never offered the trial, even with nothing booked
+  // yet: first-time booking links open on a single lesson instead.
   bookings = bookings.map(booking => ({ ...booking, status: "cancelled" }));
   await page.goto(`${base}/`);
   await page.getByRole("link", { name: "Book a lesson", exact: true }).click();
-  await page.getByRole("radio", { name: "Trial", exact: true }).waitFor({ state: "attached" });
+  await page.getByRole("radio", { name: "Single", exact: true }).waitFor({ state: "attached" });
+  assert.equal(await page.getByRole("radio", { name: "Trial", exact: true }).count(), 0, "A signed-in student is not offered the trial");
   assert.equal(await page.locator("#upcoming-lessons-heading").count(), 0);
   await page.goto(`${base}/approach/`);
   await page.getByRole("link", { name: "Book a trial lesson", exact: true }).click();
   await page.getByRole("radio", { name: "Online", exact: true }).waitFor();
   assert.ok(page.url().includes("lesson=trial"));
-  assert.equal(await page.getByRole("radio", { name: "Trial", exact: true }).isChecked(), true, "A trial link opens on the trial");
+  assert.equal(await page.getByRole("radio", { name: "Single", exact: true }).isChecked(), true, "A trial link opens on a single lesson when signed in");
+  assert.equal(await page.getByRole("radio", { name: "Trial", exact: true }).count(), 0);
 
   bookings = [{ ...bookings[0], status: "confirmed", isPast: false, startAt: "2026-09-14T16:00:00Z", endAt: "2026-09-14T17:00:00Z" }];
   await page.goto(`${base}/book/?lesson=trial`);
@@ -191,10 +193,13 @@ try {
     (await menu.locator(".nav-mobile__cta a").allTextContents()).map((text) => text.trim()),
     ["Book a lesson", "Message on WhatsApp"]
   );
+  // From Close back to the home link, then round to the last action and on.
+  await page.keyboard.press("Shift+Tab");
+  assert.equal(await page.evaluate(() => document.activeElement.getAttribute("aria-label")), "Português com a Inês, home");
   await page.keyboard.press("Shift+Tab");
   assert.equal(await page.evaluate(() => document.activeElement.textContent.trim()), "Message on WhatsApp");
   await page.keyboard.press("Tab");
-  assert.equal(await page.evaluate(() => document.activeElement.getAttribute("aria-label")), "Close menu");
+  assert.equal(await page.evaluate(() => document.activeElement.getAttribute("aria-label")), "Português com a Inês, home");
   await page.screenshot({ path: `${out}/menu-mobile.png` });
   await page.keyboard.press("Escape");
   await menu.waitFor({ state: "hidden" });
@@ -254,7 +259,7 @@ try {
 
   const legacy = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await legacy.goto(`${base}/my-lessons/`);
-  await legacy.getByRole("heading", { name: "Sign in to view your lessons", exact: true }).waitFor();
+  await legacy.getByRole("heading", { name: "Your account", exact: true }).waitFor();
   assert.ok(legacy.url().includes("/book/?view=lessons"));
   await legacy.close();
   assert.deepEqual(errors, []);

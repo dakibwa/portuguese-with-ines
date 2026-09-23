@@ -78,8 +78,13 @@ try {
       await page.goto(`${base}/book/?view=book`);
       await page.getByRole("radio", { name: recurring ? "Weekly" : "Single", exact: true }).check();
     }
+    async function choosePart(time) {
+      const part = page.locator(`.time-picker__parts input[value="${time < "14:00" ? "early" : "late"}"]`);
+      if (await part.count()) await part.check();
+    }
     async function choose(date, time = "10:00") {
       await page.locator(`button[data-date-key="${date}"]`).click();
+      await choosePart(time);
       await page.getByRole("button", { name: time, exact: true }).click();
       await page.locator("#booking-confirmation-stage").waitFor();
     }
@@ -161,6 +166,7 @@ try {
     const dates = await page.locator('button[data-date-key]').evaluateAll(nodes => nodes.map(node => node.dataset.dateKey));
     assert.deepEqual(dates, Array.from({ length: 7 }, (_, i) => `2026-09-${14 + i}`), "Only the initial Monday–Sunday week can be chosen");
     await page.locator('button[data-date-key="2026-09-14"]').click();
+    await choosePart("10:00");
     assert.equal(await page.getByRole("button", { name: "10:00", exact: true }).count(), 0, "An already selected or overlapping time is unavailable");
     if (width < 700) await page.getByRole("button", { name: "Change date", exact: true }).click();
     await choose("2026-09-15");

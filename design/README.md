@@ -192,11 +192,14 @@ Dan's 22 September review tightened the public pages:
   120 px: the wordmark, the four destinations, a thin divider, then `Terms &
   privacy` at the right. On phones the destinations live behind the footer
   `Menu`, with `Terms & privacy` beneath it;
-- banners give the page back to the task. The Lessons banner is about 230 px
-  on desktop; on phones it becomes a lavender band with the splat on a blue
-  blob cropped at its right edge. The FAQ banner is about 200 px, 150 px on
-  phones. On phones the Approach splat sits at the banner's top right beside
-  the heading rather than trailing beneath it, and the booking banner keeps
+- banners give the page back to the task, and their art sits halfway down the
+  band rather than up in a corner. The Lessons banner is about 230 px on
+  desktop; on phones it becomes a lavender band with the splat in a
+  square-cornered blue strip at its right edge, like the wider layouts' blue
+  column. The FAQ banner is about 200 px, 150 px on phones, with its question
+  splat whole inside the page margin. Stacked, the Approach fan comes in from
+  the right edge halfway down the heading rather than trailing beneath it, and
+  the booking banner keeps
   its splat at the right in a band of about 124 px, without an editorial rule;
 - the three Lessons cards each have their own squiggle outline, and their own
   splat comes in large from the card's top-right corner, cropped by its edge
@@ -216,8 +219,9 @@ Dan's 22 September review tightened the public pages:
   two-line heading drops by the same amount, as `talking.`, `Lessons` and
   `before booking?` do. On phones, `Beginners welcome.` wraps with the same
   clearance;
-- the FAQ's question splat comes in large from the banner's top-right corner.
-  Opening a question is one motion: the answer grows and fades in while the
+- the FAQ's question splat sits whole in the middle of the banner's height.
+  On a stacked FAQ the last question's rule closes the list, with no second
+  full-width rule beneath it. Opening a question is one motion: the answer grows and fades in while the
   plus makes a half turn into a minus; where a browser cannot animate to the
   answer's height it simply appears;
 - the phone menu gives each of the four destinations its mark and a short note
@@ -364,21 +368,33 @@ and dismissal take effect immediately; reduced motion removes the fade.
 
 Booking is one page. A visitor lands on the calendar, ready to book, beneath a
 choices bar that is already filled in: `Trial`, `Single` or `Weekly` (the trial
-only for an eligible first lesson, and then the default), Online or In Porto,
-the length with its price (`60 min · €25`, `90 min · €35`; a trial states its
-fixed length and price instead), and for weekly lessons 4, 6 or 8 weeks or
-`Ongoing`. Each choice changes in place without moving the page, and the free
+only for a first-time visitor, and then the default), Online or In Porto, the
+length with its price (`60 min · €25`, `90 min · €35`; a trial's fixed
+`60 min · €20` is the same control with its one option chosen), and for weekly
+lessons 4, 6 or 8 weeks or `Ongoing`. Each choice changes in place without moving the page, and the free
 days follow it; there is no fork, setup screen or `Continue` step. A returning
-student starts from a single lesson at their usual location. The bar's head
-offers `Already booked? Sign in` to a signed-out visitor (`Sign in` alone on a
-phone) and `Your lessons` to a signed-in student. On wide screens its groups
-carry small `Lesson`, `Where`, `Length` and `Repeat` labels; on a phone the
-options name themselves and the labels remain for assistive technology.
+student starts from a single lesson at their usual location. A student who is
+signed in, or who has signed in on this browser before, is not offered the
+trial; that is settled as booking opens, so creating an account at the
+confirmation never takes away the trial being booked. The bar's head offers
+`Your lessons` to a signed-in student and a coral `Already booked? Sign in`
+(`Sign in` alone on a phone) to a returning browser. A first-time visitor sees
+no sign-in there, since booking asks for an account only at the confirmation;
+a quiet `Already booked? Sign in` line beneath the calendar still serves a
+student on a new browser. Signing in to view lessons shows the `Your account`
+card on its own, with a small `Back` above its corner. On wide screens the
+groups carry small `Lesson`, `Where`, `Length` and `Repeat` labels; on a phone
+the options name themselves and the labels remain for assistive technology.
+Each group starts as wide as its options need and a row shares out what is
+left, so a wide screen fills the line and a narrower one moves a group down;
+option labels never wrap. Below 361 px the four repeat options sit two by
+two.
 
 Choosing a free day keeps the four weeks in view on wide screens, with the day
 highlighted and its times beside it under `Choose a time` and the date. On a
-phone the times take the calendar's place, headed by the date and a `Change`
-that returns to the calendar. Before a day is chosen, the panel beside the
+phone the times take the calendar's place: an outline `Change date` beside
+`Choose a time` returns to the calendar, and the date has the line beneath to
+itself. Before a day is chosen, the panel beside the
 calendar offers `Soonest times`: the first free time on each of the next three
 free days, each one tap from the confirmation. On a phone that panel stays out
 of sight until there is a day to show.
@@ -416,7 +432,8 @@ Preserve these desktop and mobile states:
   and three reassurances while returning the full viewport width to the task.
   Their small organic marks are large enough to read at a glance, while the
   decorative availability splat is deliberately much larger and crops across
-  the banner's top-right corner rather than floating as a small isolated icon;
+  the banner's right edge, halfway down, rather than floating as a small
+  isolated icon;
 - between 821px and 1100px, the booking title and reassurance row stack. Give
   each label room for whole words and hide the large corner splat at those
   widths; never squeeze the three labels into narrow columns that collide with
@@ -505,12 +522,17 @@ Preserve these desktop and mobile states:
   when that is later. The lessons view has no second context strip or
   selected-day panel. Choosing a free day while booking keeps the four weeks
   beside its times on desktop; on a phone the times replace the calendar, with
-  the date's `Change` returning to it. A free day shows the available times
-  without redundant “no lesson booked” or lesson-summary copy. Those times form a small timetable without
-  morning, afternoon, or evening subheadings: one row per hour, one column per
-  start minute the day offers (four for quarter hours), so a gap reads as a gap
-  and buttons keep an accessible touch target on a phone. `Change` returns to the
-  four weeks that held the date. Opening any
+  `Change date` returning to it. A free day shows the available times
+  without redundant “no lesson booked” or lesson-summary copy. A day's times
+  come in two fixed halves, chosen with a two-way toggle that reads the same
+  every day: from Inês's earliest start to 14:00, and from 14:00 to her latest
+  (`09:00 – 14:00`, `14:00 – 19:00`), taken from her whole calendar rather than
+  that day's gaps, so the labels never shift. A half with nothing free that day
+  says so; the half holding a chosen time, or else the first with times, opens
+  first. Never a wall of every quarter hour. Each half is a small timetable without subheadings: one row per hour, one column
+  per start minute the day offers (four for quarter hours), so a gap reads as a
+  gap and buttons keep an accessible touch target on a phone. `Change date` returns
+  to the four weeks that held the date. Opening any
   lesson keeps the calendar in place and adds a compact overlay asking
   whether to change or cancel it. `Change` keeps the page dimmed and lifts that
   same calendar and time picker into the overlay; it never dismisses the modal
@@ -521,12 +543,16 @@ Preserve these desktop and mobile states:
   repriced. Cancellation stays inside the overlay until explicitly confirmed.
   On desktop the calendar key and the pager share one visual centre; on phones
   the key keeps its own line with the pager across the width beneath it.
-  The confirmation is the review. The choices bar comes with it, so the kind,
-  place, length and repeat still change in place; a single chosen time is kept
+  The confirmation is the review. The choices bar comes with it, without a
+  title of its own, so the kind, place, length and repeat still change in place; a single chosen time is kept
   whenever it is still free for the new lesson, and otherwise the times return
   with a short note saying so. Beneath the bar, each lesson is one row with its
   date, time and `Change` (named `Change date or time` for assistive technology),
-  then the add card when another lesson is allowed. On wide screens the bar and
+  then the add card when another lesson is allowed. For weekly lessons any
+  clashing weeks are listed right beneath, by date and time, as soon as the
+  repeat or length changes and whether or not the student has signed in, with
+  the plain consequence that those weeks won't be booked. Each row's `Change` is
+  a small outline button, of a piece with `Change date`. On wide screens the bar and
   lessons sit on the left and the account or final details on the right, in the
   calendar step's proportions; phones stack them in that order. Name Porto time
   once with the selected time and add the visitor's local time only when it

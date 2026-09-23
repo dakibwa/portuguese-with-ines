@@ -2,7 +2,7 @@
 
 import { MeetingLink } from "@/components/MeetingLink";
 
-import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, Fragment, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import dynamic from "next/dynamic";
 import {
@@ -34,7 +34,7 @@ const AccountControls = dynamic(() => import("@/components/MyLessons").then((m) 
   loading: () => <p className="booking-state-note">Loading your account…</p>
 });
 import { LessonMark } from "@/components/LessonMarks";
-import { fetchMe, readSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
+import { fetchMe, isReturningDevice, readSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
 import { keepDialogFocus } from "@/lib/dialog-focus";
 import { SITE_BASE_PATH } from "@/lib/paths";
 import {
@@ -107,19 +107,81 @@ function formatDayMonth(key: string) {
  * gap reads as a gap and a long day stays short. Finer grids fall back to
  * wrapping.
  */
-function slotLayout(slots: Slot[]) {
-  const clock = (slot: Slot) => formatSlotTime(slot.startAt);
-  const minutes = [...new Set(slots.map((slot) => clock(slot).slice(3, 5)))].sort();
-  const hours = [...new Set(slots.map((slot) => clock(slot).slice(0, 2)))];
-  if (minutes.length > 4) return { grid: undefined, place: () => undefined };
-  return {
-    grid: { gridTemplateColumns: `repeat(${minutes.length}, minmax(0, 1fr))` },
-    place: (slot: Slot) => ({
-      gridColumn: minutes.indexOf(clock(slot).slice(3, 5)) + 1,
-      gridRow: hours.indexOf(clock(slot).slice(0, 2)) + 1
-    })
-  };
+/**
+ * A day's free times in two fixed halves, split at 14:00 Porto time and named
+ * by the same span every day (from Inês's earliest start to 14:00, and from
+ * 14:00 to her latest), so a full day of quarter hours is never one wall of
+ * buttons and the choice never shifts under the student. A half with nothing
+ * free that day says so. Each half is a small timetable: one row per hour,
+ * each start minute in its own column. It opens on the half holding the time
+ * already chosen, or the first with free times.
+ */
+function TimePicker({ day, renderTime, selected = "", slots }: {
+  /** The earliest and latest start across every loaded day, Porto time. */
+  day: { first: string; last: string };
+  renderTime: (slot: Slot, place: CSSProperties | undefined) => ReactNode;
+  selected?: string;
+  slots: Slot[];
+}) {
+  const name = useId();
+  const clock = (startAt: string) => formatSlotTime(startAt);
+  const partOf = (startAt: string) => (clock(startAt) < DAY_SPLIT ? "early" : "late");
+  const split = day.first < DAY_SPLIT && day.last >= DAY_SPLIT;
+  const parts = useMemo(
+    () => (["early", "late"] as const).map((id) => ({
+      id,
+      label: id === "early" ? `${day.first} – ${DAY_SPLIT}` : `${DAY_SPLIT} – ${day.last}`,
+      slots: slots.filter((slot) => partOf(slot.startAt) === id)
+    })),
+    // partOf reads only the slot times.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [slots, day.first, day.last]
+  );
+  const [chosen, setChosen] = useState(selected ? partOf(selected) : "");
+  if (!slots.length) return null;
+  const current = split
+    ? parts.find((part) => part.id === chosen) ?? parts.find((part) => part.slots.length) ?? parts[0]
+    : { id: "all", label: "", slots };
+  const minutes = [...new Set(slots.map((slot) => clock(slot.startAt).slice(3, 5)))].sort();
+  const hours = [...new Set(current.slots.map((slot) => clock(slot.startAt).slice(0, 2)))];
+  const timetable = minutes.length <= 4;
+  return (
+    <div className="time-picker">
+      {split ? (
+        <div
+          aria-label="Part of the day, Porto time"
+          className={`segmented time-picker__parts segmented--position-${current.id === "late" ? 1 : 0}`}
+          role="radiogroup"
+        >
+          <span aria-hidden="true" className="segmented__thumb" />
+          {parts.map((part) => (
+            <label className={part.id === current.id ? "is-active" : ""} key={part.id}>
+              <input checked={part.id === current.id} name={name} onChange={() => setChosen(part.id)} type="radio" value={part.id} />
+              {part.label}
+            </label>
+          ))}
+        </div>
+      ) : null}
+      {current.slots.length ? (
+        <div
+          className="slot-grid time-picker__times"
+          key={current.id}
+          style={timetable ? { gridTemplateColumns: `repeat(${minutes.length}, minmax(0, 1fr))` } : undefined}
+        >
+          {current.slots.map((slot) => renderTime(slot, timetable ? {
+            gridColumn: minutes.indexOf(clock(slot.startAt).slice(3, 5)) + 1,
+            gridRow: hours.indexOf(clock(slot.startAt).slice(0, 2)) + 1
+          } : undefined))}
+        </div>
+      ) : (
+        <p className="booking-state-note time-picker__empty">Nothing free {current.id === "early" ? "before" : "from"} {DAY_SPLIT} on this day.</p>
+      )}
+    </div>
+  );
 }
+
+/** Where a day's times divide: the morning's, and the rest of the day's. */
+const DAY_SPLIT = "14:00";
 
 function daysBetween(fromKey: string, toKey: string) {
   return Math.round((Date.parse(`${toKey}T12:00:00Z`) - Date.parse(`${fromKey}T12:00:00Z`)) / 86_400_000);
@@ -252,7 +314,7 @@ function BookingSelectionSummary({
       {actionLabel && onAction ? (
         <button
           aria-label={actionLabel}
-          className="text-action booking-choice-summary__change"
+          className="booking-choice-summary__change"
           disabled={disabled}
           onClick={onAction}
           type="button"
@@ -490,6 +552,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // relationship with Inês, including an upcoming first lesson. Mirror that
   // exact rule here: a card the server will refuse is a trap, not a choice.
   const [hasPriorBooking, setHasPriorBooking] = useState(false);
+  // Someone who has signed in on this browser before is offered sign-in and
+  // no trial; a first-time visitor sees neither until the confirmation.
+  const returningDevice = useSyncExternalStore(subscribeToSession, isReturningDevice, () => false);
+  const [offerTrial, setOfferTrial] = useState(true);
   const [managedToken, setManagedToken] = useState("");
   const [managedSeriesId, setManagedSeriesId] = useState<string | null>(null);
   const [managedLessonTypeId, setManagedLessonTypeId] = useState("");
@@ -621,7 +687,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       if (params.get("lesson") === "single" || params.get("lesson") === "long") {
         setPreferredLessonTypeId(params.get("lesson") ?? "");
       }
-      if (params.get("lesson") === "trial") {
+      if (params.get("lesson") === "trial" && !isReturningDevice()) {
         setBookingKind("trial");
         setSavedChoices([]);
         setLessonTypeId("trial");
@@ -719,18 +785,22 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     });
   }, [hasPriorBooking, lessonTypeId, lessonTypes, preferredLessonTypeId]);
 
-  // Booking opens ready to use. A first lesson is the trial; anyone else gets
+  // Booking opens ready to use. A first visit starts from the trial; anyone else gets
   // a single lesson of the length they came for (or the first on offer). Each
   // choice then changes in place, in the bar above the calendar.
   useEffect(() => {
     if (intent !== "book" || managed || bookingKind || !lessonTypes.length || checkingSession) return;
-    const choice = defaultLessonChoice();
+    // Settled as booking opens, so creating an account at the confirmation
+    // keeps the trial someone is in the middle of booking.
+    const trialOffered = !student && !isReturningDevice();
+    const choice = defaultLessonChoice(trialOffered);
+    setOfferTrial(trialOffered);
     setBookingKind(choice.kind);
     setLessonTypeId(choice.typeId);
     setForm((current) => ({ ...current, repeat: "once" }));
   // defaultLessonChoice reads the same state listed here.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intent, managed, bookingKind, lessonTypes, checkingSession, hasPriorBooking, preferredLessonTypeId]);
+  }, [intent, managed, bookingKind, lessonTypes, checkingSession, hasPriorBooking, preferredLessonTypeId, student]);
 
   const openManaged = useCallback(async (
     token: string,
@@ -1025,7 +1095,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         { startAt: managed.booking.startAt, endAt: managed.booking.endAt }
       ].sort((a, b) => a.startAt.localeCompare(b.startAt))
     : rawDaySlots;
-  const timeLayout = slotLayout(daySlots);
+  // The halves a day's times split into are named the same every day: from
+  // the earliest start anywhere in the loaded weeks to the latest.
+  const startSpan = useMemo(() => {
+    const clocks = [...Object.values(slotsByDate).flat(), ...daySlots].map((slot) => formatSlotTime(slot.startAt)).sort();
+    return { first: clocks[0] ?? "", last: clocks[clocks.length - 1] ?? "" };
+  }, [slotsByDate, daySlots]);
   // A refreshed availability response must not erase a date from the review
   // after a failed submission. Keep it visible so the student can change it.
   const reviewedSlot = useMemo(() => step === "details" && selectedSlot && lessonType && !managed
@@ -1160,18 +1235,20 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     }
   }
 
-  /** The lesson a booking starts from: the trial for a first lesson. */
-  function defaultLessonChoice(): { kind: Exclude<BookingKind, "">; typeId: string } {
+  /** The lesson a booking starts from: the trial for a first-time visitor. */
+  function defaultLessonChoice(trialOffered: boolean): { kind: Exclude<BookingKind, "">; typeId: string } {
     const trial = lessonTypes.find((type) => type.id === "trial");
     const regular = lessonTypes.filter((type) => type.id !== "trial");
-    if (trial && !hasPriorBooking && !preferredLessonTypeId) return { kind: "trial", typeId: trial.id };
+    if (trial && trialOffered && !hasPriorBooking && !preferredLessonTypeId) return { kind: "trial", typeId: trial.id };
     return { kind: "once", typeId: regular.find((type) => type.id === preferredLessonTypeId)?.id ?? regular[0]?.id ?? "" };
   }
 
   function startBookingJourney(date = "") {
-    const choice = lessonTypes.length ? defaultLessonChoice() : null;
+    const trialOffered = !student && !isReturningDevice();
+    const choice = lessonTypes.length ? defaultLessonChoice(trialOffered) : null;
     transitionBooking(() => {
       setIntent("book");
+      setOfferTrial(trialOffered);
       setShowAccountSignIn(false);
       setManaged(null);
       setManagedToken("");
@@ -1607,9 +1684,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   function chooseBookingKind(kind: Exclude<BookingKind, "">) {
     if (kind === bookingKind) return;
     const trialId = lessonTypes.find((type) => type.id === "trial")?.id ?? "";
-    const nextTypeId = kind === "trial" ? trialId : lessonTypeId && lessonTypeId !== trialId ? lessonTypeId : defaultLessonChoice().kind === "trial"
-      ? lessonTypes.find((type) => type.id !== "trial")?.id ?? ""
-      : defaultLessonChoice().typeId;
+    const nextTypeId = kind === "trial" ? trialId : lessonTypeId && lessonTypeId !== trialId ? lessonTypeId : defaultLessonChoice(false).typeId;
     changeLesson(nextTypeId, () => {
       setBookingKind(kind);
       setForm((current) => ({ ...current, repeat: kind === "recurring" ? 4 : "once" }));
@@ -1832,7 +1907,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   function bookingChoicesBar(inConfirmation = false) {
     if (!lessonType || !bookingKind) return null;
     const kinds: { value: Exclude<BookingKind, "">; label: string }[] = [
-      ...(!hasPriorBooking && trialLessonType ? [{ value: "trial" as const, label: "Trial" }] : []),
+      ...(offerTrial && !hasPriorBooking && trialLessonType ? [{ value: "trial" as const, label: "Trial" }] : []),
       { value: "once", label: "Single" },
       { value: "recurring", label: "Weekly" }
     ];
@@ -1848,20 +1923,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               <button className="button button--outline button--compact booking-bar__back" onClick={openLessonsJourney} type="button">
                 <ArrowLeft size={15} aria-hidden="true" /> Your lessons
               </button>
-            ) : (
+            ) : returningDevice ? (
               <p className="booking-bar__sign-in">
                 <span className="booking-bar__sign-in-note">Already booked?</span>
-                <button className="button button--outline button--compact" onClick={openLessonsJourney} type="button">
+                <button className="button button--coral button--compact" onClick={openLessonsJourney} type="button">
                   Sign in
                 </button>
               </p>
-            )}
+            ) : null}
           </div>
-        ) : (
-          <p className="eyebrow booking-bar__title">{bookingChoices.length > 1 || form.repeat !== "once" ? "Your lessons" : "Your lesson"}</p>
-        )}
+        ) : null}
         <div className="booking-bar__choices" role="group" aria-label="Your lesson">
-          <fieldset className="booking-bar__group">
+          <fieldset className="booking-bar__group booking-bar__group--kind">
             <legend>Lesson</legend>
             <div className={`segmented${kinds.length === 3 ? " segmented--three" : ""} segmented--position-${kindIndex}`}>
               <span aria-hidden="true" className="segmented__thumb" />
@@ -1899,12 +1972,24 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             </div>
           </fieldset>
           {bookingKind === "trial" ? (
-            <div className="booking-bar__group booking-bar__fixed">
-              <span className="booking-bar__legend">Length</span>
-              <p>
-                {formatLessonDuration(lessonType.duration_minutes)} · {formatMoneyCents(lessonType.price_cents)}
-              </p>
-            </div>
+            <fieldset className="booking-bar__group">
+              <legend>Length</legend>
+              {/* The trial's length is fixed: the same control, with nothing to switch. */}
+              <div className="segmented segmented--single">
+                <span aria-hidden="true" className="segmented__thumb" />
+                <label className="is-active">
+                  <input
+                    aria-label={`${formatLessonDuration(lessonType.duration_minutes)} lesson · ${formatMoneyCents(lessonType.price_cents)}`}
+                    checked
+                    name="booking-duration"
+                    readOnly
+                    type="radio"
+                    value={lessonType.id}
+                  />
+                  {lessonType.duration_minutes} min · {formatMoneyCents(lessonType.price_cents)}
+                </label>
+              </div>
+            </fieldset>
           ) : (
             <fieldset className="booking-bar__group">
               <legend>Length</legend>
@@ -2448,15 +2533,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
         {needsLessonsSignIn ? (
           <section className="booking-workflow-sign-in" id="booking-lessons-sign-in" tabIndex={-1}>
-            <div className="booking-workflow-step-head">
-              <h2>Sign in to view your lessons</h2>
-              <button className="booking-back booking-back--tertiary" onClick={returnToJourneyStart} type="button">
-                <ArrowLeft size={16} aria-hidden="true" /> Back
-              </button>
-            </div>
+            <button className="booking-workflow-sign-in__back" onClick={returnToJourneyStart} type="button">
+              <ArrowLeft size={16} aria-hidden="true" /> Back
+            </button>
             <AuthPanel
               heading="Your account"
-              headingLevel={3}
+              headingLevel={2}
               initialMode="signin"
               intro="Your upcoming lessons will appear first, with your calendar beneath them."
               onSignedIn={(signedIn) => {
@@ -2508,11 +2590,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           ) : null}
           {intent === "book" && !managed ? (savedChoices.length ? bookingProgressBar() : bookingChoicesBar()) : null}
           <div
-            className={`calendar-panel unified-calendar__grid${bookingDateChosen ? " unified-calendar__grid--date-chosen" : ""}${
-              displayedCalendarWeeks.length === 1 ? " calendar-panel--single-week" : ""
-            }`}
+            className={`calendar-panel unified-calendar__grid${bookingDateChosen ? " unified-calendar__grid--date-chosen" : ""}`}
           >
-            <AssetMark asset="/visuals/v2-splats/at-your-pace-blob.webp" className="calendar-panel__mark" />
             {isLessonsCalendarOverview ? (
               <div className="lesson-overview">
                 <div className="lesson-overview__header">
@@ -2854,20 +2933,24 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 {loadingSlots ? (
                   <p className="booking-state-note">Checking what&rsquo;s free…</p>
                 ) : daySlots.length ? (
-                  <div className="slot-grid" style={timeLayout.grid}>
-                    {daySlots.map((slot) => (
+                  <TimePicker
+                    day={startSpan}
+                    key={selectedDate}
+                    renderTime={(slot, place) => (
                       <button
                         aria-pressed={selectedSlot === slot.startAt}
                         className={selectedSlot === slot.startAt ? "is-selected" : ""}
                         key={slot.startAt}
                         onClick={() => setSelectedSlot(slot.startAt)}
-                        style={timeLayout.place(slot)}
+                        style={place}
                         type="button"
                       >
                         {formatSlotTime(slot.startAt)}
                       </button>
-                    ))}
-                  </div>
+                    )}
+                    selected={selectedSlot}
+                    slots={daySlots}
+                  />
                 ) : (
                   <p className="booking-state-note">Choose a day marked free.</p>
                 )}
@@ -2912,32 +2995,32 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 {/* With no day chosen while booking, the heading already says
                     "Choose a day"; an eyebrow saying it again read as a stutter. */}
                 {selectedDate || intent === "lessons" ? (
-                  <p className="eyebrow">
-                    {selectedDate
-                      ? selectedDayBookings.length
-                        ? "Selected day"
-                        : lessonType
-                          ? "Choose a time"
-                          : "Selected day"
-                      : "Upcoming lessons"}
-                  </p>
+                  <div className="unified-calendar__panel-top">
+                    <p className="eyebrow">
+                      {selectedDate
+                        ? selectedDayBookings.length
+                          ? "Selected day"
+                          : lessonType
+                            ? "Choose a time"
+                            : "Selected day"
+                        : "Upcoming lessons"}
+                    </p>
+                    {/* On a phone the times take the calendar's place, so the
+                        way back to it sits here and the date keeps the width. */}
+                    {bookingDateChosen ? (
+                      <button className="button button--outline button--compact unified-calendar__change-date" onClick={changeDateChoice} type="button">
+                        Change date
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
-                <div className="unified-calendar__panel-head">
-                  <h3>
-                    {selectedDate
-                      ? formatLongDate(`${selectedDate}T12:00:00Z`)
-                      : intent === "lessons" && !calendarWindowBookings.length
-                        ? "Nothing booked yet"
-                        : "Choose a day"}
-                  </h3>
-                  {/* On a phone the times take the calendar's place, so the
-                      way back to it is here. */}
-                  {bookingDateChosen ? (
-                    <button aria-label="Change date" className="text-action unified-calendar__change-date" onClick={changeDateChoice} type="button">
-                      Change
-                    </button>
-                  ) : null}
-                </div>
+                <h3>
+                  {selectedDate
+                    ? formatLongDate(`${selectedDate}T12:00:00Z`)
+                    : intent === "lessons" && !calendarWindowBookings.length
+                      ? "Nothing booked yet"
+                      : "Choose a day"}
+                </h3>
                 {slotNotice ? <p className="booking-state-note booking-state-note--notice">{slotNotice}</p> : null}
 
                 {selectedDayBookings.length ? (
@@ -3010,13 +3093,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     ) : loadingSlots ? (
                       <p className="booking-state-note">Checking what&rsquo;s free…</p>
                     ) : daySlots.length ? (
-                      <div className="slot-grid" key={selectedDate} style={timeLayout.grid}>
-                        {daySlots.map((slot) => {
+                      <TimePicker
+                        day={startSpan}
+                        key={selectedDate}
+                        renderTime={(slot, place) => {
                           const local = differingLocalTime(slot.startAt, studentZone);
                           return (
                             <button
                               key={slot.startAt}
-                              style={timeLayout.place(slot)}
+                              style={place}
                               onClick={() => chooseSlot(slot)}
                               type="button"
                             >
@@ -3024,8 +3109,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                               {local ? <small>{local} your time</small> : null}
                             </button>
                           );
-                        })}
-                      </div>
+                        }}
+                        selected={selectedSlot}
+                        slots={daySlots}
+                      />
                     ) : (
                       <p className="booking-state-note">No free times on this day.</p>
                     )}
@@ -3042,11 +3129,30 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </div>
         ) : null}
 
+        {/* A first visit books first and makes an account at the end; this is
+            the quiet way in for a student booked on another browser. */}
+        {showWorkflowCalendar && intent === "book" && !managed && !student && !returningDevice && !isConfirmingBooking ? (
+          <p className="booking-returning">
+            Already booked?{" "}
+            <button onClick={openLessonsJourney} type="button">Sign in</button>
+          </p>
+        ) : null}
+
         {isConfirmingBooking ? (
           <div className="booking-confirmation-stage" id="booking-confirmation-stage">
             <div className="booking-confirmation-summary">
               {bookingChoicesBar(true)}
               {bookingSelectionSummaries()}
+              {/* Beside the repeat and length that cause them, so a clash shows
+                  as soon as either changes, signed in or not. */}
+              {form.repeat !== "once" ? (
+                <RepeatAvailability
+                  chosen={Boolean(chosen)}
+                  error={seriesPreviewError}
+                  preview={seriesPreview}
+                  previewing={previewing}
+                />
+              ) : null}
             </div>
             <div className="booking-confirmation-main">
               {/* Signed out, the sign-in card's "Almost there" is the visible heading.
@@ -3107,14 +3213,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         </details>
                         {rateMessage ? <p role="status">{rateMessage}</p> : null}
                       </div>
-                    ) : null}
-                    {form.repeat !== "once" ? (
-                      <RepeatAvailability
-                        chosen={Boolean(chosen)}
-                        error={seriesPreviewError}
-                        preview={seriesPreview}
-                        previewing={previewing}
-                      />
                     ) : null}
 
                     <div className="booking-confirmation-columns">

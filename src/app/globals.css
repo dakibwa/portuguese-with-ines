@@ -1390,7 +1390,8 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 @media (max-width: 560px) {
   /* Two columns squeezed the title into four broken lines. The title takes
-     the band instead, and the splat peeks in from the edge in its blue blob. */
+     the band instead, and the splat sits in a square-cornered blue strip at
+     its right edge, as the wider layouts' blue column does. */
   .lessons-hero {
     position: relative;
     display: block;
@@ -1416,19 +1417,21 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   .lessons-hero__art {
     position: absolute;
     z-index: 1;
-    top: 50%;
-    right: -58px;
-    width: 152px;
-    height: 152px;
-    border-radius: 48% 52% 44% 56% / 55% 45% 55% 45%;
-    transform: translateY(-50%);
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 26%;
   }
 
   .lessons-hero__art .lessons-hero__field {
-    right: -8%;
-    bottom: -8%;
-    width: 116%;
-    height: 116%;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: auto;
+    height: 112%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
   }
 
   .lesson-product__mark {
@@ -1481,9 +1484,10 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 /* FAQ */
 
-/* The question splat comes in large from the band's top-right corner; the
-   heading keeps clear of it. */
+/* The question splat sits whole, halfway down the band inside the page margin;
+   the heading keeps clear of it. */
 .faq-hero {
+  --faq-mark: clamp(170px, 21vw, 280px);
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1505,27 +1509,25 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   line-height: 1.08;
 }
 
+/* The drawing leaves more room at its right and foot than at its left and
+   top, so the offsets centre what is drawn rather than its square. */
 .faq-hero__mark {
   position: absolute;
-  top: -22px;
-  right: clamp(-28px, -1.5vw, -12px);
-  width: clamp(170px, 21vw, 300px);
+  top: 50%;
+  right: var(--page-pad);
+  width: var(--faq-mark);
   aspect-ratio: 1;
   pointer-events: none;
+  transform: translate(16%, -47%);
 }
 
 @media (max-width: 560px) {
   .faq-hero {
+    --faq-mark: clamp(116px, 38vw, 170px);
     min-height: 150px;
     padding-top: 1.5rem;
-    padding-right: calc(var(--page-pad) + 96px);
+    padding-right: calc(var(--page-pad) + var(--faq-mark) * 0.78);
     padding-bottom: 1.5rem;
-  }
-
-  .faq-hero__mark {
-    top: -14px;
-    right: -26px;
-    width: 150px;
   }
 
   .faq-hero h1 {
@@ -1863,12 +1865,13 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 .booking-intro__time-window {
   position: absolute;
   z-index: 1;
-  top: clamp(-52px, -3vw, -38px);
+  top: 50%;
   right: clamp(-58px, -3vw, -36px);
   width: clamp(220px, 16vw, 300px);
   margin: 0;
   aspect-ratio: 1;
   opacity: 0.96;
+  transform: translateY(-50%);
 }
 
 .booking-provider {
@@ -1960,33 +1963,73 @@ textarea,
   padding: 1.25rem;
 }
 
-/* Signing in to see booked lessons uses the same calm surface as the
-   calendar, so the journey stays continuous rather than a stack of pages. */
+/* Signing in to see booked lessons is the account card on its own, with the
+   way back tucked above its corner. */
 .booking-workflow-sign-in {
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-panel);
-  padding: clamp(1.35rem, 3.2vw, 2.35rem);
-  background: rgba(170, 164, 230, 0.1);
+  display: grid;
+  width: min(460px, 100%);
+  margin: 0 auto;
+  gap: 0.3rem;
 }
 
-.booking-workflow-step-head h2 {
+.booking-workflow-sign-in:focus {
+  outline: none;
+}
+
+.booking-workflow-sign-in > .auth-panel {
+  max-width: none;
   margin: 0;
-  font-family: var(--ui);
-  font-size: clamp(1.05rem, 2.3vw, 1.35rem);
-  line-height: 1.3;
 }
 
-.booking-workflow-step-head {
-  display: flex;
+.booking-workflow-sign-in__back {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.9rem;
-  gap: 0.75rem 1rem;
+  justify-self: start;
+  min-height: 44px;
+  border: 0;
+  padding: 0 0.15rem;
+  background: none;
+  color: var(--coral-action);
+  cursor: pointer;
+  font-family: var(--ui);
+  font-size: 0.74rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
-.booking-workflow-step-head .booking-back {
-  flex: none;
-  margin-left: auto;
+.booking-workflow-sign-in__back:hover,
+.booking-workflow-sign-in__back:focus-visible {
+  color: #95301f;
+}
+
+/* The quiet way in for a student booked on another browser: a first visit
+   books first and makes an account at the end. */
+.booking-returning {
+  margin: 1.1rem 0 0;
+  color: var(--lavender-ink);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.booking-returning button {
+  min-height: 44px;
+  border: 0;
+  padding: 0 0.2rem;
+  background: none;
+  color: var(--coral-action);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.booking-returning button:hover,
+.booking-returning button:focus-visible {
+  color: #95301f;
 }
 
 /* Booking decisions animate only the surface that changed. Page-wide view
@@ -2255,22 +2298,39 @@ html.booking-transitioning .booking-confirmation-stage {
   opacity: 0.72;
 }
 
+/* A small outline button, of a piece with `Change date`, rather than an
+   underlined word whose rule floated beneath it. */
 .booking-provider button.booking-choice-summary__change {
+  display: inline-flex;
+  align-items: center;
   justify-self: end;
+  min-height: 44px;
   margin-left: auto;
+  border: 1.5px solid rgba(26, 49, 105, 0.55);
+  border-radius: var(--squiggle-button-alt);
+  padding: 0.4rem 1rem;
+  background: transparent;
   color: var(--ink);
+  cursor: pointer;
+  font-family: var(--ui);
   font-size: 0.875rem;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   white-space: nowrap;
+  transition: background 160ms ease, border-color 160ms ease;
 }
 
 .booking-provider button.booking-choice-summary__change:hover,
 .booking-provider button.booking-choice-summary__change:focus-visible {
+  border-color: var(--ink);
+  background: rgba(170, 164, 230, 0.2);
   color: var(--ink);
 }
 
-.booking-provider button.booking-choice-summary__change::after {
-  background: var(--ink);
+.booking-provider button.booking-choice-summary__change:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .booking-choice-summary__change-short {
@@ -2325,10 +2385,6 @@ html.booking-transitioning .booking-confirmation-stage {
   grid-area: auto;
 }
 
-.booking-bar__title {
-  margin: 0;
-}
-
 .booking-bar__head {
   display: flex;
   flex-wrap: wrap;
@@ -2374,21 +2430,33 @@ html.booking-transitioning .booking-confirmation-stage {
   gap: 0.35rem;
 }
 
+/* Each group starts as wide as its options need and a row shares out what is
+   left, so a wide screen fills the line and a narrower one moves a group down
+   rather than squeezing a label onto two lines. */
 .booking-bar__choices {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem 1rem;
 }
 
 .booking-bar__group {
+  flex: 2 1 auto;
   min-width: 0;
   margin: 0;
   border: 0;
   padding: 0;
 }
 
+.booking-bar__group--kind {
+  flex-grow: 3;
+}
+
 .booking-bar__group--repeat {
-  grid-column: 1 / -1;
+  flex-grow: 4;
+}
+
+.booking-bar .segmented label {
+  white-space: nowrap;
 }
 
 .booking-bar__group legend,
@@ -2408,20 +2476,17 @@ html.booking-transitioning .booking-confirmation-stage {
   margin-bottom: 0;
 }
 
-/* The trial's length is fixed: said plainly, at the height of a control. */
-.booking-bar__fixed p {
-  display: flex;
-  min-height: 54px;
-  align-items: center;
-  margin: 0;
-  border: 1px dashed var(--rule);
-  border-radius: var(--squiggle-tabs);
-  padding: 0 1rem;
-  font-family: var(--ui);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+/* The trial's length is fixed: one option, already chosen, in the same control. */
+.segmented.segmented--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.segmented--single .segmented__thumb {
+  width: calc(100% - 8px);
+}
+
+.segmented--single label {
+  cursor: default;
 }
 
 @container booking (min-width: 700px) {
@@ -2431,7 +2496,7 @@ html.booking-transitioning .booking-confirmation-stage {
       "calendar panel";
   }
 
-  .unified-calendar__panel-head > .unified-calendar__change-date {
+  .unified-calendar__panel-top > .unified-calendar__change-date {
     display: none;
   }
 }
@@ -2445,24 +2510,26 @@ html.booking-transitioning .booking-confirmation-stage {
   }
 }
 
-.unified-calendar__panel-head {
+/* The eyebrow, and on a phone the way back to the calendar beside it, so the
+   date beneath keeps the panel's full width. */
+.unified-calendar__panel-top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  margin: 0.2rem 0 0.8rem;
+  margin-bottom: 0.78rem;
   gap: 0.75rem;
 }
 
-.unified-calendar__panel-head > h3 {
+.unified-calendar__panel-top .eyebrow {
+  min-width: 0;
   margin: 0;
-  font-family: var(--ui);
-  font-size: 1rem;
-  line-height: 1.4;
 }
 
-.unified-calendar__change-date {
-  flex: none;
+.unified-calendar__panel-top .button {
+  width: auto;
   min-height: 44px;
+  flex: none;
+  padding: 0.5rem 1rem;
 }
 
 .booking-state-note--notice {
@@ -2539,8 +2606,11 @@ html.booking-transitioning .booking-confirmation-stage {
   }
 
   .booking-bar__choices {
-    grid-template-columns: minmax(0, 1fr);
     gap: 0.55rem;
+  }
+
+  .booking-bar__group {
+    flex-basis: 100%;
   }
 
   /* "Sign in" says enough beside the heading on a phone. */
@@ -2577,6 +2647,27 @@ html.booking-transitioning .booking-confirmation-stage {
     font-size: 0.68rem;
     letter-spacing: 0.02em;
     white-space: nowrap;
+  }
+}
+
+/* Narrower than that, two rows of two, the pill moving across and down. */
+@media (max-width: 360px) {
+  .booking-bar .segmented--four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .booking-bar .segmented--four .segmented__thumb {
+    bottom: auto;
+    width: calc(50% - 6px);
+    height: calc(50% - 6px);
+  }
+
+  .booking-bar .segmented--four.segmented--position-2 .segmented__thumb {
+    transform: translateY(calc(100% + 4px));
+  }
+
+  .booking-bar .segmented--four.segmented--position-3 .segmented__thumb {
+    transform: translate(calc(100% + 4px), calc(100% + 4px));
   }
 }
 
@@ -3466,7 +3557,7 @@ html.booking-transitioning .booking-confirmation-stage {
   padding-top: 1rem;
 }
 
-.unified-calendar__availability .slot-grid {
+.unified-calendar__availability .time-picker {
   margin-top: 0.75rem;
 }
 
@@ -3663,23 +3754,6 @@ html.booking-transitioning .booking-confirmation-stage {
   z-index: 1;
 }
 
-/* A mark low in the panel, so a month of tiles is not a plain grey field. */
-.calendar-panel__mark {
-  position: absolute;
-  right: -84px;
-  bottom: -92px;
-  z-index: 0;
-  width: 240px;
-  height: 240px;
-  opacity: 0.16;
-  pointer-events: none;
-}
-
-/* One week of tiles has no room for it without covering days. */
-.calendar-panel--single-week .calendar-panel__mark {
-  display: none;
-}
-
 .calendar-week + .calendar-week {
   margin-top: 7px;
 }
@@ -3837,6 +3911,29 @@ html.booking-transitioning .booking-confirmation-stage {
   line-height: 1.05;
   opacity: 0.72;
   white-space: nowrap;
+}
+
+/* A day with times either side of 14:00 shows one part at a time. */
+.time-picker {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.time-picker .segmented {
+  margin-bottom: 0;
+}
+
+.time-picker__parts label {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.time-picker__empty {
+  margin: 0;
+}
+
+.time-picker__times {
+  animation: booking-content-in 150ms ease-out both;
 }
 
 /* Step 4 — details */
@@ -4037,7 +4134,8 @@ html.booking-transitioning .booking-confirmation-stage {
   z-index: 1;
 }
 
-.auth-panel h3 {
+.auth-panel h3,
+.booking-workflow-sign-in .auth-panel h2 {
   font-family: var(--display);
   font-size: clamp(1.9rem, 4.6vw, 2.4rem);
   font-weight: 400;
@@ -4218,7 +4316,7 @@ html.booking-transitioning .booking-confirmation-stage {
 }
 
 .segmented--four .segmented__thumb {
-  width: calc(25% - 7px);
+  width: calc(25% - 5px);
 }
 
 .segmented--position-1 .segmented__thumb {
@@ -5996,20 +6094,25 @@ dialog[open]::backdrop {
     grid-template-columns: 1fr;
   }
 
-  /* Stacked, the fan rises into the top corner beside the heading instead of
-     sitting alone beneath the text. It keeps its own orientation: mirrored,
-     it reads as upside down. */
+  /* Stacked, the fan comes in from the right edge halfway down the heading,
+     rather than sitting alone beneath the text or up in the corner. It keeps
+     its own orientation: mirrored, it reads as upside down. */
   .approach-intro {
     min-height: 0;
     padding-top: 2.4rem;
     padding-bottom: 2.6rem;
   }
 
+  .approach-intro__head {
+    position: relative;
+  }
+
   .approach-intro__splat {
-    top: -14%;
-    right: -22%;
+    top: 50%;
+    right: calc(-1 * var(--page-pad) - 22%);
     bottom: auto;
-    width: min(60%, 300px);
+    width: min(64%, 300px);
+    transform: translateY(-50%);
   }
 
   .teacher-band {
@@ -6027,8 +6130,15 @@ dialog[open]::backdrop {
     padding-left: 0;
   }
 
+  /* Stacked, the last answer's rule closes the list; a full-width rule
+     beneath it only repeated it. */
   .faq-reference {
     grid-template-columns: 1fr;
+    border-bottom: 0;
+  }
+
+  .faq-groups {
+    padding-bottom: 1rem;
   }
 
   .faq-index {
@@ -6102,7 +6212,6 @@ dialog[open]::backdrop {
 
   /* Beside the title rather than beneath it, so it costs no height. */
   .booking-intro__time-window {
-    top: -34px;
     right: -40px;
     width: clamp(150px, 42vw, 210px);
   }
@@ -6218,7 +6327,6 @@ dialog[open]::backdrop {
   }
 
   .booking-intro__time-window {
-    top: -30px;
     right: -46px;
     width: 168px;
   }
@@ -6319,7 +6427,8 @@ dialog[open]::backdrop {
   .unified-calendar__panel-content > .booking-alert,
   .unified-calendar__panel-content > .slot-grid,
   .unified-calendar__availability > .booking-state-note,
-  .unified-calendar__availability > .slot-grid {
+  .unified-calendar__availability > .slot-grid,
+  .time-picker__times {
     animation: none;
   }
 }

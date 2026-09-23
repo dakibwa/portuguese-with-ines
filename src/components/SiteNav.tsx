@@ -157,9 +157,15 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
       >
         <div className="nav-mobile__inner">
           <div className="site-header__inner nav-mobile__heading">
-            <div className="site-header__brand">
+            <Link
+              aria-current={currentPage === "home" ? "page" : undefined}
+              aria-label="Português com a Inês, home"
+              className="site-header__brand"
+              href="/"
+              onClick={() => setOpen(false)}
+            >
               <BrandWordmark className="header-wordmark" />
-            </div>
+            </Link>
             <button
               aria-label="Close menu"
               className="nav-mobile__close"

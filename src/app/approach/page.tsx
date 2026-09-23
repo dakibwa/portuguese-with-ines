@@ -37,24 +37,27 @@ export default function ApproachPage() {
       <main className="approach-page" id="main-content">
         <section className="approach-composition" aria-labelledby="approach-title">
           <div className="approach-intro">
-            <h1 id="approach-title">
-              No class.<br />
-              No rush.<br />
-              Just you<br />
-              <em>talking.</em>
-            </h1>
+            {/* Stacked, the fan centres on the heading, so it shares its box. */}
+            <div className="approach-intro__head">
+              <h1 id="approach-title">
+                No class.<br />
+                No rush.<br />
+                Just you<br />
+                <em>talking.</em>
+              </h1>
+              <AssetMark
+                asset="/visuals/generated-splats/cream-blue-fan-splat.webp"
+                avifAsset="/visuals/generated-splats/cream-blue-fan-splat.avif"
+                className="approach-intro__splat"
+                height={1254}
+                mobileAsset="/visuals/generated-splats/cream-blue-fan-splat-mobile.webp"
+                mobileAvifAsset="/visuals/generated-splats/cream-blue-fan-splat-mobile.avif"
+                priority
+                width={1254}
+              />
+            </div>
             <div className="editorial-rule editorial-rule--green" aria-hidden="true" />
             <p>We start from what you can already say. Where it goes after that is up to you.</p>
-            <AssetMark
-              asset="/visuals/generated-splats/cream-blue-fan-splat.webp"
-              avifAsset="/visuals/generated-splats/cream-blue-fan-splat.avif"
-              className="approach-intro__splat"
-              height={1254}
-              mobileAsset="/visuals/generated-splats/cream-blue-fan-splat-mobile.webp"
-              mobileAvifAsset="/visuals/generated-splats/cream-blue-fan-splat-mobile.avif"
-              priority
-              width={1254}
-            />
           </div>
 
           <div className="approach-list">
