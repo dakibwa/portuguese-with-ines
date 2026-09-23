@@ -51,7 +51,7 @@ export function BookingFlow({ initialView = "book" }: { initialView?: BookingVie
             <ul className="booking-intro__points">
               <li>
                 <AssetMark asset="/visuals/v2-splats/one-to-one-splat-v2.svg" />
-                <span>Book on your calendar</span>
+                <span>View your calendar</span>
               </li>
               <li>
                 <AssetMark asset="/visuals/v2-splats/flexible-rescheduling-splat-v2.svg" />

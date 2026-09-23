@@ -436,10 +436,12 @@ Preserve these desktop and mobile states:
   decorative availability splat is deliberately much larger and crops across
   the banner's right edge, halfway down, rather than floating as a small
   isolated icon;
-- between 821px and 1100px, the booking title and reassurance row stack. Give
-  each label room for whole words and hide the large corner splat at those
-  widths; never squeeze the three labels into narrow columns that collide with
-  neighbouring artwork. The phone layout keeps its existing compact title;
+- between 821px and 1100px, the booking title and two of the reassurances
+  (`View your calendar`, `Move or cancel here`) share one row, without the
+  large corner splat; `Porto time` waits for wider screens, since every time
+  below names it. Give each label room for whole words; never squeeze labels
+  into narrow columns that collide with neighbouring artwork. The phone layout
+  keeps its existing compact title;
 - the workspace has no opening fork: anyone signed out lands on the booking
   calendar beneath the choices bar. Availability always follows the chosen
   lesson, because a 90-minute lesson has fewer valid start times than a
