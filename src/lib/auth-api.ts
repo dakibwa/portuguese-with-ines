@@ -90,6 +90,21 @@ export function clearSession() {
 }
 
 /**
+ * The server has already refused this session (expired, revoked, or signed out
+ * elsewhere), so there is nothing to revoke: just forget it here and let the
+ * page show itself signed out.
+ */
+export function forgetSession() {
+  try {
+    if (!window.localStorage.getItem(SESSION_KEY)) return;
+    window.localStorage.removeItem(SESSION_KEY);
+    window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
+  } catch {
+    // Nothing stored.
+  }
+}
+
+/**
  * Whether a student with a booked lesson has been signed in on this browser,
  * or anyone is now. Booking uses it only to choose what to offer first,
  * sign-in rather than a trial; it grants nothing, and a cleared browser simply

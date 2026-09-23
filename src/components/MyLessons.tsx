@@ -108,6 +108,11 @@ export function MyLessons({
     [onTransition]
   );
 
+  // A reload that lands while the details form is open must not replace what
+  // the student is typing with the values it had before.
+  const editingRef = useRef(false);
+  useEffect(() => { editingRef.current = editing; }, [editing]);
+  const detailsLoaded = useRef(false);
   const load = useCallback(async () => {
     const session = readSession();
     if (!session) {
@@ -123,7 +128,10 @@ export function MyLessons({
         return;
       }
       setStudent(data.student);
-      setDetails({ name: data.student.name, email: data.student.email, nif: data.student.nif ?? "" });
+      if (!editingRef.current || !detailsLoaded.current) {
+        setDetails({ name: data.student.name, email: data.student.email, nif: data.student.nif ?? "" });
+        detailsLoaded.current = true;
+      }
       setBookings(data.bookings);
       setSeries(data.series ?? []);
     } catch (caught) {
@@ -140,8 +148,11 @@ export function MyLessons({
 
   // Coming back to the lessons view (after a booking, a move or a
   // cancellation) refreshes the history and the count beside View lessons.
+  // Only a later request reloads: arriving already loads once, above.
+  const seenUpcomingRequest = useRef(openUpcomingRequest);
   useEffect(() => {
-    if (!openUpcomingRequest) return;
+    if (!openUpcomingRequest || openUpcomingRequest === seenUpcomingRequest.current) return;
+    seenUpcomingRequest.current = openUpcomingRequest;
     void load();
   }, [load, openUpcomingRequest]);
 

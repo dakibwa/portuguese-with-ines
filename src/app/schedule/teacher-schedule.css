@@ -789,12 +789,12 @@
   text-align: center;
 }
 .teacher-lesson-dialog {
-  width: min(490px, calc(100vw - 2rem));
+  width: min(520px, calc(100vw - 2rem));
   max-height: calc(100dvh - 2rem);
   margin: auto;
   border: 1px solid var(--rule);
   border-radius: 20px 36px 25px 18px;
-  padding: 1.6rem 1.8rem 1.8rem;
+  padding: 1.25rem 1.4rem 1.35rem;
   background: var(--paper);
   color: var(--ink);
   box-shadow: 0 20px 90px rgba(15, 35, 80, 0.22);
@@ -803,29 +803,37 @@
 .teacher-lesson-dialog::backdrop {
   background: rgba(15, 35, 70, 0.5);
 }
+/* Shaped like a lesson row on the student side: its splat, then who and when. */
 .teacher-dialog-top {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 1rem;
+  gap: 0.8rem;
+}
+.teacher-lesson-mark {
+  width: 48px;
+  height: 48px;
+}
+.teacher-dialog-heading {
+  min-width: 0;
 }
 .teacher-lesson-dialog h2 {
-  font: 600 1.6rem/1.35 var(--ui);
+  font: 600 1.45rem/1.2 var(--ui);
   letter-spacing: -0.035em;
-  margin-top: 0.3rem;
+  margin-top: 0.1rem;
   overflow-wrap: anywhere;
 }
-.teacher-dialog-date {
-  font-size: 0.85rem;
-  margin-top: 0.5rem;
-}
+/* The details in one soft panel, as the booking side groups a lesson. */
 .teacher-lesson-facts {
   display: grid;
-  gap: 0.65rem;
-  padding: 1.2rem 0;
-  margin: 1rem 0;
-  border-block: 1px solid var(--rule-soft);
-  font-size: 0.82rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 0.95rem;
+  margin: 0.9rem 0 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-field);
+  background: rgba(255, 255, 255, 0.45);
+  font-size: 0.8rem;
 }
 .teacher-lesson-facts > * {
   display: flex;
@@ -846,14 +854,63 @@
   white-space: pre-wrap;
   margin-bottom: 1.2rem;
 }
+/* Buttons, as everywhere else on the site: blue for the lesson's choices,
+   coral only where something is lost. */
 .teacher-dialog-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.7rem 1.2rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.6rem;
 }
-.teacher-destructive {
+.teacher-lesson-dialog .button {
+  width: 100%;
+  padding-inline: 0.75rem;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+.teacher-lesson-dialog .button:disabled {
+  opacity: 0.45;
+}
+.teacher-lesson-dialog .teacher-button--danger {
+  border-color: rgba(180, 58, 38, 0.6);
   color: var(--coral-action);
+}
+.teacher-lesson-dialog .teacher-button--danger:hover:not(:disabled),
+.teacher-lesson-dialog .teacher-button--danger:focus-visible {
+  border-color: var(--coral-action);
+  background: rgba(239, 93, 60, 0.08);
+}
+.teacher-no-show {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 0.2rem;
+}
+.teacher-no-show__hint {
+  margin: 0;
+  color: var(--lavender-ink);
+  font: 500 0.72rem/1.4 var(--ui);
+  text-align: center;
+}
+/* Join Google Meet is a button too, in the lesson's blue. */
+.teacher-lesson-dialog .meeting-link {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  border: 1.5px solid var(--blue);
+  border-radius: var(--squiggle-pill);
+  padding: 0.7rem 1.25rem;
+  color: var(--blue);
+  font: 700 0.69rem/1.2 var(--ui);
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.teacher-lesson-dialog .meeting-link:hover,
+.teacher-lesson-dialog .meeting-link:focus-visible {
+  background: rgba(44, 84, 170, 0.08);
 }
 .teacher-dialog-confirmation {
   padding-top: 0.2rem;
@@ -874,7 +931,7 @@
   margin-top: 0.7rem;
 }
 .teacher-move-form > p,
-.teacher-move-form > button {
+.teacher-move-form > .teacher-dialog-actions {
   grid-column: 1/-1;
   margin: 0;
 }
@@ -1090,10 +1147,20 @@
     font-size: 0.63rem;
   }
   .teacher-lesson-dialog {
-    padding: 1.1rem 1.25rem 1.4rem;
+    padding: 1rem 1.1rem 1.15rem;
+  }
+  .teacher-dialog-top {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+  }
+  .teacher-lesson-mark {
+    width: 40px;
+    height: 40px;
+  }
+  .teacher-lesson-facts {
+    grid-template-columns: minmax(0, 1fr);
   }
   .teacher-lesson-dialog h2 {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
   }
 }
 
@@ -1198,4 +1265,11 @@
 }
 .teacher-meet-error {
   color: var(--coral-action);
+}
+
+/* Only the narrowest phones are too tight for two labels side by side. */
+@media (max-width: 380px) {
+  .teacher-dialog-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

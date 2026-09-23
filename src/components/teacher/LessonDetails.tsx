@@ -9,8 +9,9 @@ import {
   type AdminBooking,
 } from "@/lib/admin-api";
 import { formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
-import { SAME_DAY_FEE_LABEL } from "@/lib/config";
+import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
+import { AssetMark } from "@/components/BrandMarks";
 import { MeetingLink } from "@/components/MeetingLink";
 
 type Props = {
@@ -36,11 +37,18 @@ export function LessonDetails({
   const [time, setTime] = useState(formatSlotTime(booking.starts_at));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const noShowCloses = new Date(new Date(booking.ends_at).getTime() + NO_SHOW_WINDOW_HOURS_AFTER * 3_600_000);
   const canMarkAttendance =
     booking.payment_status === "scheduled" &&
     now >= new Date(booking.starts_at) &&
-    now < new Date(booking.ends_at);
+    now < noShowCloses;
   const noShow = booking.attendance_status === "no_show";
+  // Before the lesson the no-show control is shown but closed, so she knows
+  // where it will be; after it ends the lesson has been charged as normal.
+  const noShowLater =
+    booking.payment_status === "scheduled" &&
+    booking.status === "confirmed" &&
+    now < new Date(booking.starts_at);
   const locked =
     booking.payment_status === "processing" ||
     booking.same_day_fee_status === "processing";
@@ -61,6 +69,21 @@ export function LessonDetails({
     };
   }, []);
 
+  const backToLesson = (
+    <button
+      className="button button--outline"
+      type="button"
+      disabled={busy}
+      onClick={() => {
+        setAction("view");
+        setError("");
+      }}
+    >
+      <ArrowLeft size={15} aria-hidden="true" />
+      Back to lesson
+    </button>
+  );
+
   async function perform() {
     if (busy) return;
     setBusy(true);
@@ -80,8 +103,8 @@ export function LessonDetails({
         await setNoShow(token, booking.id, !noShow);
         onChanged(
           noShow
-            ? "No-show removed. The normal lesson price will be charged when it ends."
-            : `Marked as a no-show. Only ${SAME_DAY_FEE_LABEL} will be charged when the lesson ends.`,
+            ? "No-show removed. The lesson price will be charged as normal."
+            : `Marked as a no-show. Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the lesson price.`,
         );
       }
     } catch (caught) {
@@ -118,7 +141,18 @@ export function LessonDetails({
       }}
     >
       <div className="teacher-dialog-top">
-        <span className="teacher-eyebrow">{booking.lesson_name}</span>
+        <AssetMark asset="/visuals/v2-splats/one-to-one-splat-v2.svg" className="teacher-lesson-mark" />
+        <div className="teacher-dialog-heading">
+          <span className="teacher-eyebrow">
+            {booking.lesson_name} ·{" "}
+            {dateLabel(dateKey(new Date(booking.starts_at)), {
+              weekday: "short",
+              day: "numeric",
+              month: "long",
+            })}
+          </span>
+          <h2 id="teacher-lesson-title">{booking.student_name}</h2>
+        </div>
         <button
           className="teacher-icon-button"
           type="button"
@@ -129,15 +163,6 @@ export function LessonDetails({
           <X size={21} aria-hidden="true" />
         </button>
       </div>
-      <h2 id="teacher-lesson-title">{booking.student_name}</h2>
-      <p className="teacher-dialog-date">
-        {dateLabel(dateKey(new Date(booking.starts_at)), {
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        })}
-      </p>
       <div className="teacher-lesson-facts">
         <span>
           <Clock size={16} aria-hidden="true" />
@@ -187,7 +212,7 @@ export function LessonDetails({
       {action === "view" ? (
         <div className="teacher-dialog-actions">
           <button
-            className="button button--coral"
+            className="button button--blue"
             type="button"
             disabled={locked}
             onClick={() => setAction("move")}
@@ -195,37 +220,34 @@ export function LessonDetails({
             Move lesson
           </button>
           <button
-            className="teacher-text-button teacher-destructive"
+            className="button button--outline teacher-button--danger"
             type="button"
             disabled={locked}
             onClick={() => setAction("cancel")}
           >
             Cancel lesson
           </button>
-          {canMarkAttendance ? (
-            <button
-              className="teacher-text-button"
-              type="button"
-              onClick={() => setAction("no-show")}
-            >
-              {noShow ? "Undo no-show" : "Mark no-show"}
-            </button>
+          {canMarkAttendance || noShowLater ? (
+            <div className="teacher-no-show">
+              <button
+                aria-describedby={noShowLater ? "teacher-no-show-hint" : undefined}
+                className="button button--outline"
+                type="button"
+                disabled={!canMarkAttendance}
+                onClick={() => setAction("no-show")}
+              >
+                {noShow ? "Undo no-show" : "Mark no-show"}
+              </button>
+              {noShowLater ? (
+                <p className="teacher-no-show__hint" id="teacher-no-show-hint">
+                  Available {formatSlotTime(booking.starts_at)}–{formatSlotTime(noShowCloses.toISOString())}
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : (
         <div className="teacher-dialog-confirmation">
-          <button
-            className="teacher-text-button"
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setAction("view");
-              setError("");
-            }}
-          >
-            <ArrowLeft size={15} aria-hidden="true" />
-            Back to lesson
-          </button>
           {action === "move" ? (
             <form
               className="teacher-form teacher-move-form"
@@ -255,13 +277,16 @@ export function LessonDetails({
                 />
               </label>
               <p>The student will be emailed the new time.</p>
-              <button
-                className="button button--coral"
-                type="submit"
-                disabled={busy}
-              >
-                {busy ? "Moving…" : "Save new time"}
-              </button>
+              <div className="teacher-dialog-actions">
+                <button
+                  className="button button--blue"
+                  type="submit"
+                  disabled={busy}
+                >
+                  {busy ? "Moving…" : "Save new time"}
+                </button>
+                {backToLesson}
+              </div>
             </form>
           ) : (
             <>
@@ -276,23 +301,26 @@ export function LessonDetails({
                 {action === "cancel"
                   ? "The lesson will be removed from the calendar and the student will be emailed."
                   : noShow
-                    ? "The normal lesson price will be charged when the lesson ends."
-                    : `Only ${SAME_DAY_FEE_LABEL} will be charged when this lesson ends, instead of the full lesson price.`}
+                    ? "The lesson price will be charged as normal."
+                    : `Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the full lesson price.`}
               </p>
-              <button
-                className="button button--coral"
-                type="button"
-                disabled={busy}
-                onClick={() => void perform()}
-              >
-                {busy
-                  ? "Saving…"
-                  : action === "cancel"
-                    ? "Yes, cancel lesson"
-                    : noShow
-                      ? "Undo no-show"
-                      : "Confirm no-show"}
-              </button>
+              <div className="teacher-dialog-actions">
+                <button
+                  className={`button ${action === "no-show" && noShow ? "button--blue" : "button--coral"}`}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void perform()}
+                >
+                  {busy
+                    ? "Saving…"
+                    : action === "cancel"
+                      ? "Yes, cancel lesson"
+                      : noShow
+                        ? "Undo no-show"
+                        : "Confirm no-show"}
+                </button>
+                {backToLesson}
+              </div>
             </>
           )}
         </div>

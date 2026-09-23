@@ -561,6 +561,29 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // Someone who has signed in on this browser before is offered sign-in and
   // no trial; a first-time visitor sees neither until the confirmation.
   const returningDevice = useSyncExternalStore(subscribeToSession, isReturningDevice, () => false);
+
+  // A session that ends elsewhere (expired, revoked, signed out on another
+  // device) takes the page back to signed out, so booking asks for sign-in
+  // rather than failing with "Please sign in".
+  useEffect(() => subscribeToSession(() => {
+    if (!readSession()) setStudent((current) => (current ? null : current));
+  }), []);
+
+  // A tab left open overnight moves on to the new day when it is next looked at.
+  useEffect(() => {
+    const refresh = () => {
+      const key = portoDateKey(new Date());
+      setTodayKey((current) => (current && current !== key ? key : current));
+    };
+    const timer = window.setInterval(refresh, 5 * 60_000);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
   const [offerTrial, setOfferTrial] = useState(true);
   const [managedToken, setManagedToken] = useState("");
   const [managedSeriesId, setManagedSeriesId] = useState<string | null>(null);

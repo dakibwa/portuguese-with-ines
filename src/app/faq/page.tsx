@@ -142,7 +142,7 @@ const faqSections = [
       },
       {
         question: "How far ahead do I need to book?",
-        answer: `At least ${notice} before the lesson starts. For a lesson at 10:00, book by 20:00 the day before.`
+        answer: `At least ${notice} before the lesson starts. For a lesson at 10:00 on Tuesday, book by 20:00 on Monday.`
       },
       {
         question: "Do I have to commit to a block of lessons?",
@@ -181,7 +181,7 @@ const faqSections = [
       },
       {
         question: "How do I cancel or change a lesson?",
-        answer: `Use the link in your confirmation email. Cancel or change your lesson at least ${notice} before it starts and there’s no charge.`
+        answer: `Open it from your lessons on the booking page, or use the link in your confirmation email. Cancel or change it at least ${notice} before it starts and there’s no charge.`
       },
       {
         question: `What if my lesson is less than ${notice} away?`,

@@ -629,10 +629,21 @@ The change workflow has no decorative horizontal dividers. Lesson length uses
 the same sliding two-option control as `Online` / `In Porto`, so changing an
 existing lesson feels like the booking flow rather than a separate tool. The
 policy band follows the Worker's payment mode. Saved-card bookings say that the
-lesson price is charged when it ends, while moving or cancelling less than
-14 hours before it costs €5. The teacher schedule exposes `Mark no-show` only after
-the lesson starts and before it ends; the marked state remains reversible until
-charging begins and means only €5 is taken instead of the full price.
+lesson price is charged after it, while moving or cancelling less than
+14 hours before it costs €5.
+
+Inês's lesson card is shaped like the student side's lesson rows: its splat, the
+length and short date in one small line above the student's name, then the
+time, place, email and NIF in one soft panel (two columns on wide screens). Its
+actions are the site's buttons, never text links: `Join Google Meet` in outline
+blue, `Move lesson` in blue, `Cancel lesson` outlined in coral, and `Mark
+no-show` outlined, with Move and Cancel side by side except on the narrowest
+phones. `Mark no-show` is live from the lesson's start until six hours after
+its end, and before that it shows greyed out with `Available 11:00–18:00`, so
+she always knows where it is. The marked state stays reversible within the same
+window, the lesson is charged once it closes, and a no-show means only €5 is
+taken instead of the full price. Confirmations keep a `Back to lesson` button
+beside the confirming one.
 
 ## Superseded work
 

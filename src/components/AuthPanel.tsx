@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, type KeyboardEvent, useId, useRef, useState } from "react";
 import { AlertCircle, Lock, Mail, ReceiptText, UserRound } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
@@ -38,6 +38,8 @@ export function AuthPanel({
   intro?: string;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode);
+  const tabsId = useId();
+  const tabRefs = useRef<Partial<Record<Mode, HTMLButtonElement | null>>>({});
   const [form, setForm] = useState({ name: "", email: "", password: "", nif: "" });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -49,6 +51,22 @@ export function AuthPanel({
     setError("");
     if (next !== "signin") setNotice("");
     setMode(next);
+  }
+  // The two tabs follow the usual keys: arrows move between them, Home and End
+  // go to the first and last, and focus follows the choice.
+  function tabKey(event: KeyboardEvent<HTMLButtonElement>) {
+    const order: Mode[] = ["register", "signin"];
+    const index = Math.max(0, order.indexOf(mode));
+    const next =
+      event.key === "ArrowRight" || event.key === "ArrowDown" ? order[(index + 1) % order.length]
+        : event.key === "ArrowLeft" || event.key === "ArrowUp" ? order[(index + order.length - 1) % order.length]
+          : event.key === "Home" ? order[0]
+            : event.key === "End" ? order[order.length - 1]
+              : null;
+    if (!next) return;
+    event.preventDefault();
+    switchMode(next);
+    tabRefs.current[next]?.focus();
   }
   const [busy, setBusy] = useState(false);
   const Heading = headingLevel === 2 ? "h2" : "h3";
@@ -117,22 +135,32 @@ export function AuthPanel({
           fronting it, and the surfaces that are only ever reached by a
           returning student open on it instead. */}
       {mode !== "forgot" ? (
-        <div className={`auth-tabs auth-tabs--${mode}`} role="tablist">
+        <div aria-label="Your account" className={`auth-tabs auth-tabs--${mode}`} role="tablist">
           <span aria-hidden="true" className="auth-tabs__thumb" />
           <button
+            aria-controls={`${tabsId}-panel`}
             aria-selected={mode === "register"}
             className={mode === "register" ? "is-active" : ""}
+            id={`${tabsId}-register`}
             onClick={() => switchMode("register")}
+            onKeyDown={tabKey}
+            ref={(element) => { tabRefs.current.register = element; }}
             role="tab"
+            tabIndex={mode === "register" ? 0 : -1}
             type="button"
           >
             Create an account
           </button>
           <button
+            aria-controls={`${tabsId}-panel`}
             aria-selected={mode === "signin"}
             className={mode === "signin" ? "is-active" : ""}
+            id={`${tabsId}-signin`}
             onClick={() => switchMode("signin")}
+            onKeyDown={tabKey}
+            ref={(element) => { tabRefs.current.signin = element; }}
             role="tab"
+            tabIndex={mode === "signin" ? 0 : -1}
             type="button"
           >
             I have an account
@@ -140,7 +168,14 @@ export function AuthPanel({
         </div>
       ) : null}
 
-      <form className="auth-panel__form" key={mode} onSubmit={submit}>
+      <form
+        aria-labelledby={mode !== "forgot" ? `${tabsId}-${mode}` : undefined}
+        className="auth-panel__form"
+        id={`${tabsId}-panel`}
+        key={mode}
+        onSubmit={submit}
+        role={mode !== "forgot" ? "tabpanel" : undefined}
+      >
         {mode === "register" ? (
           <label>
             <span>

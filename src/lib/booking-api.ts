@@ -1,3 +1,4 @@
+import { forgetSession, readSession } from "@/lib/auth-api";
 import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, formatMoney } from "@/lib/config";
 
 export type LessonType = {
@@ -92,6 +93,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const data = (await response.json().catch(() => ({}))) as T & { error?: string };
+  // A signed request refused as unauthorised means the session died elsewhere
+  // (expired, revoked, signed out on another device). Forget it, so the page
+  // offers sign-in instead of failing every step with "Please sign in".
+  if (response.status === 401 && new Headers(init?.headers).has("Authorization")) forgetSession();
   if (!response.ok) {
     throw new BookingApiError(data.error || "Something went wrong. Please try again.", response.status);
   }
@@ -136,9 +141,12 @@ export function fetchAvailability(
   const query = new URLSearchParams({ lessonType, from, to });
   if (moving?.manageToken) query.set("manage", moving.manageToken);
   if (moving?.seriesId) query.set("series", moving.seriesId);
+  // Signed in, the student's own unfinished card-setup hold is not shown as
+  // busy to them: their next booking replaces it. Anyone else still sees it.
+  const session = moving?.session || readSession();
   return request<AvailabilityResponse>(`/availability?${query}`, {
     signal,
-    ...(moving?.seriesId && moving.session ? { headers: { Authorization: `Bearer ${moving.session}` } } : {})
+    ...(session ? { headers: { Authorization: `Bearer ${session}` } } : {})
   });
 }
 

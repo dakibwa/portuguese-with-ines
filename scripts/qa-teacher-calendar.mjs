@@ -394,9 +394,12 @@ try {
   await page.keyboard.press("Escape");
   await expect(sam).toBeFocused();
   await sam.click();
+  // Before the lesson starts the control is there, closed, with when it opens.
   await expect(
     page.getByRole("button", { name: "Mark no-show", exact: true }),
-  ).toHaveCount(0);
+  ).toBeDisabled();
+  // Open from the start until six hours after the end.
+  await expect(page.getByRole("dialog")).toContainText(/Available \d\d:\d\d–\d\d:\d\d/);
   await page.getByRole("button", { name: "Move lesson", exact: true }).click();
   await page.getByLabel("New date").fill("2026-09-10");
   await page.getByRole("dialog").getByLabel("Time in Porto").fill("00:30");
