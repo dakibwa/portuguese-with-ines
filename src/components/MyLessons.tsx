@@ -18,6 +18,10 @@ import {
 import { browserTimeZone, formatBookedLessonLabel, formatLongDate, formatSlotTimeForStudent } from "@/lib/booking-api";
 import { BOOKING_TIME_ZONE } from "@/lib/config";
 
+function accountDetails(student?: Student | null) {
+  return { name: student?.name ?? "", email: student?.email ?? "", nif: student?.nif ?? "" };
+}
+
 function historyTime(booking: MyBooking) {
   return Date.parse(booking.status === "cancelled" && booking.cancelledAt ? booking.cancelledAt : booking.endAt);
 }
@@ -58,30 +62,33 @@ function HistoryLessonCard({ booking, zone }: { booking: MyBooking; zone: string
  */
 export function MyLessons({
   bookingActive = false,
+  initialAccount = null,
   onOpenAccountSection,
   onSignedOut,
   onTransition,
   openUpcomingRequest = 0
 }: {
   bookingActive?: boolean;
+  /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
+  initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[] } | null;
   onOpenAccountSection?: (section: "history" | "upcoming" | "profile") => void;
   onSignedOut?: () => void;
   onTransition?: (update: () => void) => void;
   openUpcomingRequest?: number;
 } = {}) {
-  const [student, setStudent] = useState<Student | null>(null);
-  const [bookings, setBookings] = useState<MyBooking[]>([]);
-  const [series, setSeries] = useState<LessonSeries[]>([]);
+  const [student, setStudent] = useState<Student | null>(initialAccount?.student ?? null);
+  const [bookings, setBookings] = useState<MyBooking[]>(initialAccount?.bookings ?? []);
+  const [series, setSeries] = useState<LessonSeries[]>(initialAccount?.series ?? []);
   const [editing, setEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountSection, setAccountSection] = useState<"history" | "upcoming" | "">("");
-  const [details, setDetails] = useState({ name: "", email: "", nif: "" });
+  const [details, setDetails] = useState(() => accountDetails(initialAccount?.student));
   const [savingName, setSavingName] = useState(false);
   const [savingNif, setSavingNif] = useState(false);
   const [emailPending, setEmailPending] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
   const [detailsNote, setDetailsNote] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialAccount);
   const [error, setError] = useState("");
   const [zone, setZone] = useState(BOOKING_TIME_ZONE);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -112,7 +119,7 @@ export function MyLessons({
   // the student is typing with the values it had before.
   const editingRef = useRef(false);
   useEffect(() => { editingRef.current = editing; }, [editing]);
-  const detailsLoaded = useRef(false);
+  const detailsLoaded = useRef(Boolean(initialAccount));
   const load = useCallback(async () => {
     const session = readSession();
     if (!session) {
@@ -129,7 +136,7 @@ export function MyLessons({
       }
       setStudent(data.student);
       if (!editingRef.current || !detailsLoaded.current) {
-        setDetails({ name: data.student.name, email: data.student.email, nif: data.student.nif ?? "" });
+        setDetails(accountDetails(data.student));
         detailsLoaded.current = true;
       }
       setBookings(data.bookings);
@@ -141,9 +148,12 @@ export function MyLessons({
     }
   }, []);
 
+  // Arriving with the account the page has just loaded needs no second
+  // request; every later reload still asks.
+  const arrivedWithAccount = useRef(Boolean(initialAccount));
   useEffect(() => {
     setZone(browserTimeZone());
-    load();
+    if (!arrivedWithAccount.current) load();
   }, [load]);
 
   // Coming back to the lessons view (after a booking, a move or a
@@ -187,7 +197,7 @@ export function MyLessons({
     confirmEmailChange(readSession(), changeToken)
       .then((result) => {
         setStudent(result.student);
-        setDetails({ name: result.student.name, email: result.student.email, nif: result.student.nif ?? "" });
+        setDetails(accountDetails(result.student));
         setDetailsNote("That's your email address updated.");
         setEmailPending("");
       })

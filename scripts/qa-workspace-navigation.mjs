@@ -20,9 +20,13 @@ bookings[1] = { ...bookings[1], isPast: false, startAt: "2026-11-05T16:00:00Z", 
 bookings[2] = { ...bookings[2], isPast: false, startAt: "2026-09-07T16:00:00Z", endAt: "2026-09-07T17:00:00Z", cancelledAt: "2026-09-05T09:00:00Z" };
 const expectedHistory = [2, 0, 1, ...Array.from({ length: 9 }, (_, index) => index + 3)].map(index => `Reference PREVIEW-${index}`);
 await context.addInitScript(() => localStorage.setItem("ines-student-session", "navigation-fixture"));
-await context.route("**/me", route => route.fulfill({
-  contentType: "application/json", body: JSON.stringify({ student, bookings, series: [], sameDayFeeCents: 500 })
-}));
+let accountLoads = 0;
+await context.route("**/me", route => {
+  if (route.request().method() === "GET") accountLoads += 1;
+  return route.fulfill({
+    contentType: "application/json", body: JSON.stringify({ student, bookings, series: [], sameDayFeeCents: 500 })
+  });
+});
 await context.route("**/me/recurring-rates", route => route.fulfill({ contentType: "application/json", body: '{"rates":{}}' }));
 const page = await context.newPage();
 const errors = [];
@@ -65,6 +69,10 @@ async function openMenuWithStationaryHeader(label) {
 try {
   await page.goto(`${base}/book/`);
   await page.locator("#upcoming-lessons-heading").waitFor();
+  // The account panel opens with the account the page has just loaded.
+  await page.locator("#account-menu-button").waitFor({ state: "attached" });
+  await page.waitForLoadState("networkidle");
+  assert.equal(accountLoads, 1, "Arriving signed in should load the account once");
   const layouts = [];
   for (const width of [1920, 1440, 1280, 1101, 1100, 900, 821, 820, 390, 320]) {
     await page.setViewportSize({ width, height: width < 500 ? 844 : 1100 });

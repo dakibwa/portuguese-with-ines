@@ -553,6 +553,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [ratesReady, setRatesReady] = useState(false);
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
   const [lessonSeries, setLessonSeries] = useState<LessonSeries[]>([]);
+  // The account as last loaded here. The account panel opens with it, rather
+  // than asking for the same account again the moment it appears.
+  const [loadedAccount, setLoadedAccount] = useState<Awaited<ReturnType<typeof fetchMe>>>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   // The Worker treats any non-cancelled booking as the start of the student's
   // relationship with Inês, including an upcoming first lesson. Mirror that
@@ -566,7 +569,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // device) takes the page back to signed out, so booking asks for sign-in
   // rather than failing with "Please sign in".
   useEffect(() => subscribeToSession(() => {
-    if (!readSession()) setStudent((current) => (current ? null : current));
+    if (readSession()) return;
+    setStudent((current) => (current ? null : current));
+    setLoadedAccount(null);
   }), []);
 
   // A tab left open overnight moves on to the new day when it is next looked at.
@@ -682,10 +687,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setMyBookings([]);
       setLessonSeries([]);
       setHasPriorBooking(false);
+      setLoadedAccount(null);
       return null;
     }
 
     const data = await fetchMe(session);
+    setLoadedAccount(data);
     setStudent(data?.student ?? null);
     setMyBookings(data?.bookings ?? []);
     setLessonSeries(data?.series ?? []);
@@ -2253,12 +2260,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           >
             <AccountControls
               bookingActive={intent === "book"}
+              initialAccount={loadedAccount?.student.id === student.id ? loadedAccount : null}
               onOpenAccountSection={openAccountShortcut}
               onTransition={transitionBooking}
               onSignedOut={() => {
                 setStudent(null);
                 setMyBookings([]);
                 setLessonSeries([]);
+                setLoadedAccount(null);
                 setManaged(null);
                 setManagedToken("");
                 setManagedSeriesId(null);
