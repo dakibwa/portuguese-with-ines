@@ -1,9 +1,7 @@
 "use client";
 
-import { MeetingLink } from "@/components/MeetingLink";
-
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleHelp, CircleX, Globe2, Menu as MenuIcon, Repeat } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronRight, CircleX, Globe2, Menu as MenuIcon, Repeat } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { LessonMark } from "@/components/LessonMarks";
 import {
@@ -41,16 +39,6 @@ type UpcomingLessonGroup = {
   seriesId: string | null;
   bookings: MyBooking[];
 };
-
-export type UpcomingBookingFocusRequest = {
-  bookingReference: string;
-  requestKey: number;
-  seriesId: string | null;
-};
-
-function upcomingBookingId(reference: string) {
-  return `upcoming-booking-${encodeURIComponent(reference)}`;
-}
 
 function minutesToClock(minutes: number) {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
@@ -97,8 +85,6 @@ export function MyLessons({
   onOpenAccountSection,
   onSignedOut,
   onTransition,
-  focusUpcomingBooking,
-  focusUpcomingOnOpen = true,
   openUpcomingRequest = 0,
   showCalendar = true,
   showHistory = true,
@@ -113,8 +99,6 @@ export function MyLessons({
   onOpenAccountSection?: (section: "history" | "upcoming" | "profile") => void;
   onSignedOut?: () => void;
   onTransition?: (update: () => void) => void;
-  focusUpcomingBooking?: UpcomingBookingFocusRequest | null;
-  focusUpcomingOnOpen?: boolean;
   openUpcomingRequest?: number;
   showCalendar?: boolean;
   showHistory?: boolean;
@@ -129,8 +113,6 @@ export function MyLessons({
   const [editing, setEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountSection, setAccountSection] = useState<"history" | "upcoming" | "">("");
-  const [expandedUpcomingGroup, setExpandedUpcomingGroup] = useState("");
-  const [highlightedBookingReference, setHighlightedBookingReference] = useState("");
   const [details, setDetails] = useState({ name: "", email: "", nif: "" });
   const [savingName, setSavingName] = useState(false);
   const [savingNif, setSavingNif] = useState(false);
@@ -149,7 +131,6 @@ export function MyLessons({
     if (!bookingActive) return;
     setMenuOpen(false);
     setEditing(false);
-    setExpandedUpcomingGroup("");
     setAccountSection("");
   }, [bookingActive]);
 
@@ -157,12 +138,8 @@ export function MyLessons({
     if (!embedded || !openUpcomingRequest) return;
     setMenuOpen(false);
     setEditing(false);
-    setExpandedUpcomingGroup("");
     setAccountSection("upcoming");
-    if (!focusUpcomingOnOpen) return;
-    const frame = window.requestAnimationFrame(() => document.getElementById("account-upcoming-lessons")?.focus());
-    return () => window.cancelAnimationFrame(frame);
-  }, [embedded, focusUpcomingOnOpen, openUpcomingRequest]);
+  }, [embedded, openUpcomingRequest]);
 
   const applyTransition = useCallback(
     (update: () => void) => {
@@ -171,39 +148,6 @@ export function MyLessons({
     },
     [onTransition]
   );
-
-  useEffect(() => {
-    if (!embedded || !focusUpcomingBooking) return;
-
-    const { bookingReference, seriesId } = focusUpcomingBooking;
-    setMenuOpen(false);
-    setEditing(false);
-    setAccountSection("upcoming");
-    setExpandedUpcomingGroup(seriesId ? `series:${seriesId}` : "");
-    setHighlightedBookingReference(bookingReference);
-
-    const highlightTimeout = window.setTimeout(() => setHighlightedBookingReference(""), 1800);
-
-    return () => {
-      window.clearTimeout(highlightTimeout);
-    };
-  }, [embedded, focusUpcomingBooking]);
-
-  // This effect runs after the group expansion has committed, so the exact
-  // occurrence is guaranteed to exist before focus and scrolling are applied.
-  useEffect(() => {
-    if (accountSection !== "upcoming" || !highlightedBookingReference) return;
-    const frame = window.requestAnimationFrame(() => {
-      const target = document.getElementById(upcomingBookingId(highlightedBookingReference));
-      if (!target) return;
-      target.focus({ preventScroll: true });
-      target.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "center"
-      });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [accountSection, expandedUpcomingGroup, highlightedBookingReference]);
 
   const load = useCallback(async (animate = false, after?: () => void) => {
     const session = readSession();
@@ -443,11 +387,12 @@ export function MyLessons({
     applyTransition(() => {
       setMenuOpen(false);
       setEditing(false);
-      if (accountSection !== section) setExpandedUpcomingGroup("");
       setAccountSection(section);
       onOpenAccountSection?.(section);
     });
-    window.requestAnimationFrame(() => document.getElementById(`account-${section === "history" ? "past" : "upcoming"}-lessons`)?.focus({ preventScroll: true }));
+    if (section === "history") {
+      window.requestAnimationFrame(() => document.getElementById("account-past-lessons")?.focus({ preventScroll: true }));
+    }
   }
 
   function editDetails() {
@@ -458,19 +403,10 @@ export function MyLessons({
     applyTransition(() => {
       setMenuOpen(false);
       setEditing(true);
-      setExpandedUpcomingGroup("");
       setAccountSection("");
       onOpenAccountSection?.("profile");
     });
     window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".my-lessons__details input")?.focus({ preventScroll: true }));
-  }
-
-  function bookLesson() {
-    setMenuOpen(false);
-    setEditing(false);
-    setExpandedUpcomingGroup("");
-    setAccountSection("");
-    onBook?.();
   }
 
   if (loading) return <p className="booking-state-note">Loading your lessons…</p>;
