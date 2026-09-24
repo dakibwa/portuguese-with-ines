@@ -2600,6 +2600,28 @@ function assertIncludes(value, expected, label) {
 
 async function checkTermsDialog(targetPage, opener) {
   await targetPage.locator('#terms-privacy[data-ready="true"]').waitFor({ state: "attached" });
+  // Measure a finished page. Near the footer, content still arriving while the
+  // dialog is open (lessons, fonts) changes the page's height, and the browser
+  // then clamps the scroll position: a slow CI run once read that as the
+  // dialog moving the page (scrollY 80, then 43).
+  await targetPage.waitForLoadState("networkidle");
+  await targetPage.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise((resolve) => {
+      let previous = document.documentElement.scrollHeight;
+      let stable = 0;
+      let frames = 0;
+      const check = () => {
+        const height = document.documentElement.scrollHeight;
+        stable = height === previous ? stable + 1 : 0;
+        previous = height;
+        frames += 1;
+        if (stable >= 10 || frames >= 240) resolve();
+        else requestAnimationFrame(check);
+      };
+      requestAnimationFrame(check);
+    });
+  });
   await opener.scrollIntoViewIfNeeded();
   await opener.focus();
   await waitForOrientation(targetPage);
