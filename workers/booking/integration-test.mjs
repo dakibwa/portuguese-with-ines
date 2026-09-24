@@ -1646,6 +1646,19 @@ await test("Inês can record a no-show until six hours after the lesson ends, an
   await chargeDueLessons(env, new Date("2026-09-05T15:00:00.000Z"));
   assert.deepEqual(charged("attended-recently"), [1500]);
 });
+await test("signing up again with a registered address says so, whatever its case, and makes no second account", async () => {
+  // Deliberate (Dan, 24 September 2026): telling a returning student to sign
+  // in beats hiding whether the address is registered. See docs-booking-system.md.
+  const ip = { "CF-Connecting-IP": "198.51.100.70" };
+  const first = await call("/auth/register", { user: null, headers: ip, body: { email: "returning@example.invalid", name: "Rita Returning", password: "first-password" } });
+  assert.equal(first.status, 201, await first.clone().text());
+  const again = await call("/auth/register", { user: null, headers: ip, body: { email: "  Returning@Example.INVALID ", name: "Rita Again", password: "second-password" } });
+  assert.equal(again.status, 409);
+  assert.equal((await again.json()).error, "There is already an account with that email. Try signing in instead.");
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM students WHERE email='returning@example.invalid'").get().n, 1);
+  assert.equal((await call("/auth/login", { user: null, headers: ip, body: { email: "returning@example.invalid", password: "second-password" } })).status, 401, "the second password was never set");
+  assert.equal((await call("/auth/login", { user: null, headers: ip, body: { email: "returning@example.invalid", password: "first-password" } })).status, 200);
+});
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;
