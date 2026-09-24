@@ -5640,6 +5640,28 @@ details.booking-recurring-rate[open] > summary {
   line-height: 1.5;
 }
 
+/* A form's error is what to read before trying again, so it sits in the same
+   coral panel as the clash card rather than reading as a line of text. */
+.booking-alert--error {
+  border: 1.5px solid var(--coral);
+  border-radius: var(--squiggle-field);
+  padding: 0.8rem 0.95rem;
+  background: rgba(239, 93, 60, 0.1);
+}
+
+.booking-alert--error svg {
+  color: var(--coral-action);
+}
+
+.booking-alert--error p {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.booking-alert__action {
+  margin-top: 0.65rem;
+}
+
 .manage-booking {
   margin-top: 1.75rem;
 }

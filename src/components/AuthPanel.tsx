@@ -5,7 +5,7 @@ import { AlertCircle, Lock, Mail, ReceiptText, UserRound } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { browserTimeZone } from "@/lib/booking-api";
-import { login, register, requestPasswordReset, storeSession, type Student } from "@/lib/auth-api";
+import { AuthApiError, login, register, requestPasswordReset, storeSession, type Student } from "@/lib/auth-api";
 
 type Mode = "signin" | "register" | "forgot";
 
@@ -43,12 +43,17 @@ export function AuthPanel({
   const [form, setForm] = useState({ name: "", email: "", password: "", nif: "" });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Sign-up refused because the address already has an account: the error then
+  // offers to sign in, with the address carried over.
+  const [accountExists, setAccountExists] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   // A stale error never follows the student to another form. The "reset link is
   // on its way" notice does stay when they go back to sign in: that is where
   // they wait for it.
   function switchMode(next: Mode) {
     setError("");
+    setAccountExists(false);
     if (next !== "signin") setNotice("");
     setMode(next);
   }
@@ -80,12 +85,20 @@ export function AuthPanel({
   function update(patch: Partial<typeof form>) {
     setForm((current) => ({ ...current, ...patch }));
     setError("");
+    setAccountExists(false);
+  }
+
+  // The address is already filled in, so the password is all that's left.
+  function signInInstead() {
+    switchMode("signin");
+    window.requestAnimationFrame(() => passwordRef.current?.focus());
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setAccountExists(false);
     setNotice("");
 
     try {
@@ -110,6 +123,7 @@ export function AuthPanel({
       onSignedIn(result.student);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That didn't work. Please try again.");
+      setAccountExists(mode === "register" && caught instanceof AuthApiError && caught.status === 409);
     } finally {
       setBusy(false);
     }
@@ -128,7 +142,13 @@ export function AuthPanel({
 
       {/* Booking terms and privacy share one disclosure on the page,
           so signing up carries no explanatory copy of its own. */}
-      {mode !== "forgot" ? <GoogleSignInButton onError={setError} onSignedIn={onSignedIn} /> : null}
+      {mode !== "forgot" ? <GoogleSignInButton
+          onError={(message) => {
+            setAccountExists(false);
+            setError(message);
+          }}
+          onSignedIn={onSignedIn}
+        /> : null}
 
       {/* Creating an account leads, because at the end of a booking most people
           have never been here before. Signing in follows it rather than
@@ -215,6 +235,7 @@ export function AuthPanel({
               autoComplete={mode === "register" ? "new-password" : "current-password"}
               minLength={mode === "register" ? 8 : undefined}
               onChange={(event) => update({ password: event.target.value })}
+              ref={passwordRef}
               required
               type="password"
               value={form.password}
@@ -241,9 +262,16 @@ export function AuthPanel({
         ) : null}
 
         {error ? (
-          <div className="booking-alert" role="alert">
+          <div className="booking-alert booking-alert--error" role="alert">
             <AlertCircle size={18} aria-hidden="true" />
-            <p>{error}</p>
+            <div className="booking-alert__body">
+              <p>{error}</p>
+              {accountExists ? (
+                <button className="button button--outline button--compact booking-alert__action" onClick={signInInstead} type="button">
+                  Sign in
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
 

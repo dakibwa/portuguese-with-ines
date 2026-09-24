@@ -78,6 +78,31 @@ try {
     assert.deepEqual(signUp.errors, []);
     await signUp.page.close();
 
+    // An address that already has an account is refused in a panel that can't
+    // be missed, and one click carries the address over to signing in.
+    const taken = await open(width, "/book/?view=lessons", {
+      reply: (endpoint) => endpoint === "/auth/register"
+        ? { status: 409, json: { error: "There is already an account with that email. Try signing in instead." } }
+        : null,
+    });
+    await taken.page.getByRole("tab", { name: "Create an account", exact: true }).click();
+    const takenForm = taken.page.locator(".auth-panel__form");
+    await takenForm.getByLabel("First name").fill("Ana");
+    await takenForm.getByLabel("Email").fill("ana@example.invalid");
+    await takenForm.getByLabel("Password").fill("a-long-password");
+    await takenForm.getByRole("button", { name: "Create my account", exact: true }).click();
+    const exists = takenForm.locator(".booking-alert--error[role=alert]");
+    await expect(exists).toContainText("There is already an account with that email.");
+    assert.ok(await noOverflow(taken.page));
+    await taken.page.locator(".auth-panel").screenshot({ path: `tmp/qa/nif/account-exists-${width}.png` });
+    await exists.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(taken.page.getByRole("tab", { name: "I have an account", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(takenForm.getByLabel("Email")).toHaveValue("ana@example.invalid");
+    await expect(takenForm.getByLabel("Password")).toBeFocused();
+    await expect(takenForm.locator("[role=alert]")).toHaveCount(0);
+    assert.deepEqual(taken.errors, []);
+    await taken.page.close();
+
     // Edit details: save, clear, and a refused NIF leaves the saved one alone.
     let saved = "";
     const details = await open(width, "/book/?view=lessons", {

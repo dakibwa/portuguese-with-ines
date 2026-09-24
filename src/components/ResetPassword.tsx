@@ -95,7 +95,7 @@ export function ResetPassword() {
         </label>
 
         {error ? (
-          <div className="booking-alert" role="alert">
+          <div className="booking-alert booking-alert--error" role="alert">
             <AlertCircle size={18} aria-hidden="true" />
             <p>{error}</p>
           </div>

@@ -137,6 +137,14 @@ export function subscribeToSession(onChange: () => void) {
   };
 }
 
+/** A refusal from the account endpoints, keeping its status so a form can offer the next step. */
+export class AuthApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "AuthApiError";
+  }
+}
+
 async function post<T>(path: string, body: unknown, token?: string): Promise<T> {
   let response: Response;
   try {
@@ -154,7 +162,7 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
   }
 
   const data = (await response.json().catch(() => ({}))) as T & { error?: string };
-  if (!response.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+  if (!response.ok) throw new AuthApiError(data.error || "Something went wrong. Please try again.", response.status);
   return data;
 }
 
