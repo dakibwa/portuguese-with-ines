@@ -155,6 +155,14 @@ depending on them having kept the right confirmation email.
   per 15 minutes hold whether they arrive one at a time or all at once, and a
   correct password inside a burst does not reopen the window — which does also
   hold off the real student, the accepted trade against guessing.
+- **Sign-up does say when an address already has an account** ("Try signing in
+  instead"). That lets someone test whether an address is registered, which
+  sign-in, forgotten-password and email change avoid. It is deliberate (Dan,
+  24 September 2026): hiding it would mean mailing every new student a
+  confirmation link before they can book, and telling a returning student to
+  sign in is the more useful answer. Five new-account attempts per connection
+  an hour (IPv6 counted per /64), taken before the address is looked up, limit
+  how fast addresses can be tested.
 - Reset links are single-use and last an hour. A Google-only account has no
   password; using "forgot password" is how such a student sets one.
 - **An address counts as proven once it has received mail.**
