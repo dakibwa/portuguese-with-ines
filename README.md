@@ -73,10 +73,10 @@ request only competes with the fonts for no gain.
 - **Her print and business material is not in this repository.** Branding,
   business cards, Square booking tiles, visual concepts and the superseded-work
   archive live in `/Users/danatkinson/Documents/Work/Português com a Inês`,
-  which has a `README.md` pointing back here. That folder is backed up by
-  Google Drive; this repository is backed up by GitHub. The split exists
-  because a `.git` directory inside the Drive-synced `Documents` tree risks
-  corruption, not because the work is separate.
+  which has a `README.md` pointing back here. That folder is outside Git;
+  this repository is backed up by GitHub. The split exists because Git
+  repositories never live inside `Documents`, not because the work is
+  separate.
 - [design/README.md](./design/README.md) is the canonical visual and interaction
   contract. Read it before changing anything visual, keep it aligned with the
   code in the same change, and verify the result on the published site.
