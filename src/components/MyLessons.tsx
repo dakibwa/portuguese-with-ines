@@ -15,8 +15,19 @@ import {
   type MyBooking,
   type Student
 } from "@/lib/auth-api";
-import { browserTimeZone, formatBookedLessonLabel, formatLongDate, formatSlotTimeForStudent } from "@/lib/booking-api";
+import {
+  browserTimeZone,
+  fetchRecurringRates,
+  formatBookedLessonLabel,
+  formatLongDate,
+  formatMoneyCents,
+  formatSlotTimeForStudent,
+  redeemRecurringRate
+} from "@/lib/booking-api";
 import { BOOKING_TIME_ZONE } from "@/lib/config";
+
+/** The two lengths a code from Inês can set a weekly price for. */
+const RATE_LENGTHS = [60, 90] as const;
 
 function accountDetails(student?: Student | null) {
   return { name: student?.name ?? "", email: student?.email ?? "", nif: student?.nif ?? "" };
@@ -64,6 +75,7 @@ export function MyLessons({
   bookingActive = false,
   initialAccount = null,
   onOpenAccountSection,
+  onRatesChange,
   onSignedOut,
   onTransition,
   openUpcomingRequest = 0
@@ -72,6 +84,8 @@ export function MyLessons({
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
   initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[] } | null;
   onOpenAccountSection?: (section: "history" | "upcoming" | "profile") => void;
+  /** The account's saved weekly rates, as last read or changed here, so booking prices with them. */
+  onRatesChange?: (rates: Record<number, number>) => void;
   onSignedOut?: () => void;
   onTransition?: (update: () => void) => void;
   openUpcomingRequest?: number;
@@ -88,10 +102,19 @@ export function MyLessons({
   const [emailPending, setEmailPending] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
   const [detailsNote, setDetailsNote] = useState("");
+  // The weekly rates saved on the account, read each time the details open.
+  // `null` until they arrive, so a slow answer never reads as "none saved".
+  const [rates, setRates] = useState<Record<number, number> | null>(null);
+  const [ratesFailed, setRatesFailed] = useState(false);
+  const [rateCode, setRateCode] = useState("");
+  const [savingRate, setSavingRate] = useState(false);
   const [loading, setLoading] = useState(!initialAccount);
   const [error, setError] = useState("");
   const [zone, setZone] = useState(BOOKING_TIME_ZONE);
   const menuRef = useRef<HTMLDivElement>(null);
+  const rateCodeRef = useRef<HTMLInputElement>(null);
+  const onRatesChangeRef = useRef(onRatesChange);
+  useEffect(() => { onRatesChangeRef.current = onRatesChange; }, [onRatesChange]);
 
   useEffect(() => {
     if (!bookingActive) return;
@@ -119,6 +142,27 @@ export function MyLessons({
   // the student is typing with the values it had before.
   const editingRef = useRef(false);
   useEffect(() => { editingRef.current = editing; }, [editing]);
+
+  // Read when the details open, so a rate Inês set by hand shows without a
+  // reload, and tell booking what came back: it prices weekly lessons from it.
+  useEffect(() => {
+    if (!editing) return;
+    let active = true;
+    setRatesFailed(false);
+    fetchRecurringRates(readSession())
+      .then((data) => {
+        if (!active) return;
+        setRates(data.rates);
+        onRatesChangeRef.current?.(data.rates);
+      })
+      .catch(() => {
+        if (active) setRatesFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [editing]);
+
   const detailsLoaded = useRef(Boolean(initialAccount));
   const load = useCallback(async () => {
     const session = readSession();
@@ -248,6 +292,34 @@ export function MyLessons({
       setError(caught instanceof Error ? caught.message : "That could not be saved.");
     } finally {
       setSavingNif(false);
+    }
+  }
+
+  async function addRateCode() {
+    if (savingRate || !rateCode.trim()) return;
+    setSavingRate(true);
+    setError("");
+    setDetailsNote("");
+    try {
+      // No length is sent: the code says which one it is for. Each length keeps
+      // its own rate, so a 60 and a 90 minute code sit side by side.
+      const result = await redeemRecurringRate(readSession(), rateCode.trim());
+      setRates(result.rates);
+      setRatesFailed(false);
+      onRatesChangeRef.current?.(result.rates);
+      setRateCode("");
+      setDetailsNote(
+        result.saved
+          ? `Saved. Your ${result.saved.durationMinutes}-minute weekly lessons are now ${formatMoneyCents(result.saved.cents)} each.`
+          : "Saved."
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "That code could not be saved.");
+    } finally {
+      setSavingRate(false);
+      // The button is disabled once the field is empty, so focus goes back to
+      // the field, ready for the other length's code.
+      rateCodeRef.current?.focus();
     }
   }
 
@@ -491,8 +563,58 @@ export function MyLessons({
             </div>
             <p className="my-lessons__details-note">Added to your receipts. Leave it blank if you don&rsquo;t need one.</p>
 
+            {/* Only some students have a code, so nothing here suggests they should:
+                saved rates appear once there is one, and the field stays behind a
+                small disclosure, as it does when booking. */}
+            <div className="my-lessons__rates">
+              {rates && RATE_LENGTHS.some((minutes) => rates[minutes] !== undefined) ? (
+                <ul aria-label="Your saved weekly rates" className="my-lessons__rates-list">
+                  {RATE_LENGTHS.filter((minutes) => rates[minutes] !== undefined).map((minutes) => (
+                    <li key={minutes}>
+                      <span>{minutes}-minute weekly lessons</span>
+                      <strong>{formatMoneyCents(rates[minutes])} each</strong>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {ratesFailed ? (
+                <p className="my-lessons__details-note">We couldn&rsquo;t check your saved rates just now.</p>
+              ) : null}
+              <details className="my-lessons__code">
+                <summary>Have a code from Inês?</summary>
+                <form
+                  className="my-lessons__details-row"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void addRateCode();
+                  }}
+                >
+                  <label>
+                    <span>Your code</span>
+                    <input
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      maxLength={40}
+                      onChange={(event) => setRateCode(event.target.value)}
+                      ref={rateCodeRef}
+                      spellCheck={false}
+                      value={rateCode}
+                    />
+                  </label>
+                  <button className="button button--blue" disabled={savingRate || !rateCode.trim()} type="submit">
+                    {savingRate ? "Adding\u2026" : "Add code"}
+                  </button>
+                </form>
+                <p className="my-lessons__details-note">
+                  A code sets the price of your weekly lessons of its length and stays on your account. You can add one
+                  for 60-minute lessons and one for 90-minute lessons. Lessons already booked keep their price.
+                </p>
+              </details>
+            </div>
+
             {detailsNote ? (
-              <p className="my-lessons__details-note my-lessons__details-note--ok">{detailsNote}</p>
+              <p className="my-lessons__details-note my-lessons__details-note--ok" role="status">{detailsNote}</p>
             ) : null}
           </section>
         ) : null}

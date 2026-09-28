@@ -266,6 +266,73 @@ await test("saved rate survives catalogue removal, trial and other duration keep
   assert.equal(await priceForMove(local, { lesson_type_id: "single", amount_cents: 1800, series_id: "series", student_id: "alice" }, { id: "single", duration_minutes: 60, price_cents: 2500 }), 1800);
   assert.equal(await priceForMove(local, { lesson_type_id: "single", amount_cents: 1800, series_id: "series", student_id: "alice" }, { id: "long", duration_minutes: 90, price_cents: 3500 }), 2700);
 });
+async function enrol(id) { student(id); sessions[id] = await createSession(id, env.BOOKING_TOKEN_SECRET); }
+const savedRates = async (user) => (await (await call("/me/recurring-rates", { user, method: "GET" })).json()).rates;
+await test("a code names its own length, so a 60 and a 90 minute code save side by side without being told which", async () => {
+  await enrol("carol");
+  const ninety = await call("/me/recurring-rates", { user: "carol", body: { code: " demo27 " } });
+  assert.equal(ninety.status, 200);
+  assert.deepEqual(await ninety.json(), { rates: { 90: 2700 }, saved: { durationMinutes: 90, cents: 2700 } });
+  const sixty = await call("/me/recurring-rates", { user: "carol", body: { code: "TEST15" } });
+  assert.equal(sixty.status, 200);
+  assert.deepEqual(await sixty.json(), { rates: { 60: 1500, 90: 2700 }, saved: { durationMinutes: 60, cents: 1500 } });
+  // Adding the same code again changes nothing and is not an error.
+  const again = await call("/me/recurring-rates", { user: "carol", body: { code: "test15" } });
+  assert.equal(again.status, 200);
+  assert.deepEqual((await again.json()).rates, { 60: 1500, 90: 2700 });
+  assert.deepEqual(await savedRates("carol"), { 60: 1500, 90: 2700 });
+});
+await test("a second code for a length that already has a rate is refused and names the length; the first stays", async () => {
+  await enrol("dora");
+  assert.equal((await call("/me/recurring-rates", { user: "dora", body: { code: "TEST15" } })).status, 200);
+  const refused = await call("/me/recurring-rates", { user: "dora", body: { code: "MOCK19" } });
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).error, "You already have an agreed rate for 60-minute lessons. Ask Inês if it needs to change.");
+  assert.deepEqual(await savedRates("dora"), { 60: 1500 });
+  // The other length is still open to her.
+  assert.equal((await call("/me/recurring-rates", { user: "dora", body: { code: "DEMO27" } })).status, 200);
+  assert.deepEqual(await savedRates("dora"), { 60: 1500, 90: 2700 });
+});
+await test("two different prices for one length racing without a named length save exactly one", async () => {
+  await enrol("erin");
+  const responses = await Promise.all(["TEST15", "MOCK19"].map((code) => call("/me/recurring-rates", { user: "erin", body: { code } })));
+  assert.deepEqual(responses.map((res) => res.status).sort(), [200, 409]);
+  assert.deepEqual(Object.keys(await savedRates("erin")), ["60"]);
+});
+await test("an unknown code is refused without naming a length, and a named length still has to match", async () => {
+  await enrol("finn");
+  const unknown = await call("/me/recurring-rates", { user: "finn", body: { code: "NOPE15" } });
+  assert.equal(unknown.status, 400);
+  assert.equal((await unknown.json()).error, "We don't recognise that code. Check it with Inês.");
+  // Booking names the length it is pricing, and a code for the other length isn't one it can use.
+  const wrongLength = await call("/me/recurring-rates", { user: "finn", body: { code: "DEMO27", durationMinutes: 60 } });
+  assert.equal(wrongLength.status, 400);
+  assert.equal((await wrongLength.json()).error, "That code isn't available for this lesson length. Check the code with Inês.");
+  for (const durationMinutes of [45, "60", 0, false]) {
+    assert.equal((await call("/me/recurring-rates", { user: "finn", body: { code: "TEST15", durationMinutes } })).status, 400, String(durationMinutes));
+  }
+  const named = await call("/me/recurring-rates", { user: "finn", body: { code: "DEMO27", durationMinutes: 90 } });
+  assert.equal(named.status, 200);
+  assert.deepEqual(await savedRates("finn"), { 90: 2700 });
+});
+await test("a code the catalogue lists for two lengths is never guessed at, and odd entries are never a rate", () => {
+  const twice = JSON.stringify([{ code: "BOTH20", duration: 60, cents: 2000 }, { code: "BOTH20", duration: 90, cents: 3000 }]);
+  assert.equal(findRecurringCode(twice, "BOTH20"), null);
+  assert.deepEqual(findRecurringCode(twice, "both20", 60), { duration: 60, cents: 2000 });
+  assert.deepEqual(findRecurringCode(twice, "BOTH20", 90), { duration: 90, cents: 3000 });
+  const odd = JSON.stringify([
+    null,
+    { code: "ODDL15", duration: 45, cents: 1500 },
+    { code: "LOWX01", duration: 60, cents: 50 },
+    { code: "HIGH99", duration: 90, cents: 20000 },
+    { code: "FRAC15", duration: 60, cents: 1500.5 }
+  ]);
+  for (const code of ["ODDL15", "LOWX01", "HIGH99", "FRAC15"]) assert.equal(findRecurringCode(odd, code), null, code);
+  assert.equal(findRecurringCode("not json", "TEST15"), null);
+  assert.equal(findRecurringCode('{"code":"TEST15"}', "TEST15"), null);
+  assert.deepEqual(findRecurringCode(env.PRIVATE_RECURRING_CODES, "TEST15", null), { duration: 60, cents: 1500 });
+  assert.equal(findRecurringCode(env.PRIVATE_RECURRING_CODES, 1500), null);
+});
 await test("cross-site writes, unsupported content types and oversized streamed JSON fail", async () => {
   assert.equal((await call("/me", { origin: "https://attacker.example" })).status, 403);
   assert.equal((await call("/me", { headers: { "Content-Type": "text/plain" } })).status, 415);

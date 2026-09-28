@@ -3748,18 +3748,37 @@ async function handleRecurringRates(request, env) {
       return fail("Too many attempts. Please wait 15 minutes before trying again.", 429, request, env);
     }
     const body = await readJson(request);
-    const rate = findRecurringCode(env.PRIVATE_RECURRING_CODES, body.code, body.durationMinutes);
-    if (!rate) return fail("That code isn't available for this lesson length. Check the code with Inês.", 400, request, env);
+    // Booking is pricing one length and names it. The profile has none to give,
+    // so the code says which length it is for.
+    const named = body.durationMinutes !== undefined && body.durationMinutes !== null;
+    const rate = findRecurringCode(env.PRIVATE_RECURRING_CODES, body.code, named ? body.durationMinutes : undefined);
+    if (!rate) {
+      return fail(
+        named
+          ? "That code isn't available for this lesson length. Check the code with Inês."
+          : "We don't recognise that code. Check it with Inês.",
+        400,
+        request,
+        env
+      );
+    }
     // A first grant wins, including simultaneous redemptions. Neither a new
     // code nor removal from the catalogue silently replaces an agreed rate.
+    // Each length keeps its own, so a 60 and a 90 minute code sit side by side.
     await env.DB.prepare(
       `INSERT INTO student_recurring_rates (student_id, duration_minutes, amount_cents, redeemed_at)
        VALUES (?, ?, ?, ?) ON CONFLICT(student_id, duration_minutes) DO NOTHING`
     ).bind(student.id, rate.duration, rate.cents, new Date().toISOString()).run();
-    const saved = await recurringRates(env, student.id);
-    if (saved[rate.duration] !== rate.cents) {
-      return fail("You already have an agreed rate for this lesson length. Ask Inês if it needs to change.", 409, request, env);
+    const rates = await recurringRates(env, student.id);
+    if (rates[rate.duration] !== rate.cents) {
+      return fail(
+        `You already have an agreed rate for ${rate.duration}-minute lessons. Ask Inês if it needs to change.`,
+        409,
+        request,
+        env
+      );
     }
+    return json({ rates, saved: { durationMinutes: rate.duration, cents: rate.cents } }, 200, request, env);
   }
   return json({ rates: await recurringRates(env, student.id) }, 200, request, env);
 }

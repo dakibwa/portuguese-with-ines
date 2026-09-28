@@ -28,6 +28,7 @@ Student on /book                                     (browse without an account)
   → POST /auth/register | /auth/login | /auth/google → session token
   → POST /bookings                    (Bearer)       → D1 row, emails, ICS invite
   → GET  /me                          (Bearer)       → their calendar and series
+  → GET/POST /me/recurring-rates      (Bearer)       → saved weekly rates; POST saves a code
   → GET  /bookings/:token                            one lesson; HMAC-signed token
   → POST /bookings/:token/reschedule | /cancel       → optional lessonType, sequence++, updated ICS
   → POST /series/:id/reschedule | /stop (Bearer)     → move or end an owned weekly sequence
@@ -885,12 +886,37 @@ saved prices. Eight redemption attempts per account per 15 minute window are
 reserved atomically, including parallel guesses. Case and outer whitespace are
 normalised; prefixes/suffixes are never pricing authority.
 
+`POST` takes `{ code, durationMinutes? }`. The length is optional because a code
+is listed for exactly one: booking passes the length it is pricing and the code
+has to be for it, while the profile passes none and the code names its own. A
+code the catalogue lists for two lengths is refused without a length rather than
+guessed at. The answer carries every saved rate as `rates` and the one just
+saved as `saved: { durationMinutes, cents }`. Nothing about the catalogue is
+ever returned: an unknown code and a code for the wrong length say only that it
+isn't recognised or isn't available for that length.
+
 An account's first grant for each duration wins; codes remain reusable by other
-accounts and removing a code does not revoke prior grants. Recurring creation
+accounts and removing a code does not revoke prior grants. Each length has its
+own grant, so one account can hold a 60 minute rate and a 90 minute rate at
+once, from two codes. A second code for a length that already has a different
+rate is refused (409) naming the length and pointing to Inês; the same rate
+again changes nothing. Recurring creation
 and top-ups snapshot the saved rate in `bookings.amount_cents`, including when
 payment is off. Existing rows keep their price when moved at the same duration;
 a new duration uses its own saved rate or public price. Single/trial bookings
 and €5 fees never use these rates. No booked row is repriced merely by redeeming.
+
+**Where a student adds a code.** Under *Edit details*, behind a small `Have a
+code from Inês?` disclosure, and, as before, at weekly confirmation and when
+changing a weekly lesson's length, where the code has to be for the length being
+priced. The profile lists the saved weekly rates only once there is one, so a
+student without a code sees one quiet link and no "standard price" rows. It is
+one field for every code: after a 60 minute code is added the disclosure stays
+open for the 90 minute one. Saving there tells the booking workspace at once,
+so the next weekly booking is priced from it without a reload or the code being
+typed again. **Sign-up deliberately has no code field** (decided 28 September
+2026): only some students have a code, and a field there would suggest most new
+students should have one.
 
 The charge claim rechecks current status and end time atomically. A successful
 cancel or move wins against a previously selected charge, while already

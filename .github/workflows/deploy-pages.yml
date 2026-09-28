@@ -99,6 +99,7 @@ jobs:
           QA_BASE_URL=http://localhost:3000 node scripts/qa-meet-links.mjs
           QA_BASE_URL=http://localhost:3000 node scripts/qa-teacher-meet.mjs
           QA_BASE_URL=http://localhost:3000 node scripts/qa-student-nif.mjs
+          QA_BASE_URL=http://localhost:3000 node scripts/qa-profile-rates.mjs
 
       # The plain directory the Cloudflare deploy needs. Hidden files are kept
       # because the export carries dotfiles the deploy would otherwise lose;

@@ -60,10 +60,14 @@ Use these names in review so recurring problems are easy to recognise:
 
 Recurring checkout shows the final per-lesson price before confirmation. An
 optional “Have a code from Inês?” disclosure keeps private pricing out of the
-main booking choices. The signed-in student applies one duration-specific rate,
-gets an accessible status message, and sees that saved price on return. Duration
-changes show their actual price before submission. No valid-code suggestions,
-catalogue, countdown or expiry pressure belong in this flow.
+main booking choices. The signed-in student applies a duration-specific rate,
+one for each length, so a 60-minute code and a 90-minute code can both be saved.
+They get an accessible status message and see that saved price on return.
+Duration changes show their actual price before submission. No valid-code
+suggestions, catalogue, countdown or expiry pressure belong in this flow. Only
+some students have a code, so nothing may suggest most should: sign-up carries
+no code field, and Edit details keeps the same small disclosure, listing saved
+rates only once there is one instead of a standard price for everyone.
 
 Three visible colour choices are required for accessible contrast:
 
@@ -479,7 +483,10 @@ Preserve these desktop and mobile states:
   so cancelled future dates do not bury recently completed lessons.
   Its `Upcoming lessons` action returns directly to the current schedule.
   Profile editing uses the account bar on its own, with paired fields on wide
-  desktop; `Done editing` returns to Upcoming lessons. History and profile
+  desktop; `Done editing` returns to Upcoming lessons. Its last item is the
+  small `Have a code from Inês?` disclosure, one field with a blue `Add code`
+  beside it that stays open for the second length's code, with any saved weekly
+  rate listed above it. History and profile
   editing never leave a future calendar floating beside or underneath them.
   Future calendar dates keep their plain date tiles, with a hover/focus highlight
   and no separate `Book` label. A free date opens booking on that day at once,

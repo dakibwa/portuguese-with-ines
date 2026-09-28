@@ -1,14 +1,26 @@
-/** The code catalogue is a private Worker binding, never a shipped asset. */
+/**
+ * The code catalogue is a private Worker binding, never a shipped asset.
+ *
+ * A code is listed for one lesson length, so the length is optional. Booking
+ * is pricing a length it already knows and passes it, and the code has to be
+ * for that length. The profile has no length to give and takes it from the
+ * code. A code the catalogue lists for two lengths is refused rather than
+ * guessed at, since a wrong guess would save the wrong price.
+ */
 export function findRecurringCode(catalogue, input, duration) {
-  if (typeof input !== "string" || input.length > 40 || ![60, 90].includes(duration)) return null;
+  if (typeof input !== "string" || input.length > 40) return null;
+  const anyLength = duration === undefined || duration === null;
+  if (!anyLength && ![60, 90].includes(duration)) return null;
   const code = input.trim().toUpperCase();
   if (!/^[A-Z]{4}\d{2}$/.test(code)) return null;
   let entries;
   try { entries = JSON.parse(catalogue || "[]"); } catch { return null; }
   if (!Array.isArray(entries)) return null;
-  const match = entries.find((entry) => entry.code === code && entry.duration === duration);
-  if (!match || !Number.isInteger(match.cents) || match.cents < 100 || match.cents > 10000) return null;
-  return { duration, cents: match.cents };
+  const matches = entries.filter((entry) => entry?.code === code && (anyLength || entry.duration === duration));
+  const match = matches[0];
+  if (!match || matches.some((entry) => entry.duration !== match.duration)) return null;
+  if (![60, 90].includes(match.duration) || !Number.isInteger(match.cents) || match.cents < 100 || match.cents > 10000) return null;
+  return { duration: match.duration, cents: match.cents };
 }
 
 export async function recurringRates(env, studentId) {

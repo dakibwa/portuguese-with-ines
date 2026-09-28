@@ -98,9 +98,11 @@ request only competes with the fonts for no gain.
   present. `docs-booking-system.md` records the activation boundary.
 - The approved product display is trial lesson €20 / 60 minutes, single lessons
   at €25 / 60 minutes or €35 / 1 hour 30 minutes. Bundles are not part of the
-  public launch offer. Authenticated students can save a private, reusable
-  duration-specific recurring-rate code supplied by Inês. Grants persist for
-  future recurring lessons without changing existing bookings or the €5 fees.
+  public launch offer. Authenticated students can save private, reusable
+  recurring-rate codes supplied by Inês, one for 60-minute and one for
+  90-minute lessons, under Edit details or when booking weekly lessons; sign-up
+  never asks for one. Grants persist for future recurring lessons without
+  changing existing bookings or the €5 fees.
   The Worker's `lesson_types` table decides what is actually bookable; the
   lessons page is the copy a visitor reads. Keep the two in step.
 - The booking flow can confirm up to eight selected single-lesson dates at

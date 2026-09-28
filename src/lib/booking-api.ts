@@ -233,12 +233,20 @@ export function fetchRecurringRates(session: string) {
   });
 }
 
-export function redeemRecurringRate(session: string, code: string, durationMinutes: number) {
-  return request<{ rates: Record<number, number> }>("/me/recurring-rates", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${session}` },
-    body: JSON.stringify({ code, durationMinutes })
-  });
+/**
+ * Save a code from Inês against the account. Booking names the length it is
+ * pricing and the code has to be for it; the profile has none to give, and the
+ * code says which length it is for. `saved` is the rate that code set.
+ */
+export function redeemRecurringRate(session: string, code: string, durationMinutes?: number) {
+  return request<{ rates: Record<number, number>; saved?: { durationMinutes: number; cents: number } }>(
+    "/me/recurring-rates",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session}` },
+      body: JSON.stringify({ code, ...(durationMinutes === undefined ? {} : { durationMinutes }) })
+    }
+  );
 }
 
 export function recoverBookingPayment(token: string, purpose: "lesson" | "same-day-fee") {

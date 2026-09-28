@@ -209,6 +209,11 @@ function repeatPayload(option: RepeatOption): RepeatChoice | undefined {
   return option;
 }
 
+/** Whether two saved-rate maps hold the same price for every length. */
+function sameRates(a: Record<number, number>, b: Record<number, number>) {
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])].every((key) => a[Number(key)] === b[Number(key)]);
+}
+
 function RepeatAvailability({
   chosen,
   error,
@@ -2262,6 +2267,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               bookingActive={intent === "book"}
               initialAccount={loadedAccount?.student.id === student.id ? loadedAccount : null}
               onOpenAccountSection={openAccountShortcut}
+              onRatesChange={(rates) => {
+                // A code saved under Edit details prices the next weekly booking.
+                // An unchanged answer keeps the same object, so nothing re-prices.
+                setRecurringRates((current) => (sameRates(current, rates) ? current : rates));
+                setRatesReady(true);
+                setRateMessage("");
+              }}
               onTransition={transitionBooking}
               onSignedOut={() => {
                 setStudent(null);
