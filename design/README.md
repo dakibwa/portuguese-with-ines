@@ -58,15 +58,16 @@ Use these names in review so recurring problems are easy to recognise:
 
 ## Contrast and accessibility
 
-Recurring checkout shows the final per-lesson price before confirmation. An
-optional “Have a code from Inês?” disclosure keeps private pricing out of the
-main booking choices. The signed-in student applies a duration-specific rate,
-one for each length, so a 60-minute code and a 90-minute code can both be saved.
+Recurring checkout shows the final per-lesson price before confirmation and
+uses the account's saved rate automatically. Code entry belongs only under
+Edit details, behind the small “Have a code from Inês?” disclosure; booking and
+lesson-length changes have no code field. The student applies a rate for each
+length, so a 60-minute code and a 90-minute code can both be saved.
 They get an accessible status message and see that saved price on return.
 Duration changes show their actual price before submission. No valid-code
 suggestions, catalogue, countdown or expiry pressure belong in this flow. Only
 some students have a code, so nothing may suggest most should: sign-up carries
-no code field, and Edit details keeps the same small disclosure, listing saved
+no code field, and Edit details keeps the small disclosure, listing saved
 rates only once there is one instead of a standard price for everyone.
 
 Three visible colour choices are required for accessible contrast:

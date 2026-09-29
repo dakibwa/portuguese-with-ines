@@ -183,9 +183,39 @@ try {
     await page.getByRole("button", { name: "10:00", exact: true }).click();
     await page.locator("#booking-confirmation-stage").waitFor();
     await expect(page.getByText("€15 per recurring lesson", { exact: true })).toBeVisible();
+    await expect(page.getByLabel(/your code/i)).toHaveCount(0);
+    await expect(page.getByText(/Have a code|Apply and save rate/)).toHaveCount(0);
     await page.getByRole("radio", { name: /^90 minutes lesson/ }).check();
     await expect(page.getByText("€27 per recurring lesson", { exact: true })).toBeVisible();
+    await expect(page.getByLabel(/your code/i)).toHaveCount(0);
+    await page.locator("#booking-confirmation-stage").screenshot({ path: `${out}/booking-${width}.png` });
     assert.ok(await noOverflow(page), `Confirmation fits at ${width}px`);
+
+    // A booked weekly lesson retains its agreed price; changing its length
+    // picks up that length's saved profile rate with no second code field.
+    await page.route("**/bookings/profile-rate-lesson", (route) => route.fulfill({
+      json: {
+        booking: {
+          reference: "PROFILE-RATE", status: "confirmed",
+          startAt: "2026-09-14T09:00:00Z", endAt: "2026-09-14T10:00:00Z",
+          location: "online", studentName: student.name, studentEmail: student.email,
+          studentTimezone: student.timezone, notes: "", rescheduleCount: 0,
+          sameDayFeeCents: 500, paymentStatus: "scheduled", amountCents: 1800,
+          lessonType: { id: "single", name: "Single lesson", durationMinutes: 60, priceCents: 2500 }
+        },
+        recurring: true, durationPrices: state.rates,
+        isPast: false, sameDayFeeApplies: false, changeLocked: false, refundOnCancel: false
+      }, headers: cors
+    }));
+    await page.goto(`${base}/book/?manage=profile-rate-lesson`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("dialog", { name: "Manage this lesson", exact: true }).getByRole("button", { name: "Change", exact: true }).click();
+    const change = page.getByRole("dialog", { name: "Choose a new date and time", exact: true });
+    await expect(change.getByText("€18 per lesson · recurring rate", { exact: true })).toBeVisible();
+    await change.getByRole("radio", { name: "90 minutes", exact: true }).check();
+    await expect(change.getByText("€27 per lesson · recurring rate", { exact: true })).toBeVisible();
+    await expect(change.getByLabel(/your code/i)).toHaveCount(0);
+    await expect(change.getByText(/Have a code|Apply and save rate/)).toHaveCount(0);
+    await change.screenshot({ path: `${out}/change-length-${width}.png` });
     assert.deepEqual(account.errors, []);
     await account.context.close();
   }
@@ -204,7 +234,7 @@ try {
   assert.deepEqual(failing.errors, []);
   await failing.context.close();
 
-  console.log("Profile rates passed: no code at sign-up, quiet by default, a 60 and a 90 minute code from one field, refusals, unreadable rates, and the saved rate prices weekly booking; 1280/820/390px.");
+  console.log("Profile rates passed: no code at sign-up, quiet by default, a 60 and a 90 minute code from one field, refusals, unreadable rates, and the saved rates price weekly booking and length changes with no code entry; 1280/820/390px.");
 } finally {
   await browser.close();
 }

@@ -100,9 +100,9 @@ request only competes with the fonts for no gain.
   at €25 / 60 minutes or €35 / 1 hour 30 minutes. Bundles are not part of the
   public launch offer. Authenticated students can save private, reusable
   recurring-rate codes supplied by Inês, one for 60-minute and one for
-  90-minute lessons, under Edit details or when booking weekly lessons; sign-up
-  never asks for one. Grants persist for future recurring lessons without
-  changing existing bookings or the €5 fees.
+  90-minute lessons, only under Edit details. Booking and lesson changes
+  use the saved rates automatically; sign-up never asks for a code. Grants persist
+  for future recurring lessons without changing existing bookings or the €5 fees.
   The Worker's `lesson_types` table decides what is actually bookable; the
   lessons page is the copy a visitor reads. Keep the two in step.
 - The booking flow can confirm up to eight selected single-lesson dates at

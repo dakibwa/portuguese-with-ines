@@ -887,8 +887,8 @@ reserved atomically, including parallel guesses. Case and outer whitespace are
 normalised; prefixes/suffixes are never pricing authority.
 
 `POST` takes `{ code, durationMinutes? }`. The length is optional because a code
-is listed for exactly one: booking passes the length it is pricing and the code
-has to be for it, while the profile passes none and the code names its own. A
+is listed for exactly one: the profile passes none and the code names its own.
+A supplied length must still match for compatibility with older clients. A
 code the catalogue lists for two lengths is refused without a length rather than
 guessed at. The answer carries every saved rate as `rates` and the one just
 saved as `saved: { durationMinutes, cents }`. Nothing about the catalogue is
@@ -906,11 +906,11 @@ payment is off. Existing rows keep their price when moved at the same duration;
 a new duration uses its own saved rate or public price. Single/trial bookings
 and €5 fees never use these rates. No booked row is repriced merely by redeeming.
 
-**Where a student adds a code.** Under *Edit details*, behind a small `Have a
-code from Inês?` disclosure, and, as before, at weekly confirmation and when
-changing a weekly lesson's length, where the code has to be for the length being
-priced. The profile lists the saved weekly rates only once there is one, so a
-student without a code sees one quiet link and no "standard price" rows. It is
+**Where a student adds a code.** Only under *Edit details*, behind a small `Have a
+code from Inês?` disclosure. Weekly booking and lesson-length changes use the
+account's saved rates automatically and offer no code field. The profile lists
+the saved weekly rates only once there is one, so a student without a code sees
+one quiet link and no "standard price" rows. It is
 one field for every code: after a 60 minute code is added the disclosure stays
 open for the 90 minute one. Saving there tells the booking workspace at once,
 so the next weekly booking is priced from it without a reload or the code being

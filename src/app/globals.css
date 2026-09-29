@@ -5368,7 +5368,6 @@ button.text-action {
   margin: 0 0 0.35rem;
 }
 
-.booking-recurring-rate summary,
 .my-lessons__code summary {
   display: inline-flex;
   min-height: 44px;
@@ -5382,15 +5381,11 @@ button.text-action {
   text-underline-offset: 3px;
 }
 
-.booking-recurring-rate summary:hover,
-.booking-recurring-rate summary:focus-visible,
 .my-lessons__code summary:hover,
 .my-lessons__code summary:focus-visible {
   color: var(--coral-action);
 }
 
-.booking-recurring-rate details[open] > summary,
-details.booking-recurring-rate[open] > summary,
 .my-lessons__code[open] > summary {
   margin-bottom: 0.6rem;
 }

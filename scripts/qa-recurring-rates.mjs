@@ -34,18 +34,16 @@ for (const [duration, width] of [[60, 390], [90, 1440]]) {
   assert.equal(shared.data.rates[duration], rate.cents);
   await page.setViewportSize({ width, height: 1000 });
   await page.goto(`${base}/book/`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: /^Book a (new )?lesson$/ }).first().click();
-  await page.getByRole("radio", { name: "Weekly", exact: true }).check();
-  await page.getByRole("radio", { name: `${duration} minutes lesson · €${duration === 60 ? 25 : 35}`, exact: true }).check();
-  await page.getByRole("button", { name: /times free/ }).first().click();
-  await page.locator("#lesson-calendar .unified-calendar__availability .slot-grid button").first().click();
-  await page.getByRole("heading", { name: "Confirm your recurring lessons", exact: true }).waitFor();
-  await page.getByText("Have a code from Inês?", { exact: true }).click();
-  await page.getByLabel(`Your code for ${duration} minute lessons`).fill(` ${rate.code.toLowerCase()} `);
-  await page.getByRole("button", { name: "Apply and save rate", exact: true }).click();
-  await page.getByText("Your recurring rate is saved for future lessons of this length. Existing bookings keep their agreed price.", { exact: true }).waitFor();
-  await page.getByText(`€${rate.cents / 100} per recurring lesson`, { exact: true }).waitFor();
-  await page.waitForFunction(() => document.querySelector(".booking-confirm-button")?.disabled === false);
+  await page.locator("#account-menu").waitFor({ state: "attached" });
+  const menu = page.locator(".my-lessons__menu-toggle");
+  if (await menu.isVisible()) await menu.click();
+  await page.locator("#account-menu").getByRole("button", { name: "Edit details", exact: true }).click();
+  const editor = page.locator(".my-lessons__details");
+  await editor.getByText("Have a code from Inês?", { exact: true }).click();
+  await editor.getByLabel("Your code", { exact: true }).fill(` ${rate.code.toLowerCase()} `);
+  await editor.getByRole("button", { name: "Add code", exact: true }).click();
+  await editor.getByRole("status").getByText(`Saved. Your ${duration}-minute weekly lessons are now €${rate.cents / 100} each.`, { exact: true }).waitFor();
+  await editor.getByRole("list", { name: "Your saved weekly rates" }).getByText(`${duration}-minute weekly lessons`, { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: `tmp/qa/recurring-rate-${duration}-${width}.png`, fullPage: true });
 }
@@ -60,4 +58,4 @@ for (const account of accounts) {
 }
 assert.deepEqual(errors, []);
 await browser.close();
-console.log("Live recurring-rate verification passed: two accounts reuse both duration codes, mobile/desktop redemption, persistence, no bookings, session revocation.");
+console.log("Live recurring-rate verification passed: two accounts reuse both duration codes, mobile/desktop profile redemption, persistence, no bookings, session revocation.");

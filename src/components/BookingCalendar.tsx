@@ -49,7 +49,6 @@ import {
   fetchAvailability,
   fetchBooking,
   fetchRecurringRates,
-  redeemRecurringRate,
   recoverBookingPayment,
   formatBookedLessonLabel,
   formatLongDate,
@@ -552,9 +551,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     if (isTeacher) window.location.replace(`${SITE_BASE_PATH}/schedule/`);
   }, [isTeacher]);
   const [recurringRates, setRecurringRates] = useState<Record<number, number>>({});
-  const [rateCode, setRateCode] = useState("");
-  const [rateMessage, setRateMessage] = useState("");
-  const [rateWorking, setRateWorking] = useState(false);
+  const [ratesError, setRatesError] = useState("");
   const [ratesReady, setRatesReady] = useState(false);
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
   const [lessonSeries, setLessonSeries] = useState<LessonSeries[]>([]);
@@ -637,35 +634,17 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     let active = true;
     setRatesReady(false);
     setRecurringRates({});
-    setRateCode("");
-    setRateMessage("");
+    setRatesError("");
     if (rateStudentId) {
       fetchRecurringRates(readSession()).then((data) => {
         if (active) { setRecurringRates(data.rates); setRatesReady(true); }
       }).catch(() => {
-        if (active) setRateMessage("We couldn't check your agreed rate. Please reload before booking recurring lessons.");
+        if (active) setRatesError("We couldn't check your agreed rate. Please reload before booking recurring lessons.");
       });
     }
     return () => { active = false; };
   }, [rateStudentId]);
 
-  async function applyRate() {
-    const chosenType = managed ? lessonTypes.find((type) => type.id === managedLessonTypeId) : lessonType;
-    if (!chosenType || rateWorking) return;
-    setRateWorking(true);
-    setRateMessage("");
-    try {
-      const data = await redeemRecurringRate(readSession(), rateCode, chosenType.duration_minutes);
-      setRecurringRates(data.rates);
-      setRatesReady(true);
-      if (managed) setManaged({ ...managed, durationPrices: data.rates });
-      setPaymentConsent(false);
-      setRateCode("");
-      setRateMessage("Your recurring rate is saved for future lessons of this length. Existing bookings keep their agreed price.");
-    } catch (error) {
-      setRateMessage(error instanceof Error ? error.message : "We couldn't apply that code. Try again.");
-    } finally { setRateWorking(false); }
-  }
   const managedDurationChoices = managed?.booking.lessonType.id === "trial"
     ? []
     : lessonTypes
@@ -1234,7 +1213,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const canSubmit =
     Boolean(chosen && lessonType && student) &&
     !submitting &&
-    !rateWorking &&
     (form.repeat === "once" || ratesReady) &&
     !previewing &&
     !loadingSlots &&
@@ -2272,7 +2250,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 // An unchanged answer keeps the same object, so nothing re-prices.
                 setRecurringRates((current) => (sameRates(current, rates) ? current : rates));
                 setRatesReady(true);
-                setRateMessage("");
+                setRatesError("");
               }}
               onTransition={transitionBooking}
               onSignedOut={() => {
@@ -2979,16 +2957,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     ? "Lessons that keep their length keep their existing agreed prices."
                     : `Changed-length lessons: ${formatMoneyCents(managedPrice)} each. Lessons already this length keep their agreed prices.`
                   : `${formatMoneyCents(managedPrice)} per lesson${managed.recurring ? " · recurring rate" : ""}`}</p> : null}
-                {managed.recurring && student && managedLessonTypeId !== managed.booking.lessonType.id ? (
-                  <details className="booking-recurring-rate">
-                    <summary>Have a code for this lesson length?</summary>
-                    <label><span>Your code for {selectedManagedType?.duration_minutes} minute lessons</span>
-                      <input value={rateCode} onChange={(event) => setRateCode(event.target.value)} maxLength={40} autoComplete="off" />
-                    </label>
-                    <button className="text-action" type="button" disabled={!rateCode.trim() || rateWorking} onClick={() => void applyRate()}>Apply and save rate</button>
-                    {rateMessage ? <p role="status">{rateMessage}</p> : null}
-                  </details>
-                ) : null}
                 <fieldset className="managed-lesson__duration">
                   <legend>Where</legend>
                   <div className={`segmented segmented--${managedLocation}`}>
@@ -3288,17 +3256,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     {form.repeat !== "once" && lessonType?.id !== "trial" ? (
                       <div className="booking-recurring-rate">
                         <p><strong>{lessonType ? formatMoneyCents(lessonType.price_cents) : ""} per recurring lesson</strong></p>
-                        <details>
-                          <summary>Have a code from Inês?</summary>
-                          <label>
-                            <span>Your code for {lessonType?.duration_minutes} minute lessons</span>
-                            <input value={rateCode} onChange={(event) => setRateCode(event.target.value)} maxLength={40} autoComplete="off" autoCapitalize="characters" />
-                          </label>
-                          <button className="text-action" type="button" disabled={!rateCode.trim() || rateWorking} onClick={() => void applyRate()}>
-                            {rateWorking ? "Applying…" : "Apply and save rate"}
-                          </button>
-                        </details>
-                        {rateMessage ? <p role="status">{rateMessage}</p> : null}
+                        {ratesError ? <p role="status">{ratesError}</p> : null}
                       </div>
                     ) : null}
 

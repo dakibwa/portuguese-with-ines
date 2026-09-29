@@ -234,9 +234,9 @@ export function fetchRecurringRates(session: string) {
 }
 
 /**
- * Save a code from Inês against the account. Booking names the length it is
- * pricing and the code has to be for it; the profile has none to give, and the
- * code says which length it is for. `saved` is the rate that code set.
+ * Save a code from Inês under Edit details. The code identifies its lesson
+ * length. An optional length remains supported for callers that validate one.
+ * `saved` is the rate that code set.
  */
 export function redeemRecurringRate(session: string, code: string, durationMinutes?: number) {
   return request<{ rates: Record<number, number>; saved?: { durationMinutes: number; cents: number } }>(
