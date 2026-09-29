@@ -607,8 +607,7 @@ export function MyLessons({
                   </button>
                 </form>
                 <p className="my-lessons__details-note">
-                  A code sets the price of your weekly lessons of its length and stays on your account. You can add one
-                  for 60-minute lessons and one for 90-minute lessons. Lessons already booked keep their price.
+                  Adding a code will set the price of all future lessons.
                 </p>
               </details>
             </div>
