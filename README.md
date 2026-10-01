@@ -48,6 +48,12 @@ source resolution. Two worth knowing about:
 
 ## Delivery
 
+The mobile menu mounts when it is first opened, then stays mounted for its
+closing transition. Keeping it out of the initial page load avoids downloading
+hidden artwork and prefetching destinations the visitor has not asked to see.
+The booking calendar reuses its time and date display formatters per time zone,
+so loading a window of available slots does not construct one for every label.
+
 Two settings look incidental and are not. Both were wrong at some point and
 cost real bytes:
 
