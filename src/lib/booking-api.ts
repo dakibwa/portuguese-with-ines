@@ -361,6 +361,26 @@ export function portoDateKey(date: Date) {
   return parts;
 }
 
+// A loaded calendar formats hundreds of slots. Intl formatter construction is
+// much more expensive than formatting another instant with the same settings.
+// Keep the two display formats separate and bound the retained time zones.
+const slotTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+const longDateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function displayFormatter(
+  cache: Map<string, Intl.DateTimeFormat>,
+  timeZone: string,
+  options: Intl.DateTimeFormatOptions
+) {
+  let formatter = cache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-GB", { ...options, timeZone });
+    if (cache.size >= 16) cache.clear();
+    cache.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
 export function addDaysToKey(key: string, days: number) {
   const [year, month, day] = key.split("-").map(Number);
   const shifted = new Date(Date.UTC(year, month - 1, day + days));
@@ -376,8 +396,7 @@ export function portoWeekKey(startAt: string) {
 }
 
 export function formatSlotTime(startAt: string, timeZone = BOOKING_TIME_ZONE) {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone,
+  return displayFormatter(slotTimeFormatters, timeZone, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false
@@ -385,8 +404,7 @@ export function formatSlotTime(startAt: string, timeZone = BOOKING_TIME_ZONE) {
 }
 
 export function formatLongDate(value: string | Date, timeZone = BOOKING_TIME_ZONE) {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone,
+  return displayFormatter(longDateFormatters, timeZone, {
     weekday: "long",
     day: "numeric",
     month: "long",

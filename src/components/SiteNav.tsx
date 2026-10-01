@@ -22,6 +22,7 @@ const navigation: NavItem[] = [
 
 export function SiteNav({ currentPage }: { currentPage: SitePage }) {
   const [open, setOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
   const [ready, setReady] = useState(false);
   const [menuTop, setMenuTop] = useState(0);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -53,6 +54,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
     function onRequest() {
       openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       positionMenu();
+      setHasOpened(true);
       setOpen(true);
     }
 
@@ -120,7 +122,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
       </nav>
 
       <button
-        aria-controls="site-nav-mobile"
+        aria-controls={hasOpened ? "site-nav-mobile" : undefined}
         aria-expanded={open}
         aria-label={open ? "Close menu" : "Open menu"}
         className={`nav-toggle${open ? " is-open" : ""}`}
@@ -129,6 +131,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
           if (!open) {
             openerRef.current = toggleRef.current;
             positionMenu();
+            setHasOpened(true);
           } else requestAnimationFrame(() => openerRef.current?.focus({ preventScroll: true }));
           setOpen((value) => !value);
         }}
@@ -145,7 +148,10 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
       {/* inert, not just hidden: a closed panel must be unreachable by tab and
           invisible to a screen reader, and hiding it visually does neither.
           The portal also keeps the dialog above the optional portfolio banner. */}
-      {ready ? createPortal(<div
+      {/* Mount on first opening so an invisible menu does not download its art
+          or prefetch its destinations during the initial page load. Retain it
+          afterwards so closing transitions and focus restoration still work. */}
+      {ready && hasOpened ? createPortal(<div
         className={`nav-mobile${open ? " is-open" : ""}`}
         style={{ top: menuTop }}
         id="site-nav-mobile"
