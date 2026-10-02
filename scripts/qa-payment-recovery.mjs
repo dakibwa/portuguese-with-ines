@@ -40,6 +40,7 @@ for (const width of [390, 1440]) {
     student: { id: "teacher", name: "Inês", email: "teacher@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "teacher" }, bookings: [], series: [], sameDayFeeCents: 500
   } }));
   await diary.route("**/admin/availability", (route) => route.fulfill({ json: { rules: [], exceptions: [] } }));
+  await diary.route("**/admin/google-calendar", (route) => route.fulfill({ json: { configured: false, connected: false, needsReconnect: false, pending: 0 } }));
   await diary.route("**/admin/bookings*", (route) => route.fulfill({ json: { bookings: [], manualPaymentReconciliation: [{ id: "isolated", reference: "REVIEW-123" }] } }));
   await diary.goto(`${base}/schedule/`, { waitUntil: "domcontentloaded" });
   await diary.getByRole("status").filter({ hasText: "REVIEW-123" }).waitFor();

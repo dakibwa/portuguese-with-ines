@@ -716,6 +716,20 @@ function selectionEvent(user, { count, id = "evt_selection", customer = `cus_${u
     setup_intent: `seti_${user}`, metadata: { purpose: "card_setup", selection_count: String(count) }
   } } };
 }
+async function cardReturnToken(payload) {
+  const sent = new URLSearchParams(checkoutRequests.at(-1).body);
+  const url = new URL(sent.get("return_url") ?? sent.get("success_url"));
+  assert.equal(url.origin, env.SITE_URL);
+  assert.equal(url.pathname, "/book/");
+  assert.equal(url.searchParams.get("card"), "saved");
+  const manage = url.searchParams.get("manage");
+  assert.ok(manage, "Checkout must return the lesson token so older bookings cannot confirm this setup");
+  assert.equal(manage, payload.manageToken);
+  const response = await call(`/bookings/${manage}`, { method: "GET", user: null });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).booking.status, "pending_payment", "the return token identifies the held lesson before the webhook");
+  return manage;
+}
 await test("selection validates count, overlapping aliases and Porto calendar week boundaries", () => {
   assert.ok(bookingSelection({ startAts: [] }).error);
   assert.ok(bookingSelection({ startAts: Array(9).fill(selectedStarts[0]) }).error);
@@ -833,11 +847,13 @@ await test("a shared card setup holds both runs, saves once and confirms all occ
   const sent = new URLSearchParams(checkoutRequests.at(-1).body);
   assert.equal(sent.get("mode"), "setup");
   assert.equal(sent.get("metadata[selection_count]"), "8");
+  const manage = await cardReturnToken(await response.json());
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE status='pending_payment'").get().n, 8);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, 0);
   const event = selectionEvent(user, { count: 8 });
   const result = await webhook(event);
   assert.equal(result.status, 200, await result.clone().text());
+  assert.equal((await (await call(`/bookings/${manage}`, { method: "GET", user: null })).json()).booking.status, "confirmed");
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE payment_status='scheduled' AND status='confirmed'").get().n, 8);
   assert.equal(db.prepare("SELECT stripe_payment_method FROM students WHERE id=?").get(user).stripe_payment_method, `pm_${user}`);
   await drain();
@@ -850,7 +866,9 @@ await test("a shared card setup holds both runs, saves once and confirms all occ
 });
 await test("one-off selection card setup confirms every date and rejects wrong session or partial expiry", async () => {
   const user = await selectionFixture({ savedCard: false });
-  assert.equal((await call("/bookings", { user, body: selectionBody() })).status, 201);
+  const response = await call("/bookings", { user, body: selectionBody() });
+  assert.equal(response.status, 201);
+  await cardReturnToken(await response.json());
   const event = selectionEvent(user, { count: 2 });
   const wrong = structuredClone(event); wrong.data.object.id = "cs_other";
   assert.equal((await webhook(wrong)).status, 400);
@@ -1274,7 +1292,9 @@ await test("replacing an unfinished weekly setup removes its held lessons and it
   db.prepare("DELETE FROM request_limits WHERE key LIKE 'hold:%'").run();
   const user = await unsavedCardStudent("weekly-backs-out");
   const weekly = { lessonType: "single", startAt: "2026-11-12T17:00:00.000Z", repeat: 4, paymentConsent: true, expectedPriceCents: 2500 };
-  assert.equal((await call("/bookings", { user, body: weekly })).status, 201);
+  const response = await call("/bookings", { user, body: weekly });
+  assert.equal(response.status, 201);
+  await cardReturnToken(await response.json());
   const [first] = db.prepare("SELECT id FROM booking_series WHERE student_id=?").all(user);
   const again = await call("/bookings", { user, body: weekly });
   assert.equal(again.status, 201, await again.clone().text());

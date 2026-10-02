@@ -2441,6 +2441,14 @@ html.booking-transitioning .booking-confirmation-stage {
   white-space: nowrap;
 }
 
+.booking-bar__group:disabled .segmented {
+  opacity: 0.65;
+}
+
+.booking-bar__group:disabled .segmented label {
+  cursor: default;
+}
+
 .booking-bar__group legend,
 .booking-bar__legend {
   display: block;
@@ -5760,6 +5768,16 @@ dialog[open]::backdrop {
 }
 
 /* Terms are an overlay so reading them preserves the current booking task. */
+.policy-information-fallback {
+  display: none;
+  width: min(760px, calc(100% - 2 * var(--page-pad)));
+  margin: 2rem auto;
+  padding: 1.5rem;
+  border-radius: var(--squiggle-tile);
+  background: var(--paper);
+  color: var(--ink);
+}
+
 .policy-dialog {
   width: min(760px, calc(100% - 2rem));
   max-width: none;

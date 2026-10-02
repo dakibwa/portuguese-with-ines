@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, type KeyboardEvent, useId, useRef, useState } from "react";
+import { FormEvent, type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, Lock, Mail, ReceiptText, UserRound } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { browserTimeZone } from "@/lib/booking-api";
-import { AuthApiError, login, register, requestPasswordReset, storeSession, type Student } from "@/lib/auth-api";
+import { AuthApiError, login, readSession, register, requestPasswordReset, storeSession, type Student } from "@/lib/auth-api";
 
 type Mode = "signin" | "register" | "forgot";
 
@@ -47,11 +47,15 @@ export function AuthPanel({
   // offers to sign in, with the address carried over.
   const [accountExists, setAccountExists] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const authRequest = useRef(0);
+  useLayoutEffect(() => () => { authRequest.current += 1; }, []);
 
   // A stale error never follows the student to another form. The "reset link is
   // on its way" notice does stay when they go back to sign in: that is where
   // they wait for it.
   function switchMode(next: Mode) {
+    authRequest.current += 1;
+    setBusy(false);
     setError("");
     setAccountExists(false);
     if (next !== "signin") setNotice("");
@@ -96,6 +100,8 @@ export function AuthPanel({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const request = ++authRequest.current;
+    const session = readSession();
     setBusy(true);
     setError("");
     setAccountExists(false);
@@ -104,6 +110,7 @@ export function AuthPanel({
     try {
       if (mode === "forgot") {
         await requestPasswordReset(form.email.trim());
+        if (request !== authRequest.current || readSession() !== session) return;
         setNotice("If that email has an account, a reset link is on its way. It works for one hour.");
         return;
       }
@@ -119,13 +126,15 @@ export function AuthPanel({
             })
           : await login({ email: form.email.trim(), password: form.password });
 
+      if (request !== authRequest.current || readSession() !== session) return;
       storeSession(result.session);
       onSignedIn(result.student);
     } catch (caught) {
+      if (request !== authRequest.current || readSession() !== session) return;
       setError(caught instanceof Error ? caught.message : "That didn't work. Please try again.");
       setAccountExists(mode === "register" && caught instanceof AuthApiError && caught.status === 409);
     } finally {
-      setBusy(false);
+      if (request === authRequest.current) setBusy(false);
     }
   }
 
@@ -143,6 +152,7 @@ export function AuthPanel({
       {/* Booking terms and privacy share one disclosure on the page,
           so signing up carries no explanatory copy of its own. */}
       {mode !== "forgot" ? <GoogleSignInButton
+          key={`google-${mode}`}
           onError={(message) => {
             setAccountExists(false);
             setError(message);

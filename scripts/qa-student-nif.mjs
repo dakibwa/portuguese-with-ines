@@ -23,7 +23,7 @@ async function open(width, path, { session = "", me = student, reply = () => nul
   page.on("pageerror", (error) => errors.push(error.message));
   await page.clock.setFixedTime(new Date("2026-09-07T10:15:00Z"));
   if (session) await page.addInitScript((value) => localStorage.setItem("ines-student-session", value), session);
-  await page.route("**/ines-booking*/**", async (route) => {
+  await page.route(url => /^\/(me(?:\/|$)|auth\/|lesson-types$|availability$|admin\/)/.test(url.pathname), async (route) => {
     const request = route.request();
     const endpoint = new URL(request.url()).pathname;
     const body = request.method() === "POST" ? request.postDataJSON() : null;

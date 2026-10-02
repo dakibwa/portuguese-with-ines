@@ -1,6 +1,8 @@
 "use client";
 
 import { BOOKING_API_BASE_URL } from "@/lib/config";
+import type { BookingStatus } from "@/lib/booking-api";
+import { BOOKING_REPLY_ERROR, isApiLesson, isApiRecord } from "@/lib/api-response";
 
 export type Student = {
   id: string;
@@ -16,7 +18,7 @@ export type Student = {
 
 export type MyBooking = {
   reference: string;
-  status: "confirmed" | "cancelled";
+  status: BookingStatus;
   startAt: string;
   endAt: string;
   /** When the lesson was cancelled, independent of its scheduled date. */
@@ -65,10 +67,12 @@ export function readSession() {
   }
 }
 
-export function storeSession(token: string) {
+export function storeSession(token: string, renewal?: { previousSession: string; studentId: string }) {
   try {
     window.localStorage.setItem(SESSION_KEY, token);
-    window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
+    // A verified email change renews this account's token. Ordinary sign-ins
+    // and storage events still replace the account and clear private views.
+    window.dispatchEvent(new CustomEvent(SESSION_CHANGE_EVENT, { detail: renewal }));
   } catch {
     // A student in private browsing simply signs in again next visit.
   }
@@ -92,11 +96,13 @@ export function clearSession() {
 /**
  * The server has already refused this session (expired, revoked, or signed out
  * elsewhere), so there is nothing to revoke: just forget it here and let the
- * page show itself signed out.
+ * page show itself signed out. A delayed refusal belongs only to the session
+ * that requested it, never to a newer sign-in.
  */
-export function forgetSession() {
+export function forgetSession(expectedSession?: string) {
   try {
-    if (!window.localStorage.getItem(SESSION_KEY)) return;
+    const session = window.localStorage.getItem(SESSION_KEY);
+    if (!session || (expectedSession !== undefined && session !== expectedSession)) return;
     window.localStorage.removeItem(SESSION_KEY);
     window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
   } catch {
@@ -128,7 +134,7 @@ export function isReturningDevice() {
 }
 
 /** For useSyncExternalStore: the session changed here or in another tab. */
-export function subscribeToSession(onChange: () => void) {
+export function subscribeToSession(onChange: (event: Event) => void) {
   window.addEventListener(SESSION_CHANGE_EVENT, onChange);
   window.addEventListener("storage", onChange);
   return () => {
@@ -161,8 +167,31 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
     throw new Error("We couldn't reach the booking system. Please check your connection and try again.");
   }
 
-  const data = (await response.json().catch(() => ({}))) as T & { error?: string };
-  if (!response.ok) throw new AuthApiError(data.error || "Something went wrong. Please try again.", response.status);
+  const data: unknown = await response.json().catch(() => null);
+  if (response.status === 401 && token) forgetSession(token);
+  if (!response.ok) {
+    const error = isApiRecord(data) && typeof data.error === "string" ? data.error : "";
+    throw new AuthApiError(error || "Something went wrong. Please try again.", response.status);
+  }
+  if (!isApiRecord(data)) throw new AuthApiError(BOOKING_REPLY_ERROR, response.status);
+  return data as T;
+}
+
+function validStudent(value: unknown): value is Student {
+  return isApiRecord(value) && typeof value.id === "string" && Boolean(value.id) &&
+    typeof value.name === "string" && typeof value.email === "string" &&
+    ["nif", "phone", "timezone"].every((field) => value[field] == null || typeof value[field] === "string") &&
+    (value.role === undefined || value.role === "student" || value.role === "teacher");
+}
+
+function validateStudentReply<T extends { student: Student }>(data: T) {
+  if (!validStudent(data.student)) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
+  return data;
+}
+
+function validateSignInReply(data: { student: Student; session: string }) {
+  validateStudentReply(data);
+  if (typeof data.session !== "string" || !data.session) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
   return data;
 }
 
@@ -174,27 +203,30 @@ export function register(input: {
   nif?: string;
   timezone?: string;
 }) {
-  return post<{ student: Student; session: string }>("/auth/register", input);
+  return post<{ student: Student; session: string }>("/auth/register", input).then(validateSignInReply);
 }
 
 export function login(input: { email: string; password: string }) {
-  return post<{ student: Student; session: string }>("/auth/login", input);
+  return post<{ student: Student; session: string }>("/auth/login", input).then(validateSignInReply);
 }
 
 export function signInWithGoogle(credential: string, timezone: string) {
-  return post<{ student: Student; session: string }>("/auth/google", { credential, timezone });
+  return post<{ student: Student; session: string }>("/auth/google", { credential, timezone }).then(validateSignInReply);
 }
 
 export function requestPasswordReset(email: string) {
-  return post<{ ok: true }>("/auth/forgot", { email });
+  return post<{ ok: true }>("/auth/forgot", { email }).then((data) => {
+    if (data.ok !== true) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
+    return data;
+  });
 }
 
 export function resetPassword(token: string, password: string) {
-  return post<{ student: Student; session: string }>("/auth/reset", { token, password });
+  return post<{ student: Student; session: string }>("/auth/reset", { token, password }).then(validateSignInReply);
 }
 
 export function updateProfile(token: string, input: { name?: string; phone?: string; nif?: string; timezone?: string }) {
-  return post<{ student: Student }>("/me", input, token);
+  return post<{ student: Student }>("/me", input, token).then(validateStudentReply);
 }
 
 /**
@@ -203,13 +235,18 @@ export function updateProfile(token: string, input: { name?: string; phone?: str
  * use — otherwise this would be a way to test who has an account.
  */
 export function requestEmailChange(token: string, email: string) {
-  return post<{ ok: true; pending: string }>("/me/email", { email }, token);
+  return post<{ ok: true; pending: string }>("/me/email", { email }, token).then((data) => {
+    if (data.ok !== true || typeof data.pending !== "string" || !data.pending) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
+    return data;
+  });
 }
 
 /** Apply a change the new address has proved, using the token from its email. */
 export async function confirmEmailChange(token: string, changeToken: string) {
-  const result = await post<{ student: Student; session?: string }>("/me/email/confirm", { token: changeToken }, token);
-  if (result.session) storeSession(result.session);
+  const result = await post<{ student: Student; session?: string }>("/me/email/confirm", { token: changeToken }, token).then(validateStudentReply);
+  if (result.session !== undefined && (typeof result.session !== "string" || !result.session)) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
+  if (readSession() !== token) throw new AuthApiError("Your account changed while confirming this email. Please check your account.", 409);
+  if (result.session) storeSession(result.session, { previousSession: token, studentId: result.student.id });
   return result;
 }
 
@@ -223,20 +260,21 @@ export async function fetchMe(token: string) {
     throw new Error("We couldn't reach the booking system. Please check your connection and try again.");
   }
 
-  const data = (await response.json().catch(() => ({}))) as {
-    student: Student;
-    bookings: MyBooking[];
-    series?: LessonSeries[];
-    sameDayFeeCents: number;
-    error?: string;
-  };
+  const data: unknown = await response.json().catch(() => null);
 
   // An expired or tampered session is not an error to show — it just means
   // signing in again.
   if (response.status === 401) {
-    clearSession();
+    forgetSession(token);
     return null;
   }
-  if (!response.ok) throw new Error(data.error || "Could not load your lessons.");
-  return data;
+  if (!response.ok) {
+    const error = isApiRecord(data) && typeof data.error === "string" ? data.error : "";
+    throw new AuthApiError(error || "Could not load your lessons.", response.status);
+  }
+  if (!isApiRecord(data) || !validStudent(data.student) || !Array.isArray(data.bookings) || !data.bookings.every(isApiLesson) ||
+    (data.series !== undefined && (!Array.isArray(data.series) || !data.series.every((series) =>
+      isApiRecord(series) && typeof series.id === "string" && Boolean(series.id)
+    )))) throw new AuthApiError(BOOKING_REPLY_ERROR, response.status);
+  return data as { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; sameDayFeeCents: number };
 }

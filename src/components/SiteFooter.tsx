@@ -14,7 +14,7 @@ export function SiteFooter() {
           <Link href="/approach">Approach</Link>
           <Link href="/lessons">Lessons</Link>
           <Link href="/faq">FAQ</Link>
-          <Link href="/book">Booking</Link>
+          <a href={publicAssetPath("/book")}>Booking</a>
         </nav>
         <nav className="site-footer__legal" aria-label="Terms and privacy">
           <a aria-haspopup="dialog" data-terms-privacy href={publicAssetPath("/book/#terms-privacy")}>Terms &amp; privacy</a>

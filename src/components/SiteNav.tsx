@@ -9,6 +9,8 @@ import { BrandWordmark } from "@/components/BrandWordmark";
 import { AssetMark } from "@/components/BrandMarks";
 import { CONTACT_WHATSAPP_URL } from "@/lib/config";
 import type { SitePage } from "@/components/SiteHeader";
+import { lockPageScroll } from "@/lib/scroll-lock";
+import { publicAssetPath } from "@/lib/paths";
 
 type NavItem = { href: string; id: SitePage; label: string; note: string; mark: string };
 
@@ -67,9 +69,8 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
 
     const root = document.documentElement;
     const previousRootOverflow = root.style.overflow;
-    const previousBodyOverflow = document.body.style.overflow;
+    const releaseScroll = lockPageScroll();
     root.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
     const background = [...document.querySelectorAll<HTMLElement>("main, .site-footer, .akibwa-project-banner, .site-header")]
       .filter((element) => !element.inert);
     background.forEach((element) => { element.inert = true; });
@@ -81,6 +82,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
     window.addEventListener("resize", positionMenu);
 
     function onKeyDown(event: KeyboardEvent) {
+      if (document.querySelector("dialog[open]")) return;
       if (event.key === "Escape") {
         event.preventDefault();
         setOpen(false);
@@ -98,7 +100,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       root.style.overflow = previousRootOverflow;
-      document.body.style.overflow = previousBodyOverflow;
+      releaseScroll();
       background.forEach((element) => { element.inert = false; });
       cancelAnimationFrame(focusFrame);
       desktop.removeEventListener("change", closeOnDesktop);
@@ -109,16 +111,17 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
   return (
     <>
       <nav className="site-nav" aria-label="Main navigation">
-        {navigation.map((item) => (
-          <Link
+        {navigation.map((item) => {
+          const Destination = item.id === "book" ? "a" : Link;
+          return <Destination
             aria-current={currentPage === item.id ? "page" : undefined}
             className="site-nav__link"
-            href={item.href}
+            href={item.id === "book" ? publicAssetPath(item.href) : item.href}
             key={item.id}
           >
             {item.label}
-          </Link>
-        ))}
+          </Destination>;
+        })}
       </nav>
 
       <button
@@ -186,13 +189,14 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
             </button>
           </div>
           <div className="nav-mobile__links">
-            {navigation.map((item) => (
-              <Link
+            {navigation.map((item) => {
+              const Destination = item.id === "book" ? "a" : Link;
+              return <Destination
                 aria-current={currentPage === item.id ? "page" : undefined}
                 aria-describedby={`nav-mobile-note-${item.id}`}
                 aria-label={item.label}
                 className="nav-mobile__link"
-                href={item.href}
+                href={item.id === "book" ? publicAssetPath(item.href) : item.href}
                 key={item.id}
                 onClick={() => setOpen(false)}
               >
@@ -201,15 +205,15 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
                   <span className="nav-mobile__label">{item.label}</span>
                   <span className="nav-mobile__note" id={`nav-mobile-note-${item.id}`}>{item.note}</span>
                 </span>
-              </Link>
-            ))}
+              </Destination>;
+            })}
           </div>
           <div className="nav-mobile__cta">
             <p>One to one, online or in Porto.</p>
             <div className="nav-mobile__cta-actions">
-              <Link className="button button--coral button--compact" href="/book/?view=book" onClick={() => setOpen(false)}>
+              <a className="button button--coral button--compact" href={publicAssetPath("/book/?view=book")} onClick={() => setOpen(false)}>
                 Book a lesson
-              </Link>
+              </a>
               <a className="button button--outline-light button--compact" href={CONTACT_WHATSAPP_URL} rel="noreferrer" target="_blank">
                 Message on WhatsApp
               </a>

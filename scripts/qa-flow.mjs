@@ -468,6 +468,12 @@ if ((await page.locator(".faq-group:not([hidden])").count()) !== 1) {
 }
 // Before hydration the index is plain anchors; switching in place needs the page ready.
 await page.locator('.faq-index[data-ready="true"]').waitFor();
+// Finish the preceding disclosure's height transition before measuring the
+// separate section switch. Scroll anchoring while it closes is not that switch.
+await firstFaq.evaluate(async element => {
+  await document.fonts.ready;
+  await Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
+});
 const faqScrollBefore = await page.evaluate(() => window.scrollY);
 // Dispatched directly: Playwright's own scroll-into-view before a click is not
 // the page moving, and on a slower runner it scrolled this link to centre.

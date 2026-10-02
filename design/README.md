@@ -63,6 +63,9 @@ uses the account's saved rate automatically. Code entry belongs only under
 Edit details, behind the small “Have a code from Inês?” disclosure; booking and
 lesson-length changes have no code field. The student applies a rate for each
 length, so a 60-minute code and a 90-minute code can both be saved.
+The disclosure note describes future weekly lessons of the matching length.
+Students can continue editing while a save is pending; a reply preserves newer
+drafts, and independent name/NIF saves cannot undo one another.
 They get an accessible status message and see that saved price on return.
 Duration changes show their actual price before submission. No valid-code
 suggestions, catalogue, countdown or expiry pressure belong in this flow. Only
@@ -70,7 +73,7 @@ some students have a code, so nothing may suggest most should: sign-up carries
 no code field, and Edit details keeps the small disclosure, listing saved
 rates only once there is one instead of a standard price for everyone.
 
-Three visible colour choices are required for accessible contrast:
+Text colours must meet these accessible contrast requirements:
 
 - the second half of the Approach page heading (`way to learn.`) uses `--blue`
   on the lavender panel. Cream measured 1.95:1 there, while blue on lavender
@@ -82,9 +85,17 @@ Three visible colour choices are required for accessible contrast:
   panel;
 - completed booking-choice values and change actions use body ink at no less
   than 14 px, so both remain readable on the lavender mobile surface.
+- Google Meet setup warnings and errors use `#a73523` on the soft lavender
+  panel, giving small feedback text 4.78:1 contrast. The coral action colour
+  measured 4.25:1 on that surface.
 
 The `--blue`, `--blue-deep`, `--lavender`, `--paper`, and `--coral` fill
 colours are unchanged.
+
+With JavaScript disabled, public pages retain ordinary navigation links at
+every width, all FAQ categories remain readable, and terms/privacy are readable
+in the booking document. With JavaScript enabled, the existing mobile menu,
+category selection and terms modal enhance those documents.
 
 ## Current responsive composition — 2026-08-31
 
@@ -171,7 +182,9 @@ the same identity or action:
   without requiring sign-in. The overlay scrolls within the viewport, keeps its
   close button visible, traps keyboard focus, and closes with Escape or a click
   outside. Closing returns focus to the link and preserves the page position,
-  booking choices, notes and agreement state. The old `/terms`,
+  booking choices, notes and agreement state. When lesson management is underneath,
+  Escape closes only the top overlay and restores focus within the remaining
+  dialog, which keeps the page scroll locked. The old `/terms`,
   `/booking-terms` and `/privacy` pages redirect into booking; there is no
   separate legal-page hero, index or marketing treatment. Payment wording follows
   the method shown at booking and never implies every booking saves or charges a card.
@@ -237,9 +250,9 @@ Dan's 22 September review tightened the public pages:
 - the FAQ shows one section at a time. The index switches sections in place,
   fading the chosen one in without scrolling the page, and the address keeps
   `#faq-<section>` so links open the right section; on phones, where the index
-  sits above, the chosen section is brought into view. Section headings carry
-  no number because the index already does, and questions sit close to body
-  size;
+  sits above, the chosen section is brought into view. Modified clicks retain
+  the browser's ordinary navigation behaviour. Section headings carry no number
+  because the index already does, and questions sit close to body size;
 - text is not selectable by default, so a tap or drag never paints the page
   blue. Anything a visitor may reasonably copy stays selectable: form fields,
   the terms and privacy text, booking references, alerts and error messages,
@@ -354,6 +367,20 @@ lesson management pairs blue `Move recurrence`, an outline `Stop repeating`, and
 coral `Cancel all booked lessons`; profile editing pairs coral `Save name` with
 blue `Send confirmation link`. Keep the existing labels and state indicators so
 colour is never the only way to tell the controls apart.
+
+Confirmed email changes preserve an open profile editor and newer drafts while
+renewing that account's session. If the calendar cannot refresh after booking,
+moving, cancelling or stopping a sequence, retain the successful outcome and
+show the account warning with `Try again`, including inside lesson management.
+That action reloads the account without repeating the change. Disable change
+controls while their save is pending. A payment form that fails to load offers
+`Try again` using the same held booking and checkout.
+Availability failures also offer `Try again` while retaining the selection.
+When a longer lesson makes selected times overlap or removes the required gap,
+keep the earliest compatible times and explain which later times came off.
+Apply that check when retry completes while adding or changing a lesson, and
+when Back restores the original choice. Disable booking edits during submit
+and card checkout so the choices beside the card form describe its held times.
 
 ## Motion direction
 

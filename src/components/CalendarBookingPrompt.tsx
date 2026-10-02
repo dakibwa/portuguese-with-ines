@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react";
 import { ChevronRight, X } from "lucide-react";
 import { formatLongDate } from "@/lib/booking-api";
-import { keepDialogFocus } from "@/lib/dialog-focus";
+import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
+import { lockPageScroll } from "@/lib/scroll-lock";
 
 type PromptLesson = { key: string; title: string; detail: string; onOpen: () => void };
 
@@ -22,13 +23,12 @@ export function CalendarBookingPrompt({ date, lessons = [], onBook, onClose }: {
   useEffect(() => {
     const dialog = dialogRef.current;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockPageScroll();
     dialog?.showModal();
     return () => {
       dialog?.close();
-      document.body.style.overflow = overflow;
-      if (previous?.isConnected) previous.focus({ preventScroll: true });
+      releaseScroll();
+      restoreDialogFocus(previous);
     };
   }, []);
 

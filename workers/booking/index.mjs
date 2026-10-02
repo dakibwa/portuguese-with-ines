@@ -2083,7 +2083,7 @@ async function handleCreate(request, env, ctx) {
           customer: student.stripe_customer_id ?? null,
           customerEmail: student.email,
           seriesId,
-          successUrl: siteUrl(env, "/book/?view=lessons&card=saved"),
+          successUrl: `${manageUrl}&view=lessons&card=saved`,
           cancelUrl: siteUrl(env, "/book/?cancelled=1"),
           skippedStartAts: filled.skipped.map((occurrence) => occurrence.startAt)
         });
@@ -2223,7 +2223,7 @@ async function handleCreateSelection(request, env, ctx, {
       const session = await createCardSetupSession(env, {
         booking: first, customer: student.stripe_customer_id ?? null, customerEmail: student.email,
         selectionCount: rows.length,
-        successUrl: siteUrl(env, "/book/?view=lessons&card=saved"), cancelUrl: siteUrl(env, "/book/?cancelled=1"),
+        successUrl: `${payload.manageUrl}&view=lessons&card=saved`, cancelUrl: siteUrl(env, "/book/?cancelled=1"),
         skippedStartAts: selection.skipped
       });
       await env.DB.prepare("UPDATE bookings SET stripe_session_id = ? WHERE id IN (SELECT value FROM json_each(?)) AND status = 'pending_payment'")

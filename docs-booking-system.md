@@ -94,8 +94,12 @@ The week itself is where Inês takes time off. Clicking, tapping or dragging
 across times on a date blocks them for that date only, and doing so again
 reopens them; the `Day off` switch above each date blocks the whole day. Each
 change saves as she makes it, one request at a time, so quick clicks coalesce
-into the date's latest choice; a failed save puts that date back as saved and
-says so. Past dates and weekly blocks such as lunch are shown but not toggled.
+into the date's latest choice. A failed older save keeps a newer choice queued;
+failure of the latest choice puts that date back as saved and says so.
+Leaving the teacher page releases its queue: an already submitted write may
+finish, but no later queued write starts. Unreadable time-off or weekly-hours
+acknowledgments show an error instead of claiming success. Past dates and
+weekly blocks such as lunch are shown but not toggled.
 Existing lessons are never cancelled by time off — they stay on the calendar
 and need their own move or cancel.
 
@@ -275,6 +279,11 @@ depending on them having kept the right confirmation email.
   `Change` or `Cancel` overlay. `Change` reuses the existing calendar date and
   time picker and, when payment state permits, offers the ordinary `60 mins`
   and `90 mins` lengths plus Online/In Porto in matching sliding controls.
+  Each cancellation or recurring decision keeps focus inside the changed dialog.
+  Terms/privacy can open above lesson management. Escape dismisses only the
+  top dialog, preserving the underlying lesson, management token and scroll lock.
+  Payment recovery replies are ignored after its account changes or the page
+  closes, so an abandoned request cannot redirect to Stripe or reopen an error.
 - **Past and cancelled lessons keep the same readable card hierarchy.** Their
   status, mark, date, compact duration, location and booking reference sit on
   one readable card, without an action treatment that suggests they can still
@@ -394,6 +403,53 @@ number of booking rows at once.
   link sitting in the old mailbox would otherwise stay valid for its hour — and
   future lessons are re-addressed. Past and cancelled lessons keep the address
   they were taken under, which is the record of what happened.
+- The confirming browser saves the renewed session without closing this
+  account's profile editor. Confirmation updates the verified email while
+  preserving newer drafts and independently saved name/NIF fields. The link's
+  token is removed before the request waits; a late reply cannot rewrite a
+  page the student has since opened. Replacing the account or signing out
+  still clears its private views.
+- An account reload started before a successful profile save cannot restore
+  the older saved values. Booking replies also belong to their original
+  page and session: they cannot redirect an abandoned page or unlock a
+  replacement account's pending booking. A failed account refresh after a
+  successful booking, move, cancellation or sequence change keeps the
+  confirmation and offers a reload retry, including inside lesson management,
+  without repeating the mutation. A move renders the saved booking returned
+  by its POST, so an unavailable detail reread cannot undo the displayed success.
+  Change controls stay disabled while the save is pending.
+- Background account refreshes update both the calendar and the account menu's
+  lesson count/history. Incoming lesson data preserves the student's profile
+  drafts and independently saved fields; a successful refresh clears an older
+  account-read warning without clearing profile-save errors.
+- Availability replies belong to their original length, location and session.
+  An older retry cannot replace a newer lookup's times or error state. Changing
+  session reloads availability with the current account's hold exclusions.
+  A failed length lookup retains the selected dates and offers an in-place
+  retry. The pending recheck remains until fresh availability arrives. Rechecks
+  compare the whole selection, including the lesson gap, and remove later
+  conflicting starts with a clear notice rather than submit overlapping lessons.
+  They also run while a lesson is being added or changed, before offering more
+  times. Back restores a changed lesson only after checking it against the
+  current availability and the other selected lessons.
+- Account, schedule and lesson reads also validate their nested rows before
+  rendering. Invalid dates, missing lesson objects, malformed series/exceptions
+  and unreadable recurring previews produce recoverable feedback, preserving
+  the session. An invalid skipped-date reply cannot invent a clash in 1970.
+- Booking creation, cancellation and move replies validate the returned
+  lesson before showing success. Invalid selection/series dates and teacher
+  booking acknowledgments are rejected too, retaining the form without
+  automatically repeating the mutation. Email-change acknowledgments must
+  contain a usable address; an invalid renewed session is never stored.
+- Booking choices, notes and consent stay disabled while submitting. During
+  embedded checkout, length, location, kind and repeat stay disabled, and
+  changing/adding dates is unavailable. The summary continues to describe the
+  held booking whose card form is open.
+- A payment library that downloads without exposing Stripe is a recoverable
+  load failure. `Try again` retries the library or checkout initialization using
+  the same held booking and client secret, without booking again. Signing out
+  or replacing the account also dismisses its pending checkout-return check;
+  a late verification cannot restore that account's success banner.
 
 ### NIF for receipts
 
@@ -406,6 +462,10 @@ number of booking rows at once.
   or an empty string. Spaces, dots, hyphens and a `PT` prefix are removed, and
   anything that fails the mod-11 check digit or starts with 0 is refused with a
   plain message, so a mistyped number never reaches a tax document.
+- **Independent profile saves.** Saving a name or NIF sends and applies only
+  that field, so overlapping replies cannot undo another saved field. A NIF
+  reply normalises the submitted draft only if the student has not edited it
+  again while waiting.
 - **Where it appears.** Inês's fatura-recibo automation reads her booking
   emails and schedule, so every email she gets about a student's lessons
   (bookings, weekly runs, moves, cancellations, declined cards and payments)
@@ -644,7 +704,27 @@ are unchanged. Reading the combined notice preserves the selection and agreement
 The underlined terms text inside the agreement opens the dialog independently
 of the toggle. The page shows one payment summary, without a separate reading
 link or repeated authorisation sentence. Escape, the close button or clicking
-outside dismisses the dialog and returns focus to its opener.
+outside dismisses the dialog and returns focus to its opener. With JavaScript
+disabled, the same terms and privacy text is ordinary document content; the
+footer and old legal links still reach it. Public navigation and all FAQ
+categories also remain usable without JavaScript.
+
+Unreadable booking API replies and invalid lesson-type or availability data
+show a booking error and the contact link while keeping the document usable.
+Lesson-type failures persist independently of later availability requests.
+A reload can recover when the API returns valid data again.
+Account and teacher API clients also reject unreadable or missing required data:
+they show a retryable error instead of treating it as an empty lesson list or
+schedule. Sign-in validates the returned student and a nonempty string session
+before storing it.
+These response failures retain an existing session; a matching 401 still ends it.
+Password-reset, recurring-stop and teacher no-show actions require a valid
+acknowledgment before reporting success. Rate-code receipts, optional rendered
+booking fields, payment amounts and late-fee flags are also validated; malformed
+replies preserve a usable retry instead of inventing a fee or displaying an
+invalid price. Main-menu and footer booking links use ordinary document
+navigation so explicit destinations and browser history initialize the matching
+booking or lessons view, including navigation from an already open booking page.
 
 Dan confirmed the public contact email `aprenderportugues.ines@gmail.com`,
 Época as the contact address, Inês's own NIF and her status as a sole trader
@@ -689,6 +769,16 @@ With `postpay` and Stripe configured:
 - the slot is held as `pending_payment` while Checkout saves a reusable card in
   setup mode; no money is taken and nothing is emailed until the webhook proves
   the card setup succeeded;
+- a direct management link to a held lesson says `Not confirmed`, explains
+  that checkout must complete, and offers `Book a lesson` to start again.
+  It has no confirmed-lesson change or recurrence controls. Held lessons never
+  appear in completed history, even if the scheduled date has passed;
+- all card-setup returns carry the first held lesson's existing signed manage
+  token, including weekly runs and multiple-date selections. The page confirms
+  only when that lesson becomes `confirmed`; `card=saved` alone and older
+  account bookings do not prove this checkout succeeded. A missing token or
+  delayed webhook leaves the page asking the student to check their lessons.
+  Publish the Worker return-link change before the website confirmation guard;
 - a student's next `POST /bookings` replaces their own unfinished card setup,
   so backing out of the form, reloading or closing the tab never leaves them
   refused by their own hold or treated as having had a trial. The replaced
@@ -912,7 +1002,12 @@ account's saved rates automatically and offer no code field. The profile lists
 the saved weekly rates only once there is one, so a student without a code sees
 one quiet link and no "standard price" rows. It is
 one field for every code: after a 60 minute code is added the disclosure stays
-open for the 90 minute one. Saving there tells the booking workspace at once,
+open for the 90 minute one. A reply clears only its submitted code; a newer
+code typed while waiting stays ready to add. The note names future weekly
+lessons of the matching length, since single/trial prices are unaffected.
+Old rates lookups cannot overwrite a saved code's prices or show a stale
+lookup error, in either the editor or the booking workspace.
+Saving there tells the booking workspace at once,
 so the next weekly booking is priced from it without a reload or the code being
 typed again. **Sign-up deliberately has no code field** (decided 28 September
 2026): only some students have a code, and a field there would suggest most new

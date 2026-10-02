@@ -80,6 +80,7 @@ async function fixture(width, options = {}) {
     failHours: 0,
     failDay: "",
     delay: 0,
+    dayGate: null,
     nextId: 1000,
     failMove: 0,
     failBookings: false,
@@ -131,6 +132,7 @@ async function fixture(width, options = {}) {
     }
     if (path === "/admin/exceptions/day") {
       // Mirrors the Worker: a day off and hour blocks replace only their own rows.
+      if (state.dayGate) await state.dayGate;
       if (state.delay)
         await new Promise((done) => setTimeout(done, state.delay));
       if (data.date === state.failDay) {
@@ -494,10 +496,19 @@ try {
   await expect(slot(page, 5, 600)).toHaveAttribute("aria-pressed", "false");
 
   // Quick clicks while a save is in flight coalesce into the latest choice.
-  state.delay = 400;
-  for (const minute of [900, 930, 960]) await slot(page, 5, minute).click();
+  let finishDaySave;
+  state.dayGate = new Promise(resolve => { finishDaySave = resolve; });
+  await slot(page, 5, 900).click();
+  await expect.poll(() => dayWrites(state, "2026-09-11").at(-1)).toEqual({
+    date: "2026-09-11", blocks: [{ startMinute: 900, endMinute: 930 }],
+  });
+  for (const minute of [930, 960]) await slot(page, 5, minute).click();
+  state.dayGate = null;
+  finishDaySave();
   await expect(note).toHaveText("16:00–16:30 on Fri 11 Sept is off.");
-  state.delay = 0;
+  await expect.poll(() => state.exceptions
+    .filter(entry => entry.date === "2026-09-11")
+    .map(entry => [entry.start_minute, entry.end_minute])).toEqual([[900, 990]]);
   assert.deepEqual(dayWrites(state, "2026-09-11").slice(-2), [
     { date: "2026-09-11", blocks: [{ startMinute: 900, endMinute: 930 }] },
     { date: "2026-09-11", blocks: [{ startMinute: 900, endMinute: 990 }] },

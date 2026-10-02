@@ -1,27 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { TermsPrivacyInformation } from "@/components/PolicyInformation";
-import { keepDialogFocus } from "@/lib/dialog-focus";
+import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
+import { lockPageScroll } from "@/lib/scroll-lock";
 
 const policySections = ["terms-privacy", "booking", "change-booking", "privacy"];
 
 export function BookingInformation() {
+  const [ready, setReady] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
-  const previousOverflow = useRef<string | null>(null);
+  const releaseScroll = useRef<(() => void) | null>(null);
+  useEffect(() => { setReady(true); }, []);
 
   const restorePage = useCallback(() => {
-    if (dialogRef.current?.open || previousOverflow.current === null) return;
-    document.body.style.overflow = previousOverflow.current;
-    previousOverflow.current = null;
+    if (dialogRef.current?.open || releaseScroll.current === null) return;
+    releaseScroll.current();
+    releaseScroll.current = null;
     // Keep old shared links working without leaving a stale fragment on close.
     if (policySections.includes(window.location.hash.slice(1))) {
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
     }
-    if (returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
+    restoreDialogFocus(returnFocus.current);
     returnFocus.current = null;
   }, []);
 
@@ -37,8 +40,7 @@ export function BookingInformation() {
     function openInformation(trigger?: HTMLElement) {
       if (!dialog || dialog.open) return;
       returnFocus.current = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-      previousOverflow.current = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
+      releaseScroll.current = lockPageScroll();
       dialog.showModal();
       if (contentRef.current) contentRef.current.scrollTop = 0;
     }
@@ -69,12 +71,19 @@ export function BookingInformation() {
       dialog.removeEventListener("close", restorePage);
       delete dialog.dataset.ready;
       dialog.close();
-      if (previousOverflow.current !== null) document.body.style.overflow = previousOverflow.current;
-      previousOverflow.current = null;
-      if (returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
+      releaseScroll.current?.();
+      releaseScroll.current = null;
+      restoreDialogFocus(returnFocus.current);
       returnFocus.current = null;
     };
-  }, [restorePage]);
+  }, [ready, restorePage]);
+
+  if (!ready) return (
+    <section className="policy-information-fallback" id="terms-privacy" aria-labelledby="terms-privacy-title">
+      <h2 id="terms-privacy-title">Terms &amp; privacy</h2>
+      <TermsPrivacyInformation />
+    </section>
+  );
 
   return (
     <dialog

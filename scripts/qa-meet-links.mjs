@@ -34,7 +34,7 @@ try {
     page.on("pageerror", error => errors.push(error.message));
     await page.clock.setFixedTime(new Date("2026-09-14T10:00:00Z"));
     await page.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-meet-fixture"));
-    await page.route("**/ines-booking*/**", async route => {
+    await page.route(url => /^\/(me(?:\/|$)|lesson-types$|availability$|bookings\/)/.test(url.pathname), async route => {
       const path = new URL(route.request().url()).pathname;
       if (path === "/me") return route.fulfill({ json: { student, bookings, series: [], sameDayFeeCents: 500 } });
       if (path === "/me/recurring-rates") return route.fulfill({ json: { rates: {} } });

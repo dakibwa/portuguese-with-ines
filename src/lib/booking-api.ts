@@ -1,5 +1,6 @@
 import { forgetSession, readSession } from "@/lib/auth-api";
 import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, formatMoney } from "@/lib/config";
+import { BOOKING_REPLY_ERROR, isApiAmount, isApiInstant, isApiLesson, isApiRecord as isRecord } from "@/lib/api-response";
 
 export type LessonType = {
   id: string;
@@ -22,9 +23,11 @@ export type AvailabilityResponse = {
   lessonType: { id: string; name: string; durationMinutes: number; priceCents: number };
 };
 
+export type BookingStatus = "confirmed" | "cancelled" | "pending_payment";
+
 export type Booking = {
   reference: string;
-  status: "confirmed" | "cancelled";
+  status: BookingStatus;
   lessonType: { id: string; name: string; durationMinutes: number; priceCents: number };
   startAt: string;
   endAt: string;
@@ -75,6 +78,10 @@ export class BookingApiError extends Error {
   }
 }
 
+function unreadableReply(status = 502): never {
+  throw new BookingApiError(BOOKING_REPLY_ERROR, status);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!BOOKING_API_BASE_URL) {
     throw new BookingApiError("Booking is not connected yet.", 503);
@@ -92,16 +99,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new BookingApiError("We couldn't reach the booking system. Please check your connection.", 0);
   }
 
-  const data = (await response.json().catch(() => ({}))) as T & { error?: string };
+  const data: unknown = await response.json().catch(() => null);
   // A signed request refused as unauthorised means the session died elsewhere
   // (expired, revoked, signed out on another device). Forget it, so the page
   // offers sign-in instead of failing every step with "Please sign in".
-  if (response.status === 401 && new Headers(init?.headers).has("Authorization")) forgetSession();
+  const authorization = new Headers(init?.headers).get("Authorization");
+  if (response.status === 401 && authorization?.startsWith("Bearer ")) forgetSession(authorization.slice(7));
   if (!response.ok) {
-    throw new BookingApiError(data.error || "Something went wrong. Please try again.", response.status);
+    const error = isRecord(data) && typeof data.error === "string" ? data.error : "";
+    throw new BookingApiError(error || "Something went wrong. Please try again.", response.status);
   }
 
-  return data;
+  if (!isRecord(data)) unreadableReply(response.status);
+  return data as T;
 }
 
 declare global {
@@ -109,6 +119,15 @@ declare global {
     /** Set by the inline script on /book, before React exists. */
     __inesLessonTypes?: Promise<LessonTypesResponse | null> | null;
   }
+}
+
+function validateLessonTypes(data: LessonTypesResponse) {
+  if (!isRecord(data) || !Array.isArray(data.lessonTypes) || !data.lessonTypes.every((type) =>
+    isRecord(type) && typeof type.id === "string" && typeof type.name === "string" &&
+    typeof type.duration_minutes === "number" && Number.isFinite(type.duration_minutes) && type.duration_minutes > 0 &&
+    typeof type.price_cents === "number" && Number.isFinite(type.price_cents) && type.price_cents >= 0
+  )) unreadableReply();
+  return data;
 }
 
 export function listLessonTypes() {
@@ -119,10 +138,10 @@ export function listLessonTypes() {
     window.__inesLessonTypes = null;
     return primed.then(
       (data) => data ?? request<LessonTypesResponse>("/lesson-types")
-    );
+    ).then(validateLessonTypes);
   }
 
-  return request<LessonTypesResponse>("/lesson-types");
+  return request<LessonTypesResponse>("/lesson-types").then(validateLessonTypes);
 }
 
 /**
@@ -147,6 +166,14 @@ export function fetchAvailability(
   return request<AvailabilityResponse>(`/availability?${query}`, {
     signal,
     ...(session ? { headers: { Authorization: `Bearer ${session}` } } : {})
+  }).then((data) => {
+    if (!isRecord(data.slotsByDate) || !Object.values(data.slotsByDate).every((slots) =>
+      Array.isArray(slots) && slots.every((slot) =>
+        isRecord(slot) && typeof slot.startAt === "string" && typeof slot.endAt === "string" &&
+        Number.isFinite(Date.parse(slot.startAt)) && Date.parse(slot.endAt) > Date.parse(slot.startAt)
+      )
+    )) unreadableReply();
+    return data;
   });
 }
 
@@ -188,6 +215,10 @@ export function previewSeries(
     method: "POST",
     ...(session ? { headers: { Authorization: `Bearer ${session}` } } : {}),
     body: JSON.stringify(payload)
+  }).then((data) => {
+    if (!Array.isArray(data.bookable) || !data.bookable.every(isApiInstant) ||
+      !Array.isArray(data.skipped) || !data.skipped.every(isApiInstant)) unreadableReply();
+    return data;
   });
 }
 
@@ -224,13 +255,37 @@ export function createBooking(
     method: "POST",
     headers: { Authorization: `Bearer ${session}` },
     body: JSON.stringify(payload)
+  }).then((data) => {
+    validateBookingReply(data);
+    if ([data.checkoutClientSecret, data.checkoutUrl, data.manageUrl, data.manageToken].some((value) => value !== undefined && (typeof value !== "string" || !value)) ||
+      (data.series !== undefined && (!validSelectionDates(data.series) || typeof data.series.id !== "string" || typeof data.series.openEnded !== "boolean")) ||
+      (data.selection !== undefined && (!validSelectionDates(data.selection) || typeof data.selection.recurring !== "boolean" || !Number.isInteger(data.selection.weeklyTimes) || data.selection.weeklyTimes < 0))) unreadableReply();
+    return data;
   });
+}
+
+function validateBookingReply<T extends { booking: Booking }>(data: T) {
+  if (!isApiLesson(data.booking)) unreadableReply();
+  return data;
+}
+
+function validSelectionDates(value: unknown) {
+  return isRecord(value) && Array.isArray(value.booked) && value.booked.every(isApiInstant) &&
+    Array.isArray(value.skipped) && value.skipped.every(isApiInstant) &&
+    (value.weeks === null || (Number.isInteger(value.weeks) && Number(value.weeks) > 0));
+}
+
+function validateRates<T extends { rates: Record<number, number> }>(data: T) {
+  if (!isRecord(data.rates) || !Object.values(data.rates).every((cents) =>
+    typeof cents === "number" && Number.isFinite(cents) && cents >= 0
+  )) unreadableReply();
+  return data;
 }
 
 export function fetchRecurringRates(session: string) {
   return request<{ rates: Record<number, number> }>("/me/recurring-rates", {
     headers: { Authorization: `Bearer ${session}` }
-  });
+  }).then(validateRates);
 }
 
 /**
@@ -246,7 +301,12 @@ export function redeemRecurringRate(session: string, code: string, durationMinut
       headers: { Authorization: `Bearer ${session}` },
       body: JSON.stringify({ code, ...(durationMinutes === undefined ? {} : { durationMinutes }) })
     }
-  );
+  ).then((data) => {
+    validateRates(data);
+    if (data.saved !== undefined && (!isRecord(data.saved) ||
+      !Number.isInteger(data.saved.durationMinutes) || data.saved.durationMinutes <= 0 || !isApiAmount(data.saved.cents))) unreadableReply();
+    return data;
+  });
 }
 
 export function recoverBookingPayment(token: string, purpose: "lesson" | "same-day-fee") {
@@ -268,7 +328,12 @@ export function stopSeries(session: string, seriesId: string, cancelRemaining = 
       headers: { Authorization: `Bearer ${session}` },
       body: JSON.stringify({ cancelRemaining })
     }
-  );
+  ).then((data) => {
+    if (data.ok !== true || data.stopped !== true ||
+      [data.cancelled, data.kept, data.refunded].some((count) => !Number.isInteger(count) || count < 0) ||
+      (data.pendingRefunds !== undefined && (!Number.isInteger(data.pendingRefunds) || data.pendingRefunds < 0))) unreadableReply();
+    return data;
+  });
 }
 
 /** Move every upcoming occurrence in an active weekly sequence together. */
@@ -293,11 +358,30 @@ export function rescheduleSeries(
         ...(location ? { location } : {})
       })
     }
-  );
+  ).then((data) => {
+    if (data.ok !== true || !Number.isInteger(data.moved) || data.moved < 0 ||
+      !Array.isArray(data.bookings) || !data.bookings.every(isApiLesson) ||
+      (data.kept !== undefined && (!Array.isArray(data.kept) || !data.kept.every(isApiInstant)))) unreadableReply();
+    return data;
+  });
 }
 
 export function fetchBooking(token: string) {
-  return request<ManagedBooking>(`/bookings/${encodeURIComponent(token)}`);
+  return request<ManagedBooking>(`/bookings/${encodeURIComponent(token)}`).then((data) => {
+    validateBookingReply(data);
+    if ([data.isPast, data.sameDayFeeApplies, data.recurring, data.sameDayFeeAutomatic, data.changeLocked, data.refundOnCancel]
+      .some((value) => value !== undefined && typeof value !== "boolean") ||
+      (data.paymentsDue !== undefined && (!isRecord(data.paymentsDue) ||
+        ![data.paymentsDue.lesson, data.paymentsDue.sameDayFee].every((amount) => amount === null || isApiAmount(amount)))) ||
+      (data.durationPrices !== undefined && (!isRecord(data.durationPrices) || !Object.values(data.durationPrices).every(isApiAmount)))) unreadableReply();
+    return data;
+  });
+}
+
+function validateLessonChange<T extends { booking: Booking; sameDayFeeApplied: boolean }>(data: T) {
+  validateBookingReply(data);
+  if (typeof data.sameDayFeeApplied !== "boolean") unreadableReply();
+  return data;
 }
 
 export function rescheduleBooking(
@@ -318,14 +402,14 @@ export function rescheduleBooking(
         ...(location ? { location } : {})
       })
     }
-  );
+  ).then(validateLessonChange);
 }
 
 export function cancelBooking(token: string) {
   return request<{ booking: Booking; sameDayFeeApplied: boolean }>(
     `/bookings/${encodeURIComponent(token)}/cancel`,
     { method: "POST", body: "{}" }
-  );
+  ).then(validateLessonChange);
 }
 
 /** The student's own zone, so times can be shown in it alongside Porto time. */

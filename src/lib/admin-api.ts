@@ -1,4 +1,6 @@
 import { BOOKING_API_BASE_URL } from "@/lib/config";
+import { forgetSession } from "@/lib/auth-api";
+import { BOOKING_REPLY_ERROR, isApiInstant, isApiRecord } from "@/lib/api-response";
 
 export type AdminStudent = {
   id: string;
@@ -78,12 +80,14 @@ async function adminRequest<T>(
     throw new Error("We couldn't reach the booking system. Please check your connection.");
   }
 
-  const data = (await response.json().catch(() => ({}))) as T & {
-    error?: string;
-  };
-  if (!response.ok)
-    throw new Error(data.error || `Request failed (${response.status})`);
-  return data;
+  const data: unknown = await response.json().catch(() => null);
+  if (response.status === 401) forgetSession(token);
+  if (!response.ok) {
+    const error = isApiRecord(data) && typeof data.error === "string" ? data.error : "";
+    throw new Error(error || `Request failed (${response.status})`);
+  }
+  if (!isApiRecord(data)) throw new Error(BOOKING_REPLY_ERROR);
+  return data as T;
 }
 
 export function fetchSchedule(token: string) {
@@ -91,7 +95,14 @@ export function fetchSchedule(token: string) {
     rules: AvailabilityRule[];
     exceptions: AvailabilityException[];
     settings?: { slotIntervalMinutes: number };
-  }>(token, "/admin/availability");
+  }>(token, "/admin/availability").then((data) => {
+    if (!Array.isArray(data.rules) || !data.rules.every((row) =>
+      isApiRecord(row) && Number.isInteger(row.weekday) && Number(row.weekday) >= 0 && Number(row.weekday) <= 6 &&
+      Number.isInteger(row.start_minute) && Number.isInteger(row.last_start_minute) &&
+      Number(row.start_minute) >= 0 && Number(row.last_start_minute) <= 1440 && Number(row.start_minute) <= Number(row.last_start_minute)
+    ) || !Array.isArray(data.exceptions) || !data.exceptions.every(validException)) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
 }
 
 export function fetchBookings(token: string, from?: string) {
@@ -101,7 +112,17 @@ export function fetchBookings(token: string, from?: string) {
   }>(
     token,
     `/admin/bookings${from ? `?from=${encodeURIComponent(from)}` : ""}`,
-  );
+  ).then((data) => {
+    if (!Array.isArray(data.bookings) || !data.bookings.every((row) =>
+      isApiRecord(row) && typeof row.id === "string" && typeof row.reference === "string" &&
+      typeof row.student_name === "string" && typeof row.student_email === "string" && typeof row.lesson_name === "string" &&
+      (row.notes === undefined || typeof row.notes === "string") &&
+      isApiInstant(row.starts_at) && isApiInstant(row.ends_at) && Date.parse(row.ends_at) > Date.parse(row.starts_at)
+    ) || (data.manualPaymentReconciliation !== undefined && (!Array.isArray(data.manualPaymentReconciliation) || !data.manualPaymentReconciliation.every((row) =>
+      isApiRecord(row) && typeof row.id === "string" && typeof row.reference === "string"
+    )))) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
 }
 
 export function saveRules(
@@ -115,7 +136,10 @@ export function saveRules(
       method: "POST",
       body: JSON.stringify({ rules }),
     },
-  );
+  ).then((data) => {
+    if (data.ok !== true || !Number.isInteger(data.count) || data.count < 0) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
 }
 
 /**
@@ -141,7 +165,21 @@ export function saveDayOff(
         })),
       }),
     },
-  );
+  ).then((data) => {
+    if (data.ok !== true || !Array.isArray(data.exceptions) || !data.exceptions.every((row) => validException(row) && row.date === date)) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
+}
+
+function validException(value: unknown): value is AvailabilityException {
+  return isApiRecord(value) && (value.date === null || (typeof value.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.date))) &&
+    (value.note == null || typeof value.note === "string") &&
+    (value.kind === "blocked" || value.kind === "extra");
+}
+
+function validateBookingAcknowledgment<T extends { booking: { reference: string } }>(data: T) {
+  if (!isApiRecord(data.booking) || typeof data.booking.reference !== "string" || !data.booking.reference) throw new Error(BOOKING_REPLY_ERROR);
+  return data;
 }
 
 export function fetchStudents(token: string) {
@@ -167,7 +205,7 @@ export function createBookingFor(
       method: "POST",
       body: JSON.stringify(input),
     },
-  );
+  ).then(validateBookingAcknowledgment);
 }
 
 export function rescheduleBookingAs(
@@ -182,7 +220,7 @@ export function rescheduleBookingAs(
       method: "POST",
       body: JSON.stringify({ startAt }),
     },
-  );
+  ).then(validateBookingAcknowledgment);
 }
 
 export function cancelBookingAs(token: string, bookingId: string) {
@@ -193,7 +231,7 @@ export function cancelBookingAs(token: string, bookingId: string) {
       method: "POST",
       body: "{}",
     },
-  );
+  ).then(validateBookingAcknowledgment);
 }
 
 export function setNoShow(token: string, bookingId: string, noShow: boolean) {
@@ -204,7 +242,11 @@ export function setNoShow(token: string, bookingId: string, noShow: boolean) {
       method: "POST",
       body: JSON.stringify({ noShow }),
     },
-  );
+  ).then((data) => {
+    if (!isApiRecord(data.booking) || data.booking.id !== bookingId ||
+      data.booking.attendance_status !== (noShow ? "no_show" : "expected")) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
 }
 
 export function minutesToTime(minutes: number) {

@@ -100,6 +100,14 @@ jobs:
           QA_BASE_URL=http://localhost:3000 node scripts/qa-teacher-meet.mjs
           QA_BASE_URL=http://localhost:3000 node scripts/qa-student-nif.mjs
           QA_BASE_URL=http://localhost:3000 node scripts/qa-profile-rates.mjs
+          QA_BASE_URL=http://localhost:3000 npm run test:request-recovery
+          QA_BASE_URL=http://localhost:3000 npm run test:auth-recovery
+          QA_BASE_URL=http://localhost:3000 npm run test:html-fallbacks
+          QA_BASE_URL=http://localhost:3000 npm run test:state-continuity
+          QA_BASE_URL=http://localhost:3000 npm run test:account-booking-recovery
+          QA_BASE_URL=http://localhost:3000 npm run test:management-recovery
+          QA_BASE_URL=http://localhost:3000 npm run test:selection-calendar-recovery
+          QA_BASE_URL=http://localhost:3000 npm run test:release-recovery
 
       # The plain directory the Cloudflare deploy needs. Hidden files are kept
       # because the export carries dotfiles the deploy would otherwise lose;

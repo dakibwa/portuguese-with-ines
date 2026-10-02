@@ -11,6 +11,22 @@ const teacher = { id: "teacher", name: "Inês", email: "teacher@example.invalid"
 const authorizationUrl = "https://accounts.google.com/o/oauth2/v2/auth?fixture=meet";
 await mkdir("tmp/qa/meet", { recursive: true });
 
+async function readableMeetFeedback(panel, selector) {
+  const colors = await panel.locator(selector).evaluate(element => ({
+    ink: getComputedStyle(element).color,
+    paper: getComputedStyle(element.closest(".teacher-meet")).backgroundColor
+  }));
+  const luminance = color => {
+    const channels = color.match(/[\d.]+/g).map(Number);
+    assert.ok(channels.length === 3 || channels[3] === 1, "Contrast check needs opaque colors");
+    const linear = channels.slice(0, 3).map(channel => channel / 255).map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  };
+  const values = [luminance(colors.ink), luminance(colors.paper)].sort((a, b) => b - a);
+  const ratio = (values[0] + 0.05) / (values[1] + 0.05);
+  assert.ok(ratio >= 4.5, `${selector} needs AA text contrast; measured ${ratio.toFixed(2)}:1`);
+}
+
 async function fixture(width, connection, { callback = "", failStatus = false, connectResult = { url: authorizationUrl } } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 1000 } });
   const calls = [];
@@ -18,7 +34,7 @@ async function fixture(width, connection, { callback = "", failStatus = false, c
   page.on("pageerror", error => errors.push(error.message));
   await page.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-meet-teacher"));
   await page.route("https://accounts.google.com/**", route => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Isolated Google authorization</title><p>Authorization fixture only</p>" }));
-  await page.route("**/ines-booking*/**", route => {
+  await page.route(url => /^\/(me$|admin\/)/.test(url.pathname), route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (path === "/me") return route.fulfill({ json: { student: teacher, bookings: [], series: [] } });
@@ -47,12 +63,14 @@ try {
   for (const width of [1280, 390]) {
     const setup = await fixture(width, { ...disconnected, configured: false, pending: 0 });
     await expect(setup.panel).toContainText("one-time setup");
+    await readableMeetFeedback(setup.panel, ".teacher-meet-attention");
     await expect(setup.panel.getByRole("button")).toHaveCount(0);
     assert.deepEqual(setup.calls, []);
     await setup.page.close();
 
     const ready = await fixture(width, disconnected);
     await expect(ready.panel).toContainText("Not connected");
+    await readableMeetFeedback(ready.panel, ".teacher-meet-attention");
     await expect(ready.panel).not.toContainText("waiting to sync");
     const configure = ready.panel.getByRole("button", { name: "Configure", exact: true });
     await expect(configure).toHaveAttribute("aria-expanded", "false");
@@ -111,6 +129,7 @@ try {
 
   const failed = await fixture(1280, disconnected, { failStatus: true });
   await expect(failed.panel.getByRole("alert")).toContainText("temporarily unavailable");
+  await readableMeetFeedback(failed.panel, ".teacher-meet-error");
   failed.recoverStatus();
   await failed.panel.getByRole("button", { name: "Try again", exact: true }).click();
   await expect(failed.panel.getByRole("button", { name: "Configure", exact: true })).toBeVisible();

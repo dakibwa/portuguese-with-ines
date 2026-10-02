@@ -1237,8 +1237,11 @@
   height: auto;
   flex: none;
 }
+.teacher-meet-attention,
+.teacher-meet-error {
+  color: #a73523;
+}
 .teacher-meet-attention {
-  color: var(--coral-action);
   font: 600 0.75rem/1.5 var(--ui);
 }
 .teacher-meet p {
@@ -1263,10 +1266,6 @@
   color: var(--lavender-ink);
   font-size: 0.75rem;
 }
-.teacher-meet-error {
-  color: var(--coral-action);
-}
-
 /* Only the narrowest phones are too tight for two labels side by side. */
 @media (max-width: 380px) {
   .teacher-dialog-actions {

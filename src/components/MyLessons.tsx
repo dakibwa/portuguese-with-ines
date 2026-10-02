@@ -109,12 +109,34 @@ export function MyLessons({
   const [rateCode, setRateCode] = useState("");
   const [savingRate, setSavingRate] = useState(false);
   const [loading, setLoading] = useState(!initialAccount);
+  const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
   const [zone, setZone] = useState(BOOKING_TIME_ZONE);
   const menuRef = useRef<HTMLDivElement>(null);
   const rateCodeRef = useRef<HTMLInputElement>(null);
   const onRatesChangeRef = useRef(onRatesChange);
+  const ratesVersion = useRef(0);
+  const profileVersion = useRef(0);
+  const accountRequest = useRef(0);
+  const emailDraftVersion = useRef(0);
+  const emailConfirmation = useRef<ReturnType<typeof confirmEmailChange> | null>(null);
+  const confirmationDraftVersion = useRef(0);
+  const receivedAccount = useRef(initialAccount);
+  useEffect(() => () => { accountRequest.current += 1; }, []);
   useEffect(() => { onRatesChangeRef.current = onRatesChange; }, [onRatesChange]);
+
+  // Booking also reloads the account after changes and meeting-link polling.
+  // Keep lesson counts/history in step with that verified snapshot, without
+  // replacing profile drafts or values saved independently in this editor.
+  useEffect(() => {
+    if (!initialAccount || initialAccount === receivedAccount.current || initialAccount.student.id !== student?.id) return;
+    receivedAccount.current = initialAccount;
+    accountRequest.current += 1;
+    setBookings(initialAccount.bookings);
+    setSeries(initialAccount.series ?? []);
+    setLoading(false);
+    setLoadError("");
+  }, [initialAccount, student?.id]);
 
   useEffect(() => {
     if (!bookingActive) return;
@@ -148,15 +170,16 @@ export function MyLessons({
   useEffect(() => {
     if (!editing) return;
     let active = true;
+    const version = ratesVersion.current;
     setRatesFailed(false);
     fetchRecurringRates(readSession())
       .then((data) => {
-        if (!active) return;
+        if (!active || version !== ratesVersion.current) return;
         setRates(data.rates);
         onRatesChangeRef.current?.(data.rates);
       })
       .catch(() => {
-        if (active) setRatesFailed(true);
+        if (active && version === ratesVersion.current) setRatesFailed(true);
       });
     return () => {
       active = false;
@@ -165,6 +188,8 @@ export function MyLessons({
 
   const detailsLoaded = useRef(Boolean(initialAccount));
   const load = useCallback(async () => {
+    const request = ++accountRequest.current;
+    const version = profileVersion.current;
     const session = readSession();
     if (!session) {
       setStudent(null);
@@ -174,21 +199,26 @@ export function MyLessons({
 
     try {
       const data = await fetchMe(session);
+      if (request !== accountRequest.current || readSession() !== session) return;
       if (!data) {
         setStudent(null);
         return;
       }
-      setStudent(data.student);
-      if (!editingRef.current || !detailsLoaded.current) {
-        setDetails(accountDetails(data.student));
-        detailsLoaded.current = true;
+      setLoadError("");
+      if (version === profileVersion.current) {
+        setStudent(data.student);
+        if (!editingRef.current || !detailsLoaded.current) {
+          setDetails(accountDetails(data.student));
+          detailsLoaded.current = true;
+        }
       }
       setBookings(data.bookings);
       setSeries(data.series ?? []);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not load your lessons.");
+      if (request !== accountRequest.current || readSession() !== session) return;
+      setLoadError(caught instanceof Error ? caught.message : "Could not load your lessons.");
     } finally {
-      setLoading(false);
+      if (request === accountRequest.current && readSession() === session) setLoading(false);
     }
   }, []);
 
@@ -234,44 +264,51 @@ export function MyLessons({
    * person confirming has to be the person who asked.
    */
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const changeToken = params.get("emailToken");
-    if (!changeToken || !readSession()) return;
+    if (!emailConfirmation.current) {
+      const url = new URL(window.location.href);
+      const changeToken = url.searchParams.get("emailToken");
+      const session = readSession();
+      if (!changeToken || !session) return;
 
-    confirmEmailChange(readSession(), changeToken)
+      // Consume the address-bar token before waiting. A late reply cannot
+      // rewrite another page, and renewing the session cannot spend it twice.
+      url.searchParams.delete("emailToken");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+      confirmationDraftVersion.current = emailDraftVersion.current;
+      emailConfirmation.current = confirmEmailChange(session, changeToken);
+    }
+    let active = true;
+    emailConfirmation.current
       .then((result) => {
-        setStudent(result.student);
-        setDetails(accountDetails(result.student));
+        if (!active) return;
+        profileVersion.current += 1;
+        setStudent((current) => current ? { ...current, email: result.student.email } : result.student);
+        if (emailDraftVersion.current === confirmationDraftVersion.current) {
+          setDetails((current) => ({ ...current, email: result.student.email }));
+        }
         setDetailsNote("That's your email address updated.");
         setEmailPending("");
       })
       .catch((caught) => {
-        setError(caught instanceof Error ? caught.message : "That link could not be used.");
-      })
-      .finally(() => {
-        // Take the token out of the address bar either way, so a refresh does
-        // not try to spend a link that has already been used.
-        params.delete("emailToken");
-        const query = params.toString();
-        window.history.replaceState({}, "", window.location.pathname + (query ? `?${query}` : ""));
+        if (active) setError(caught instanceof Error ? caught.message : "That link could not be used.");
       });
+    return () => { active = false; };
   }, []);
 
   async function saveName() {
+    const session = readSession();
     setSavingName(true);
     setError("");
     setDetailsNote("");
     try {
-      // Phone and timezone go back untouched: the endpoint keeps a field it is
-      // not sent, but sending what we hold is one less thing to rely on.
-      const result = await updateProfile(readSession(), {
-        name: details.name.trim(),
-        phone: student?.phone,
-        timezone: student?.timezone
-      });
-      setStudent(result.student);
+      const result = await updateProfile(session, { name: details.name.trim() });
+      if (readSession() !== session) return;
+      profileVersion.current += 1;
+      // Other fields may have been saved since this response was prepared.
+      setStudent((current) => current && { ...current, name: result.student.name });
       setDetailsNote("Saved.");
     } catch (caught) {
+      if (readSession() !== session) return;
       setError(caught instanceof Error ? caught.message : "That could not be saved.");
     } finally {
       setSavingName(false);
@@ -279,16 +316,22 @@ export function MyLessons({
   }
 
   async function saveNif() {
+    const session = readSession();
+    const submittedNif = details.nif;
     setSavingNif(true);
     setError("");
     setDetailsNote("");
     try {
       // Only the NIF is sent; the endpoint keeps every field it is not sent.
-      const result = await updateProfile(readSession(), { nif: details.nif.trim() });
-      setStudent(result.student);
-      setDetails((current) => ({ ...current, nif: result.student.nif ?? "" }));
+      const result = await updateProfile(session, { nif: submittedNif.trim() });
+      if (readSession() !== session) return;
+      profileVersion.current += 1;
+      const savedNif = result.student.nif ?? "";
+      setStudent((current) => current && { ...current, nif: savedNif });
+      setDetails((current) => current.nif === submittedNif ? { ...current, nif: savedNif } : current);
       setDetailsNote(result.student.nif ? "Saved. Your receipts will show this NIF." : "Saved. Your receipts won't show a NIF.");
     } catch (caught) {
+      if (readSession() !== session) return;
       setError(caught instanceof Error ? caught.message : "That could not be saved.");
     } finally {
       setSavingNif(false);
@@ -297,17 +340,21 @@ export function MyLessons({
 
   async function addRateCode() {
     if (savingRate || !rateCode.trim()) return;
+    const session = readSession();
+    const submittedCode = rateCode;
     setSavingRate(true);
     setError("");
     setDetailsNote("");
     try {
       // No length is sent: the code says which one it is for. Each length keeps
       // its own rate, so a 60 and a 90 minute code sit side by side.
-      const result = await redeemRecurringRate(readSession(), rateCode.trim());
+      const result = await redeemRecurringRate(session, submittedCode.trim());
+      if (readSession() !== session) return;
+      ratesVersion.current += 1;
       setRates(result.rates);
       setRatesFailed(false);
       onRatesChangeRef.current?.(result.rates);
-      setRateCode("");
+      setRateCode((current) => current === submittedCode ? "" : current);
       setDetailsNote(
         result.saved
           ? `Saved. Your ${result.saved.durationMinutes}-minute weekly lessons are now ${formatMoneyCents(result.saved.cents)} each.`
@@ -326,11 +373,13 @@ export function MyLessons({
   async function changeEmail() {
     // Each request sends two emails, so a double-click must not send four.
     if (emailBusy) return;
+    const session = readSession();
     setEmailBusy(true);
     setError("");
     setDetailsNote("");
     try {
-      const result = await requestEmailChange(readSession(), details.email.trim());
+      const result = await requestEmailChange(session, details.email.trim());
+      if (readSession() !== session) return;
       setEmailPending(result.pending);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That could not be sent.");
@@ -349,7 +398,7 @@ export function MyLessons({
       )
   ).size;
   const past = bookings
-    .filter((booking) => booking.isPast || booking.status === "cancelled")
+    .filter((booking) => booking.status === "cancelled" || (booking.status === "confirmed" && booking.isPast))
     .sort((a, b) => historyTime(b) - historyTime(a) || b.startAt.localeCompare(a.startAt));
 
   function openAccountSection(section: "history" | "upcoming") {
@@ -386,18 +435,19 @@ export function MyLessons({
    * are not, and burying the real message. The session is still in hand, so
    * say what actually happened and offer the way back.
    */
-  if (!student && error && readSession()) {
+  if (!student && (loadError || error) && readSession()) {
     return (
       <div className="my-lessons">
         <div className="booking-alert" role="alert">
           <AlertCircle size={18} aria-hidden="true" />
-          <p>{error}</p>
+          <p>{loadError || error}</p>
         </div>
         <p className="booking-state-note">
           <button
             className="text-action"
             onClick={() => {
               setError("");
+              setLoadError("");
               setLoading(true);
               load();
             }}
@@ -511,7 +561,10 @@ export function MyLessons({
                 <span>Email address</span>
                 <input
                   autoComplete="email"
-                  onChange={(event) => setDetails((current) => ({ ...current, email: event.target.value }))}
+                  onChange={(event) => {
+                    emailDraftVersion.current += 1;
+                    setDetails((current) => ({ ...current, email: event.target.value }));
+                  }}
                   type="email"
                   value={details.email}
                 />
@@ -607,7 +660,7 @@ export function MyLessons({
                   </button>
                 </form>
                 <p className="my-lessons__details-note">
-                  Adding a code will set the price of all future lessons.
+                  Your code sets the price for future weekly lessons of the matching length.
                 </p>
               </details>
             </div>
@@ -618,10 +671,10 @@ export function MyLessons({
           </section>
         ) : null}
 
-        {error ? (
+        {error || loadError ? (
           <div className="booking-alert" role="alert">
             <AlertCircle size={18} aria-hidden="true" />
-            <p>{error}</p>
+            <p>{error || loadError}</p>
           </div>
         ) : null}
       </div>

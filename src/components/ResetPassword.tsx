@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Lock } from "lucide-react";
-import { resetPassword, storeSession } from "@/lib/auth-api";
+import { readSession, resetPassword, storeSession } from "@/lib/auth-api";
 
 export function ResetPassword() {
   const [token, setToken] = useState<string | null>(null);
@@ -10,7 +10,10 @@ export function ResetPassword() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
   const [busy, setBusy] = useState(false);
+  const resetRequest = useRef(0);
+  useLayoutEffect(() => () => { resetRequest.current += 1; }, []);
 
   useEffect(() => {
     const found = new URLSearchParams(window.location.search).get("token");
@@ -30,17 +33,23 @@ export function ResetPassword() {
       return;
     }
 
+    const request = ++resetRequest.current;
+    const session = readSession();
     setBusy(true);
     setError("");
 
     try {
       const result = await resetPassword(token, password);
-      storeSession(result.session);
+      if (request !== resetRequest.current) return;
+      const canSignIn = readSession() === session;
+      if (canSignIn) storeSession(result.session);
+      setSignedIn(canSignIn);
       setDone(true);
     } catch (caught) {
+      if (request !== resetRequest.current) return;
       setError(caught instanceof Error ? caught.message : "That didn't work. Please request a new link.");
     } finally {
-      setBusy(false);
+      if (request === resetRequest.current) setBusy(false);
     }
   }
 
@@ -51,7 +60,8 @@ export function ResetPassword() {
         <div>
           <strong>Your password has been changed.</strong>
           <p>
-            You&rsquo;re signed in. <a href="/book/?view=lessons">Go to your lessons</a>.
+            {signedIn ? <>You&rsquo;re signed in. <a href="/book/?view=lessons">Go to your lessons</a>.</>
+              : "You can use your new password next time you sign in."}
           </p>
         </div>
       </div>

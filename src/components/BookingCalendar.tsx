@@ -35,7 +35,8 @@ const AccountControls = dynamic(() => import("@/components/MyLessons").then((m) 
 });
 import { LessonMark } from "@/components/LessonMarks";
 import { fetchMe, isReturningDevice, readSession, rememberReturningStudent, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
-import { keepDialogFocus } from "@/lib/dialog-focus";
+import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
+import { lockPageScroll } from "@/lib/scroll-lock";
 import { SITE_BASE_PATH } from "@/lib/paths";
 import {
   addDaysToKey,
@@ -129,7 +130,7 @@ function TimePicker({ day, renderTime, selected = "", slots }: {
   const parts = useMemo(
     () => (["early", "late"] as const).map((id) => ({
       id,
-      label: id === "early" ? `${day.first} – ${DAY_SPLIT}` : `${DAY_SPLIT} – ${day.last}`,
+      label: id === "early" ? `${day.first} – ${DAY_SPLIT}` : day.last === DAY_SPLIT ? DAY_SPLIT : `${DAY_SPLIT} – ${day.last}`,
       slots: slots.filter((slot) => partOf(slot.startAt) === id)
     })),
     // partOf reads only the slot times.
@@ -372,16 +373,21 @@ declare global {
 
 let stripeJs: Promise<void> | null = null;
 function loadStripeJs() {
-  if (typeof window !== "undefined" && window.Stripe) return Promise.resolve();
+  if (typeof window !== "undefined" && typeof window.Stripe === "function") return Promise.resolve();
   if (!stripeJs) {
     stripeJs = new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.src = "https://js.stripe.com/v3/";
-      script.onload = () => resolve();
-      script.onerror = () => {
+      const failed = () => {
+        script.remove();
         stripeJs = null;
         reject(new Error("The payment form couldn't load. Please check your connection and try again."));
       };
+      script.onload = () => {
+        if (typeof window.Stripe !== "function") failed();
+        else resolve();
+      };
+      script.onerror = failed;
       document.head.appendChild(script);
     });
   }
@@ -461,6 +467,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [paymentConsent, setPaymentConsent] = useState(false);
   const [payment, setPayment] = useState<{ clientSecret: string } | null>(null);
   const [paymentError, setPaymentError] = useState("");
+  const [paymentAttempt, setPaymentAttempt] = useState(0);
   const paymentMountRef = useRef<HTMLDivElement>(null);
 
   // Mount Stripe's embedded form when a payment starts; tear it down when the
@@ -473,7 +480,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
     loadStripeJs()
       .then(() => {
-        if (cancelled || !window.Stripe || !paymentMountRef.current) return;
+        if (cancelled || !paymentMountRef.current) return;
+        if (typeof window.Stripe !== "function") throw new Error("The payment form couldn't load. Please try again.");
         return window.Stripe(STRIPE_PUBLISHABLE_KEY)
           .initEmbeddedCheckout({ clientSecret: payment.clientSecret })
           .then((checkout) => {
@@ -493,7 +501,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       cancelled = true;
       mounted?.destroy();
     };
-  }, [payment]);
+  }, [payment, paymentAttempt]);
   const [lessonTypeId, setLessonTypeId] = useState("");
   // A lesson card on /lessons names its length (`?lesson=single|long`). The
   // student still chooses one-off or weekly; that choice then starts there.
@@ -533,7 +541,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const slotRecheck = useRef<string[]>([]);
   const [slotNotice, setSlotNotice] = useState("");
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [loadError, setLoadError] = useState("");
+  const [lessonTypesError, setLessonTypesError] = useState("");
+  const [availabilityError, setAvailabilityError] = useState("");
+  const loadError = lessonTypesError || availabilityError;
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -551,6 +561,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     if (isTeacher) window.location.replace(`${SITE_BASE_PATH}/schedule/`);
   }, [isTeacher]);
   const [recurringRates, setRecurringRates] = useState<Record<number, number>>({});
+  const recurringRatesVersion = useRef(0);
   const [ratesError, setRatesError] = useState("");
   const [ratesReady, setRatesReady] = useState(false);
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
@@ -566,15 +577,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // Someone who has signed in on this browser before is offered sign-in and
   // no trial; a first-time visitor sees neither until the confirmation.
   const returningDevice = useSyncExternalStore(subscribeToSession, isReturningDevice, () => false);
-
-  // A session that ends elsewhere (expired, revoked, signed out on another
-  // device) takes the page back to signed out, so booking asks for sign-in
-  // rather than failing with "Please sign in".
-  useEffect(() => subscribeToSession(() => {
-    if (readSession()) return;
-    setStudent((current) => (current ? null : current));
-    setLoadedAccount(null);
-  }), []);
 
   // A tab left open overnight moves on to the new day when it is next looked at.
   useEffect(() => {
@@ -607,6 +609,16 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     | "confirm-cancel-sequence"
   >("view");
   const [manageLoading, setManageLoading] = useState(false);
+  const managedRequest = useRef(0);
+  const accountRequest = useRef(0);
+  const bookingRequest = useRef(0);
+  const availabilityVersion = useRef(0);
+  useEffect(() => () => {
+    managedRequest.current += 1;
+    accountRequest.current += 1;
+    bookingRequest.current += 1;
+    availabilityVersion.current += 1;
+  }, []);
   const [manageWorking, setManageWorking] = useState(false);
   const [manageError, setManageError] = useState("");
   const [manageOutcome, setManageOutcome] = useState("");
@@ -632,14 +644,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const rateStudentId = student?.id;
   useEffect(() => {
     let active = true;
+    const version = ++recurringRatesVersion.current;
     setRatesReady(false);
     setRecurringRates({});
     setRatesError("");
     if (rateStudentId) {
       fetchRecurringRates(readSession()).then((data) => {
-        if (active) { setRecurringRates(data.rates); setRatesReady(true); }
+        if (active && version === recurringRatesVersion.current) { setRecurringRates(data.rates); setRatesReady(true); }
       }).catch(() => {
-        if (active) setRatesError("We couldn't check your agreed rate. Please reload before booking recurring lessons.");
+        if (active && version === recurringRatesVersion.current) setRatesError("We couldn't check your agreed rate. Please reload before booking recurring lessons.");
       });
     }
     return () => { active = false; };
@@ -665,6 +678,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     managedDurationChoices.length > 1 && ["not_required", "scheduled"].includes(managedPaymentStatus);
 
   const refreshStudent = useCallback(async () => {
+    const request = ++accountRequest.current;
     const session = readSession();
     if (!session) {
       setStudent(null);
@@ -675,7 +689,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       return null;
     }
 
-    const data = await fetchMe(session);
+    let data: Awaited<ReturnType<typeof fetchMe>>;
+    try {
+      data = await fetchMe(session);
+    } catch (caught) {
+      if (request !== accountRequest.current || readSession() !== session) return null;
+      throw caught;
+    }
+    if (request !== accountRequest.current || readSession() !== session) return null;
+    setAccountLoadError("");
     setLoadedAccount(data);
     setStudent(data?.student ?? null);
     setMyBookings(data?.bookings ?? []);
@@ -687,6 +709,67 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     if (booked && data?.student?.role !== "teacher") rememberReturningStudent();
     return data;
   }, []);
+
+  const refreshStudentInBackground = useCallback(() => {
+    const session = readSession();
+    void refreshStudent().catch(() => {
+      if (readSession() === session) {
+        setAccountLoadError("We couldn’t refresh your account just now. Please check your connection and try again.");
+      }
+    });
+  }, [refreshStudent]);
+
+  // A session can change in another tab. Remove its private calendar and
+  // management links immediately, and load a replacement account separately.
+  // Keep the visitor's unsubmitted booking choices through their own sign-in.
+  useEffect(() => {
+    let session = readSession();
+    return subscribeToSession((event) => {
+      const current = readSession();
+      if (current === session) return;
+      const previous = session;
+      session = current;
+      managedRequest.current += 1;
+      accountRequest.current += 1;
+      bookingRequest.current += 1;
+      availabilityVersion.current += 1;
+      setAvailabilityRequest((value) => value + 1);
+      setManageLoading(false);
+      setManageWorking(false);
+      setSubmitting(false);
+      if (
+        current && event instanceof CustomEvent &&
+        event.detail?.previousSession === previous &&
+        event.detail?.studentId === student?.id
+      ) {
+        // The API verified this account's email change. Keep its open editor
+        // and drafts while loading the account with the renewed token.
+        refreshStudentInBackground();
+        return;
+      }
+      setManaged(null);
+      setManagedToken("");
+      setManagedSeriesId(null);
+      setManageError("");
+      setManageOutcome("");
+      setBookingPromptDate("");
+      setStudent(null);
+      setLoadedAccount(null);
+      setMyBookings([]);
+      setLessonSeries([]);
+      setHasPriorBooking(false);
+      setConfirmation(null);
+      setPayment(null);
+      setPaymentError("");
+      setCardReturn(null);
+      setAccountLoadError("");
+      if (current) {
+        void refreshStudent().catch(() => {
+          if (readSession() === current) setAccountLoadError("We couldn’t reach your account just now. Please check your connection and try again.");
+        });
+      }
+    });
+  }, [refreshStudent, refreshStudentInBackground, student?.id]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -729,7 +812,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         setPaymentConfigurationError("");
         setPostpay(Boolean(postpayOn));
       })
-      .catch((error: Error) => setLoadError(error.message));
+      .catch((error: Error) => setLessonTypesError(error.message));
 
     // `fetchMe` already clears a genuinely invalid session on a 401. A network
     // interruption (including a quick reload while this request is in flight)
@@ -783,12 +866,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         setConfirmation(current => current?.manageToken === awaitingMeetToken
           ? { ...current, meetingUrl: result.booking.meetingUrl, location: result.booking.location } : current);
         setManaged(current => current?.booking.reference === result.booking.reference ? result : current);
-        if (result.booking.meetingUrl) void refreshStudent();
+        if (result.booking.meetingUrl) refreshStudentInBackground();
       } catch { /* The existing booking remains usable during a network delay. */ }
     }
     const timers = [3000, 10000, 30000, 65000, 125000].map(delay => window.setTimeout(() => void refreshMeeting(), delay));
     return () => { active = false; timers.forEach(timer => window.clearTimeout(timer)); };
-  }, [awaitingMeetToken, refreshStudent]);
+  }, [awaitingMeetToken, refreshStudentInBackground]);
 
   // Signing in mid-flow can reveal a history the lesson step didn't know
   // about. If the trial is the current choice, dissolve it and put the real
@@ -830,7 +913,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     initialMode: "view" | "sequence" = "view"
   ) => {
     if (!token) return;
+    const request = ++managedRequest.current;
     setIntent("lessons");
+    setManaged(null);
     setManagedToken(token);
     setManagedSeriesId(seriesId);
     setManagedLessonTypeId("");
@@ -842,6 +927,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     setSelectedSlot("");
     try {
       const result = await fetchBooking(token);
+      if (request !== managedRequest.current) return;
       transitionBooking(() => {
         setManaged(result);
         setManagedLessonTypeId(result.booking.lessonType.id);
@@ -851,6 +937,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         setManageLoading(false);
       });
     } catch (caught) {
+      if (request !== managedRequest.current) return;
       transitionBooking(() => {
         setManaged(null);
         setManagedLessonTypeId("");
@@ -878,14 +965,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     const check = async () => {
       attempts += 1;
       try {
-        const confirmed = token
-          ? (await fetchBooking(token)).booking.status === "confirmed"
-          : !((await refreshStudent())?.bookings ?? []).some((booking) => String(booking.status) === "pending_payment");
+        // Only the returned lesson's token identifies this checkout. An
+        // account with older confirmed lessons does not prove a new booking.
+        if (!token) await refreshStudent();
+        const confirmed = Boolean(token && (await fetchBooking(token)).booking.status === "confirmed");
         if (!active) return;
         if (confirmed) {
           setCardReturn((current) => current && { ...current, state: "confirmed" });
           setUpcomingRequestKey((current) => current + 1);
-          void refreshStudent();
+          refreshStudentInBackground();
           return;
         }
       } catch {
@@ -903,7 +991,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       active = false;
       window.clearTimeout(timer);
     };
-  }, [cardReturn?.state, cardReturn?.token, refreshStudent]);
+  }, [cardReturn?.state, cardReturn?.token, refreshStudent, refreshStudentInBackground]);
 
   const availabilityLessonTypeId =
     isManagedReschedule && managed
@@ -918,6 +1006,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   const loadAvailability = useCallback(
     (signal?: AbortSignal) => {
+      const request = ++availabilityVersion.current;
+      const session = readSession();
       if (!availabilityLessonTypeId || !todayKey) {
         setSlotsByDate({});
         setLoadingSlots(false);
@@ -925,7 +1015,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       }
 
       setLoadingSlots(true);
-      setLoadError("");
+      setAvailabilityError("");
 
       /*
        * Ask for more than the horizon and let the Worker clamp it, rather than
@@ -941,17 +1031,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         session: movingSeriesId ? readSession() : ""
       })
         .then((data) => {
+          if (request !== availabilityVersion.current || signal?.aborted || readSession() !== session) return;
           setSlotsByDate(data.slotsByDate);
           setHorizonDays(data.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
           setLessonGapMinutes(Math.max(0, Number(data.bufferMinutes) || 0));
         })
         .catch((error: Error) => {
-          if (signal?.aborted) return;
+          if (request !== availabilityVersion.current || signal?.aborted || readSession() !== session) return;
           setSlotsByDate({});
-          setLoadError(error.message);
+          setAvailabilityError(error.message);
         })
         .finally(() => {
-          if (!signal?.aborted) setLoadingSlots(false);
+          if (request === availabilityVersion.current && !signal?.aborted && readSession() === session) setLoadingSlots(false);
         });
     },
     // availabilityRequest is a deliberate trigger: see where it is declared.
@@ -962,7 +1053,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   useEffect(() => {
     const controller = new AbortController();
     loadAvailability(controller.signal);
-    return () => controller.abort();
+    return () => {
+      availabilityVersion.current += 1;
+      controller.abort();
+    };
   }, [loadAvailability]);
 
   const calendarBookings = myBookings
@@ -1139,7 +1233,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const chosen = daySlots.find((slot) => slot.startAt === selectedSlot) ?? reviewedSlot;
   const bookingChoices = useMemo(() => [...savedChoices, ...(chosen ? [chosen] : [])].sort((a, b) => a.startAt.localeCompare(b.startAt)), [savedChoices, chosen]);
   // Choosing a replacement time, or any reset of the selection, ends a change.
-  const activeChange = changingChoice && !selectedSlot && savedChoices.length ? changingChoice : null;
+  const activeChange = changingChoice && !selectedSlot ? changingChoice : null;
   const choiceStarts = useMemo(() => bookingChoices.map((choice) => choice.startAt), [bookingChoices]);
   const choiceKey = choiceStarts.join(",");
   const selectedDayBookings = selectedDate ? bookingsByDate[selectedDate] ?? [] : [];
@@ -1220,30 +1314,53 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     (!needsPaymentConsent || paymentConsent);
 
   useEffect(() => {
-    const kept = slotRecheck.current;
-    if (!kept.length || loadingSlots || step !== "details") return;
-    slotRecheck.current = [];
+    if (!slotRecheck.current.length || loadingSlots) return;
     // A failed reload says nothing about the times; its own error shows, and
     // booking re-checks every time anyway.
     if (loadError) return;
+    slotRecheck.current = [];
+    // The student may have opened Add/Change while the lookup failed. Validate
+    // today's selection on every step, rather than the starts captured before
+    // those edits, and update saved durations before offering another time.
+    const kept = [...new Set([...savedChoices.map((choice) => choice.startAt), ...(selectedSlot ? [selectedSlot] : [])])];
     const fresh = (startAt: string) =>
       (slotsByDate[portoDateKey(new Date(startAt))] ?? []).find((slot) => slot.startAt === startAt);
     const taken = kept.filter((startAt) => !fresh(startAt));
-    // Saved lessons take the new length's end times, and lose any now taken.
+    // Check the whole selection too: individually free starts can overlap
+    // one another after a longer lesson or a changed gap is applied.
+    const accepted: Slot[] = [];
+    const overlapping: string[] = [];
+    for (const slot of kept.flatMap((startAt) => {
+      const found = fresh(startAt);
+      return found ? [found] : [];
+    }).sort((a, b) => a.startAt.localeCompare(b.startAt))) {
+      if (accepted.some((other) =>
+        Date.parse(other.startAt) < Date.parse(slot.endAt) + lessonGapMs &&
+        Date.parse(other.endAt) + lessonGapMs > Date.parse(slot.startAt)
+      )) overlapping.push(slot.startAt);
+      else accepted.push(slot);
+    }
+    const rejected = [...taken, ...overlapping];
+    const allowed = new Set(accepted.map((slot) => slot.startAt));
+    // Saved lessons take the new length's end times and lose invalid starts.
     setSavedChoices((current) => current.flatMap((choice) => {
       const slot = fresh(choice.startAt);
-      return slot ? [slot] : [];
+      return slot && allowed.has(choice.startAt) ? [slot] : [];
     }));
-    if (!taken.length) return;
-    const one = taken.length === 1;
-    setSlotNotice(`${taken.map((startAt) => `${formatLongDate(startAt)}, ${formatSlotTime(startAt)}`).join("; ")} ${
-      one ? "is" : "are"
-    } not free at this length${taken.includes(selectedSlot) ? ". Choose another time." : `, so ${one ? "it" : "they"} came off your selection.`}`);
-    if (taken.includes(selectedSlot)) {
+    if (!rejected.length) return;
+    const describe = (starts: string[], reason: string) => starts.length
+      ? `${starts.map((startAt) => `${formatLongDate(startAt)}, ${formatSlotTime(startAt)}`).join("; ")} ${starts.length === 1 ? "is" : "are"} ${reason}.`
+      : "";
+    setSlotNotice([
+      describe(taken, "not free at this length"),
+      describe(overlapping, "too close to another chosen lesson at this length"),
+      rejected.includes(selectedSlot) ? "Choose another time." : `${rejected.length === 1 ? "It came" : "They came"} off your selection.`
+    ].filter(Boolean).join(" "));
+    if (rejected.includes(selectedSlot)) {
       setSelectedSlot("");
       goTo("time");
     }
-  }, [loadingSlots, slotsByDate, selectedSlot, step, loadError]);
+  }, [loadingSlots, slotsByDate, selectedSlot, step, loadError, lessonGapMs, savedChoices]);
 
   useEffect(() => {
     if (!isConfirmingBooking) return;
@@ -1397,10 +1514,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
     setSubmitting(true);
     setSubmitError("");
+    const request = ++bookingRequest.current;
+    const session = readSession();
 
     try {
       const repeat = repeatPayload(form.repeat);
-      const result = await createBooking(readSession(), {
+      const result = await createBooking(session, {
         notes: form.notes.trim(),
         lessonType: lessonType.id,
         startAt: chosen.startAt,
@@ -1412,6 +1531,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         // Omitted entirely for a one-off: `null` means "every week" on the wire.
         ...(repeat === undefined ? {} : { repeat })
       });
+      if (request !== bookingRequest.current || readSession() !== session) return;
 
       // A first booking is held while Stripe saves and authenticates a card.
       // This setup step does not charge it; the webhook then confirms the slot.
@@ -1442,8 +1562,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           selection: result.selection
         })
       );
-      void refreshStudent();
+      refreshStudentInBackground();
     } catch (error) {
+      if (request !== bookingRequest.current || readSession() !== session) return;
       const message = error instanceof Error ? error.message : "The booking could not be created.";
       setSubmitError(message);
       if (/taken|available/i.test(message)) {
@@ -1451,7 +1572,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         if (bookingChoices.length === 1) goTo("time");
       }
     } finally {
-      setSubmitting(false);
+      if (request === bookingRequest.current) setSubmitting(false);
     }
   }
 
@@ -1461,7 +1582,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
    */
   async function feeStillAsShown() {
     if (!managedToken || !managed || managed.sameDayFeeApplies) return true;
+    const request = managedRequest.current;
     const fresh = await fetchBooking(managedToken);
+    if (request !== managedRequest.current) return false;
     if (!fresh.sameDayFeeApplies) return true;
     setManaged(fresh);
     setManageError(
@@ -1479,6 +1602,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   async function moveManagedLesson() {
     if (!managedToken || !selectedSlot || !managed) return;
+    const request = managedRequest.current;
     setManageWorking(true);
     setManageError("");
     try {
@@ -1487,6 +1611,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       if (!movingSequence && !(await feeStillAsShown())) return;
       let sameDayFeeApplied = false;
       let keptStarts: string[] = [];
+      let updatedBooking = managed.booking;
       if (movingSequence) {
         if (!resolvedManagedSeriesId) throw new Error("That recurring lesson could not be found.");
         const moved = await rescheduleSeries(
@@ -1498,6 +1623,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           managedPrice
         );
         keptStarts = moved.kept ?? [];
+        // A lesson inside the notice window may stay put while the rest of
+        // its sequence moves. Use its own returned booking when it moved.
+        updatedBooking = moved.bookings.find((booking) => booking.reference === managed.booking.reference) ?? managed.booking;
       } else {
         const result = await rescheduleBooking(
           managedToken,
@@ -1507,13 +1635,17 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           managedPrice
         );
         sameDayFeeApplied = result.sameDayFeeApplied;
+        updatedBooking = result.booking;
       }
-      const refreshed = await fetchBooking(managedToken);
+      if (request !== managedRequest.current) return;
+      // The mutation reply already proves the saved time. A failed reread
+      // must not leave an accepted change looking like an unsaved form.
+      const saved = { ...managed, booking: updatedBooking };
       transitionBooking(() => {
-        setManaged(refreshed);
-        setManagedLessonTypeId(refreshed.booking.lessonType.id);
-        setManagedLocation(refreshed.booking.location);
-        setSelectedDate(portoDateKey(new Date(refreshed.booking.startAt)));
+        setManaged(saved);
+        setManagedLessonTypeId(saved.booking.lessonType.id);
+        setManagedLocation(saved.booking.location);
+        setSelectedDate(portoDateKey(new Date(saved.booking.startAt)));
         setSelectedSlot("");
         setManageMode("view");
         setManageOutcome(
@@ -1523,22 +1655,24 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   ? ` ${keptStarts.map((startAt) => `${formatLongDate(startAt)} at ${formatSlotTime(startAt)}`).join(" and ")} stays where it is, as it’s less than ${NOTICE_HOURS} hours away.`
                   : ""
               }`
-            : refreshed.booking.lessonType.id === previousLessonTypeId
-            ? `Your lesson has been moved. We’ve emailed you and updated your calendar.${lateFeeNote(sameDayFeeApplied, refreshed.booking.sameDayFeeCents)}`
-            : `Your lesson is now ${formatBookedLessonLabel(refreshed.booking.lessonType)}. We’ve emailed you and updated your calendar.${lateFeeNote(sameDayFeeApplied, refreshed.booking.sameDayFeeCents)}`
+            : saved.booking.lessonType.id === previousLessonTypeId
+            ? `Your lesson has been moved. We’ve emailed you and updated your calendar.${lateFeeNote(sameDayFeeApplied, saved.booking.sameDayFeeCents)}`
+            : `Your lesson is now ${formatBookedLessonLabel(saved.booking.lessonType)}. We’ve emailed you and updated your calendar.${lateFeeNote(sameDayFeeApplied, saved.booking.sameDayFeeCents)}`
         );
       });
-      await refreshStudent();
+      refreshStudentInBackground();
     } catch (caught) {
+      if (request !== managedRequest.current) return;
       setManageError(caught instanceof Error ? caught.message : "That lesson could not be moved.");
       loadAvailability();
     } finally {
-      setManageWorking(false);
+      if (request === managedRequest.current) setManageWorking(false);
     }
   }
 
   async function cancelManagedLesson() {
     if (!managedToken || !managed) return;
+    const request = managedRequest.current;
     setManageWorking(true);
     setManageError("");
     try {
@@ -1547,6 +1681,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         return;
       }
       const result = await cancelBooking(managedToken);
+      if (request !== managedRequest.current) return;
       transitionBooking(() => {
         setManaged({ ...managed, booking: result.booking });
         setManageMode("view");
@@ -1556,22 +1691,26 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             : `Your lesson has been cancelled. We’ve emailed you and updated your calendar.${lateFeeNote(result.sameDayFeeApplied, result.booking.sameDayFeeCents)}`
         );
       });
-      await refreshStudent();
+      refreshStudentInBackground();
     } catch (caught) {
+      if (request !== managedRequest.current) return;
       setManageError(caught instanceof Error ? caught.message : "That lesson could not be cancelled.");
     } finally {
-      setManageWorking(false);
+      if (request === managedRequest.current) setManageWorking(false);
     }
   }
 
   async function stopManagedSequence(cancelRemaining = false) {
     if (!resolvedManagedSeriesId) return;
+    const request = managedRequest.current;
     setManageWorking(true);
     setManageError("");
     try {
       const result = await stopSeries(readSession(), resolvedManagedSeriesId, cancelRemaining);
+      if (request !== managedRequest.current) return;
       transitionBooking(() => {
         setManageMode("view");
+        setLessonSeries((current) => current.filter((entry) => entry.id !== resolvedManagedSeriesId));
         if (!cancelRemaining) {
           setManageOutcome("This sequence has stopped. The lessons already booked stay in your calendar.");
           return;
@@ -1588,15 +1727,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               : "This sequence has stopped. There were no future booked lessons to cancel."
         );
       });
-      await refreshStudent();
+      refreshStudentInBackground();
     } catch (caught) {
+      if (request !== managedRequest.current) return;
       setManageError(caught instanceof Error ? caught.message : cancelRemaining ? "Those lessons could not be cancelled." : "That sequence could not be stopped.");
     } finally {
-      setManageWorking(false);
+      if (request === managedRequest.current) setManageWorking(false);
     }
   }
 
   const closeManagedLesson = useCallback(() => {
+    managedRequest.current += 1;
+    setManageLoading(false);
     setManaged(null);
     setManagedToken("");
     setManagedSeriesId(null);
@@ -1630,7 +1772,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     manageWasOpen.current = false;
     const trigger = lessonTrigger.current;
     lessonTrigger.current = null;
-    if (trigger?.isConnected) requestAnimationFrame(() => trigger.focus({ preventScroll: true }));
+    requestAnimationFrame(() => restoreDialogFocus(trigger));
   }, [manageDialogOpen]);
 
   const dismissManagedDialog = useCallback(() => {
@@ -1644,22 +1786,22 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   useEffect(() => {
     if (!manageDialogOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockPageScroll();
     const frame = requestAnimationFrame(() => {
       if (isManagedReschedule) managedRescheduleRef.current?.focus({ preventScroll: true });
       else manageDialogRef.current?.focus({ preventScroll: true });
     });
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") dismissManagedDialog();
+      // A native dialog above this overlay owns Escape until it closes.
+      if (event.key === "Escape" && !event.defaultPrevented && !document.querySelector("dialog[open]")) dismissManagedDialog();
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => {
       cancelAnimationFrame(frame);
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [dismissManagedDialog, isManagedReschedule, manageDialogOpen]);
+  }, [dismissManagedDialog, isManagedReschedule, manageDialogOpen, manageMode]);
 
   function beginManagedReschedule() {
     if (!managed) return;
@@ -1817,9 +1959,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   }
 
   function reviewSavedLessons() {
-    // Backing out of a change puts that lesson back exactly as it was.
+    // A length lookup can finish while changing a lesson. Recheck the restored
+    // time too, so Back cannot revive an unavailable or overlapping choice.
     const last = activeChange ?? savedChoices[savedChoices.length - 1];
     if (!last) return;
+    if (activeChange) slotRecheck.current = [last.startAt];
     transitionBooking(() => {
       if (activeChange) setChangingChoice(null);
       else setSavedChoices(savedChoices.slice(0, -1));
@@ -1906,7 +2050,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       <div className="booking-selection-stack" aria-label="Your booking choices">
         {bookingChoices.length <= 1 && chosen ? (
           <BookingSelectionSummary
-            actionLabel="Change date or time"
+            actionLabel={!payment ? "Change date or time" : undefined}
             actionText="Change"
             ariaLabel="Selected lesson"
             detail={`Porto time${localTime ? ` · ${localTime} your time` : ""}`}
@@ -1961,6 +2105,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
    */
   function bookingChoicesBar(inConfirmation = false) {
     if (!lessonType || !bookingKind) return null;
+    const choicesLocked = submitting || Boolean(payment);
     const kinds: { value: Exclude<BookingKind, "">; label: string }[] = [
       ...(offerTrial && !hasPriorBooking && trialLessonType ? [{ value: "trial" as const, label: "Trial" }] : []),
       { value: "once", label: "Single" },
@@ -1989,7 +2134,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </div>
         ) : null}
         <div className="booking-bar__choices" role="group" aria-label="Your lesson">
-          <fieldset className="booking-bar__group booking-bar__group--kind">
+          <fieldset className="booking-bar__group booking-bar__group--kind" disabled={choicesLocked}>
             <legend>Lesson</legend>
             <div className={`segmented${kinds.length === 3 ? " segmented--three" : ""} segmented--position-${kindIndex}`}>
               <span aria-hidden="true" className="segmented__thumb" />
@@ -2007,7 +2152,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               ))}
             </div>
           </fieldset>
-          <fieldset className="booking-bar__group">
+          <fieldset className="booking-bar__group" disabled={choicesLocked}>
             <legend>Where</legend>
             <div className={`segmented segmented--position-${form.location === "porto" ? 1 : 0}`}>
               <span aria-hidden="true" className="segmented__thumb" />
@@ -2027,7 +2172,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             </div>
           </fieldset>
           {bookingKind === "trial" ? (
-            <fieldset className="booking-bar__group">
+            <fieldset className="booking-bar__group" disabled={choicesLocked}>
               <legend>Length</legend>
               {/* The trial's length is fixed: the same control, with nothing to switch. */}
               <div className="segmented segmented--single">
@@ -2046,7 +2191,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               </div>
             </fieldset>
           ) : (
-            <fieldset className="booking-bar__group">
+            <fieldset className="booking-bar__group" disabled={choicesLocked}>
               <legend>Length</legend>
               <div className={`segmented segmented--position-${lengthIndex}`}>
                 <span aria-hidden="true" className="segmented__thumb" />
@@ -2067,7 +2212,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             </fieldset>
           )}
           {bookingKind === "recurring" ? (
-            <fieldset className="booking-bar__group booking-bar__group--repeat">
+            <fieldset className="booking-bar__group booking-bar__group--repeat" disabled={choicesLocked}>
               <legend>Repeat</legend>
               <div className={`segmented segmented--four segmented--position-${repeatIndex}`}>
                 <span aria-hidden="true" className="segmented__thumb" />
@@ -2094,6 +2239,28 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   if (isTeacher) {
     return <p className="booking-state-note" role="status">Opening your schedule…</p>;
   }
+
+  const accountRefreshNotice = accountLoadError ? (
+    <div className="booking-alert" role="alert">
+      <AlertCircle size={18} aria-hidden="true" />
+      <p>
+        {accountLoadError}{" "}
+        <button
+          className="text-action"
+          onClick={() => {
+            setAccountLoadError("");
+            setCheckingSession(true);
+            refreshStudent()
+              .catch(() => setAccountLoadError("We still couldn’t reach your account. Please try again in a moment."))
+              .finally(() => setCheckingSession(false));
+          }}
+          type="button"
+        >
+          Try again
+        </button>
+      </p>
+    </div>
+  ) : null;
 
   if (confirmation) {
     const localTime = differingLocalTime(confirmation.startAt, studentZone);
@@ -2191,6 +2358,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             Change or cancel this one
           </button>
         </div>
+        {accountRefreshNotice}
         <p className="booking-success__note">
           This lesson is now marked on your calendar. You can open it there to move or cancel it. It&rsquo;s free up to
           {" "}{NOTICE_HOURS} hours before; after that it costs {formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.
@@ -2226,6 +2394,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           <AlertCircle size={18} aria-hidden="true" />
           <p>
             {loadError}{" "}
+            {availabilityError && !lessonTypesError ? (
+              <>
+                <button className="text-action" disabled={loadingSlots} onClick={() => loadAvailability()} type="button">
+                  Try again
+                </button>{" "}
+              </>
+            ) : null}
             <a href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
               Message Inês instead
             </a>
@@ -2242,18 +2417,22 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             aria-label="Account, upcoming and past lessons"
           >
             <AccountControls
+              key={student.id}
               bookingActive={intent === "book"}
               initialAccount={loadedAccount?.student.id === student.id ? loadedAccount : null}
               onOpenAccountSection={openAccountShortcut}
               onRatesChange={(rates) => {
                 // A code saved under Edit details prices the next weekly booking.
                 // An unchanged answer keeps the same object, so nothing re-prices.
+                recurringRatesVersion.current += 1;
                 setRecurringRates((current) => (sameRates(current, rates) ? current : rates));
                 setRatesReady(true);
                 setRatesError("");
               }}
               onTransition={transitionBooking}
               onSignedOut={() => {
+                managedRequest.current += 1;
+                setManageLoading(false);
                 setStudent(null);
                 setMyBookings([]);
                 setLessonSeries([]);
@@ -2323,9 +2502,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               ) : managed ? (
                 <>
                   <p className={`lesson-calendar__status${resolvedManagedSeriesId ? " lesson-calendar__status--recurring" : ""}`}>
-                    {resolvedManagedSeriesId ? <Repeat size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
+                    {managed.booking.status === "pending_payment" ? <AlertCircle size={13} aria-hidden="true" /> : resolvedManagedSeriesId ? <Repeat size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
                     {managed.booking.status === "cancelled"
                       ? "Cancelled"
+                      : managed.booking.status === "pending_payment"
+                        ? "Not confirmed"
                       : resolvedManagedSeriesId
                         ? "Recurring lesson"
                         : "Booked"}
@@ -2361,29 +2542,43 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     <MeetingLink meetingUrl={managed.booking.meetingUrl} location={managed.booking.location} status={managed.booking.status} />
                   </div>
 
+                  {accountRefreshNotice}
+
                   {!manageOutcome && manageMode === "view" ? (
                     <>
+                      {managed.booking.status === "pending_payment" ? (
+                        <div className="lesson-calendar__notice">
+                          <p>Checkout has not confirmed this lesson. Complete checkout, or choose your lessons again.</p>
+                          <button className="button button--coral" onClick={() => {
+                            closeManagedLesson();
+                            startBookingJourney();
+                          }} type="button">Book a lesson</button>
+                        </div>
+                      ) : null}
                       {([ ["lesson", managed.paymentsDue?.lesson, "lesson payment"], ["same-day-fee", managed.paymentsDue?.sameDayFee, "late change fee"] ] as const).map(([purpose, amount, label]) => amount != null ? (
                         <div className="lesson-calendar__notice" key={purpose}>
                           <p>Your {label} of {formatMoneyCents(amount)} is still to pay.</p>
                           <button className="button button--coral" disabled={manageWorking} type="button" onClick={async () => {
                             if (!managedToken) return;
+                            const request = managedRequest.current;
                             setManageWorking(true); setManageError("");
                             try {
                               const result = await recoverBookingPayment(managedToken, purpose);
+                              if (request !== managedRequest.current) return;
                               window.location.assign(stripePaymentUrl(result.url));
                             } catch (error) {
+                              if (request !== managedRequest.current) return;
                               setManageError(error instanceof Error ? error.message : "Please try again shortly.");
                               setManageWorking(false);
                             }
                           }}>{manageWorking ? "Opening secure payment…" : `Pay ${formatMoneyCents(amount)} securely`}</button>
                         </div>
                       ) : null)}
-                      {managed.changeLocked && managed.booking.status !== "cancelled" ? (
+                      {managed.changeLocked && managed.booking.status === "confirmed" ? (
                         <p className="lesson-calendar__notice">
                           This lesson is less than {NOTICE_HOURS} hours away and can&rsquo;t be changed or cancelled.
                         </p>
-                      ) : managed.sameDayFeeApplies && managed.booking.status !== "cancelled" ? (
+                      ) : managed.sameDayFeeApplies && managed.booking.status === "confirmed" ? (
                         <p className="lesson-calendar__notice">
                           This lesson is less than {NOTICE_HOURS} hours away, so moving or cancelling it now costs{" "}
                           {formatMoneyCents(managed.booking.sameDayFeeCents)}.
@@ -2410,7 +2605,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         </>
                       ) : null}
 
-                      {resolvedManagedSeriesId ? (
+                      {resolvedManagedSeriesId && managed.booking.status === "confirmed" ? (
                         <div className="lesson-manage-dialog__series">
                           <Repeat aria-hidden="true" size={17} />
                           <div>
@@ -2556,10 +2751,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             )}
             <p>
               {cardReturn.state === "confirming"
-                ? "Your card is saved. Confirming your booking…"
+                ? "Confirming your booking…"
                 : cardReturn.state === "confirmed"
                   ? "You’re booked in. Your confirmation email is on its way."
-                  : "Your card is saved and your booking is still being confirmed. It will appear here shortly, and we’ll email you when it does."}
+                  : "We couldn’t confirm your booking yet. Please check your lessons, or message Inês."}
             </p>
             {cardReturn.state !== "confirming" ? (
               <button aria-label="Dismiss" className="booking-card-return__close" onClick={() => setCardReturn(null)} type="button">
@@ -2569,27 +2764,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </div>
         ) : null}
 
-        {accountLoadError && !student ? (
-          <div className="booking-alert" role="alert">
-            <AlertCircle size={18} aria-hidden="true" />
-            <p>
-              {accountLoadError}{" "}
-              <button
-                className="text-action"
-                onClick={() => {
-                  setAccountLoadError("");
-                  setCheckingSession(true);
-                  refreshStudent()
-                    .catch(() => setAccountLoadError("We still couldn’t reach your account. Please try again in a moment."))
-                    .finally(() => setCheckingSession(false));
-                }}
-                type="button"
-              >
-                Try again
-              </button>
-            </p>
-          </div>
-        ) : null}
+        {!manageDialogOpen && accountRefreshNotice}
 
         {checkingSession && intent === "choose" && !managed ? (
           <p className="booking-state-note booking-state-note--initial">Loading your lessons…</p>
@@ -2612,7 +2787,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   setAccountView("upcoming");
                   setUpcomingRequestKey((current) => current + 1);
                 });
-                void refreshStudent();
+                refreshStudentInBackground();
               }}
             />
           </section>
@@ -2652,7 +2827,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               <X aria-hidden="true" size={22} strokeWidth={2} />
             </button>
           ) : null}
-          {intent === "book" && !managed ? (savedChoices.length ? bookingProgressBar() : bookingChoicesBar()) : null}
+          {intent === "book" && !managed ? (savedChoices.length || activeChange ? bookingProgressBar() : bookingChoicesBar()) : null}
           <div
             className={`calendar-panel unified-calendar__grid${bookingDateChosen ? " unified-calendar__grid--date-chosen" : ""}`}
           >
@@ -2728,7 +2903,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         aria-controls="booking-calendar-weeks"
                         aria-label="Earlier weeks"
                         className="calendar-pager__step"
-                        disabled={calendarPageIndex === 0}
+                        disabled={manageWorking || calendarPageIndex === 0}
                         onClick={() => turnCalendarPage(-1)}
                         type="button"
                       >
@@ -2741,7 +2916,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         aria-controls="booking-calendar-weeks"
                         aria-label={laterLessonCount ? `Later weeks, ${laterLessonCount} more ${laterLessonCount === 1 ? "lesson" : "lessons"}` : "Later weeks"}
                         className="calendar-pager__step"
-                        disabled={calendarPageIndex >= calendarPages.length - 1}
+                        disabled={manageWorking || calendarPageIndex >= calendarPages.length - 1}
                         onClick={() => turnCalendarPage(1)}
                         type="button"
                       >
@@ -2755,6 +2930,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   <button
                     aria-controls="booking-calendar-weeks"
                     className="text-action unified-calendar__expand"
+                    disabled={manageWorking}
                     onClick={() => transitionBooking(() => setCalendarWeekCount(returnCalendarWeekCount))}
                     type="button"
                   >
@@ -2805,7 +2981,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             lessons.length ? " has-booking" : ""
                           }${weeklyDay ? " has-weekly-booking" : ""}${!isLessonsCalendarOverview && selectedDate === cell.key ? " is-selected" : ""}${cell.isToday ? " is-today" : ""}`}
                           data-date-key={cell.key}
-                          disabled={!canStartBooking && !slots.length && !lessons.length}
+                          disabled={manageWorking || (!canStartBooking && !slots.length && !lessons.length)}
                           key={cell.key}
                           onClick={(event) => {
                             if (isLessonsCalendarOverview && lessons.length === 1) {
@@ -2887,7 +3063,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     setStudent(signedIn);
                     setShowAccountSignIn(false);
                   });
-                  void refreshStudent();
+                  refreshStudentInBackground();
                 }}
               />
             ) : managed && isManagedReschedule ? (
@@ -2901,6 +3077,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   </div>
                   <button
                     className="booking-back booking-back--tertiary"
+                    disabled={manageWorking}
                     onClick={() => transitionBooking(() => setManageMode(manageMode === "reschedule-sequence" ? "sequence" : "view"))}
                     type="button"
                   >
@@ -2926,6 +3103,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           <input
                             aria-label={`${type.duration_minutes} minutes`}
                             checked={managedLessonTypeId === type.id}
+                            disabled={manageWorking}
                             name="managed-lesson-duration"
                             onChange={() => {
                               if (type.id === managedLessonTypeId) return;
@@ -2965,6 +3143,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       <label className={managedLocation === option ? "is-active" : ""} key={option}>
                         <input
                           checked={managedLocation === option}
+                          disabled={manageWorking}
                           name="managed-lesson-location"
                           onChange={() => setManagedLocation(option)}
                           type="radio"
@@ -2984,6 +3163,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 <p className="booking-state-note">
                   {selectedDate ? `${formatLongDate(`${selectedDate}T12:00:00Z`)} · Porto time` : "Choose a free day on the calendar."}
                 </p>
+                {accountRefreshNotice}
                 {loadingSlots ? (
                   <p className="booking-state-note">Checking what&rsquo;s free…</p>
                 ) : daySlots.length ? (
@@ -2994,6 +3174,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       <button
                         aria-pressed={selectedSlot === slot.startAt}
                         className={selectedSlot === slot.startAt ? "is-selected" : ""}
+                        disabled={manageWorking}
                         key={slot.startAt}
                         onClick={() => setSelectedSlot(slot.startAt)}
                         style={place}
@@ -3037,6 +3218,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   </button>
                   <button
                     className="button button--quiet"
+                    disabled={manageWorking}
                     onClick={() => transitionBooking(() => setManageMode(manageMode === "reschedule-sequence" ? "sequence" : "view"))}
                     type="button"
                   >
@@ -3231,7 +3413,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     {paymentError ? (
                       <div className="booking-alert" role="alert">
                         <AlertCircle size={18} aria-hidden="true" />
-                        <p>{paymentError}</p>
+                        <p>
+                          {paymentError}{" "}
+                          <button className="text-action" type="button" onClick={() => {
+                            setPaymentError("");
+                            setPaymentAttempt((attempt) => attempt + 1);
+                          }}>
+                            Try again
+                          </button>
+                        </p>
                       </div>
                     ) : null}
                     <div className="booking-payment__mount" ref={paymentMountRef} />
@@ -3248,7 +3438,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     keepCopy
                     onSignedIn={(signedIn) => {
                       setStudent(signedIn);
-                      void refreshStudent();
+                      refreshStudentInBackground();
                     }}
                   />
                 ) : (
@@ -3267,6 +3457,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           Add a note <em>(optional)</em>
                         </span>
                         <textarea
+                          disabled={submitting}
                           onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
                           rows={2}
                           value={form.notes}
@@ -3300,6 +3491,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             <div className={`booking-agreement__control${paymentConsent ? " is-agreed" : ""}`}>
                               <button
                                 className="booking-agreement__button"
+                                disabled={submitting}
                                 type="button"
                                 aria-label="Agree to terms & privacy"
                                 aria-pressed={paymentConsent}

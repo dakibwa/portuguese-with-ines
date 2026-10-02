@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { readSession } from "@/lib/auth-api";
 import {
   connectGoogleMeet,
   fetchGoogleMeetConnection,
@@ -28,6 +29,8 @@ export function TeacherMeetConnection({ token }: { token: string }) {
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
+  const connectRequest = useRef(0);
+  useEffect(() => () => { connectRequest.current += 1; }, [token]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -54,17 +57,20 @@ export function TeacherMeetConnection({ token }: { token: string }) {
 
   async function connect() {
     if (busy) return;
+    const request = ++connectRequest.current;
     setBusy(true);
     setError("");
     setCallbackResult("");
     try {
       const result = await connectGoogleMeet(token);
+      if (request !== connectRequest.current || readSession() !== token) return;
       const url = new URL(result.url);
       if (url.origin !== "https://accounts.google.com" || url.pathname !== "/o/oauth2/v2/auth" || url.username || url.password) {
         throw new Error("The Google connection could not be opened. Please try again.");
       }
       window.location.assign(url.href);
     } catch (caught) {
+      if (request !== connectRequest.current || readSession() !== token) return;
       setError(caught instanceof Error ? caught.message : "The Google connection could not be opened. Please try again.");
       setBusy(false);
     }

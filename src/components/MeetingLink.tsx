@@ -1,9 +1,10 @@
 import { Video } from "lucide-react";
+import type { BookingStatus } from "@/lib/booking-api";
 
 type Props = {
   meetingUrl?: string | null;
   location: "online" | "porto";
-  status: "confirmed" | "cancelled";
+  status: BookingStatus;
 };
 
 /** Only the Google Meet join URL belongs in a lesson's external action. */

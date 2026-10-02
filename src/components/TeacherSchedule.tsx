@@ -22,7 +22,7 @@ import {
   type AdminBooking,
   type AvailabilityException,
 } from "@/lib/admin-api";
-import { clearSession, fetchMe, readSession, type Student } from "@/lib/auth-api";
+import { clearSession, fetchMe, readSession, subscribeToSession, type Student } from "@/lib/auth-api";
 import { portoTimeToUtc } from "@/lib/booking-api";
 import { BOOKING_CONFIGURED } from "@/lib/config";
 import { SITE_BASE_PATH } from "@/lib/paths";
@@ -91,15 +91,55 @@ export function TeacherSchedule() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const bookingRequest = useRef(0);
+  const accountGeneration = useRef(0);
   const dayChangesRef = useRef(dayChanges);
   const dayVersion = useRef(0);
   const sendingDays = useRef(false);
+  useEffect(() => () => {
+    accountGeneration.current += 1;
+    bookingRequest.current += 1;
+  }, []);
   const shownExceptions = useMemo(
     () => withDayChanges(exceptions, dayChanges),
     [exceptions, dayChanges],
   );
   const hoursDirty = serialiseHours(savedHours) !== serialiseHours(draftHours);
   const invalidHours = hoursProblem(draftHours);
+
+  const resetAccount = useCallback(() => {
+    accountGeneration.current += 1;
+    bookingRequest.current += 1;
+    setToken("");
+    setMe(null);
+    setInitialised(false);
+    setEditing(false);
+    setSelectedBooking(null);
+    setBookings([]);
+    setPaymentReview([]);
+    setSavedHours(emptyWeek);
+    setDraftHours(emptyWeek);
+    setExceptions([]);
+    dayChangesRef.current = new Map();
+    setDayChanges(new Map());
+    sendingDays.current = false;
+    setSavingDays(false);
+    setSavingHours(false);
+    setDayNote(undefined);
+    setAuthError("");
+    setStatus("");
+    setError("");
+  }, []);
+
+  useEffect(() => {
+    let session = readSession();
+    return subscribeToSession(() => {
+      const current = readSession();
+      if (current === session) return;
+      session = current;
+      resetAccount();
+      setAuthAttempt(value => value + 1);
+    });
+  }, [resetAccount]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
@@ -117,7 +157,7 @@ export function TeacherSchedule() {
     setAuthError("");
     fetchMe(session)
       .then((data) => {
-        if (!active) return;
+        if (!active || readSession() !== session) return;
         setMe(data?.student ?? null);
         if (data?.student.role === "teacher") setToken(session);
       })
@@ -139,7 +179,7 @@ export function TeacherSchedule() {
     setScheduleError("");
     fetchSchedule(token)
       .then((schedule) => {
-        if (!active) return;
+        if (!active || readSession() !== token) return;
         const hours = hoursFromRules(schedule.rules);
         setSavedHours(hours);
         setDraftHours(hours);
@@ -161,7 +201,7 @@ export function TeacherSchedule() {
   }, [token, scheduleAttempt]);
 
   const reloadBookings = useCallback(async () => {
-    if (!token) return;
+    if (!token || readSession() !== token) return;
     const request = ++bookingRequest.current;
     setBookingsLoading(true);
     setBookingsError("");
@@ -209,6 +249,7 @@ export function TeacherSchedule() {
 
   async function saveHours() {
     if (savingHours || invalidHours) return;
+    const account = accountGeneration.current;
     setSavingHours(true);
     setError("");
     setStatus("");
@@ -224,16 +265,18 @@ export function TeacherSchedule() {
           })),
         ),
       );
+      if (account !== accountGeneration.current) return;
       setSavedHours(submitted);
       setStatus("Teaching hours saved. Students can now book these times.");
     } catch (caught) {
+      if (account !== accountGeneration.current) return;
       setError(
         caught instanceof Error
           ? caught.message
           : "Your hours could not be saved. Your changes are still here.",
       );
     } finally {
-      setSavingHours(false);
+      if (account === accountGeneration.current) setSavingHours(false);
     }
   }
 
@@ -251,13 +294,16 @@ export function TeacherSchedule() {
    */
   async function sendDayChanges() {
     if (sendingDays.current) return;
+    const account = accountGeneration.current;
     sendingDays.current = true;
     setSavingDays(true);
     try {
       while (dayChangesRef.current.size) {
+        if (account !== accountGeneration.current) return;
         const [date, change] = dayChangesRef.current.entries().next().value!;
         try {
           const result = await saveDayOff(token, date, change);
+          if (account !== accountGeneration.current) return;
           setExceptions((current) => [
             ...current.filter((row) => row.date !== date),
             ...result.exceptions,
@@ -267,16 +313,23 @@ export function TeacherSchedule() {
               changes.delete(date);
           });
         } catch (caught) {
-          updateDayChanges((changes) => changes.delete(date));
-          setDayNote({
-            error: true,
-            text: `${shortDate(date)} was not changed. ${caught instanceof Error ? caught.message : "Please try again."}`,
-          });
+          if (account !== accountGeneration.current) return;
+          // A failed earlier save does not own a newer choice for this date.
+          // Keep that choice queued so the next request can save it in full.
+          if (dayChangesRef.current.get(date)?.version === change.version) {
+            updateDayChanges((changes) => changes.delete(date));
+            setDayNote({
+              error: true,
+              text: `${shortDate(date)} was not changed. ${caught instanceof Error ? caught.message : "Please try again."}`,
+            });
+          }
         }
       }
     } finally {
-      sendingDays.current = false;
-      setSavingDays(false);
+      if (account === accountGeneration.current) {
+        sendingDays.current = false;
+        setSavingDays(false);
+      }
     }
   }
 
@@ -412,13 +465,7 @@ export function TeacherSchedule() {
   function signOut() {
     if (hoursDirty && !window.confirm("Sign out and lose the weekly hours you haven’t saved?")) return;
     clearSession();
-    setToken("");
-    setMe(null);
-    setInitialised(false);
-    setEditing(false);
-    setSelectedBooking(null);
-    setStatus("");
-    setError("");
+    resetAccount();
   }
 
   return (
@@ -658,6 +705,7 @@ export function TeacherSchedule() {
           now={now}
           onClose={() => setSelectedBooking(null)}
           onChanged={(message) => {
+            if (readSession() !== token) return;
             setSelectedBooking(null);
             setStatus(message);
             void reloadBookings();

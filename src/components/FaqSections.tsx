@@ -42,6 +42,7 @@ export function FaqSections({ sections, indexMark }: { sections: FaqSection[]; i
   }, [sections]);
 
   function choose(id: string, event: MouseEvent<HTMLAnchorElement>) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     const index = event.currentTarget.closest(".faq-index");
     setActive(id);
@@ -68,7 +69,7 @@ export function FaqSections({ sections, indexMark }: { sections: FaqSection[]; i
           {sections.map((section, index) => (
             <li key={section.id}>
               <a
-                aria-current={active === section.id ? "true" : undefined}
+                aria-current={ready && active === section.id ? "true" : undefined}
                 aria-controls={`faq-${section.id}`}
                 href={`#faq-${section.id}`}
                 onClick={(event) => choose(section.id, event)}
@@ -87,7 +88,7 @@ export function FaqSections({ sections, indexMark }: { sections: FaqSection[]; i
           <section
             aria-labelledby={`faq-${section.id}-title`}
             className="faq-group"
-            hidden={active !== section.id}
+            hidden={ready && active !== section.id}
             id={`faq-${section.id}`}
             key={section.id}
           >

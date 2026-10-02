@@ -13,6 +13,8 @@ import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { AssetMark } from "@/components/BrandMarks";
 import { MeetingLink } from "@/components/MeetingLink";
+import { restoreDialogFocus } from "@/lib/dialog-focus";
+import { lockPageScroll } from "@/lib/scroll-lock";
 
 type Props = {
   booking: AdminBooking;
@@ -58,14 +60,13 @@ export function LessonDetails({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    const overflow = document.body.style.overflow;
+    const releaseScroll = lockPageScroll();
     const dialog = dialogRef.current;
-    document.body.style.overflow = "hidden";
     dialog?.showModal();
     return () => {
       dialog?.close();
-      document.body.style.overflow = overflow;
-      if (previous?.isConnected) previous.focus({ preventScroll: true });
+      releaseScroll();
+      restoreDialogFocus(previous);
     };
   }, []);
 
