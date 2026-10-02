@@ -6,6 +6,7 @@ import {
   eachDateKey,
   parseDateKey,
   weekdayOf,
+  zonedParts,
   zonedToUtc
 } from "./time.mjs";
 
@@ -244,6 +245,10 @@ export async function computeAvailability(
 
     for (const minute of candidateStartMinutes({ startRanges, blockedSpans, duration, interval })) {
       const slotStart = zonedToUtc(year, month, day, minute, PORTO);
+      const wall = zonedParts(slotStart, PORTO);
+      // The missing spring hour must not reappear as a duplicate, shifted
+      // start. Only real minutes from the teaching window are offered.
+      if (wall.year !== year || wall.month !== month || wall.day !== day || wall.hour * 60 + wall.minute !== minute) continue;
       const slotEnd = new Date(slotStart.getTime() + duration * 60000);
 
       if (slotStart < earliest) continue;

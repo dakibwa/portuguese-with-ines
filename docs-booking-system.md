@@ -196,6 +196,14 @@ depending on them having kept the right confirmation email.
   only when it names a UUID, as every booking id is, so no session can ever
   open a booking. Offline sign-out clears this device but cannot reach the
   revocation endpoint.
+  A failed session-storage write never claims successful sign-in. The form
+  explains how to allow site storage and retry; a completed registration offers
+  sign-in instead of another registration. Password reset still reports the
+  completed password change when its new session cannot be saved.
+  Email confirmation reports its completed address change if saving the renewed
+  session fails, then permits sign-in with the new address. Opening the lessons
+  destination with an expired/revoked session asks for sign-in after the account
+  read refuses that session; network failures retain the existing read retry.
 - The emailed manage link still works on its own, so a forgotten password never
   blocks someone from changing a lesson.
 - **Booking, the learner's calendar, and lesson changes share one workspace.**
@@ -466,6 +474,10 @@ number of booking rows at once.
   that field, so overlapping replies cannot undo another saved field. A NIF
   reply normalises the submitted draft only if the student has not edited it
   again while waiting.
+  The Worker updates only submitted columns too, so concurrent saves cannot
+  restore stale values in D1. Account creation handles an email claimed after
+  its lookup: password registration offers sign-in; Google resolves the winning
+  row through the existing verified identity and first-link rules.
 - **Where it appears.** Inês's fatura-recibo automation reads her booking
   emails and schedule, so every email she gets about a student's lessons
   (bookings, weekly runs, moves, cancellations, declined cards and payments)
@@ -676,6 +688,15 @@ anonymous or signed in, still sees them held. `POST /bookings/series/preview`
 does the same. A missing, malformed, expired, revoked or out-of-date bearer is
 exactly an anonymous request — the same 200 and the same answer, never a 401 —
 so an old session on the device can never blank the calendar.
+
+The spring clock change's missing hour never becomes shifted or duplicate
+availability. A weekly run skips an occurrence whose Porto wall time does not
+exist, and moving a whole run across such an occurrence refuses the move before
+writing any dates. Skipped-week previews, confirmations and emails name the
+dates, without converting a missing time into a later real appointment. This
+also applies to skipped values recovered from older card-setup metadata.
+Existing lessons in autumn's repeated hour keep their
+original UTC instant when the teacher saves an unchanged date/time.
 
 Once availability has loaded, the date picker omits complete leading weeks with
 no free slots. That means a weekend with nothing left to book opens directly on

@@ -603,12 +603,18 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   const cadence = series.occurrences ? `${rows.length} lessons` : "Every week, until you stop it";
   const multipleWeeklyTimes = (series.weeklyTimes ?? 1) > 1;
   const weeklyTimeCopy = multipleWeeklyTimes ? "both times are" : "the same time is";
+  // A nonexistent spring wall time cannot be represented by an instant.
+  // Skipped values also travel through older card-setup metadata, so show
+  // dates here rather than interpreting that placeholder as a real time.
+  const skippedDate = new Intl.DateTimeFormat("en-GB", {
+    timeZone: PORTO, weekday: "short", day: "numeric", month: "short"
+  });
   const skippedNote = skipped.length
     ? `${
         skipped.length === 1
-          ? "One lesson time was not free and was left out:"
-          : `${skipped.length} lesson times were not free and were left out:`
-      } ${skipped.map((entry) => formatShort(new Date(entry.startAt), PORTO)).join(", ")}.`
+          ? "One lesson time was unavailable and was left out:"
+          : `${skipped.length} lesson times were unavailable and were left out:`
+      } ${skipped.map((entry) => skippedDate.format(new Date(entry.startAt))).join(", ")}.`
     : "";
 
   const rowsForBoth = [
@@ -2592,6 +2598,10 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
     const occurrence = occurrences[index];
+    const actualSlot = slotOf(occurrence.startAt);
+    if (actualSlot.dateKey !== occurrence.key || actualSlot.minuteOfDay !== requestedSlot.minuteOfDay) {
+      return fail("That weekly time does not exist on a clock-change day. Choose another time.", 409, request, env);
+    }
     const check = await isSlotBookable(env, {
       startAt: occurrence.startAt.toISOString(),
       lessonType,
@@ -3503,11 +3513,15 @@ async function handleRegister(request, env) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  await env.DB.prepare(
-    "INSERT INTO students (id, email, name, phone, nif, timezone, password_hash, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  const inserted = await env.DB.prepare(
+    "INSERT INTO students (id, email, name, phone, nif, timezone, password_hash, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(email) DO NOTHING"
   )
     .bind(id, email, name, phone, nif, timezone, await hashPassword(body.password), now, now)
     .run();
+
+  if (!inserted.meta?.changes) {
+    return fail("There is already an account with that email. Try signing in instead.", 409, request, env);
+  }
 
   const student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(id).first();
   return json(
@@ -3603,6 +3617,24 @@ async function handleGoogleSignIn(request, env) {
     student = byEmail ?? null;
   }
 
+  if (!student) {
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO students (id, email, name, phone, timezone, password_hash, google_sub, created_at, last_login_at, email_verified_at)
+       VALUES (?, ?, ?, '', ?, '', ?, ?, ?, ?) ON CONFLICT(email) DO NOTHING`
+    )
+      .bind(id, profile.email, profile.name || profile.email.split("@")[0],
+        isValidTimeZone(body.timezone) ? body.timezone : PORTO, profile.sub, now, now, now)
+      .run();
+    // Another callback or password registration may have won since the read.
+    // Resolve its row through the same verified first-link rules below.
+    student = await env.DB.prepare("SELECT * FROM students WHERE email = ?").bind(profile.email).first();
+    if (!student) throw new Error("Google account creation did not produce an account");
+    if (student.google_sub && student.google_sub !== profile.sub) {
+      return fail("That address is linked to another Google account.", 409, request, env);
+    }
+  }
+
   if (student) {
     // The address is deliberately not rewritten here. A student who changed it
     // on the site means that change to stand, and forcing it back to whatever
@@ -3627,24 +3659,6 @@ async function handleGoogleSignIn(request, env) {
     }
     student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(student.id).first();
     if (student.google_sub !== profile.sub) return fail("That address is linked to another Google account.", 409, request, env);
-  } else {
-    const id = crypto.randomUUID();
-    await env.DB.prepare(
-      `INSERT INTO students (id, email, name, phone, timezone, password_hash, google_sub, created_at, last_login_at, email_verified_at)
-       VALUES (?, ?, ?, '', ?, '', ?, ?, ?, ?)`
-    )
-      .bind(
-        id,
-        profile.email,
-        profile.name || profile.email.split("@")[0],
-        isValidTimeZone(body.timezone) ? body.timezone : PORTO,
-        profile.sub,
-        now,
-        now,
-        now
-      )
-      .run();
-    student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(id).first();
   }
 
   return json(
@@ -4024,20 +4038,27 @@ async function handleUpdateMe(request, env) {
   if (!student) return fail("Please sign in.", 401, request, env);
 
   const body = await readJson(request);
-  const name = cleanText(body.name, 120) || student.name;
-  // "in body", not falsiness: a field that was not sent must keep its value,
-  // while one sent empty is a student deliberately clearing it. Sending only a
-  // name used to wipe the phone number without anyone noticing.
-  const phone = "phone" in body ? cleanText(body.phone, 40) : student.phone;
-  const nif = "nif" in body ? normaliseNif(body.nif) : student.nif ?? "";
-  const timezone = isValidTimeZone(body.timezone) ? body.timezone : student.timezone;
+  // Only write submitted fields. Identity was read before this request's body,
+  // and another save can finish after that read; copying its full snapshot
+  // back would silently undo that independent save.
+  const fields = [];
+  const values = [];
+  const name = cleanText(body.name, 120);
+  if ("name" in body && name) { fields.push("name = ?"); values.push(name); }
+  if ("phone" in body) { fields.push("phone = ?"); values.push(cleanText(body.phone, 40)); }
+  if ("nif" in body) {
+    const nif = normaliseNif(body.nif);
+    const problem = nifProblem(nif);
+    if (problem) return fail(problem, 400, request, env);
+    fields.push("nif = ?"); values.push(nif);
+  }
+  if (isValidTimeZone(body.timezone)) { fields.push("timezone = ?"); values.push(body.timezone); }
 
-  const problem = nifProblem(nif);
-  if ("nif" in body && problem) return fail(problem, 400, request, env);
-
-  await env.DB.prepare("UPDATE students SET name = ?, phone = ?, nif = ?, timezone = ? WHERE id = ?")
-    .bind(name, phone, nif, timezone, student.id)
-    .run();
+  if (fields.length) {
+    await env.DB.prepare(`UPDATE students SET ${fields.join(", ")} WHERE id = ?`)
+      .bind(...values, student.id)
+      .run();
+  }
 
   const updated = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(student.id).first();
   return json({ student: publicStudent(updated) }, 200, request, env);

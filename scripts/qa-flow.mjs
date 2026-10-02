@@ -2074,7 +2074,7 @@ previewHasClash = true;
 await accountPage.getByRole("button", { name: /times free/ }).first().click();
 await accountPage.locator("#lesson-calendar .unified-calendar__availability .slot-grid button").first().click();
 await accountPage.getByRole("heading", { name: "Confirm your recurring lessons", exact: true }).waitFor();
-await accountPage.getByText("One lesson time clashes", { exact: false }).waitFor();
+await accountPage.getByText("One lesson time is unavailable", { exact: false }).waitFor();
 if ((await accountPage.locator(".booking-confirmation-stage .booking-skipped li").count()) !== 1) {
   throw new Error("Recurring confirmation should list the exact clashing week before booking.");
 }

@@ -178,6 +178,34 @@ async function confirm(page) {
 let cases = 0;
 try {
   for (const width of [320, 390, 1280]) {
+    // A spring gap has no UTC instant for the intended time. Legacy skipped
+    // values still identify the correct date; neither their shifted time nor
+    // a normal skipped week's time should be invented in the date list.
+    for (const skipped of [
+      { startAt: "2027-03-28T01:30:00.000Z", label: "Sun 28 Mar" },
+      { startAt: "2027-04-04T00:30:00.000Z", label: "Sun 4 Apr" }
+    ]) {
+      const startAt = "2027-03-21T01:30:00.000Z";
+      const state = await fixture(width, async (path) => {
+        if (path === "/availability") return { json: availability([startAt], 60) };
+        if (path === "/bookings/series/preview") return { json: { bookable: [startAt], skipped: [skipped.startAt] } };
+        return null;
+      });
+      try {
+        const { page } = state;
+        await page.clock.setFixedTime(new Date("2027-03-20T10:00:00Z"));
+        await startChoices(page, [startAt]);
+        await selectRadio(page, "Weekly");
+        const warning = page.getByRole("region", { name: "Recurring lesson availability", exact: true });
+        await expect(warning).toContainText("One lesson time is unavailable");
+        await expect(warning.locator("li [aria-hidden=true]")).toHaveText(skipped.label);
+        await expect(warning).not.toContainText(/01:30|02:30/);
+        if (width !== 390) await warning.screenshot({ path: `${output}/weekly-skipped-${skipped.startAt.slice(0, 10)}-${width}.png` });
+        await check(state); cases += 1;
+      } finally { await state.context.close(); }
+    }
+    if (process.env.QA_WEEKLY_SKIP_ONLY === "1") continue;
+
     // A failed older save cannot discard the latest complete date choice.
     for (const failure of ["server", "network", "malformed"]) {
       const started = deferred(), waiting = deferred(), writes = [];

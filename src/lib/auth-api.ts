@@ -53,6 +53,13 @@ const SESSION_KEY = "ines-student-session";
 const RETURNING_KEY = "ines-returning-student";
 export const SESSION_CHANGE_EVENT = "ines:student-session-change";
 
+export class SessionStorageError extends Error {
+  constructor(message = "Your browser couldn't save your sign-in. Allow site storage, then try signing in again.") {
+    super(message);
+    this.name = "SessionStorageError";
+  }
+}
+
 /**
  * The session lives in localStorage rather than a cookie: the site and the
  * booking API are on different origins, so a cookie would have to be
@@ -70,12 +77,14 @@ export function readSession() {
 export function storeSession(token: string, renewal?: { previousSession: string; studentId: string }) {
   try {
     window.localStorage.setItem(SESSION_KEY, token);
-    // A verified email change renews this account's token. Ordinary sign-ins
-    // and storage events still replace the account and clear private views.
-    window.dispatchEvent(new CustomEvent(SESSION_CHANGE_EVENT, { detail: renewal }));
   } catch {
-    // A student in private browsing simply signs in again next visit.
+    // Every authenticated request reads this bearer from storage. Continuing
+    // after a failed write would claim sign-in without any usable session.
+    throw new SessionStorageError();
   }
+  // A verified email change renews this account's token. Ordinary sign-ins
+  // and storage events still replace the account and clear private views.
+  window.dispatchEvent(new CustomEvent(SESSION_CHANGE_EVENT, { detail: renewal }));
 }
 
 export function clearSession() {
@@ -246,7 +255,14 @@ export async function confirmEmailChange(token: string, changeToken: string) {
   const result = await post<{ student: Student; session?: string }>("/me/email/confirm", { token: changeToken }, token).then(validateStudentReply);
   if (result.session !== undefined && (typeof result.session !== "string" || !result.session)) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
   if (readSession() !== token) throw new AuthApiError("Your account changed while confirming this email. Please check your account.", 409);
-  if (result.session) storeSession(result.session, { previousSession: token, studentId: result.student.id });
+  if (result.session) {
+    try {
+      storeSession(result.session, { previousSession: token, studentId: result.student.id });
+    } catch (caught) {
+      if (!(caught instanceof SessionStorageError)) throw caught;
+      throw new SessionStorageError("Your email was changed, but your browser couldn't save your sign-in. Allow site storage, then sign in with your new email.");
+    }
+  }
   return result;
 }
 

@@ -21,6 +21,7 @@
     "test:management-recovery": "node scripts/qa-management-recovery.mjs",
     "test:selection-calendar-recovery": "node scripts/qa-selection-calendar-recovery.mjs",
     "test:release-recovery": "node scripts/qa-release-recovery.mjs",
+    "test:teacher-boundaries": "node scripts/qa-teacher-boundaries.mjs",
     "deploy:cloudflare": "npm run check:fast && npm run check:release && wrangler pages deploy out --project-name=portuguese-with-ines --branch=main",
     "deploy:cloudflare:redirect": "wrangler pages deploy redirects/portuguescomaines.com --project-name=portugues-com-a-ines-redirect --branch=main",
     "worker:dev": "wrangler dev --config workers/booking/wrangler.jsonc",

@@ -210,14 +210,25 @@ availability retries while adding/changing lessons, locked choices during
 booking and checkout, newer time-off choices after failed saves, abandoned
 teacher queues, malformed mutation acknowledgments, invalid nested read rows,
 and email replies that must preserve the current session and draft.
-Its 135 isolated cases per browser cover 320, 390 and 1280 px, accept the same
+Its 141 isolated cases per browser cover 320, 390 and 1280 px, accept the same
 browser/server options, and run against the release export in CI.
+Weekly skipped-date checks include the spring missing hour and show dates
+without inventing a shifted time.
 
 `test:release-recovery` covers booking destinations and browser history, malformed
 password-reset and recurring-stop acknowledgments, teacher attendance replies,
 booking confirmation fields, payment amounts, late-fee flags and rate-code
 receipts. It verifies usable retries with isolated replies across the same
 three widths and browser engines, and runs against the release export in CI.
+
+`test:teacher-boundaries` covers mixed quarter-hour cells, click/keyboard/drag
+edits, exact off-grid hours, retained form fields after failures, spring's
+missing hour and both occurrences of autumn's repeated hour. Its 78 isolated
+cases per browser run at 320, 390 and 1280 px, accept the same browser/server
+options, and run against the release export in CI. Authentication recovery also
+checks session-storage refusal and retry for password, Google and registration,
+truthful password-reset/email-change success without a saved session, and
+sign-in at an explicit lessons destination after an expired bearer is refused.
 
 `test:state-continuity` uses isolated replies at 320, 390 and 1280 px. It
 checks edits made during a save, overlapping name/NIF saves in both reply

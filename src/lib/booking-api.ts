@@ -1,6 +1,7 @@
 import { forgetSession, readSession } from "@/lib/auth-api";
 import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, formatMoney } from "@/lib/config";
 import { BOOKING_REPLY_ERROR, isApiAmount, isApiInstant, isApiLesson, isApiRecord as isRecord } from "@/lib/api-response";
+import { wallTimeToUtc } from "@/lib/wall-time";
 
 export type LessonType = {
   id: string;
@@ -514,33 +515,11 @@ export function shortMonth(monthNumber: number, yearHint: string) {
  *
  * Two passes, as the Worker does it: the first guesses using the offset at the
  * naive timestamp, the second corrects using the offset actually in force at
- * that guess. One correction covers every real transition, since offsets move
- * by at most an hour.
+ * that guess. Missing spring times are rejected; moving an existing lesson
+ * keeps its original occurrence of autumn's repeated hour.
  */
-export function portoTimeToUtc(dateKey: string, time: string) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const [hours, minutes] = time.split(":").map(Number);
-  const naive = Date.UTC(year, month - 1, day, hours, minutes);
-
-  const offsetAt = (instant: number) => {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: BOOKING_TIME_ZONE,
-      hour12: false,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit"
-    }).formatToParts(new Date(instant));
-    const get = (type: string) => Number(parts.find((part) => part.type === type)?.value);
-    return (
-      Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"), get("second")) - instant
-    );
-  };
-
-  const firstPass = naive - offsetAt(naive);
-  return new Date(naive - offsetAt(firstPass)).toISOString();
+export function portoTimeToUtc(dateKey: string, time: string, originalInstant?: string) {
+  return wallTimeToUtc(dateKey, time, BOOKING_TIME_ZONE, originalInstant);
 }
 
 export function formatMoneyCents(cents: number) {

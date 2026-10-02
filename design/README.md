@@ -314,12 +314,22 @@ usual lesson starts and days off; avoid a wall of administration forms.
   values and provide an exact-time editor. The last start is not a finishing
   time. Weekly edits remain a draft until `Save teaching hours`, and booking
   activity must never silently discard that draft.
+  Half-hour cells include both quarter-hour starts when the booking interval
+  is 15 minutes. A partly available cell names its actual start and shows a
+  mixed state; clearing it removes its selected starts, and enabling an empty
+  cell enables both. Dragging includes the final cell, and the exact-time
+  editor retains control of off-grid windows.
 - Time off prevents new bookings; existing lessons remain visible and need
   their own deliberate move/cancel action.
 - Show the full week on desktop. On small screens, keep a seven-day selector
   above a spacious single-day timetable and that day's `Day off` switch, with
   no horizontal page overflow.
   Dates and timed lessons always use Porto time, including at DST boundaries.
+  Entering a time skipped by the spring clock change shows an error and keeps
+  the form available to correct. Moving a lesson in autumn's repeated hour
+  preserves its original occurrence while its wall time remains unchanged.
+  Skipped weekly occurrences are listed by date in previews, confirmations
+  and emails; a missing wall time never appears as a different real time.
 - The timetable spans 08:00–20:00 and widens to fit any teaching hours or
   lessons outside it. There is no 24-hour view; early or late hours are set
   with the exact-time editor.

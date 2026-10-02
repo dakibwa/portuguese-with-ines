@@ -5,7 +5,7 @@ import { AlertCircle, Lock, Mail, ReceiptText, UserRound } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { browserTimeZone } from "@/lib/booking-api";
-import { AuthApiError, login, readSession, register, requestPasswordReset, storeSession, type Student } from "@/lib/auth-api";
+import { AuthApiError, SessionStorageError, login, readSession, register, requestPasswordReset, storeSession, type Student } from "@/lib/auth-api";
 
 type Mode = "signin" | "register" | "forgot";
 
@@ -131,8 +131,12 @@ export function AuthPanel({
       onSignedIn(result.student);
     } catch (caught) {
       if (request !== authRequest.current || readSession() !== session) return;
-      setError(caught instanceof Error ? caught.message : "That didn't work. Please try again.");
-      setAccountExists(mode === "register" && caught instanceof AuthApiError && caught.status === 409);
+      setError(mode === "register" && caught instanceof SessionStorageError
+        ? `Your account was created. ${caught.message}`
+        : caught instanceof Error ? caught.message : "That didn't work. Please try again.");
+      setAccountExists(mode === "register" && (
+        caught instanceof SessionStorageError || caught instanceof AuthApiError && caught.status === 409
+      ));
     } finally {
       if (request === authRequest.current) setBusy(false);
     }

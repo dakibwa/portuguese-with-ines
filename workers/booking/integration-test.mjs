@@ -996,6 +996,35 @@ await test("payment emails carry the NIF: Inês's reminder always, the student's
   assert.ok(!sent("receipt-none", false).text.includes("NIF"), "no NIF, no row: the student isn't asked for one here");
 });
 
+await test("skipped weekly emails show the missing spring date without inventing a later time", async () => {
+  booking("clock-skip-notice", { start: "2027-03-21T01:30:00.000Z", end: "2027-03-21T02:30:00.000Z" });
+  Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0", TEACHER_NOTIFICATIONS_ENABLED: "1" });
+  sentEmails.length = 0;
+  try {
+    await notifySeries(env, {
+      rows: db.prepare("SELECT * FROM bookings WHERE id='clock-skip-notice'").all(),
+      lessonType: db.prepare("SELECT * FROM lesson_types WHERE id='single'").get(),
+      settings: { teacherName: "Inês", teacherEmail: "ines@example.invalid", sameDayChangeFeeCents: 500, minimumNoticeHours: 14 },
+      series: { id: "clock-skip-series", occurrences: 4 },
+      manageUrls: { "clock-skip-notice": "https://lesson.example/book/?manage=clock-skip" },
+      // This is also the shape recovered from older card-setup metadata.
+      skipped: [{ startAt: "2027-03-28T01:30:00.000Z" }]
+    });
+    assert.equal(sentEmails.length, 2);
+    for (const email of sentEmails) {
+      assert.match(email.text, /One lesson time was unavailable and was left out: Sun 28 Mar\./);
+      assert.ok(email.html.includes("Sun 28 Mar"));
+      assert.doesNotMatch(email.text, /Sun 28 Mar, 02:30/);
+      assert.ok(!email.html.includes("Sun 28 Mar, 02:30"));
+    }
+  } finally {
+    Object.assign(env, { EMAIL_DRY_RUN: "1", TEACHER_NOTIFICATIONS_ENABLED: "0" });
+    delete env.TEACHER_EMAIL;
+    delete env.RESEND_API_KEY;
+    db.prepare("DELETE FROM bookings WHERE id='clock-skip-notice'").run();
+  }
+});
+
 await test("every email Inês gets about a student's lessons carries the NIF her receipt automation reads", async () => {
   db.prepare("UPDATE students SET nif='123456789' WHERE id='alice'").run();
   booking("teacher-copy-nif", { start: "2026-10-19T09:00:00.000Z", end: "2026-10-19T10:00:00.000Z" });
@@ -1745,6 +1774,101 @@ await test("signing up again with a registered address says so, whatever its cas
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM students WHERE email='returning@example.invalid'").get().n, 1);
   assert.equal((await call("/auth/login", { user: null, headers: ip, body: { email: "returning@example.invalid", password: "second-password" } })).status, 401, "the second password was never set");
   assert.equal((await call("/auth/login", { user: null, headers: ip, body: { email: "returning@example.invalid", password: "first-password" } })).status, 200);
+});
+await test("independent profile saves preserve each other in either completion order", async () => {
+  for (const fields of [
+    [{ name: "Updated name" }, { nif: "123456789" }],
+    [{ nif: "123456789" }, { name: "Updated name" }],
+    [{ phone: "+351 910000000" }, { timezone: "America/New_York" }],
+    [{ timezone: "America/New_York" }, { phone: "+351 910000000" }]
+  ]) {
+    db.prepare("UPDATE students SET name='Original name', nif='', phone='', timezone='Europe/Lisbon' WHERE id='alice'").run();
+    const replies = await Promise.all(fields.map(body => call("/me", { body })));
+    for (const response of replies) assert.equal(response.status, 200, await response.clone().text());
+    const saved = (await (await call("/me", { method: "GET" })).json()).student;
+    for (const patch of fields) for (const [field, value] of Object.entries(patch)) {
+      assert.equal(saved[field], value, `a concurrent save must preserve ${field}`);
+    }
+  }
+});
+await test("parallel first Google sign-ins return the same verified account without losing a callback", async () => {
+  const credential = await googleCredential({ sub: "parallel-first-google", email: "parallel-google@example.invalid", name: "Parallel Google" });
+  const replies = await Promise.all([0, 1].map(() => call("/auth/google", { user: null, body: { credential } })));
+  for (const response of replies) assert.equal(response.status, 200, await response.clone().text());
+  const students = await Promise.all(replies.map(response => response.json()));
+  assert.equal(students[0].student.id, students[1].student.id);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM students WHERE email='parallel-google@example.invalid'").get().n, 1);
+});
+await test("Google sign-in recovers an account claimed after its lookup without overwriting another identity", async () => {
+  const credential = await googleCredential({ sub: "google-insert-race", email: "google-insert-race@example.invalid", name: "Google Race" });
+  const winner = crypto.randomUUID();
+  beforeRun = (sql, values) => {
+    if (!/^\s*INSERT INTO students/.test(sql) || !sql.includes("google_sub")) return;
+    beforeRun = null;
+    db.prepare(sql).run(winner, ...values.slice(1));
+  };
+  const response = await call("/auth/google", { user: null, body: { credential } });
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.equal((await response.json()).student.id, winner);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM students WHERE email='google-insert-race@example.invalid'").get().n, 1);
+});
+await test("parallel sign-ups for one address create one account and offer the loser sign-in", async () => {
+  const body = { email: "parallel-signup@example.invalid", name: "Parallel Student", password: "parallel-password" };
+  const replies = await Promise.all([0, 1].map(() => call("/auth/register", {
+    user: null, headers: { "CF-Connecting-IP": "198.51.100.71" }, body
+  })));
+  assert.deepEqual(replies.map(response => response.status).sort(), [201, 409]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM students WHERE email=?").get(body.email).n, 1);
+});
+await test("a Google creation race still applies ownership rules to the winning account", async () => {
+  for (const kind of ["password", "different-google"]) {
+    const id = crypto.randomUUID(), email = `google-winner-${kind}@example.invalid`;
+    const password = await hashPassword("winner-password");
+    const priorSession = await createSession(id, env.BOOKING_TOKEN_SECRET, 3);
+    const credential = await googleCredential({ sub: `google-winner-${kind}`, email });
+    beforeRun = (sql) => {
+      if (!/^\s*INSERT INTO students/.test(sql) || !sql.includes("google_sub")) return;
+      beforeRun = null;
+      db.prepare("INSERT INTO students (id,email,name,password_hash,google_sub,session_version,created_at) VALUES (?,?,?,?,?,3,?)")
+        .run(id, email, "Winning Student", password, kind === "different-google" ? "another-google-owner" : null, new Date().toISOString());
+    };
+    const response = await call("/auth/google", { user: null, body: { credential } });
+    const saved = db.prepare("SELECT * FROM students WHERE id=?").get(id);
+    if (kind === "password") {
+      assert.equal(response.status, 200, await response.clone().text());
+      assert.equal((await response.json()).student.id, id);
+      assert.equal(saved.password_hash, "");
+      assert.equal(saved.session_version, 4);
+      assert.equal((await call("/me", { method: "GET", user: null, headers: { Authorization: `Bearer ${priorSession}` } })).status, 401);
+    } else {
+      assert.equal(response.status, 409);
+      assert.equal(saved.google_sub, "another-google-owner");
+      assert.equal(saved.password_hash, password);
+      assert.equal(saved.session_version, 3);
+    }
+  }
+});
+await test("a weekly move across spring's missing hour changes nothing and permits a valid retry", async () => {
+  const now = new Date().toISOString();
+  const rule = db.prepare("INSERT INTO availability_rules (weekday,start_minute,last_start_minute) VALUES (0,0,180)").run().lastInsertRowid;
+  db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('spring-move','alice','single',0,600,?,?)").run(now, now);
+  for (const day of [21, 28]) booking(`spring-move-${day}`, { series: "spring-move", start: `2027-03-${day}T10:00:00.000Z`, end: `2027-03-${day}T11:00:00.000Z` });
+  const rows = () => db.prepare("SELECT starts_at,ends_at,sequence FROM bookings WHERE series_id='spring-move' ORDER BY starts_at").all();
+  try {
+    const before = rows();
+    const failed = await call("/series/spring-move/reschedule", { body: { startAt: "2027-03-21T01:30:00.000Z" } });
+    assert.equal(failed.status, 409, await failed.clone().text());
+    assert.match((await failed.json()).error, /clock-change day/);
+    assert.deepEqual(rows(), before, "no occurrence changes when a later week names a missing time");
+    const retried = await call("/series/spring-move/reschedule", { body: { startAt: "2027-03-21T02:30:00.000Z" } });
+    assert.equal(retried.status, 200, await retried.clone().text());
+    assert.equal((await retried.json()).moved, 2);
+    assert.deepEqual(rows().map(row => row.starts_at), ["2027-03-21T02:30:00.000Z", "2027-03-28T01:30:00.000Z"]);
+  } finally {
+    db.prepare("DELETE FROM bookings WHERE series_id='spring-move'").run();
+    db.prepare("DELETE FROM booking_series WHERE id='spring-move'").run();
+    db.prepare("DELETE FROM availability_rules WHERE id=?").run(rule);
+  }
 });
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;

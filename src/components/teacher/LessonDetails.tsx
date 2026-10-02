@@ -94,7 +94,7 @@ export function LessonDetails({
         await rescheduleBookingAs(
           token,
           booking.id,
-          portoTimeToUtc(date, time),
+          portoTimeToUtc(date, time, booking.starts_at),
         );
         onChanged("Lesson moved. The student has been emailed the new time.");
       } else if (action === "cancel") {

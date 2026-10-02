@@ -12,6 +12,25 @@ const replacementSession = "isolated-replacement-session";
 const replacementStudent = { ...student, id: "replacement-student", name: "Replacement Student" };
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 let googleChecks = 0;
+let storageChecks = 0;
+let expiredSessionChecks = 0;
+
+// A full or restricted store can refuse a write even while reads work. Keep
+// the refusal reversible so the same form can demonstrate recovery.
+function refuseSessionWrites(initialSession) {
+  if (initialSession && !sessionStorage.getItem("isolated-storage-initialised")) {
+    localStorage.setItem("ines-student-session", initialSession);
+    sessionStorage.setItem("isolated-storage-initialised", "1");
+  }
+  const nativeSet = Storage.prototype.setItem;
+  window.qaRefuseSessionWrites = true;
+  Storage.prototype.setItem = function (key, value) {
+    if (key === "ines-student-session" && window.qaRefuseSessionWrites) {
+      throw new DOMException("Isolated storage refusal", "QuotaExceededError");
+    }
+    return nativeSet.call(this, key, value);
+  };
+}
 
 function googleSdkFixture() {
   let callback;
@@ -65,8 +84,138 @@ async function replaceSession(page) {
   }, replacementSession);
 }
 
+async function settleNavigation(page) {
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => new Promise(resolve => {
+    const done = () => requestAnimationFrame(() => resolve(null));
+    if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(done, { timeout: 1000 });
+    else done();
+  }));
+  await page.waitForLoadState("networkidle");
+}
+
 try {
   for (const width of [320, 390, 1280]) {
+    // A successful exchange is not a signed-in browser until its bearer has
+    // actually been saved. Account creation still happened on the server, so
+    // its retry must offer sign-in rather than creating a second account.
+    for (const action of ["signin", "register", "google"]) {
+      const session = `isolated-storage-${action}`;
+      const state = await fixture(width, async path => /^\/auth\/(login|register|google)$/.test(path)
+        ? { json: { student, session } } : null);
+      await state.page.addInitScript(refuseSessionWrites);
+      try {
+        await state.page.goto(`${base}/book/?view=lessons`);
+        const panel = state.page.locator(".auth-panel");
+        await expect(panel).toBeVisible();
+        if (action === "google") {
+          if (!await panel.locator(".google-signin").count()) continue;
+          await panel.getByRole("button", { name: "Continue with Google", exact: true }).click();
+        } else {
+          if (action === "register") {
+            await panel.getByRole("tab", { name: "Create an account", exact: true }).click();
+            await panel.getByLabel("First name", { exact: true }).fill(student.name);
+          }
+          await panel.getByLabel("Email", { exact: true }).fill(student.email);
+          await panel.getByLabel(/^Password/).fill("isolated-password");
+          await panel.getByRole("button", { name: action === "register" ? "Create my account" : "Sign in", exact: true }).click();
+        }
+        await expect(panel.getByRole("alert")).toContainText("couldn't save your sign-in");
+        assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), null);
+        await expect(state.page.locator(".my-lessons__account-name")).toHaveCount(0);
+        await state.page.evaluate(() => { window.qaRefuseSessionWrites = false; });
+        if (action === "register") {
+          await panel.getByRole("alert").getByRole("button", { name: "Sign in", exact: true }).click();
+          await expect(panel.getByLabel("Email", { exact: true })).toHaveValue(student.email);
+        }
+        await panel.getByRole("button", { name: action === "google" ? "Continue with Google" : "Sign in", exact: true }).click();
+        await expect(state.page.locator(".my-lessons__account-name")).toContainText(student.name);
+        assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), session);
+        assert.deepEqual(state.errors, []);
+        storageChecks += 1;
+      } finally { await state.context.close(); }
+    }
+
+    // Email confirmation also consumes its link before renewing the session.
+    // If storage refuses that renewal, the changed address remains truthful
+    // and signing in with it recovers without replaying the confirmation.
+    {
+      const renewed = "isolated-email-storage-renewal", previous = "isolated-email-storage-old";
+      const verified = { ...student, email: "verified@example.invalid" };
+      let changed = false, confirmations = 0;
+      const state = await fixture(width, async (path, request) => {
+        if (path === "/me/email/confirm") {
+          changed = true; confirmations += 1;
+          return { json: { student: verified, session: renewed } };
+        }
+        if (path === "/me" && changed) return request.headers().authorization === `Bearer ${renewed}`
+          ? { json: { student: verified, bookings: [], series: [], sameDayFeeCents: 500 } }
+          : { status: 401, json: { error: "The old session was renewed." } };
+        if (path === "/auth/login") return { json: { student: verified, session: renewed } };
+        return null;
+      });
+      await state.page.addInitScript(refuseSessionWrites, previous);
+      try {
+        await state.page.goto(`${base}/book/?view=lessons&emailToken=isolated-email-proof`);
+        await expect(state.page.getByRole("alert").filter({ hasText: "Your email was changed" })).toContainText("sign in with your new email");
+        assert.equal(confirmations, 1);
+        assert.equal(new URL(state.page.url()).searchParams.has("emailToken"), false);
+        await settleNavigation(state.page);
+        await state.page.reload();
+        const panel = state.page.locator(".auth-panel");
+        await expect(panel).toBeVisible();
+        await state.page.evaluate(() => { window.qaRefuseSessionWrites = false; });
+        await panel.getByLabel("Email", { exact: true }).fill(verified.email);
+        await panel.getByLabel("Password", { exact: true }).fill("isolated-password");
+        await panel.getByRole("button", { name: "Sign in", exact: true }).click();
+        await expect(state.page.locator(".my-lessons__account-name")).toContainText(student.name);
+        assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), renewed);
+        assert.equal(confirmations, 1);
+        assert.deepEqual(state.errors, []);
+        storageChecks += 1;
+      } finally { await state.context.close(); }
+    }
+
+    // Reset consumes its link and changes the password even if saving the new
+    // session fails. Report that completed change without claiming sign-in or
+    // offering a second submission of the already used reset token.
+    {
+      const state = await fixture(width, async path => path === "/auth/reset"
+        ? { json: { student, session: "isolated-unsaved-reset-session" } } : null);
+      await state.page.addInitScript(refuseSessionWrites);
+      try {
+        await state.page.goto(`${base}/reset-password/?token=isolated-reset-token`);
+        await state.page.locator(".auth-panel").getByLabel(/^New password/).fill("isolated-password");
+        await state.page.locator(".auth-panel").getByLabel("Again, to be sure", { exact: true }).fill("isolated-password");
+        await state.page.getByRole("button", { name: "Save my new password", exact: true }).click();
+        await expect(state.page.getByRole("status")).toContainText("Your password has been changed");
+        await expect(state.page.getByRole("status")).not.toContainText("You’re signed in");
+        await expect(state.page.getByRole("status")).toContainText("couldn't save your sign-in");
+        await expect(state.page.getByRole("button", { name: "Save my new password", exact: true })).toHaveCount(0);
+        assert.equal(state.requests.length, 1);
+        assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), null);
+        assert.deepEqual(state.errors, []);
+        storageChecks += 1;
+      } finally { await state.context.close(); }
+    }
+
+    for (const destination of ["/book/?view=lessons", "/my-lessons/"]) {
+      const state = await fixture(width, async path => path === "/me"
+        ? { status: 401, json: { error: "The current session expired." } } : null);
+      await state.page.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-expired-session"));
+      try {
+        await state.page.goto(`${base}${destination}`);
+        await expect(state.page.locator(".auth-panel")).toBeVisible();
+        assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), null);
+        await expect(state.page.locator("#lesson-calendar")).toHaveCount(0);
+        assert.deepEqual(state.requests, []);
+        assert.deepEqual(state.errors, []);
+        expiredSessionChecks += 1;
+      } finally { await state.context.close(); }
+    }
+
+    if (process.env.QA_AUTH_STORAGE_ONLY === "1") continue;
+
     for (const { status, action } of [200, 503].flatMap(status =>
       ["register", "replacement", "navigate"].map(action => ({ status, action })))) {
       const waiting = deferred(), started = deferred();
@@ -249,7 +398,7 @@ try {
         await expect(state.page.locator(".booking-alert")).toContainText("link from your reset email");
         // Complete this document's prefetches before another full navigation;
         // WebKit reports their cancellation as errors on the next document.
-        await state.page.waitForLoadState("networkidle");
+        await settleNavigation(state.page);
         await state.page.goto(`${base}/reset-password/?token=isolated-reset-token`);
         await expect.poll(() => new URL(state.page.url()).search).toBe("");
         await state.page.locator(".auth-panel").getByLabel(/^New password/).fill("isolated-password");
@@ -269,5 +418,7 @@ try {
       } finally { await state.context.close(); }
     }
   }
-  console.log(`Authentication recovery passed in ${engine} at 320/390/1280px: stale success/failure after switching forms, Google exchanges and SDK retry (${googleChecks}/15 configured cases), reset notices, missing/expired links, mismatch prevention, retry and interrupted resets.`);
+  console.log(process.env.QA_AUTH_STORAGE_ONLY === "1"
+    ? `Authentication storage recovery passed in ${engine} at 320/390/1280px: ${storageChecks}/15 configured storage cases and ${expiredSessionChecks}/6 expired-session destinations, including password/Google sign-in, completed registration/reset/email change and valid recovery.`
+    : `Authentication recovery passed in ${engine} at 320/390/1280px: stale success/failure after switching forms, Google exchanges and SDK retry (${googleChecks}/15 configured cases), storage refusals and recovery (${storageChecks}/15 configured cases), expired-session destinations (${expiredSessionChecks}/6), reset notices, missing/expired links, mismatch prevention, retry and interrupted resets.`);
 } finally { await browser.close(); }

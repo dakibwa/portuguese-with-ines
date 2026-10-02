@@ -349,6 +349,12 @@
 .teacher-timetable--editing .teacher-time-slot.is-available {
   background: var(--lavender-soft);
 }
+.teacher-timetable--editing .teacher-time-slot.is-partial {
+  background: linear-gradient(135deg, var(--lavender-soft) 50%, transparent 50%);
+}
+.teacher-timetable--editing .teacher-time-slot.is-partial > span {
+  opacity: 1;
+}
 .teacher-timetable--editing .teacher-time-slot {
   cursor: crosshair;
   touch-action: pan-y;

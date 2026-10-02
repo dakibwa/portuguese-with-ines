@@ -259,8 +259,8 @@ function RepeatAvailability({
           <div className="booking-skipped__copy">
             <p className="booking-skipped__title">
               {preview.skipped.length === 1
-                ? "One lesson time clashes"
-                : `${preview.skipped.length} lesson times clash`}
+                ? "One lesson time is unavailable"
+                : `${preview.skipped.length} lesson times are unavailable`}
             </p>
             <p>
               {preview.skipped.length === 1 ? "It won't be booked" : "They won't be booked"}; the rest go ahead.
@@ -269,8 +269,10 @@ function RepeatAvailability({
             <ul>
               {preview.skipped.map((startAt) => (
                 <li key={startAt}>
-                  <span className="visually-hidden">{formatLongDate(startAt)} at {formatSlotTime(startAt)}</span>
-                  <span aria-hidden="true">{shortDay.format(new Date(startAt))} · {formatSlotTime(startAt)}</span>
+                  {/* A missing clock-change time has no instant. The legacy
+                      skipped value identifies its date, never its wall time. */}
+                  <span className="visually-hidden">{formatLongDate(startAt)}</span>
+                  <span aria-hidden="true">{shortDay.format(new Date(startAt))}</span>
                 </li>
               ))}
             </ul>
@@ -1238,7 +1240,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const choiceKey = choiceStarts.join(",");
   const selectedDayBookings = selectedDate ? bookingsByDate[selectedDate] ?? [] : [];
   const isConfirmingBooking = step === "details" && Boolean(lessonType && chosen) && !managed;
-  const needsLessonsSignIn = intent === "lessons" && showAccountSignIn && !student;
+  // An expired bearer is only discovered after the account read. An explicit
+  // lessons destination still needs sign-in when that read clears the token;
+  // an interrupted read with a retained bearer keeps its retry/error state.
+  const needsLessonsSignIn = intent === "lessons" && !student && (
+    showAccountSignIn || !checkingSession && !readSession()
+  );
   const showWorkflowCalendar =
     !isConfirmingBooking &&
     !needsLessonsSignIn &&
@@ -2315,8 +2322,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   <p>
                     <strong>
                       {confirmation.series.skipped.length === 1
-                        ? "One week wasn't free, so it is not booked"
-                        : `${confirmation.series.skipped.length} weeks weren't free, so they are not booked`}
+                        ? "One week was unavailable, so it is not booked"
+                        : `${confirmation.series.skipped.length} weeks were unavailable, so they are not booked`}
                     </strong>
                   </p>
                   <ul>

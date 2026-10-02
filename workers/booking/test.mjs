@@ -28,7 +28,7 @@ import { hashPassword, verifyPassword, passwordProblem } from "./auth.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
 import { formatEuros } from "./money.mjs";
 import { buildCalendarInvite, buildCalendarSeriesInvite, calendarUid } from "./ics.mjs";
-import { normaliseWeeks, occurrenceInstants, outstandingFor, slotOf, SERIES_LENGTHS } from "./series.mjs";
+import { normaliseWeeks, occurrenceInstants, outstandingFor, planOccurrences, slotOf, SERIES_LENGTHS } from "./series.mjs";
 import { createManageToken, readManageToken, safeEqual, bookingReference } from "./tokens.mjs";
 import { rateLimitAddress } from "./rates.mjs";
 import {
@@ -190,6 +190,27 @@ await test("moving a recurrence ignores only that sequence's existing lessons", 
 
   assert.equal(blocked.slotsByDate["2026-09-07"], undefined);
   assert.equal(moving.slotsByDate["2026-09-07"]?.[0]?.startAt, "2026-09-07T09:00:00.000Z");
+});
+
+await test("spring's missing starts neither duplicate availability nor shift a weekly lesson", async () => {
+  const env = { DB: { prepare(sql) { return {
+    bind() { return this; },
+    async all() { return { results: sql.includes("FROM availability_rules")
+      ? [{ weekday: 0, start_minute: 0, last_start_minute: 180 }] : [] }; }
+  }; } } };
+  const lessonType = { duration_minutes: 60 }, now = new Date("2027-03-20T10:00:00Z");
+  const { slotsByDate } = await computeAvailability(env, { fromKey: "2027-03-28", toKey: "2027-03-28", lessonType, now });
+  const starts = slotsByDate["2027-03-28"].map(slot => slot.startAt);
+  const plan = await planOccurrences(env, { fromKey: "2027-03-21", minuteOfDay: 90, count: 3, lessonType, now });
+  assert.deepEqual({
+    uniqueAvailability: new Set(starts).size === starts.length,
+    springBooked: plan.bookable.some(occurrence => occurrence.key === "2027-03-28"),
+    springSkipped: plan.skipped.some(occurrence => occurrence.key === "2027-03-28"),
+    retainedDates: plan.bookable.map(occurrence => occurrence.key)
+  }, {
+    uniqueAvailability: true, springBooked: false, springSkipped: true,
+    retainedDates: ["2027-03-21", "2027-04-04"]
+  });
 });
 
 await test("14-hour notice hides early slots, allows the boundary and rejects a stale selection across DST", async () => {

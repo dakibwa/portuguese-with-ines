@@ -185,8 +185,8 @@ export function WeeklyTimetable({
       paintHours(
         hours[day] ?? [],
         minute,
-        minute,
-        !lessonStarts(hours[day] ?? [], interval).includes(minute),
+        minute + step - interval,
+        !lessonStarts(hours[day] ?? [], interval).some(value => value >= minute && value < minute + step),
         interval,
       ),
     );
@@ -212,7 +212,7 @@ export function WeeklyTimetable({
       from: minute,
       to: minute,
       paint: editing
-        ? !lessonStarts(hours[day] ?? [], interval).includes(minute)
+        ? !lessonStarts(hours[day] ?? [], interval).some(value => value >= minute && value < minute + step)
         : !takenOff(day, minute),
     });
   }
@@ -233,8 +233,8 @@ export function WeeklyTimetable({
         drag.day,
         paintHours(
           hours[drag.day] ?? [],
-          drag.from,
-          drag.to,
+          Math.min(drag.from, drag.to),
+          Math.max(drag.from, drag.to) + step - interval,
           drag.paint,
           interval,
         ),
@@ -429,9 +429,10 @@ export function WeeklyTimetable({
                       drag?.day === day.value &&
                       minute >= Math.min(drag.from, drag.to) &&
                       minute <= Math.max(drag.from, drag.to);
-                    const usual = starts.some(
+                    const startsInCell = starts.filter(
                       (value) => value >= minute && value < cellEnd,
                     );
+                    const usual = startsInCell.length > 0;
                     const inWeekly = overlapsSpan(weekly, minute, cellEnd);
                     const focusable =
                       WEEKDAYS[mobileDay].value === day.value &&
@@ -452,14 +453,18 @@ export function WeeklyTimetable({
                     const weeklyClass = inWeekly && !off ? "is-weekly" : "";
                     if (editing) {
                       const selected = dragging ? drag.paint : usual;
+                      const mixed = !dragging && usual && interval < step && startsInCell.length < step / interval;
+                      const availableTimes = dragging && selected
+                        ? Array.from({ length: step / interval }, (_, index) => minuteLabel(minute + index * interval))
+                        : startsInCell.map(minuteLabel);
                       return (
                         <button
                           key={minute}
                           type="button"
-                          className={`teacher-time-slot ${selected ? "is-available" : ""} ${weeklyClass} ${hourClass}`}
-                          aria-pressed={selected}
+                          className={`teacher-time-slot ${selected ? "is-available" : ""} ${mixed ? "is-partial" : ""} ${weeklyClass} ${hourClass}`}
+                          aria-pressed={mixed ? "mixed" : selected}
                           disabled={disabled}
-                          aria-label={`${day.name} ${minuteLabel(minute)}, ${selected ? "lesson start available" : "unavailable"}`}
+                          aria-label={`${day.name} ${selected ? availableTimes.join(" and ") : minuteLabel(minute)}, ${selected ? "lesson start available" : "unavailable"}`}
                           {...pointer}
                           onClick={(event) => {
                             if (
@@ -470,7 +475,7 @@ export function WeeklyTimetable({
                               toggle(day.value, minute);
                           }}
                         >
-                          <span>{minuteLabel(minute)}</span>
+                          <span>{mixed ? availableTimes.join(", ") : minuteLabel(minute)}</span>
                         </button>
                       );
                     }

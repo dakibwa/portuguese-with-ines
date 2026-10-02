@@ -85,6 +85,11 @@ export async function planOccurrences(env, { fromKey, minuteOfDay, count, lesson
   const bookable = [];
   const skipped = [];
   for (const occurrence of wanted) {
+    const actual = slotOf(occurrence.startAt);
+    if (actual.dateKey !== occurrence.key || actual.minuteOfDay !== minuteOfDay) {
+      skipped.push({ key: occurrence.key, startAt: occurrence.startAt.toISOString(), reason: "That weekly time does not exist because the clocks change." });
+      continue;
+    }
     const check = await isSlotBookable(env, {
       startAt: occurrence.startAt.toISOString(),
       lessonType,

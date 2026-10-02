@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { candidateStartMinutes } from "../workers/booking/availability.mjs";
+import { wallTimeToUtc } from "../src/lib/wall-time.ts";
 import {
   addSpan,
   bookingSegments,
@@ -18,6 +19,35 @@ import {
   weeklyBlocks,
   withDayChanges,
 } from "../src/lib/teacher-calendar.ts";
+
+test("Porto wall times round-trip across DST and reject the missing spring hour", () => {
+  const convert = (date, time) => wallTimeToUtc(date, time, "Europe/Lisbon");
+  for (const minute of ["01:00", "01:15", "01:30", "01:45"]) {
+    assert.throws(() => convert("2027-03-28", minute), /does not exist.*clocks change/);
+  }
+  assert.equal(convert("2027-03-28", "00:45"), "2027-03-28T00:45:00.000Z");
+  assert.equal(convert("2027-03-28", "02:00"), "2027-03-28T01:00:00.000Z");
+  assert.equal(convert("2027-01-15", "10:15"), "2027-01-15T10:15:00.000Z");
+  assert.equal(convert("2027-07-15", "10:15"), "2027-07-15T09:15:00.000Z");
+  for (const time of ["00:00", "00:45", "01:00", "01:15", "01:45", "02:00", "23:45"]) {
+    const instant = new Date(convert("2027-10-31", time));
+    const actual = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit" }).format(instant);
+    assert.equal(actual, time, "fall's repeated hour must keep the entered time");
+  }
+  for (const [date, time] of [["2027-02-30", "10:00"], ["2027-03-28", "24:00"], ["2027-13-01", "10:00"], ["invalid", "10:00"]]) {
+    assert.throws(() => convert(date, time), /valid date and time/);
+  }
+});
+
+test("moving an autumn lesson preserves its occurrence of the repeated hour", () => {
+  const convert = (time, original) => wallTimeToUtc("2026-10-25", time, "Europe/Lisbon", original);
+  assert.equal(convert("01:30", "2026-10-25T00:30:00.000Z"), "2026-10-25T00:30:00.000Z");
+  assert.equal(convert("01:30", "2026-10-25T01:30:00.000Z"), "2026-10-25T01:30:00.000Z");
+  assert.equal(convert("01:45", "2026-10-25T00:30:00.000Z"), "2026-10-25T00:45:00.000Z");
+  assert.equal(convert("01:45", "2026-10-25T01:30:00.000Z"), "2026-10-25T01:45:00.000Z");
+  assert.equal(convert("02:00", "2026-10-25T00:30:00.000Z"), "2026-10-25T02:00:00.000Z");
+  assert.throws(() => wallTimeToUtc("2027-03-28", "01:30", "Europe/Lisbon", "2027-03-21T01:30Z"), /clocks change/);
+});
 
 test("paint and erase preserve the actual bookable starts at inclusive last-start boundaries", () => {
   const original = [

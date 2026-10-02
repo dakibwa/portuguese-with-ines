@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Lock } from "lucide-react";
-import { readSession, resetPassword, storeSession } from "@/lib/auth-api";
+import { readSession, resetPassword, SessionStorageError, storeSession } from "@/lib/auth-api";
 
 export function ResetPassword() {
   const [token, setToken] = useState<string | null>(null);
@@ -11,6 +11,7 @@ export function ResetPassword() {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [storageNote, setStorageNote] = useState("");
   const [busy, setBusy] = useState(false);
   const resetRequest = useRef(0);
   useLayoutEffect(() => () => { resetRequest.current += 1; }, []);
@@ -42,8 +43,17 @@ export function ResetPassword() {
       const result = await resetPassword(token, password);
       if (request !== resetRequest.current) return;
       const canSignIn = readSession() === session;
-      if (canSignIn) storeSession(result.session);
-      setSignedIn(canSignIn);
+      let saved = false;
+      if (canSignIn) {
+        try {
+          storeSession(result.session);
+          saved = true;
+        } catch (caught) {
+          if (!(caught instanceof SessionStorageError)) throw caught;
+          setStorageNote(caught.message);
+        }
+      }
+      setSignedIn(saved);
       setDone(true);
     } catch (caught) {
       if (request !== resetRequest.current) return;
@@ -61,7 +71,7 @@ export function ResetPassword() {
           <strong>Your password has been changed.</strong>
           <p>
             {signedIn ? <>You&rsquo;re signed in. <a href="/book/?view=lessons">Go to your lessons</a>.</>
-              : "You can use your new password next time you sign in."}
+              : storageNote || "You can use your new password next time you sign in."}
           </p>
         </div>
       </div>
