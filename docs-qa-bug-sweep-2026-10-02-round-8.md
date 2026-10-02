@@ -52,7 +52,8 @@ session. Its existing own-hold ownership behavior remains correct.
 
 ## Verification and release
 
-Website publication is pending. The final `check:fast` passed all 265 tests:
+The fixes are published at [portuguesewithines.com](https://portuguesewithines.com).
+The final `check:fast` passed all 265 tests:
 101 booking unit, 92 SQLite integration, 32 Google Calendar, 26 meeting service,
 five redirect and nine teacher-calendar checks, plus type checking and lint.
 Worker packaging passed its dry run. The final `check:release` passed the live
@@ -75,15 +76,36 @@ the full 48-case account-recovery suite in Chromium. Type checking, lint, all
 
 The first workflow run,
 [37041245946](https://github.com/dakibwa/portuguese-with-ines/actions/runs/37041245946),
-blocked publication on the focus race. The corrected release gate is being
-rerun; the failed run did not publish a website artifact.
+blocked publication on the focus race; it did not publish a website artifact.
+The corrected run,
+[37043394317](https://github.com/dakibwa/portuguese-with-ines/actions/runs/37043394317),
+passed every build step and all 18 browser suites, then published that same
+tested export. Its source is `cdbfe3d1c74aede30e5f28967760dfca0d2d583d`.
+
+The `site` artifact is `11244162701`, digest
+`sha256:d7e4a25b9f9745695128a44572920f8bff99261d07c44c13f3fed968624bc8a2`.
+The publication job downloaded that artifact and deployed
+`470f6ccc-2a0b-4baa-95dc-224d5f2db0ea`; Cloudflare confirms it is the successful
+production deployment, completed **2 October 2026 at 18:05:29 UTC**. Artifact
+deployments have an empty Cloudflare checkout hash; the workflow source,
+artifact digest and published deployment URL establish the release binding.
 
 The Worker was deployed first; active version
 `2455770d-8a81-446a-9b23-9bcd45e9b099` reports healthy live email, teacher
 notifications, Stripe/postpay and configured Google sign-in. No schema,
 credentials or production account/booking data were changed by the sweep.
 
-The final release records and live acceptance results will be added after
-publication. Passing these checks establishes the documented scenarios; real
+Live acceptance passed **138 Chromium browser cases** against the published
+client: 24 public routes/navigation, 78 teacher boundaries, 21 storage/expired
+session recovery, nine profile-focus and six skipped-date cases. Account and
+mutation replies are isolated; public page assets and availability are real.
+There were no page errors or real production writes. The `www` domain and both
+Portuguese-name aliases return 301 while preserving `/book/?view=lessons`.
+The live Worker health probe returned 200 with no missing configuration.
+
+Local release evidence is collected in `tmp/qa/pass8-release-proof.json`, with
+the associated `pass8-*` reproduction, browser and release logs.
+
+Passing these checks establishes the documented scenarios; real
 identity/payment provider transactions and unexercised conditions remain outside
 this sweep's evidence.
