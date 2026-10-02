@@ -184,7 +184,10 @@ the same identity or action:
   outside. Closing returns focus to the link and preserves the page position,
   booking choices, notes and agreement state. When lesson management is underneath,
   Escape closes only the top overlay and restores focus within the remaining
-  dialog, which keeps the page scroll locked. The old `/terms`,
+  dialog, which keeps the page scroll locked. A backdrop dismissal requires the
+  gesture to start and finish outside the dialog; dragging from its content or
+  fields preserves it. An open account menu leaves Escape to the top modal and
+  preserves the modal's original return target. The old `/terms`,
   `/booking-terms` and `/privacy` pages redirect into booking; there is no
   separate legal-page hero, index or marketing treatment. Payment wording follows
   the method shown at booking and never implies every booking saves or charges a card.
@@ -349,6 +352,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   permission checks and server error handling intact. The details always
   state the student's NIF, or `NIF not given (consumidor final)`, because her
   receipt automation reads them.
+  Closing without a change returns keyboard focus to its opener. Completing
+  an action returns focus to the stable week heading while the timetable
+  reloads, with a single blue outline; it never steals a later focus choice.
 - Put manual lesson entry last, collapsed under `Add a lesson for a student`.
   It is a backup for a lesson arranged elsewhere; the ordinary student booking
   service remains the primary route. Include online/in-Porto location.

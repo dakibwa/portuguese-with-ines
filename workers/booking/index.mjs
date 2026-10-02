@@ -758,13 +758,13 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
  * the same as requiring that much free time between it and any other lesson.
  * Students' lessons pass the setting; Inês's own bookings pass nothing.
  */
-async function claimSlot(env, { columns, values, startAt, endAt, studentId = null, bufferMinutes = 0 }) {
+function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = null, bufferMinutes = 0, seriesSnapshot = null }) {
   const placeholders = columns.map(() => "?").join(", ");
   const seriesId = values[columns.indexOf("series_id")] ?? null;
   // A pending setup reserves its slot for everyone, including its owner.
   // Ignoring one's own hold allowed two setup webhooks to confirm overlapping
   // lessons. Expired holds do not block a fresh atomic claim.
-  const result = await env.DB.prepare(
+  return env.DB.prepare(
     `INSERT INTO bookings (${columns.join(", ")})
      SELECT ${placeholders}
      WHERE NOT EXISTS (
@@ -774,7 +774,8 @@ async function claimSlot(env, { columns, values, startAt, endAt, studentId = nul
          AND ends_at > ?
      ) AND (? != 'trial' OR ? IS NULL OR NOT EXISTS (
        SELECT 1 FROM bookings prior WHERE prior.student_id = ? AND prior.status != 'cancelled'
-     )) AND (? IS NULL OR EXISTS (SELECT 1 FROM booking_series WHERE id = ? AND status = 'active'))`
+     )) AND (? IS NULL OR EXISTS (SELECT 1 FROM booking_series WHERE id = ? AND status = 'active'))
+     ${seriesSnapshot ? `AND EXISTS (SELECT 1 FROM booking_series WHERE id = ? AND ${SERIES_FILL_GUARD})` : ""}`
   )
     .bind(
       ...values,
@@ -785,9 +786,13 @@ async function claimSlot(env, { columns, values, startAt, endAt, studentId = nul
       studentId,
       studentId,
       seriesId,
-      seriesId
-    )
-    .run();
+      seriesId,
+      ...(seriesSnapshot ? [seriesSnapshot.id, ...seriesFillValues(seriesSnapshot)] : [])
+    );
+}
+
+async function claimSlot(env, options) {
+  const result = await prepareSlotClaim(env, options).run();
 
   return (result?.meta?.changes ?? 0) > 0;
 }
@@ -1619,7 +1624,9 @@ async function resendFailedEmails(env) {
 async function topUpOpenSeries(env) {
   const now = new Date();
   const { results } = await env.DB.prepare(
-    "SELECT * FROM booking_series WHERE status = 'active' AND occurrences IS NULL"
+    `SELECT * FROM booking_series WHERE status = 'active' AND occurrences IS NULL
+       AND EXISTS (SELECT 1 FROM bookings WHERE series_id = booking_series.id)
+       AND NOT EXISTS (SELECT 1 FROM bookings WHERE series_id = booking_series.id AND status = 'pending_payment')`
   ).all();
 
   for (const series of results ?? []) {
@@ -2269,13 +2276,31 @@ async function notifySelection(env, { rows, lessonType, settings, series, skippe
  * pay-in-person run, 'hold' while its first card setup is open, and 'scheduled'
  * for a lesson that will charge the saved card after its end.
  */
-async function insertOccurrence(env, { seriesId, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null, bufferMinutes = 0 }) {
+// The recipe and bookmark are the optimistic version for a fill. A move or
+// another fill changes them even when two writes share the same timestamp.
+const SERIES_FILL_GUARD = `status = 'active' AND student_id = ? AND lesson_type_id = ?
+  AND location = ? AND notes = ? AND weekday = ? AND minute_of_day = ?
+  AND occurrences IS ? AND filled_to IS ? AND automatic_payment = ? AND prepaid = ?
+  AND payment_consent_at IS ? AND payment_consent_version IS ?`;
+
+function seriesFillValues(series) {
+  return [series.student_id, series.lesson_type_id, series.location, series.notes, series.weekday,
+    series.minute_of_day, series.occurrences ?? null, series.filled_to ?? null,
+    series.automatic_payment, series.prepaid, series.payment_consent_at ?? null, series.payment_consent_version ?? null];
+}
+
+function prepareSeriesBookmark(env, series, key, now) {
+  return env.DB.prepare(`UPDATE booking_series SET filled_to = ?, updated_at = ? WHERE id = ? AND ${SERIES_FILL_GUARD}`)
+    .bind(key, now.toISOString(), series.id, ...seriesFillValues(series));
+}
+
+async function insertOccurrence(env, { series, key, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null, bufferMinutes = 0 }) {
   const id = crypto.randomUUID();
   const timestamp = now.toISOString();
   const startsAt = new Date(startAt).toISOString();
   const endsAt = new Date(endAt).toISOString();
 
-  const claimed = await claimSlot(env, {
+  const claim = prepareSlotClaim(env, {
     columns: [
       "id", "reference", "lesson_type_id", "student_id", "student_name", "student_email", "student_phone",
       "student_timezone", "location", "notes", "starts_at", "ends_at", "status", "sequence", "created_at",
@@ -2302,21 +2327,25 @@ async function insertOccurrence(env, { seriesId, student, lessonType, timezone, 
       paymentState === "hold" ? "pending" : paymentState === "scheduled" ? "scheduled" : "not_required",
       lessonType.price_cents,
       paymentState === "hold" ? holdExpiresAt : null,
-      seriesId,
+      series.id,
       paymentConsentAt,
       paymentConsentVersion
     ],
     startAt: startsAt,
     endAt: endsAt,
     studentId: student.id,
-    bufferMinutes
+    bufferMinutes,
+    seriesSnapshot: series
   });
 
-  // Losing the race is a skipped week, not a failed booking: the rest of the
-  // run is still worth having, and the student is told which weeks were missed.
-  if (!claimed) return null;
+  // Commit the occurrence and bookmark together. Stale jobs may neither add
+  // an old appointment nor overwrite the bookmark of a moved/extended recipe.
+  const [claimed, advanced] = await env.DB.batch([claim, prepareSeriesBookmark(env, series, key, now)]);
+  if (!(advanced?.meta?.changes > 0)) return { current: false, row: null };
+  // A competing lesson only skips this week; the current recipe still advances.
+  if (!(claimed?.meta?.changes > 0)) return { current: true, row: null };
 
-  return env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
+  return { current: true, row: await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first() };
 }
 
 /**
@@ -2338,10 +2367,21 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
   });
 
   const rows = [];
-  const lost = [];
-  for (const occurrence of bookable) {
-    const row = await insertOccurrence(env, {
-      seriesId: series.id,
+  const consideredSkipped = [];
+  const pending = [...bookable.map(occurrence => ({ ...occurrence, available: true })),
+    ...skipped.map(occurrence => ({ ...occurrence, available: false }))].sort((a, b) => a.key.localeCompare(b.key));
+  let currentSeries = series;
+  for (const occurrence of pending) {
+    if (!occurrence.available) {
+      const advanced = await prepareSeriesBookmark(env, currentSeries, occurrence.key, now).run();
+      if (!(advanced?.meta?.changes > 0)) break;
+      consideredSkipped.push(occurrence);
+      currentSeries = { ...currentSeries, filled_to: occurrence.key };
+      continue;
+    }
+    const { current, row } = await insertOccurrence(env, {
+      series: currentSeries,
+      key: occurrence.key,
       student,
       lessonType,
       timezone: student.timezone,
@@ -2357,31 +2397,13 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
       bufferMinutes: lessonBufferMinutes
     });
 
+    if (!current) break;
     if (row) rows.push(row);
-    else lost.push({ key: occurrence.key, startAt: occurrence.startAt.toISOString(), reason: "Taken while booking." });
-
-    /*
-     * The bookmark moves with each occurrence, not once at the end. Advancing it
-     * only after the loop meant a run that died half way left rows committed and
-     * `filled_to` untouched — so the next night replanned the same weeks, found
-     * its own bookings in the way, and emailed the student and Inês to say those
-     * lessons had been "left out". They were in the calendar the whole time.
-     */
-    await env.DB.prepare("UPDATE booking_series SET filled_to = ?, updated_at = ? WHERE id = ?")
-      .bind(occurrence.key, now.toISOString(), series.id)
-      .run();
+    else consideredSkipped.push({ key: occurrence.key, startAt: occurrence.startAt.toISOString(), reason: "Taken while booking." });
+    currentSeries = { ...currentSeries, filled_to: occurrence.key };
   }
 
-  const allSkipped = [...skipped, ...lost];
-  const considered = [...bookable.map((o) => o.key), ...skipped.map((o) => o.key)].sort();
-  const lastConsidered = considered[considered.length - 1] ?? series.filled_to;
-  if (lastConsidered) {
-    await env.DB.prepare("UPDATE booking_series SET filled_to = ?, updated_at = ? WHERE id = ?")
-      .bind(lastConsidered, now.toISOString(), series.id)
-      .run();
-  }
-
-  return { rows, skipped: allSkipped };
+  return { rows, skipped: consideredSkipped };
 }
 
 /**
@@ -2457,6 +2479,12 @@ async function handleStopSeries(request, env, ctx, seriesId) {
   let pendingRefunds = 0;
   let cancellationPlan = [];
 
+  // End extension before reading the cancellation set. An occurrence committed
+  // first is included below; a stale nightly fill cannot add one afterwards.
+  await env.DB.prepare("UPDATE booking_series SET status = 'ended', ended_at = ?, updated_at = ? WHERE id = ?")
+    .bind(now.toISOString(), now.toISOString(), seriesId)
+    .run();
+
   if (cancelRemaining) {
     const { results } = await env.DB.prepare(
       "SELECT * FROM bookings WHERE series_id = ? AND status = 'confirmed' AND starts_at > ? ORDER BY starts_at"
@@ -2472,10 +2500,6 @@ async function handleStopSeries(request, env, ctx, seriesId) {
     cancellationPlan = plan.cancellable;
 
   }
-
-  await env.DB.prepare("UPDATE booking_series SET status = 'ended', ended_at = ?, updated_at = ? WHERE id = ?")
-    .bind(now.toISOString(), now.toISOString(), seriesId)
-    .run();
 
   if (cancelRemaining) {
     const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?")
@@ -2637,6 +2661,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
       oldStart: row.starts_at,
       oldLessonType: row.lesson_type_id,
       oldLocation: row.location,
+      oldSequence: row.sequence,
       startAt: occurrence.startAt.toISOString(),
       endAt: check.endAt.toISOString(),
       amountCents,
@@ -2644,25 +2669,25 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     });
   }
 
-  const proposedValues = planned.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
-  const proposedBindings = planned.flatMap((entry) => [
-    entry.id,
-    entry.oldStart,
-    entry.oldLessonType,
-    entry.oldLocation,
-    entry.startAt,
-    entry.endAt,
-    entry.amountCents,
+  // D1 allows only 100 bound parameters per statement. JSON keeps a whole
+  // ongoing run in one atomic move without exhausting that limit after nine
+  // lessons, and carries each occurrence's optimistic sequence as well.
+  const proposed = JSON.stringify(planned.map(entry => ({
+    ...entry,
     // The span that must be clear of other lessons: the lesson plus its gap.
-    new Date(Date.parse(entry.startAt) - gapMs).toISOString(),
-    new Date(Date.parse(entry.endAt) + gapMs).toISOString()
-  ]);
-  const expectedValues = planned.map(() => "(?, ?, ?)").join(", ");
-  const expectedBindings = planned.flatMap((entry) => [entry.id, entry.startAt, entry.endAt]);
+    guardStart: new Date(Date.parse(entry.startAt) - gapMs).toISOString(),
+    guardEnd: new Date(Date.parse(entry.endAt) + gapMs).toISOString()
+  })));
 
   const moveBookings = env.DB.prepare(
-    `WITH proposed(id, old_start, old_lesson_type, old_location, new_start, new_end, new_amount, guard_start, guard_end) AS (
-       VALUES ${proposedValues}
+    `WITH proposed AS MATERIALIZED (
+       SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.oldStart') AS old_start,
+         json_extract(value, '$.oldLessonType') AS old_lesson_type, json_extract(value, '$.oldLocation') AS old_location,
+         json_extract(value, '$.oldSequence') AS old_sequence,
+         json_extract(value, '$.startAt') AS new_start, json_extract(value, '$.endAt') AS new_end,
+         json_extract(value, '$.amountCents') AS new_amount,
+         json_extract(value, '$.guardStart') AS guard_start, json_extract(value, '$.guardEnd') AS guard_end
+       FROM json_each(?)
      )
      UPDATE bookings
      SET lesson_type_id = ?, location = ?, previous_starts_at = starts_at,
@@ -2676,12 +2701,14 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
          SELECT 1 FROM proposed p
          WHERE p.id = bookings.id AND p.old_start = bookings.starts_at
            AND p.old_lesson_type = bookings.lesson_type_id AND p.old_location = bookings.location
+           AND p.old_sequence = bookings.sequence
        )
        AND (SELECT COUNT(*) FROM bookings current
             WHERE current.series_id = ? AND current.status = 'confirmed' AND current.starts_at > ?) = ?
        AND (SELECT COUNT(*) FROM bookings current
             JOIN proposed p ON p.id = current.id AND p.old_start = current.starts_at
               AND p.old_lesson_type = current.lesson_type_id AND p.old_location = current.location
+              AND p.old_sequence = current.sequence
             WHERE current.series_id = ? AND current.status = 'confirmed' AND current.starts_at > ?) = ?
        AND (SELECT status FROM booking_series WHERE id = ? AND student_id = ?) = 'active'
        AND NOT EXISTS (SELECT 1 FROM bookings processing WHERE processing.series_id = bookings.series_id
@@ -2694,7 +2721,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
            AND other.id NOT IN (SELECT id FROM proposed)
        )`
   ).bind(
-    ...proposedBindings,
+    proposed,
     lessonType.id,
     location,
     nowIso,
@@ -2714,15 +2741,19 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
 
   // The recipe only moves if the first statement produced every expected row.
   const updateSeries = env.DB.prepare(
-    `WITH expected(id, new_start, new_end) AS (VALUES ${expectedValues})
+    `WITH expected AS MATERIALIZED (
+       SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.startAt') AS new_start,
+         json_extract(value, '$.endAt') AS new_end FROM json_each(?)
+     )
      UPDATE booking_series
      SET lesson_type_id = ?, location = ?, weekday = ?, minute_of_day = ?, filled_to = ?, updated_at = ?
      WHERE id = ? AND student_id = ? AND status = 'active'
+       AND changes() = ?
        AND (SELECT COUNT(*) FROM bookings b JOIN expected e
             ON e.id = b.id AND e.new_start = b.starts_at AND e.new_end = b.ends_at
             WHERE b.series_id = ? AND b.status = 'confirmed') = ?`
   ).bind(
-    ...expectedBindings,
+    proposed,
     lessonType.id,
     location,
     requestedSlot.weekday,
@@ -2731,6 +2762,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     nowIso,
     seriesId,
     student.id,
+    planned.length,
     seriesId,
     planned.length
   );

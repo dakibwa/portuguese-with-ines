@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { X, MapPin, Video, Clock, Mail, ArrowLeft, ReceiptText } from "lucide-react";
 import {
   cancelBookingAs,
@@ -15,11 +15,13 @@ import { AssetMark } from "@/components/BrandMarks";
 import { MeetingLink } from "@/components/MeetingLink";
 import { restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
+import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 
 type Props = {
   booking: AdminBooking;
   token: string;
   now: Date;
+  afterChangeFocusRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onChanged: (message: string) => void;
 };
@@ -28,10 +30,12 @@ export function LessonDetails({
   booking,
   token,
   now,
+  afterChangeFocusRef,
   onClose,
   onChanged,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const changed = useRef(false);
   const [action, setAction] = useState<"view" | "move" | "cancel" | "no-show">(
     "view",
   );
@@ -54,8 +58,9 @@ export function LessonDetails({
   const locked =
     booking.payment_status === "processing" ||
     booking.same_day_fee_status === "processing";
+  const backdropHandlers = useDialogBackdrop(() => { if (!busy) onClose(); });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previous =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -66,9 +71,11 @@ export function LessonDetails({
     return () => {
       dialog?.close();
       releaseScroll();
-      restoreDialogFocus(previous);
+      // Successful actions reload the timetable, removing its opener. Keep
+      // keyboard position at the stable week heading throughout that reload.
+      restoreDialogFocus(changed.current ? afterChangeFocusRef.current : previous);
     };
-  }, []);
+  }, [afterChangeFocusRef]);
 
   const backToLesson = (
     <button
@@ -96,12 +103,15 @@ export function LessonDetails({
           booking.id,
           portoTimeToUtc(date, time, booking.starts_at),
         );
+        changed.current = true;
         onChanged("Lesson moved. The student has been emailed the new time.");
       } else if (action === "cancel") {
         await cancelBookingAs(token, booking.id);
+        changed.current = true;
         onChanged("Lesson cancelled. The student has been emailed.");
       } else if (action === "no-show") {
         await setNoShow(token, booking.id, !noShow);
+        changed.current = true;
         onChanged(
           noShow
             ? "No-show removed. The lesson price will be charged as normal."
@@ -123,22 +133,11 @@ export function LessonDetails({
     <dialog
       className="teacher-lesson-dialog"
       ref={dialogRef}
+      {...backdropHandlers}
       aria-labelledby="teacher-lesson-title"
       onCancel={(event) => {
         event.preventDefault();
         if (!busy) onClose();
-      }}
-      onClick={(event) => {
-        const rect = event.currentTarget.getBoundingClientRect();
-        if (
-          !busy &&
-          event.target === event.currentTarget &&
-          (event.clientX < rect.left ||
-            event.clientX > rect.right ||
-            event.clientY < rect.top ||
-            event.clientY > rect.bottom)
-        )
-          onClose();
       }}
     >
       <div className="teacher-dialog-top">

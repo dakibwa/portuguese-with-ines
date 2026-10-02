@@ -72,6 +72,12 @@
   font: 600 clamp(1.15rem, 2.4vw, 1.55rem) / 1.45 var(--ui);
   letter-spacing: -0.035em;
 }
+.teacher-week-title h2:focus {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+  box-shadow: none;
+  border-radius: 4px;
+}
 .teacher-unsaved-dot {
   width: 6px;
   height: 6px;

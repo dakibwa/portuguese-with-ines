@@ -252,9 +252,11 @@ export function MyLessons({
       if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented ||
+        document.querySelector('dialog:modal, [role="dialog"][aria-modal="true"]')) return;
+      event.preventDefault();
       setMenuOpen(false);
-      window.requestAnimationFrame(() => document.getElementById("account-menu-button")?.focus());
+      document.getElementById("account-menu-button")?.focus({ preventScroll: true });
     };
     document.addEventListener("pointerdown", closeOnPointerDown);
     document.addEventListener("keydown", closeOnEscape);

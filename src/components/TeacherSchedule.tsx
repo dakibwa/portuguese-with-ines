@@ -91,6 +91,7 @@ export function TeacherSchedule() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const bookingRequest = useRef(0);
+  const calendarTitleRef = useRef<HTMLHeadingElement>(null);
   const accountGeneration = useRef(0);
   const dayChangesRef = useRef(dayChanges);
   const dayVersion = useRef(0);
@@ -517,7 +518,7 @@ export function TeacherSchedule() {
             <span className="teacher-eyebrow">
               {editing ? "Set your rhythm" : "Your week at a glance"}
             </span>
-            <h2 id="teacher-week-title">
+            <h2 id="teacher-week-title" ref={calendarTitleRef} tabIndex={-1}>
               {editing
                 ? "Your usual week"
                 : `${dateLabel(weekStart, { day: "numeric", month: "short" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}`}
@@ -608,7 +609,10 @@ export function TeacherSchedule() {
             <button
               className="teacher-text-button"
               type="button"
-              onClick={() => void reloadBookings()}
+              onClick={() => {
+                calendarTitleRef.current?.focus({ preventScroll: true });
+                void reloadBookings();
+              }}
             >
               Reload lessons
             </button>
@@ -703,6 +707,7 @@ export function TeacherSchedule() {
           booking={selectedBooking}
           token={token}
           now={now}
+          afterChangeFocusRef={calendarTitleRef}
           onClose={() => setSelectedBooking(null)}
           onChanged={(message) => {
             if (readSession() !== token) return;

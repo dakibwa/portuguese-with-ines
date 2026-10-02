@@ -5,6 +5,7 @@ import { ChevronRight, X } from "lucide-react";
 import { formatLongDate } from "@/lib/booking-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
+import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 
 type PromptLesson = { key: string; title: string; detail: string; onOpen: () => void };
 
@@ -19,6 +20,7 @@ export function CalendarBookingPrompt({ date, lessons = [], onBook, onClose }: {
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const backdropHandlers = useDialogBackdrop(onClose);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -38,15 +40,9 @@ export function CalendarBookingPrompt({ date, lessons = [], onBook, onClose }: {
       aria-describedby="calendar-booking-date"
       className="policy-dialog calendar-booking-prompt"
       ref={dialogRef}
+      {...backdropHandlers}
       onKeyDown={keepDialogFocus}
       onCancel={(event) => { event.preventDefault(); onClose(); }}
-      onClick={(event) => {
-        const bounds = event.currentTarget.getBoundingClientRect();
-        if (event.target === event.currentTarget && (
-          event.clientX < bounds.left || event.clientX > bounds.right ||
-          event.clientY < bounds.top || event.clientY > bounds.bottom
-        )) onClose();
-      }}
     >
       <div className="policy-dialog__heading">
         <h2 id="calendar-booking-title">{lessons.length ? "Your lessons" : "Do you want to book?"}</h2>

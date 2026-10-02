@@ -89,6 +89,11 @@ cancelling or recording attendance. Week navigation requests the corresponding
 booking range, including lessons that cross midnight. A failed range load is
 shown as an error, never as an empty calendar. Mobile shows one selected day
 under the same seven-day header.
+Closing lesson details without a change returns focus to its lesson. A completed
+move, cancellation or attendance change returns focus to the stable week
+heading while the timetable reloads; a failed read retains that position and
+offers its existing reload action. Reloading never moves focus from a control
+Inês selects while it is pending.
 
 The week itself is where Inês takes time off. Clicking, tapping or dragging
 across times on a date blocks them for that date only, and doing so again
@@ -292,6 +297,10 @@ depending on them having kept the right confirmation email.
   Each cancellation or recurring decision keeps focus inside the changed dialog.
   Terms/privacy can open above lesson management. Escape dismisses only the
   top dialog, preserving the underlying lesson, management token and scroll lock.
+  The account menu also leaves Escape to an open modal and retains that modal's
+  original return target. A dialog's backdrop only dismisses a gesture that
+  starts and finishes there; selecting or dragging text/fields out of the
+  dialog preserves its draft.
   Payment recovery replies are ignored after its account changes or the page
   closes, so an abandoned request cannot redirect to Stripe or reopen an error.
 - **Past and cancelled lessons keep the same readable card hierarchy.** Their
@@ -337,6 +346,12 @@ A student can hold the same slot every week for 4, 6, or 8 weeks, or choose
 `Ongoing` so it continues until they stop it. An open-ended schedule is kept
 twelve weeks ahead by the nightly top-up rather than creating an unlimited
 number of booking rows at once.
+Each extended occurrence and the considered-week bookmark commit together
+against the current recipe and bookmark. A job planned before a move, stop or
+another extension cannot add old times or overwrite the newer bookmark. A
+competing booking still skips only that week. Initial card-setup holds are not
+extended until confirmed. Stopping ends extension before reading the remaining
+lessons, so its cancellation set includes every occurrence committed first.
 
 - **The occurrences are ordinary rows in `bookings`.** A series is only the
   recipe that made them. That is what puts the time in Ines's calendar for real,
@@ -376,7 +391,13 @@ number of booking rows at once.
   The student chooses the new weekly anchor, length, and location through the
   same compact change-booking controls. Every proposed week is checked before
   one guarded database update moves the run and its series recipe; a newly
-  claimed slot or concurrent individual change moves none of it. Past lessons
+  claimed slot or concurrent individual change moves none of it. Each planned
+  occurrence is guarded by its sequence as well as its prior slot.
+  The recipe changes only after the guarded move updates every planned row,
+  including when a pending refund refuses a move to an individually adjusted
+  time. Planned rows use JSON-backed SQL CTEs so long ongoing runs fit
+  [D1's 100-bound-parameter limit](https://developers.cloudflare.com/d1/platform/limits/).
+  Past lessons
   are left alone, and a lesson inside the 14-hour window stays where it is while
   the rest of the run moves; the new weekly time may not overlap it, and the
   response lists its start under `kept`. Each booking keeps its

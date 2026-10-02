@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { TermsPrivacyInformation } from "@/components/PolicyInformation";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
+import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 
 const policySections = ["terms-privacy", "booking", "change-booking", "privacy"];
 
@@ -32,6 +33,7 @@ export function BookingInformation() {
     dialogRef.current?.close();
     restorePage();
   }, [restorePage]);
+  const backdropHandlers = useDialogBackdrop(closeInformation);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -91,15 +93,9 @@ export function BookingInformation() {
       className="policy-dialog"
       id="terms-privacy"
       ref={dialogRef}
+      {...backdropHandlers}
       onKeyDown={keepDialogFocus}
       onCancel={(event) => { event.preventDefault(); closeInformation(); }}
-      onClick={(event) => {
-        const bounds = event.currentTarget.getBoundingClientRect();
-        if (event.target === event.currentTarget && (
-          event.clientX < bounds.left || event.clientX > bounds.right ||
-          event.clientY < bounds.top || event.clientY > bounds.bottom
-        )) closeInformation();
-      }}
     >
       <div className="policy-dialog__heading">
         <h2 id="terms-privacy-title">Terms &amp; privacy</h2>
