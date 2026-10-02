@@ -51,8 +51,8 @@ false production type errors when a component contract changes.
   the final client. Worker packaging passed its dry run. Provider and private
   browser replies were isolated; no test creates real accounts, bookings,
   email, card setups, charges or refunds.
-- The new browser suite runs as the nineteenth CI suite against the same export
-  that publication will deploy. The new database suite runs in `test:booking`.
+- All **nineteen CI browser suites passed** against the same export that the
+  publication job deployed. The new database suite runs in `test:booking`.
 
 ## Release
 
@@ -61,8 +61,44 @@ The Worker was deployed first, version
 missing configuration and live email, teacher notifications, Stripe/postpay,
 and configured Google sign-in. No schema or credential changes were required.
 
-Website publication and live acceptance are pending the release workflow.
-The tested client is preserved in `tmp/qa/pass9-final-export`; reproduction,
+The website is live at [portuguesewithines.com](https://portuguesewithines.com).
+Source commit `3f6fa61726c007cf59c5d4515159c89be7078ccc` passed
+[workflow 37050162508](https://github.com/dakibwa/portuguese-with-ines/actions/runs/37050162508):
+build job `110981284697` and publication job `110987063924` both succeeded.
+The `site` artifact was `11247320535`, with SHA-256 digest
+`d025d3008ad8a264d12a4e34ae0f201f32f955adcc21d8b470cdcc05e71a8f1f`.
+The publication job downloaded that artifact with the same digest and deployed
+it at [23be7687.portuguese-with-ines.pages.dev](https://23be7687.portuguese-with-ines.pages.dev).
+
+Cloudflare's canonical production deployment is
+`23be7687-b5a7-4a2f-905f-84efa9b5eb61`, completed
+`2026-10-02T19:06:40.14092Z`. Artifact publication leaves Cloudflare's commit
+metadata empty; the workflow SHA, artifact digest and published URL establish
+the source binding. The Worker remained on the recorded version at 100% of
+traffic, with its final healthy probe at `2026-10-02T19:13:31.145Z`.
+
+Live acceptance passed **134 checks**:
+
+- **105 dialog cases:** all 35 cases in Chromium, Firefox and WebKit against
+  the published assets, at 320/390/1280 px, using isolated private/provider
+  replies.
+- **24 public route/navigation cases:** eleven pages and the booking destination
+  at mobile and desktop widths, with no page errors, horizontal overflow or
+  production mutation requests. Live mobile booking and desktop teacher-focus
+  screenshots were inspected.
+- **Five backend probes:** healthy configuration, live lesson types/payment
+  readiness, refusal of unsigned private-data access, canonical-site preflight,
+  and absence of cross-origin access for an unrelated origin.
+
+The three `www`/legacy-domain redirects separately returned 301 and preserved
+`/book/?view=lessons`. No test created a real account, lesson, email, card setup,
+charge or refund. Firefox's live run used a fresh NSS profile seeded with the
+execution environment's existing trusted proxy CAs, with TLS verification
+enabled. WebKit used the already-extracted browser dependency libraries. The
+initial certificate/library setup failures occurred before site tests and were
+retained separately from the completed runs.
+
+The tested local client is preserved in `tmp/qa/pass9-final-export`; reproduction,
 native D1, browser and release evidence is stored in the ignored `tmp/qa/pass9-*`
-artifacts. Passing the recorded scenarios does not establish that unexercised
-conditions are bug-free.
+artifacts, including `tmp/qa/pass9-release-proof.json`. Passing the recorded
+scenarios does not establish that unexercised conditions are bug-free.
