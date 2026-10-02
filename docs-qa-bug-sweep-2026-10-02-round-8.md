@@ -17,6 +17,7 @@ possible bugs had been found.
 | Teacher forms silently shifted nonexistent spring times by an hour. The Worker also offered duplicate UTC starts and shifted a weekly occurrence into a real later hour. Its skipped-week presentation then named that later time. | Forms reject missing wall times before POST and retain fields. Availability omits missing starts, weekly creation skips the nonexistent occurrence, and a whole-series move fails before writing any dates. Valid retries succeed. Skipped-week previews, confirmations and emails list dates without inventing a shifted time, including older card-setup metadata. |
 | Saving an unchanged teacher appointment in autumn's repeated hour selected its second occurrence, moving it by an hour. | The original instant is preserved. Nearby edits retain that occurrence's offset when it still names the entered wall time. |
 | Opening the lessons destination with a revoked/expired stored session cleared its bearer but displayed an empty calendar without sign-in. | After the account read refuses that bearer, the explicit lessons destination asks for sign-in. A retained bearer during a network interruption keeps its existing read error and retry. |
+| The profile editor queued focus on the name field after opening. A student who had already selected another field could lose focus or type into the wrong input. | Initial focus runs with the editor's layout before interaction; later browser frames retain the student's selected name/email/NIF field and draft. The editing guard is also set before a delayed account read can land. |
 
 ## Coverage changes
 
@@ -37,6 +38,13 @@ possible bugs had been found.
   and summer times, and both autumn occurrences unchanged and edited.
 - The new suite runs in CI against the built export before publication.
   Documentation now describes the grouped-cell and clock-change behavior.
+- The first release run stopped before publication when an account test's NIF
+  fill left Save NIF disabled. The ordinary local rerun passed, but a controlled
+  frame-delivery test reproduced the editor's focus stealing. The fix retains
+  initial focus without queuing a callback; nine new field/width cases now run
+  in account recovery alongside the existing 39 cases.
+  An independent focus/insertion handoff reproduced the exact wrong-field
+  typing and disabled Save NIF symptom at all three widths.
 
 One calendar candidate was ruled out: the normal availability caller passes an
 empty explicit session, but its shared API helper already supplies the current
@@ -61,6 +69,14 @@ checks. Request recovery and the existing teacher/state/selection suites passed
 in Chromium. The added skipped-date checks passed six cases per browser (18
 total), with mobile/desktop screenshots inspected. The full selection suite
 now runs 141 cases per browser in CI.
+The final focus build passed nine focused cases in each browser (27 total) and
+the full 48-case account-recovery suite in Chromium. Type checking, lint, all
+265 core tests and the production release build passed again for this fix.
+
+The first workflow run,
+[37041245946](https://github.com/dakibwa/portuguese-with-ines/actions/runs/37041245946),
+blocked publication on the focus race. The corrected release gate is being
+rerun; the failed run did not publish a website artifact.
 
 The Worker was deployed first; active version
 `2455770d-8a81-446a-9b23-9bcd45e9b099` reports healthy live email, teacher

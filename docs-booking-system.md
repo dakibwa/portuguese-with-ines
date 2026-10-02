@@ -204,6 +204,8 @@ depending on them having kept the right confirmation email.
   session fails, then permits sign-in with the new address. Opening the lessons
   destination with an expired/revoked session asks for sign-in after the account
   read refuses that session; network failures retain the existing read retry.
+  The profile editor focuses its initial field when it opens, before the student
+  can choose another; delayed frame callbacks cannot steal later typing.
 - The emailed manage link still works on its own, so a forgotten password never
   blocks someone from changing a lesson.
 - **Booking, the learner's calendar, and lesson changes share one workspace.**

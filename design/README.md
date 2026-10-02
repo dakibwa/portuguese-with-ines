@@ -379,7 +379,9 @@ blue `Send confirmation link`. Keep the existing labels and state indicators so
 colour is never the only way to tell the controls apart.
 
 Confirmed email changes preserve an open profile editor and newer drafts while
-renewing that account's session. If the calendar cannot refresh after booking,
+renewing that account's session. Opening the profile editor initially focuses
+the name field before interaction; later browser frames never move focus away
+from a field the student has selected. If the calendar cannot refresh after booking,
 moving, cancelling or stopping a sequence, retain the successful outcome and
 show the account warning with `Try again`, including inside lesson management.
 That action reloads the account without repeating the change. Disable change

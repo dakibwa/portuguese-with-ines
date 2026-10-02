@@ -194,7 +194,10 @@ renewal, newer profile drafts and saved fields, interrupted navigation,
 overlapping bookings from replaced accounts, and retrying an account refresh
 after a confirmed booking. Refresh retries never submit another booking.
 Verified email renewal preserves the current editor; replacing or ending a
-session still clears its private views. CI runs this against its built export.
+session still clears its private views. Profile focus checks defer browser
+frames and verify that opening the editor never steals later typing from the
+chosen name, email or NIF field. Its 48 cases per browser run against the built
+export in CI.
 
 `test:management-recovery` uses isolated replies at the same three widths and
 accepts the same browser/server options. It checks accepted individual and

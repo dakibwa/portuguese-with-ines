@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowLeft, CheckCircle2, CircleX, Menu as MenuIcon } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { LessonMark } from "@/components/LessonMarks";
@@ -163,7 +163,13 @@ export function MyLessons({
   // A reload that lands while the details form is open must not replace what
   // the student is typing with the values it had before.
   const editingRef = useRef(false);
-  useEffect(() => { editingRef.current = editing; }, [editing]);
+  const detailsRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    editingRef.current = editing;
+    // Focus as the editor opens, before a student can select another field.
+    // A queued frame could otherwise steal their focus or subsequent typing.
+    if (editing) detailsRef.current?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+  }, [editing]);
 
   // Read when the details open, so a rate Inês set by hand shows without a
   // reload, and tell booking what came back: it prices weekly lessons from it.
@@ -424,7 +430,6 @@ export function MyLessons({
       setAccountSection("");
       onOpenAccountSection?.("profile");
     });
-    window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".my-lessons__details input")?.focus({ preventScroll: true }));
   }
 
   if (loading) return <p className="booking-state-note">Loading your lessons…</p>;
@@ -536,7 +541,7 @@ export function MyLessons({
         </div>
 
         {editing ? (
-          <section className="my-lessons__details">
+          <section className="my-lessons__details" ref={detailsRef}>
             <div className="my-lessons__details-row">
               <label>
                 <span>Your name</span>

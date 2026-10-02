@@ -125,6 +125,47 @@ function bookingDefaults(path) {
 let cases = 0;
 try {
   for (const width of [320, 390, 1280]) {
+    // Opening an editor can queue browser work for the next frame. If the
+    // student already selected a field, later frame callbacks must not move
+    // their focus or subsequent typing into a different field.
+    for (const field of ["name", "email", "nif"]) {
+      const state = await fixture(width);
+      try {
+        const { page } = state;
+        await page.goto(`${base}/book/?view=lessons`);
+        await page.locator("#account-menu").waitFor({ state: "attached" });
+        await check(state);
+        await page.evaluate(() => {
+          const nativeFrame = window.requestAnimationFrame.bind(window);
+          const nativeCancel = window.cancelAnimationFrame.bind(window);
+          const frames = new Map();
+          let nextId = 0, holding = true;
+          window.requestAnimationFrame = callback => {
+            if (!holding) return nativeFrame(callback);
+            const id = --nextId; frames.set(id, callback); return id;
+          };
+          window.cancelAnimationFrame = id => {
+            if (id < 0) frames.delete(id); else nativeCancel(id);
+          };
+          window.qaReleaseEditorFrames = () => {
+            holding = false;
+            const callbacks = [...frames.values()]; frames.clear();
+            for (const callback of callbacks) callback(performance.now());
+          };
+        });
+        await chooseAccount(page, "Edit details");
+        const input = page.getByLabel(field === "name" ? "Your name" : field === "email" ? "Email address" : "NIF (optional)", { exact: true });
+        const value = field === "name" ? "Ana Draft" : field === "email" ? "draft@example.invalid" : "248899945";
+        await input.fill(value);
+        await page.evaluate(() => window.qaReleaseEditorFrames());
+        await expect(input).toBeFocused();
+        await expect(input).toHaveValue(value);
+        if (field !== "name") await expect(page.getByLabel("Your name", { exact: true })).toHaveValue(student.name);
+        await check(state); cases += 1;
+      } finally { await state.context.close(); }
+    }
+    if (process.env.QA_ACCOUNT_FOCUS_ONLY === "1") continue;
+
     // The current Worker rotates the session; an older Worker may omit it.
     // Neither reply owns the saved name, NIF draft, or newer email draft.
     for (const rotate of [false, true]) {
