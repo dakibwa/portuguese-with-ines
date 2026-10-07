@@ -212,12 +212,12 @@ export default function FAQPage() {
       <main className="faq-page" id="main-content">
         <section className="faq-hero" aria-labelledby="faq-title">
           <h1 id="faq-title">Questions<br /><span className="display-second-line">before booking?</span></h1>
-          <AssetMark asset="/visuals/v2-splats/faq-answers-splat-v2.svg" className="faq-hero__mark" priority />
+          <AssetMark asset="/visuals/v2-splats/faq-answers-splat-v2.svg" className="faq-hero__mark" lands priority />
         </section>
 
         <section className="faq-reference" aria-label="Frequently asked questions">
           <FaqSections
-            indexMark={<AssetMark asset="/visuals/v2-splats/faq-answers-splat-v2.svg" className="faq-index__answer-index" />}
+            indexMark={<AssetMark asset="/visuals/v2-splats/faq-answers-splat-v2.svg" className="faq-index__answer-index" lands />}
             sections={faqSections}
           />
         </section>

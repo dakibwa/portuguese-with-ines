@@ -22,6 +22,7 @@ type LessonMarkProps = {
   lessonTypeId: string;
   className?: string;
   durationMinutes?: number;
+  lands?: boolean;
   location?: "online" | "porto";
   recurring?: boolean;
 };
@@ -41,7 +42,7 @@ export function lessonSplat({ lessonTypeId, durationMinutes, location = "online"
  * small size used in lesson cards.
  */
 export function LessonMark(props: LessonMarkProps) {
-  return <AssetMark asset={lessonSplat(props)} className={props.className} />;
+  return <AssetMark asset={lessonSplat(props)} className={props.className} lands={props.lands} />;
 }
 
 /**

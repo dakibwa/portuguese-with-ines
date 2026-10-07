@@ -53,6 +53,9 @@
   --motion-route: 240ms;
   --motion-surface: 190ms;
   --motion-dialog: 260ms;
+  --motion-land: 720ms;
+  /* Overshoots a few per cent before resting: the give of paint settling. */
+  --motion-land-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 * {
@@ -461,6 +464,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   :root {
     --motion-route: 190ms;
     --motion-surface: 180ms;
+    --motion-land: 640ms;
   }
 }
 
@@ -743,6 +747,61 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   height: 100%;
   object-fit: contain;
   object-position: center;
+}
+
+/*
+ * The little splats land. Each arrives the way a dab of paint does: out of
+ * nothing, a touch small and turned, then flat on the page with the smallest
+ * give. Only the picture inside the mark moves, never the mark's own box, so
+ * layout, hit areas and measured sizes stay put, and a mark placed by its own
+ * transform (the FAQ banner's) keeps it.
+ *
+ * Marks in the first screen land as the page arrives; SplatArrivals holds the
+ * rest until the reader reaches them. Text and controls never wait for a
+ * landing, nothing repeats or loops, and reduced motion, print and a page
+ * without JavaScript show every splat at rest. The large painted fields on the
+ * pages do not land: they are the paper these marks land on.
+ */
+@keyframes splat-appear {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes splat-land {
+  from {
+    transform: scale(var(--land-scale, 0.72)) rotate(var(--land-turn, -10deg));
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .asset-mark--lands > .asset-mark__picture {
+    --land-delay: calc(var(--land-start, 120ms) + var(--land-order, 0) * var(--land-step, 110ms));
+    animation:
+      splat-appear 260ms ease-out var(--land-delay) backwards,
+      splat-land var(--land-duration, var(--motion-land)) var(--motion-land-ease) var(--land-delay) backwards;
+  }
+
+  .asset-mark--lands[data-splat="held"] > .asset-mark__picture {
+    opacity: 0;
+    animation: none;
+  }
+}
+
+/* A group lands in reading order, and no two neighbours turn the same way. */
+:is(.principle, .approach-item, .lesson-product, .booking-intro__points > li, .nav-mobile__link):nth-child(2) {
+  --land-order: 1;
+  --land-turn: 9deg;
+}
+
+:is(.principle, .approach-item, .lesson-product, .booking-intro__points > li, .nav-mobile__link):nth-child(3) {
+  --land-order: 2;
+  --land-turn: -7deg;
+}
+
+.nav-mobile__link:nth-child(4) {
+  --land-order: 3;
+  --land-turn: 11deg;
 }
 
 /* Home */
@@ -1143,8 +1202,8 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
  * one twice, each carrying the lesson's own mark. It is the mark that lesson
  * wears later, in the booking flow and on booked lessons, so the same splat
  * means the same lesson wherever a student meets it. The whole card is the
- * way into booking that lesson; hovering it warms the colour and tips the
- * mark, without lifting or shifting anything.
+ * way into booking that lesson; hovering it warms the colour while the button
+ * lifts and fills, and the card and its mark stay where they are.
  */
 .lesson-product {
   position: relative;
@@ -1195,7 +1254,8 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 /* Each splat comes in from the card's top-right corner, cropped by the card's
-   own squiggle, and stays still: the button does the moving. */
+   own squiggle. It lands with the page, then stays still: on hover the button
+   does the moving. */
 .lesson-product__mark {
   position: absolute;
   top: -30px;
@@ -1512,6 +1572,9 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 /* The drawing leaves more room at its right and foot than at its left and
    top, so the offsets centre what is drawn rather than its square. */
 .faq-hero__mark {
+  /* Twice the size of the other marks, so it travels half as far to land. */
+  --land-scale: 0.86;
+  --land-turn: -6deg;
   position: absolute;
   top: 50%;
   right: var(--page-pad);
@@ -4582,6 +4645,10 @@ html.booking-transitioning .booking-confirmation-stage {
 }
 
 .nav-mobile__splat {
+  --land-start: 90ms;
+  --land-scale: 0.8;
+  --land-turn: -12deg;
+  --land-duration: 1000ms;
   position: absolute;
   z-index: 0;
   right: -86px;
@@ -4590,6 +4657,20 @@ html.booking-transitioning .booking-confirmation-stage {
   aspect-ratio: 1;
   opacity: 0.55;
   pointer-events: none;
+}
+
+/* The menu stays mounted once opened, so its marks land each time it opens,
+   in step with the links dropping into place, rather than only the first. The
+   splat cropped into its foot blooms with them, a little more slowly. */
+.nav-mobile {
+  --land-start: 40ms;
+  --land-step: 60ms;
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .nav-mobile:not(.is-open) .asset-mark--lands > .asset-mark__picture {
+    animation: none;
+  }
 }
 
 .nav-mobile__close {

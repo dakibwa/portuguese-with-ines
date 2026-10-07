@@ -200,7 +200,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
                 key={item.id}
                 onClick={() => setOpen(false)}
               >
-                <AssetMark asset={item.mark} className="nav-mobile__mark" />
+                <AssetMark asset={item.mark} className="nav-mobile__mark" lands />
                 <span className="nav-mobile__text">
                   <span className="nav-mobile__label">{item.label}</span>
                   <span className="nav-mobile__note" id={`nav-mobile-note-${item.id}`}>{item.note}</span>
@@ -219,7 +219,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
               </a>
             </div>
           </div>
-          <AssetMark asset="/visuals/generated-splats/open-centre-lavender-splat.webp" className="nav-mobile__splat" />
+          <AssetMark asset="/visuals/generated-splats/open-centre-lavender-splat.webp" className="nav-mobile__splat" lands />
         </div>
       </div>, document.body) : null}
     </>

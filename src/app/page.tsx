@@ -53,7 +53,7 @@ export default function Home() {
             {principles.map((principle) => {
               return (
                 <article className="principle" key={principle.title}>
-                  <AssetMark asset={principle.asset} />
+                  <AssetMark asset={principle.asset} lands />
                   <div>
                     <h2>{principle.title}</h2>
                     <span className="short-rule" aria-hidden="true" />

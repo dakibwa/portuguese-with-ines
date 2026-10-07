@@ -53,8 +53,10 @@ Use these names in review so recurring problems are easy to recognise:
 - **Intermediate-width squeeze:** preserving a wide desktop composition after
   headings, controls, or the seven-column calendar have started to clip or
   wrap unnaturally.
-- **Decorative motion:** adding ambient loops, entrance choreography, click
-  delay, or movement that does not explain a state change.
+- **Decorative motion:** adding ambient loops, click delay, entrance
+  choreography for text, controls or whole sections, or any movement that
+  makes a reader wait or does not explain a state change. The little splats'
+  one-time landing (see Motion direction) is the deliberate exception.
 
 ## Contrast and accessibility
 
@@ -224,8 +226,8 @@ Dan's 22 September review tightened the public pages:
   its splat at the right in a band of about 124 px, without an editorial rule;
 - the three Lessons cards each have their own squiggle outline, and their own
   splat comes in large from the card's top-right corner, cropped by its edge
-  and still; the trial card is lavender. Their rows align across the cards:
-  name, the price with its length as a small tag beside it (`60 min`),
+  and, once landed, still; the trial card is lavender. Their rows align across
+  the cards: name, the price with its length as a small tag beside it (`60 min`),
   a one-line description, then one full-width button, so no card has an empty
   foot. The whole card opens booking with that lesson chosen. Hover and
   keyboard focus add a quiet colour wash to the card, and the button answers
@@ -403,11 +405,29 @@ and card checkout so the choices beside the card form describe its held times.
 ## Motion direction
 
 Use a short opacity-only transition on completed route changes, with faster
-mobile timings and no click delay, overlay, transform, ambient loop, or
-decorative hero entrance. Decisions inside the booking flow resize and
-dissolve the existing calendar workspace rather than abruptly replacing the
-page. Keep the rest of the page fixed. Reduced-motion users navigate
-immediately without animation or smooth scrolling.
+mobile timings and no click delay, overlay, transform or ambient loop.
+Headings, copy and actions arrive with the page, never in an entrance of their
+own. Decisions inside the booking flow resize and dissolve the existing
+calendar workspace rather than abruptly replacing the page. Keep the rest of
+the page fixed. Reduced-motion users navigate immediately without animation or
+smooth scrolling.
+
+The little splats land (7 October 2026, at Dan's request for tasteful
+animation on them). Each small emblem mark arrives once like a dab of paint:
+it fades in slightly small and turned, then settles flat with the smallest
+give, in under a second. That covers the Home principles, the Approach points,
+the Lessons card corners and closing card, the FAQ banner and index, and the
+booking banner's three reassurances. A group lands in reading order,
+neighbours turning opposite ways, and a mark twice the usual size travels half
+as far. Marks in the first screen land as the page arrives; those further down
+wait until the reader reaches them, so none lands unseen. The phone menu's
+marks land each time it opens, in step with its links, while the splat cropped
+into its foot blooms a little more slowly. The large painted fields on the
+pages (the Approach fan, the Lessons hero splat and the booking banner's corner
+splat) stay still: they are the paper the marks land on. Text, buttons and the
+booking workspace never move or wait for a landing, nothing loops, and a
+landed mark stays still, including on hover. Reduced motion, print and a page
+without JavaScript show every splat at rest.
 
 Pop-ups and their dimmed backgrounds appear with a short, gentle fade. Apply
 the same entrance to terms, booking prompts and student/teacher lesson dialogs,

@@ -261,8 +261,8 @@ body text on lavender.
 
 Each destination arrives with a short opacity-only dissolve: 190 ms on mobile
 and 240 ms on wider screens. Navigation itself starts immediately; there is no
-click interception, exit delay, overlay, movement, scale, or staggered hero
-animation. Booking decisions use a 220–260 ms same-document surface transition
+click interception, exit delay, overlay, or movement or scale of the page or
+its text. Booking decisions use a 220–260 ms same-document surface transition
 where supported. The account, lesson choice, calendar, detail, and confirmation
 surfaces each keep their place while their own geometry and content change, so
 the page no longer dissolves as one oversized snapshot. Older browsers keep the
@@ -272,9 +272,20 @@ decision is visible; an already visible desktop choice does not move the page.
 Interrupted transitions from a quick second choice are treated as normal input,
 not as browser errors.
 
+The little splats are the one decorative motion: each lands once, like a dab
+of paint, in under a second. `AssetMark`'s `lands` prop opts a mark in. Marks
+in the first screen land from CSS alone as the page arrives; `SplatArrivals`,
+in the route template, holds those further down until the reader reaches them,
+and a first-screen mark only until its picture has downloaded. The landing
+moves the `<picture>` inside the mark, never the mark's own box, so measured
+sizes (the booking banner check) and positioning transforms are untouched. A
+hold is only ever placed before a mark has been seen, and anything that fails
+leaves the mark showing.
+
 `prefers-reduced-motion: reduce` removes route and booking transitions, smooth
-scrolling, and the button and navigation hover transforms, keeping colour
-changes so states stay distinguishable.
+scrolling, the splat landings, and the button and navigation hover transforms,
+keeping colour changes so states stay distinguishable. Splats are also shown at
+rest in print and without JavaScript.
 
 Approach and lessons hero artwork is served as AVIF with a WebP fallback — the
 painterly splats cost less than half as much in AVIF as they did in WebP — and

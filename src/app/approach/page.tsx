@@ -63,7 +63,7 @@ export default function ApproachPage() {
           <div className="approach-list">
             {approachItems.map((item) => (
               <article className="approach-item" key={item.title}>
-                <AssetMark asset={item.asset} />
+                <AssetMark asset={item.asset} lands />
                 <div>
                   <h2>{item.title}</h2>
                   <p>{item.body}</p>
