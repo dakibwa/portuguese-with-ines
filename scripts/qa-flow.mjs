@@ -403,6 +403,25 @@ if (await signedInPage.getByRole("link", { name: "My lessons", exact: true }).co
 await signedInPage.close();
 await signedInBrowser.close();
 
+// Pages turn into one another inside a view transition that React starts for
+// each navigation. Count them, and keep what each one animated.
+const watchPageTurns = () => {
+  const start = document.startViewTransition?.bind(document);
+  if (!start) return;
+  window.__qaPageTurns = [];
+  document.startViewTransition = (...args) => {
+    const transition = start(...args);
+    const turn = { durations: null };
+    window.__qaPageTurns.push(turn);
+    transition.ready.then(() => {
+      turn.durations = document.getAnimations()
+        .filter((animation) => animation.effect?.pseudoElement?.startsWith("::view-transition"))
+        .map((animation) => animation.effect.getComputedTiming().duration);
+    }, () => {});
+    return transition;
+  };
+};
+await page.addInitScript(watchPageTurns);
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(`${base}/`, { waitUntil: "domcontentloaded" });
 const expectedApproachUrl = new URL(`${base}/approach/`).href;
@@ -414,11 +433,15 @@ await page.locator(".nav-toggle").click();
 await page.waitForTimeout(400);
 await page.locator("#site-nav-mobile a", { hasText: "Approach" }).first().click();
 await page.waitForURL(expectedApproachUrl, { timeout: 10_000 });
+await page.waitForFunction(() => !window.__qaPageTurns || window.__qaPageTurns.some((turn) => turn.durations), null, { timeout: 5_000 });
 const mobileNavigation = await page.evaluate(() => ({
   overlayCount: document.querySelectorAll(".route-transition-wash").length,
   animationDuration: getComputedStyle(document.querySelector(".route-fade")).animationDuration,
   animationName: getComputedStyle(document.querySelector(".route-fade")).animationName,
   transform: getComputedStyle(document.querySelector(".route-fade")).transform,
+  pageTurns: window.__qaPageTurns?.length ?? null,
+  turnDirection: document.documentElement.dataset.pageTurn ?? null,
+  turnAnimated: window.__qaPageTurns?.some((turn) => turn.durations?.some((duration) => duration > 0)) ?? null,
   url: window.location.href
 }));
 
@@ -429,17 +452,22 @@ if (mobileNavigation.url !== expectedApproachUrl) {
 }
 
 if (mobileNavigation.overlayCount !== 0 || mobileNavigation.transform !== "none") {
-  throw new Error("Mobile route navigation should use opacity only, with no overlay or transform.");
+  throw new Error("Route navigation should turn the page without an overlay or moving the page element itself.");
 }
 
-if (
-  !mobileNavigation.animationName.includes("route-fade-in") ||
-  mobileNavigation.animationDuration === "0s"
-) {
-  throw new Error("Mobile route navigation should dissolve the destination without delaying the click.");
+// Where view transitions exist the page turns; elsewhere it dissolves in.
+const pageTurned =
+  mobileNavigation.pageTurns > 0 &&
+  mobileNavigation.turnAnimated &&
+  ["forward", "back", "settle"].includes(mobileNavigation.turnDirection);
+const pageDissolved =
+  mobileNavigation.animationName.includes("route-fade-in") && mobileNavigation.animationDuration !== "0s";
+if (mobileNavigation.pageTurns === null ? !pageDissolved : !pageTurned) {
+  throw new Error(`Route navigation should turn the destination in without delaying the click: ${JSON.stringify(mobileNavigation)}.`);
 }
 
 const reducedMotionPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+await reducedMotionPage.addInitScript(watchPageTurns);
 await reducedMotionPage.emulateMedia({ reducedMotion: "reduce" });
 await reducedMotionPage.goto(`${base}/faq/`, { waitUntil: "domcontentloaded" });
 await reducedMotionPage.locator("h1").waitFor({ timeout: 10_000 });
@@ -449,6 +477,15 @@ const reducedRouteMotion = await reducedMotionPage.evaluate(() => {
 });
 if (reducedRouteMotion.animationName !== "none" && reducedRouteMotion.animationDuration !== "0s") {
   throw new Error("Reduced-motion users should not receive a route transition.");
+}
+// A page reached by a link swaps at once, with nothing in its turn moving.
+await reducedMotionPage.waitForFunction(() => document.querySelector(".nav-toggle")?.disabled === false);
+await reducedMotionPage.locator(".site-footer__menu").click();
+await reducedMotionPage.locator("#site-nav-mobile").getByRole("link", { name: "Approach", exact: true }).click();
+await reducedMotionPage.waitForURL(`${base}/approach/`, { timeout: 10_000 });
+const reducedTurns = await reducedMotionPage.evaluate(() => window.__qaPageTurns ?? null);
+if (reducedTurns?.some((turn) => turn.durations?.some((duration) => duration > 0))) {
+  throw new Error(`Reduced-motion users should not receive a page turn: ${JSON.stringify(reducedTurns)}.`);
 }
 await reducedMotionPage.close();
 

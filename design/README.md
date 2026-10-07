@@ -54,9 +54,10 @@ Use these names in review so recurring problems are easy to recognise:
   headings, controls, or the seven-column calendar have started to clip or
   wrap unnaturally.
 - **Decorative motion:** adding ambient loops, click delay, entrance
-  choreography for text, controls or whole sections, or any movement that
-  makes a reader wait or does not explain a state change. The little splats'
-  one-time landing (see Motion direction) is the deliberate exception.
+  choreography for a page's text, controls or sections as it loads, or any
+  movement that makes a reader wait or does not explain a state change. The
+  page turn, the phone menu opening and the little splats' one-time landing
+  (see Motion direction) are deliberate.
 
 ## Contrast and accessibility
 
@@ -404,18 +405,38 @@ and card checkout so the choices beside the card form describe its held times.
 
 ## Motion direction
 
-Use a short opacity-only transition on completed route changes, with faster
-mobile timings and no click delay, overlay, transform or ambient loop.
-Headings, copy and actions arrive with the page, never in an entrance of their
-own. Decisions inside the booking flow resize and dissolve the existing
-calendar workspace rather than abruptly replacing the page. Keep the rest of
-the page fixed. Reduced-motion users navigate immediately without animation or
-smooth scrolling.
+Motion is calm, quick and physical, and never makes anyone wait (7 October
+2026, at Dan's request for tasteful animation on the little splats, beautiful
+transitions between pages and a premium feel throughout). What lands or
+travels moves on a soft spring that gives a few per cent and settles; controls
+answer on a firm one; everything else decelerates long.
 
-The little splats land (7 October 2026, at Dan's request for tasteful
-animation on them). Each small emblem mark arrives once like a dab of paint:
-it fades in slightly small and turned, then settles flat with the smallest
-give, in under a second. That covers the Home principles, the Approach points,
+Pages turn into one another. The header stays exactly where it is and the
+nav's coral line glides along to the new destination. The page being left
+drops out of focus and away almost at once, and the new one pulls into focus as
+it settles, so two pages never print over each other and for a breath the
+paper shows between them. On wider screens the pages sit in a row along the
+nav: a later page arrives from the right and an earlier one from the left,
+whether reached by a link or the back button. On phones every page settles in
+place with a lighter blur, and an open menu recedes with the page it covered.
+A full page load into Booking turns the same way. Navigation starts at once and
+the new page is live throughout, with no click delay or overlay. Headings, copy
+and actions arrive with their page, never in an entrance of their own.
+Decisions inside the booking flow resize and dissolve the existing calendar
+workspace rather than turning the page, and keep the rest of the page fixed.
+Without view transitions a new page dissolves in. Reduced-motion users get
+each page at once, without animation or smooth scrolling.
+
+Buttons answer like objects. They lift on hover, the filled ones casting a
+soft shadow in their own colour, and a press sinks them a touch before they
+spring back; a disabled button does not answer. Every hover line draws on the
+same firm spring, the FAQ's plus turns into its minus with a little give, and
+the phone menu's destinations drop in one after another as their marks land.
+
+The little splats land. Each small emblem mark arrives once like a dab of
+paint: it blooms from its middle outwards, soft at first and then sharp, a touch
+small and turned, and settles flat on the soft spring in under a second. That
+covers the Home principles, the Approach points,
 the Lessons card corners and closing card, the FAQ banner and index, and the
 booking banner's three reassurances. A group lands in reading order,
 neighbours turning opposite ways, and a mark twice the usual size travels half

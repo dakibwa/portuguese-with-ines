@@ -259,10 +259,34 @@ body text on lavender.
 
 ## Motion and loading
 
-Each destination arrives with a short opacity-only dissolve: 190 ms on mobile
-and 240 ms on wider screens. Navigation itself starts immediately; there is no
-click interception, exit delay, overlay, or movement or scale of the page or
-its text. Booking decisions use a 220–260 ms same-document surface transition
+Pages turn into one another with view transitions. Next.js remounts
+`src/app/template.tsx` on every navigation, and its React `<ViewTransition>`
+gives the page being left an exit and the arriving page an enter, which
+`globals.css` animates: the old page recedes out of focus in about 220 ms while
+the new one focuses in over about 420 ms, drifting into place over 620 ms on
+desktop and 520 ms on phones. The header, the portfolio banner and an open phone
+menu carry their own `view-transition-name`s, so the header holds still and the
+menu recedes with its page; the nav's current line, `.site-nav__current`, is a
+named element of its own and glides. `PageTurn` sets `data-page-turn`
+(`forward`, `back` or `settle`) on the root while the new page commits, from the
+pages' order along the nav. React commits a back or forward navigation
+synchronously, so it has no view transition, and `PageTurn` gives those pages
+the arrival half through the Web Animations API instead. Full page loads, such
+as the nav's Booking link, recede and focus the same way through
+`@view-transition { navigation: auto; types: document; }`. Navigation itself
+starts immediately and `::view-transition { pointer-events: none; }` keeps the
+arriving page clickable; only the named header skips clicks for the moment of
+the turn. Browsers without view transitions keep the 190–240 ms dissolve. The
+journey test counts the turns, and checks that reduced motion animates none.
+
+The motion tokens are deliberately few. `--motion-spring` and
+`--motion-spring-firm` are damped-spring curves sampled into CSS `linear()`,
+with `cubic-bezier` fallbacks: the soft one gives about 4% for what lands or
+travels, the firm one barely 0.5% for controls. `--motion-ease-out` is a long
+deceleration for everything else. Buttons lift on hover and sink to 97% while
+pressed, except when disabled.
+
+Booking decisions use a 220–260 ms same-document surface transition
 where supported. The account, lesson choice, calendar, detail, and confirmation
 surfaces each keep their place while their own geometry and content change, so
 the page no longer dissolves as one oversized snapshot. Older browsers keep the
@@ -273,7 +297,9 @@ Interrupted transitions from a quick second choice are treated as normal input,
 not as browser errors.
 
 The little splats are the one decorative motion: each lands once, like a dab
-of paint, in under a second. `AssetMark`'s `lands` prop opts a mark in. Marks
+of paint, in under a second, blooming out from its middle as a widening radial
+mask while a blur sharpens and the soft spring settles its scale and turn.
+`AssetMark`'s `lands` prop opts a mark in. Marks
 in the first screen land from CSS alone as the page arrives; `SplatArrivals`,
 in the route template, holds those further down until the reader reaches them,
 and a first-screen mark only until its picture has downloaded. The landing
@@ -282,10 +308,11 @@ sizes (the booking banner check) and positioning transforms are untouched. A
 hold is only ever placed before a mark has been seen, and anything that fails
 leaves the mark showing.
 
-`prefers-reduced-motion: reduce` removes route and booking transitions, smooth
-scrolling, the splat landings, and the button and navigation hover transforms,
-keeping colour changes so states stay distinguishable. Splats are also shown at
-rest in print and without JavaScript.
+`prefers-reduced-motion: reduce` removes page turns, booking transitions,
+smooth scrolling, the splat landings, the phone menu's entrance, and the button
+and navigation hover and press transforms, keeping colour changes so states
+stay distinguishable. Splats are also shown at rest in print and without
+JavaScript.
 
 Approach and lessons hero artwork is served as AVIF with a WebP fallback — the
 painterly splats cost less than half as much in AVIF as they did in WebP — and

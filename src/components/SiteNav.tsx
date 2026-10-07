@@ -120,6 +120,8 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
             key={item.id}
           >
             {item.label}
+            {/* Its own element, so a page turn can glide it to the next destination. */}
+            {currentPage === item.id ? <span aria-hidden="true" className="site-nav__current" /> : null}
           </Destination>;
         })}
       </nav>

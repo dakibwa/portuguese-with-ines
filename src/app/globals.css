@@ -53,9 +53,25 @@
   --motion-route: 240ms;
   --motion-surface: 190ms;
   --motion-dialog: 260ms;
-  --motion-land: 720ms;
-  /* Overshoots a few per cent before resting: the give of paint settling. */
-  --motion-land-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --motion-land: 900ms;
+  --motion-page: 620ms;
+  /* Decelerates hard and long: things arrive quickly, then take their time. */
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /*
+   * Springs, sampled from a damped oscillator. The soft one gives about 4% and
+   * settles, for things that land or travel; the firm one barely gives, for
+   * controls answering a press. Browsers without linear() keep the curves
+   * beside them, which approximate each spring's sweep.
+   */
+  --motion-spring: cubic-bezier(0.3, 1.25, 0.5, 1);
+  --motion-spring-firm: cubic-bezier(0.25, 1.05, 0.5, 1);
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --motion-spring: linear(0, 0.036, 0.125, 0.243, 0.372, 0.5, 0.618, 0.722, 0.809, 0.88, 0.934, 0.975, 1.003, 1.022, 1.033, 1.038, 1.038, 1.036, 1.032, 1.028, 1.023, 1.018, 1.013, 1.01, 1.006, 1.004, 1);
+    --motion-spring-firm: linear(0, 0.04, 0.133, 0.252, 0.376, 0.495, 0.602, 0.694, 0.77, 0.832, 0.881, 0.918, 0.946, 0.967, 0.981, 0.991, 0.997, 1.001, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1.003, 1.003, 1);
+  }
 }
 
 * {
@@ -435,20 +451,190 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   }
 }
 
-/* Next remounts the route template after navigation, so this is an incoming
-   dissolve rather than a click delay. The destination starts loading
-   immediately; the fade only softens the paint once it is ready. */
 /* A column the height of the window, so a short page (the first booking step)
    ends on its footer rather than on a strip of paper beneath it. */
 .route-fade {
   display: flex;
   min-height: 100dvh;
   flex-direction: column;
-  animation: route-fade-in var(--motion-route) var(--motion-ease) both;
 }
 
 .route-fade > main {
   flex: 1 0 auto;
+}
+
+/*
+ * Pages turn into one another. Every navigation runs as a view transition
+ * (template.tsx): the page being left lifts away quickly and the new one
+ * settles in, while the header holds still and the nav's coral line glides
+ * to the new destination. On wider screens the pages sit in a row along the
+ * nav, so a later page arrives from the right and an earlier one from the left
+ * (PageTurn); on phones every page settles in place. Nothing waits for
+ * the motion: the new page is live, and clickable, from its first frame.
+ * A full page load into Booking crossfades the same way between documents.
+ */
+@view-transition {
+  navigation: auto;
+  types: document;
+}
+
+.site-header {
+  view-transition-name: site-header;
+}
+
+.akibwa-project-banner {
+  view-transition-name: portfolio-banner;
+}
+
+/* Hidden on wide screens, so only a phone's menu ever takes part. */
+.nav-mobile {
+  view-transition-name: site-menu;
+}
+
+::view-transition {
+  pointer-events: none;
+}
+
+/* The header and the portfolio banner above it hold still: the new one is
+   simply there, so a page left scrolled down does not drag either into view. */
+::view-transition-group(site-header),
+::view-transition-group(portfolio-banner) {
+  z-index: 3;
+  animation: none;
+}
+
+::view-transition-old(site-header),
+::view-transition-old(portfolio-banner) {
+  display: none;
+}
+
+::view-transition-new(site-header),
+::view-transition-new(portfolio-banner) {
+  animation: none;
+}
+
+::view-transition-group(site-nav-current) {
+  z-index: 4;
+  animation-duration: 640ms;
+  animation-timing-function: var(--motion-spring);
+}
+
+/* A phone menu open over the page recedes with it, above the page being left
+   rather than vanishing beneath it, and beneath the page arriving. */
+::view-transition-group(site-menu) {
+  z-index: 1;
+  animation: none;
+}
+
+::view-transition-group(.page-in) {
+  z-index: 2;
+}
+
+::view-transition-old(site-menu) {
+  --page-blur: 3px;
+  animation: page-recede 200ms var(--motion-ease-out) both;
+}
+
+::view-transition-new(site-menu) {
+  display: none;
+}
+
+/* The page being left drops out of focus and away almost at once... */
+@keyframes page-recede {
+  to {
+    opacity: 0;
+    filter: blur(var(--page-blur));
+    scale: 0.985;
+  }
+}
+
+/* ...and the new one pulls into focus as it settles. */
+@keyframes page-focus {
+  from {
+    opacity: 0;
+    filter: blur(var(--page-blur));
+  }
+}
+
+@keyframes page-drift-out {
+  to {
+    translate: var(--page-out);
+  }
+}
+
+@keyframes page-drift-in {
+  from {
+    translate: var(--page-in);
+  }
+}
+
+/* The old page is all but gone before the new one shows, so two pages never
+   print over each other; for a breath the paper shows between them. */
+::view-transition-old(.page-out) {
+  --page-blur: 8px;
+  --page-out: 0 -12px;
+  animation:
+    page-recede 220ms var(--motion-ease-out) both,
+    page-drift-out 420ms var(--motion-ease-out) both;
+}
+
+::view-transition-new(.page-in) {
+  --page-blur: 10px;
+  --page-in: 0 20px;
+  animation:
+    page-focus 420ms var(--motion-ease-out) 90ms both,
+    page-drift-in var(--motion-page) var(--motion-ease-out) both;
+}
+
+@media (min-width: 821px) {
+  :root[data-page-turn="forward"]::view-transition-old(.page-out) {
+    --page-out: -32px 0;
+  }
+
+  :root[data-page-turn="forward"]::view-transition-new(.page-in) {
+    --page-in: 48px 0;
+  }
+
+  :root[data-page-turn="back"]::view-transition-old(.page-out) {
+    --page-out: 32px 0;
+  }
+
+  :root[data-page-turn="back"]::view-transition-new(.page-in) {
+    --page-in: -48px 0;
+  }
+}
+
+/* A full page load, as into Booking, has no page of its own to move, so the
+   whole page recedes and focuses in the same way, around the still header. */
+html:active-view-transition-type(document)::view-transition-old(root) {
+  --page-blur: 8px;
+  animation: page-recede 220ms var(--motion-ease-out) both;
+}
+
+html:active-view-transition-type(document)::view-transition-new(root) {
+  --page-blur: 10px;
+  animation: page-focus 420ms var(--motion-ease-out) 90ms both;
+}
+
+/* A phone keeps a lighter blur, so the turn holds its frame rate. */
+@media (max-width: 820px) {
+  ::view-transition-old(.page-out),
+  ::view-transition-new(.page-in) {
+    --page-blur: 3px;
+  }
+
+  /* Its own rule: a browser that cannot read this selector drops only it. */
+  html:active-view-transition-type(document)::view-transition-old(root),
+  html:active-view-transition-type(document)::view-transition-new(root) {
+    --page-blur: 3px;
+  }
+}
+
+/* Without view transitions, the arriving page dissolves in instead. */
+@supports not (view-transition-name: none) {
+  .route-fade {
+    animation: route-fade-in var(--motion-route) var(--motion-ease) both;
+  }
 }
 
 @keyframes route-fade-in {
@@ -464,7 +650,8 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   :root {
     --motion-route: 190ms;
     --motion-surface: 180ms;
-    --motion-land: 640ms;
+    --motion-land: 820ms;
+    --motion-page: 520ms;
   }
 }
 
@@ -475,6 +662,14 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
   .route-fade {
     animation: none;
+  }
+
+  /* The new page is simply there. Important, because the turn's own rules
+     name their pseudo-elements more specifically than any wildcard can. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }
 
@@ -564,7 +759,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   content: "";
   opacity: 0;
   transform: scaleX(0.5);
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity 200ms ease, transform 420ms var(--motion-spring-firm);
 }
 
 .site-nav__link:hover,
@@ -572,10 +767,21 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   color: var(--coral-action);
 }
 
-.site-nav__link:hover::after,
-.site-nav__link[aria-current="page"]::after {
+.site-nav__link:hover::after {
   opacity: 1;
   transform: scaleX(1);
+}
+
+/* The current page's line is the same drawing as the hover line, as its own
+   element so that a page turn can glide it along the nav to the new page. */
+.site-nav__current {
+  position: absolute;
+  right: 0;
+  bottom: 22px;
+  left: 0;
+  height: 2px;
+  background: var(--coral);
+  view-transition-name: site-nav-current;
 }
 
 .button {
@@ -596,11 +802,22 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   line-height: 1.15;
   text-align: center;
   text-transform: uppercase;
-  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    box-shadow 320ms var(--motion-ease-out),
+    transform 420ms var(--motion-spring-firm);
 }
 
 .button:hover {
   transform: translateY(-2px);
+}
+
+/* A press sinks the button a touch at once, and the spring lets it back up. */
+.button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 200ms, 200ms, 200ms, 120ms, 80ms;
 }
 
 .button--coral {
@@ -608,8 +825,10 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   color: var(--paper-light);
 }
 
+/* Lifted, the filled buttons cast a soft shadow in their own colour. */
 .button--coral:hover {
   background: #95301f;
+  box-shadow: 0 12px 22px -14px rgba(149, 48, 31, 0.75);
 }
 
 .button--blue {
@@ -619,6 +838,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 .button--blue:hover {
   background: var(--ink);
+  box-shadow: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
 }
 
 /*
@@ -685,7 +905,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   content: "";
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform 160ms ease-out;
+  transition: transform 420ms var(--motion-spring-firm);
 }
 
 .text-action:hover {
@@ -762,9 +982,38 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
  * without JavaScript show every splat at rest. The large painted fields on the
  * pages do not land: they are the paper these marks land on.
  */
+/* Soft at first, as wet paint is, then sharp. */
 @keyframes splat-appear {
   from {
     opacity: 0;
+    filter: blur(5px);
+  }
+}
+
+/* A disc that widens from the mark's middle, so the body of a splat shows
+   before its outer flecks, the way paint spreads from where it lands. At its
+   widest it covers the whole mark, and it is gone once the landing ends. */
+@keyframes splat-spread {
+  from {
+    -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 10% 10%;
+    mask-size: 10% 10%;
+  }
+
+  to {
+    -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 320% 320%;
+    mask-size: 320% 320%;
   }
 }
 
@@ -776,10 +1025,11 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 @media screen and (prefers-reduced-motion: no-preference) {
   .asset-mark--lands > .asset-mark__picture {
-    --land-delay: calc(var(--land-start, 120ms) + var(--land-order, 0) * var(--land-step, 110ms));
+    --land-delay: calc(var(--land-start, 160ms) + var(--land-order, 0) * var(--land-step, 110ms));
     animation:
-      splat-appear 260ms ease-out var(--land-delay) backwards,
-      splat-land var(--land-duration, var(--motion-land)) var(--motion-land-ease) var(--land-delay) backwards;
+      splat-appear 480ms var(--motion-ease-out) var(--land-delay) backwards,
+      splat-spread 720ms var(--motion-ease-out) var(--land-delay) backwards,
+      splat-land var(--land-duration, var(--motion-land)) var(--motion-spring) var(--land-delay) backwards;
   }
 
   .asset-mark--lands[data-splat="held"] > .asset-mark__picture {
@@ -1282,11 +1532,11 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 .lesson-product__link {
   transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    color 180ms ease,
-    box-shadow 220ms var(--motion-ease),
-    transform 220ms var(--motion-ease);
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    box-shadow 320ms var(--motion-ease-out),
+    transform 420ms var(--motion-spring-firm);
 }
 
 /* The button answers too, apart from the card's wash: it lifts and fills. */
@@ -1294,6 +1544,12 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 .lesson-product:focus-within .lesson-product__link {
   box-shadow: 0 6px 14px rgba(26, 49, 105, 0.16);
   transform: translateY(-2px);
+}
+
+/* Pressing anywhere on the card presses its button. */
+.lesson-product .lesson-product__link:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 200ms, 200ms, 200ms, 120ms, 80ms;
 }
 
 .lesson-product:hover .lesson-product__link.button--coral,
@@ -1533,7 +1789,8 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   }
 
   .lesson-product:hover .lesson-product__link,
-  .lesson-product:focus-within .lesson-product__link {
+  .lesson-product:focus-within .lesson-product__link,
+  .lesson-product .lesson-product__link:active {
     transform: none;
   }
 
@@ -1729,7 +1986,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   flex: 0 0 24px;
   width: 24px;
   height: 24px;
-  transition: transform 380ms var(--motion-ease);
+  transition: transform 560ms var(--motion-spring);
 }
 
 /* Opening a question is one motion: the plus makes a half turn and folds into
@@ -1751,7 +2008,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 .faq-row__symbol::after {
   transform: rotate(90deg);
-  transition: transform 380ms var(--motion-ease);
+  transition: transform 560ms var(--motion-spring);
 }
 
 .faq-row[open] .faq-row__symbol::after {
@@ -4520,7 +4777,7 @@ html.booking-transitioning .booking-confirmation-stage {
   content: "";
   transform: scaleX(0.4);
   opacity: 0;
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity 200ms ease, transform 420ms var(--motion-spring-firm);
 }
 
 .auth-panel__link:hover,
@@ -4648,7 +4905,7 @@ html.booking-transitioning .booking-confirmation-stage {
   --land-start: 90ms;
   --land-scale: 0.8;
   --land-turn: -12deg;
-  --land-duration: 1000ms;
+  --land-duration: 1200ms;
   position: absolute;
   z-index: 0;
   right: -86px;
@@ -4667,9 +4924,26 @@ html.booking-transitioning .booking-confirmation-stage {
   --land-step: 60ms;
 }
 
+.nav-mobile__cta {
+  --land-order: 4;
+}
+
+/* Opening, the destinations drop in one after another, then the card. */
+@keyframes menu-item-in {
+  from {
+    opacity: 0;
+    translate: 0 -10px;
+  }
+}
+
 @media screen and (prefers-reduced-motion: no-preference) {
   .nav-mobile:not(.is-open) .asset-mark--lands > .asset-mark__picture {
     animation: none;
+  }
+
+  .nav-mobile.is-open .nav-mobile__link,
+  .nav-mobile.is-open .nav-mobile__cta {
+    animation: menu-item-in 520ms var(--motion-ease-out) calc(30ms + var(--land-order, 0) * 45ms) backwards;
   }
 }
 
@@ -4737,7 +5011,7 @@ html.booking-transitioning .booking-confirmation-stage {
   content: "";
   opacity: 0;
   transform: scaleX(0.5);
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity 200ms ease, transform 420ms var(--motion-spring-firm);
 }
 
 .nav-mobile__link:last-child {
@@ -6582,14 +6856,14 @@ dialog[open]::backdrop {
    * Colour changes are kept so the states remain distinguishable.
    */
   .button,
-  .button:hover {
+  .button:hover,
+  .button:active:not(:disabled) {
     transform: none;
     transition: background 160ms ease, color 160ms ease;
   }
 
   .site-nav__link::after,
   .site-nav__link:hover::after,
-  .site-nav__link[aria-current="page"]::after,
   .nav-mobile__link::after,
   .nav-mobile__link:hover::after,
   .nav-mobile__link[aria-current="page"]::after {
