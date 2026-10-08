@@ -1,13 +1,17 @@
 "use client";
 
 import { FormEvent, type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
-import { AlertCircle, Lock, Mail, ReceiptText, UserRound } from "lucide-react";
+import { AlertCircle, CheckCircle2, Lock, Mail, ReceiptText, UserRound } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { browserTimeZone } from "@/lib/booking-api";
 import { AuthApiError, SessionStorageError, login, readSession, register, requestPasswordReset, storeSession, type Student } from "@/lib/auth-api";
 
 type Mode = "signin" | "register" | "forgot";
+
+/** Said once wherever the student is reading: the forgotten-password intro
+    carries it, so the sent notice repeats it only back at signing in. */
+const RESET_LINK_LIFETIME = "It works for one hour.";
 
 /**
  * Sign in, create an account, or ask for a reset link.
@@ -26,10 +30,11 @@ export function AuthPanel({
 }: {
   initialMode?: Mode;
   /**
-   * Hold the caller's heading and intro across the two tabs. For a caller whose
-   * heading names one of them — "Sign in" — the copy has to follow the tab or it
-   * contradicts it. For one whose heading names neither, like "Almost there" at
-   * the end of a booking, following the tab only throws away the better line.
+   * Hold the caller's intro (and a "Sign in" heading) across the two tabs.
+   * Without it, the intro follows the tab, and so does a heading that names
+   * one of them, or it would contradict it. A heading that names neither,
+   * like "Your account" or "Almost there", always stays: the tabs alone name
+   * the mode, and a heading repeating the selected tab only doubled it.
    */
   keepCopy?: boolean;
   onSignedIn: (student: Student) => void;
@@ -79,9 +84,10 @@ export function AuthPanel({
   }
   const [busy, setBusy] = useState(false);
   const Heading = headingLevel === 2 ? "h2" : "h3";
+  const headingNamesTab = !heading || heading === "Sign in";
   const introText =
     mode === "forgot"
-      ? "Give us the email you booked with and we'll send you a link to choose a new password. It works for one hour."
+      ? `Give us the email you booked with and we'll send you a link to choose a new password. ${RESET_LINK_LIFETIME}`
       : mode === "register" && !keepCopy
         ? "Keeps all your lessons in one place, so you can change them yourself."
         : intro;
@@ -111,7 +117,7 @@ export function AuthPanel({
       if (mode === "forgot") {
         await requestPasswordReset(form.email.trim());
         if (request !== authRequest.current || readSession() !== session) return;
-        setNotice("If that email has an account, a reset link is on its way. It works for one hour.");
+        setNotice("If that email has an account, a reset link is on its way.");
         return;
       }
 
@@ -145,11 +151,16 @@ export function AuthPanel({
   return (
     <div className="auth-panel">
       <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="auth-panel__mark" />
-      {/* The heading follows the mode, or it contradicts the active tab —
-          "Sign in" sat above a selected "Create an account". Forgotten password
-          is its own task, so it overrides the copy either way. */}
+      {/* A "Sign in" heading follows the mode, or it contradicts the active
+          tab. Any other heading, such as "Your account", stays put rather
+          than repeating the selected tab above it. Forgotten password is its
+          own task, so it overrides the copy either way. */}
       <Heading>
-        {mode === "forgot" ? "Forgotten password" : mode === "register" && !keepCopy ? "Create an account" : heading}
+        {mode === "forgot"
+          ? "Forgotten password"
+          : mode === "register" && !keepCopy && headingNamesTab
+            ? "Create an account"
+            : heading}
       </Heading>
       {introText ? <p className="auth-panel__intro">{introText}</p> : null}
 
@@ -289,9 +300,12 @@ export function AuthPanel({
           </div>
         ) : null}
 
+        {/* Good news, so it reads as the site's calm success panel rather
+            than a coral warning. */}
         {notice ? (
-          <div className="booking-alert booking-alert--warn" role="status">
-            <p>{notice}</p>
+          <div className="booking-outcome" role="status">
+            <CheckCircle2 size={18} aria-hidden="true" />
+            <p>{mode === "forgot" ? notice : `${notice} ${RESET_LINK_LIFETIME}`}</p>
           </div>
         ) : null}
 

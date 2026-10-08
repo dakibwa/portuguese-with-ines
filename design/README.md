@@ -777,6 +777,44 @@ calmer, without new content:
   colour from the one-off one, and the calendar key shows `Booked lesson` only
   when there is a booked lesson to point to.
 
+## Reading and account pages, simplified — 8 October 2026
+
+The same request, carried to the pages with most to read and the account
+tools, again without new content:
+
+- in `Terms & privacy` the five section headings are the site's lilac
+  eyebrows, set well apart from the section before, so the overlay's title,
+  its sections and the bold labels inside the points read as three levels. A
+  list never sits tight against the sentence that introduces it;
+- stacked, the FAQ index keeps two columns at every width, so on a phone it is
+  a short block above the first section rather than the whole first screen.
+  Phones drop the `Index` label (the list keeps its name for assistive
+  technology), and the index's own last rule is the only line between it and
+  the section, whose rule is drawn under its heading;
+- the Approach points are headed in sentence-case Montserrat at reading size,
+  and each point's line is no larger than its heading, so the three read
+  heading first, as the Home principles do. Side by side, the intro line
+  narrows with its column so its last word always stops short of the fan.
+  `Meet Inês` lists its three credentials one to a line rather than run
+  together between separators, and closing paragraphs avoid leaving a word
+  alone on their last line;
+- the account card's heading stays `Your account` whichever tab is chosen,
+  since the tabs alone name the mode; only a `Sign in` heading follows the tab.
+  Every sign-in card opens on one small full-colour mark centred above its
+  heading, clear of the words;
+- in Edit details each note sits under its own field when the fields are
+  paired;
+- past lessons are cut in the tile hand on one soft lavender wash, and only the
+  status pill carries colour, lilac for `Completed` and coral for `Cancelled`,
+  so a run of cancellations reads as records rather than a wall of coral. Good
+  news (`All sorted`, a changed password, a reset link on its way) is a calm
+  lavender panel with a tick, never a coloured stripe, and says the link's
+  one-hour life only where the form above it does not already;
+- Inês's schedule shares the page's left and right edges with the header
+  rather than sitting in a centred box. On a phone the week has its own row,
+  `Weekly hours` and the pager share the next, and the hint follows; a wider
+  phone or small tablet that fits all three keeps them on one row.
+
 ## Account interaction states
 
 Selecting an occurrence from a recurring sequence identifies it in the compact

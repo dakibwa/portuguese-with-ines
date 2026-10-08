@@ -1523,6 +1523,22 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   margin: 0;
   font-size: clamp(1.2rem, 1.7vw, 1.55rem);
   line-height: 1.3;
+  text-wrap: balance;
+}
+
+/* Side by side, the fan reaches in under the words wherever it is large
+   beside a narrow column; the measure narrows with the column so the last
+   word always stops short of the paint. */
+@media (min-width: 821px) and (max-width: 1100px) {
+  .approach-intro > p {
+    max-width: 360px;
+  }
+}
+
+@media (min-width: 1101px) {
+  .approach-intro > p {
+    max-width: clamp(250px, 44.9vw - 307px, 400px);
+  }
 }
 
 .approach-intro__splat {
@@ -1561,14 +1577,16 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   height: 132px;
 }
 
+/* Sentence case, like the Home principles, at reading size rather than in
+   tracked capitals: each point says what it is and the line beneath it does
+   the talking. */
 .approach-item h2 {
-  margin-bottom: 1rem;
+  margin-bottom: 0.45rem;
   font-family: var(--ui);
-  font-size: clamp(1.1rem, 1.7vw, 1.45rem);
-  letter-spacing: 0.09em;
-  line-height: 1.2;
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
   text-wrap: balance;
-  text-transform: uppercase;
 }
 
 @media (min-width: 821px) {
@@ -1594,11 +1612,12 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   }
 }
 
+/* No larger than its heading, so each point reads heading first. */
 .approach-item p {
   max-width: 470px;
   margin: 0;
-  font-size: clamp(1.15rem, 1.6vw, 1.45rem);
-  line-height: 1.35;
+  font-size: clamp(1.05rem, 1.25vw, 1.15rem);
+  line-height: 1.45;
 }
 
 .teacher-band {
@@ -1622,10 +1641,22 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   word-spacing: 0.12em;
 }
 
-.teacher-band p {
+/* One credential to a line, a little apart, so one that wraps on a phone
+   still reads as one. */
+.teacher-band__credentials {
   margin: 0;
-  padding-left: clamp(2rem, 4vw, 4rem);
+  padding: 0 0 0 clamp(2rem, 4vw, 4rem);
   font-size: clamp(1.15rem, 1.75vw, 1.55rem);
+  line-height: 1.3;
+  list-style: none;
+}
+
+.teacher-band__credentials li {
+  text-wrap: balance;
+}
+
+.teacher-band__credentials li + li {
+  margin-top: 0.45rem;
 }
 
 .editorial-callout {
@@ -1656,6 +1687,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   max-width: 660px;
   margin: 0 auto 2rem;
   font-size: 1.25rem;
+  text-wrap: pretty;
 }
 
 /* Lessons */
@@ -1958,6 +1990,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   color: var(--lavender-soft);
   font-size: 0.98rem;
   line-height: 1.45;
+  text-wrap: pretty;
 }
 
 .lessons-closing__actions {
@@ -4138,30 +4171,27 @@ html.booking-transitioning .booking-confirmation-stage {
 
 /* Lesson history keeps the useful anatomy of Upcoming lessons without making
    an old or cancelled booking look interactive. The status changes; the mark,
-   date, duration and location stay in the same places. */
+   date, duration and location stay in the same places. Every record is cut
+   in the same hand on the same soft lavender wash, and only its status pill
+   carries colour: a stripe and a coral wash per cancellation had turned a
+   list of records into a wall of coral. */
 .history-lesson-card {
-  border-color: rgba(82, 74, 150, 0.28);
-  background:
-    linear-gradient(115deg, rgba(170, 164, 230, 0.15), rgba(255, 255, 255, 0.1)),
-    var(--paper-light);
-  box-shadow: inset 4px 0 0 rgba(82, 74, 150, 0.48);
-}
-
-.history-lesson-card--cancelled {
-  border-color: rgba(194, 58, 39, 0.24);
-  background: rgba(194, 58, 39, 0.055);
-  box-shadow: inset 4px 0 0 rgba(194, 58, 39, 0.46);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--squiggle-tile);
+  background: rgba(170, 164, 230, 0.12);
 }
 
 .history-lesson-card__summary {
   grid-template-columns: 42px minmax(0, 1fr);
 }
 
-.history-lesson-card__status--completed {
+/* Scoped to the card: the shared pill rule comes later and painted a
+   completed lesson's pill coral too. */
+.history-lesson-card .history-lesson-card__status--completed {
   background: var(--lavender-ink);
 }
 
-.history-lesson-card__status--cancelled {
+.history-lesson-card .history-lesson-card__status--cancelled {
   background: var(--coral-action);
 }
 
@@ -4788,18 +4818,14 @@ html.booking-transitioning .booking-confirmation-stage {
 /* .asset-mark is display:block with no intrinsic size, so without this the
    splat expands to the full width of the card. */
 /*
- * Decoration, so it sits behind the words and bleeds off the corner rather
- * than reserving space beside them. At 46px inside the padding it collided
- * with a long heading; larger and behind, an overlap reads as intended.
+ * The card opens on one small mark in full colour, centred above the heading
+ * like a seal. In a corner it collided with a long heading, and the large
+ * faint splat that replaced it sat behind the heading's last letters.
  */
 .auth-panel__mark {
-  position: absolute;
-  top: -18px;
-  right: -22px;
-  z-index: 0;
-  width: 128px;
-  height: 128px;
-  opacity: 0.3;
+  width: 44px;
+  height: 44px;
+  margin: -0.15rem auto 0.55rem;
   pointer-events: none;
 }
 
@@ -5085,6 +5111,12 @@ html.booking-transitioning .booking-confirmation-stage {
   margin-top: 0.3rem;
   font-size: 0.76rem;
   opacity: 0.68;
+}
+
+/* "A reset link is on its way" sits between the field and the button,
+   spaced like another field. */
+.auth-panel__form > .booking-outcome {
+  margin-bottom: 0.5rem;
 }
 
 .auth-panel__aside {
@@ -5637,6 +5669,16 @@ button.text-action {
     margin-bottom: 0;
   }
 
+  /* Paired fields line up at the top, so the note under one never pushes its
+     neighbour down; the code disclosure stays the quiet last item under NIF. */
+  .unified-account-controls .my-lessons__details {
+    align-items: start;
+  }
+
+  .unified-account-controls .my-lessons__rates {
+    grid-column: 1;
+  }
+
 }
 
 .upcoming-lessons__title-line {
@@ -5742,6 +5784,15 @@ button.text-action {
   display: grid;
   align-items: end;
   gap: 0.65rem 0.8rem;
+}
+
+/* A field with the note that explains it, kept together in one cell. */
+.my-lessons__field {
+  min-width: 0;
+}
+
+.my-lessons__field > .my-lessons__details-note {
+  margin-bottom: 0;
 }
 
 .my-lessons__details label {
@@ -6553,14 +6604,24 @@ button.text-action {
   border-color: var(--green);
 }
 
+/* Good news is a calm lavender panel in the fields' hand with a tick, never a
+   ruled box: a coloured stripe down one side read as a warning. */
 .booking-outcome {
   display: flex;
   align-items: flex-start;
   margin-bottom: 1.4rem;
-  border-left: 3px solid var(--green);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--squiggle-field);
   padding: 0.9rem 1rem;
   background: rgba(170, 164, 230, 0.22);
   gap: 0.7rem;
+  text-align: left;
+}
+
+.booking-outcome > svg {
+  flex: none;
+  margin-top: 0.1em;
+  color: var(--blue);
 }
 
 .booking-outcome strong {
@@ -6570,7 +6631,7 @@ button.text-action {
 }
 
 .booking-outcome p {
-  margin-top: 0.2rem;
+  margin: 0.2rem 0 0;
   font-size: 0.9rem;
 }
 
@@ -6712,20 +6773,27 @@ dialog[open]::backdrop {
   margin: 0;
 }
 
+/* Three levels, each in its own voice: the dialog's title, the five sections
+   as the site's lilac eyebrows with room above them, and the bold lead-ins
+   inside the points. Set alike, they had read as one flat run of bold. */
 .policy-information h2 {
-  margin: 1.6rem 0 0.7rem;
+  margin: 2.2rem 0 0.6rem;
+  color: var(--lavender-ink);
   font-family: var(--ui);
-  font-size: 1rem;
+  font-size: 0.78rem;
   font-weight: 700;
+  letter-spacing: 0.14em;
   line-height: 1.4;
+  text-transform: uppercase;
 }
 
 .policy-information h2:first-child {
   margin-top: 0.5rem;
 }
 
+/* A list never sits tight against the sentence that introduces it. */
 .policy-information ul {
-  margin: 0 0 0.9rem;
+  margin: 0.6rem 0 0.9rem;
   padding-left: 1.2rem;
 }
 
@@ -7077,12 +7145,14 @@ dialog[open]::backdrop {
     padding-bottom: 1rem;
   }
 
-  .teacher-band p {
+  .teacher-band__credentials {
     padding-left: 0;
   }
 
   /* Stacked, the last answer's rule closes the list; a full-width rule
-     beneath it only repeated it. */
+     beneath it only repeated it. The same goes for the index: its own last
+     rule separates it from the section, so the section's drawn rule is the
+     only other line before the questions. */
   .faq-reference {
     grid-template-columns: 1fr;
     border-bottom: 0;
@@ -7095,7 +7165,7 @@ dialog[open]::backdrop {
   .faq-index {
     min-height: auto;
     border-right: 0;
-    border-bottom: 1px solid var(--rule);
+    padding-bottom: 1.5rem;
   }
 
   .faq-index ol {
@@ -7258,21 +7328,37 @@ dialog[open]::backdrop {
     padding-bottom: 2rem;
   }
 
+  /* The index keeps its two columns on a phone, so it is a short block
+     rather than the whole first screen. The sections name themselves, so the
+     Index label goes; the list keeps its name for assistive technology. */
+  .faq-index {
+    padding-top: 1.6rem;
+    padding-bottom: 0.4rem;
+  }
+
+  .faq-index > .eyebrow {
+    display: none;
+  }
+
   .faq-index ol {
-    grid-template-columns: 1fr;
+    margin-top: 0;
   }
 
   .faq-index li:nth-child(2n) {
-    border-left: 0;
-    padding-left: 0;
+    padding-left: 0.8rem;
   }
 
-  .faq-index li {
-    border-bottom: 0;
+  .faq-index a {
+    min-height: 54px;
+    padding: 0.45rem 0;
+    letter-spacing: 0.06em;
+    line-height: 1.3;
+    text-wrap: balance;
   }
 
-  .faq-index li:last-child {
-    border-bottom: 1px solid var(--rule-soft);
+  .faq-index a span {
+    width: 30px;
+    flex: none;
   }
 
   .faq-groups {

@@ -563,65 +563,71 @@ export function MyLessons({
               </button>
             </div>
 
-            <div className="my-lessons__details-row">
-              <label>
-                <span>Email address</span>
-                <input
-                  autoComplete="email"
-                  onChange={(event) => {
-                    emailDraftVersion.current += 1;
-                    setDetails((current) => ({ ...current, email: event.target.value }));
-                  }}
-                  type="email"
-                  value={details.email}
-                />
-              </label>
-              {/* Changing the address you sign in with is deliberately the slower
-                  of the two: nothing moves until the new address answers. */}
-              <button
-                className="button button--blue"
-                disabled={emailBusy || !details.email.trim() || details.email.trim() === student.email}
-                onClick={changeEmail}
-                type="button"
-              >
-                Send confirmation link
-              </button>
+            {/* Each note travels with its own field, so paired on a wide
+                screen it sits under that field rather than across both. */}
+            <div className="my-lessons__field">
+              <div className="my-lessons__details-row">
+                <label>
+                  <span>Email address</span>
+                  <input
+                    autoComplete="email"
+                    onChange={(event) => {
+                      emailDraftVersion.current += 1;
+                      setDetails((current) => ({ ...current, email: event.target.value }));
+                    }}
+                    type="email"
+                    value={details.email}
+                  />
+                </label>
+                {/* Changing the address you sign in with is deliberately the slower
+                    of the two: nothing moves until the new address answers. */}
+                <button
+                  className="button button--blue"
+                  disabled={emailBusy || !details.email.trim() || details.email.trim() === student.email}
+                  onClick={changeEmail}
+                  type="button"
+                >
+                  Send confirmation link
+                </button>
+              </div>
+
+              {emailPending ? (
+                <p className="my-lessons__details-note">
+                  Check <strong>{emailPending}</strong>. It only becomes your address once that link is used. Until then
+                  you sign in with {student.email}.
+                </p>
+              ) : (
+                <p className="my-lessons__details-note">
+                  A new email address only takes effect once you confirm it from the link we send.
+                </p>
+              )}
             </div>
 
-            {emailPending ? (
-              <p className="my-lessons__details-note">
-                Check <strong>{emailPending}</strong>. It only becomes your address once that link is used. Until then
-                you sign in with {student.email}.
-              </p>
-            ) : (
-              <p className="my-lessons__details-note">
-                A new email address only takes effect once you confirm it from the link we send.
-              </p>
-            )}
-
-            <div className="my-lessons__details-row">
-              <label>
-                <span>
-                  NIF <em>(optional)</em>
-                </span>
-                <input
-                  autoComplete="off"
-                  inputMode="numeric"
-                  maxLength={20}
-                  onChange={(event) => setDetails((current) => ({ ...current, nif: event.target.value }))}
-                  value={details.nif}
-                />
-              </label>
-              <button
-                className="button button--coral"
-                disabled={savingNif || details.nif.trim() === (student.nif ?? "")}
-                onClick={saveNif}
-                type="button"
-              >
-                {savingNif ? "Saving…" : "Save NIF"}
-              </button>
+            <div className="my-lessons__field">
+              <div className="my-lessons__details-row">
+                <label>
+                  <span>
+                    NIF <em>(optional)</em>
+                  </span>
+                  <input
+                    autoComplete="off"
+                    inputMode="numeric"
+                    maxLength={20}
+                    onChange={(event) => setDetails((current) => ({ ...current, nif: event.target.value }))}
+                    value={details.nif}
+                  />
+                </label>
+                <button
+                  className="button button--coral"
+                  disabled={savingNif || details.nif.trim() === (student.nif ?? "")}
+                  onClick={saveNif}
+                  type="button"
+                >
+                  {savingNif ? "Saving…" : "Save NIF"}
+                </button>
+              </div>
+              <p className="my-lessons__details-note">Added to your receipts. Leave it blank if you don&rsquo;t need one.</p>
             </div>
-            <p className="my-lessons__details-note">Added to your receipts. Leave it blank if you don&rsquo;t need one.</p>
 
             {/* Only some students have a code, so nothing here suggests they should:
                 saved rates appear once there is one, and the field stays behind a
