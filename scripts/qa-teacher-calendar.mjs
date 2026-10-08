@@ -320,6 +320,14 @@ try {
     await noOverflow(page);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
+  // Wide, the week stands at its full height: no lesson hides in an inner box.
+  assert.equal(
+    await page
+      .locator(".teacher-timetable-scroll")
+      .evaluate((box) => box.scrollHeight - box.clientHeight <= 1),
+    true,
+    "The desktop timetable must not scroll inside itself",
+  );
   await showHours(page);
   await dragDown(page, slot(page, 1, 480), slot(page, 1, 540));
   for (const minute of [480, 510, 540])
@@ -610,9 +618,22 @@ try {
   await page.close();
 
   const mobile = await fixture(390);
+  // A phone's day scrolls in its own box, opening at her first teaching hour
+  // or the day's first lesson, whichever is earlier: Monday at 10:00, ahead
+  // of Alex at 11:00, and Tuesday, which has no hours, at Sam's 14:00.
+  const opensAt = (minute) =>
+    mobile.page.locator(".teacher-timetable-scroll").evaluate((box, at) => {
+      const top = Math.min(
+        box.querySelector(`[data-axis-minute="${at}"]`).offsetTop,
+        box.scrollHeight - box.clientHeight,
+      );
+      return Math.abs(box.scrollTop - top) <= 1;
+    }, minute);
+  assert.equal(await opensAt(600), true, "Monday should open at 10:00");
   await mobile.page
     .getByRole("button", { name: "Tuesday 8 September, show lessons" })
     .tap();
+  assert.equal(await opensAt(840), true, "Tuesday should open at Sam's lesson");
   const tuesdayOff = mobile.page.getByRole("switch", {
     name: "Day off, Tuesday 8 September",
   });

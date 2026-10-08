@@ -8,7 +8,7 @@ import {
   setNoShow,
   type AdminBooking,
 } from "@/lib/admin-api";
-import { formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
+import { formatBookedLessonLabel, formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
 import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { AssetMark } from "@/components/BrandMarks";
@@ -143,12 +143,22 @@ export function LessonDetails({
       <div className="teacher-dialog-top">
         <AssetMark asset="/visuals/v2-splats/one-to-one-splat-v2.svg" className="teacher-lesson-mark" />
         <div className="teacher-dialog-heading">
+          {/* The length and short date, as the student's own lesson rows
+              read: `60 mins · Thu 8 Oct`, while a trial keeps its name. */}
           <span className="teacher-eyebrow">
-            {booking.lesson_name} ·{" "}
+            {formatBookedLessonLabel({
+              id: booking.lesson_type_id ?? "",
+              name: booking.lesson_name,
+              durationMinutes: Math.round(
+                (Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) /
+                  60_000,
+              ),
+            })}{" "}
+            ·{" "}
             {dateLabel(dateKey(new Date(booking.starts_at)), {
               weekday: "short",
               day: "numeric",
-              month: "long",
+              month: "short",
             })}
           </span>
           <h2 id="teacher-lesson-title">{booking.student_name}</h2>
