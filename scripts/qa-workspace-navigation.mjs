@@ -33,8 +33,12 @@ const errors = [];
 page.on("pageerror", error => errors.push(error.message));
 await page.clock.setFixedTime(new Date("2026-09-05T12:00:00Z"));
 
+// Settled means every finite animation has finished. The wordmark's hats tip
+// for as long as a page is open, on the wall clock's beat, so an endless
+// animation never counts.
 async function settle() {
-  await page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== "running"));
+  await page.waitForFunction(() => document.getAnimations().every(animation =>
+    animation.playState !== "running" || animation.effect?.getTiming().iterations === Infinity));
 }
 
 async function accountAction(name) {

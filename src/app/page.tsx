@@ -32,6 +32,16 @@ export default function Home() {
       <main className="home-page" id="main-content">
         <section className="home-hero" aria-labelledby="home-title">
           <div className="home-hero__copy">
+            <AssetMark
+              asset="/visuals/generated-splats/cream-wave-splat.webp"
+              avifAsset="/visuals/generated-splats/cream-wave-splat.avif"
+              className="home-hero__splat"
+              height={1254}
+              mobileAsset="/visuals/generated-splats/cream-wave-splat-mobile.webp"
+              mobileAvifAsset="/visuals/generated-splats/cream-wave-splat-mobile.avif"
+              priority
+              width={1254}
+            />
             <h1 id="home-title">
               <span>Portuguese</span>
               <span className="home-title__script">Lessons</span>

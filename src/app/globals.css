@@ -1322,6 +1322,8 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 }
 
 .home-hero__copy {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -1331,6 +1333,21 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   background-color: var(--green);
   background-image: var(--paper-texture);
   color: var(--paper);
+}
+
+/* The hero's own painted field: a cream wave curling in from the blue
+   panel's right edge beside the heading, as if breaking against the lilac
+   column, clear of the words and the actions at every width. Like the other
+   large fields it stays still: it is the paper the marks land on. */
+.home-hero__splat {
+  position: absolute;
+  top: 50%;
+  right: -14%;
+  z-index: -1;
+  width: min(48%, 420px);
+  aspect-ratio: 1;
+  translate: 0 -56%;
+  pointer-events: none;
 }
 
 .home-hero__copy h1 {
@@ -6861,6 +6878,15 @@ dialog[open]::backdrop {
 }
 
 @media (max-width: 900px) {
+  /* Stacked, the actions run wide, so the wave rides higher, beside the
+     heading and above them. */
+  .home-hero__splat {
+    top: 34%;
+    right: -8%;
+    width: min(34%, 300px);
+    translate: 0 -50%;
+  }
+
   .home-hero {
     grid-template-columns: 1fr;
     min-height: auto;
@@ -7093,6 +7119,14 @@ dialog[open]::backdrop {
     min-height: 420px;
     padding-top: 3rem;
     padding-bottom: 3rem;
+  }
+
+  /* Beside "Lessons" and the line beneath it, in from the right edge. */
+  .home-hero__splat {
+    top: 5.6rem;
+    right: -12%;
+    width: min(40%, 150px);
+    translate: none;
   }
 
   .home-hero__copy h1 {

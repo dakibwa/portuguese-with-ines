@@ -153,7 +153,11 @@ the same identity or action:
 - on Home, the display heading is `Portuguese Lessons` and the
   supporting line describes one-to-one lessons, online or in person. `Book a lesson` appears
   once. `How I teach` and `Lessons and prices` sit beside it as quieter outline
-  buttons rather than plain links or a second strip beneath the hero;
+  buttons rather than plain links or a second strip beneath the hero. The blue
+  hero carries its own painted field: a cream wave curling in from its right
+  edge beside the heading, as if breaking against the lilac column, clear of
+  the words and the actions at every width. Stacked, it rides higher beside the
+  heading; on phones it comes in beside `Lessons` (8 October 2026);
 - Approach, Lessons, FAQ, and Booking follow the same hierarchy: the brand
   anchors the shared header and footer, while each page owns a task-specific
   heading and only the actions that meaningfully advance its reading path.
@@ -471,8 +475,8 @@ as far. Marks in the first screen land as the page arrives; those further down
 wait until the reader reaches them, so none lands unseen. The phone menu's
 marks land each time it opens, in step with its links, while the splat cropped
 into its foot blooms a little more slowly. The large painted fields on the
-pages (the Approach fan, the Lessons hero splat and the booking banner's corner
-splat) stay still: they are the paper the marks land on. Text, buttons and the
+pages (the Home wave, the Approach fan, the Lessons hero splat and the booking
+banner's corner splat) stay still: they are the paper the marks land on. Text, buttons and the
 booking workspace never move or wait for a landing, nothing else loops, and a
 landed mark stays still, except that a Lessons card turns its mark a few
 degrees while it is pointed at. A confirmed booking is celebrated once: the

@@ -361,7 +361,7 @@ cards' turning marks, the drawn rules, and the wordmark's writing and tipping
 hats, keeping colour changes so states stay distinguishable. Splats are also
 shown at rest in print and without JavaScript, and the rules in print.
 
-Approach and lessons hero artwork is served as AVIF with a WebP fallback — the
+Home, Approach and Lessons hero artwork is served as AVIF with a WebP fallback — the
 painterly splats cost less than half as much in AVIF as they did in WebP — and
 fetched eagerly, with dedicated 800 px sources for screens up to 720 px;
 non-critical marks load lazily. The display font is
