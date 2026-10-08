@@ -229,7 +229,8 @@ Dan's 22 September review tightened the public pages:
   splat whole inside the page margin. Stacked, the Approach fan comes in from
   the right edge halfway down the heading rather than trailing beneath it, and
   the booking banner keeps
-  its splat at the right in a band of about 124 px, without an editorial rule;
+  its splat at the right in a band of about 124 px, without an editorial rule,
+  its two-line `Your Lessons` set close as one handwritten block;
 - the three Lessons cards each have their own squiggle outline, and their own
   splat comes in large from the card's top-right corner, cropped by its edge;
   once landed it moves only to turn a little while its card is pointed at. The
@@ -592,7 +593,9 @@ Preserve these desktop and mobile states:
 - the signed-in identity appears once, inside a generously padded account bar.
   On wide desktop, `View lessons`, `Past lessons`, `Edit details`, and `Sign
   out` sit directly in that bar, in that order; narrower layouts retain them
-  inside a small `Menu`. Booking is not repeated there: its one coral action
+  inside a small `Menu` that opens with a dropdown chevron, never the site
+  menu's three lines, so a phone shows one `☰` for the site and one clearly
+  different account menu. Booking is not repeated there: its one coral action
   belongs to the calendar. `View lessons` may show the useful
   upcoming count; `Past lessons` deliberately has no count competing for
   attention. It remains present on the lessons calendar, while booking, and
@@ -796,6 +799,11 @@ calmer, without new content:
   and a one-line `Currently …` come first, even on a phone, the day above the
   times reads short, and a phone drops the length and place legends. A day
   filled coral shows every booked time in white.
+- `Terms & privacy` and a day's list of lessons are one family with the lesson
+  dialog: the same hand-cut panel on light paper with its warm corner, over the
+  same lightly dimmed page. The day's list needs no ruled header, and each of
+  its rows wears the lesson's own mark, as on the calendar. Terms keeps the
+  rule under its title, where a long text scrolls beneath it.
 
 ## Reading and account pages, simplified — 8 October 2026
 

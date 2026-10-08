@@ -2444,6 +2444,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             key: booking.reference,
             title: formatSlotTimeForStudent(booking.startAt, studentZone),
             detail: `${formatBookedLessonLabel(booking.lessonType)} · ${booking.location === "porto" ? "In Porto" : "Online"}${isWeeklyLesson(booking) ? " · Weekly" : ""}`,
+            mark: (
+              <LessonMark
+                className="lesson-calendar__mark"
+                durationMinutes={booking.lessonType.durationMinutes}
+                lessonTypeId={booking.lessonType.id}
+                location={booking.location}
+                recurring={isWeeklyLesson(booking)}
+              />
+            ),
             onOpen: () => {
               const trigger = promptTrigger.current;
               setBookingPromptDate("");

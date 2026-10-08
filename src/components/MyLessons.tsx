@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, CheckCircle2, CircleX, Menu as MenuIcon } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, CircleX } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { LessonMark } from "@/components/LessonMarks";
 import {
@@ -500,7 +500,9 @@ export function MyLessons({
                 onClick={() => setMenuOpen((open) => !open)}
                 type="button"
               >
-                <MenuIcon size={16} aria-hidden="true" /> Menu
+                {/* A dropdown's chevron rather than the site menu's three lines,
+                    so the account's menu is never mistaken for the site's. */}
+                Menu <ChevronDown size={15} aria-hidden="true" />
               </button>
               <div className={`my-lessons__menu-panel${menuOpen ? " is-open" : ""}`} id="account-menu">
                 <button
