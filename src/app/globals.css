@@ -720,13 +720,65 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 }
 
 .header-wordmark {
-  width: 100%;
+  /* Sized to the artwork, so the ink below crosses letters rather than empty
+     paper. Where the header is narrower than the artwork, it still starts on
+     the page's edge, as the footer logo does, not floating in the middle. */
+  width: auto;
+  max-width: 100%;
   height: 72px;
-  aspect-ratio: auto;
-  /* The artwork is narrower than its box: start it on the page's edge, as the
-     footer logo does, not floating in the middle. */
+  aspect-ratio: 760 / 236;
   -webkit-mask-position: left center;
   mask-position: left center;
+}
+
+/*
+ * The wordmark is the way home, so pointing at it re-inks Inês's lettering in
+ * coral, written left to right at a pen's steady pace, with the wet edge of
+ * the ink on the slant of her hand. Mixed in OKLCH, that edge runs through
+ * pink and violet rather than mud; a browser without it mixes plainly, and one
+ * that cannot animate the ink (no @property) simply turns coral. Only a
+ * pointer that can rest there writes it: a tap simply goes home.
+ */
+@property --wordmark-ink {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+.header-wordmark {
+  /* Declared, not left to the registration, so that a browser without
+     @property still has a value; and never as a var() fallback, which
+     Chromium does not repaint until the transition has ended. */
+  --wordmark-ink: 0%;
+  --wordmark-pen: cubic-bezier(0.61, 1, 0.88, 1);
+  background: linear-gradient(105deg, var(--coral) calc(var(--wordmark-ink) - 12%), currentColor var(--wordmark-ink));
+  background: linear-gradient(in oklch 105deg, var(--coral) calc(var(--wordmark-ink) - 12%), currentColor var(--wordmark-ink));
+  transition: --wordmark-ink 400ms var(--wordmark-pen);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .site-header__brand:hover .header-wordmark {
+    --wordmark-ink: 112%;
+    transition-duration: 720ms;
+  }
+
+  /* Clicked while written, it arrives home written (PageTurn), rather than
+     bare and then written again once the page has turned. */
+  :root[data-wordmark="inked"] .header-wordmark {
+    --wordmark-ink: 112%;
+    transition: none;
+  }
+}
+
+.site-header__brand:focus-visible .header-wordmark {
+  --wordmark-ink: 112%;
+  transition-duration: 720ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-wordmark {
+    transition: none;
+  }
 }
 
 .site-nav {

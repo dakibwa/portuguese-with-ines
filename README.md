@@ -286,6 +286,19 @@ travels, the firm one barely 0.5% for controls. `--motion-ease-out` is a long
 deceleration for everything else. Buttons lift on hover and sink to 97% while
 pressed, except when disabled.
 
+The header wordmark is a CSS mask, so its colour is whatever is painted behind
+it. Hovering over it, or focusing it from the keyboard, writes it in coral: a
+registered `--wordmark-ink` percentage carries the edge of a 105° gradient
+across the lettering in 720 ms on a sine ease, mixed in OKLCH so that the wet
+edge runs through pink and violet, and draws it back in 400 ms. The mask's box
+is sized to the artwork's 760 × 236 ratio, so the ink crosses letters rather
+than empty header. `(hover: hover) and (pointer: fine)` leaves touch screens
+out. A browser does not check hover again until a view transition has
+finished, so a click on a written wordmark would bring the new page's wordmark
+in bare and then write it a second time. Instead, `PageTurn` holds it written
+with `data-wordmark="inked"` until a few frames after the turn. Without
+`@property` it simply turns coral.
+
 Booking decisions use a 220–260 ms same-document surface transition
 where supported. The account, lesson choice, calendar, detail, and confirmation
 surfaces each keep their place while their own geometry and content change, so
@@ -309,10 +322,10 @@ hold is only ever placed before a mark has been seen, and anything that fails
 leaves the mark showing.
 
 `prefers-reduced-motion: reduce` removes page turns, booking transitions,
-smooth scrolling, the splat landings, the phone menu's entrance, and the button
-and navigation hover and press transforms, keeping colour changes so states
-stay distinguishable. Splats are also shown at rest in print and without
-JavaScript.
+smooth scrolling, the splat landings, the phone menu's entrance, the button
+and navigation hover and press transforms, and the wordmark's writing, keeping
+colour changes so states stay distinguishable. Splats are also shown at rest
+in print and without JavaScript.
 
 Approach and lessons hero artwork is served as AVIF with a WebP fallback — the
 painterly splats cost less than half as much in AVIF as they did in WebP — and

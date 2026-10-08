@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
 
 // Home and the four destinations, in the order the header lists them.
@@ -16,6 +16,29 @@ function inViewTransition() {
   }
 }
 
+// Clicked while its hover has written it in coral, the wordmark would arrive
+// home bare, because the browser does not look at hover again until the turn
+// is over, and then be written a second time. Hold it written instead, and let
+// go a few frames after the turn, once hover is known again.
+function holdWordmarkInk(event: MouseEvent) {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  const brand = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>(".site-header__brand") : null;
+  if (!brand?.matches(":hover") || brand.pathname === window.location.pathname) return;
+  const root = document.documentElement;
+  const clicked = performance.now();
+  let turned = false;
+  let after = 0;
+  root.dataset.wordmark = "inked";
+  const release = () => {
+    if (inViewTransition()) turned = true;
+    else if (turned || performance.now() - clicked > 1500) after += 1;
+    if (after < 3) requestAnimationFrame(release);
+    else delete root.dataset.wordmark;
+  };
+  requestAnimationFrame(release);
+}
+
 /**
  * Steers the page turn (globals.css) as each page commits, which is inside
  * the view transition and before the browser builds its animation.
@@ -29,9 +52,16 @@ function inViewTransition() {
  * at once, so it has no view transition. The new page still focuses in the
  * way a turned page does, under a header that stays put. Browsers without
  * view transitions use the plain dissolve instead, and reduced motion neither.
+ *
+ * The header's wordmark keeps its ink across a turn it started (above).
  */
 export function PageTurn() {
   const pathname = usePathname();
+
+  useEffect(() => {
+    document.addEventListener("click", holdWordmarkInk, true);
+    return () => document.removeEventListener("click", holdWordmarkInk, true);
+  }, []);
 
   useLayoutEffect(() => {
     const page = pathname.endsWith("/") ? pathname : `${pathname}/`;

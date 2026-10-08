@@ -407,7 +407,8 @@ and card checkout so the choices beside the card form describe its held times.
 
 Motion is calm, quick and physical, and never makes anyone wait (7 October
 2026, at Dan's request for tasteful animation on the little splats, beautiful
-transitions between pages and a premium feel throughout). What lands or
+transitions between pages and a premium feel throughout; the wordmark's hover
+followed on 8 October). What lands or
 travels moves on a soft spring that gives a few per cent and settles; controls
 answer on a firm one; everything else decelerates long.
 
@@ -432,6 +433,13 @@ soft shadow in their own colour, and a press sinks them a touch before they
 spring back; a disabled button does not answer. Every hover line draws on the
 same firm spring, the FAQ's plus turns into its minus with a little give, and
 the phone menu's destinations drop in one after another as their marks land.
+
+The header wordmark is the way home, and it answers in Inês's own hand.
+Pointing at it, or focusing it from the keyboard, writes the lettering again
+in coral, left to right at a pen's steady pace, with a pink-violet wet edge on
+the slant of her writing; leaving it draws the ink back quickly. A tap on a
+phone simply goes home. Clicked, it arrives on Home still written rather than
+written twice. Reduced motion changes the colour without the writing.
 
 The little splats land. Each small emblem mark arrives once like a dab of
 paint: it blooms from its middle outwards, soft at first and then sharp, a touch
