@@ -105,7 +105,8 @@ try {
       await page.locator("#terms-privacy[open]").waitFor();
       assert.equal(await page.locator(".booking-information details").count(), 0);
       assert.equal(await page.getByRole("dialog", { name: "Terms & privacy", exact: true }).count(), 1);
-      assert.equal(await page.locator(".policy-information h2").first().innerText(), "Booking");
+      // The section headings are lilac eyebrows, capitalised by CSS; read the words.
+      assert.equal(await page.locator(".policy-information h2").first().textContent(), "Booking");
       await page.locator("#terms-privacy").screenshot({ path: `${out}/terms-${width}.png` });
       assert.equal(await agreement.getAttribute("aria-pressed"), "true", "Reading the terms keeps the selection and agreement");
       await page.getByRole("button", { name: "Close terms & privacy", exact: true }).click();
