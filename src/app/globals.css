@@ -6131,22 +6131,28 @@ button.text-action {
 
 /* The lesson's own mark lands in the corner, cropped at the card's edge as
    the Lessons cards crop theirs, a little larger and slower than the small
-   marks: the one landing on the page that celebrates something. Clipped by
-   itself rather than by the card, so nothing inside the card is ever cut, and
+   marks: the one landing on the page that celebrates something. The mark's
+   box stays inside the card and crops its own larger picture, so nothing in
+   the card is ever cut and a narrow phone never scrolls sideways; it sits
    beneath the card's words should a long line reach the corner. */
 .booking-success__mark {
   position: absolute;
-  right: -34px;
-  bottom: -34px;
+  right: 0;
+  bottom: 0;
   z-index: -1;
-  width: 128px;
-  height: 128px;
-  clip-path: inset(0 34px 34px 0);
+  overflow: hidden;
+  width: 94px;
+  height: 94px;
   pointer-events: none;
   --land-start: 240ms;
   --land-scale: 0.56;
   --land-turn: -16deg;
   --land-duration: 1150ms;
+}
+
+.booking-success__mark > .asset-mark__picture {
+  width: 128px;
+  height: 128px;
 }
 
 .booking-success__head {

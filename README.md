@@ -342,9 +342,11 @@ hold is only ever placed before a mark has been seen, and anything that fails
 leaves the mark showing. A Lessons card turns its mark's box, not the picture,
 a few degrees on hover or focus, so the two motions never meet. A confirmed
 booking's `.booking-success` lands the lesson's own `LessonMark` in its
-corner, larger and slower than the small marks; the mark crops itself with
-`clip-path` and sits beneath the card's text inside an isolated stacking
-context, so nothing in the card is ever clipped.
+corner, larger and slower than the small marks. The mark's box stays inside
+the card and crops its own larger picture, so nothing in the card is ever
+clipped and a narrow phone never scrolls sideways (`clip-path` on a box that
+reached past the card hid it but still widened the page); it sits beneath the
+card's text inside an isolated stacking context.
 
 `prefers-reduced-motion: reduce` removes page turns, booking transitions,
 smooth scrolling, the splat landings, the phone menu's entrance, the button
