@@ -16,6 +16,20 @@ function inViewTransition() {
   }
 }
 
+// The wordmark's hats tip now and then on their own (globals.css). Their beat
+// is the wall clock's: each hat's place in its cycle comes from the time of
+// day, so a page turn, or a full page load, never restarts the rhythm.
+function keepWordmarkHatsOnTheBeat() {
+  if (typeof CSSAnimation === "undefined" || !("getAnimations" in document)) return;
+  for (const animation of document.getAnimations()) {
+    if (!(animation instanceof CSSAnimation) || !animation.animationName.startsWith("wordmark-hat-idle")) continue;
+    const period = Number(animation.effect?.getTiming().duration);
+    if (!period) continue;
+    animation.currentTime = Date.now() % period;
+    animation.play();
+  }
+}
+
 // Clicked while its hover has written it in coral, the wordmark would arrive
 // home bare, because the browser does not look at hover again until the turn
 // is over, and then be written a second time. Hold it written instead, and let
@@ -53,7 +67,8 @@ function holdWordmarkInk(event: MouseEvent) {
  * way a turned page does, under a header that stays put. Browsers without
  * view transitions use the plain dissolve instead, and reduced motion neither.
  *
- * The header's wordmark keeps its ink across a turn it started (above).
+ * The header's wordmark keeps its ink across a turn it started, and its hats
+ * keep the wall clock's beat on every page (above).
  */
 export function PageTurn() {
   const pathname = usePathname();
@@ -74,6 +89,7 @@ export function PageTurn() {
     const to = row.indexOf(page);
     document.documentElement.dataset.pageTurn =
       from < 0 || to < 0 || from === to ? "settle" : to > from ? "forward" : "back";
+    keepWordmarkHatsOnTheBeat();
 
     if (!arrived || !("startViewTransition" in document) || inViewTransition()) return;
     if (!window.matchMedia("(prefers-reduced-motion: no-preference)").matches) return;

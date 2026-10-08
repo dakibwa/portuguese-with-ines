@@ -2274,8 +2274,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     return (
       <section className="booking-success" aria-live="polite">
         {/* Good news gets one small celebration: the lesson's own mark, the
-            one it wears on the calendar from now on, lands in the card's
-            corner. Decorative, and it lands only once. */}
+            one it wears on the calendar from now on, lands in the card's top
+            corner, as each Lessons card carries its own. It is also the card's
+            only seal: the heading says the rest. Decorative; it lands once. */}
         {lessonType ? (
           <LessonMark
             className="booking-success__mark"
@@ -2286,23 +2287,21 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             recurring={Boolean(confirmation.series || confirmation.selection?.recurring)}
           />
         ) : null}
-        {/* The tick and the word sat above the heading and pushed everything
-            down a screen that is mostly one sentence of good news. Beside it,
-            they confirm the same thing and cost no height. */}
+        {/* One good-news card, read top to bottom: what happened, when,
+            where the details went, what next, then the small print. */}
         <div className="booking-success__head">
           <h2 id="booking-success-heading" tabIndex={-1}>
             You&rsquo;re booked in.
           </h2>
-          <p className="eyebrow booking-success__badge">
-            <CheckCircle2 size={18} aria-hidden="true" />
-            Booked
-          </p>
         </div>
         <p className="booking-success__when">
-          {formatLongDate(confirmation.startAt)} at {formatSlotTime(confirmation.startAt)} Porto time
-          {localTime ? ` · ${localTime} your time` : ""}
+          <strong>{formatLongDate(confirmation.startAt)}</strong>{" "}
+          <span>
+            at {formatSlotTime(confirmation.startAt)} Porto time
+            {localTime ? ` · ${localTime} your time` : ""}
+          </span>
         </p>
-        <p>
+        <p className="booking-success__sent">
           A confirmation and calendar invitation are on their way to <strong>{confirmation.email}</strong>.
         </p>
 
@@ -2349,10 +2348,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             ) : null}
           </div>
         ) : null}
-        <dl className="booking-success__reference">
-          <dt>Your reference</dt>
-          <dd>{confirmation.reference}</dd>
-        </dl>
         <div className="booking-success__actions">
           <button
             className="button button--coral"
@@ -2379,10 +2374,16 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </button>
         </div>
         {accountRefreshNotice}
-        <p className="booking-success__note">
-          This lesson is now marked on your calendar. You can open it there to move or cancel it. It&rsquo;s free up to
-          {" "}{NOTICE_HOURS} hours before; after that it costs {formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.
-        </p>
+        <div className="booking-success__foot">
+          <dl className="booking-success__reference">
+            <dt>Your reference</dt>
+            <dd>{confirmation.reference}</dd>
+          </dl>
+          <p className="booking-success__note">
+            This lesson is now marked on your calendar. You can open it there to move or cancel it. It&rsquo;s free up to
+            {" "}{NOTICE_HOURS} hours before; after that it costs {formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.
+          </p>
+        </div>
       </section>
     );
   }

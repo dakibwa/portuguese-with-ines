@@ -310,7 +310,13 @@ again until a view transition has finished, so a click on a written wordmark
 would bring the new page's wordmark in bare and then write it a second time.
 Instead, `PageTurn` holds it written, hats included, with
 `data-wordmark="inked"` until a few frames after the turn. Without `@property`
-it simply turns coral.
+it simply turns coral. The hats also tip now and then on their own, the site's
+one ambient motion: paused CSS animations on a registered `--wordmark-idle`,
+nine seconds for Português and thirteen for Inês, sharing the hover's arc
+through `max()` so the two never add up. `PageTurn` starts them on every page
+at `Date.now() % period`, so the rhythm is the wall clock's and carries on
+unbroken across page turns and full page loads; without JavaScript, and with
+reduced motion, the hats stay still.
 
 The rules under the display headings (`.editorial-rule`, the Home principles'
 `.short-rule`, and the FAQ section header's `::after`, which replaced its
@@ -341,11 +347,11 @@ sizes (the booking banner check) and positioning transforms are untouched. A
 hold is only ever placed before a mark has been seen, and anything that fails
 leaves the mark showing. A Lessons card turns its mark's box, not the picture,
 a few degrees on hover or focus, so the two motions never meet. A confirmed
-booking's `.booking-success` lands the lesson's own `LessonMark` in its
-corner, larger and slower than the small marks. The mark's box stays inside
-the card and crops its own larger picture, so nothing in the card is ever
-clipped and a narrow phone never scrolls sideways (`clip-path` on a box that
-reached past the card hid it but still widened the page); it sits beneath the
+booking's `.booking-success` lands the lesson's own `LessonMark` in its top
+corner, larger and slower than the small marks, cropped by the card's own
+hand-cut edge as the Lessons cards crop theirs. The card clips its overflow, so
+the mark never widens a narrow phone (an earlier `clip-path` on a box reaching
+past the card hid it but still widened the page), and it sits beneath the
 card's text inside an isolated stacking context.
 
 `prefers-reduced-motion: reduce` removes page turns, booking transitions,

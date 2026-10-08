@@ -803,6 +803,12 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   initial-value: 0;
 }
 
+@property --wordmark-idle {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 .header-wordmark {
   /* Declared, not left to the registration, so that a browser without
      @property still has a value; and never as a var() fallback, which
@@ -819,11 +825,59 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 /* A hat's tip is one arc, from 0 to 1: up and back, with the spring's give
    as it lands. Leaving resets it at once, so leaving never tips it again; a
    browser that cannot animate it, or reduced motion, jumps straight to 1,
-   where the arc is back at rest. */
+   where the arc is back at rest. The hats also tip now and then on their own
+   (below), on the same arc; the higher of the two arcs wins, so a hover and
+   an idle tip never add up. */
 .header-wordmark .brand-wordmark__hat {
   --wordmark-hat: 0;
-  translate: 0 calc(-2.5px * sin(var(--wordmark-hat) * 180deg));
-  rotate: calc(var(--hat-turn) * sin(var(--wordmark-hat) * 180deg));
+  --hat-lift: max(sin(var(--wordmark-hat) * 180deg), sin(var(--wordmark-idle) * 180deg));
+  translate: 0 calc(-2.5px * var(--hat-lift));
+  rotate: calc(var(--hat-turn) * var(--hat-lift));
+}
+
+/*
+ * Lightly alive: each hat tips once in a while by itself, on its own rhythm
+ * (nine seconds for Português, thirteen for Inês, so they seldom coincide and
+ * never feel mechanical). The beat is the wall clock's, not the page's:
+ * PageTurn sets each hat's place in its cycle from the time of day, so moving
+ * between pages, even by a full page load, never restarts the rhythm. Until
+ * it does, and without JavaScript, the hats stay still. The one ambient
+ * motion on the site, kept to the two smallest marks in it.
+ */
+/* Each cycle opens with one 630 ms tip, then rests at 1, where the arc is
+   flat, until the next. */
+@keyframes wordmark-hat-idle-9s {
+  0% {
+    --wordmark-idle: 0;
+    animation-timing-function: var(--motion-spring);
+  }
+
+  7%,
+  100% {
+    --wordmark-idle: 1;
+  }
+}
+
+@keyframes wordmark-hat-idle-13s {
+  0% {
+    --wordmark-idle: 0;
+    animation-timing-function: var(--motion-spring);
+  }
+
+  4.85%,
+  100% {
+    --wordmark-idle: 1;
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .header-wordmark .brand-wordmark__hat--portugues {
+    animation: wordmark-hat-idle-9s 9s linear infinite paused;
+  }
+
+  .header-wordmark .brand-wordmark__hat--ines {
+    animation: wordmark-hat-idle-13s 13s linear infinite paused;
+  }
 }
 
 .header-wordmark .brand-wordmark__hat--portugues {
@@ -6115,34 +6169,38 @@ button.text-action {
   background: rgba(239, 93, 60, 0.09);
 }
 
-/* Confirmation shown in place of the calendar once a booking succeeds. */
-
+/*
+ * Confirmation shown in place of the calendar once a booking succeeds: one
+ * hand-cut card in the booking panels' own wash and outline, read top to
+ * bottom. The good news and the lesson's time lead; where the details went is
+ * quieter; the actions follow; the reference and the fee rule close it as
+ * small print under a soft rule. The lesson's own mark is the only seal.
+ */
 .booking-success {
   position: relative;
   isolation: isolate;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   margin-top: 1.5rem;
   border: 1px solid var(--rule);
-  padding: 2rem 1.75rem;
-  gap: 0.55rem;
+  border-radius: var(--squiggle-panel);
+  padding: clamp(1.5rem, 3vw, 2.2rem) clamp(1.25rem, 3vw, 2.2rem) clamp(1.3rem, 2.6vw, 1.8rem);
+  background: rgba(170, 164, 230, 0.1);
 }
 
-/* The lesson's own mark lands in the corner, cropped at the card's edge as
-   the Lessons cards crop theirs, a little larger and slower than the small
-   marks: the one landing on the page that celebrates something. The mark's
-   box stays inside the card and crops its own larger picture, so nothing in
-   the card is ever cut and a narrow phone never scrolls sideways; it sits
-   beneath the card's words should a long line reach the corner. */
+/* The lesson's own mark lands in the top corner, cropped by the card's
+   hand-cut edge as the Lessons cards crop theirs, a little larger and slower
+   than the small marks: the one landing on the page that celebrates
+   something. It sits beneath the card's words. */
 .booking-success__mark {
   position: absolute;
-  right: 0;
-  bottom: 0;
+  top: -30px;
+  right: -30px;
   z-index: -1;
-  overflow: hidden;
-  width: 94px;
-  height: 94px;
+  width: 118px;
+  height: 118px;
   pointer-events: none;
   --land-start: 240ms;
   --land-scale: 0.56;
@@ -6150,73 +6208,107 @@ button.text-action {
   --land-duration: 1150ms;
 }
 
-.booking-success__mark > .asset-mark__picture {
-  width: 128px;
-  height: 128px;
-}
-
+/* The heading keeps clear of the corner mark, and balances its lines rather
+   than leaving "in." alone on a phone. */
 .booking-success__head {
-  display: flex;
   width: 100%;
-  align-self: stretch;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+  padding-right: 4.5rem;
 }
 
-/* Never squeezed by a long heading, and never wrapped onto its own line. */
-.booking-success__badge {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  margin-top: 0.5rem;
-  gap: 0.4rem;
+.booking-success h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2rem, 4vw, 2.7rem);
+  font-weight: 400;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+/* When: the day on its own line, the times beneath it. */
+.booking-success__when {
+  margin: 1.2rem 0 0;
+  font-family: var(--ui);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.booking-success__when strong {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.booking-success__when span {
+  display: block;
+  color: var(--lavender-ink);
+  font-weight: 600;
+}
+
+.booking-success__sent {
+  max-width: 36rem;
+  margin: 0.7rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.booking-success .meeting-link,
+.booking-success .booking-success__series,
+.booking-success > .booking-alert {
+  margin-top: 1rem;
 }
 
 .booking-success__actions {
   display: flex;
-  align-items: center;
-  margin: 0.4rem 0 0.2rem;
-  gap: 1.4rem;
   flex-wrap: wrap;
+  align-items: center;
+  margin-top: 1.5rem;
+  gap: 0.5rem 1.4rem;
 }
 
-.booking-success h2 {
-  font-family: var(--display);
-  font-size: clamp(1.9rem, 3.6vw, 2.6rem);
-  line-height: 1.1;
-}
-
-.booking-success__when {
-  font-family: var(--ui);
-  font-size: 1rem;
-  font-weight: 700;
+/* The small print: the reference to quote, and when changing costs. */
+.booking-success__foot {
+  display: grid;
+  align-self: stretch;
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 1rem;
+  gap: 0.45rem;
 }
 
 .booking-success__reference {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  margin: 0.5rem 0;
-  gap: 0.6rem;
+  margin: 0;
+  gap: 0.1rem 0.6rem;
 }
 
 .booking-success__reference dt {
+  color: var(--lavender-ink);
   font-family: var(--ui);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .booking-success__reference dd {
+  margin: 0;
   font-family: var(--ui);
-  font-size: 1.05rem;
+  font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
 }
 
 .booking-success__note {
+  max-width: 40rem;
+  margin: 0;
   font-size: 0.84rem;
-  opacity: 0.78;
+  line-height: 1.5;
+  opacity: 0.8;
+  text-wrap: pretty;
 }
 
 /* /booking — the page a student reaches from their confirmation email. */

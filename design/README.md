@@ -56,8 +56,9 @@ Use these names in review so recurring problems are easy to recognise:
 - **Decorative motion:** adding ambient loops, click delay, entrance
   choreography for a page's text, controls or sections as it loads, or any
   movement that makes a reader wait or does not explain a state change. The
-  page turn, the phone menu opening, the little splats' one-time landing and
-  the rules drawn under the headings (see Motion direction) are deliberate.
+  page turn, the phone menu opening, the little splats' one-time landing, the
+  rules drawn under the headings and the wordmark's hats tipping now and then
+  (see Motion direction) are deliberate.
 
 ## Contrast and accessibility
 
@@ -452,8 +453,12 @@ the slant of her writing; leaving it draws the ink back quickly. As the ink
 reaches each ê, its circumflex (the chapéu, the hat) tips: a lift of a few
 pixels and a small turn, the two hats turning opposite ways, settling on the
 soft spring. A tap on a phone simply goes home. Clicked, it arrives on Home
-still written rather than written twice. Reduced motion changes the colour
-without the writing or the tip.
+still written rather than written twice. The hats also tip now and then on
+their own, so the site feels lightly alive: Português every nine seconds and
+Inês every thirteen, so they seldom coincide. The beat is the wall clock's, not
+the page's, so the rhythm carries on unbroken from page to page. It is the one
+ambient motion on the site. Reduced motion changes the colour without the
+writing, and the hats stay still.
 
 The little splats land. Each small emblem mark arrives once like a dab of
 paint: it blooms from its middle outwards, soft at first and then sharp, a touch
@@ -468,7 +473,7 @@ marks land each time it opens, in step with its links, while the splat cropped
 into its foot blooms a little more slowly. The large painted fields on the
 pages (the Approach fan, the Lessons hero splat and the booking banner's corner
 splat) stay still: they are the paper the marks land on. Text, buttons and the
-booking workspace never move or wait for a landing, nothing loops, and a
+booking workspace never move or wait for a landing, nothing else loops, and a
 landed mark stays still, except that a Lessons card turns its mark a few
 degrees while it is pointed at. A confirmed booking is celebrated once: the
 lesson's own mark, the one it wears on the calendar, lands in the corner of
@@ -637,6 +642,12 @@ Preserve these desktop and mobile states:
 - after a successful one-off or recurring booking, the confirmation's primary
   back action opens the lessons calendar so the new booking is immediately
   visible on its day;
+- the confirmation itself is one hand-cut card in the booking panels' wash,
+  read top to bottom: `You're booked in.`, the day with its times beneath it,
+  where the confirmation went, then the two actions, and a small-print foot
+  under a soft rule with the reference and the fee rule. The lesson's own mark
+  lands in its top corner as its only seal, so there is no separate `Booked`
+  badge (8 October 2026);
 - the calendar shows four Monday-to-Sunday weeks at a time, never one long
   scroll. `Earlier weeks` and `Later weeks` arrows sit either side of the range
   label, and `Later weeks` carries a small coral count of the booked lessons
