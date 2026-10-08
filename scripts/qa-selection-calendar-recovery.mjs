@@ -577,7 +577,9 @@ try {
             await choose(page, at(9));
             await dialog.getByRole("button", { name: mode === "move-series" ? "Move recurrence" : "Change to 10:00", exact: true }).click();
           }
-          await expect(dialog.locator(mode === "cancel" ? ".lesson-manage-dialog__lesson" : ".managed-lesson__current-time")).toContainText("Monday, 5 October 2026, 11:00");
+          // The change form names the lesson as it stands in its short form.
+          if (mode === "cancel") await expect(dialog.locator(".lesson-manage-dialog__lesson")).toContainText("Monday, 5 October 2026, 11:00");
+          else await expect(dialog.locator(".managed-lesson__current-time")).toContainText("Mon 5 Oct, 11:00");
           await expect(dialog.getByRole("heading", { name: "All sorted", exact: true })).toHaveCount(0);
         }
         await expect(page.getByRole("alert").filter({ hasText: unreadable })).toBeVisible();

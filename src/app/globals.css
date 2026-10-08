@@ -3611,6 +3611,11 @@ html.booking-transitioning .booking-confirmation-stage {
   color: var(--lavender-ink);
 }
 
+/* On a day filled coral every time reads in white, the weekly one included. */
+.unified-calendar .calendar-week button.has-booking:not(.has-weekly-booking):is(:hover, :focus-visible, .is-selected) .calendar-booking-times .is-weekly {
+  color: inherit;
+}
+
 /* A day with several lessons lists them to open, and can still book another. */
 .calendar-booking-prompt__lessons {
   display: grid;
@@ -3818,10 +3823,6 @@ html.booking-transitioning .booking-confirmation-stage {
   outline: 0;
   transform: translate(-50%, -50%);
   animation: dialog-fade-in var(--motion-dialog) ease-out both;
-}
-
-.unified-calendar--managed-overlay .unified-calendar__toolbar {
-  padding-right: 2.65rem;
 }
 
 .unified-calendar--managed-overlay .unified-calendar__grid {
@@ -4038,7 +4039,12 @@ html.booking-transitioning .booking-confirmation-stage {
 }
 
 .managed-lesson__current-time {
-  margin: 0 0 0.8rem;
+  margin: 0.2rem 0 0;
+  color: var(--lavender-ink);
+  font-family: var(--ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .managed-lesson__duration {
@@ -4076,11 +4082,64 @@ html.booking-transitioning .booking-confirmation-stage {
   }
 }
 
-.managed-lesson__heading {
-  margin: 0.2rem 0 0.75rem;
+/* The task, then the lesson as it stands in one short line: a phone reads
+   them before the calendar, a wide screen across the top. */
+.unified-calendar.unified-calendar--managed-overlay {
+  grid-template-areas:
+    "head"
+    "calendar"
+    "panel";
+}
+
+@container booking (min-width: 700px) {
+  .unified-calendar.unified-calendar--managed-overlay {
+    grid-template-areas:
+      "head head"
+      "calendar panel";
+  }
+}
+
+.managed-lesson__head {
+  grid-area: head;
+  min-width: 0;
+  /* Level with the calendar's own content, and clear of the close button. */
+  padding: 0.2rem 3rem 0 clamp(1rem, 2.4vw, 1.75rem);
+}
+
+/* Beneath the head the calendar and the form start together, close under it. */
+.unified-calendar--managed-overlay .unified-calendar__grid,
+.unified-calendar--managed-overlay .unified-calendar__panel {
+  padding-top: 0.5rem;
+}
+
+.unified-calendar--managed-overlay .unified-calendar__move {
+  margin-top: 0;
+}
+
+.managed-lesson__head h3 {
+  margin: 0;
   font-family: var(--ui);
-  font-size: 1rem;
+  font-size: 1.05rem;
   line-height: 1.35;
+  text-wrap: balance;
+}
+
+/* Where the form stacks under the calendar, it keeps to its choices: the key
+   shares its row with Show all, and the length and place controls name
+   themselves, their legends kept for screen readers, as in the booking bar. */
+@container booking (max-width: 699px) {
+  .unified-calendar--managed-overlay .unified-calendar__toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .managed-lesson__duration legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .unified-calendar__bookings,

@@ -2904,6 +2904,21 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               <X aria-hidden="true" size={22} strokeWidth={2} />
             </button>
           ) : null}
+          {managed && isManagedReschedule ? (
+            // The task and the lesson as it stands come first: above the
+            // calendar on a phone, across the top on a wide screen. Keep
+            // current time at the foot of the form is the one way back.
+            <div className="managed-lesson__head">
+              <h3 id="managed-reschedule-heading">
+                {manageMode === "reschedule-sequence" ? "Choose a new weekly day and time" : "Choose a new date and time"}
+              </h3>
+              <p className="managed-lesson__current-time">
+                {manageMode === "reschedule-sequence" ? "Currently repeats from " : "Currently "}
+                {shortDay.format(new Date(managed.booking.startAt))}, {formatSlotTimeForStudent(managed.booking.startAt, studentZone)}
+                {manageMode === "reschedule-sequence" ? null : ` · ${formatBookedLessonLabel(managed.booking.lessonType)}`}
+              </p>
+            </div>
+          ) : null}
           {intent === "book" && !managed ? (savedChoices.length || activeChange ? bookingProgressBar() : bookingChoicesBar()) : null}
           <div
             className={`calendar-panel unified-calendar__grid${bookingDateChosen ? " unified-calendar__grid--date-chosen" : ""}`}
@@ -3152,15 +3167,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               />
             ) : managed && isManagedReschedule ? (
               <div className="unified-calendar__move">
-                {/* The heading names the task on its own, and Keep current time
-                    at the foot of the form is the one way back. */}
-                <h3 className="managed-lesson__heading" id="managed-reschedule-heading">
-                  {manageMode === "reschedule-sequence" ? "Choose a new weekly day and time" : "Choose a new date and time"}
-                </h3>
-                <p className="booking-state-note managed-lesson__current-time">
-                  {manageMode === "reschedule-sequence" ? "Currently repeats from" : `Currently ${formatBookedLessonLabel(managed.booking.lessonType)} on`}{" "}
-                  {formatLongDate(managed.booking.startAt)}, {formatSlotTimeForStudent(managed.booking.startAt, studentZone)}
-                </p>
                 {canChangeManagedDuration ? (
                   <fieldset className="managed-lesson__duration">
                     <legend>Lesson length</legend>
@@ -3234,7 +3240,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   </div>
                 ) : null}
                 <p className="booking-state-note">
-                  {selectedDate ? `${formatLongDate(`${selectedDate}T12:00:00Z`)} · Porto time` : "Choose a free day on the calendar."}
+                  {selectedDate ? `${shortDay.format(new Date(`${selectedDate}T12:00:00Z`))} · Porto time` : "Choose a free day on the calendar."}
                 </p>
                 {accountRefreshNotice}
                 {loadingSlots ? (

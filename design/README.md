@@ -678,10 +678,14 @@ Preserve these desktop and mobile states:
   same calendar and time picker into the overlay; it never dismisses the modal
   or scrolls the student down the underlying page. Where the form sits beside
   the calendar it shows the usual four weeks from the lesson's week; where the
-  form stacks beneath it, as on a phone, the lesson's week alone with `Show all`.
-  Its heading names the task with no eyebrow above it, and `Keep current time`
-  (`Keep current schedule` for a recurrence) is the one way back, with no
-  separate `Back`. The overlay is one surface,
+  form stacks beneath it, as on a phone, the lesson's week alone with `Show all`
+  on the key's row. The overlay leads with its heading and one short line for
+  the lesson as it stands (`Currently Thu 15 Oct, 18:00 · 60 mins`): above the
+  calendar on a phone, across the top on a wide screen, with no eyebrow. The
+  chosen day reads short above its times (`Fri 16 Oct · Porto time`), and on
+  a phone the length and place controls name themselves without legends, as
+  in the booking bar. `Keep current time` (`Keep current schedule` for a
+  recurrence) is the one way back, with no separate `Back`. The overlay is one surface,
   without framed cards nested inside it. Eligible ordinary lessons can switch
   between the same compact `60 mins` and `90 mins` choices and Online/In Porto
   there, with the current date and time already selected; a paid lesson is never silently
@@ -787,7 +791,11 @@ calmer, without new content:
 - changing a lesson on a wide screen opens on the usual four weeks beside the
   form, so there is no empty half and no `Show all`; the overlay's heading
   stands alone and `Keep current time` is its one way back, stacked beneath
-  the coral action so neither label breaks onto a second line.
+  the coral action so neither label breaks onto a second line;
+- the change overlay says the date once rather than three times: the heading
+  and a one-line `Currently …` come first, even on a phone, the day above the
+  times reads short, and a phone drops the length and place legends. A day
+  filled coral shows every booked time in white.
 
 ## Account interaction states
 
