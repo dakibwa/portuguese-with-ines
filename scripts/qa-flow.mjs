@@ -1726,16 +1726,20 @@ if (
 ) {
   throw new Error(`Changing a lesson should stay inside the aligned calendar interface, without decorative rules and with the shared segmented control: ${JSON.stringify(desktopChangeLayout)}.`);
 }
-await desktopManagePanel.getByRole("button", { name: "Back", exact: true }).click();
+await desktopManagePanel.getByRole("button", { name: "Keep current time", exact: true }).click();
 await desktopManageDialog.waitFor({ state: "visible" });
 await desktopManageDialog.getByRole("button", { name: "Change", exact: true }).click();
 await desktopChangeDialog.waitFor({ state: "visible" });
 await ninetyMinuteChoice.check();
 await desktopManagePanel.getByRole("radio", { name: "In Porto", exact: true }).check();
-// Rescheduling opens the booked week. On Sundays, tomorrow's fixture is in
-// the following week, so expand the calendar through the same control a
-// student uses instead of assuming both dates share the compact week.
-await desktopChangeDialog.getByRole("button", { name: "Show all", exact: true }).click();
+// Beside the change form there is room for the usual four weeks, from the
+// booked week on, so tomorrow's fixture is in view even on a Sunday.
+if ((await desktopChangeDialog.locator(".calendar-week").count()) !== 4) {
+  throw new Error("Changing a lesson on a wide screen should open on the usual four weeks.");
+}
+if (await desktopChangeDialog.getByRole("button", { name: "Show all", exact: true }).count()) {
+  throw new Error("Four weeks beside the change form need no Show all.");
+}
 await accountPage.locator(`#lesson-calendar [data-date-key="${qaFreeDate}"]`).click();
 await desktopManagePanel.locator(".slot-grid button").first().click();
 await waitForOrientation(accountPage);
@@ -2059,7 +2063,7 @@ if (
   throw new Error(`Mobile lesson changing should remain above the dimmed page: ${JSON.stringify(mobileChangeLayout)}.`);
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-change-workflow-mobile.png"), fullPage: false });
-await mobileManagePanel.getByRole("button", { name: "Back", exact: true }).click();
+await mobileManagePanel.getByRole("button", { name: "Keep current time", exact: true }).click();
 await mobileManageDialog.waitFor({ state: "visible" });
 await mobileManageDialog.getByRole("button", { name: "Close lesson management", exact: true }).click();
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
@@ -2410,7 +2414,7 @@ if ((await moveRecurrenceDialog.locator(".segmented").count()) !== 2) {
   throw new Error("Moving a recurrence should retain the compact length and location sliders.");
 }
 await moveRecurrenceDialog.getByText(/Currently repeats from/i).waitFor();
-await moveRecurrenceDialog.getByRole("button", { name: "Back", exact: true }).click();
+await moveRecurrenceDialog.getByRole("button", { name: "Keep current schedule", exact: true }).click();
 await sequenceDialog.getByRole("heading", { name: "Manage recurring lesson", exact: true }).waitFor();
 await stopRepeating.click();
 if (stopRepeatPayloads.length !== 0) throw new Error("Opening the repeat confirmation called the stop endpoint.");

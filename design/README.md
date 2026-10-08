@@ -524,8 +524,9 @@ place, headed by a short date (`Thu 24 Sept 2026`) with an outline `Change`
 beside it on the same row, which returns to the calendar (named `Change date`
 for assistive technology). Before a day is chosen, the panel beside the
 calendar offers `Soonest times`: the first free time on each of the next three
-free days, each one tap from the confirmation. On a phone that panel stays out
-of sight until there is a day to show.
+free days, each one tap from the confirmation. `Soonest times` is the panel's
+heading, with no `Choose a day` or eyebrow stacked above the three rows. On a
+phone that panel stays out of sight until there is a day to show.
 
 Students can collect several single-lesson dates and confirm them together.
 Each chosen lesson is its own row: its own splat, the date and time, Porto time
@@ -675,7 +676,12 @@ Preserve these desktop and mobile states:
   lesson keeps the calendar in place and adds a compact overlay asking
   whether to change or cancel it. `Change` keeps the page dimmed and lifts that
   same calendar and time picker into the overlay; it never dismisses the modal
-  or scrolls the student down the underlying page. The overlay is one surface,
+  or scrolls the student down the underlying page. Where the form sits beside
+  the calendar it shows the usual four weeks from the lesson's week; where the
+  form stacks beneath it, as on a phone, the lesson's week alone with `Show all`.
+  Its heading names the task with no eyebrow above it, and `Keep current time`
+  (`Keep current schedule` for a recurrence) is the one way back, with no
+  separate `Back`. The overlay is one surface,
   without framed cards nested inside it. Eligible ordinary lessons can switch
   between the same compact `60 mins` and `90 mins` choices and Online/In Porto
   there, with the current date and time already selected; a paid lesson is never silently
@@ -771,11 +777,17 @@ calmer, without new content:
   and the rules around the lesson's date. Its pill is `Recurring lesson` only
   while the repeat is running, `Booked` once it stops, and `Cancelled` carries
   the past lessons' ⊗. `Manage sequence` is a compact outline button. Cancelling
-  a sequence states what happens rather than asking again, and on a phone each
-  pair of dialog actions stacks so no label wraps;
+  a sequence states what happens rather than asking again. On a phone a
+  decision's pair of actions (`Yes, cancel it` / `Keep lesson` and the like)
+  stacks so no label wraps, while `Change` and `Cancel` stay side by side;
 - booked times in calendar tiles are big enough to read and to tell the weekly
   colour from the one-off one, and the calendar key shows `Booked lesson` only
-  when there is a booked lesson to point to.
+  when there is a booked lesson to point to;
+- before a day is chosen, `Soonest times` heads the side panel on its own;
+- changing a lesson on a wide screen opens on the usual four weeks beside the
+  form, so there is no empty half and no `Show all`; the overlay's heading
+  stands alone and `Keep current time` is its one way back, stacked beneath
+  the coral action so neither label breaks onto a second line.
 
 ## Account interaction states
 

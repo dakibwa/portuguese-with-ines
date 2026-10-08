@@ -1839,6 +1839,17 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     };
   }, [dismissManagedDialog, isManagedReschedule, manageDialogOpen, manageMode]);
 
+  // Where the change form sits beside the calendar (the booking column's
+  // two-column layout, `@container booking (min-width: 700px)`), there is room
+  // for the usual four weeks. Where it stacks beneath, the lesson's own week
+  // keeps the overlay short, with Show all for the rest.
+  function changeFormBesideCalendar() {
+    const column = managedRescheduleRef.current?.closest<HTMLElement>(".booking-provider");
+    if (!column) return false;
+    const style = getComputedStyle(column);
+    return column.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) >= 700;
+  }
+
   function beginManagedReschedule() {
     if (!managed) return;
     const managedDate = portoDateKey(new Date(managed.booking.startAt));
@@ -1853,7 +1864,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setManagedLocation(managed.booking.location);
       setSelectedDate(isInCalendar ? managedDate : "");
       setSelectedSlot(isInCalendar ? managed.booking.startAt : "");
-      setCalendarWeekCount(isInCalendar ? 1 : 4);
+      setCalendarWeekCount(isInCalendar && !changeFormBesideCalendar() ? 1 : 4);
       setManageError("");
       setLoadingSlots(true);
     });
@@ -1873,7 +1884,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setManagedLocation(managed.booking.location);
       setSelectedDate(isInCalendar ? managedDate : "");
       setSelectedSlot(isInCalendar ? managed.booking.startAt : "");
-      setCalendarWeekCount(isInCalendar ? 1 : 4);
+      setCalendarWeekCount(isInCalendar && !changeFormBesideCalendar() ? 1 : 4);
       setManageError("");
       setLoadingSlots(true);
     });
@@ -3072,7 +3083,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             }
                             transitionBooking(() => {
                               setSelectedDate(cell.key);
-                              setCalendarWeekCount(managed ? 1 : CALENDAR_PAGE_WEEKS);
+                              setCalendarWeekCount(managed && !changeFormBesideCalendar() ? 1 : CALENDAR_PAGE_WEEKS);
                               setSlotNotice("");
                               setSelectedSlot(
                                 managed &&
@@ -3141,22 +3152,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               />
             ) : managed && isManagedReschedule ? (
               <div className="unified-calendar__move">
-                <div className="managed-lesson__header">
-                  <div>
-                    <p className="eyebrow">{manageMode === "reschedule-sequence" ? "Move recurrence" : "Change this lesson"}</p>
-                    <h3 id="managed-reschedule-heading">
-                      {manageMode === "reschedule-sequence" ? "Choose a new weekly day and time" : "Choose a new date and time"}
-                    </h3>
-                  </div>
-                  <button
-                    className="booking-back booking-back--tertiary"
-                    disabled={manageWorking}
-                    onClick={() => transitionBooking(() => setManageMode(manageMode === "reschedule-sequence" ? "sequence" : "view"))}
-                    type="button"
-                  >
-                    <ArrowLeft size={16} aria-hidden="true" /> Back
-                  </button>
-                </div>
+                {/* The heading names the task on its own, and Keep current time
+                    at the foot of the form is the one way back. */}
+                <h3 className="managed-lesson__heading" id="managed-reschedule-heading">
+                  {manageMode === "reschedule-sequence" ? "Choose a new weekly day and time" : "Choose a new date and time"}
+                </h3>
                 <p className="booking-state-note managed-lesson__current-time">
                   {manageMode === "reschedule-sequence" ? "Currently repeats from" : `Currently ${formatBookedLessonLabel(managed.booking.lessonType)} on`}{" "}
                   {formatLongDate(managed.booking.startAt)}, {formatSlotTimeForStudent(managed.booking.startAt, studentZone)}
@@ -3301,13 +3301,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               </div>
             ) : (
               <>
-                {/* With no day chosen while booking, the heading already says
-                    "Choose a day"; an eyebrow saying it again read as a stutter. */}
+                {/* With no day chosen while booking, the heading already names
+                    what the panel holds; an eyebrow above it would only stutter. */}
                 {intent === "lessons" || (selectedDate && !bookingDateChosen) ? (
                   <p className="eyebrow">{selectedDate ? "Selected day" : "Upcoming lessons"}</p>
                 ) : null}
                 <div className="unified-calendar__panel-head">
-                  <h3>
+                  <h3 id="unified-calendar-panel-heading">
                     {selectedDate && bookingDateChosen ? (
                       <>
                         <span className="unified-calendar__date-long">{formatLongDate(`${selectedDate}T12:00:00Z`)}</span>
@@ -3319,7 +3319,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       ? formatLongDate(`${selectedDate}T12:00:00Z`)
                       : intent === "lessons" && !calendarWindowBookings.length
                         ? "Nothing booked yet"
-                        : "Choose a day"}
+                        : soonestSlots.length
+                          ? "Soonest times"
+                          : "Choose a day"}
                   </h3>
                   {/* On a phone the times take the calendar's place, so the way
                       back to it sits beside the date, which is short enough to
@@ -3371,8 +3373,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     {!selectedDate ? (
                       soonestSlots.length ? (
                         <div className="booking-soonest">
-                          <p className="eyebrow" id="booking-soonest-heading">Soonest times</p>
-                          <ul aria-labelledby="booking-soonest-heading">
+                          <ul aria-labelledby="unified-calendar-panel-heading">
                             {soonestSlots.map((slot) => {
                               const local = differingLocalTime(slot.startAt, studentZone);
                               return (

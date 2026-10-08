@@ -233,7 +233,6 @@ try {
         await (await moveForm(page, sequence)).click();
         await started.promise;
         const dialog = page.getByRole("dialog");
-        await expect(dialog.getByRole("button", { name: "Back", exact: true })).toBeDisabled();
         await expect(dialog.getByRole("button", { name: sequence ? "Keep current schedule" : "Keep current time", exact: true })).toBeDisabled();
         await expect(dialog.getByRole("button", { name: "10:00", exact: true })).toBeDisabled();
         await expect(page.locator('button[data-date-key="2026-10-06"]')).toBeDisabled();
