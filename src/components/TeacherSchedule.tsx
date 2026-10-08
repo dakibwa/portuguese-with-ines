@@ -513,6 +513,11 @@ export function TeacherSchedule() {
       ) : null}
 
       <section className="teacher-week" aria-labelledby="teacher-week-title">
+        {/* One bar holds the week, Weekly hours, the hint and the pager, in
+            that reading order. Wide, the week and Weekly hours share the top
+            row with the hint and pager beneath. Narrower, the week, Weekly
+            hours and the pager share a row where they fit (on a phone the week
+            has its own, with the other two beneath it), and the hint follows. */}
         <div className="teacher-week-toolbar">
           <div className="teacher-week-title">
             <span className="teacher-eyebrow">
@@ -549,9 +554,7 @@ export function TeacherSchedule() {
               ) : null}
             </button>
           )}
-        </div>
-        <div className="teacher-week-subbar">
-          <p>
+          <p className="teacher-week-hint">
             {editing ? (
               "Click or drag down a day to mark lesson start times."
             ) : (

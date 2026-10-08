@@ -50,15 +50,15 @@ export function BookingFlow({ initialView = "book" }: { initialView?: BookingVie
             <div className="editorial-rule" aria-hidden="true" />
             <ul className="booking-intro__points">
               <li>
-                <AssetMark asset="/visuals/v2-splats/one-to-one-splat-v2.svg" />
+                <AssetMark asset="/visuals/v2-splats/one-to-one-splat-v2.svg" lands />
                 <span>View your calendar</span>
               </li>
               <li>
-                <AssetMark asset="/visuals/v2-splats/flexible-rescheduling-splat-v2.svg" />
+                <AssetMark asset="/visuals/v2-splats/flexible-rescheduling-splat-v2.svg" lands />
                 <span>Move or cancel here</span>
               </li>
               <li>
-                <AssetMark asset="/visuals/v2-splats/lesson-format-splat-v2.svg" />
+                <AssetMark asset="/visuals/v2-splats/lesson-format-splat-v2.svg" lands />
                 <span>Porto time</span>
               </li>
             </ul>

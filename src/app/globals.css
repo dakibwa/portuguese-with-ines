@@ -38,6 +38,10 @@
   --squiggle-panel: 48px 20px 44px 24px / 22px 46px 21px 42px;
   --squiggle-button: 44px 18px 40px 22px / 20px 42px 19px 38px;
   --squiggle-button-alt: 20px 42px 19px 38px / 44px 18px 40px 22px;
+  /* Where a pointer settles, a button's cut shifts a little and settles, as
+     wet ink does: the same hand, never a new shape. */
+  --squiggle-button-shift: 38px 24px 46px 16px / 24px 36px 23px 44px;
+  --squiggle-button-alt-shift: 24px 36px 23px 44px / 38px 24px 46px 16px;
   --squiggle-tile: 37px 15px 34px 19px / 17px 36px 16px 32px;
   --squiggle-tabs: 35px 14px 32px 18px / 16px 34px 15px 30px;
   --squiggle-field: 33px 13px 30px 16px / 15px 31px 14px 28px;
@@ -53,6 +57,28 @@
   --motion-route: 240ms;
   --motion-surface: 190ms;
   --motion-dialog: 260ms;
+  --motion-land: 900ms;
+  --motion-page: 620ms;
+  /* Decelerates hard and long: things arrive quickly, then take their time. */
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A pen's steady pace, easing only as it lifts: for what is drawn or
+     written, the wordmark's ink and the rules under the headings. */
+  --motion-pen: cubic-bezier(0.61, 1, 0.88, 1);
+  /*
+   * Springs, sampled from a damped oscillator. The soft one gives about 4% and
+   * settles, for things that land or travel; the firm one barely gives, for
+   * controls answering a press. Browsers without linear() keep the curves
+   * beside them, which approximate each spring's sweep.
+   */
+  --motion-spring: cubic-bezier(0.3, 1.25, 0.5, 1);
+  --motion-spring-firm: cubic-bezier(0.25, 1.05, 0.5, 1);
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --motion-spring: linear(0, 0.036, 0.125, 0.243, 0.372, 0.5, 0.618, 0.722, 0.809, 0.88, 0.934, 0.975, 1.003, 1.022, 1.033, 1.038, 1.038, 1.036, 1.032, 1.028, 1.023, 1.018, 1.013, 1.01, 1.006, 1.004, 1);
+    --motion-spring-firm: linear(0, 0.04, 0.133, 0.252, 0.376, 0.495, 0.602, 0.694, 0.77, 0.832, 0.881, 0.918, 0.946, 0.967, 0.981, 0.991, 0.997, 1.001, 1.004, 1.005, 1.005, 1.005, 1.004, 1.004, 1.003, 1.003, 1);
+  }
 }
 
 * {
@@ -432,20 +458,190 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   }
 }
 
-/* Next remounts the route template after navigation, so this is an incoming
-   dissolve rather than a click delay. The destination starts loading
-   immediately; the fade only softens the paint once it is ready. */
 /* A column the height of the window, so a short page (the first booking step)
    ends on its footer rather than on a strip of paper beneath it. */
 .route-fade {
   display: flex;
   min-height: 100dvh;
   flex-direction: column;
-  animation: route-fade-in var(--motion-route) var(--motion-ease) both;
 }
 
 .route-fade > main {
   flex: 1 0 auto;
+}
+
+/*
+ * Pages turn into one another. Every navigation runs as a view transition
+ * (template.tsx): the page being left lifts away quickly and the new one
+ * settles in, while the header holds still and the nav's coral line glides
+ * to the new destination. On wider screens the pages sit in a row along the
+ * nav, so a later page arrives from the right and an earlier one from the left
+ * (PageTurn); on phones every page settles in place. Nothing waits for
+ * the motion: the new page is live, and clickable, from its first frame.
+ * A full page load into Booking crossfades the same way between documents.
+ */
+@view-transition {
+  navigation: auto;
+  types: document;
+}
+
+.site-header {
+  view-transition-name: site-header;
+}
+
+.akibwa-project-banner {
+  view-transition-name: portfolio-banner;
+}
+
+/* Hidden on wide screens, so only a phone's menu ever takes part. */
+.nav-mobile {
+  view-transition-name: site-menu;
+}
+
+::view-transition {
+  pointer-events: none;
+}
+
+/* The header and the portfolio banner above it hold still: the new one is
+   simply there, so a page left scrolled down does not drag either into view. */
+::view-transition-group(site-header),
+::view-transition-group(portfolio-banner) {
+  z-index: 3;
+  animation: none;
+}
+
+::view-transition-old(site-header),
+::view-transition-old(portfolio-banner) {
+  display: none;
+}
+
+::view-transition-new(site-header),
+::view-transition-new(portfolio-banner) {
+  animation: none;
+}
+
+::view-transition-group(site-nav-current) {
+  z-index: 4;
+  animation-duration: 640ms;
+  animation-timing-function: var(--motion-spring);
+}
+
+/* A phone menu open over the page recedes with it, above the page being left
+   rather than vanishing beneath it, and beneath the page arriving. */
+::view-transition-group(site-menu) {
+  z-index: 1;
+  animation: none;
+}
+
+::view-transition-group(.page-in) {
+  z-index: 2;
+}
+
+::view-transition-old(site-menu) {
+  --page-blur: 3px;
+  animation: page-recede 200ms var(--motion-ease-out) both;
+}
+
+::view-transition-new(site-menu) {
+  display: none;
+}
+
+/* The page being left drops out of focus and away almost at once... */
+@keyframes page-recede {
+  to {
+    opacity: 0;
+    filter: blur(var(--page-blur));
+    scale: 0.985;
+  }
+}
+
+/* ...and the new one pulls into focus as it settles. */
+@keyframes page-focus {
+  from {
+    opacity: 0;
+    filter: blur(var(--page-blur));
+  }
+}
+
+@keyframes page-drift-out {
+  to {
+    translate: var(--page-out);
+  }
+}
+
+@keyframes page-drift-in {
+  from {
+    translate: var(--page-in);
+  }
+}
+
+/* The old page is all but gone before the new one shows, so two pages never
+   print over each other; for a breath the paper shows between them. */
+::view-transition-old(.page-out) {
+  --page-blur: 8px;
+  --page-out: 0 -12px;
+  animation:
+    page-recede 220ms var(--motion-ease-out) both,
+    page-drift-out 420ms var(--motion-ease-out) both;
+}
+
+::view-transition-new(.page-in) {
+  --page-blur: 10px;
+  --page-in: 0 20px;
+  animation:
+    page-focus 420ms var(--motion-ease-out) 90ms both,
+    page-drift-in var(--motion-page) var(--motion-ease-out) both;
+}
+
+@media (min-width: 821px) {
+  :root[data-page-turn="forward"]::view-transition-old(.page-out) {
+    --page-out: -32px 0;
+  }
+
+  :root[data-page-turn="forward"]::view-transition-new(.page-in) {
+    --page-in: 48px 0;
+  }
+
+  :root[data-page-turn="back"]::view-transition-old(.page-out) {
+    --page-out: 32px 0;
+  }
+
+  :root[data-page-turn="back"]::view-transition-new(.page-in) {
+    --page-in: -48px 0;
+  }
+}
+
+/* A full page load, as into Booking, has no page of its own to move, so the
+   whole page recedes and focuses in the same way, around the still header. */
+html:active-view-transition-type(document)::view-transition-old(root) {
+  --page-blur: 8px;
+  animation: page-recede 220ms var(--motion-ease-out) both;
+}
+
+html:active-view-transition-type(document)::view-transition-new(root) {
+  --page-blur: 10px;
+  animation: page-focus 420ms var(--motion-ease-out) 90ms both;
+}
+
+/* A phone keeps a lighter blur, so the turn holds its frame rate. */
+@media (max-width: 820px) {
+  ::view-transition-old(.page-out),
+  ::view-transition-new(.page-in) {
+    --page-blur: 3px;
+  }
+
+  /* Its own rule: a browser that cannot read this selector drops only it. */
+  html:active-view-transition-type(document)::view-transition-old(root),
+  html:active-view-transition-type(document)::view-transition-new(root) {
+    --page-blur: 3px;
+  }
+}
+
+/* Without view transitions, the arriving page dissolves in instead. */
+@supports not (view-transition-name: none) {
+  .route-fade {
+    animation: route-fade-in var(--motion-route) var(--motion-ease) both;
+  }
 }
 
 @keyframes route-fade-in {
@@ -461,6 +657,8 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   :root {
     --motion-route: 190ms;
     --motion-surface: 180ms;
+    --motion-land: 820ms;
+    --motion-page: 520ms;
   }
 }
 
@@ -472,12 +670,35 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   .route-fade {
     animation: none;
   }
+
+  /* The new page is simply there. Important, because the turn's own rules
+     name their pseudo-elements more specifically than any wildcard can. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
+/*
+ * One artwork, three masks: the lettering, and the two circumflexes over its
+ * ê (the chapéu, the "hat"), each cut out by a small window round it. At rest
+ * they print as one wordmark. The windows are in the artwork's own pixels
+ * (760 × 236): x 404–442, y 22–48 for Português and x 647–686, y 136–162 for
+ * Inês, both clear of every other stroke, placed as percentages where
+ * position = start / (1 − size).
+ */
 .brand-wordmark {
+  position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 900 / 280;
+  aspect-ratio: 760 / 236;
+}
+
+/* No more specific than the layers' own rules below, which must win. */
+.brand-wordmark > * {
+  position: absolute;
+  inset: 0;
   background: currentColor;
   -webkit-mask-image: var(--wordmark-image);
   -webkit-mask-position: center;
@@ -487,6 +708,40 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   mask-position: center;
   mask-repeat: no-repeat;
   mask-size: contain;
+}
+
+.brand-wordmark__letters {
+  -webkit-mask-image: var(--wordmark-image), linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  -webkit-mask-position: center, 56.033% 10.526%, 89.861% 65.072%;
+  -webkit-mask-size: contain, 5.132% 11.441%, 5.263% 11.441%;
+  -webkit-mask-composite: source-out, source-over;
+  mask-image: var(--wordmark-image), linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  mask-position: center, 56.033% 10.526%, 89.861% 65.072%;
+  mask-size: contain, 5.132% 11.441%, 5.263% 11.441%;
+  mask-composite: subtract, add;
+}
+
+.brand-wordmark__hat {
+  -webkit-mask-image: var(--wordmark-image), linear-gradient(#000 0 0);
+  -webkit-mask-composite: source-in;
+  mask-image: var(--wordmark-image), linear-gradient(#000 0 0);
+  mask-composite: intersect;
+}
+
+.brand-wordmark__hat--portugues {
+  -webkit-mask-position: center, 56.033% 10.526%;
+  -webkit-mask-size: contain, 5.132% 11.441%;
+  mask-position: center, 56.033% 10.526%;
+  mask-size: contain, 5.132% 11.441%;
+  transform-origin: 55.658% 18.644%;
+}
+
+.brand-wordmark__hat--ines {
+  -webkit-mask-position: center, 89.861% 65.072%;
+  -webkit-mask-size: contain, 5.263% 11.441%;
+  mask-position: center, 89.861% 65.072%;
+  mask-size: contain, 5.263% 11.441%;
+  transform-origin: 87.697% 66.949%;
 }
 
 .brand-wordmark--green {
@@ -521,13 +776,160 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 .header-wordmark {
-  width: 100%;
-  height: 72px;
-  aspect-ratio: auto;
-  /* The artwork is narrower than its box: start it on the page's edge, as the
-     footer logo does, not floating in the middle. */
-  -webkit-mask-position: left center;
-  mask-position: left center;
+  /* Sized to the artwork, so the ink below crosses letters rather than empty
+     paper, and so the hats' windows sit where they were measured. */
+  width: min(100%, calc(72px * 760 / 236));
+}
+
+/*
+ * The wordmark is the way home, so pointing at it re-inks Inês's lettering in
+ * coral, written left to right at a pen's steady pace, with the wet edge of
+ * the ink on the slant of her hand. Mixed in OKLCH, that edge runs through
+ * pink and violet rather than mud; a browser without it mixes plainly, and one
+ * that cannot animate the ink (no @property) simply turns coral. As the edge
+ * reaches each ê, its hat tips: a lift of a few pixels and a small turn that
+ * settles on the soft spring. Only a pointer that can rest there writes it: a
+ * tap simply goes home.
+ */
+@property --wordmark-ink {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+@property --wordmark-hat {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --wordmark-idle {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.header-wordmark {
+  /* Declared, not left to the registration, so that a browser without
+     @property still has a value; and never as a var() fallback, which
+     Chromium does not repaint until the transition has ended. */
+  --wordmark-ink: 0%;
+  transition: --wordmark-ink 400ms var(--motion-pen);
+}
+
+.header-wordmark > * {
+  background: linear-gradient(105deg, var(--coral) calc(var(--wordmark-ink) - 12%), currentColor var(--wordmark-ink));
+  background: linear-gradient(in oklch 105deg, var(--coral) calc(var(--wordmark-ink) - 12%), currentColor var(--wordmark-ink));
+}
+
+/* A hat's tip is one arc, from 0 to 1: up and back, with the spring's give
+   as it lands. Leaving resets it at once, so leaving never tips it again; a
+   browser that cannot animate it, or reduced motion, jumps straight to 1,
+   where the arc is back at rest. The hats also tip now and then on their own
+   (below), on the same arc; the higher of the two arcs wins, so a hover and
+   an idle tip never add up. */
+.header-wordmark .brand-wordmark__hat {
+  --wordmark-hat: 0;
+  --hat-lift: max(sin(var(--wordmark-hat) * 180deg), sin(var(--wordmark-idle) * 180deg));
+  translate: 0 calc(-2.5px * var(--hat-lift));
+  rotate: calc(var(--hat-turn) * var(--hat-lift));
+}
+
+/*
+ * Lightly alive: each hat tips once in a while by itself, on its own rhythm
+ * (nine seconds for Português, thirteen for Inês, so they seldom coincide and
+ * never feel mechanical). The beat is the wall clock's, not the page's:
+ * PageTurn sets each hat's place in its cycle from the time of day, so moving
+ * between pages, even by a full page load, never restarts the rhythm. Until
+ * it does, and without JavaScript, the hats stay still. The one ambient
+ * motion on the site, kept to the two smallest marks in it.
+ */
+/* Each cycle opens with one 630 ms tip, then rests at 1, where the arc is
+   flat, until the next. */
+@keyframes wordmark-hat-idle-9s {
+  0% {
+    --wordmark-idle: 0;
+    animation-timing-function: var(--motion-spring);
+  }
+
+  7%,
+  100% {
+    --wordmark-idle: 1;
+  }
+}
+
+@keyframes wordmark-hat-idle-13s {
+  0% {
+    --wordmark-idle: 0;
+    animation-timing-function: var(--motion-spring);
+  }
+
+  4.85%,
+  100% {
+    --wordmark-idle: 1;
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .header-wordmark .brand-wordmark__hat--portugues {
+    animation: wordmark-hat-idle-9s 9s linear infinite paused;
+  }
+
+  .header-wordmark .brand-wordmark__hat--ines {
+    animation: wordmark-hat-idle-13s 13s linear infinite paused;
+  }
+}
+
+.header-wordmark .brand-wordmark__hat--portugues {
+  --hat-turn: -14deg;
+  --hat-delay: 210ms;
+}
+
+.header-wordmark .brand-wordmark__hat--ines {
+  --hat-turn: 12deg;
+  --hat-delay: 400ms;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .site-header__brand:hover .header-wordmark {
+    --wordmark-ink: 112%;
+    transition-duration: 720ms;
+  }
+
+  .site-header__brand:hover .brand-wordmark__hat {
+    --wordmark-hat: 1;
+    transition: --wordmark-hat 620ms var(--motion-spring) var(--hat-delay);
+  }
+
+  /* Clicked while written, it arrives home written (PageTurn), rather than
+     bare and then written again once the page has turned. */
+  :root[data-wordmark="inked"] .header-wordmark {
+    --wordmark-ink: 112%;
+    transition: none;
+  }
+
+  :root[data-wordmark="inked"] .header-wordmark .brand-wordmark__hat {
+    --wordmark-hat: 1;
+    transition: none;
+  }
+}
+
+.site-header__brand:focus-visible .header-wordmark {
+  --wordmark-ink: 112%;
+  transition-duration: 720ms;
+}
+
+.site-header__brand:focus-visible .brand-wordmark__hat {
+  --wordmark-hat: 1;
+  transition: --wordmark-hat 620ms var(--motion-spring) var(--hat-delay);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-wordmark,
+  .header-wordmark .brand-wordmark__hat,
+  .site-header__brand:is(:hover, :focus-visible) .brand-wordmark__hat {
+    transition: none;
+  }
 }
 
 .site-nav {
@@ -560,7 +962,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   content: "";
   opacity: 0;
   transform: scaleX(0.5);
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity 200ms ease, transform 420ms var(--motion-spring-firm);
 }
 
 .site-nav__link:hover,
@@ -568,10 +970,21 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   color: var(--coral-action);
 }
 
-.site-nav__link:hover::after,
-.site-nav__link[aria-current="page"]::after {
+.site-nav__link:hover::after {
   opacity: 1;
   transform: scaleX(1);
+}
+
+/* The current page's line is the same drawing as the hover line, as its own
+   element so that a page turn can glide it along the nav to the new page. */
+.site-nav__current {
+  position: absolute;
+  right: 0;
+  bottom: 22px;
+  left: 0;
+  height: 2px;
+  background: var(--coral);
+  view-transition-name: site-nav-current;
 }
 
 .button {
@@ -592,11 +1005,23 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   line-height: 1.15;
   text-align: center;
   text-transform: uppercase;
-  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    box-shadow 320ms var(--motion-ease-out),
+    transform 420ms var(--motion-spring-firm),
+    border-radius 640ms var(--motion-spring);
 }
 
 .button:hover {
   transform: translateY(-2px);
+}
+
+/* A press sinks the button a touch at once, and the spring lets it back up. */
+.button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 200ms, 200ms, 200ms, 120ms, 80ms, 640ms;
 }
 
 .button--coral {
@@ -604,8 +1029,10 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   color: var(--paper-light);
 }
 
+/* Lifted, the filled buttons cast a soft shadow in their own colour. */
 .button--coral:hover {
   background: #95301f;
+  box-shadow: 0 12px 22px -14px rgba(149, 48, 31, 0.75);
 }
 
 .button--blue {
@@ -615,6 +1042,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 .button--blue:hover {
   background: var(--ink);
+  box-shadow: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
 }
 
 /*
@@ -649,6 +1077,21 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   background: rgba(245, 236, 217, 0.15);
 }
 
+/* Pointed at or focused, the cut shifts on the soft spring. The booking
+   journey's own control grammar, later in this file, keeps its buttons as
+   they are. */
+@media (prefers-reduced-motion: no-preference) {
+  .button:where(:hover, :focus-visible):not(:disabled) {
+    border-radius: var(--squiggle-button-shift);
+  }
+
+  .button--outline:where(:hover, :focus-visible):not(:disabled),
+  .button--outline-light:where(:hover, :focus-visible):not(:disabled),
+  .booking-confirm-button:where(:hover, :focus-visible):not(:disabled) {
+    border-radius: var(--squiggle-button-alt-shift);
+  }
+}
+
 /* For a supporting pair beside or beneath the page's main action. */
 .button--compact {
   min-height: 50px;
@@ -681,7 +1124,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   content: "";
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform 160ms ease-out;
+  transition: transform 420ms var(--motion-spring-firm);
 }
 
 .text-action:hover {
@@ -722,6 +1165,38 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   background: var(--lavender);
 }
 
+/*
+ * The rules under the headings are drawn, once, from their left end at a
+ * pen's pace as their page arrives: the hero rules a moment after the heading
+ * shows, each principle's short rule as its splat settles, and an FAQ
+ * section's rule each time the section is chosen. The heading itself never
+ * waits or moves; reduced motion and print show every rule drawn.
+ */
+@keyframes rule-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .editorial-rule,
+  .short-rule,
+  .faq-group__header::after {
+    transform-origin: left center;
+    animation: rule-draw var(--rule-duration, 820ms) var(--motion-pen) var(--rule-delay, 240ms) backwards;
+  }
+
+  .short-rule {
+    --rule-duration: 520ms;
+    --rule-delay: calc(var(--land-start, 160ms) + var(--land-order, 0) * var(--land-step, 110ms) + 260ms);
+  }
+
+  .faq-group__header::after {
+    --rule-duration: 700ms;
+    --rule-delay: 60ms;
+  }
+}
+
 .asset-mark {
   position: relative;
   display: block;
@@ -745,6 +1220,91 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   object-position: center;
 }
 
+/*
+ * The little splats land. Each arrives the way a dab of paint does: out of
+ * nothing, a touch small and turned, then flat on the page with the smallest
+ * give. Only the picture inside the mark moves, never the mark's own box, so
+ * layout, hit areas and measured sizes stay put, and a mark placed by its own
+ * transform (the FAQ banner's) keeps it.
+ *
+ * Marks in the first screen land as the page arrives; SplatArrivals holds the
+ * rest until the reader reaches them. Text and controls never wait for a
+ * landing, nothing repeats or loops, and reduced motion, print and a page
+ * without JavaScript show every splat at rest. The large painted fields on the
+ * pages do not land: they are the paper these marks land on.
+ */
+/* Soft at first, as wet paint is, then sharp. */
+@keyframes splat-appear {
+  from {
+    opacity: 0;
+    filter: blur(5px);
+  }
+}
+
+/* A disc that widens from the mark's middle, so the body of a splat shows
+   before its outer flecks, the way paint spreads from where it lands. At its
+   widest it covers the whole mark, and it is gone once the landing ends. */
+@keyframes splat-spread {
+  from {
+    -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 10% 10%;
+    mask-size: 10% 10%;
+  }
+
+  to {
+    -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 320% 320%;
+    mask-size: 320% 320%;
+  }
+}
+
+@keyframes splat-land {
+  from {
+    transform: scale(var(--land-scale, 0.72)) rotate(var(--land-turn, -10deg));
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .asset-mark--lands > .asset-mark__picture {
+    --land-delay: calc(var(--land-start, 160ms) + var(--land-order, 0) * var(--land-step, 110ms));
+    animation:
+      splat-appear 480ms var(--motion-ease-out) var(--land-delay) backwards,
+      splat-spread 720ms var(--motion-ease-out) var(--land-delay) backwards,
+      splat-land var(--land-duration, var(--motion-land)) var(--motion-spring) var(--land-delay) backwards;
+  }
+
+  .asset-mark--lands[data-splat="held"] > .asset-mark__picture {
+    opacity: 0;
+    animation: none;
+  }
+}
+
+/* A group lands in reading order, and no two neighbours turn the same way. */
+:is(.principle, .approach-item, .lesson-product, .booking-intro__points > li, .nav-mobile__link):nth-child(2) {
+  --land-order: 1;
+  --land-turn: 9deg;
+}
+
+:is(.principle, .approach-item, .lesson-product, .booking-intro__points > li, .nav-mobile__link):nth-child(3) {
+  --land-order: 2;
+  --land-turn: -7deg;
+}
+
+.nav-mobile__link:nth-child(4) {
+  --land-order: 3;
+  --land-turn: 11deg;
+}
+
 /* Home */
 
 /* The hero fills whatever the snug footer leaves, so home never ends on a
@@ -762,6 +1322,8 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 .home-hero__copy {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -771,6 +1333,21 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   background-color: var(--green);
   background-image: var(--paper-texture);
   color: var(--paper);
+}
+
+/* The hero's own painted field: a cream wave curling in from the blue
+   panel's right edge beside the heading, as if breaking against the lilac
+   column, clear of the words and the actions at every width. Like the other
+   large fields it stays still: it is the paper the marks land on. */
+.home-hero__splat {
+  position: absolute;
+  top: 50%;
+  right: -14%;
+  z-index: -1;
+  width: min(48%, 420px);
+  aspect-ratio: 1;
+  translate: 0 -56%;
+  pointer-events: none;
 }
 
 .home-hero__copy h1 {
@@ -946,6 +1523,22 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   margin: 0;
   font-size: clamp(1.2rem, 1.7vw, 1.55rem);
   line-height: 1.3;
+  text-wrap: balance;
+}
+
+/* Side by side, the fan reaches in under the words wherever it is large
+   beside a narrow column; the measure narrows with the column so the last
+   word always stops short of the paint. */
+@media (min-width: 821px) and (max-width: 1100px) {
+  .approach-intro > p {
+    max-width: 360px;
+  }
+}
+
+@media (min-width: 1101px) {
+  .approach-intro > p {
+    max-width: clamp(250px, 44.9vw - 307px, 400px);
+  }
 }
 
 .approach-intro__splat {
@@ -984,14 +1577,16 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   height: 132px;
 }
 
+/* Sentence case, like the Home principles, at reading size rather than in
+   tracked capitals: each point says what it is and the line beneath it does
+   the talking. */
 .approach-item h2 {
-  margin-bottom: 1rem;
+  margin-bottom: 0.45rem;
   font-family: var(--ui);
-  font-size: clamp(1.1rem, 1.7vw, 1.45rem);
-  letter-spacing: 0.09em;
-  line-height: 1.2;
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
   text-wrap: balance;
-  text-transform: uppercase;
 }
 
 @media (min-width: 821px) {
@@ -1017,11 +1612,12 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   }
 }
 
+/* No larger than its heading, so each point reads heading first. */
 .approach-item p {
   max-width: 470px;
   margin: 0;
-  font-size: clamp(1.15rem, 1.6vw, 1.45rem);
-  line-height: 1.35;
+  font-size: clamp(1.05rem, 1.25vw, 1.15rem);
+  line-height: 1.45;
 }
 
 .teacher-band {
@@ -1045,10 +1641,22 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   word-spacing: 0.12em;
 }
 
-.teacher-band p {
+/* One credential to a line, a little apart, so one that wraps on a phone
+   still reads as one. */
+.teacher-band__credentials {
   margin: 0;
-  padding-left: clamp(2rem, 4vw, 4rem);
+  padding: 0 0 0 clamp(2rem, 4vw, 4rem);
   font-size: clamp(1.15rem, 1.75vw, 1.55rem);
+  line-height: 1.3;
+  list-style: none;
+}
+
+.teacher-band__credentials li {
+  text-wrap: balance;
+}
+
+.teacher-band__credentials li + li {
+  margin-top: 0.45rem;
 }
 
 .editorial-callout {
@@ -1079,6 +1687,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   max-width: 660px;
   margin: 0 auto 2rem;
   font-size: 1.25rem;
+  text-wrap: pretty;
 }
 
 /* Lessons */
@@ -1143,8 +1752,9 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
  * one twice, each carrying the lesson's own mark. It is the mark that lesson
  * wears later, in the booking flow and on booked lessons, so the same splat
  * means the same lesson wherever a student meets it. The whole card is the
- * way into booking that lesson; hovering it warms the colour and tips the
- * mark, without lifting or shifting anything.
+ * way into booking that lesson; hovering it warms the colour while the button
+ * lifts and fills, and its mark turns a little on the soft spring. The card
+ * itself stays where it is.
  */
 .lesson-product {
   position: relative;
@@ -1195,7 +1805,10 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 }
 
 /* Each splat comes in from the card's top-right corner, cropped by the card's
-   own squiggle, and stays still: the button does the moving. */
+   own squiggle. It lands with the page; pointed at, the card turns it a few
+   degrees and lets it swell a touch, neighbours turning opposite ways, and it
+   settles back when the pointer leaves. The landing moves the picture inside,
+   this the mark's box, so the two never meet. */
 .lesson-product__mark {
   position: absolute;
   top: -30px;
@@ -1203,6 +1816,22 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   width: 118px;
   height: 118px;
   pointer-events: none;
+  --mark-turn: 8deg;
+  transition:
+    rotate 720ms var(--motion-spring),
+    scale 720ms var(--motion-spring);
+}
+
+.lesson-product--trial .lesson-product__mark,
+.lesson-product--long .lesson-product__mark {
+  --mark-turn: -8deg;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lesson-product:is(:hover, :focus-within) .lesson-product__mark {
+    rotate: var(--mark-turn);
+    scale: 1.05;
+  }
 }
 
 .lesson-product__pricing,
@@ -1222,11 +1851,12 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 .lesson-product__link {
   transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    color 180ms ease,
-    box-shadow 220ms var(--motion-ease),
-    transform 220ms var(--motion-ease);
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    box-shadow 320ms var(--motion-ease-out),
+    transform 420ms var(--motion-spring-firm),
+    border-radius 640ms var(--motion-spring);
 }
 
 /* The button answers too, apart from the card's wash: it lifts and fills. */
@@ -1234,6 +1864,22 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 .lesson-product:focus-within .lesson-product__link {
   box-shadow: 0 6px 14px rgba(26, 49, 105, 0.16);
   transform: translateY(-2px);
+}
+
+/* Pressing anywhere on the card presses its button. */
+.lesson-product .lesson-product__link:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 200ms, 200ms, 200ms, 120ms, 80ms, 640ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lesson-product:is(:hover, :focus-within) .lesson-product__link {
+    border-radius: var(--squiggle-button-shift);
+  }
+
+  .lesson-product:is(:hover, :focus-within) .lesson-product__link.button--outline {
+    border-radius: var(--squiggle-button-alt-shift);
+  }
 }
 
 .lesson-product:hover .lesson-product__link.button--coral,
@@ -1344,6 +1990,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   color: var(--lavender-soft);
   font-size: 0.98rem;
   line-height: 1.45;
+  text-wrap: pretty;
 }
 
 .lessons-closing__actions {
@@ -1473,7 +2120,8 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   }
 
   .lesson-product:hover .lesson-product__link,
-  .lesson-product:focus-within .lesson-product__link {
+  .lesson-product:focus-within .lesson-product__link,
+  .lesson-product .lesson-product__link:active {
     transform: none;
   }
 
@@ -1512,6 +2160,9 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 /* The drawing leaves more room at its right and foot than at its left and
    top, so the offsets centre what is drawn rather than its square. */
 .faq-hero__mark {
+  /* Twice the size of the other marks, so it travels half as far to land. */
+  --land-scale: 0.86;
+  --land-turn: -6deg;
   position: absolute;
   top: 50%;
   right: var(--page-pad);
@@ -1624,12 +2275,23 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   outline: none;
 }
 
-/* The index numbers the sections, so the heading needs no number of its own. */
+/* The index numbers the sections, so the heading needs no number of its own.
+   Its rule is a line of its own rather than a border, so it can be drawn. */
 .faq-group__header {
+  position: relative;
   display: flex;
   align-items: baseline;
-  border-bottom: 2px solid var(--green);
-  padding: 1.3rem 0 0.9rem;
+  padding: 1.3rem 0 calc(0.9rem + 2px);
+}
+
+.faq-group__header::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--green);
+  content: "";
 }
 
 .faq-group__header h2 {
@@ -1666,7 +2328,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
   flex: 0 0 24px;
   width: 24px;
   height: 24px;
-  transition: transform 380ms var(--motion-ease);
+  transition: transform 560ms var(--motion-spring);
 }
 
 /* Opening a question is one motion: the plus makes a half turn and folds into
@@ -1688,7 +2350,7 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 
 .faq-row__symbol::after {
   transform: rotate(90deg);
-  transition: transform 380ms var(--motion-ease);
+  transition: transform 560ms var(--motion-spring);
 }
 
 .faq-row[open] .faq-row__symbol::after {
@@ -2132,8 +2794,10 @@ html.booking-transitioning .booking-confirmation-stage {
   margin: 0;
 }
 
+/* Room beneath for Beth Ellen's descenders, which reach about 0.4em below
+   the line: the f of "Confirm" never touches the label under it. */
 .booking-step-heading {
-  margin: 0.5rem 0 0.3rem;
+  margin: 0.5rem 0 0.4em;
   font-family: var(--display);
   font-size: clamp(1.9rem, 4.2vw, 2.9rem);
   font-weight: 400;
@@ -2317,6 +2981,27 @@ html.booking-transitioning .booking-confirmation-stage {
 
 .booking-choice-summary__change-short {
   display: none;
+}
+
+/* A long date and its short form: the short one only where the booking
+   column is narrow, the long one then kept for screen readers alone. */
+.when-short {
+  display: none;
+}
+
+@container booking (max-width: 480px) {
+  .when-long {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .when-short {
+    display: inline;
+  }
 }
 
 .unified-calendar-shell {
@@ -2548,10 +3233,6 @@ html.booking-transitioning .booking-confirmation-stage {
 }
 
 /* The first free time on each of the next few free days. */
-.booking-soonest > .eyebrow {
-  margin: 0 0 0.6rem;
-}
-
 .booking-soonest ul {
   display: grid;
   margin: 0;
@@ -2963,6 +3644,11 @@ html.booking-transitioning .booking-confirmation-stage {
   color: var(--lavender-ink);
 }
 
+/* On a day filled coral every time reads in white, the weekly one included. */
+.unified-calendar .calendar-week button.has-booking:not(.has-weekly-booking):is(:hover, :focus-visible, .is-selected) .calendar-booking-times .is-weekly {
+  color: inherit;
+}
+
 /* A day with several lessons lists them to open, and can still book another. */
 .calendar-booking-prompt__lessons {
   display: grid;
@@ -2977,7 +3663,7 @@ html.booking-transitioning .booking-confirmation-stage {
   width: 100%;
   min-height: 56px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-tile);
   padding: 0.6rem 0.9rem;
@@ -2991,6 +3677,15 @@ html.booking-transitioning .booking-confirmation-stage {
 .calendar-booking-prompt__lesson span {
   display: grid;
   gap: 0.15rem;
+}
+
+.calendar-booking-prompt__lesson > .lesson-calendar__mark {
+  flex: none;
+}
+
+.calendar-booking-prompt__lesson > svg {
+  flex: none;
+  margin-left: auto;
 }
 
 .calendar-booking-prompt__lesson small {
@@ -3080,14 +3775,22 @@ html.booking-transitioning .booking-confirmation-stage {
   white-space: nowrap;
 }
 
+/* Booked times big enough to read, and to tell the weekly lilac from the
+   one-off coral: smaller only where the seven columns are narrow. */
 .unified-calendar .calendar-week button small.calendar-booking-times {
   display: grid;
   justify-items: center;
   margin-top: 0.15rem;
-  font-size: 0.46rem;
+  font-size: 0.56rem;
   letter-spacing: 0;
   line-height: 1.12;
   white-space: normal;
+}
+
+@media (min-width: 821px) {
+  .unified-calendar .calendar-week button small.calendar-booking-times {
+    font-size: 0.7rem;
+  }
 }
 
 .calendar-booking-times span {
@@ -3162,10 +3865,6 @@ html.booking-transitioning .booking-confirmation-stage {
   outline: 0;
   transform: translate(-50%, -50%);
   animation: dialog-fade-in var(--motion-dialog) ease-out both;
-}
-
-.unified-calendar--managed-overlay .unified-calendar__toolbar {
-  padding-right: 2.65rem;
 }
 
 .unified-calendar--managed-overlay .unified-calendar__grid {
@@ -3283,11 +3982,11 @@ html.booking-transitioning .booking-confirmation-stage {
   margin: 0;
 }
 
+/* The lesson's date and kind, without rules around them: the dialog's own
+   spacing sets them apart, as the change workflow has no decorative dividers. */
 .lesson-manage-dialog__lesson {
   display: grid;
-  border-top: 1px solid var(--rule-soft);
-  border-bottom: 1px solid var(--rule-soft);
-  padding: 0.8rem 0;
+  padding: 0.2rem 0 0.35rem;
   gap: 0.18rem;
 }
 
@@ -3298,14 +3997,9 @@ html.booking-transitioning .booking-confirmation-stage {
 }
 
 .lesson-manage-dialog__lesson span,
-.lesson-manage-dialog__question,
 .lesson-manage-dialog__decision > p {
   font-size: 0.8rem;
   line-height: 1.5;
-}
-
-.lesson-manage-dialog__question {
-  margin-top: 0.1rem;
 }
 
 .lesson-manage-dialog__actions {
@@ -3326,6 +4020,15 @@ html.booking-transitioning .booking-confirmation-stage {
 
 .lesson-manage-dialog__actions--sequence {
   grid-template-columns: minmax(0, 1fr);
+}
+
+/* On a phone a decision's pair stacks, so a long label never breaks onto a
+   second line beside a one-line neighbour. Change and Cancel stay side by
+   side. */
+@media (max-width: 560px) {
+  .lesson-manage-dialog__decision .lesson-manage-dialog__actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .lesson-manage-dialog__series {
@@ -3357,11 +4060,13 @@ html.booking-transitioning .booking-confirmation-stage {
   line-height: 1.4;
 }
 
-.lesson-manage-dialog__series .text-action {
+/* A small outline button, as every secondary action is, not underlined text. */
+.lesson-manage-dialog__series .button {
   grid-column: 2;
   justify-self: start;
-  min-height: 34px;
-  margin-top: 0.2rem;
+  min-height: 44px;
+  margin-top: 0.45rem;
+  padding: 0.55rem 1.1rem;
   font-size: 0.68rem;
 }
 
@@ -3376,7 +4081,12 @@ html.booking-transitioning .booking-confirmation-stage {
 }
 
 .managed-lesson__current-time {
-  margin: 0 0 0.8rem;
+  margin: 0.2rem 0 0;
+  color: var(--lavender-ink);
+  font-family: var(--ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .managed-lesson__duration {
@@ -3414,28 +4124,64 @@ html.booking-transitioning .booking-confirmation-stage {
   }
 }
 
-.managed-lesson__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-  gap: 0.75rem 1rem;
+/* The task, then the lesson as it stands in one short line: a phone reads
+   them before the calendar, a wide screen across the top. */
+.unified-calendar.unified-calendar--managed-overlay {
+  grid-template-areas:
+    "head"
+    "calendar"
+    "panel";
 }
 
-.managed-lesson__header > div {
+@container booking (min-width: 700px) {
+  .unified-calendar.unified-calendar--managed-overlay {
+    grid-template-areas:
+      "head head"
+      "calendar panel";
+  }
+}
+
+.managed-lesson__head {
+  grid-area: head;
   min-width: 0;
+  /* Level with the calendar's own content, and clear of the close button. */
+  padding: 0.2rem 3rem 0 clamp(1rem, 2.4vw, 1.75rem);
 }
 
-.managed-lesson__header h3 {
-  margin: 0.45rem 0 0;
+/* Beneath the head the calendar and the form start together, close under it. */
+.unified-calendar--managed-overlay .unified-calendar__grid,
+.unified-calendar--managed-overlay .unified-calendar__panel {
+  padding-top: 0.5rem;
+}
+
+.unified-calendar--managed-overlay .unified-calendar__move {
+  margin-top: 0;
+}
+
+.managed-lesson__head h3 {
+  margin: 0;
   font-family: var(--ui);
-  font-size: 1rem;
+  font-size: 1.05rem;
   line-height: 1.35;
+  text-wrap: balance;
 }
 
-.managed-lesson__header .booking-back {
-  flex: none;
-  margin-left: auto;
+/* Where the form stacks under the calendar, it keeps to its choices: the key
+   shares its row with Show all, and the length and place controls name
+   themselves, their legends kept for screen readers, as in the booking bar. */
+@container booking (max-width: 699px) {
+  .unified-calendar--managed-overlay .unified-calendar__toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .managed-lesson__duration legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .unified-calendar__bookings,
@@ -3473,30 +4219,27 @@ html.booking-transitioning .booking-confirmation-stage {
 
 /* Lesson history keeps the useful anatomy of Upcoming lessons without making
    an old or cancelled booking look interactive. The status changes; the mark,
-   date, duration and location stay in the same places. */
+   date, duration and location stay in the same places. Every record is cut
+   in the same hand on the same soft lavender wash, and only its status pill
+   carries colour: a stripe and a coral wash per cancellation had turned a
+   list of records into a wall of coral. */
 .history-lesson-card {
-  border-color: rgba(82, 74, 150, 0.28);
-  background:
-    linear-gradient(115deg, rgba(170, 164, 230, 0.15), rgba(255, 255, 255, 0.1)),
-    var(--paper-light);
-  box-shadow: inset 4px 0 0 rgba(82, 74, 150, 0.48);
-}
-
-.history-lesson-card--cancelled {
-  border-color: rgba(194, 58, 39, 0.24);
-  background: rgba(194, 58, 39, 0.055);
-  box-shadow: inset 4px 0 0 rgba(194, 58, 39, 0.46);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--squiggle-tile);
+  background: rgba(170, 164, 230, 0.12);
 }
 
 .history-lesson-card__summary {
   grid-template-columns: 42px minmax(0, 1fr);
 }
 
-.history-lesson-card__status--completed {
+/* Scoped to the card: the shared pill rule comes later and painted a
+   completed lesson's pill coral too. */
+.history-lesson-card .history-lesson-card__status--completed {
   background: var(--lavender-ink);
 }
 
-.history-lesson-card__status--cancelled {
+.history-lesson-card .history-lesson-card__status--cancelled {
   background: var(--coral-action);
 }
 
@@ -3622,9 +4365,11 @@ html.booking-transitioning .booking-confirmation-stage {
   }
 }
 
+/* Stacked: even the widest panel has no room for `Keep current time` beside
+   the coral action without breaking it onto a second line. */
 .unified-calendar__panel .manage-booking__actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
 }
 
@@ -4025,7 +4770,6 @@ html.booking-transitioning .booking-confirmation-stage {
   min-width: 0;
 }
 
-.booking-confirmation-payment > .booking-form-note,
 .booking-confirmation-payment > .booking-agreement {
   margin-top: 0;
 }
@@ -4124,18 +4868,14 @@ html.booking-transitioning .booking-confirmation-stage {
 /* .asset-mark is display:block with no intrinsic size, so without this the
    splat expands to the full width of the card. */
 /*
- * Decoration, so it sits behind the words and bleeds off the corner rather
- * than reserving space beside them. At 46px inside the padding it collided
- * with a long heading; larger and behind, an overlap reads as intended.
+ * The card opens on one small mark in full colour, centred above the heading
+ * like a seal. In a corner it collided with a long heading, and the large
+ * faint splat that replaced it sat behind the heading's last letters.
  */
 .auth-panel__mark {
-  position: absolute;
-  top: -18px;
-  right: -22px;
-  z-index: 0;
-  width: 128px;
-  height: 128px;
-  opacity: 0.3;
+  width: 44px;
+  height: 44px;
+  margin: -0.15rem auto 0.55rem;
   pointer-events: none;
 }
 
@@ -4423,6 +5163,12 @@ html.booking-transitioning .booking-confirmation-stage {
   opacity: 0.68;
 }
 
+/* "A reset link is on its way" sits between the field and the button,
+   spaced like another field. */
+.auth-panel__form > .booking-outcome {
+  margin-bottom: 0.5rem;
+}
+
 .auth-panel__aside {
   margin-top: 0.9rem;
   text-align: center;
@@ -4457,7 +5203,7 @@ html.booking-transitioning .booking-confirmation-stage {
   content: "";
   transform: scaleX(0.4);
   opacity: 0;
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity 200ms ease, transform 420ms var(--motion-spring-firm);
 }
 
 .auth-panel__link:hover,
@@ -4582,6 +5328,10 @@ html.booking-transitioning .booking-confirmation-stage {
 }
 
 .nav-mobile__splat {
+  --land-start: 90ms;
+  --land-scale: 0.8;
+  --land-turn: -12deg;
+  --land-duration: 1200ms;
   position: absolute;
   z-index: 0;
   right: -86px;
@@ -4590,6 +5340,37 @@ html.booking-transitioning .booking-confirmation-stage {
   aspect-ratio: 1;
   opacity: 0.55;
   pointer-events: none;
+}
+
+/* The menu stays mounted once opened, so its marks land each time it opens,
+   in step with the links dropping into place, rather than only the first. The
+   splat cropped into its foot blooms with them, a little more slowly. */
+.nav-mobile {
+  --land-start: 40ms;
+  --land-step: 60ms;
+}
+
+.nav-mobile__cta {
+  --land-order: 4;
+}
+
+/* Opening, the destinations drop in one after another, then the card. */
+@keyframes menu-item-in {
+  from {
+    opacity: 0;
+    translate: 0 -10px;
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .nav-mobile:not(.is-open) .asset-mark--lands > .asset-mark__picture {
+    animation: none;
+  }
+
+  .nav-mobile.is-open .nav-mobile__link,
+  .nav-mobile.is-open .nav-mobile__cta {
+    animation: menu-item-in 520ms var(--motion-ease-out) calc(30ms + var(--land-order, 0) * 45ms) backwards;
+  }
 }
 
 .nav-mobile__close {
@@ -4656,7 +5437,7 @@ html.booking-transitioning .booking-confirmation-stage {
   content: "";
   opacity: 0;
   transform: scaleX(0.5);
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity 200ms ease, transform 420ms var(--motion-spring-firm);
 }
 
 .nav-mobile__link:last-child {
@@ -4790,6 +5571,14 @@ button.text-action {
 .my-lessons__menu-toggle[aria-expanded="true"] {
   border-color: var(--coral-action);
   background: rgba(194, 58, 39, 0.08);
+}
+
+.my-lessons__menu-toggle svg {
+  transition: rotate 200ms var(--motion-ease);
+}
+
+.my-lessons__menu-toggle[aria-expanded="true"] svg {
+  rotate: 180deg;
 }
 
 .my-lessons__menu-panel {
@@ -4938,6 +5727,16 @@ button.text-action {
     margin-bottom: 0;
   }
 
+  /* Paired fields line up at the top, so the note under one never pushes its
+     neighbour down; the code disclosure stays the quiet last item under NIF. */
+  .unified-account-controls .my-lessons__details {
+    align-items: start;
+  }
+
+  .unified-account-controls .my-lessons__rates {
+    grid-column: 1;
+  }
+
 }
 
 .upcoming-lessons__title-line {
@@ -5043,6 +5842,15 @@ button.text-action {
   display: grid;
   align-items: end;
   gap: 0.65rem 0.8rem;
+}
+
+/* A field with the note that explains it, kept together in one cell. */
+.my-lessons__field {
+  min-width: 0;
+}
+
+.my-lessons__field > .my-lessons__details-note {
+  margin-bottom: 0;
 }
 
 .my-lessons__details label {
@@ -5338,32 +6146,83 @@ button.text-action {
   text-transform: none;
 }
 
-.booking-form-note {
-  margin-top: 0.8rem;
-  font-size: 0.82rem;
-  line-height: 1.65;
-  opacity: 0.86;
-}
-
-.booking-form-note a {
-  border: 0;
+/* The payment facts read as a short list, two to a row where the column
+   allows. Each follows a little dab of paint, the one in the FAQ mark, turned
+   and coloured differently from its neighbours as her marks are. */
+.booking-payment-facts {
+  --payment-dab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='176.6 175.5 101.8 101.8'%3E%3Cpath d='M269 184c7.478 8.42 7.768 18.218 7.195 28.954C275.431 220.962 271.9 227.64 266 233a443 443 0 0 1-5.125 4c-6.43 5.051-8.478 8.967-10.25 16.875-1.782 7.614-4.93 13.575-11.437 18.125-6.639 3.667-13.932 3.546-21.188 2-3.062-1.625-3.062-1.625-6-4l-1.645-1.328c-4.029-3.602-6.361-7.39-8.855-12.172-3.637-6.948-8.545-11.995-14.309-17.262-5.077-4.722-7.73-8.614-8.629-15.675.644-5.239 2.181-9.452 6.107-13.124 4.939-3.733 9.812-6.127 15.581-8.314 8.051-3.217 14.746-6.974 21.75-12.125 12.942-9.323 32.845-18.774 47-6'/%3E%3C/svg%3E");
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  gap: 0.55rem 1.4rem;
+  margin: 0;
   padding: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  list-style: none;
+  text-wrap: pretty;
 }
 
-.booking-form-note a:hover,
-.booking-form-note a:focus-visible {
-  color: var(--coral-action);
+.booking-payment-facts li {
+  position: relative;
+  padding-left: 1.55rem;
 }
 
-.booking-form-note strong {
+.booking-payment-facts li::before {
+  position: absolute;
+  top: calc((1.5em - 0.875rem) / 2);
+  left: 0;
+  width: 0.875rem;
+  aspect-ratio: 1;
+  background: var(--blue);
+  content: "";
+  -webkit-mask: var(--payment-dab) center / contain no-repeat;
+  mask: var(--payment-dab) center / contain no-repeat;
+}
+
+/* Colour and turn repeat on different beats, so no two dabs in a list match. */
+.booking-payment-facts li:nth-child(4n + 2)::before {
+  background: var(--lavender);
+}
+
+.booking-payment-facts li:nth-child(4n + 3)::before {
+  background: var(--coral);
+}
+
+.booking-payment-facts li:nth-child(4n + 4)::before {
+  background: var(--lavender-ink);
+}
+
+.booking-payment-facts li:nth-child(5n + 2)::before {
+  rotate: 60deg;
+}
+
+.booking-payment-facts li:nth-child(5n + 3)::before {
+  rotate: 180deg;
+}
+
+.booking-payment-facts li:nth-child(5n + 4)::before {
+  rotate: 330deg;
+}
+
+.booking-payment-facts li:nth-child(5n + 5)::before {
+  rotate: 210deg;
+}
+
+.booking-payment-facts strong {
   color: var(--coral-action);
   white-space: nowrap;
+}
+
+.booking-payment-facts a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.booking-payment-facts a:hover,
+.booking-payment-facts a:focus-visible {
+  color: var(--coral-action);
 }
 
 .booking-recurring-rate {
@@ -5522,80 +6381,148 @@ button.text-action {
   background: rgba(239, 93, 60, 0.09);
 }
 
-/* Confirmation shown in place of the calendar once a booking succeeds. */
-
+/*
+ * Confirmation shown in place of the calendar once a booking succeeds: one
+ * hand-cut card in the booking panels' own wash and outline, read top to
+ * bottom. The good news and the lesson's time lead; where the details went is
+ * quieter; the actions follow; the reference and the fee rule close it as
+ * small print under a soft rule. The lesson's own mark is the only seal.
+ */
 .booking-success {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   margin-top: 1.5rem;
   border: 1px solid var(--rule);
-  padding: 2rem 1.75rem;
-  gap: 0.55rem;
+  border-radius: var(--squiggle-panel);
+  padding: clamp(1.5rem, 3vw, 2.2rem) clamp(1.25rem, 3vw, 2.2rem) clamp(1.3rem, 2.6vw, 1.8rem);
+  background: rgba(170, 164, 230, 0.1);
 }
 
+/* The lesson's own mark lands in the top corner, cropped by the card's
+   hand-cut edge as the Lessons cards crop theirs, a little larger and slower
+   than the small marks: the one landing on the page that celebrates
+   something. It sits beneath the card's words. */
+.booking-success__mark {
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  z-index: -1;
+  width: 118px;
+  height: 118px;
+  pointer-events: none;
+  --land-start: 240ms;
+  --land-scale: 0.56;
+  --land-turn: -16deg;
+  --land-duration: 1150ms;
+}
+
+/* The heading keeps clear of the corner mark, and balances its lines rather
+   than leaving "in." alone on a phone. */
 .booking-success__head {
-  display: flex;
   width: 100%;
-  align-self: stretch;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-/* Never squeezed by a long heading, and never wrapped onto its own line. */
-.booking-success__badge {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  margin-top: 0.5rem;
-  gap: 0.4rem;
-}
-
-.booking-success__actions {
-  display: flex;
-  align-items: center;
-  margin: 0.4rem 0 0.2rem;
-  gap: 1.4rem;
-  flex-wrap: wrap;
+  padding-right: 4.5rem;
 }
 
 .booking-success h2 {
+  margin: 0;
   font-family: var(--display);
-  font-size: clamp(1.9rem, 3.6vw, 2.6rem);
-  line-height: 1.1;
+  font-size: clamp(2rem, 4vw, 2.7rem);
+  font-weight: 400;
+  line-height: 1.12;
+  text-wrap: balance;
 }
 
+/* When: the day on its own line, the times beneath it. */
 .booking-success__when {
+  margin: 1.2rem 0 0;
   font-family: var(--ui);
   font-size: 1rem;
+  line-height: 1.45;
+}
+
+.booking-success__when strong {
+  display: block;
+  font-size: 1.1rem;
   font-weight: 700;
+}
+
+.booking-success__when span {
+  display: block;
+  color: var(--lavender-ink);
+  font-weight: 600;
+}
+
+.booking-success__sent {
+  max-width: 36rem;
+  margin: 0.7rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.booking-success .meeting-link,
+.booking-success .booking-success__series,
+.booking-success > .booking-alert {
+  margin-top: 1rem;
+}
+
+/* The way back to the calendar in coral, and changing this lesson as the
+   outline beside it: two buttons, never a button and a stray underline. */
+.booking-success__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 1.5rem;
+  gap: 0.7rem;
+}
+
+/* The small print: the reference to quote, and when changing costs. */
+.booking-success__foot {
+  display: grid;
+  align-self: stretch;
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 1rem;
+  gap: 0.45rem;
 }
 
 .booking-success__reference {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  margin: 0.5rem 0;
-  gap: 0.6rem;
+  margin: 0;
+  gap: 0.1rem 0.6rem;
 }
 
 .booking-success__reference dt {
+  color: var(--lavender-ink);
   font-family: var(--ui);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .booking-success__reference dd {
+  margin: 0;
   font-family: var(--ui);
-  font-size: 1.05rem;
+  font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
 }
 
 .booking-success__note {
+  max-width: 40rem;
+  margin: 0;
   font-size: 0.84rem;
-  opacity: 0.78;
+  line-height: 1.5;
+  opacity: 0.8;
+  text-wrap: pretty;
 }
 
 /* /booking — the page a student reaches from their confirmation email. */
@@ -5735,14 +6662,24 @@ button.text-action {
   border-color: var(--green);
 }
 
+/* Good news is a calm lavender panel in the fields' hand with a tick, never a
+   ruled box: a coloured stripe down one side read as a warning. */
 .booking-outcome {
   display: flex;
   align-items: flex-start;
   margin-bottom: 1.4rem;
-  border-left: 3px solid var(--green);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--squiggle-field);
   padding: 0.9rem 1rem;
   background: rgba(170, 164, 230, 0.22);
   gap: 0.7rem;
+  text-align: left;
+}
+
+.booking-outcome > svg {
+  flex: none;
+  margin-top: 0.1em;
+  color: var(--blue);
 }
 
 .booking-outcome strong {
@@ -5752,7 +6689,7 @@ button.text-action {
 }
 
 .booking-outcome p {
-  margin-top: 0.2rem;
+  margin: 0.2rem 0 0;
   font-size: 0.9rem;
 }
 
@@ -5778,17 +6715,22 @@ dialog[open]::backdrop {
   color: var(--ink);
 }
 
+/* One family with the lesson dialog: the same hand-cut panel, the same light
+   paper with its warm corner, over the same lightly dimmed page. */
 .policy-dialog {
   width: min(760px, calc(100% - 2rem));
   max-width: none;
   max-height: calc(100dvh - 2rem);
   margin: auto;
   border: 1px solid var(--rule);
-  border-radius: 22px 30px 24px 28px;
+  border-radius: var(--squiggle-panel);
   padding: 0;
-  background-color: var(--paper);
-  background-image: var(--paper-texture);
-  box-shadow: 0 24px 80px rgba(17, 31, 72, 0.3);
+  background-color: var(--paper-light);
+  background-image:
+    radial-gradient(circle at 94% 4%, rgba(239, 93, 60, 0.12), transparent 28%),
+    linear-gradient(145deg, rgba(170, 164, 230, 0.08), transparent 58%),
+    var(--paper-texture);
+  box-shadow: 0 24px 65px rgba(26, 49, 105, 0.26);
   color: var(--ink);
   overflow: hidden;
 }
@@ -5799,7 +6741,7 @@ dialog[open]::backdrop {
 }
 
 .policy-dialog::backdrop {
-  background: rgba(17, 31, 72, 0.58);
+  background: rgba(26, 49, 105, 0.24);
   backdrop-filter: blur(3px);
 }
 
@@ -5854,6 +6796,14 @@ dialog[open]::backdrop {
   width: min(480px, calc(100% - 2rem));
 }
 
+/* Short enough to need no ruled header: the title sits in the panel, as the
+   lesson dialog's does. */
+.calendar-booking-prompt .policy-dialog__heading {
+  border-bottom: 0;
+  padding-top: 1.1rem;
+  padding-bottom: 0;
+}
+
 .calendar-booking-prompt__content {
   display: grid;
   padding: 1.3rem clamp(1rem, 3vw, 2rem) 1.6rem;
@@ -5894,20 +6844,27 @@ dialog[open]::backdrop {
   margin: 0;
 }
 
+/* Three levels, each in its own voice: the dialog's title, the five sections
+   as the site's lilac eyebrows with room above them, and the bold lead-ins
+   inside the points. Set alike, they had read as one flat run of bold. */
 .policy-information h2 {
-  margin: 1.6rem 0 0.7rem;
+  margin: 2.2rem 0 0.6rem;
+  color: var(--lavender-ink);
   font-family: var(--ui);
-  font-size: 1rem;
+  font-size: 0.78rem;
   font-weight: 700;
+  letter-spacing: 0.14em;
   line-height: 1.4;
+  text-transform: uppercase;
 }
 
 .policy-information h2:first-child {
   margin-top: 0.5rem;
 }
 
+/* A list never sits tight against the sentence that introduces it. */
 .policy-information ul {
-  margin: 0 0 0.9rem;
+  margin: 0.6rem 0 0.9rem;
   padding-left: 1.2rem;
 }
 
@@ -6148,6 +7105,15 @@ dialog[open]::backdrop {
 }
 
 @media (max-width: 900px) {
+  /* Stacked, the actions run wide, so the wave rides higher, beside the
+     heading and above them. */
+  .home-hero__splat {
+    top: 34%;
+    right: -8%;
+    width: min(34%, 300px);
+    translate: 0 -50%;
+  }
+
   .home-hero {
     grid-template-columns: 1fr;
     min-height: auto;
@@ -6250,12 +7216,14 @@ dialog[open]::backdrop {
     padding-bottom: 1rem;
   }
 
-  .teacher-band p {
+  .teacher-band__credentials {
     padding-left: 0;
   }
 
   /* Stacked, the last answer's rule closes the list; a full-width rule
-     beneath it only repeated it. */
+     beneath it only repeated it. The same goes for the index: its own last
+     rule separates it from the section, so the section's drawn rule is the
+     only other line before the questions. */
   .faq-reference {
     grid-template-columns: 1fr;
     border-bottom: 0;
@@ -6268,7 +7236,7 @@ dialog[open]::backdrop {
   .faq-index {
     min-height: auto;
     border-right: 0;
-    border-bottom: 1px solid var(--rule);
+    padding-bottom: 1.5rem;
   }
 
   .faq-index ol {
@@ -6304,8 +7272,8 @@ dialog[open]::backdrop {
     position: relative;
     display: block;
     min-height: 124px;
-    padding-top: 1.35rem;
-    padding-bottom: 1.35rem;
+    padding-top: 1.1rem;
+    padding-bottom: 1.1rem;
   }
 
   .booking-intro h1 {
@@ -6316,8 +7284,10 @@ dialog[open]::backdrop {
     display: initial;
   }
 
+  /* The two words set close, as one handwritten block, so the band stays
+     about 124px rather than growing a loose line between them. */
   .booking-intro h1 .display-second-line {
-    margin-top: 0.5em;
+    margin-top: 0.06em;
   }
 
   .booking-intro > .editorial-rule {
@@ -6382,6 +7352,14 @@ dialog[open]::backdrop {
     padding-bottom: 3rem;
   }
 
+  /* Beside "Lessons" and the line beneath it, in from the right edge. */
+  .home-hero__splat {
+    top: 5.6rem;
+    right: -12%;
+    width: min(40%, 150px);
+    translate: none;
+  }
+
   .home-hero__copy h1 {
     font-size: clamp(2.1rem, 11vw, 4.2rem);
   }
@@ -6423,21 +7401,37 @@ dialog[open]::backdrop {
     padding-bottom: 2rem;
   }
 
+  /* The index keeps its two columns on a phone, so it is a short block
+     rather than the whole first screen. The sections name themselves, so the
+     Index label goes; the list keeps its name for assistive technology. */
+  .faq-index {
+    padding-top: 1.6rem;
+    padding-bottom: 0.4rem;
+  }
+
+  .faq-index > .eyebrow {
+    display: none;
+  }
+
   .faq-index ol {
-    grid-template-columns: 1fr;
+    margin-top: 0;
   }
 
   .faq-index li:nth-child(2n) {
-    border-left: 0;
-    padding-left: 0;
+    padding-left: 0.8rem;
   }
 
-  .faq-index li {
-    border-bottom: 0;
+  .faq-index a {
+    min-height: 54px;
+    padding: 0.45rem 0;
+    letter-spacing: 0.06em;
+    line-height: 1.3;
+    text-wrap: balance;
   }
 
-  .faq-index li:last-child {
-    border-bottom: 1px solid var(--rule-soft);
+  .faq-index a span {
+    width: 30px;
+    flex: none;
   }
 
   .faq-groups {
@@ -6473,7 +7467,8 @@ dialog[open]::backdrop {
     transition: none;
   }
 
-  .upcoming-lessons__tip {
+  .upcoming-lessons__tip,
+  .my-lessons__menu-toggle svg {
     transition: none;
   }
 
@@ -6501,14 +7496,14 @@ dialog[open]::backdrop {
    * Colour changes are kept so the states remain distinguishable.
    */
   .button,
-  .button:hover {
+  .button:hover,
+  .button:active:not(:disabled) {
     transform: none;
     transition: background 160ms ease, color 160ms ease;
   }
 
   .site-nav__link::after,
   .site-nav__link:hover::after,
-  .site-nav__link[aria-current="page"]::after,
   .nav-mobile__link::after,
   .nav-mobile__link:hover::after,
   .nav-mobile__link[aria-current="page"]::after {

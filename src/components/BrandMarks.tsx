@@ -5,6 +5,8 @@ type AssetMarkProps = {
   avifAsset?: string;
   className?: string;
   height?: number;
+  /** A little splat that lands as it arrives; see SplatArrivals. */
+  lands?: boolean;
   mobileAsset?: string;
   mobileAvifAsset?: string;
   priority?: boolean;
@@ -28,6 +30,7 @@ export function AssetMark({
   avifAsset,
   className,
   height,
+  lands = false,
   mobileAsset,
   mobileAvifAsset,
   priority = false,
@@ -38,7 +41,7 @@ export function AssetMark({
 
   return (
     <span
-      className={className ? `asset-mark ${className}` : "asset-mark"}
+      className={["asset-mark", lands ? "asset-mark--lands" : "", className ?? ""].filter(Boolean).join(" ")}
       aria-hidden="true"
     >
       {priority && mobileAvifPath ? (

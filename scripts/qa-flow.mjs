@@ -403,6 +403,25 @@ if (await signedInPage.getByRole("link", { name: "My lessons", exact: true }).co
 await signedInPage.close();
 await signedInBrowser.close();
 
+// Pages turn into one another inside a view transition that React starts for
+// each navigation. Count them, and keep what each one animated.
+const watchPageTurns = () => {
+  const start = document.startViewTransition?.bind(document);
+  if (!start) return;
+  window.__qaPageTurns = [];
+  document.startViewTransition = (...args) => {
+    const transition = start(...args);
+    const turn = { durations: null };
+    window.__qaPageTurns.push(turn);
+    transition.ready.then(() => {
+      turn.durations = document.getAnimations()
+        .filter((animation) => animation.effect?.pseudoElement?.startsWith("::view-transition"))
+        .map((animation) => animation.effect.getComputedTiming().duration);
+    }, () => {});
+    return transition;
+  };
+};
+await page.addInitScript(watchPageTurns);
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(`${base}/`, { waitUntil: "domcontentloaded" });
 const expectedApproachUrl = new URL(`${base}/approach/`).href;
@@ -414,11 +433,15 @@ await page.locator(".nav-toggle").click();
 await page.waitForTimeout(400);
 await page.locator("#site-nav-mobile a", { hasText: "Approach" }).first().click();
 await page.waitForURL(expectedApproachUrl, { timeout: 10_000 });
+await page.waitForFunction(() => !window.__qaPageTurns || window.__qaPageTurns.some((turn) => turn.durations), null, { timeout: 5_000 });
 const mobileNavigation = await page.evaluate(() => ({
   overlayCount: document.querySelectorAll(".route-transition-wash").length,
   animationDuration: getComputedStyle(document.querySelector(".route-fade")).animationDuration,
   animationName: getComputedStyle(document.querySelector(".route-fade")).animationName,
   transform: getComputedStyle(document.querySelector(".route-fade")).transform,
+  pageTurns: window.__qaPageTurns?.length ?? null,
+  turnDirection: document.documentElement.dataset.pageTurn ?? null,
+  turnAnimated: window.__qaPageTurns?.some((turn) => turn.durations?.some((duration) => duration > 0)) ?? null,
   url: window.location.href
 }));
 
@@ -429,17 +452,22 @@ if (mobileNavigation.url !== expectedApproachUrl) {
 }
 
 if (mobileNavigation.overlayCount !== 0 || mobileNavigation.transform !== "none") {
-  throw new Error("Mobile route navigation should use opacity only, with no overlay or transform.");
+  throw new Error("Route navigation should turn the page without an overlay or moving the page element itself.");
 }
 
-if (
-  !mobileNavigation.animationName.includes("route-fade-in") ||
-  mobileNavigation.animationDuration === "0s"
-) {
-  throw new Error("Mobile route navigation should dissolve the destination without delaying the click.");
+// Where view transitions exist the page turns; elsewhere it dissolves in.
+const pageTurned =
+  mobileNavigation.pageTurns > 0 &&
+  mobileNavigation.turnAnimated &&
+  ["forward", "back", "settle"].includes(mobileNavigation.turnDirection);
+const pageDissolved =
+  mobileNavigation.animationName.includes("route-fade-in") && mobileNavigation.animationDuration !== "0s";
+if (mobileNavigation.pageTurns === null ? !pageDissolved : !pageTurned) {
+  throw new Error(`Route navigation should turn the destination in without delaying the click: ${JSON.stringify(mobileNavigation)}.`);
 }
 
 const reducedMotionPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+await reducedMotionPage.addInitScript(watchPageTurns);
 await reducedMotionPage.emulateMedia({ reducedMotion: "reduce" });
 await reducedMotionPage.goto(`${base}/faq/`, { waitUntil: "domcontentloaded" });
 await reducedMotionPage.locator("h1").waitFor({ timeout: 10_000 });
@@ -449,6 +477,15 @@ const reducedRouteMotion = await reducedMotionPage.evaluate(() => {
 });
 if (reducedRouteMotion.animationName !== "none" && reducedRouteMotion.animationDuration !== "0s") {
   throw new Error("Reduced-motion users should not receive a route transition.");
+}
+// A page reached by a link swaps at once, with nothing in its turn moving.
+await reducedMotionPage.waitForFunction(() => document.querySelector(".nav-toggle")?.disabled === false);
+await reducedMotionPage.locator(".site-footer__menu").click();
+await reducedMotionPage.locator("#site-nav-mobile").getByRole("link", { name: "Approach", exact: true }).click();
+await reducedMotionPage.waitForURL(`${base}/approach/`, { timeout: 10_000 });
+const reducedTurns = await reducedMotionPage.evaluate(() => window.__qaPageTurns ?? null);
+if (reducedTurns?.some((turn) => turn.durations?.some((duration) => duration > 0))) {
+  throw new Error(`Reduced-motion users should not receive a page turn: ${JSON.stringify(reducedTurns)}.`);
 }
 await reducedMotionPage.close();
 
@@ -1637,7 +1674,7 @@ await desktopManageDialog.getByRole("button", { name: "Change", exact: true }).e
 await desktopManageDialog.getByRole("button", { name: "Change", exact: true }).click();
 const desktopChangeDialog = accountPage.getByRole("dialog", { name: "Choose a new date and time", exact: true });
 await desktopChangeDialog.waitFor({ state: "visible" });
-await desktopManagePanel.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
+await desktopChangeDialog.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
 await desktopManagePanel.getByRole("radio", { name: "60 minutes", exact: true }).waitFor();
 const ninetyMinuteChoice = desktopManagePanel.getByRole("radio", { name: "90 minutes", exact: true });
 await ninetyMinuteChoice.waitFor();
@@ -1689,16 +1726,20 @@ if (
 ) {
   throw new Error(`Changing a lesson should stay inside the aligned calendar interface, without decorative rules and with the shared segmented control: ${JSON.stringify(desktopChangeLayout)}.`);
 }
-await desktopManagePanel.getByRole("button", { name: "Back", exact: true }).click();
+await desktopManagePanel.getByRole("button", { name: "Keep current time", exact: true }).click();
 await desktopManageDialog.waitFor({ state: "visible" });
 await desktopManageDialog.getByRole("button", { name: "Change", exact: true }).click();
 await desktopChangeDialog.waitFor({ state: "visible" });
 await ninetyMinuteChoice.check();
 await desktopManagePanel.getByRole("radio", { name: "In Porto", exact: true }).check();
-// Rescheduling opens the booked week. On Sundays, tomorrow's fixture is in
-// the following week, so expand the calendar through the same control a
-// student uses instead of assuming both dates share the compact week.
-await desktopChangeDialog.getByRole("button", { name: "Show all", exact: true }).click();
+// Beside the change form there is room for the usual four weeks, from the
+// booked week on, so tomorrow's fixture is in view even on a Sunday.
+if ((await desktopChangeDialog.locator(".calendar-week").count()) !== 4) {
+  throw new Error("Changing a lesson on a wide screen should open on the usual four weeks.");
+}
+if (await desktopChangeDialog.getByRole("button", { name: "Show all", exact: true }).count()) {
+  throw new Error("Four weeks beside the change form need no Show all.");
+}
 await accountPage.locator(`#lesson-calendar [data-date-key="${qaFreeDate}"]`).click();
 await desktopManagePanel.locator(".slot-grid button").first().click();
 await waitForOrientation(accountPage);
@@ -1991,7 +2032,7 @@ await mobileManageDialog.getByRole("button", { name: "Change", exact: true }).ev
 await mobileManageDialog.getByRole("button", { name: "Change", exact: true }).click();
 const mobileChangeDialog = accountPage.getByRole("dialog", { name: "Choose a new date and time", exact: true });
 await mobileChangeDialog.waitFor({ state: "visible" });
-await mobileManagePanel.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
+await mobileChangeDialog.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
 await mobileManagePanel.getByRole("radio", { name: "60 minutes", exact: true }).waitFor();
 await mobileManagePanel.getByRole("radio", { name: "90 minutes", exact: true }).waitFor();
 await waitForOrientation(accountPage);
@@ -2022,7 +2063,7 @@ if (
   throw new Error(`Mobile lesson changing should remain above the dimmed page: ${JSON.stringify(mobileChangeLayout)}.`);
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-change-workflow-mobile.png"), fullPage: false });
-await mobileManagePanel.getByRole("button", { name: "Back", exact: true }).click();
+await mobileManagePanel.getByRole("button", { name: "Keep current time", exact: true }).click();
 await mobileManageDialog.waitFor({ state: "visible" });
 await mobileManageDialog.getByRole("button", { name: "Close lesson management", exact: true }).click();
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
@@ -2373,7 +2414,7 @@ if ((await moveRecurrenceDialog.locator(".segmented").count()) !== 2) {
   throw new Error("Moving a recurrence should retain the compact length and location sliders.");
 }
 await moveRecurrenceDialog.getByText(/Currently repeats from/i).waitFor();
-await moveRecurrenceDialog.getByRole("button", { name: "Back", exact: true }).click();
+await moveRecurrenceDialog.getByRole("button", { name: "Keep current schedule", exact: true }).click();
 await sequenceDialog.getByRole("heading", { name: "Manage recurring lesson", exact: true }).waitFor();
 await stopRepeating.click();
 if (stopRepeatPayloads.length !== 0) throw new Error("Opening the repeat confirmation called the stop endpoint.");

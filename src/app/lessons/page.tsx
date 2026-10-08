@@ -49,6 +49,7 @@ export default function LessonsPage() {
                   <LessonMark
                     className="lesson-product__mark"
                     durationMinutes={product.durationMinutes}
+                    lands
                     lessonTypeId={product.id}
                   />
                 </div>
@@ -72,7 +73,7 @@ export default function LessonsPage() {
         </section>
 
         <section className="lessons-closing" aria-label="Where lessons happen and paying">
-          <AssetMark asset="/visuals/v2-splats/in-porto-or-online-splat-v2.svg" className="lessons-closing__mark" />
+          <AssetMark asset="/visuals/v2-splats/in-porto-or-online-splat-v2.svg" className="lessons-closing__mark" lands />
           <div className="lessons-closing__copy">
             <p className="lessons-closing__title">In Porto or online</p>
             <p>You’ll see the price and how to pay before you confirm your lesson.</p>

@@ -53,8 +53,12 @@ Use these names in review so recurring problems are easy to recognise:
 - **Intermediate-width squeeze:** preserving a wide desktop composition after
   headings, controls, or the seven-column calendar have started to clip or
   wrap unnaturally.
-- **Decorative motion:** adding ambient loops, entrance choreography, click
-  delay, or movement that does not explain a state change.
+- **Decorative motion:** adding ambient loops, click delay, entrance
+  choreography for a page's text, controls or sections as it loads, or any
+  movement that makes a reader wait or does not explain a state change. The
+  page turn, the phone menu opening, the little splats' one-time landing, the
+  rules drawn under the headings and the wordmark's hats tipping now and then
+  (see Motion direction) are deliberate.
 
 ## Contrast and accessibility
 
@@ -149,7 +153,11 @@ the same identity or action:
 - on Home, the display heading is `Portuguese Lessons` and the
   supporting line describes one-to-one lessons, online or in person. `Book a lesson` appears
   once. `How I teach` and `Lessons and prices` sit beside it as quieter outline
-  buttons rather than plain links or a second strip beneath the hero;
+  buttons rather than plain links or a second strip beneath the hero. The blue
+  hero carries its own painted field: a cream wave curling in from its right
+  edge beside the heading, as if breaking against the lilac column, clear of
+  the words and the actions at every width. Stacked, it rides higher beside the
+  heading; on phones it comes in beside `Lessons` (8 October 2026);
 - Approach, Lessons, FAQ, and Booking follow the same hierarchy: the brand
   anchors the shared header and footer, while each page owns a task-specific
   heading and only the actions that meaningfully advance its reading path.
@@ -221,15 +229,18 @@ Dan's 22 September review tightened the public pages:
   splat whole inside the page margin. Stacked, the Approach fan comes in from
   the right edge halfway down the heading rather than trailing beneath it, and
   the booking banner keeps
-  its splat at the right in a band of about 124 px, without an editorial rule;
+  its splat at the right in a band of about 124 px, without an editorial rule,
+  its two-line `Your Lessons` set close as one handwritten block;
 - the three Lessons cards each have their own squiggle outline, and their own
-  splat comes in large from the card's top-right corner, cropped by its edge
-  and still; the trial card is lavender. Their rows align across the cards:
-  name, the price with its length as a small tag beside it (`60 min`),
+  splat comes in large from the card's top-right corner, cropped by its edge;
+  once landed it moves only to turn a little while its card is pointed at. The
+  trial card is lavender. Their rows align across
+  the cards: name, the price with its length as a small tag beside it (`60 min`),
   a one-line description, then one full-width button, so no card has an empty
   foot. The whole card opens booking with that lesson chosen. Hover and
-  keyboard focus add a quiet colour wash to the card, and the button answers
-  on its own: it lifts slightly and fills. The closing blue card
+  keyboard focus add a quiet colour wash to the card, the button answers on
+  its own (it lifts slightly and fills) and the corner splat turns a few
+  degrees. The closing blue card
   keeps its two buttons on the right, stacked when the width tightens, and
   moves them beneath the copy only on phones;
 - the header logo starts on the page's left edge, like the footer logo and the
@@ -402,12 +413,78 @@ and card checkout so the choices beside the card form describe its held times.
 
 ## Motion direction
 
-Use a short opacity-only transition on completed route changes, with faster
-mobile timings and no click delay, overlay, transform, ambient loop, or
-decorative hero entrance. Decisions inside the booking flow resize and
-dissolve the existing calendar workspace rather than abruptly replacing the
-page. Keep the rest of the page fixed. Reduced-motion users navigate
-immediately without animation or smooth scrolling.
+Motion is calm, quick and physical, and never makes anyone wait (7 October
+2026, at Dan's request for tasteful animation on the little splats, beautiful
+transitions between pages and a premium feel throughout; on 8 October the
+wordmark's writing, the buttons' shifting cut, the Lessons cards' turning
+marks, the drawn rules and the booking celebration followed, kept in style and
+tasteful). What lands or
+travels moves on a soft spring that gives a few per cent and settles; controls
+answer on a firm one; everything else decelerates long.
+
+Pages turn into one another. The header stays exactly where it is and the
+nav's coral line glides along to the new destination. The page being left
+drops out of focus and away almost at once, and the new one pulls into focus as
+it settles, so two pages never print over each other and for a breath the
+paper shows between them. On wider screens the pages sit in a row along the
+nav: a later page arrives from the right and an earlier one from the left,
+whether reached by a link or the back button. On phones every page settles in
+place with a lighter blur, and an open menu recedes with the page it covered.
+A full page load into Booking turns the same way. Navigation starts at once and
+the new page is live throughout, with no click delay or overlay. Headings, copy
+and actions arrive with their page, never in an entrance of their own. Only the
+rules under the display headings are drawn in: once, from the left end at a
+pen's pace, the hero rules a moment after their heading shows, each Home
+principle's short rule as its splat settles, and an FAQ section's rule each
+time that section is chosen.
+Decisions inside the booking flow resize and dissolve the existing calendar
+workspace rather than turning the page, and keep the rest of the page fixed.
+Without view transitions a new page dissolves in. Reduced-motion users get
+each page at once, without animation or smooth scrolling.
+
+Buttons answer like objects. They lift on hover, the filled ones casting a
+soft shadow in their own colour, and their hand-cut outline shifts a little and
+settles on the soft spring, as wet ink does: the same hand, never a new shape.
+A press sinks them a touch before they spring back; a disabled button does not
+answer, and the booking journey's own controls keep their cut. Every hover line
+draws on the
+same firm spring, the FAQ's plus turns into its minus with a little give, and
+the phone menu's destinations drop in one after another as their marks land.
+
+The header wordmark is the way home, and it answers in Inês's own hand.
+Pointing at it, or focusing it from the keyboard, writes the lettering again
+in coral, left to right at a pen's steady pace, with a pink-violet wet edge on
+the slant of her writing; leaving it draws the ink back quickly. As the ink
+reaches each ê, its circumflex (the chapéu, the hat) tips: a lift of a few
+pixels and a small turn, the two hats turning opposite ways, settling on the
+soft spring. A tap on a phone simply goes home. Clicked, it arrives on Home
+still written rather than written twice. The hats also tip now and then on
+their own, so the site feels lightly alive: Português every nine seconds and
+Inês every thirteen, so they seldom coincide. The beat is the wall clock's, not
+the page's, so the rhythm carries on unbroken from page to page. It is the one
+ambient motion on the site. Reduced motion changes the colour without the
+writing, and the hats stay still.
+
+The little splats land. Each small emblem mark arrives once like a dab of
+paint: it blooms from its middle outwards, soft at first and then sharp, a touch
+small and turned, and settles flat on the soft spring in under a second. That
+covers the Home principles, the Approach points,
+the Lessons card corners and closing card, the FAQ banner and index, and the
+booking banner's three reassurances. A group lands in reading order,
+neighbours turning opposite ways, and a mark twice the usual size travels half
+as far. Marks in the first screen land as the page arrives; those further down
+wait until the reader reaches them, so none lands unseen. The phone menu's
+marks land each time it opens, in step with its links, while the splat cropped
+into its foot blooms a little more slowly. The large painted fields on the
+pages (the Home wave, the Approach fan, the Lessons hero splat and the booking
+banner's corner splat) stay still: they are the paper the marks land on. Text, buttons and the
+booking workspace never move or wait for a landing, nothing else loops, and a
+landed mark stays still, except that a Lessons card turns its mark a few
+degrees while it is pointed at. A confirmed booking is celebrated once: the
+lesson's own mark, the one it wears on the calendar, lands in the corner of
+the confirmation, cropped at its edge and a little larger and slower than the
+small marks. Reduced motion, print and a page without JavaScript show every
+splat at rest.
 
 Pop-ups and their dimmed backgrounds appear with a short, gentle fade. Apply
 the same entrance to terms, booking prompts and student/teacher lesson dialogs,
@@ -448,8 +525,9 @@ place, headed by a short date (`Thu 24 Sept 2026`) with an outline `Change`
 beside it on the same row, which returns to the calendar (named `Change date`
 for assistive technology). Before a day is chosen, the panel beside the
 calendar offers `Soonest times`: the first free time on each of the next three
-free days, each one tap from the confirmation. On a phone that panel stays out
-of sight until there is a day to show.
+free days, each one tap from the confirmation. `Soonest times` is the panel's
+heading, with no `Choose a day` or eyebrow stacked above the three rows. On a
+phone that panel stays out of sight until there is a day to show.
 
 Students can collect several single-lesson dates and confirm them together.
 Each chosen lesson is its own row: its own splat, the date and time, Porto time
@@ -515,7 +593,9 @@ Preserve these desktop and mobile states:
 - the signed-in identity appears once, inside a generously padded account bar.
   On wide desktop, `View lessons`, `Past lessons`, `Edit details`, and `Sign
   out` sit directly in that bar, in that order; narrower layouts retain them
-  inside a small `Menu`. Booking is not repeated there: its one coral action
+  inside a small `Menu` that opens with a dropdown chevron, never the site
+  menu's three lines, so a phone shows one `☰` for the site and one clearly
+  different account menu. Booking is not repeated there: its one coral action
   belongs to the calendar. `View lessons` may show the useful
   upcoming count; `Past lessons` deliberately has no count competing for
   attention. It remains present on the lessons calendar, while booking, and
@@ -570,6 +650,12 @@ Preserve these desktop and mobile states:
 - after a successful one-off or recurring booking, the confirmation's primary
   back action opens the lessons calendar so the new booking is immediately
   visible on its day;
+- the confirmation itself is one hand-cut card in the booking panels' wash,
+  read top to bottom: `You're booked in.`, the day with its times beneath it,
+  where the confirmation went, then the two actions, and a small-print foot
+  under a soft rule with the reference and the fee rule. The lesson's own mark
+  lands in its top corner as its only seal, so there is no separate `Booked`
+  badge (8 October 2026);
 - the calendar shows four Monday-to-Sunday weeks at a time, never one long
   scroll. `Earlier weeks` and `Later weeks` arrows sit either side of the range
   label, and `Later weeks` carries a small coral count of the booked lessons
@@ -593,7 +679,16 @@ Preserve these desktop and mobile states:
   lesson keeps the calendar in place and adds a compact overlay asking
   whether to change or cancel it. `Change` keeps the page dimmed and lifts that
   same calendar and time picker into the overlay; it never dismisses the modal
-  or scrolls the student down the underlying page. The overlay is one surface,
+  or scrolls the student down the underlying page. Where the form sits beside
+  the calendar it shows the usual four weeks from the lesson's week; where the
+  form stacks beneath it, as on a phone, the lesson's week alone with `Show all`
+  on the key's row. The overlay leads with its heading and one short line for
+  the lesson as it stands (`Currently Thu 15 Oct, 18:00 · 60 mins`): above the
+  calendar on a phone, across the top on a wide screen, with no eyebrow. The
+  chosen day reads short above its times (`Fri 16 Oct · Porto time`), and on
+  a phone the length and place controls name themselves without legends, as
+  in the booking bar. `Keep current time` (`Keep current schedule` for a
+  recurrence) is the one way back, with no separate `Back`. The overlay is one surface,
   without framed cards nested inside it. Eligible ordinary lessons can switch
   between the same compact `60 mins` and `90 mins` choices and Online/In Porto
   there, with the current date and time already selected; a paid lesson is never silently
@@ -664,6 +759,89 @@ lesson` and `Book a longer lesson` open booking with that length already
 chosen. The main `Booking` navigation still opens a returning student's
 schedule. Old `/my-lessons` and emailed `/booking` links retain their
 destination and tokens in `/book/`.
+
+## Booking, simplified — 8 October 2026
+
+At Dan's request to make the places where people read or act simpler and
+calmer, without new content:
+
+- one price at the point of payment: with Weekly chosen, each length shows the
+  account's saved weekly rate, the same price as the line under `Confirm your
+  recurring lessons`;
+- the payment summary is a short list rather than a paragraph: one fact per
+  item, two to a row where the column allows and one on a phone, each after a
+  little dab of paint cut from the FAQ mark and turned and coloured
+  differently from its neighbours. Every fee fact stays, with the amount in
+  coral. Paying on the lesson day, `The full rules are in terms & privacy` is
+  the last item rather than a link standing alone above the final action; with
+  card payment the agreement control is unchanged. The step heading leaves room
+  for Beth Ellen's descenders;
+- in a narrow booking column a lesson row's date reads short
+  (`Fri 16 Oct, 18:00`), as does the next lesson, with the long form kept for
+  screen readers. The row's `Change` keeps its 14 px label (see Contrast and
+  accessibility);
+- the lesson dialog drops the question that repeated its heading and buttons,
+  and the rules around the lesson's date. Its pill is `Recurring lesson` only
+  while the repeat is running, `Booked` once it stops, and `Cancelled` carries
+  the past lessons' ⊗. `Manage sequence` is a compact outline button. Cancelling
+  a sequence states what happens rather than asking again. On a phone a
+  decision's pair of actions (`Yes, cancel it` / `Keep lesson` and the like)
+  stacks so no label wraps, while `Change` and `Cancel` stay side by side;
+- booked times in calendar tiles are big enough to read and to tell the weekly
+  colour from the one-off one, and the calendar key shows `Booked lesson` only
+  when there is a booked lesson to point to;
+- before a day is chosen, `Soonest times` heads the side panel on its own;
+- changing a lesson on a wide screen opens on the usual four weeks beside the
+  form, so there is no empty half and no `Show all`; the overlay's heading
+  stands alone and `Keep current time` is its one way back, stacked beneath
+  the coral action so neither label breaks onto a second line;
+- the change overlay says the date once rather than three times: the heading
+  and a one-line `Currently …` come first, even on a phone, the day above the
+  times reads short, and a phone drops the length and place legends. A day
+  filled coral shows every booked time in white.
+- `Terms & privacy` and a day's list of lessons are one family with the lesson
+  dialog: the same hand-cut panel on light paper with its warm corner, over the
+  same lightly dimmed page. The day's list needs no ruled header, and each of
+  its rows wears the lesson's own mark, as on the calendar. Terms keeps the
+  rule under its title, where a long text scrolls beneath it.
+
+## Reading and account pages, simplified — 8 October 2026
+
+The same request, carried to the pages with most to read and the account
+tools, again without new content:
+
+- in `Terms & privacy` the five section headings are the site's lilac
+  eyebrows, set well apart from the section before, so the overlay's title,
+  its sections and the bold labels inside the points read as three levels. A
+  list never sits tight against the sentence that introduces it;
+- stacked, the FAQ index keeps two columns at every width, so on a phone it is
+  a short block above the first section rather than the whole first screen.
+  Phones drop the `Index` label (the list keeps its name for assistive
+  technology), and the index's own last rule is the only line between it and
+  the section, whose rule is drawn under its heading;
+- the Approach points are headed in sentence-case Montserrat at reading size,
+  and each point's line is no larger than its heading, so the three read
+  heading first, as the Home principles do. Side by side, the intro line
+  narrows with its column so its last word always stops short of the fan.
+  `Meet Inês` lists its three credentials one to a line rather than run
+  together between separators, and closing paragraphs avoid leaving a word
+  alone on their last line;
+- the account card's heading stays `Your account` whichever tab is chosen,
+  since the tabs alone name the mode; only a `Sign in` heading follows the tab.
+  Every sign-in card opens on one small full-colour mark centred above its
+  heading, clear of the words;
+- in Edit details each note sits under its own field when the fields are
+  paired;
+- past lessons are cut in the tile hand on one soft lavender wash, and only the
+  status pill carries colour, lilac for `Completed` and coral for `Cancelled`,
+  so a run of cancellations reads as records rather than a wall of coral. Good
+  news (`All sorted`, a changed password, a reset link on its way) is a calm
+  lavender panel with a tick, never a coloured stripe, and says the link's
+  one-hour life only where the form above it does not already;
+- Inês's schedule shares the page's left and right edges with the header
+  rather than sitting in a centred box. On a phone the week has its own row,
+  `Weekly hours` and the pager share the next, and the hint follows; a wider
+  phone or small tablet that fits all three keeps them on one row.
 
 ## Account interaction states
 

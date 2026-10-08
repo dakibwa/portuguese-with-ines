@@ -259,10 +259,78 @@ body text on lavender.
 
 ## Motion and loading
 
-Each destination arrives with a short opacity-only dissolve: 190 ms on mobile
-and 240 ms on wider screens. Navigation itself starts immediately; there is no
-click interception, exit delay, overlay, movement, scale, or staggered hero
-animation. Booking decisions use a 220–260 ms same-document surface transition
+Pages turn into one another with view transitions. Next.js remounts
+`src/app/template.tsx` on every navigation, and its React `<ViewTransition>`
+gives the page being left an exit and the arriving page an enter, which
+`globals.css` animates: the old page recedes out of focus in about 220 ms while
+the new one focuses in over about 420 ms, drifting into place over 620 ms on
+desktop and 520 ms on phones. The header, the portfolio banner and an open phone
+menu carry their own `view-transition-name`s, so the header holds still and the
+menu recedes with its page; the nav's current line, `.site-nav__current`, is a
+named element of its own and glides. `PageTurn` sets `data-page-turn`
+(`forward`, `back` or `settle`) on the root while the new page commits, from the
+pages' order along the nav. React commits a back or forward navigation
+synchronously, so it has no view transition, and `PageTurn` gives those pages
+the arrival half through the Web Animations API instead. Full page loads, such
+as the nav's Booking link, recede and focus the same way through
+`@view-transition { navigation: auto; types: document; }`. Navigation itself
+starts immediately and `::view-transition { pointer-events: none; }` keeps the
+arriving page clickable; only the named header skips clicks for the moment of
+the turn. Browsers without view transitions keep the 190–240 ms dissolve. The
+journey test counts the turns, and checks that reduced motion animates none.
+A turn changes the address a moment before the page being left unmounts, and
+the unmount is what retires the booking flow's requests, so a new booking and a
+payment recovery also check that the page's path is unchanged before they send
+a student on to Stripe or show an error: someone who has already left is never
+pulled back to pay.
+
+The motion tokens are deliberately few. `--motion-spring` and
+`--motion-spring-firm` are damped-spring curves sampled into CSS `linear()`,
+with `cubic-bezier` fallbacks: the soft one gives about 4% for what lands or
+travels, the firm one barely 0.5% for controls. `--motion-ease-out` is a long
+deceleration for everything else, and `--motion-pen`, a sine ease-out, paces
+whatever is written or drawn. Buttons lift on hover, shift their cut to
+`--squiggle-button-shift` (`--squiggle-button-alt-shift` for outlined ones) on
+the soft spring, and sink to 97% while pressed, except when disabled; the
+booking journey's control grammar keeps its own radius.
+
+The wordmark is three CSS masks over one artwork, so its colour is whatever is
+painted behind it. `BrandWordmark` renders the lettering with two small windows
+subtracted (`mask-composite: subtract`) and each circumflex over ê in its own
+window (`intersect`); at rest the three print as one. Hovering over the header
+wordmark, or focusing it from the keyboard, writes it in coral: a registered,
+inheriting `--wordmark-ink` percentage carries the edge of a 105° gradient
+across all three layers in 720 ms on `--motion-pen`, mixed in OKLCH so that the
+wet edge runs through pink and violet, and draws it back in 400 ms. As the
+edge reaches each ê, a registered `--wordmark-hat` number runs from 0 to 1 on
+the soft spring and its `sin()` lifts and turns that hat; leaving resets it at
+once, so leaving never tips a hat again, and a browser without `@property`, or
+reduced motion, jumps straight to 1, where the arc is back at rest. The ink's
+value is declared on the element, never as a `var()` fallback, which Chromium
+does not repaint until the transition has ended. The header wordmark's box is
+sized to the artwork's 760 × 236 ratio, so the ink crosses letters rather than
+empty header and the windows sit where they were measured. `(hover: hover) and
+(pointer: fine)` leaves touch screens out. A browser does not check hover
+again until a view transition has finished, so a click on a written wordmark
+would bring the new page's wordmark in bare and then write it a second time.
+Instead, `PageTurn` holds it written, hats included, with
+`data-wordmark="inked"` until a few frames after the turn. Without `@property`
+it simply turns coral. The hats also tip now and then on their own, the site's
+one ambient motion: paused CSS animations on a registered `--wordmark-idle`,
+nine seconds for Português and thirteen for Inês, sharing the hover's arc
+through `max()` so the two never add up. `PageTurn` starts them on every page
+at `Date.now() % period`, so the rhythm is the wall clock's and carries on
+unbroken across page turns and full page loads; without JavaScript, and with
+reduced motion, the hats stay still.
+
+The rules under the display headings (`.editorial-rule`, the Home principles'
+`.short-rule`, and the FAQ section header's `::after`, which replaced its
+border at the same height) are drawn once with a `scaleX` animation from the
+left on `--motion-pen`, starting when they are inserted. A page turn or a newly
+chosen FAQ section therefore draws its rules again, and the principles' short
+rules borrow their splats' `--land-order` so each draws as its mark settles.
+
+Booking decisions use a 220–260 ms same-document surface transition
 where supported. The account, lesson choice, calendar, detail, and confirmation
 surfaces each keep their place while their own geometry and content change, so
 the page no longer dissolves as one oversized snapshot. Older browsers keep the
@@ -272,11 +340,33 @@ decision is visible; an already visible desktop choice does not move the page.
 Interrupted transitions from a quick second choice are treated as normal input,
 not as browser errors.
 
-`prefers-reduced-motion: reduce` removes route and booking transitions, smooth
-scrolling, and the button and navigation hover transforms, keeping colour
-changes so states stay distinguishable.
+The little splats are the one decorative motion: each lands once, like a dab
+of paint, in under a second, blooming out from its middle as a widening radial
+mask while a blur sharpens and the soft spring settles its scale and turn.
+`AssetMark`'s `lands` prop opts a mark in. Marks
+in the first screen land from CSS alone as the page arrives; `SplatArrivals`,
+in the route template, holds those further down until the reader reaches them,
+and a first-screen mark only until its picture has downloaded. The landing
+moves the `<picture>` inside the mark, never the mark's own box, so measured
+sizes (the booking banner check) and positioning transforms are untouched. A
+hold is only ever placed before a mark has been seen, and anything that fails
+leaves the mark showing. A Lessons card turns its mark's box, not the picture,
+a few degrees on hover or focus, so the two motions never meet. A confirmed
+booking's `.booking-success` lands the lesson's own `LessonMark` in its top
+corner, larger and slower than the small marks, cropped by the card's own
+hand-cut edge as the Lessons cards crop theirs. The card clips its overflow, so
+the mark never widens a narrow phone (an earlier `clip-path` on a box reaching
+past the card hid it but still widened the page), and it sits beneath the
+card's text inside an isolated stacking context.
 
-Approach and lessons hero artwork is served as AVIF with a WebP fallback — the
+`prefers-reduced-motion: reduce` removes page turns, booking transitions,
+smooth scrolling, the splat landings, the phone menu's entrance, the button
+and navigation hover and press transforms, the buttons' shifting cut, the
+cards' turning marks, the drawn rules, and the wordmark's writing and tipping
+hats, keeping colour changes so states stay distinguishable. Splats are also
+shown at rest in print and without JavaScript, and the rules in print.
+
+Home, Approach and Lessons hero artwork is served as AVIF with a WebP fallback — the
 painterly splats cost less than half as much in AVIF as they did in WebP — and
 fetched eagerly, with dedicated 800 px sources for screens up to 720 px;
 non-critical marks load lazily. The display font is

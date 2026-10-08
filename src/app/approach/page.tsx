@@ -63,7 +63,7 @@ export default function ApproachPage() {
           <div className="approach-list">
             {approachItems.map((item) => (
               <article className="approach-item" key={item.title}>
-                <AssetMark asset={item.asset} />
+                <AssetMark asset={item.asset} lands />
                 <div>
                   <h2>{item.title}</h2>
                   <p>{item.body}</p>
@@ -75,10 +75,13 @@ export default function ApproachPage() {
 
         <section className="teacher-band" aria-labelledby="teacher-title">
           <h2 id="teacher-title">Meet Inês</h2>
-          <p>
-            Native speaker from Porto <span aria-hidden="true">·</span> BA in Languages, Literatures &amp; Cultures{" "}
-            <span aria-hidden="true">·</span> Portuguese and English
-          </p>
+          {/* One credential to a line: run together, a line could start or end
+              on the separator between them. */}
+          <ul className="teacher-band__credentials">
+            <li>Native speaker from Porto</li>
+            <li>BA in Languages, Literatures &amp; Cultures</li>
+            <li>Portuguese and English</li>
+          </ul>
         </section>
 
         <section className="editorial-callout">

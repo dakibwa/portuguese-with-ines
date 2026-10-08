@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { ChevronRight, X } from "lucide-react";
 import { formatLongDate } from "@/lib/booking-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 
-type PromptLesson = { key: string; title: string; detail: string; onOpen: () => void };
+/** Each lesson row wears the lesson's own mark, as it does on the calendar. */
+type PromptLesson = { key: string; title: string; detail: string; mark?: ReactNode; onOpen: () => void };
 
 /**
  * The question a calendar day asks. A free day offers to book; a day with
@@ -57,6 +58,7 @@ export function CalendarBookingPrompt({ date, lessons = [], onBook, onClose }: {
             {lessons.map((lesson) => (
               <li key={lesson.key}>
                 <button className="calendar-booking-prompt__lesson" onClick={lesson.onOpen} type="button">
+                  {lesson.mark}
                   <span>
                     <strong>{lesson.title}</strong>
                     <small>{lesson.detail}</small>
