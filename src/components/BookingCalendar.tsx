@@ -2273,6 +2273,19 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     const localTime = differingLocalTime(confirmation.startAt, studentZone);
     return (
       <section className="booking-success" aria-live="polite">
+        {/* Good news gets one small celebration: the lesson's own mark, the
+            one it wears on the calendar from now on, lands in the card's
+            corner. Decorative, and it lands only once. */}
+        {lessonType ? (
+          <LessonMark
+            className="booking-success__mark"
+            durationMinutes={lessonType.duration_minutes}
+            lands
+            lessonTypeId={lessonType.id}
+            location={confirmation.location}
+            recurring={Boolean(confirmation.series || confirmation.selection?.recurring)}
+          />
+        ) : null}
         {/* The tick and the word sat above the heading and pushed everything
             down a screen that is mostly one sentence of good news. Beside it,
             they confirm the same thing and cost no height. */}

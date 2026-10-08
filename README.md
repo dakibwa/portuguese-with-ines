@@ -283,21 +283,41 @@ The motion tokens are deliberately few. `--motion-spring` and
 `--motion-spring-firm` are damped-spring curves sampled into CSS `linear()`,
 with `cubic-bezier` fallbacks: the soft one gives about 4% for what lands or
 travels, the firm one barely 0.5% for controls. `--motion-ease-out` is a long
-deceleration for everything else. Buttons lift on hover and sink to 97% while
-pressed, except when disabled.
+deceleration for everything else, and `--motion-pen`, a sine ease-out, paces
+whatever is written or drawn. Buttons lift on hover, shift their cut to
+`--squiggle-button-shift` (`--squiggle-button-alt-shift` for outlined ones) on
+the soft spring, and sink to 97% while pressed, except when disabled; the
+booking journey's control grammar keeps its own radius.
 
-The header wordmark is a CSS mask, so its colour is whatever is painted behind
-it. Hovering over it, or focusing it from the keyboard, writes it in coral: a
-registered `--wordmark-ink` percentage carries the edge of a 105° gradient
-across the lettering in 720 ms on a sine ease, mixed in OKLCH so that the wet
-edge runs through pink and violet, and draws it back in 400 ms. The mask's box
-is sized to the artwork's 760 × 236 ratio, so the ink crosses letters rather
-than empty header. `(hover: hover) and (pointer: fine)` leaves touch screens
-out. A browser does not check hover again until a view transition has
-finished, so a click on a written wordmark would bring the new page's wordmark
-in bare and then write it a second time. Instead, `PageTurn` holds it written
-with `data-wordmark="inked"` until a few frames after the turn. Without
-`@property` it simply turns coral.
+The wordmark is three CSS masks over one artwork, so its colour is whatever is
+painted behind it. `BrandWordmark` renders the lettering with two small windows
+subtracted (`mask-composite: subtract`) and each circumflex over ê in its own
+window (`intersect`); at rest the three print as one. Hovering over the header
+wordmark, or focusing it from the keyboard, writes it in coral: a registered,
+inheriting `--wordmark-ink` percentage carries the edge of a 105° gradient
+across all three layers in 720 ms on `--motion-pen`, mixed in OKLCH so that the
+wet edge runs through pink and violet, and draws it back in 400 ms. As the
+edge reaches each ê, a registered `--wordmark-hat` number runs from 0 to 1 on
+the soft spring and its `sin()` lifts and turns that hat; leaving resets it at
+once, so leaving never tips a hat again, and a browser without `@property`, or
+reduced motion, jumps straight to 1, where the arc is back at rest. The ink's
+value is declared on the element, never as a `var()` fallback, which Chromium
+does not repaint until the transition has ended. The header wordmark's box is
+sized to the artwork's 760 × 236 ratio, so the ink crosses letters rather than
+empty header and the windows sit where they were measured. `(hover: hover) and
+(pointer: fine)` leaves touch screens out. A browser does not check hover
+again until a view transition has finished, so a click on a written wordmark
+would bring the new page's wordmark in bare and then write it a second time.
+Instead, `PageTurn` holds it written, hats included, with
+`data-wordmark="inked"` until a few frames after the turn. Without `@property`
+it simply turns coral.
+
+The rules under the display headings (`.editorial-rule`, the Home principles'
+`.short-rule`, and the FAQ section header's `::after`, which replaced its
+border at the same height) are drawn once with a `scaleX` animation from the
+left on `--motion-pen`, starting when they are inserted. A page turn or a newly
+chosen FAQ section therefore draws its rules again, and the principles' short
+rules borrow their splats' `--land-order` so each draws as its mark settles.
 
 Booking decisions use a 220–260 ms same-document surface transition
 where supported. The account, lesson choice, calendar, detail, and confirmation
@@ -319,13 +339,19 @@ and a first-screen mark only until its picture has downloaded. The landing
 moves the `<picture>` inside the mark, never the mark's own box, so measured
 sizes (the booking banner check) and positioning transforms are untouched. A
 hold is only ever placed before a mark has been seen, and anything that fails
-leaves the mark showing.
+leaves the mark showing. A Lessons card turns its mark's box, not the picture,
+a few degrees on hover or focus, so the two motions never meet. A confirmed
+booking's `.booking-success` lands the lesson's own `LessonMark` in its
+corner, larger and slower than the small marks; the mark crops itself with
+`clip-path` and sits beneath the card's text inside an isolated stacking
+context, so nothing in the card is ever clipped.
 
 `prefers-reduced-motion: reduce` removes page turns, booking transitions,
 smooth scrolling, the splat landings, the phone menu's entrance, the button
-and navigation hover and press transforms, and the wordmark's writing, keeping
-colour changes so states stay distinguishable. Splats are also shown at rest
-in print and without JavaScript.
+and navigation hover and press transforms, the buttons' shifting cut, the
+cards' turning marks, the drawn rules, and the wordmark's writing and tipping
+hats, keeping colour changes so states stay distinguishable. Splats are also
+shown at rest in print and without JavaScript, and the rules in print.
 
 Approach and lessons hero artwork is served as AVIF with a WebP fallback — the
 painterly splats cost less than half as much in AVIF as they did in WebP — and

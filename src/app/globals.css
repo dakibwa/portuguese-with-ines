@@ -38,6 +38,10 @@
   --squiggle-panel: 48px 20px 44px 24px / 22px 46px 21px 42px;
   --squiggle-button: 44px 18px 40px 22px / 20px 42px 19px 38px;
   --squiggle-button-alt: 20px 42px 19px 38px / 44px 18px 40px 22px;
+  /* Where a pointer settles, a button's cut shifts a little and settles, as
+     wet ink does: the same hand, never a new shape. */
+  --squiggle-button-shift: 38px 24px 46px 16px / 24px 36px 23px 44px;
+  --squiggle-button-alt-shift: 24px 36px 23px 44px / 38px 24px 46px 16px;
   --squiggle-tile: 37px 15px 34px 19px / 17px 36px 16px 32px;
   --squiggle-tabs: 35px 14px 32px 18px / 16px 34px 15px 30px;
   --squiggle-field: 33px 13px 30px 16px / 15px 31px 14px 28px;
@@ -57,6 +61,9 @@
   --motion-page: 620ms;
   /* Decelerates hard and long: things arrive quickly, then take their time. */
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A pen's steady pace, easing only as it lifts: for what is drawn or
+     written, the wordmark's ink and the rules under the headings. */
+  --motion-pen: cubic-bezier(0.61, 1, 0.88, 1);
   /*
    * Springs, sampled from a damped oscillator. The soft one gives about 4% and
    * settles, for things that land or travel; the firm one barely gives, for
@@ -673,10 +680,25 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   }
 }
 
+/*
+ * One artwork, three masks: the lettering, and the two circumflexes over its
+ * ê (the chapéu, the "hat"), each cut out by a small window round it. At rest
+ * they print as one wordmark. The windows are in the artwork's own pixels
+ * (760 × 236): x 404–442, y 22–48 for Português and x 647–686, y 136–162 for
+ * Inês, both clear of every other stroke, placed as percentages where
+ * position = start / (1 − size).
+ */
 .brand-wordmark {
+  position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 900 / 280;
+  aspect-ratio: 760 / 236;
+}
+
+/* No more specific than the layers' own rules below, which must win. */
+.brand-wordmark > * {
+  position: absolute;
+  inset: 0;
   background: currentColor;
   -webkit-mask-image: var(--wordmark-image);
   -webkit-mask-position: center;
@@ -686,6 +708,40 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   mask-position: center;
   mask-repeat: no-repeat;
   mask-size: contain;
+}
+
+.brand-wordmark__letters {
+  -webkit-mask-image: var(--wordmark-image), linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  -webkit-mask-position: center, 56.033% 10.526%, 89.861% 65.072%;
+  -webkit-mask-size: contain, 5.132% 11.441%, 5.263% 11.441%;
+  -webkit-mask-composite: source-out, source-over;
+  mask-image: var(--wordmark-image), linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  mask-position: center, 56.033% 10.526%, 89.861% 65.072%;
+  mask-size: contain, 5.132% 11.441%, 5.263% 11.441%;
+  mask-composite: subtract, add;
+}
+
+.brand-wordmark__hat {
+  -webkit-mask-image: var(--wordmark-image), linear-gradient(#000 0 0);
+  -webkit-mask-composite: source-in;
+  mask-image: var(--wordmark-image), linear-gradient(#000 0 0);
+  mask-composite: intersect;
+}
+
+.brand-wordmark__hat--portugues {
+  -webkit-mask-position: center, 56.033% 10.526%;
+  -webkit-mask-size: contain, 5.132% 11.441%;
+  mask-position: center, 56.033% 10.526%;
+  mask-size: contain, 5.132% 11.441%;
+  transform-origin: 55.658% 18.644%;
+}
+
+.brand-wordmark__hat--ines {
+  -webkit-mask-position: center, 89.861% 65.072%;
+  -webkit-mask-size: contain, 5.263% 11.441%;
+  mask-position: center, 89.861% 65.072%;
+  mask-size: contain, 5.263% 11.441%;
+  transform-origin: 87.697% 66.949%;
 }
 
 .brand-wordmark--green {
@@ -721,14 +777,8 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 
 .header-wordmark {
   /* Sized to the artwork, so the ink below crosses letters rather than empty
-     paper. Where the header is narrower than the artwork, it still starts on
-     the page's edge, as the footer logo does, not floating in the middle. */
-  width: auto;
-  max-width: 100%;
-  height: 72px;
-  aspect-ratio: 760 / 236;
-  -webkit-mask-position: left center;
-  mask-position: left center;
+     paper, and so the hats' windows sit where they were measured. */
+  width: min(100%, calc(72px * 760 / 236));
 }
 
 /*
@@ -736,13 +786,21 @@ html:active-view-transition-type(document)::view-transition-new(root) {
  * coral, written left to right at a pen's steady pace, with the wet edge of
  * the ink on the slant of her hand. Mixed in OKLCH, that edge runs through
  * pink and violet rather than mud; a browser without it mixes plainly, and one
- * that cannot animate the ink (no @property) simply turns coral. Only a
- * pointer that can rest there writes it: a tap simply goes home.
+ * that cannot animate the ink (no @property) simply turns coral. As the edge
+ * reaches each ê, its hat tips: a lift of a few pixels and a small turn that
+ * settles on the soft spring. Only a pointer that can rest there writes it: a
+ * tap simply goes home.
  */
 @property --wordmark-ink {
   syntax: "<percentage>";
-  inherits: false;
+  inherits: true;
   initial-value: 0%;
+}
+
+@property --wordmark-hat {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
 }
 
 .header-wordmark {
@@ -750,10 +808,32 @@ html:active-view-transition-type(document)::view-transition-new(root) {
      @property still has a value; and never as a var() fallback, which
      Chromium does not repaint until the transition has ended. */
   --wordmark-ink: 0%;
-  --wordmark-pen: cubic-bezier(0.61, 1, 0.88, 1);
+  transition: --wordmark-ink 400ms var(--motion-pen);
+}
+
+.header-wordmark > * {
   background: linear-gradient(105deg, var(--coral) calc(var(--wordmark-ink) - 12%), currentColor var(--wordmark-ink));
   background: linear-gradient(in oklch 105deg, var(--coral) calc(var(--wordmark-ink) - 12%), currentColor var(--wordmark-ink));
-  transition: --wordmark-ink 400ms var(--wordmark-pen);
+}
+
+/* A hat's tip is one arc, from 0 to 1: up and back, with the spring's give
+   as it lands. Leaving resets it at once, so leaving never tips it again; a
+   browser that cannot animate it, or reduced motion, jumps straight to 1,
+   where the arc is back at rest. */
+.header-wordmark .brand-wordmark__hat {
+  --wordmark-hat: 0;
+  translate: 0 calc(-2.5px * sin(var(--wordmark-hat) * 180deg));
+  rotate: calc(var(--hat-turn) * sin(var(--wordmark-hat) * 180deg));
+}
+
+.header-wordmark .brand-wordmark__hat--portugues {
+  --hat-turn: -14deg;
+  --hat-delay: 210ms;
+}
+
+.header-wordmark .brand-wordmark__hat--ines {
+  --hat-turn: 12deg;
+  --hat-delay: 400ms;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -762,10 +842,20 @@ html:active-view-transition-type(document)::view-transition-new(root) {
     transition-duration: 720ms;
   }
 
+  .site-header__brand:hover .brand-wordmark__hat {
+    --wordmark-hat: 1;
+    transition: --wordmark-hat 620ms var(--motion-spring) var(--hat-delay);
+  }
+
   /* Clicked while written, it arrives home written (PageTurn), rather than
      bare and then written again once the page has turned. */
   :root[data-wordmark="inked"] .header-wordmark {
     --wordmark-ink: 112%;
+    transition: none;
+  }
+
+  :root[data-wordmark="inked"] .header-wordmark .brand-wordmark__hat {
+    --wordmark-hat: 1;
     transition: none;
   }
 }
@@ -775,8 +865,15 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   transition-duration: 720ms;
 }
 
+.site-header__brand:focus-visible .brand-wordmark__hat {
+  --wordmark-hat: 1;
+  transition: --wordmark-hat 620ms var(--motion-spring) var(--hat-delay);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .header-wordmark {
+  .header-wordmark,
+  .header-wordmark .brand-wordmark__hat,
+  .site-header__brand:is(:hover, :focus-visible) .brand-wordmark__hat {
     transition: none;
   }
 }
@@ -859,7 +956,8 @@ html:active-view-transition-type(document)::view-transition-new(root) {
     border-color 200ms ease,
     color 200ms ease,
     box-shadow 320ms var(--motion-ease-out),
-    transform 420ms var(--motion-spring-firm);
+    transform 420ms var(--motion-spring-firm),
+    border-radius 640ms var(--motion-spring);
 }
 
 .button:hover {
@@ -869,7 +967,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 /* A press sinks the button a touch at once, and the spring lets it back up. */
 .button:active:not(:disabled) {
   transform: translateY(0) scale(0.97);
-  transition-duration: 200ms, 200ms, 200ms, 120ms, 80ms;
+  transition-duration: 200ms, 200ms, 200ms, 120ms, 80ms, 640ms;
 }
 
 .button--coral {
@@ -923,6 +1021,21 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 .button--outline-light:focus-visible {
   border-color: var(--paper);
   background: rgba(245, 236, 217, 0.15);
+}
+
+/* Pointed at or focused, the cut shifts on the soft spring. The booking
+   journey's own control grammar, later in this file, keeps its buttons as
+   they are. */
+@media (prefers-reduced-motion: no-preference) {
+  .button:where(:hover, :focus-visible):not(:disabled) {
+    border-radius: var(--squiggle-button-shift);
+  }
+
+  .button--outline:where(:hover, :focus-visible):not(:disabled),
+  .button--outline-light:where(:hover, :focus-visible):not(:disabled),
+  .booking-confirm-button:where(:hover, :focus-visible):not(:disabled) {
+    border-radius: var(--squiggle-button-alt-shift);
+  }
 }
 
 /* For a supporting pair beside or beneath the page's main action. */
@@ -996,6 +1109,38 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   height: 1px;
   margin: 0.8rem 0 1.1rem;
   background: var(--lavender);
+}
+
+/*
+ * The rules under the headings are drawn, once, from their left end at a
+ * pen's pace as their page arrives: the hero rules a moment after the heading
+ * shows, each principle's short rule as its splat settles, and an FAQ
+ * section's rule each time the section is chosen. The heading itself never
+ * waits or moves; reduced motion and print show every rule drawn.
+ */
+@keyframes rule-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .editorial-rule,
+  .short-rule,
+  .faq-group__header::after {
+    transform-origin: left center;
+    animation: rule-draw var(--rule-duration, 820ms) var(--motion-pen) var(--rule-delay, 240ms) backwards;
+  }
+
+  .short-rule {
+    --rule-duration: 520ms;
+    --rule-delay: calc(var(--land-start, 160ms) + var(--land-order, 0) * var(--land-step, 110ms) + 260ms);
+  }
+
+  .faq-group__header::after {
+    --rule-duration: 700ms;
+    --rule-delay: 60ms;
+  }
 }
 
 .asset-mark {
@@ -1505,7 +1650,8 @@ html:active-view-transition-type(document)::view-transition-new(root) {
  * wears later, in the booking flow and on booked lessons, so the same splat
  * means the same lesson wherever a student meets it. The whole card is the
  * way into booking that lesson; hovering it warms the colour while the button
- * lifts and fills, and the card and its mark stay where they are.
+ * lifts and fills, and its mark turns a little on the soft spring. The card
+ * itself stays where it is.
  */
 .lesson-product {
   position: relative;
@@ -1556,8 +1702,10 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 }
 
 /* Each splat comes in from the card's top-right corner, cropped by the card's
-   own squiggle. It lands with the page, then stays still: on hover the button
-   does the moving. */
+   own squiggle. It lands with the page; pointed at, the card turns it a few
+   degrees and lets it swell a touch, neighbours turning opposite ways, and it
+   settles back when the pointer leaves. The landing moves the picture inside,
+   this the mark's box, so the two never meet. */
 .lesson-product__mark {
   position: absolute;
   top: -30px;
@@ -1565,6 +1713,22 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   width: 118px;
   height: 118px;
   pointer-events: none;
+  --mark-turn: 8deg;
+  transition:
+    rotate 720ms var(--motion-spring),
+    scale 720ms var(--motion-spring);
+}
+
+.lesson-product--trial .lesson-product__mark,
+.lesson-product--long .lesson-product__mark {
+  --mark-turn: -8deg;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lesson-product:is(:hover, :focus-within) .lesson-product__mark {
+    rotate: var(--mark-turn);
+    scale: 1.05;
+  }
 }
 
 .lesson-product__pricing,
@@ -1588,7 +1752,8 @@ html:active-view-transition-type(document)::view-transition-new(root) {
     border-color 200ms ease,
     color 200ms ease,
     box-shadow 320ms var(--motion-ease-out),
-    transform 420ms var(--motion-spring-firm);
+    transform 420ms var(--motion-spring-firm),
+    border-radius 640ms var(--motion-spring);
 }
 
 /* The button answers too, apart from the card's wash: it lifts and fills. */
@@ -1601,7 +1766,17 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 /* Pressing anywhere on the card presses its button. */
 .lesson-product .lesson-product__link:active {
   transform: translateY(0) scale(0.97);
-  transition-duration: 200ms, 200ms, 200ms, 120ms, 80ms;
+  transition-duration: 200ms, 200ms, 200ms, 120ms, 80ms, 640ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lesson-product:is(:hover, :focus-within) .lesson-product__link {
+    border-radius: var(--squiggle-button-shift);
+  }
+
+  .lesson-product:is(:hover, :focus-within) .lesson-product__link.button--outline {
+    border-radius: var(--squiggle-button-alt-shift);
+  }
 }
 
 .lesson-product:hover .lesson-product__link.button--coral,
@@ -1996,12 +2171,23 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   outline: none;
 }
 
-/* The index numbers the sections, so the heading needs no number of its own. */
+/* The index numbers the sections, so the heading needs no number of its own.
+   Its rule is a line of its own rather than a border, so it can be drawn. */
 .faq-group__header {
+  position: relative;
   display: flex;
   align-items: baseline;
-  border-bottom: 2px solid var(--green);
-  padding: 1.3rem 0 0.9rem;
+  padding: 1.3rem 0 calc(0.9rem + 2px);
+}
+
+.faq-group__header::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--green);
+  content: "";
 }
 
 .faq-group__header h2 {
@@ -5932,6 +6118,8 @@ button.text-action {
 /* Confirmation shown in place of the calendar once a booking succeeds. */
 
 .booking-success {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -5939,6 +6127,26 @@ button.text-action {
   border: 1px solid var(--rule);
   padding: 2rem 1.75rem;
   gap: 0.55rem;
+}
+
+/* The lesson's own mark lands in the corner, cropped at the card's edge as
+   the Lessons cards crop theirs, a little larger and slower than the small
+   marks: the one landing on the page that celebrates something. Clipped by
+   itself rather than by the card, so nothing inside the card is ever cut, and
+   beneath the card's words should a long line reach the corner. */
+.booking-success__mark {
+  position: absolute;
+  right: -34px;
+  bottom: -34px;
+  z-index: -1;
+  width: 128px;
+  height: 128px;
+  clip-path: inset(0 34px 34px 0);
+  pointer-events: none;
+  --land-start: 240ms;
+  --land-scale: 0.56;
+  --land-turn: -16deg;
+  --land-duration: 1150ms;
 }
 
 .booking-success__head {

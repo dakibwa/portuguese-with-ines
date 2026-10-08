@@ -56,8 +56,8 @@ Use these names in review so recurring problems are easy to recognise:
 - **Decorative motion:** adding ambient loops, click delay, entrance
   choreography for a page's text, controls or sections as it loads, or any
   movement that makes a reader wait or does not explain a state change. The
-  page turn, the phone menu opening and the little splats' one-time landing
-  (see Motion direction) are deliberate.
+  page turn, the phone menu opening, the little splats' one-time landing and
+  the rules drawn under the headings (see Motion direction) are deliberate.
 
 ## Contrast and accessibility
 
@@ -226,13 +226,15 @@ Dan's 22 September review tightened the public pages:
   the booking banner keeps
   its splat at the right in a band of about 124 px, without an editorial rule;
 - the three Lessons cards each have their own squiggle outline, and their own
-  splat comes in large from the card's top-right corner, cropped by its edge
-  and, once landed, still; the trial card is lavender. Their rows align across
+  splat comes in large from the card's top-right corner, cropped by its edge;
+  once landed it moves only to turn a little while its card is pointed at. The
+  trial card is lavender. Their rows align across
   the cards: name, the price with its length as a small tag beside it (`60 min`),
   a one-line description, then one full-width button, so no card has an empty
   foot. The whole card opens booking with that lesson chosen. Hover and
-  keyboard focus add a quiet colour wash to the card, and the button answers
-  on its own: it lifts slightly and fills. The closing blue card
+  keyboard focus add a quiet colour wash to the card, the button answers on
+  its own (it lifts slightly and fills) and the corner splat turns a few
+  degrees. The closing blue card
   keeps its two buttons on the right, stacked when the width tightens, and
   moves them beneath the copy only on phones;
 - the header logo starts on the page's left edge, like the footer logo and the
@@ -407,8 +409,10 @@ and card checkout so the choices beside the card form describe its held times.
 
 Motion is calm, quick and physical, and never makes anyone wait (7 October
 2026, at Dan's request for tasteful animation on the little splats, beautiful
-transitions between pages and a premium feel throughout; the wordmark's hover
-followed on 8 October). What lands or
+transitions between pages and a premium feel throughout; on 8 October the
+wordmark's writing, the buttons' shifting cut, the Lessons cards' turning
+marks, the drawn rules and the booking celebration followed, kept in style and
+tasteful). What lands or
 travels moves on a soft spring that gives a few per cent and settles; controls
 answer on a firm one; everything else decelerates long.
 
@@ -422,24 +426,34 @@ whether reached by a link or the back button. On phones every page settles in
 place with a lighter blur, and an open menu recedes with the page it covered.
 A full page load into Booking turns the same way. Navigation starts at once and
 the new page is live throughout, with no click delay or overlay. Headings, copy
-and actions arrive with their page, never in an entrance of their own.
+and actions arrive with their page, never in an entrance of their own. Only the
+rules under the display headings are drawn in: once, from the left end at a
+pen's pace, the hero rules a moment after their heading shows, each Home
+principle's short rule as its splat settles, and an FAQ section's rule each
+time that section is chosen.
 Decisions inside the booking flow resize and dissolve the existing calendar
 workspace rather than turning the page, and keep the rest of the page fixed.
 Without view transitions a new page dissolves in. Reduced-motion users get
 each page at once, without animation or smooth scrolling.
 
 Buttons answer like objects. They lift on hover, the filled ones casting a
-soft shadow in their own colour, and a press sinks them a touch before they
-spring back; a disabled button does not answer. Every hover line draws on the
+soft shadow in their own colour, and their hand-cut outline shifts a little and
+settles on the soft spring, as wet ink does: the same hand, never a new shape.
+A press sinks them a touch before they spring back; a disabled button does not
+answer, and the booking journey's own controls keep their cut. Every hover line
+draws on the
 same firm spring, the FAQ's plus turns into its minus with a little give, and
 the phone menu's destinations drop in one after another as their marks land.
 
 The header wordmark is the way home, and it answers in Inês's own hand.
 Pointing at it, or focusing it from the keyboard, writes the lettering again
 in coral, left to right at a pen's steady pace, with a pink-violet wet edge on
-the slant of her writing; leaving it draws the ink back quickly. A tap on a
-phone simply goes home. Clicked, it arrives on Home still written rather than
-written twice. Reduced motion changes the colour without the writing.
+the slant of her writing; leaving it draws the ink back quickly. As the ink
+reaches each ê, its circumflex (the chapéu, the hat) tips: a lift of a few
+pixels and a small turn, the two hats turning opposite ways, settling on the
+soft spring. A tap on a phone simply goes home. Clicked, it arrives on Home
+still written rather than written twice. Reduced motion changes the colour
+without the writing or the tip.
 
 The little splats land. Each small emblem mark arrives once like a dab of
 paint: it blooms from its middle outwards, soft at first and then sharp, a touch
@@ -455,8 +469,12 @@ into its foot blooms a little more slowly. The large painted fields on the
 pages (the Approach fan, the Lessons hero splat and the booking banner's corner
 splat) stay still: they are the paper the marks land on. Text, buttons and the
 booking workspace never move or wait for a landing, nothing loops, and a
-landed mark stays still, including on hover. Reduced motion, print and a page
-without JavaScript show every splat at rest.
+landed mark stays still, except that a Lessons card turns its mark a few
+degrees while it is pointed at. A confirmed booking is celebrated once: the
+lesson's own mark, the one it wears on the calendar, lands in the corner of
+the confirmation, cropped at its edge and a little larger and slower than the
+small marks. Reduced motion, print and a page without JavaScript show every
+splat at rest.
 
 Pop-ups and their dimmed backgrounds appear with a short, gentle fade. Apply
 the same entrance to terms, booking prompts and student/teacher lesson dialogs,
