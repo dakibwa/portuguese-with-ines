@@ -747,6 +747,36 @@ chosen. The main `Booking` navigation still opens a returning student's
 schedule. Old `/my-lessons` and emailed `/booking` links retain their
 destination and tokens in `/book/`.
 
+## Booking, simplified — 8 October 2026
+
+At Dan's request to make the places where people read or act simpler and
+calmer, without new content:
+
+- one price at the point of payment: with Weekly chosen, each length shows the
+  account's saved weekly rate, the same price as the line under `Confirm your
+  recurring lessons`;
+- the payment summary is a short list rather than a paragraph: one fact per
+  item, two to a row where the column allows and one on a phone, each after a
+  little dab of paint cut from the FAQ mark and turned and coloured
+  differently from its neighbours. Every fee fact stays, with the amount in
+  coral. Paying on the lesson day, `The full rules are in terms & privacy` is
+  the last item rather than a link standing alone above the final action; with
+  card payment the agreement control is unchanged. The step heading leaves room
+  for Beth Ellen's descenders;
+- in a narrow booking column a lesson row's date reads short
+  (`Fri 16 Oct, 18:00`), as does the next lesson, with the long form kept for
+  screen readers. The row's `Change` keeps its 14 px label (see Contrast and
+  accessibility);
+- the lesson dialog drops the question that repeated its heading and buttons,
+  and the rules around the lesson's date. Its pill is `Recurring lesson` only
+  while the repeat is running, `Booked` once it stops, and `Cancelled` carries
+  the past lessons' ⊗. `Manage sequence` is a compact outline button. Cancelling
+  a sequence states what happens rather than asking again, and on a phone each
+  pair of dialog actions stacks so no label wraps;
+- booked times in calendar tiles are big enough to read and to tell the weekly
+  colour from the one-off one, and the calendar key shows `Booked lesson` only
+  when there is a booked lesson to point to.
+
 ## Account interaction states
 
 Selecting an occurrence from a recurring sequence identifies it in the compact

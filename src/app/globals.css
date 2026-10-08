@@ -2761,8 +2761,10 @@ html.booking-transitioning .booking-confirmation-stage {
   margin: 0;
 }
 
+/* Room beneath for Beth Ellen's descenders, which reach about 0.4em below
+   the line: the f of "Confirm" never touches the label under it. */
 .booking-step-heading {
-  margin: 0.5rem 0 0.3rem;
+  margin: 0.5rem 0 0.4em;
   font-family: var(--display);
   font-size: clamp(1.9rem, 4.2vw, 2.9rem);
   font-weight: 400;
@@ -2946,6 +2948,27 @@ html.booking-transitioning .booking-confirmation-stage {
 
 .booking-choice-summary__change-short {
   display: none;
+}
+
+/* A long date and its short form: the short one only where the booking
+   column is narrow, the long one then kept for screen readers alone. */
+.when-short {
+  display: none;
+}
+
+@container booking (max-width: 480px) {
+  .when-long {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .when-short {
+    display: inline;
+  }
 }
 
 .unified-calendar-shell {
@@ -3709,14 +3732,22 @@ html.booking-transitioning .booking-confirmation-stage {
   white-space: nowrap;
 }
 
+/* Booked times big enough to read, and to tell the weekly lilac from the
+   one-off coral: smaller only where the seven columns are narrow. */
 .unified-calendar .calendar-week button small.calendar-booking-times {
   display: grid;
   justify-items: center;
   margin-top: 0.15rem;
-  font-size: 0.46rem;
+  font-size: 0.56rem;
   letter-spacing: 0;
   line-height: 1.12;
   white-space: normal;
+}
+
+@media (min-width: 821px) {
+  .unified-calendar .calendar-week button small.calendar-booking-times {
+    font-size: 0.7rem;
+  }
 }
 
 .calendar-booking-times span {
@@ -3912,11 +3943,11 @@ html.booking-transitioning .booking-confirmation-stage {
   margin: 0;
 }
 
+/* The lesson's date and kind, without rules around them: the dialog's own
+   spacing sets them apart, as the change workflow has no decorative dividers. */
 .lesson-manage-dialog__lesson {
   display: grid;
-  border-top: 1px solid var(--rule-soft);
-  border-bottom: 1px solid var(--rule-soft);
-  padding: 0.8rem 0;
+  padding: 0.2rem 0 0.35rem;
   gap: 0.18rem;
 }
 
@@ -3927,14 +3958,9 @@ html.booking-transitioning .booking-confirmation-stage {
 }
 
 .lesson-manage-dialog__lesson span,
-.lesson-manage-dialog__question,
 .lesson-manage-dialog__decision > p {
   font-size: 0.8rem;
   line-height: 1.5;
-}
-
-.lesson-manage-dialog__question {
-  margin-top: 0.1rem;
 }
 
 .lesson-manage-dialog__actions {
@@ -3955,6 +3981,14 @@ html.booking-transitioning .booking-confirmation-stage {
 
 .lesson-manage-dialog__actions--sequence {
   grid-template-columns: minmax(0, 1fr);
+}
+
+/* On a phone the pair stacks, so no label breaks onto a second line beside
+   a one-line neighbour. */
+@media (max-width: 560px) {
+  .lesson-manage-dialog__actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .lesson-manage-dialog__series {
@@ -3986,11 +4020,13 @@ html.booking-transitioning .booking-confirmation-stage {
   line-height: 1.4;
 }
 
-.lesson-manage-dialog__series .text-action {
+/* A small outline button, as every secondary action is, not underlined text. */
+.lesson-manage-dialog__series .button {
   grid-column: 2;
   justify-self: start;
-  min-height: 34px;
-  margin-top: 0.2rem;
+  min-height: 44px;
+  margin-top: 0.45rem;
+  padding: 0.55rem 1.1rem;
   font-size: 0.68rem;
 }
 
@@ -4654,7 +4690,6 @@ html.booking-transitioning .booking-confirmation-stage {
   min-width: 0;
 }
 
-.booking-confirmation-payment > .booking-form-note,
 .booking-confirmation-payment > .booking-agreement {
   margin-top: 0;
 }
@@ -6002,32 +6037,83 @@ button.text-action {
   text-transform: none;
 }
 
-.booking-form-note {
-  margin-top: 0.8rem;
-  font-size: 0.82rem;
-  line-height: 1.65;
-  opacity: 0.86;
-}
-
-.booking-form-note a {
-  border: 0;
+/* The payment facts read as a short list, two to a row where the column
+   allows. Each follows a little dab of paint, the one in the FAQ mark, turned
+   and coloured differently from its neighbours as her marks are. */
+.booking-payment-facts {
+  --payment-dab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='176.6 175.5 101.8 101.8'%3E%3Cpath d='M269 184c7.478 8.42 7.768 18.218 7.195 28.954C275.431 220.962 271.9 227.64 266 233a443 443 0 0 1-5.125 4c-6.43 5.051-8.478 8.967-10.25 16.875-1.782 7.614-4.93 13.575-11.437 18.125-6.639 3.667-13.932 3.546-21.188 2-3.062-1.625-3.062-1.625-6-4l-1.645-1.328c-4.029-3.602-6.361-7.39-8.855-12.172-3.637-6.948-8.545-11.995-14.309-17.262-5.077-4.722-7.73-8.614-8.629-15.675.644-5.239 2.181-9.452 6.107-13.124 4.939-3.733 9.812-6.127 15.581-8.314 8.051-3.217 14.746-6.974 21.75-12.125 12.942-9.323 32.845-18.774 47-6'/%3E%3C/svg%3E");
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  gap: 0.55rem 1.4rem;
+  margin: 0;
   padding: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  list-style: none;
+  text-wrap: pretty;
 }
 
-.booking-form-note a:hover,
-.booking-form-note a:focus-visible {
-  color: var(--coral-action);
+.booking-payment-facts li {
+  position: relative;
+  padding-left: 1.55rem;
 }
 
-.booking-form-note strong {
+.booking-payment-facts li::before {
+  position: absolute;
+  top: calc((1.5em - 0.875rem) / 2);
+  left: 0;
+  width: 0.875rem;
+  aspect-ratio: 1;
+  background: var(--blue);
+  content: "";
+  -webkit-mask: var(--payment-dab) center / contain no-repeat;
+  mask: var(--payment-dab) center / contain no-repeat;
+}
+
+/* Colour and turn repeat on different beats, so no two dabs in a list match. */
+.booking-payment-facts li:nth-child(4n + 2)::before {
+  background: var(--lavender);
+}
+
+.booking-payment-facts li:nth-child(4n + 3)::before {
+  background: var(--coral);
+}
+
+.booking-payment-facts li:nth-child(4n + 4)::before {
+  background: var(--lavender-ink);
+}
+
+.booking-payment-facts li:nth-child(5n + 2)::before {
+  rotate: 60deg;
+}
+
+.booking-payment-facts li:nth-child(5n + 3)::before {
+  rotate: 180deg;
+}
+
+.booking-payment-facts li:nth-child(5n + 4)::before {
+  rotate: 330deg;
+}
+
+.booking-payment-facts li:nth-child(5n + 5)::before {
+  rotate: 210deg;
+}
+
+.booking-payment-facts strong {
   color: var(--coral-action);
   white-space: nowrap;
+}
+
+.booking-payment-facts a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.booking-payment-facts a:hover,
+.booking-payment-facts a:focus-visible {
+  color: var(--coral-action);
 }
 
 .booking-recurring-rate {
@@ -6275,12 +6361,14 @@ button.text-action {
   margin-top: 1rem;
 }
 
+/* The way back to the calendar in coral, and changing this lesson as the
+   outline beside it: two buttons, never a button and a stray underline. */
 .booking-success__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   margin-top: 1.5rem;
-  gap: 0.5rem 1.4rem;
+  gap: 0.7rem;
 }
 
 /* The small print: the reference to quote, and when changing costs. */

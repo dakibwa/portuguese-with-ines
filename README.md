@@ -278,6 +278,11 @@ starts immediately and `::view-transition { pointer-events: none; }` keeps the
 arriving page clickable; only the named header skips clicks for the moment of
 the turn. Browsers without view transitions keep the 190–240 ms dissolve. The
 journey test counts the turns, and checks that reduced motion animates none.
+A turn changes the address a moment before the page being left unmounts, and
+the unmount is what retires the booking flow's requests, so a new booking and a
+payment recovery also check that the page's path is unchanged before they send
+a student on to Stripe or show an error: someone who has already left is never
+pulled back to pay.
 
 The motion tokens are deliberately few. `--motion-spring` and
 `--motion-spring-firm` are damped-spring curves sampled into CSS `linear()`,
