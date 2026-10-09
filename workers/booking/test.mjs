@@ -400,8 +400,11 @@ await test("a clock is named as the site names it, by its place", () => {
   assert.equal(zoneName("America/Los_Angeles"), "Los Angeles time");
   assert.equal(zoneName("America/Argentina/Buenos_Aires"), "Buenos Aires time");
   assert.equal(zoneName("Asia/Calcutta"), "Kolkata time");
+  // Offsets are worked out, not worded by Intl, so every runtime agrees.
   assert.equal(zoneName("UTC"), "UTC");
   assert.equal(zoneName("Etc/GMT+5"), "GMT-5");
+  assert.equal(zoneName("Etc/GMT-14"), "GMT+14");
+  assert.equal(zoneName("Not a zone"), "Not a zone");
 });
 
 // --- iCalendar --------------------------------------------------------------
