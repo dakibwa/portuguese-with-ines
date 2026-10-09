@@ -53,6 +53,13 @@ closing transition. Keeping it out of the initial page load avoids downloading
 hidden artwork and prefetching destinations the visitor has not asked to see.
 The booking calendar reuses its time and date display formatters per time zone,
 so loading a window of available slots does not construct one for every label.
+The booking page asks the Worker for its lesson types, the first lesson's free
+times and a stored session's account from an inline script in its HTML, so the
+answers are on their way before the bundle has loaded; the calendar takes each
+once, and only for the exact request it would have made. Free times are reused
+for a minute. The sign-in form's code is left out of the first load and
+fetched while the page is idle, with the next likely step's free times, and
+the account's own code comes with the page whenever a session is stored.
 
 Two settings look incidental and are not. Both were wrong at some point and
 cost real bytes:

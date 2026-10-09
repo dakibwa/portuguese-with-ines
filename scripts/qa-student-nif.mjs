@@ -126,11 +126,11 @@ try {
         return { json: { student: { ...student, nif: saved } } };
       },
     });
-    // The menu is inline on desktop; phones open it from its toggle. The
-    // workspace loads the account twice on arrival; type after both land.
+    // The student's name opens the account's menu. The workspace loads the
+    // account twice on arrival; type after both land.
     await details.page.locator("#account-menu").waitFor({ state: "attached" });
     await details.page.waitForLoadState("networkidle");
-    const toggle = details.page.locator(".my-lessons__menu-toggle");
+    const toggle = details.page.locator("#account-menu-button");
     if (await toggle.isVisible() && await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
     await details.page.locator("#account-menu").getByRole("button", { name: "Edit details", exact: true }).click();
     const editor = details.page.locator(".my-lessons__details");

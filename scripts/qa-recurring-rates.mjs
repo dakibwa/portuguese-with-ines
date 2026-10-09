@@ -35,7 +35,7 @@ for (const [duration, width] of [[60, 390], [90, 1440]]) {
   await page.setViewportSize({ width, height: 1000 });
   await page.goto(`${base}/book/`, { waitUntil: "domcontentloaded" });
   await page.locator("#account-menu").waitFor({ state: "attached" });
-  const menu = page.locator(".my-lessons__menu-toggle");
+  const menu = page.locator("#account-menu-button");
   if (await menu.isVisible()) await menu.click();
   await page.locator("#account-menu").getByRole("button", { name: "Edit details", exact: true }).click();
   const editor = page.locator(".my-lessons__details");

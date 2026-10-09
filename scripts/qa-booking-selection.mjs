@@ -16,8 +16,8 @@ const types = [
 const addWeeks = (start, index) => new Date(Date.parse(start) + index * 7 * 86400000).toISOString();
 try {
   for (const width of [320, 390, 1280]) {
-    // Pin Porto time: in any other browser zone each slot also shows "your time",
-    // so exact time labels would depend on the machine running the check.
+    // A student on Porto's clock: elsewhere every time shows on the browser's
+    // own, so exact time labels would depend on the machine running the check.
     const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce", timezoneId: "Europe/Lisbon" });
     const student = { id: "selection-preview", name: "Preview Student", email: "preview@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "student" };
     const requests = [];

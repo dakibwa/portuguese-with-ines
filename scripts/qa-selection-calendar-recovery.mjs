@@ -352,11 +352,13 @@ try {
     for (const mode of ["current", "saved", "renewed"]) {
       const starts = [at(9), at(12)];
       const fresh = mode === "renewed" ? [at(15)] : mode === "current" ? [at(9), at(15)] : [at(12), at(15)];
-      let reads = 0, posts = 0;
+      let reads = 0, posts = 0, switched = false;
       const state = await fixture(width, async (path, request) => {
         if (path === "/availability") {
           if (new URL(request.url()).searchParams.get("lessonType") !== "long") return { json: availability(starts, 60) };
-          if (++reads <= (mode === "current" ? 2 : 1)) return { status: 503, json: { error: "New length temporarily unavailable." } };
+          // The page looks up the other length while idle; that fails too, but
+          // only lookups once the length changes count towards the failures.
+          if (!switched || ++reads <= (mode === "current" ? 2 : 1)) return { status: 503, json: { error: "New length temporarily unavailable." } };
           return { json: availability(fresh, 90) };
         }
         if (path === "/bookings" && request.method() === "POST") { posts += 1; return acceptedBooking(request); }
@@ -366,6 +368,7 @@ try {
         const { page } = state;
         await startChoices(page, starts);
         const previous = await page.locator(".booking-chosen-lessons").textContent();
+        switched = true;
         await selectRadio(page, "90-minute lesson · €35");
         const warning = page.getByRole("status").filter({ hasText: "New length temporarily unavailable." });
         await expect(warning).toBeVisible();
@@ -399,12 +402,13 @@ try {
     for (const mode of ["add", "change-taken", "change-overlap", "change-other-taken"]) {
       const starts = mode === "change-overlap" ? [at(9), at(10)] : [at(9), at(12)];
       const fresh = mode === "change-other-taken" ? [at(12), at(15)] : mode === "change-taken" ? [at(9), at(10), at(15)] : [at(9), at(10), at(12), at(15)];
-      let reads = 0;
+      let reads = 0, switched = false;
       const posts = [];
       const state = await fixture(width, async (path, request) => {
         if (path === "/availability") {
           const long = new URL(request.url()).searchParams.get("lessonType") === "long";
-          if (long && ++reads === 1) return { status: 503, json: { error: "New length temporarily unavailable." } };
+          // As above, the idle lookup of the other length fails uncounted.
+          if (long && (!switched || ++reads === 1)) return { status: 503, json: { error: "New length temporarily unavailable." } };
           return { json: availability(long ? fresh : [at(9), at(10), at(12), at(15)], long ? 90 : 60) };
         }
         if (path === "/bookings" && request.method() === "POST") { posts.push(request.postDataJSON()); return acceptedBooking(request); }
@@ -413,6 +417,7 @@ try {
       try {
         const { page } = state;
         await startChoices(page, starts);
+        switched = true;
         await selectRadio(page, "90-minute lesson · €35");
         const warning = page.getByRole("status").filter({ hasText: "New length temporarily unavailable." });
         await expect(warning).toBeVisible();

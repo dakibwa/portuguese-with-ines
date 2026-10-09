@@ -85,10 +85,10 @@ async function open(width, { session = true, ratesReadFails = false } = {}) {
 
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
 
-// The menu is inline on desktop; phones open it from its toggle.
+// The student's name opens the account's menu.
 async function chooseFromMenu(page, name) {
   await page.locator("#account-menu").waitFor({ state: "attached" });
-  const toggle = page.locator(".my-lessons__menu-toggle");
+  const toggle = page.locator("#account-menu-button");
   if (await toggle.isVisible() && (await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
   await page.locator("#account-menu").getByRole("button", { name, exact: true }).click();
 }
@@ -157,7 +157,7 @@ try {
 
     // A second code for a length that already has a rate is refused, saying
     // which length, and the typed code stays so a slip can be fixed.
-    const alert = page.locator(".unified-account-controls .booking-alert[role=alert]");
+    const alert = page.locator(".my-lessons__details .booking-alert[role=alert]");
     await code.fill("mock19");
     await add.click();
     await expect(alert).toContainText("You already have an agreed rate for 60-minute lessons. Ask Inês if it needs to change.");

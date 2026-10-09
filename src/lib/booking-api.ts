@@ -83,17 +83,24 @@ function unreadableReply(status = 502): never {
   throw new BookingApiError(BOOKING_REPLY_ERROR, status);
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * `primed` is the same request already sent by the document, read here
+ * exactly as a fresh one would be.
+ */
+async function request<T>(path: string, init?: RequestInit, primed?: Promise<Response>): Promise<T> {
   if (!BOOKING_API_BASE_URL) {
     throw new BookingApiError("Booking is not connected yet.", 503);
   }
 
+  // Anything that changes a booking can free or take a time.
+  if (init?.method && init.method !== "GET") forgetAvailability();
+
   let response: Response;
   try {
-    response = await fetch(`${BOOKING_API_BASE_URL}${path}`, {
+    response = await (primed ?? fetch(`${BOOKING_API_BASE_URL}${path}`, {
       ...init,
       headers: { Accept: "application/json", ...(init?.body ? { "Content-Type": "application/json" } : {}), ...init?.headers }
-    });
+    }));
   } catch {
     // A network failure here is indistinguishable from the Worker being down,
     // and both mean the same thing to a student: use another way to reach her.
@@ -119,6 +126,8 @@ declare global {
   interface Window {
     /** Set by the inline script on /book, before React exists. */
     __inesLessonTypes?: Promise<LessonTypesResponse | null> | null;
+    /** The first calendar's free times, asked for by the same script. */
+    __inesAvailability?: { url: string; response: Promise<Response> } | null;
   }
 }
 
@@ -158,24 +167,87 @@ export function fetchAvailability(
   signal?: AbortSignal,
   moving?: { manageToken?: string; seriesId?: string; session?: string }
 ) {
+  const { path, session, key } = availabilityRequest(lessonType, from, to, moving);
+  const cached = availabilityCache.get(key);
+  let entry = cached && Date.now() - cached.at < AVAILABILITY_REUSE_MS ? cached : null;
+  if (!entry) {
+    // The document's own request is used once, and only when it asked for
+    // exactly this: the same lesson, dates and (lack of) session.
+    const primed = typeof window !== "undefined" ? window.__inesAvailability : null;
+    if (primed) window.__inesAvailability = null;
+    const reply = request<AvailabilityResponse>(
+      path,
+      session ? { headers: { Authorization: `Bearer ${session}` } } : undefined,
+      primed && !session && primed.url === `${BOOKING_API_BASE_URL}${path}` ? primed.response : undefined
+    ).then((data) => {
+      if (!isRecord(data.slotsByDate) || !Object.values(data.slotsByDate).every((slots) =>
+        Array.isArray(slots) && slots.every((slot) =>
+          isRecord(slot) && typeof slot.startAt === "string" && typeof slot.endAt === "string" &&
+          Number.isFinite(Date.parse(slot.startAt)) && Date.parse(slot.endAt) > Date.parse(slot.startAt)
+        )
+      )) unreadableReply();
+      return data;
+    });
+    const fresh: AvailabilityEntry = { at: Date.now(), reply };
+    entry = fresh;
+    availabilityCache.set(key, fresh);
+    reply.then(
+      (data) => { fresh.data = data; },
+      () => { if (availabilityCache.get(key) === fresh) availabilityCache.delete(key); }
+    );
+  }
+  if (!signal) return entry.reply;
+  // A shared request is never aborted for everyone; this caller just stops
+  // listening.
+  const reply = entry.reply;
+  return new Promise<AvailabilityResponse>((resolve, reject) => {
+    const stop = () => reject(new DOMException("The request was aborted.", "AbortError"));
+    if (signal.aborted) return stop();
+    signal.addEventListener("abort", stop, { once: true });
+    reply.then(resolve, reject).finally(() => signal.removeEventListener("abort", stop));
+  });
+}
+
+/*
+ * Free times asked for in the last minute are reused, so going from Your
+ * lessons to Book, switching back to a lesson already looked at, or opening
+ * Change on a lesson just viewed shows the calendar at once instead of
+ * emptying it for a round trip. Booking still checks the time itself, and
+ * anything sent to change a booking forgets them all.
+ */
+const AVAILABILITY_REUSE_MS = 60_000;
+type AvailabilityEntry = { at: number; reply: Promise<AvailabilityResponse>; data?: AvailabilityResponse };
+const availabilityCache = new Map<string, AvailabilityEntry>();
+
+function availabilityRequest(
+  lessonType: string,
+  from: string,
+  to: string,
+  moving?: { manageToken?: string; seriesId?: string; session?: string }
+) {
   const query = new URLSearchParams({ lessonType, from, to });
   if (moving?.manageToken) query.set("manage", moving.manageToken);
   if (moving?.seriesId) query.set("series", moving.seriesId);
   // Signed in, the student's own unfinished card-setup hold is not shown as
   // busy to them: their next booking replaces it. Anyone else still sees it.
   const session = moving?.session || readSession();
-  return request<AvailabilityResponse>(`/availability?${query}`, {
-    signal,
-    ...(session ? { headers: { Authorization: `Bearer ${session}` } } : {})
-  }).then((data) => {
-    if (!isRecord(data.slotsByDate) || !Object.values(data.slotsByDate).every((slots) =>
-      Array.isArray(slots) && slots.every((slot) =>
-        isRecord(slot) && typeof slot.startAt === "string" && typeof slot.endAt === "string" &&
-        Number.isFinite(Date.parse(slot.startAt)) && Date.parse(slot.endAt) > Date.parse(slot.startAt)
-      )
-    )) unreadableReply();
-    return data;
-  });
+  const path = `/availability?${query}`;
+  return { path, session, key: `${session} ${path}` };
+}
+
+/** Free times already in hand for this request, or `null` without waiting. */
+export function peekAvailability(
+  lessonType: string,
+  from: string,
+  to: string,
+  moving?: { manageToken?: string; seriesId?: string; session?: string }
+) {
+  const entry = availabilityCache.get(availabilityRequest(lessonType, from, to, moving).key);
+  return entry?.data && Date.now() - entry.at < AVAILABILITY_REUSE_MS ? entry.data : null;
+}
+
+export function forgetAvailability() {
+  availabilityCache.clear();
 }
 
 /** A weekly run. `null` means it keeps going until the student stops it. */
@@ -437,13 +509,18 @@ export function formatBookedLessonLabel(lessonType: {
 }
 
 export function portoDateKey(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: BOOKING_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
-  return parts;
+  return dateKeyIn(date, BOOKING_TIME_ZONE);
+}
+
+/** The calendar date an instant falls on in a zone, as YYYY-MM-DD. */
+export function dateKeyIn(date: Date, timeZone: string) {
+  let formatter = dateKeyFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+    if (dateKeyFormatters.size >= 16) dateKeyFormatters.clear();
+    dateKeyFormatters.set(timeZone, formatter);
+  }
+  return formatter.format(date);
 }
 
 // A loaded calendar formats hundreds of slots. Intl formatter construction is
@@ -451,6 +528,8 @@ export function portoDateKey(date: Date) {
 // Keep the two display formats separate and bound the retained time zones.
 const slotTimeFormatters = new Map<string, Intl.DateTimeFormat>();
 const longDateFormatters = new Map<string, Intl.DateTimeFormat>();
+const shortDayFormatters = new Map<string, Intl.DateTimeFormat>();
+const dateKeyFormatters = new Map<string, Intl.DateTimeFormat>();
 
 function displayFormatter(
   cache: Map<string, Intl.DateTimeFormat>,
@@ -475,7 +554,11 @@ export function addDaysToKey(key: string, days: number) {
 }
 
 export function portoWeekKey(startAt: string) {
-  const key = portoDateKey(new Date(startAt));
+  return weekKeyOf(portoDateKey(new Date(startAt)));
+}
+
+/** The Monday that starts a date's Monday–Sunday week. */
+export function weekKeyOf(key: string) {
   const weekday = new Date(`${key}T12:00:00Z`).getUTCDay();
   return addDaysToKey(key, -((weekday + 6) % 7));
 }
@@ -486,6 +569,35 @@ export function formatSlotTime(startAt: string, timeZone = BOOKING_TIME_ZONE) {
     minute: "2-digit",
     hour12: false
   }).format(new Date(startAt));
+}
+
+/** A day in a few words, as it falls in a zone: "Tue 13 Oct". */
+export function formatShortDay(value: string | Date, timeZone = BOOKING_TIME_ZONE) {
+  return displayFormatter(shortDayFormatters, timeZone, {
+    weekday: "short",
+    day: "numeric",
+    month: "short"
+  }).format(typeof value === "string" ? new Date(value) : value);
+}
+
+/** A time with its clock named: "17:00 Porto time", "08:00 Los Angeles time". */
+export function formatTimeIn(startAt: string, timeZone: string) {
+  return `${formatSlotTime(startAt, timeZone)} ${timeZoneName(timeZone)}`;
+}
+
+/**
+ * Free times grouped by the dates of the zone they are shown in. The Worker
+ * groups them by Porto's dates; a student elsewhere sees each one on the day
+ * it falls on for them.
+ */
+export function slotsByDateIn(slotsByDate: Record<string, Slot[]>, timeZone: string) {
+  if (timeZone === BOOKING_TIME_ZONE) return slotsByDate;
+  const grouped: Record<string, Slot[]> = {};
+  for (const slots of Object.values(slotsByDate)) {
+    for (const slot of slots) (grouped[dateKeyIn(new Date(slot.startAt), timeZone)] ??= []).push(slot);
+  }
+  for (const slots of Object.values(grouped)) slots.sort((a, b) => a.startAt.localeCompare(b.startAt));
+  return grouped;
 }
 
 export function formatLongDate(value: string | Date, timeZone = BOOKING_TIME_ZONE) {
@@ -544,54 +656,50 @@ export function stripePaymentUrl(value: string) {
   return url.href;
 }
 
+// Some browsers still report a few places by their old names.
+const RENAMED_PLACES: Record<string, string> = {
+  Calcutta: "Kolkata",
+  Katmandu: "Kathmandu",
+  Kiev: "Kyiv",
+  Rangoon: "Yangon",
+  Saigon: "Ho Chi Minh City"
+};
+
 /**
- * A booked lesson's time as its student should read it. On Porto's clock that
- * is the bare time; anywhere else it names both clocks, because "15:00" alone
- * reads as the student's own 15:00.
+ * A clock named the way Porto's is: by its place ("London time", "New York
+ * time"), taken from the zone's own name, with Porto's own zone always
+ * "Porto time". A zone without a place, such as UTC or a bare offset, is
+ * named by its offset instead.
  */
-export function formatSlotTimeForStudent(startAt: string, studentZone: string) {
-  const local = differingLocalTime(startAt, studentZone);
-  return local ? `${formatSlotTime(startAt)} Porto time · ${local} your time` : formatSlotTime(startAt);
+export function timeZoneName(zone: string) {
+  if (zone === BOOKING_TIME_ZONE) return "Porto time";
+  const place = zone.includes("/") && !zone.startsWith("Etc/") ? zone.slice(zone.lastIndexOf("/") + 1).replace(/_/g, " ") : "";
+  if (place) return `${RENAMED_PLACES[place] ?? place} time`;
+  try {
+    const offset = new Intl.DateTimeFormat("en-GB", { timeZone: zone, timeZoneName: "shortOffset" })
+      .formatToParts(new Date())
+      .find((part) => part.type === "timeZoneName")?.value;
+    if (offset) return offset === "GMT" ? "UTC" : offset;
+  } catch {
+    // An unknown zone keeps its name.
+  }
+  return zone;
 }
 
 /**
- * The same instant in the student's own zone, or null when it reads the same as
- * Porto time. Lisbon and London share an offset, so a naive "zones differ"
- * check prints "10:00 your time" under "10:00" for every UK student.
- *
- * Compared per instant rather than per zone: two zones can agree for part of
- * the year and diverge for the rest, around each side's DST change.
+ * Whether a zone's clock reads differently from Porto's at any point in the
+ * coming year. London's never does (its times are Porto's under another
+ * name); Paris's always does; New York's does, but by a different amount for
+ * a few weeks around each clock change.
  */
-export function differingLocalTime(startAt: string, studentZone: string) {
-  if (studentZone === BOOKING_TIME_ZONE) return null;
-
-  const local = formatSlotTime(startAt, studentZone);
-  if (local === formatSlotTime(startAt)) return null;
-
-  /*
-   * The date comes too when the student's calendar day is not Porto's. A
-   * lesson at 10:00 Porto is 21:00 the day before in Auckland, and printing
-   * "21:00 your time" beside a Porto date told them the wrong day entirely —
-   * the further from Portugal a student is, the more wrong it got.
-   */
-  const date = new Date(startAt);
-  const localKey = new Intl.DateTimeFormat("en-CA", {
-    timeZone: studentZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
-
-  if (localKey === portoDateKey(date)) return local;
-
-  const day = new Intl.DateTimeFormat("en-GB", {
-    timeZone: studentZone,
-    weekday: "long",
-    day: "numeric",
-    month: "long"
-  }).format(date);
-
-  return `${day}, ${local}`;
+export function clockDiffersFromPorto(zone: string) {
+  if (zone === BOOKING_TIME_ZONE) return false;
+  const now = Date.now();
+  for (let day = 0; day < 366; day += 15) {
+    const instant = new Date(now + day * 86_400_000).toISOString();
+    if (formatSlotTime(instant, zone) !== formatSlotTime(instant) || dateKeyIn(new Date(instant), zone) !== portoDateKey(new Date(instant))) return true;
+  }
+  return false;
 }
 
 export type DayCell = { key: string; day: number; month: number; isToday: boolean };

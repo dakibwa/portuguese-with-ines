@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, CircleX } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, ArrowLeft, CheckCircle2, CircleX } from "lucide-react";
+import { AccountMenu, type AccountSection } from "@/components/AccountMenu";
 import { AuthPanel } from "@/components/AuthPanel";
 import { LessonMark } from "@/components/LessonMarks";
 import {
-  clearSession,
   confirmEmailChange,
   fetchMe,
   readSession,
@@ -17,11 +17,13 @@ import {
 } from "@/lib/auth-api";
 import {
   browserTimeZone,
+  clockDiffersFromPorto,
   fetchRecurringRates,
   formatBookedLessonLabel,
   formatLongDate,
   formatMoneyCents,
-  formatSlotTimeForStudent,
+  formatSlotTime,
+  formatTimeIn,
   redeemRecurringRate
 } from "@/lib/booking-api";
 import { BOOKING_TIME_ZONE } from "@/lib/config";
@@ -37,7 +39,7 @@ function historyTime(booking: MyBooking) {
   return Date.parse(booking.status === "cancelled" && booking.cancelledAt ? booking.cancelledAt : booking.endAt);
 }
 
-function HistoryLessonCard({ booking, zone }: { booking: MyBooking; zone: string }) {
+function HistoryLessonCard({ booking, named, zone }: { booking: MyBooking; named: boolean; zone: string }) {
   const cancelled = booking.status === "cancelled";
 
   return (
@@ -54,7 +56,12 @@ function HistoryLessonCard({ booking, zone }: { booking: MyBooking; zone: string
             {cancelled ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
             {cancelled ? "Cancelled" : "Completed"}
           </span>
-          <strong>{formatLongDate(booking.startAt)}, {formatSlotTimeForStudent(booking.startAt, zone)}</strong>
+          {/* Online at the student's own time, in Porto at Porto's, naming the
+              clock for a student whose own differs from Porto's. */}
+          <strong>
+            {formatLongDate(booking.startAt, booking.location === "porto" ? BOOKING_TIME_ZONE : zone)},{" "}
+            {(named ? formatTimeIn : formatSlotTime)(booking.startAt, booking.location === "porto" ? BOOKING_TIME_ZONE : zone)}
+          </strong>
           <span>
             {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}
           </span>
@@ -66,36 +73,32 @@ function HistoryLessonCard({ booking, zone }: { booking: MyBooking; zone: string
 }
 
 /**
- * The account bar above the booking workspace: who is signed in, and the
- * account's own views. Your lessons live on the calendar beneath it, which
- * opens each lesson directly; this component owns Past lessons and the
- * profile fields.
+ * The account's own cards, Past lessons and Your details, each headed like the
+ * Your lessons calendar card with the name's menu beneath its heading. Which
+ * one shows is the booking page's choice (`section`); on Your lessons itself
+ * this draws nothing but a failure to read the account, if there is one.
  */
 export function MyLessons({
-  bookingActive = false,
   initialAccount = null,
-  onOpenAccountSection,
   onRatesChange,
-  onSignedOut,
-  onTransition,
-  openUpcomingRequest = 0
+  onSelectSection,
+  onSignOut,
+  openUpcomingRequest = 0,
+  section = "upcoming"
 }: {
-  bookingActive?: boolean;
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
   initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[] } | null;
-  onOpenAccountSection?: (section: "history" | "upcoming" | "profile") => void;
   /** The account's saved weekly rates, as last read or changed here, so booking prices with them. */
   onRatesChange?: (rates: Record<number, number>) => void;
-  onSignedOut?: () => void;
-  onTransition?: (update: () => void) => void;
+  onSelectSection?: (section: AccountSection) => void;
+  onSignOut?: () => void;
   openUpcomingRequest?: number;
-} = {}) {
+  section?: AccountSection;
+}) {
   const [student, setStudent] = useState<Student | null>(initialAccount?.student ?? null);
   const [bookings, setBookings] = useState<MyBooking[]>(initialAccount?.bookings ?? []);
   const [series, setSeries] = useState<LessonSeries[]>(initialAccount?.series ?? []);
-  const [editing, setEditing] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [accountSection, setAccountSection] = useState<"history" | "upcoming" | "">("");
+  const editing = section === "profile";
   const [details, setDetails] = useState(() => accountDetails(initialAccount?.student));
   const [savingName, setSavingName] = useState(false);
   const [savingNif, setSavingNif] = useState(false);
@@ -112,7 +115,7 @@ export function MyLessons({
   const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
   const [zone, setZone] = useState(BOOKING_TIME_ZONE);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const clockNamed = useMemo(() => clockDiffersFromPorto(zone), [zone]);
   const rateCodeRef = useRef<HTMLInputElement>(null);
   const onRatesChangeRef = useRef(onRatesChange);
   const ratesVersion = useRef(0);
@@ -137,28 +140,6 @@ export function MyLessons({
     setLoading(false);
     setLoadError("");
   }, [initialAccount, student?.id]);
-
-  useEffect(() => {
-    if (!bookingActive) return;
-    setMenuOpen(false);
-    setEditing(false);
-    setAccountSection("");
-  }, [bookingActive]);
-
-  useEffect(() => {
-    if (!openUpcomingRequest) return;
-    setMenuOpen(false);
-    setEditing(false);
-    setAccountSection("upcoming");
-  }, [openUpcomingRequest]);
-
-  const applyTransition = useCallback(
-    (update: () => void) => {
-      if (onTransition) onTransition(update);
-      else update();
-    },
-    [onTransition]
-  );
 
   // A reload that lands while the details form is open must not replace what
   // the student is typing with the values it had before.
@@ -245,26 +226,6 @@ export function MyLessons({
     seenUpcomingRequest.current = openUpcomingRequest;
     void load();
   }, [load, openUpcomingRequest]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const closeOnPointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented ||
-        document.querySelector('dialog:modal, [role="dialog"][aria-modal="true"]')) return;
-      event.preventDefault();
-      setMenuOpen(false);
-      document.getElementById("account-menu-button")?.focus({ preventScroll: true });
-    };
-    document.addEventListener("pointerdown", closeOnPointerDown);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnPointerDown);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [menuOpen]);
 
   /*
    * The link mailed to the new address lands back here. It is applied only for
@@ -409,32 +370,7 @@ export function MyLessons({
     .filter((booking) => booking.status === "cancelled" || (booking.status === "confirmed" && booking.isPast))
     .sort((a, b) => historyTime(b) - historyTime(a) || b.startAt.localeCompare(a.startAt));
 
-  function openAccountSection(section: "history" | "upcoming") {
-    applyTransition(() => {
-      setMenuOpen(false);
-      setEditing(false);
-      setAccountSection(section);
-      onOpenAccountSection?.(section);
-    });
-    window.requestAnimationFrame(() =>
-      document.getElementById(section === "history" ? "account-past-lessons" : "upcoming-lessons-heading")?.focus({ preventScroll: true })
-    );
-  }
-
-  function editDetails() {
-    if (editing) {
-      openAccountSection("upcoming");
-      return;
-    }
-    applyTransition(() => {
-      setMenuOpen(false);
-      setEditing(true);
-      setAccountSection("");
-      onOpenAccountSection?.("profile");
-    });
-  }
-
-  if (loading) return <p className="booking-state-note">Loading your lessons…</p>;
+  if (loading) return section === "upcoming" ? null : <p className="booking-state-note">Loading your lessons…</p>;
 
   /*
    * An unreachable API leaves `student` null, which used to fall straight
@@ -482,238 +418,199 @@ export function MyLessons({
     );
   }
 
-  return (
-    <div className="my-lessons my-lessons--embedded">
-      <div className="unified-account-controls">
-        <div className="my-lessons__header my-lessons__header--embedded">
-          <div className="my-lessons__account-name">
-            <span>Account</span>
-            <strong>{student.name}</strong>
-          </div>
-          <div className="my-lessons__header-actions">
-            <div className="my-lessons__menu" ref={menuRef}>
-              <button
-                aria-controls="account-menu"
-                aria-expanded={menuOpen}
-                className="my-lessons__menu-toggle"
-                id="account-menu-button"
-                onClick={() => setMenuOpen((open) => !open)}
-                type="button"
-              >
-                {/* A dropdown's chevron rather than the site menu's three lines,
-                    so the account's menu is never mistaken for the site's. */}
-                Menu <ChevronDown size={15} aria-hidden="true" />
-              </button>
-              <div className={`my-lessons__menu-panel${menuOpen ? " is-open" : ""}`} id="account-menu">
-                <button
-                  aria-current={accountSection === "upcoming" && !editing ? "true" : undefined}
-                  onClick={() => openAccountSection("upcoming")}
-                  type="button"
-                >
-                  Your lessons {upcomingCount ? <span>{upcomingCount}</span> : null}
-                </button>
-                <button
-                  aria-controls="account-past-lessons"
-                  aria-expanded={accountSection === "history"}
-                  aria-current={accountSection === "history" ? "true" : undefined}
-                  onClick={() => openAccountSection("history")}
-                  type="button"
-                >
-                  Past lessons
-                </button>
-                <button aria-current={editing ? "true" : undefined} onClick={editDetails} type="button">
-                  {editing ? "Done editing" : "Edit details"}
-                </button>
-                <button
-                  onClick={() =>
-                    applyTransition(() => {
-                      setMenuOpen(false);
-                      clearSession();
-                      setStudent(null);
-                      setBookings([]);
-                      setAccountSection("");
-                      onSignedOut?.();
-                    })
-                  }
-                  type="button"
-                >
-                  Sign out
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {editing ? (
-          <section className="my-lessons__details" ref={detailsRef}>
-            <div className="my-lessons__details-row">
-              <label>
-                <span>Your name</span>
-                <input
-                  autoComplete="name"
-                  onChange={(event) => setDetails((current) => ({ ...current, name: event.target.value }))}
-                  value={details.name}
-                />
-              </label>
-              <button
-                className="button button--coral"
-                disabled={savingName || !details.name.trim() || details.name.trim() === student.name}
-                onClick={saveName}
-                type="button"
-              >
-                {savingName ? "Saving…" : "Save name"}
-              </button>
-            </div>
-
-            {/* Each note travels with its own field, so paired on a wide
-                screen it sits under that field rather than across both. */}
-            <div className="my-lessons__field">
-              <div className="my-lessons__details-row">
-                <label>
-                  <span>Email</span>
-                  <input
-                    autoComplete="email"
-                    onChange={(event) => {
-                      emailDraftVersion.current += 1;
-                      setDetails((current) => ({ ...current, email: event.target.value }));
-                    }}
-                    type="email"
-                    value={details.email}
-                  />
-                </label>
-                {/* Changing the address you sign in with is deliberately the slower
-                    of the two: nothing moves until the new address answers. */}
-                <button
-                  className="button button--blue"
-                  disabled={emailBusy || !details.email.trim() || details.email.trim() === student.email}
-                  onClick={changeEmail}
-                  type="button"
-                >
-                  Send confirmation link
-                </button>
-              </div>
-
-              {emailPending ? (
-                <p className="my-lessons__details-note">
-                  Check <strong>{emailPending}</strong>. It only becomes your address once that link is used. Until then
-                  you sign in with {student.email}.
-                </p>
-              ) : (
-                <p className="my-lessons__details-note">
-                  A new email address only takes effect once you confirm it from the link we send.
-                </p>
-              )}
-            </div>
-
-            <div className="my-lessons__field">
-              <div className="my-lessons__details-row">
-                <label>
-                  <span>
-                    NIF <em>(optional)</em>
-                  </span>
-                  <input
-                    autoComplete="off"
-                    inputMode="numeric"
-                    maxLength={20}
-                    onChange={(event) => setDetails((current) => ({ ...current, nif: event.target.value }))}
-                    value={details.nif}
-                  />
-                </label>
-                <button
-                  className="button button--coral"
-                  disabled={savingNif || details.nif.trim() === (student.nif ?? "")}
-                  onClick={saveNif}
-                  type="button"
-                >
-                  {savingNif ? "Saving…" : "Save NIF"}
-                </button>
-              </div>
-              <p className="my-lessons__details-note">Added to your receipts. Leave it blank if you don&rsquo;t need one.</p>
-            </div>
-
-            {/* Only some students have a code, so nothing here suggests they should:
-                saved rates appear once there is one, and the field stays behind a
-                small disclosure, as it does when booking. */}
-            <div className="my-lessons__rates">
-              {rates && RATE_LENGTHS.some((minutes) => rates[minutes] !== undefined) ? (
-                <ul aria-label="Your saved weekly rates" className="my-lessons__rates-list">
-                  {RATE_LENGTHS.filter((minutes) => rates[minutes] !== undefined).map((minutes) => (
-                    <li key={minutes}>
-                      <span>{minutes}-minute weekly lessons</span>
-                      <strong>{formatMoneyCents(rates[minutes])} each</strong>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {ratesFailed ? (
-                <p className="my-lessons__details-note">We couldn&rsquo;t check your saved weekly rates just now.</p>
-              ) : null}
-              <details className="my-lessons__code">
-                <summary>Have a code from Inês?</summary>
-                <form
-                  className="my-lessons__details-row"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void addRateCode();
-                  }}
-                >
-                  <label>
-                    <span>Your code</span>
-                    <input
-                      autoCapitalize="characters"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      maxLength={40}
-                      onChange={(event) => setRateCode(event.target.value)}
-                      ref={rateCodeRef}
-                      spellCheck={false}
-                      value={rateCode}
-                    />
-                  </label>
-                  <button className="button button--blue" disabled={savingRate || !rateCode.trim()} type="submit">
-                    {savingRate ? "Adding\u2026" : "Add code"}
-                  </button>
-                </form>
-                <p className="my-lessons__details-note">
-                  Your code sets the rate for future weekly lessons of the matching length.
-                </p>
-              </details>
-            </div>
-
-            {detailsNote ? (
-              <div className="booking-outcome my-lessons__details-outcome" role="status">
-                <CheckCircle2 size={20} aria-hidden="true" />
-                <p>{detailsNote}</p>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
-        {error || loadError ? (
-          <div className="booking-alert" role="alert">
-            <AlertCircle size={18} aria-hidden="true" />
-            <p>{error || loadError}</p>
-          </div>
-        ) : null}
+  const menu = (current: AccountSection) => (
+    <AccountMenu
+      current={current}
+      name={student.name}
+      onSelect={(next) => onSelectSection?.(next)}
+      onSignOut={() => onSignOut?.()}
+      upcomingCount={upcomingCount}
+    />
+  );
+  const heading = (id: string, title: string, current: AccountSection) => (
+    <div className="account-card__head">
+      <div className="account-card__title">
+        <h2 className="eyebrow" id={id}>{title}</h2>
+        {menu(current)}
       </div>
-
-      {accountSection === "history" ? (
-        <section className="my-lessons__account-section my-lessons__account-section--detached" id="account-past-lessons" aria-labelledby="past-lessons-heading" tabIndex={-1}>
-          <div className="my-lessons__account-section-heading">
-            <h3 className="eyebrow" id="past-lessons-heading">Past lessons</h3>
-            <button className="booking-back booking-back--tertiary my-lessons__back" onClick={() => openAccountSection("upcoming")} type="button">
-              <ArrowLeft size={16} aria-hidden="true" /> Your lessons
-            </button>
-          </div>
-          {past.length ? (
-            <div className="my-lessons__history-bookings">
-              {past.map((booking) => <HistoryLessonCard booking={booking} key={booking.reference} zone={zone} />)}
-            </div>
-          ) : (
-            <p className="booking-state-note">No past lessons yet.</p>
-          )}
-        </section>
-      ) : null}
+      <button className="booking-back booking-back--tertiary my-lessons__back" onClick={() => onSelectSection?.("upcoming")} type="button">
+        <ArrowLeft size={16} aria-hidden="true" /> Your lessons
+      </button>
     </div>
   );
+  const alert = error || loadError ? (
+    <div className="booking-alert booking-alert--account" role="alert">
+      <AlertCircle size={18} aria-hidden="true" />
+      <p>{error || loadError}</p>
+    </div>
+  ) : null;
+
+  if (section === "history") {
+    return (
+      <section className="account-card my-lessons__history" id="account-past-lessons" aria-labelledby="past-lessons-heading" tabIndex={-1}>
+        {heading("past-lessons-heading", "Past lessons", "history")}
+        {alert}
+        {past.length ? (
+          <div className="my-lessons__history-bookings">
+            {past.map((booking) => <HistoryLessonCard booking={booking} key={booking.reference} named={clockNamed} zone={zone} />)}
+          </div>
+        ) : (
+          <p className="booking-state-note">No past lessons yet.</p>
+        )}
+      </section>
+    );
+  }
+
+  if (section === "profile") {
+    return (
+      <section className="account-card my-lessons__details" aria-labelledby="account-details-heading" ref={detailsRef}>
+        {heading("account-details-heading", "Your details", "profile")}
+        <div className="my-lessons__details-row">
+          <label>
+            <span>Your name</span>
+            <input
+              autoComplete="name"
+              onChange={(event) => setDetails((current) => ({ ...current, name: event.target.value }))}
+              value={details.name}
+            />
+          </label>
+          <button
+            className="button button--coral"
+            disabled={savingName || !details.name.trim() || details.name.trim() === student.name}
+            onClick={saveName}
+            type="button"
+          >
+            {savingName ? "Saving…" : "Save name"}
+          </button>
+        </div>
+
+        {/* Each note travels with its own field, so paired on a wide
+            screen it sits under that field rather than across both. */}
+        <div className="my-lessons__field">
+          <div className="my-lessons__details-row">
+            <label>
+              <span>Email</span>
+              <input
+                autoComplete="email"
+                onChange={(event) => {
+                  emailDraftVersion.current += 1;
+                  setDetails((current) => ({ ...current, email: event.target.value }));
+                }}
+                type="email"
+                value={details.email}
+              />
+            </label>
+            {/* Changing the address you sign in with is deliberately the slower
+                of the two: nothing moves until the new address answers. */}
+            <button
+              className="button button--blue"
+              disabled={emailBusy || !details.email.trim() || details.email.trim() === student.email}
+              onClick={changeEmail}
+              type="button"
+            >
+              Send confirmation link
+            </button>
+          </div>
+
+          {emailPending ? (
+            <p className="my-lessons__details-note">
+              Check <strong>{emailPending}</strong>. It only becomes your address once that link is used. Until then
+              you sign in with {student.email}.
+            </p>
+          ) : (
+            <p className="my-lessons__details-note">
+              A new email address only takes effect once you confirm it from the link we send.
+            </p>
+          )}
+        </div>
+
+        <div className="my-lessons__field">
+          <div className="my-lessons__details-row">
+            <label>
+              <span>
+                NIF <em>(optional)</em>
+              </span>
+              <input
+                autoComplete="off"
+                inputMode="numeric"
+                maxLength={20}
+                onChange={(event) => setDetails((current) => ({ ...current, nif: event.target.value }))}
+                value={details.nif}
+              />
+            </label>
+            <button
+              className="button button--coral"
+              disabled={savingNif || details.nif.trim() === (student.nif ?? "")}
+              onClick={saveNif}
+              type="button"
+            >
+              {savingNif ? "Saving…" : "Save NIF"}
+            </button>
+          </div>
+          <p className="my-lessons__details-note">Added to your receipts. Leave it blank if you don&rsquo;t need one.</p>
+        </div>
+
+        {/* Only some students have a code, so nothing here suggests they should:
+            saved rates appear once there is one, and the field stays behind a
+            small disclosure, as it does when booking. */}
+        <div className="my-lessons__rates">
+          {rates && RATE_LENGTHS.some((minutes) => rates[minutes] !== undefined) ? (
+            <ul aria-label="Your saved weekly rates" className="my-lessons__rates-list">
+              {RATE_LENGTHS.filter((minutes) => rates[minutes] !== undefined).map((minutes) => (
+                <li key={minutes}>
+                  <span>{minutes}-minute weekly lessons</span>
+                  <strong>{formatMoneyCents(rates[minutes])} each</strong>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {ratesFailed ? (
+            <p className="my-lessons__details-note">We couldn&rsquo;t check your saved weekly rates just now.</p>
+          ) : null}
+          <details className="my-lessons__code">
+            <summary>Have a code from Inês?</summary>
+            <form
+              className="my-lessons__details-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void addRateCode();
+              }}
+            >
+              <label>
+                <span>Your code</span>
+                <input
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  maxLength={40}
+                  onChange={(event) => setRateCode(event.target.value)}
+                  ref={rateCodeRef}
+                  spellCheck={false}
+                  value={rateCode}
+                />
+              </label>
+              <button className="button button--blue" disabled={savingRate || !rateCode.trim()} type="submit">
+                {savingRate ? "Adding\u2026" : "Add code"}
+              </button>
+            </form>
+            <p className="my-lessons__details-note">
+              Your code sets the rate for future weekly lessons of the matching length.
+            </p>
+          </details>
+        </div>
+
+        {detailsNote ? (
+          <div className="booking-outcome my-lessons__details-outcome" role="status">
+            <CheckCircle2 size={20} aria-hidden="true" />
+            <p>{detailsNote}</p>
+          </div>
+        ) : null}
+        {alert}
+      </section>
+    );
+  }
+
+  // On Your lessons the calendar card carries the account; only a failure to
+  // read it needs saying here.
+  return alert;
 }
