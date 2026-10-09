@@ -114,6 +114,8 @@ try {
         } else {
           if (action === "register") {
             await panel.getByRole("tab", { name: "Create an account", exact: true }).click();
+            // Only someone signing in has a password to forget.
+            await expect(panel.getByRole("button", { name: /forgotten my password/ })).toHaveCount(0);
             await panel.getByLabel("First name", { exact: true }).fill(student.name);
           }
           await panel.getByLabel("Email", { exact: true }).fill(student.email);

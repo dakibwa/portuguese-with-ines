@@ -320,17 +320,21 @@ export function AuthPanel({
         </button>
       </form>
 
-      <p className="auth-panel__aside">
-        {mode === "forgot" ? (
-          <button className="auth-panel__link" onClick={() => switchMode("signin")} type="button">
-            Back to signing in
-          </button>
-        ) : (
-          <button className="auth-panel__link" onClick={() => switchMode("forgot")} type="button">
-            I&rsquo;ve forgotten my password
-          </button>
-        )}
-      </p>
+      {/* Only someone signing in has a password to forget, so creating an
+          account carries no recovery link. */}
+      {mode !== "register" ? (
+        <p className="auth-panel__aside">
+          {mode === "forgot" ? (
+            <button className="auth-panel__link" onClick={() => switchMode("signin")} type="button">
+              Back to signing in
+            </button>
+          ) : (
+            <button className="auth-panel__link" onClick={() => switchMode("forgot")} type="button">
+              I&rsquo;ve forgotten my password
+            </button>
+          )}
+        </p>
+      ) : null}
     </div>
   );
 }

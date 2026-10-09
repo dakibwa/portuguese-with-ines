@@ -96,6 +96,10 @@ Text colours must meet these accessible contrast requirements:
 The `--blue`, `--blue-deep`, `--lavender`, `--paper`, and `--coral` fill
 colours are unchanged.
 
+Every text field, in sign-in, Edit details and Inês's schedule forms as well
+as the booking notes, shows focus as one clear blue boundary in place of its
+border, never the coral and blue rings drawn around buttons and links.
+
 With JavaScript disabled, public pages retain ordinary navigation links at
 every width, all FAQ categories remain readable, and terms/privacy are readable
 in the booking document. With JavaScript enabled, the existing mobile menu,
@@ -153,7 +157,9 @@ the same identity or action:
 - on Home, the display heading is `Portuguese Lessons` and the
   supporting line describes one-to-one lessons, online or in person. `Book a lesson` appears
   once. `How I teach` and `Lessons and prices` sit beside it as quieter outline
-  buttons rather than plain links or a second strip beneath the hero. The blue
+  buttons rather than plain links or a second strip beneath the hero; on a
+  phone they share a row beneath it, and below 414 px each takes the full
+  width so neither label wraps. The blue
   hero carries its own painted field: a cream wave curling in from its right
   edge beside the heading, as if breaking against the lilac column, clear of
   the words and the actions at every width. Stacked, it rides higher beside the
@@ -161,6 +167,9 @@ the same identity or action:
 - Approach, Lessons, FAQ, and Booking follow the same hierarchy: the brand
   anchors the shared header and footer, while each page owns a task-specific
   heading and only the actions that meaningfully advance its reading path.
+- a missing address keeps the shared header and footer around one Beth Ellen
+  line on the paper, `This page could not be found.`; the header's navigation
+  is the way on, so the page adds no action of its own.
 - the closing Lessons and FAQ actions stay compact. In the FAQ, WhatsApp and
   booking sit together on one row when space allows and wrap on phones; do not
   turn each choice into a separate tall band. The Lessons payment note says
@@ -337,7 +346,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   their own deliberate move/cancel action.
 - Show the full week on desktop. On small screens, keep a seven-day selector
   above a spacious single-day timetable and that day's `Day off` switch, with
-  no horizontal page overflow.
+  no horizontal page overflow. On desktop the timetable stands at its full
+  height, with no scroll of its own, so an evening lesson is never hidden
+  inside it. On a phone the day scrolls within its box and opens at her first
+  teaching hour that day or its first lesson, whichever is earlier.
   Dates and timed lessons always use Porto time, including at DST boundaries.
   Entering a time skipped by the spring clock change shows an error and keeps
   the form available to correct. Moving a lesson in autumn's repeated hour
@@ -393,7 +405,10 @@ fills. Selected agreement uses blue beside the coral booking action. Recurring
 lesson management pairs blue `Move recurrence`, an outline `Stop repeating`, and
 coral `Cancel all booked lessons`; profile editing pairs coral `Save name` with
 blue `Send confirmation link`. Keep the existing labels and state indicators so
-colour is never the only way to tell the controls apart.
+colour is never the only way to tell the controls apart. A filled button that
+cannot act yet, such as `Save name` before the name changes, is drawn as the
+same quiet outline as the booking's final action, so coral and blue appear
+only when the action is live.
 
 Confirmed email changes preserve an open profile editor and newer drafts while
 renewing that account's session. Opening the profile editor initially focuses
@@ -837,6 +852,9 @@ tools, again without new content:
   alone on their last line;
 - the account card's heading stays `Your account` whichever tab is chosen,
   since the tabs alone name the mode; only a `Sign in` heading follows the tab.
+  `I've forgotten my password` belongs to `I have an account` alone: someone
+  creating an account, including at the booking's `Almost there`, has no
+  password to forget.
   Every sign-in card opens on one small full-colour mark centred above its
   heading, clear of the words;
 - in Edit details each note sits under its own field when the fields are
@@ -873,7 +891,8 @@ lesson price is charged after it, while moving or cancelling less than
 14 hours before it costs €5.
 
 Inês's lesson card is shaped like the student side's lesson rows: its splat, the
-length and short date in one small line above the student's name, then the
+length and short date in one small line above the student's name (`60 mins ·
+Thu 8 Oct`, while a trial keeps its name), then the
 time, place, email and NIF in one soft panel (two columns on wide screens). Its
 actions are the site's buttons, never text links: `Join Google Meet` in outline
 blue, `Move lesson` in blue, `Cancel lesson` outlined in coral, and `Mark

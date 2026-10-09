@@ -29,6 +29,8 @@ export type AvailabilityException = {
 export type AdminBooking = {
   id: string;
   reference: string;
+  /** The lesson type, so a trial can keep its name where others show their length. */
+  lesson_type_id?: string;
   lesson_name: string;
   student_name: string;
   student_email: string;

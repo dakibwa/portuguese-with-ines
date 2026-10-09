@@ -1045,6 +1045,20 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   box-shadow: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
 }
 
+/* Until it can act, a filled button is the same quiet outline as the booking's
+   final action, so coral and blue appear only when the action is live. White
+   on a faded fill read as broken. A disabled button does not answer either. */
+.button--coral:disabled,
+.button--blue:disabled {
+  border: 1px solid var(--rule);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
 /*
  * The second choice beside a coral one. Same hand, same type, outlined rather
  * than filled, so "How I teach" or "Payment questions" reads as something to
@@ -1425,6 +1439,18 @@ html:active-view-transition-type(document)::view-transition-new(root) {
     padding-right: 0.6rem;
     padding-left: 0.6rem;
     letter-spacing: 0.1em;
+  }
+}
+
+/* Narrower, "Lessons and prices" would break onto a second line beside a
+   one-line "How I teach", so each takes the full width instead. */
+@media (max-width: 413px) {
+  .home-hero__actions {
+    align-self: stretch;
+  }
+
+  .home-hero__links {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2426,6 +2452,30 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   align-items: center;
   justify-content: center;
   gap: 0.8rem;
+}
+
+/* Missing page */
+
+/* One handwritten line in the middle of the paper, between the site's own
+   header and footer. */
+.not-found-page {
+  display: grid;
+  place-items: center;
+  padding: clamp(4rem, 10vw, 7rem) var(--page-pad);
+  text-align: center;
+}
+
+.not-found-page h1 {
+  max-width: 13em;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.3rem, 5vw, 3.8rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  /* Wrapped, each line drops the 0.4em Beth Ellen's descenders need, as a
+     two-line display heading's second line does, so none crosses the next. */
+  line-height: 1.55;
+  text-wrap: balance;
 }
 
 /* Booking */
@@ -5142,14 +5192,17 @@ html.booking-transitioning .booking-confirmation-stage {
   font: inherit;
 }
 
-/* The layered focus ring is drawn outside the field, so without room for it the
-   outer band sat on top of the label above. */
+/* A little more room between each label and its field. */
 .auth-panel label > span {
   margin-bottom: 0.45rem;
 }
 
+/* One clear blue boundary, as on the booking notes, rather than the coral
+   and blue rings drawn around buttons and links. */
 .auth-panel input:focus-visible {
-  outline-offset: 3px;
+  border: 2px solid var(--blue-deep);
+  outline: 0;
+  box-shadow: none;
 }
 
 /* The masking dots render small and faint at body size; more size and tracking
@@ -5888,15 +5941,11 @@ button.text-action {
   font: inherit;
 }
 
+/* The booking notes' single blue boundary, never a ring outside the border. */
 .my-lessons__details input:focus-visible {
-  outline: 2px solid var(--blue-deep);
-  outline-offset: 2px;
+  border: 2px solid var(--blue-deep);
+  outline: 0;
   box-shadow: none;
-}
-
-.my-lessons__details button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
 }
 
 .my-lessons__details-row .button {

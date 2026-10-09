@@ -318,12 +318,12 @@
 .teacher-day-toggle[aria-checked="true"] .teacher-day-toggle__track::after {
   transform: translateX(11px);
 }
+/* Wide, the day stands at its full height with no scroll of its own, so an
+   evening lesson is never left below the fold of an inner box; the page
+   scrolls instead. A phone scrolls the day inside its box (below). */
 .teacher-timetable-scroll {
-  max-height: 650px;
-  overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--lavender) var(--paper-light);
-  overscroll-behavior: contain;
 }
 .teacher-time-grid {
   min-height: calc(var(--slot-count) * var(--teacher-slot-height));
@@ -667,9 +667,12 @@
   color: var(--ink);
   font: 500 0.84rem/1.3 var(--ui);
 }
+/* One clear blue boundary, as on every text field, never a ring outside it. */
 .teacher-form input:focus,
 .teacher-form select:focus {
-  border-color: var(--blue);
+  border: 2px solid var(--blue-deep);
+  outline: 0;
+  box-shadow: none;
 }
 .teacher-exact-hours {
   margin-top: 0.5rem;
@@ -1092,8 +1095,13 @@
   .teacher-time-axis > span {
     font-size: 0.68rem;
   }
+  /* The seven-day selector stays in view above a day that scrolls in its own
+     box, opening at her first teaching hour or lesson (WeeklyTimetable). At
+     either end the page carries on scrolling rather than trapping the
+     gesture. */
   .teacher-timetable-scroll {
     max-height: 504px;
+    overflow: auto;
   }
   .teacher-timetable--editing .teacher-time-slot > span {
     opacity: 1;

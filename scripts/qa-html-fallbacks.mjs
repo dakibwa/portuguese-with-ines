@@ -11,7 +11,8 @@ if (!browserType) throw new Error(`Unknown QA_BROWSER: ${engine}`);
 const browser = await browserType.launch({ headless: true });
 const out = "tmp/qa/html-fallbacks";
 await mkdir(out, { recursive: true });
-const pages = ["/", "/approach/", "/lessons/", "/faq/", "/book/"];
+// /404.html is the document the host serves for any missing address.
+const pages = ["/", "/approach/", "/lessons/", "/faq/", "/book/", "/404.html"];
 const errors = [], writes = [];
 
 try {
@@ -40,6 +41,10 @@ try {
           await expect(page.locator(".policy-information-fallback")).toBeVisible();
           await expect(page.getByRole("heading", { name: "Privacy", exact: true })).toHaveCount(1);
         } else await expect(page.locator(".policy-information-fallback")).toBeHidden();
+        if (path === "/404.html") {
+          await expect(page.getByRole("heading", { level: 1, name: "This page could not be found.", exact: true })).toBeVisible();
+          await expect(page.getByRole("contentinfo")).toBeVisible();
+        }
       }
 
       await page.goto(`${base}/faq/#faq-payment`);
@@ -98,5 +103,5 @@ try {
   } finally { await context.close(); }
   assert.deepEqual(errors, []);
   assert.deepEqual(writes, []);
-  console.log(`HTML fallbacks passed in ${engine} at 320/390/820/1440px: five public pages, navigation, all FAQ categories, terms/privacy and legacy links; hydrated FAQ and modal behavior preserved.`);
+  console.log(`HTML fallbacks passed in ${engine} at 320/390/820/1440px: five public pages and the missing-page document, navigation, all FAQ categories, terms/privacy and legacy links; hydrated FAQ and modal behavior preserved.`);
 } finally { await browser.close(); }
