@@ -41,6 +41,12 @@ function lesson(token, day) {
 const previousLesson = lesson("previous", "16");
 const nextLesson = lesson("next", "15");
 
+// The next lesson opens from its row on a phone, or from its day where a
+// pointer reads it off the calendar.
+function nextLesson(page) {
+  return page.locator(".lesson-overview__next-open:visible, #lesson-calendar .calendar-week button.is-next:visible").first();
+}
+
 async function fixture(width, reply = async () => null) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce", timezoneId: "Europe/Lisbon" });
   const page = await context.newPage();
@@ -253,7 +259,7 @@ try {
         await state.page.goto(`${base}/`);
         await state.page.getByRole("link", { name: "Book a lesson", exact: true }).click();
         await state.page.getByRole("button", { name: /^Your lessons/ }).first().click();
-        await state.page.locator(".lesson-overview__next-open").click();
+        await nextLesson(state.page).click();
         await state.page.getByRole("button", { name: "Pay €25 securely", exact: true }).click();
         await started.promise;
         await state.page.goBack();
@@ -384,7 +390,7 @@ try {
         await page.goto(`${base}/book/?manage=previous`);
         await page.getByRole("button", { name: "Close lesson management" }).click();
         await expect(page.getByRole("dialog")).toHaveCount(0);
-        await page.locator(".lesson-overview__next-open").click();
+        await nextLesson(page).click();
         await expect(page.getByRole("dialog")).toContainText("Tuesday, 15 September 2026");
         const response = page.waitForResponse("**/bookings/previous");
         waiting.resolve(); await response;

@@ -26,19 +26,19 @@
   --rule: rgba(139, 130, 211, 0.72);
   --rule-soft: rgba(139, 130, 211, 0.38);
   /*
-   * Booking in one hand, from the palette above: every card is the same lilac
+   * Booking in one hand, from the palette above: every card is the same warm
    * sheet, and what sits on it to be pressed or read (the next lesson, a free
    * day, a time, a control's track) is raised in the paper cream of the lesson
    * cards and dialogs, without an outline of its own. Blue marks where you are
    * and what you have chosen; coral is booking and the lessons booked.
    *
-   * The sheet is --lavender-soft laid 70% over --paper-light: the lilac of the
-   * Home principles strip and the trial lesson card, lifted just enough for
-   * coral text on it to clear AA (4.55:1; on --lavender-soft itself 4.25:1). A booked
-   * day is --coral 15% over --paper-light, and a weekly one --lavender 50%, each
-   * the lightest that keeps its own text above 4.5:1.
+   * The sheet is --lavender laid thinly over the page, the booking panels'
+   * wash from before, chosen back by Dan over a solid lilac: warm, with the
+   * paper's grain still showing. Coral text on it clears AA (4.63:1). A booked
+   * day is --coral 15% over --paper-light, and a weekly one --lavender 50%,
+   * each the lightest that keeps its own text above 4.5:1.
    */
-  --sheet: #e5e0f0;
+  --sheet: rgba(170, 164, 230, 0.13);
   --raised: var(--paper-light);
   --booked: #f9ddcc;
   --weekly: #d2cce6;
@@ -2950,6 +2950,37 @@ textarea,
   font-weight: 700;
 }
 
+/* On Your lessons with lessons on both clocks, the line names one at a time:
+   the next lesson's, then whichever lesson is hovered or focused. The two
+   names share one place, so switching never moves anything. */
+.calendar-zone--switching strong {
+  display: inline-grid;
+}
+
+.calendar-zone--switching strong > span {
+  grid-area: 1 / 1;
+  transition: opacity 160ms var(--motion-ease);
+}
+
+.calendar-zone__porto,
+.calendar-zone--porto .calendar-zone__own {
+  opacity: 0;
+}
+
+.calendar-zone--porto .calendar-zone__porto {
+  opacity: 1;
+}
+
+.unified-calendar:has(.is-porto-day:is(:hover, :focus-visible)) .calendar-zone__own,
+.unified-calendar:has(.is-own-day:is(:hover, :focus-visible)) .calendar-zone__porto {
+  opacity: 0;
+}
+
+.unified-calendar:has(.is-porto-day:is(:hover, :focus-visible)) .calendar-zone__porto,
+.unified-calendar:has(.is-own-day:is(:hover, :focus-visible)) .calendar-zone__own {
+  opacity: 1;
+}
+
 .unified-calendar-shell {
   min-width: 0;
 }
@@ -3588,8 +3619,161 @@ textarea,
 }
 
 /* On a day filled coral every time reads in white, the weekly one included. */
-.unified-calendar .calendar-week button.has-booking:not(.has-weekly-booking):is(:hover, :focus-visible, .is-selected) .calendar-booking-times .is-weekly {
+.unified-calendar .calendar-week button.has-booking:not(.has-weekly-booking):is(:hover, :focus-visible, .is-selected, .is-next) .calendar-booking-times .is-weekly {
   color: inherit;
+}
+
+/* The next lesson stands out on the calendar itself, filled in its kind's
+   colour, and on a wide card each day spells its lessons out, so there is no
+   separate row to say it. */
+.unified-calendar--overview .calendar-week button.has-booking.is-next {
+  background: var(--coral-action);
+  color: #fff;
+}
+
+.unified-calendar--overview .calendar-week button.has-booking.has-weekly-booking.is-next {
+  background: var(--lavender-ink);
+}
+
+.unified-calendar--overview .calendar-week button.is-next.is-today > span:not(.calendar-lesson-tip)::after {
+  color: inherit;
+}
+
+@container booking (min-width: 700px) {
+  .lesson-overview__next--on-calendar {
+    display: none;
+  }
+}
+
+/*
+ * Hovering a booked day, or reaching it by keyboard, shows its lessons in full
+ * in the `?` tip's dark hand: above the day, or below it on the first row,
+ * pointing at it from wherever the card's edges let it sit.
+ */
+.calendar-lesson-tip {
+  --tip-x: -50%;
+  --tip-y: 4px;
+  position: absolute;
+  z-index: 5;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  display: grid;
+  width: max-content;
+  max-width: min(260px, 70vw);
+  border: 1px solid rgba(220, 216, 245, 0.72);
+  border-radius: var(--squiggle-field);
+  padding: 0.62rem 0.8rem;
+  /* Solid, unlike the ? tip's, since it lies over other days' dates. */
+  background: var(--ink);
+  box-shadow: 0 14px 30px rgba(17, 31, 72, 0.3);
+  color: var(--paper-light);
+  font-family: var(--body);
+  font-size: 0.76rem;
+  font-weight: 400;
+  gap: 0.55rem;
+  letter-spacing: 0;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  text-transform: none;
+  translate: var(--tip-x) var(--tip-y);
+  transition:
+    opacity 140ms ease-out,
+    translate 180ms var(--motion-ease),
+    visibility 0s linear 180ms;
+  visibility: hidden;
+  white-space: normal;
+}
+
+.calendar-lesson-tip--start {
+  --tip-x: 0;
+  left: 0;
+}
+
+.calendar-lesson-tip--end {
+  --tip-x: 0;
+  right: 0;
+  left: auto;
+}
+
+.has-tip-below > .calendar-lesson-tip {
+  --tip-y: -4px;
+  top: calc(100% + 10px);
+  bottom: auto;
+}
+
+.calendar-lesson-tip__lesson {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.calendar-lesson-tip__next {
+  color: var(--lavender-soft);
+  font-family: var(--ui);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.calendar-lesson-tip strong {
+  font-family: var(--ui);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+/* The tip's point hangs from the day itself, so it always meets the day's
+   middle wherever the tip sits. */
+.calendar-week button[aria-describedby]::after {
+  position: absolute;
+  z-index: 6;
+  bottom: calc(100% + 5px);
+  left: calc(50% - 5px);
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid rgba(220, 216, 245, 0.72);
+  border-bottom: 1px solid rgba(220, 216, 245, 0.72);
+  background: var(--ink);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transform: rotate(45deg);
+  transition: opacity 140ms ease-out, visibility 0s linear 180ms;
+  visibility: hidden;
+}
+
+.calendar-week button.has-tip-below[aria-describedby]::after {
+  top: calc(100% + 5px);
+  bottom: auto;
+  border: 0;
+  border-top: 1px solid rgba(220, 216, 245, 0.72);
+  border-left: 1px solid rgba(220, 216, 245, 0.72);
+}
+
+.calendar-week button:focus-visible > .calendar-lesson-tip,
+.calendar-week button[aria-describedby]:focus-visible::after {
+  opacity: 1;
+  transition-delay: 0s;
+  visibility: visible;
+}
+
+.calendar-week button:focus-visible > .calendar-lesson-tip {
+  translate: var(--tip-x) 0;
+}
+
+/* Only where a pointer truly hovers: on a touch screen a tap opens the lesson. */
+@media (hover: hover) and (pointer: fine) {
+  .calendar-week button:hover > .calendar-lesson-tip,
+  .calendar-week button[aria-describedby]:hover::after {
+    opacity: 1;
+    transition-delay: 0s;
+    visibility: visible;
+  }
+
+  .calendar-week button:hover > .calendar-lesson-tip {
+    translate: var(--tip-x) 0;
+  }
 }
 
 /* A day with several lessons lists them to open, and can still book another. */
@@ -3738,8 +3922,39 @@ textarea,
   }
 }
 
-.calendar-booking-times span {
+.calendar-booking-times > span {
   display: block;
+}
+
+/*
+ * Your lessons spells each booked day out: a globe for online or a little
+ * person for in person, over the start time on a phone, and on a wide card
+ * beside the time it runs from and until, on one line.
+ */
+.calendar-booking-times > span:has(.calendar-booking-times__place) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.calendar-booking-times__place {
+  flex: none;
+}
+
+.calendar-booking-times__until {
+  display: none;
+}
+
+@container booking (min-width: 700px) {
+  .calendar-booking-times > span:has(.calendar-booking-times__place) {
+    flex-direction: row;
+    gap: 0.3rem;
+  }
+
+  .calendar-booking-times__until {
+    display: inline;
+  }
 }
 
 .unified-calendar__panel {
@@ -4545,7 +4760,7 @@ textarea,
 }
 
 /* Marked, but not as a selection — a ring read as "already chosen". */
-.calendar-week button.is-today > span::after {
+.calendar-week button.is-today > span:not(.calendar-lesson-tip)::after {
   display: block;
   margin-top: 0.1rem;
   color: var(--lavender-ink);
@@ -7515,6 +7730,8 @@ dialog[open]::backdrop {
   }
 
   .upcoming-lessons__tip,
+  .calendar-lesson-tip,
+  .calendar-zone--switching strong > span,
   .account-menu__toggle svg,
   .account-menu__name,
   .account-menu__thumb,
