@@ -440,7 +440,8 @@ time that section is chosen.
 Decisions inside the booking flow resize and dissolve the existing calendar
 workspace rather than turning the page, and keep the rest of the page fixed.
 Without view transitions a new page dissolves in. Reduced-motion users get
-each page at once, without animation or smooth scrolling.
+each page at once, without animation or smooth scrolling, and a full page load
+is an ordinary load rather than a turn.
 
 Buttons answer like objects. They lift on hover, the filled ones casting a
 soft shadow in their own colour, and their hand-cut outline shifts a little and

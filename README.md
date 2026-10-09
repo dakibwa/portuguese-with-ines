@@ -273,7 +273,10 @@ pages' order along the nav. React commits a back or forward navigation
 synchronously, so it has no view transition, and `PageTurn` gives those pages
 the arrival half through the Web Animations API instead. Full page loads, such
 as the nav's Booking link, recede and focus the same way through
-`@view-transition { navigation: auto; types: document; }`. Navigation itself
+`@view-transition { navigation: auto; types: document; }`, declared only for
+`prefers-reduced-motion: no-preference`: with reduced motion such a turn would
+animate nothing, and a slow CI browser once stopped drawing the arriving page
+while it waited on one. Navigation itself
 starts immediately and `::view-transition { pointer-events: none; }` keeps the
 arriving page clickable; only the named header skips clicks for the moment of
 the turn. Browsers without view transitions keep the 190–240 ms dissolve. The
