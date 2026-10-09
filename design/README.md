@@ -91,6 +91,12 @@ Text colours must meet these accessible contrast requirements:
   panel, giving small feedback text 4.78:1 contrast. The coral action colour
   measured 4.25:1 on that surface.
 
+- the booking cards' lilac sheet is `--lavender-soft` laid 70% over
+  `--paper-light` (`#e5e0f0`), the lightest lift that keeps coral action text
+  on it at AA (4.55:1; 4.25:1 on `--lavender-soft` itself). A booked day is
+  `--coral` 15% over `--paper-light` and a weekly one `--lavender` 50%, each
+  the lightest that keeps its own coral or lilac-ink text above 4.5:1.
+
 The `--blue`, `--blue-deep`, `--lavender`, `--paper`, and `--coral` fill
 colours are unchanged.
 
@@ -540,11 +546,11 @@ highlighted and its times beside it under the date, with no eyebrow above it
 to say what the times already say. On a phone the times take the calendar's
 place, headed by a short date (`Thu 24 Sept 2026`) with an outline `Change`
 beside it on the same row, which returns to the calendar (named `Change date`
-for assistive technology). Before a day is chosen, the panel beside the
-calendar offers `Soonest times`: the first free time on each of the next three
-free days, each one tap from the confirmation. `Soonest times` is the panel's
-heading, with no `Choose a day` or eyebrow stacked above the three rows. On a
-phone that panel stays out of sight until there is a day to show.
+for assistive technology). Before a day is chosen there are no times to show,
+so the times panel stays out of sight at every width and the calendar takes the
+whole row, as Your lessons does; a chosen day brings its times in beside it.
+`Soonest times` went on 9 October 2026, when Dan found it unnecessary. A window
+with nothing free says so beneath the calendar.
 
 Students can collect several single-lesson dates and confirm them together.
 Each chosen lesson is its own row: its own splat, the date and time, its clock
@@ -562,8 +568,8 @@ location.
 
 Weekly bookings start with one date and time and may add a second weekly time.
 Both starting dates fall in the same Monday–Sunday week in Porto, so the second
-calendar shows that week only, with its date range in place of the pager, and
-the rule is never spelled out. The chosen times repeat for the common 4/6/8-week
+calendar shows that week only, under its month and without arrows, and the
+rule is never spelled out. The chosen times repeat for the common 4/6/8-week
 or ongoing period. Show both starting dates and times together, check later
 occurrences for both, and name any unavailable lesson times precisely rather
 than suggesting the entire week is lost. One confirmation and one card setup
@@ -591,26 +597,35 @@ Preserve these desktop and mobile states:
   silent; only clashing weeks appear before the student can book;
 - a returning signed-in student opens directly on their lessons. Their
   lessons are one calendar card, which carries the account as well: there is
-  no bar above it and no separate list to keep in step with it. The card's
-  header reads `Your lessons`, with a `?` tooltip, the student's name beneath
-  it as the account's menu, and the coral `Book a lesson` at its top right
+  no bar above it and no separate list to keep in step with it. On a wide card
+  its header is one row: the student's name with a quiet `Sign out` beneath
+  it, the account's places in the middle and the coral `Book a lesson` at the
+  right. On a narrower card it reads `Your lessons`, the student's name
+  beneath it as the account's menu, and `Book a lesson` at its top right
   (`Book` on phones, keeping the full name for assistive technology).
-  Beneath the header, the next lesson, or `Happening now`, shows its date,
-  time, length, location, `Weekly` when it repeats and its Meet link, and opens
-  that lesson directly. With nothing booked, one line says so above the same
+  Beneath the header, the next lesson, or `Happening now`, shows its date and
+  time in one plain line (the calendar's header names the clock), then its
+  length, location, `Weekly` when it repeats and its Meet link, and opens that
+  lesson directly. With nothing booked, one line says so above the same
   calendar. Free times do not appear in this lesson overview.
   A signed-out visitor can browse lesson types, dates, and times first; sign-in
   is requested only when they open their lessons or confirm a booking.
   Completed decisions collapse into a compact row, so account tools, the
   calendar, and confirmation never compete at once;
-- the signed-in identity appears once: the student's name, beneath the
-  heading of whichever account card is showing, is the account's menu (9
-  October 2026, at Dan's request to fold the separate account bar into the
-  calendar card). It reads quietly as the name with a small coral chevron,
-  never the site menu's three lines, so a phone shows one `☰` for the site and
-  one clearly different account menu. At every width it opens over the card on
-  `Your lessons`, `Past lessons`, `Edit details` (`Done editing` while
-  editing) and `Sign out`, in that order. Booking is not repeated there: its
+- the signed-in identity appears once, with the account's menu (9 October
+  2026, at Dan's request to fold the separate account bar into the calendar
+  card, then to show the menu in the header's empty middle). Its places are
+  `Your lessons`, `Past lessons` and `Edit details` (`Done editing` while
+  editing), then `Sign out`, in that order. On a wide card (1100 px of booking
+  column and up) they sit open in the header, centred on the card, as one
+  sliding control of the booking bar's kind, its blue thumb on the card that is
+  showing; the name stands plain at the left with `Sign out` beneath it, since
+  signing out belongs to the person, not among the places, and the card's
+  title is kept for screen readers because the places already name it. On a
+  narrower card the name, beneath the card's title, is the menu: it reads
+  quietly as the name with a small coral chevron, never the site menu's three
+  lines, so a phone shows one `☰` for the site and one clearly different
+  account menu, and it opens over the card. Booking is not repeated there: its
   one coral action belongs to the card. `Your lessons` may show the useful
   upcoming count; `Past lessons` deliberately has no count competing for
   attention. The menu lives in the account cards, behind an open lesson too;
@@ -619,8 +634,10 @@ Preserve these desktop and mobile states:
   calendar reaches every future commitment. Account destinations open
   consistently: selecting the current view again keeps it open. Past lessons
   and Your details each take the lessons card's place, in the same hand and
-  headed the same way: the title, the name's menu beneath it and, at the
-  right, a `Your lessons` way back to the current schedule. History has two
+  headed the same way: on a wide card the same row, with the places exactly
+  where they were and the thumb on the card showing; on a narrower one the
+  title, the name's menu beneath it and, at the right, a `Your lessons` way
+  back to the current schedule. History has two
   readable columns of records on wide desktop and one on mobile; order records
   by when each lesson ended or was cancelled, newest first, so cancelled
   future dates do not bury recently completed lessons.
@@ -645,10 +662,10 @@ Preserve these desktop and mobile states:
   `Weekly lesson` status and `Manage weekly lessons`, which moves, stops or
   cancels the whole run. Stopping a repeat turns every retained date back into an
   ordinary coral lesson; `Your lessons` counts an active repeat once and each
-  retained date on its own. The `?` tooltip says that a booked lesson opens its
-  details, change and cancel choices, and that any other day starts a booking; it
-  floats over the card on a dark blue surface without moving anything beneath
-  it. In these already-booked summaries, ordinary lesson product names are
+  retained date on its own. The `?` beside the calendar's month says that a
+  booked lesson opens its details, change and cancel choices, and that any
+  other day starts a booking; its tip floats over the weeks on a dark blue
+  surface, pointing at the `?`, without moving anything beneath it. In these already-booked summaries, ordinary lesson product names are
   replaced by their useful compact duration (`60 mins` or `90 mins`), while a
   trial stays named. Booked marks vary by 60/90 minutes and Online/In Porto; a
   repeating schedule has its own fifth mark. Do not reuse the stacked-wave
@@ -666,7 +683,7 @@ Preserve these desktop and mobile states:
 - after a successful one-off or weekly booking, the confirmation's primary
   `Back to your lessons` opens the lessons calendar so the new booking is immediately
   visible on its day;
-- the confirmation itself is one hand-cut card in the booking panels' wash,
+- the confirmation itself is one hand-cut card on the booking cards' lilac sheet,
   read top to bottom: `You're booked in.`, the day with its times beneath it,
   where the confirmation went, then the two actions, and a small-print foot
   under a soft rule with the reference and the fee rule. The lesson's own mark
@@ -678,9 +695,16 @@ Preserve these desktop and mobile states:
   box inside a ruled block. With several lessons the second action goes, since
   each opens from the calendar, and the foot speaks of them all;
 - the calendar shows four Monday-to-Sunday weeks at a time, never one long
-  scroll. `Earlier weeks` and `Later weeks` arrows sit either side of the range
-  label, and `Later weeks` carries a small coral count of the booked lessons
-  beyond the page, so nothing booked is out of sight without a sign. A new
+  scroll. Its header is the one every calendar has: its months on the left
+  (`October 2026`, or `October – November 2026` where the weeks cross into the
+  next, `Oct – Nov 2026` on a phone), with the clock beside them for a student
+  elsewhere, and the `Earlier weeks` and `Later weeks` arrows on the right.
+  `Later weeks` carries a small coral count of the booked lessons beyond the
+  page, so nothing booked is out of sight without a sign. Each week starts with
+  its month (`OCT`), in ink where a month begins and lilac ink where it carries
+  on, and a month that begins part-way through a week marks its 1st (`1 NOV`);
+  there are no caption rows across the grid. The key sits beneath the weeks it
+  explains. A new
   booking pages through the whole twelve-week booking window; the lessons view
   pages from this week through the same window, or to the last booked lesson
   when that is later. The lessons view has no second context strip or
@@ -738,9 +762,9 @@ Preserve these desktop and mobile states:
   clear blue focus boundary rather than stacking coral and blue rings.
   The inclusive 84-day API boundary must not add a thirteenth week: a partial
   row beyond the window is not shown;
-- calendar month headings and spillover abbreviations come from the date key
-  itself, on the clock the calendar shows, so a visitor behind UTC sees `31 AUG`
-  rather than `31 JUL`;
+- calendar month labels come from the date key itself, on the clock the
+  calendar shows, so a visitor behind UTC sees the week of 31 August labelled
+  `AUG` rather than `JUL`;
 - days with two bookings show both booked times on separate lines. Do not use a
   small `2x` count badge beside the date;
 - primary coral and secondary outline actions share a 52 px height, Montserrat
@@ -814,7 +838,8 @@ calmer, without new content:
 - booked times in calendar tiles are big enough to read and to tell the weekly
   colour from the one-off one, and the calendar key shows `Booked lesson` only
   when there is a booked lesson to point to;
-- before a day is chosen, `Soonest times` heads the side panel on its own;
+- before a day is chosen, `Soonest times` heads the side panel on its own
+  (removed 9 October 2026; the panel now waits for a chosen day);
 - changing a lesson on a wide screen opens on the usual four weeks beside the
   form, so there is no empty half and no `Show all`; the overlay's heading
   stands alone and `Keep current time` is its one way back, stacked beneath
@@ -876,6 +901,36 @@ And the drawing:
   lesson`, as every other one does; the past lessons' status pill keeps the
   pill's own size; faint rules are drawn in ink, not the old green.
 
+## One card, one palette — 9 October 2026
+
+At Dan's request, the same day, to show the account's menu in the header's
+empty middle, then to make the card feel premium rather than a bundle of
+parts, in the site's own colours with a colour of its own, with the month
+where a calendar puts it and nothing taking room it doesn't earn:
+
+- every booking card is one lilac sheet in the site's palette (see Contrast
+  and accessibility), and what sits on it to be pressed or read is raised in
+  the paper cream of the lesson cards and dialogs, without an outline of its
+  own: the next lesson, a free day, a time, a control's track, a past lesson.
+  Blue marks where you are and what you have chosen; coral is booking and the
+  lessons booked. The time-zone pill above the card is gone;
+- on a wide card the header is one row: the name with `Sign out` beneath, the
+  places as one sliding control in the middle, and `Book a lesson` at the
+  right (see Booking workspace). The next lesson's date and time are one plain
+  line;
+- the calendar's header holds its months, the clock (`Los Angeles time`, with
+  `Porto time for lessons in Porto` on Your lessons when one is booked, or
+  `Porto time` once In Porto is chosen) and the arrows; the `?` sits beside
+  the months, and the key beneath the weeks. Each week starts with its month,
+  instead of a caption row across the grid;
+- `Soonest times` is gone: until a day is chosen the booking calendar takes
+  the whole row, and a chosen day brings its times in beside it;
+- the student's emails lead with the lesson's own clock, as the site does:
+  theirs for an online lesson, Porto's for one in Porto, its clock named once
+  after the time (`… 09:00, Los Angeles time`), with no second clock. Inês's
+  copies stay on Porto time and add the student's own beneath it when it
+  differs.
+
 ## Simpler, quicker booking on the student's own clock — 9 October 2026
 
 At Dan's request to make the booking pages and their menus simpler, quicker to
@@ -895,14 +950,11 @@ time zone and make that obvious:
   Angeles time`, or `10:00 Porto time` for a lesson in Porto); in Portugal
   times stay plain, and the confirmation and a day's times name the clock
   once, as they always did. A student whose clock differs from Porto's at any time of
-  year is told so once, in one calm line where the times begin: `Times are in
-  your time zone: Los Angeles time`, adding `Lessons in Porto are in Porto
-  time` on Your lessons when one is booked, and `Times are in Porto time,
-  where lessons in Porto happen` once In Porto is chosen. Someone on Porto's
-  clock sees no line. A weekly time is kept in Porto, so for a few weeks
-  around a clock change its time elsewhere moves by an hour; its weekly label
-  names the student's usual time. Emails still lead with Porto time and add the
-  student's own beneath it when it differs;
+  year is told so once, where the times begin (since the follow-up above, in
+  the calendar's header beside its months). Someone on Porto's clock sees no
+  line. A weekly time is kept in Porto, so for a few weeks around a clock
+  change its time elsewhere moves by an hour; its weekly label names the
+  student's usual time. The emails followed later the same day (see above);
 - the page asks for its lessons and free times as its HTML arrives rather than
   after its code, reuses free times fetched in the last minute, and while idle
   fetches what the next likely step needs, the sign-in form's code included,
@@ -940,7 +992,8 @@ tools, again without new content:
   heading, clear of the words;
 - in Edit details each note sits under its own field when the fields are
   paired;
-- past lessons are cut in the tile hand on one soft lavender wash, and only the
+- past lessons are cut in the tile hand on one surface (since 9 October 2026
+  the raised cream of everything on a booking card), and only the
   status pill carries colour, lilac for `Completed` and coral for `Cancelled`,
   so a run of cancellations reads as records rather than a wall of coral. Good
   news (`All sorted`, a changed password, a reset link on its way) is a calm

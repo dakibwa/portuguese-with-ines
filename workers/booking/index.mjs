@@ -55,7 +55,8 @@ import {
   formatInZone,
   formatShort,
   isValidTimeZone,
-  parseDateKey
+  parseDateKey,
+  zoneName
 } from "./time.mjs";
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { findRecurringCode, recurringRates, recurringLessonType, priceForMove, rateLimitAddress, takeRateLimit } from "./rates.mjs";
@@ -223,6 +224,20 @@ function locationLabel(row) {
   return row.location === "porto" ? "In person, Porto" : "Online";
 }
 
+/**
+ * The clock a student reads a lesson on, as the site shows it: their own for
+ * an online lesson, Porto's for one in Porto, where it happens.
+ */
+function lessonZone(row) {
+  if (row.location === "porto") return PORTO;
+  return isValidTimeZone(row.student_timezone) ? row.student_timezone : PORTO;
+}
+
+/** "Wednesday 14 October 2026 at 09:00, Los Angeles time": one time, its clock named. */
+function lessonWhen(date, zone) {
+  return `${formatInZone(date, zone)}, ${zoneName(zone, date)}`;
+}
+
 export function normaliseLocation(value, fallback = "online") {
   if (value === "porto" || value === "online") return value;
   return fallback === "porto" ? "porto" : "online";
@@ -253,21 +268,20 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const replyTo = settings.replyToEmail || teacherEmail || undefined;
   const start = new Date(row.starts_at);
 
-  // "Porto time", in words — the site's own vocabulary. "(WEST)" was accurate
-  // but jargon to a student; the your-time line below the hero and the calendar
-  // attachment already carry the conversion for anyone in another zone.
+  // Clocks in words, the site's own vocabulary: "(WEST)" was accurate but
+  // jargon. The student reads the lesson on its own clock, as the site shows
+  // it, one time named once; Inês reads Porto's, with the student's beneath.
   const portoTime = `${formatInZone(start, PORTO)}, Porto time`;
   const studentZone = isValidTimeZone(row.student_timezone) ? row.student_timezone : PORTO;
   // Null unless the student's clock genuinely reads differently from Porto's.
   const studentTime = differingZonedTime(start, studentZone);
+  const studentClock = lessonZone(row);
+  const studentWhen = lessonWhen(start, studentClock);
 
   // The date and time is the one thing the reader is looking for, so it is
   // lifted out of the detail table into its own panel rather than being the
   // second row of five.
   const hero = portoTime;
-  // Porto time *is* Inês's time, so this note is the student's clock on her
-  // copy and their own on theirs. Labelling it "Your time" to her was wrong.
-  const studentHeroNote = studentTime ? `${studentTime} — your time` : "";
   const teacherHeroNote = studentTime ? `${studentTime} — the student's time` : "";
 
   const baseRows = [
@@ -328,6 +342,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   // Subjects carry the date, not the reference: "PT-LS29CT" tells the reader
   // nothing in an inbox list, and the date is what they are scanning for.
   const shortWhen = formatShort(start, PORTO);
+  const studentShortWhen = formatShort(start, studentClock);
   const lessonTypeChanged = Boolean(previousLessonType && previousLessonType.id !== lessonType.id);
 
   // Older already-paid bookings lock inside the window instead of paying.
@@ -341,7 +356,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
 
   const student = {
     booked: {
-      subject: `Your Portuguese lesson is booked — ${shortWhen}`,
+      subject: `Your Portuguese lesson is booked — ${studentShortWhen}`,
       heading: "You're booked",
       intro: `Olá ${row.student_name.split(" ")[0]}, your lesson with Inês is ${
         isPaid ? "paid and confirmed" : "confirmed"
@@ -357,7 +372,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
           // Written for someone who did not ask for this. The old copy said
           // "that's done", which reads as a confirmation of something you did
           // — a strange thing to receive when Inês moved your lesson.
-          subject: `Inês has moved your lesson — now ${shortWhen}`,
+          subject: `Inês has moved your lesson — now ${studentShortWhen}`,
           heading: "Inês has moved your lesson",
           intro: `Olá ${row.student_name.split(" ")[0]}, Inês has moved your lesson to the time below. An updated calendar invitation is attached. If the new time doesn't suit, choose another time or reply to this email.`,
           callout: "",
@@ -365,14 +380,14 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         }
       : lessonTypeChanged
         ? {
-            subject: `Your lesson has changed — ${shortWhen}`,
+            subject: `Your lesson has changed — ${studentShortWhen}`,
             heading: "Your lesson has changed",
             intro: `Olá ${row.student_name.split(" ")[0]}, your lesson is now ${lessonType.duration_minutes} minutes at the time below. An updated calendar invitation is attached.`,
             callout: sameDayNotice,
             footer: isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : "You can change or cancel it again from the same link."
           }
         : {
-          subject: `Your lesson has moved — ${shortWhen}`,
+          subject: `Your lesson has moved — ${studentShortWhen}`,
           heading: "Your lesson has moved",
           intro: `Olá ${row.student_name.split(" ")[0]}, your new lesson time is below. An updated calendar invitation is attached.`,
           callout: sameDayNotice,
@@ -380,14 +395,14 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         },
     cancelled: byTeacher
       ? {
-          subject: `Inês has cancelled your lesson on ${shortWhen}`,
+          subject: `Inês has cancelled your lesson on ${studentShortWhen}`,
           heading: "Inês has cancelled this lesson",
           intro: `Olá ${row.student_name.split(" ")[0]}, Inês has cancelled this lesson. Sorry about that — reply to arrange another time. A cancellation update for your calendar is attached.`,
           callout: refundNote,
           footer: wasRefunded ? "Refunded in full — a cancellation she makes never costs you anything." : "No charge for a cancellation she makes."
         }
       : {
-          subject: `Your lesson on ${shortWhen} is cancelled`,
+          subject: `Your lesson on ${studentShortWhen} is cancelled`,
           heading: "Your lesson is cancelled",
           intro: `Olá ${row.student_name.split(" ")[0]}, your lesson has been cancelled and removed from your calendar.`,
           callout: wasRefunded
@@ -471,9 +486,9 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         heading: student.heading,
         intro: student.intro,
         callout: student.callout,
-        hero,
-        heroNote: studentHeroNote,
-        preheader: `${lessonType.name} · ${portoTime}`,
+        hero: studentWhen,
+        heroNote: "",
+        preheader: `${lessonType.name} · ${studentWhen}`,
         rows: studentRows,
         action: manageUrl && event !== "cancelled" ? { label: "Change or cancel this lesson", url: manageUrl } : null,
         footer: student.footer
@@ -532,7 +547,7 @@ async function notifyMeetingReady(env, input) {
     content: {
       heading: "Your online lesson link",
       intro: `Hi ${row.student_name}, here’s the Google Meet link for your lesson with Inês.`,
-      hero: `${formatInZone(new Date(row.starts_at), PORTO)}, Porto time`,
+      hero: lessonWhen(new Date(row.starts_at), lessonZone(row)),
       preheader: "Join your lesson from your email or booking.",
       rows: [{ label: "Reference", value: row.reference }],
       action: { label: "Join Google Meet", url },
@@ -566,7 +581,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
   const replyTo = settings.replyToEmail || teacherEmail || undefined;
   const first = rows[0];
-  const studentZone = isValidTimeZone(first.student_timezone) ? first.student_timezone : PORTO;
+  // The student reads the run on its own clock, Inês on Porto's.
+  const studentClock = lessonZone(first);
 
   // The per-occurrence manage link is added per recipient below, not baked in
   // here: it is the student's own credential, so only their copy carries it.
@@ -596,9 +612,6 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
       }))
     });
 
-  const dateLines = rows
-    .map((row) => formatInZone(new Date(row.starts_at), PORTO))
-    .join("\n");
 
   const cadence = series.occurrences ? `${rows.length} lessons` : "Every week, until you stop it";
   const multipleWeeklyTimes = (series.weeklyTimes ?? 1) > 1;
@@ -617,29 +630,32 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
       } ${skipped.map((entry) => skippedDate.format(new Date(entry.startAt))).join(", ")}.`
     : "";
 
-  const rowsForBoth = [
+  // Each copy lists the dates on its reader's clock.
+  const rowsOn = (zone) => [
     { label: "Lesson", value: `${lessonType.name} · ${lessonType.duration_minutes} minutes` },
     { label: "Where", value: locationLabel(first) },
     { label: series.oneOff ? "Booking" : "Repeats", value: cadence },
     ...(rows.some(row => meetingUrl(row))
-      ? rows.map(row => ({ label: formatShort(new Date(row.starts_at), PORTO),
+      ? rows.map(row => ({ label: formatShort(new Date(row.starts_at), zone),
           value: meetingUrl(row) ? "Join Google Meet" : (row.location === "online" ? "Online link will appear in your booking" : locationLabel(row)), url: meetingUrl(row) }))
-      : [{ label: "Dates", value: dateLines }])
+      : [{ label: "Dates", value: rows.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n") }])
   ];
+  const studentRowsOn = rowsOn(studentClock);
+  const teacherRows = rowsOn(PORTO);
 
   // Price on the student's copy only, per lesson — Inês doesn't need her own
   // prices repeated to her. Current runs charge each lesson separately after
   // it ends; an older run keeps the pay-on-the-day terms it was booked under.
   const seriesOnCard = rows.some((row) => row.payment_status === "paid" || row.payment_status === "scheduled");
   const studentSeriesRows = [
-    ...rowsForBoth.slice(0, 2),
+    ...studentRowsOn.slice(0, 2),
     {
       label: "Price",
       value: seriesOnCard
         ? `${formatEuros(lessonType.price_cents)} a lesson · charged to your saved card after each lesson`
         : `${formatEuros(lessonType.price_cents)} a lesson · pay on the day, in person`
     },
-    ...rowsForBoth.slice(2)
+    ...studentRowsOn.slice(2)
   ];
   const seriesFee = formatEuros(settings.sameDayChangeFeeCents);
   const seriesFooter = seriesOnCard
@@ -659,8 +675,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
       deliver(env, {
         to: first.student_email,
         subject: moved
-          ? `Your weekly Portuguese lessons have moved — from ${formatShort(new Date(first.starts_at), PORTO)}`
-          : `Your ${series.oneOff ? "" : "weekly "}Portuguese lessons are booked — from ${formatShort(new Date(first.starts_at), PORTO)}`,
+          ? `Your weekly Portuguese lessons have moved — from ${formatShort(new Date(first.starts_at), studentClock)}`
+          : `Your ${series.oneOff ? "" : "weekly "}Portuguese lessons are booked — from ${formatShort(new Date(first.starts_at), studentClock)}`,
         kind: moved ? "student_series_moved" : "student_series_booked",
         bookingId: first.id,
         dedupeKey: moved
@@ -678,8 +694,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
                 ? `Olá ${first.student_name.split(" ")[0]}, ${weeklyTimeCopy} now held for you each week. Every lesson is in the calendar attachment, and you can move or cancel any one of them on your lesson calendar.`
                 : `Olá ${first.student_name.split(" ")[0]}, ${weeklyTimeCopy} now held for you each week. Your current lessons are in the calendar attachment, and new weeks will appear automatically on your lesson calendar without extra confirmation emails.`,
           callout: skippedNote,
-          hero: `${formatInZone(new Date(first.starts_at), PORTO)}, Porto time`,
-          heroNote: differingZonedTime(new Date(first.starts_at), studentZone) ? `${differingZonedTime(new Date(first.starts_at), studentZone)} — your time` : "",
+          hero: lessonWhen(new Date(first.starts_at), studentClock),
+          heroNote: "",
           preheader: `${lessonType.name} · ${cadence}`,
           rows: studentSeriesRows,
           action: { label: "See all your lessons", url: siteUrl(env, "/book/?view=lessons") },
@@ -724,7 +740,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
           heroNote: "",
           preheader: `${first.student_name} · ${cadence}`,
           rows: [
-            ...rowsForBoth,
+            ...teacherRows,
             { label: "Student", value: `${first.student_name}\n${first.student_email}${first.student_phone ? `\n${first.student_phone}` : ""}` },
             nifRow,
             ...(first.notes ? [{ label: "Notes", value: first.notes }] : [])
@@ -829,7 +845,8 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
   const invite = (attendee) =>
     buildCalendarSeriesInvite({ method: "CANCEL", events: events.map((event) => ({ ...event, attendees: [attendee] })) });
 
-  const dates = rows.map((row) => formatInZone(new Date(row.starts_at), PORTO)).join("\n");
+  const datesOn = (zone) => rows.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n");
+  const studentClock = lessonZone(first);
   const count = `${rows.length} ${rows.length === 1 ? "lesson" : "lessons"}`;
 
   const sends = [
@@ -848,7 +865,7 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
         callout: "",
         hero: "",
         heroNote: "",
-        rows: [{ label: "Cancelled", value: dates }],
+        rows: [{ label: `Cancelled, ${zoneName(studentClock, new Date(first.starts_at))}`, value: datesOn(studentClock) }],
         action: null,
         footer: "Booking is always open on portuguesewithines.com."
       }
@@ -876,7 +893,7 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
           rows: [
             { label: "Student", value: `${first.student_name}\n${first.student_email}` },
             nifRow,
-            { label: "Cancelled", value: dates }
+            { label: "Cancelled", value: datesOn(PORTO) }
           ],
           action: null,
           footer: "Sent automatically by the booking system on portuguesewithines.com."
@@ -1313,7 +1330,7 @@ async function notifyLessonCharged(env, { row, lessonType, amountCents, noShow =
   const sends = [
     deliver(env, {
       to: row.student_email,
-      subject: `${heading} — ${formatShort(start, PORTO)}`,
+      subject: `${heading} — ${formatShort(start, lessonZone(row))}`,
       kind: "student_lesson_charged",
       bookingId: row.id,
       dedupeKey: `charged:${row.id}`,

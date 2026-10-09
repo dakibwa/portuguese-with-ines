@@ -51,7 +51,8 @@ import {
   offsetMinutes,
   parseDateKey,
   weekdayOf,
-  zonedToUtc
+  zonedToUtc,
+  zoneName
 } from "./time.mjs";
 
 let passed = 0;
@@ -391,6 +392,16 @@ await test("the short form used in subject lines stays short and is Porto-based"
 
   // Short enough that an inbox does not truncate the sender's meaning away.
   assert.ok(formatShort(summer).length <= 20, formatShort(summer));
+});
+
+await test("a clock is named as the site names it, by its place", () => {
+  assert.equal(zoneName("Europe/Lisbon"), "Porto time");
+  assert.equal(zoneName(""), "Porto time");
+  assert.equal(zoneName("America/Los_Angeles"), "Los Angeles time");
+  assert.equal(zoneName("America/Argentina/Buenos_Aires"), "Buenos Aires time");
+  assert.equal(zoneName("Asia/Calcutta"), "Kolkata time");
+  assert.equal(zoneName("UTC"), "UTC");
+  assert.equal(zoneName("Etc/GMT+5"), "GMT-5");
 });
 
 // --- iCalendar --------------------------------------------------------------
@@ -1214,6 +1225,24 @@ await test("a repeating booking sends one consolidated email to the client", asy
       { kind: "teacher_series_booked", recipient: "ines@example.com" }
     ]
   );
+});
+
+// The student reads a run on the lesson's own clock, as the site shows it:
+// theirs online, Porto's in Porto. Inês's copy stays on Porto's.
+await test("a run's emails are on each reader's clock", async () => {
+  for (const [location, studentFrom] of [["online", "from Thu 3 Sept, 09:30"], ["porto", "from Thu 3 Sept, 17:30"]]) {
+    const fixture = seriesEmailFixture();
+    for (const row of fixture.rows) Object.assign(row, { student_timezone: "America/Los_Angeles", location });
+    const logs = [];
+    const originalLog = console.log;
+    console.log = message => { try { logs.push(JSON.parse(message)); } catch { /* unrelated logs */ } };
+    try {
+      await notifySeries(fixture.env, { rows: fixture.rows, lessonType: fixture.lessonType, settings: fixture.settings,
+        series: { id: `series-clock-${location}`, occurrences: 3 }, manageUrls: fixture.manageUrls, skipped: [] });
+    } finally { console.log = originalLog; }
+    assert.ok(logs.find(row => row.kind === "student_series_booked")?.subject.endsWith(studentFrom), JSON.stringify(logs));
+    assert.ok(logs.find(row => row.kind === "teacher_series_booked")?.subject.endsWith("from Thu 3 Sept, 17:30"), JSON.stringify(logs));
+  }
 });
 
 await test("teacher notifications can pause without silencing the student", async () => {

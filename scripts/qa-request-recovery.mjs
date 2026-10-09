@@ -12,6 +12,8 @@ const sessionKey = "ines-student-session";
 const oldSession = "isolated-old-session";
 const newSession = "isolated-new-session";
 const student = { id: "recovery-student", name: "Recovery Student", email: "recovery@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "student" };
+// A wide card shows the name plain while the folded menu's copy of it stays
+// hidden, so a name is checked where it is visible.
 const replacementStudent = { ...student, id: "replacement-student", name: "Replacement Student", email: "replacement@example.invalid" };
 const types = [
   { id: "trial", name: "Trial lesson", duration_minutes: 60, price_cents: 2000 },
@@ -404,7 +406,7 @@ try {
         waiting.resolve(); await response;
         await page.waitForLoadState("networkidle");
         assert.equal(await currentSession(page), newSession, `${endpoint} must preserve the new session at ${width}px`);
-        await expect(page.getByText(replacementStudent.name, { exact: true })).toBeVisible();
+        await expect(page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
         assert.deepEqual(state.logouts, [], "An old refusal must never revoke the new session");
         assert.deepEqual(state.errors, []);
       } finally { waiting.resolve(); await context.close(); }
@@ -441,12 +443,12 @@ try {
         await state.page.goto(`${base}/book/?view=lessons&emailToken=isolated-change-token`);
         await started.promise;
         await replaceSession(state.page, newSession);
-        await expect(state.page.getByText(replacementStudent.name, { exact: true })).toBeVisible();
+        await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
         const response = state.page.waitForResponse("**/me/email/confirm");
         waiting.resolve(); await response;
         await state.page.waitForLoadState("networkidle");
         assert.equal(await currentSession(state.page), newSession);
-        await expect(state.page.getByText(replacementStudent.name, { exact: true })).toBeVisible();
+        await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
         assert.deepEqual(state.errors, []);
       } finally { waiting.resolve(); await state.context.close(); }
     }

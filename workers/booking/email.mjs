@@ -211,7 +211,7 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, acti
 function plainText({ heading, intro, hero, heroNote, rows, callout, action, footer }) {
   const clean = (value) => String(value ?? "").trim();
   const lines = [heading, "", clean(intro)];
-  // heroNote already reads "… — your time", so a bracket here nests badly.
+  // heroNote already reads "… — the student's time", so a bracket here nests badly.
   if (hero) lines.push("", `When: ${hero}`, ...(heroNote ? [heroNote] : []));
   if (callout) lines.push("", clean(callout));
   if (rows.length) {
