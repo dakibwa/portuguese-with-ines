@@ -149,7 +149,7 @@ for (const viewport of [
 await localMotionPage.close();
 
 // Calendar dates are wall-clock keys on the clock shown: the student's own for
-// an online lesson, Porto's for one in Porto. Formatting their month captions
+// an online lesson, Porto's for one in Porto. Formatting their month labels
 // in a behind-UTC browser must not move midnight UTC back into the previous
 // month.
 const calendarZoneContext = await browser.newContext({
@@ -205,32 +205,41 @@ try {
 await calendarZonePage.locator("#booking-calendar-weeks").waitFor({ state: "visible", timeout: 10_000 });
 
 // The calendar shows four weeks at a time; the end of September and October
-// are on the next page.
-const readCalendarLabels = (keys) => calendarZonePage.evaluate((dateKeys) => ({
-  headings: [...document.querySelectorAll(".calendar-month")].map((element) => element.textContent?.trim()),
-  spillovers: Object.fromEntries(
-    dateKeys.map((key) => {
-      const cell = document.querySelector(`[data-date-key="${key}"]`);
-      return [
-        key,
-        { ariaLabel: cell?.getAttribute("aria-label"), month: cell?.querySelector("em")?.textContent?.trim().toUpperCase() }
-      ];
-    })
-  )
-}), keys);
-const firstPageLabels = await readCalendarLabels(["2026-08-31"]);
+// are on the next page. Its title names the months the weeks start in, each
+// week starts with its own month, and a month beginning part-way through a
+// week marks its 1st.
+const readCalendarLabels = (keys) => calendarZonePage.evaluate((dateKeys) => {
+  const title = document.querySelector(".unified-calendar__month");
+  return {
+    title: (title?.querySelector(".when-long") ?? title)?.textContent?.trim() ?? "",
+    rows: [...document.querySelectorAll(".calendar-week__month")].map((label) => label.textContent?.trim().toUpperCase()),
+    days: Object.fromEntries(
+      dateKeys.map((key) => {
+        const cell = document.querySelector(`[data-date-key="${key}"]`);
+        return [
+          key,
+          { ariaLabel: cell?.getAttribute("aria-label"), month: cell?.querySelector("em")?.textContent?.trim().toUpperCase() ?? "" }
+        ];
+      })
+    )
+  };
+}, keys);
+const firstPageLabels = await readCalendarLabels(["2026-08-31", "2026-09-01"]);
 await calendarZonePage.getByRole("button", { name: "Later weeks", exact: true }).click();
 await calendarZonePage.locator('[data-date-key="2026-09-28"]').waitFor();
-const nextPageLabels = await readCalendarLabels(["2026-09-28", "2026-09-29", "2026-09-30"]);
+const nextPageLabels = await readCalendarLabels(["2026-09-28", "2026-10-01"]);
 const calendarDateLabels = { firstPageLabels, nextPageLabels };
 
 if (
-  firstPageLabels.spillovers["2026-08-31"].month !== "AUG" ||
-  firstPageLabels.spillovers["2026-08-31"].ariaLabel !== "Monday, 31 August 2026, unavailable" ||
-  ["2026-09-28", "2026-09-29", "2026-09-30"].some(
-    (key) => nextPageLabels.spillovers[key].month !== "SEPT"
-  ) ||
-  !nextPageLabels.headings.includes("October")
+  firstPageLabels.title !== "August – September 2026" ||
+  firstPageLabels.rows.join(" ") !== "AUG SEPT SEPT SEPT" ||
+  firstPageLabels.days["2026-08-31"].month !== "" ||
+  firstPageLabels.days["2026-08-31"].ariaLabel !== "Monday, 31 August 2026, unavailable" ||
+  firstPageLabels.days["2026-09-01"].month !== "SEPT" ||
+  nextPageLabels.title !== "September – October 2026" ||
+  nextPageLabels.rows.join(" ") !== "SEPT OCT OCT OCT" ||
+  nextPageLabels.days["2026-09-28"].month !== "" ||
+  nextPageLabels.days["2026-10-01"].month !== "OCT"
 ) {
   throw new Error(`Calendar month labels moved in America/Los_Angeles: ${JSON.stringify(calendarDateLabels)}.`);
 }
@@ -239,10 +248,11 @@ await calendarZonePage.locator('[data-date-key="2026-09-03"]').waitFor();
 
 await calendarZonePage.locator('[data-date-key="2026-09-03"]').click();
 await waitForOrientation(calendarZonePage);
-// Online, a student on another clock books on their own, and is told so where
-// the times begin; a lesson in Porto is on Porto's clock, and says that.
+// Online, a student on another clock books on their own, and the calendar's
+// header says so beside its month; a lesson in Porto is on Porto's clock, and
+// says that.
 const readCalendarClock = () => calendarZonePage.evaluate(() => ({
-  note: document.querySelector(".calendar-zone-note")?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+  note: document.querySelector(".unified-calendar__toolbar .calendar-zone")?.textContent?.replace(/\s+/g, " ").trim() ?? "",
   time: document.querySelector(".slot-grid button")?.textContent?.replace(/\s+/g, " ").trim() ?? ""
 }));
 const onlineClock = await readCalendarClock();
@@ -252,9 +262,9 @@ await calendarZonePage.waitForFunction(() => document.querySelector(".slot-grid 
 const portoClock = await readCalendarClock();
 if (
   onlineClock.time !== "09:00" ||
-  onlineClock.note !== "Times are in your time zone: Los Angeles time" ||
+  onlineClock.note !== "Times are in Los Angeles time" ||
   portoClock.time !== "17:00" ||
-  portoClock.note !== "Times are in Porto time, where lessons in Porto happen."
+  portoClock.note !== "Times are in Porto time"
 ) {
   throw new Error(`Times should be on the student's clock online and Porto's in Porto, saying which: ${JSON.stringify({ onlineClock, portoClock })}.`);
 }
@@ -577,7 +587,7 @@ if (bookingCalendar) {
   assertIncludes(bookingText, "weekly", "weekly booking choice");
   assertIncludes(bookingText, "already booked?", "sign-in route for booked students");
   // A student on Porto's clock needs no line saying which clock times are on.
-  if (await page.locator(".calendar-zone-note").count()) {
+  if (await page.locator(".calendar-zone").count()) {
     throw new Error("Only a student whose clock differs from Porto's should be told which clock the times are on.");
   }
   if (bookingText.includes("booked lessons and free times share the same calendar")) {
@@ -1123,12 +1133,13 @@ for (const oldToggleName of ["Account", "Close", "Close account"]) {
     throw new Error(`The obsolete ${oldToggleName} account disclosure is still present.`);
   }
 }
-// The student's name is the account's menu, in whichever account card shows.
+// The account's menu is in whichever account card shows: open in the header
+// of a wide card, behind the student's name on a narrow one.
 const accountMenuButton = accountPanel.locator("#account-menu-button");
 const accountActions = accountPanel.locator("#account-menu");
-await accountMenuButton.waitFor({ state: "visible" });
+await accountActions.waitFor({ state: "attached" });
 async function chooseAccountAction(name) {
-  if ((await accountMenuButton.getAttribute("aria-expanded")) !== "true") await accountMenuButton.click();
+  if (await accountMenuButton.isVisible() && (await accountMenuButton.getAttribute("aria-expanded")) !== "true") await accountMenuButton.click();
   await accountActions.getByRole("button", { name }).click();
 }
 
@@ -1198,11 +1209,8 @@ async function bookQaLessonAndReturnToUpcoming({ recurring }) {
   await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 }
 
-if (
-  (await accountPanel.getByText("Ana Martins", { exact: true }).count()) !== 1 ||
-  (await accountPage.getByRole("button", { name: "Account: Ana Martins", exact: true }).count()) !== 1
-) {
-  throw new Error("The signed-in identity should appear once, as the account's menu.");
+if ((await accountPanel.getByText("Ana Martins", { exact: true }).filter({ visible: true }).count()) !== 1) {
+  throw new Error("The signed-in identity should appear once, with the account's menu.");
 }
 for (const duplicateIdentity of ["Signed in as", "Booking as", "Not you?"]) {
   if (await accountPage.getByText(duplicateIdentity, { exact: false }).count()) {
@@ -1229,39 +1237,54 @@ await accountPage.waitForFunction(
   null,
   { timeout: 2_000 }
 );
+// Wide, the card's header is one row: the student's name with Sign out
+// beneath it, the account's places open in the middle, centred on the card,
+// and Book at the right. The places name the card, so its title is there for
+// screen readers only. The card is one lilac sheet, the next lesson raised on
+// it in cream without an outline.
 const initialWorkflowLayout = await accountPage.evaluate(() => {
   const bounds = (selector) => document.querySelector(selector)?.getBoundingClientRect().toJSON() ?? null;
+  const next = document.querySelector(".lesson-overview__next");
   return {
     calendar: bounds("#lesson-calendar .calendar-panel"),
     heading: bounds("#upcoming-lessons-heading"),
-    name: bounds("#account-menu-button"),
+    name: bounds(".account-menu__label"),
+    signOut: bounds(".account-menu__sign-out"),
+    places: bounds(".account-menu__places"),
     book: bounds(".lesson-overview__book"),
     next: bounds(".lesson-overview__next"),
+    sheet: getComputedStyle(document.querySelector("#lesson-calendar .calendar-panel")).backgroundColor,
+    nextSurface: next ? `${getComputedStyle(next).backgroundColor} ${getComputedStyle(next).borderTopWidth}` : "",
+    toggleShown: Boolean(document.querySelector("#account-menu-button")?.getClientRects().length),
     separateBars: document.querySelectorAll(".unified-account-controls, .unified-account-area:not(:empty)").length
   };
 });
 const centreOf = (box) => (box.top + box.bottom) / 2;
+const middleOf = (box) => (box.left + box.right) / 2;
 if (
-  ["calendar", "heading", "name", "book", "next"].some((key) => !initialWorkflowLayout[key]) ||
+  ["calendar", "name", "signOut", "places", "book", "next"].some((key) => !initialWorkflowLayout[key]?.width) ||
+  (initialWorkflowLayout.heading?.width ?? 0) > 1 ||
   initialWorkflowLayout.separateBars ||
-  initialWorkflowLayout.heading.top < initialWorkflowLayout.calendar.top ||
-  initialWorkflowLayout.name.top < initialWorkflowLayout.heading.bottom - 1 ||
-  Math.abs(initialWorkflowLayout.name.left - initialWorkflowLayout.heading.left) > 2 ||
-  initialWorkflowLayout.book.left <= initialWorkflowLayout.name.right ||
+  initialWorkflowLayout.toggleShown ||
+  initialWorkflowLayout.sheet !== "rgb(229, 224, 240)" ||
+  initialWorkflowLayout.nextSurface !== "rgb(251, 244, 229) 0px" ||
+  initialWorkflowLayout.signOut.top < initialWorkflowLayout.name.bottom - 1 ||
+  Math.abs(initialWorkflowLayout.signOut.left - initialWorkflowLayout.name.left) > 2 ||
+  initialWorkflowLayout.places.left <= Math.max(initialWorkflowLayout.name.right, initialWorkflowLayout.signOut.right) ||
+  Math.abs(middleOf(initialWorkflowLayout.places) - middleOf(initialWorkflowLayout.calendar)) > 4 ||
+  initialWorkflowLayout.book.left <= initialWorkflowLayout.places.right ||
   initialWorkflowLayout.book.right > initialWorkflowLayout.calendar.right - 12 ||
-  initialWorkflowLayout.book.top > initialWorkflowLayout.name.bottom ||
-  initialWorkflowLayout.next.top < Math.max(initialWorkflowLayout.book.bottom, initialWorkflowLayout.name.bottom)
+  Math.abs(centreOf(initialWorkflowLayout.places) - centreOf(initialWorkflowLayout.book)) > 4 ||
+  initialWorkflowLayout.next.top < Math.max(initialWorkflowLayout.book.bottom, initialWorkflowLayout.places.bottom, initialWorkflowLayout.signOut.bottom)
 ) {
-  throw new Error(`The signed-in overview should be one lessons calendar card, the name's menu under its heading and booking at its top right: ${JSON.stringify(initialWorkflowLayout)}.`);
+  throw new Error(`The signed-in overview should be one lilac lessons card headed by the name with Sign out, the account's places and Book: ${JSON.stringify(initialWorkflowLayout)}.`);
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-lessons-overview-desktop.png"), fullPage: true });
 
 const initialAccountMenu = accountPanel.locator("#account-menu");
-if (await initialAccountMenu.isVisible()) {
-  throw new Error("The account's menu should stay closed until the name is chosen.");
+if (!(await initialAccountMenu.isVisible()) || await accountMenuButton.isVisible()) {
+  throw new Error("A wide card should show the account's places open in its header, without a dropdown.");
 }
-await accountMenuButton.click();
-await initialAccountMenu.waitFor({ state: "visible" });
 const initialAccountActionLabels = (await initialAccountMenu.getByRole("button").allTextContents()).map((label) =>
   label.replace(/\s+/g, " ").trim()
 );
@@ -1272,29 +1295,30 @@ if (
 ) {
   throw new Error(`The account menu should hold Your lessons, Past lessons, Edit details and Sign out: ${JSON.stringify(initialAccountActionLabels)}.`);
 }
-// It opens beneath the name and over the calendar, not under it, and the one
-// highlighted action on the card stays Book.
-const openAccountMenu = await accountPage.evaluate(() => {
-  const name = document.querySelector("#account-menu-button")?.getBoundingClientRect();
-  const panel = document.querySelector("#account-menu")?.getBoundingClientRect();
+// The places are one sliding control, its thumb on the card that is showing,
+// and the one highlighted action on the card stays Book.
+const readPlaces = () => accountPage.evaluate(() => {
+  const thumb = document.querySelector(".account-menu__thumb")?.getBoundingClientRect();
+  const current = document.querySelector('#account-menu [aria-current="true"]');
+  const currentBox = current?.getBoundingClientRect();
+  const places = document.querySelector(".account-menu__places")?.getBoundingClientRect();
   const book = document.querySelector(".lesson-overview__book");
-  const atFoot = panel ? document.elementFromPoint(panel.left + panel.width / 2, panel.bottom - 8) : null;
   return {
-    name: name ? { left: name.left, bottom: name.bottom } : null,
-    panel: panel ? { top: panel.top, left: panel.left, bottom: panel.bottom } : null,
-    onTop: Boolean(atFoot?.closest("#account-menu")),
+    thumb: thumb ? { left: thumb.left, right: thumb.right } : null,
+    current: currentBox ? { left: currentBox.left, right: currentBox.right, label: current.textContent.replace(/\s+/g, " ").trim() } : null,
+    placesLeft: places?.left ?? null,
     bookBackground: book ? getComputedStyle(book).backgroundColor : ""
   };
 });
+const lessonsPlaces = await readPlaces();
 if (
-  !openAccountMenu.name ||
-  !openAccountMenu.panel ||
-  openAccountMenu.panel.top < openAccountMenu.name.bottom - 1 ||
-  Math.abs(openAccountMenu.panel.left - openAccountMenu.name.left) > 2 ||
-  !openAccountMenu.onTop ||
-  openAccountMenu.bookBackground !== "rgb(180, 58, 38)"
+  !lessonsPlaces.thumb ||
+  !lessonsPlaces.current?.label.startsWith("Your lessons") ||
+  Math.abs(lessonsPlaces.thumb.left - lessonsPlaces.current.left) > 2 ||
+  Math.abs(lessonsPlaces.thumb.right - lessonsPlaces.current.right) > 2 ||
+  lessonsPlaces.bookBackground !== "rgb(180, 58, 38)"
 ) {
-  throw new Error(`The account menu should open beneath the name and over the calendar: ${JSON.stringify(openAccountMenu)}.`);
+  throw new Error(`The account's places should be one control with its thumb on Your lessons, beside Book: ${JSON.stringify(lessonsPlaces)}.`);
 }
 if (/\d/.test(await initialAccountMenu.getByRole("button", { name: /Past lessons/ }).innerText())) {
   throw new Error("Past lessons should not carry an attention-grabbing count.");
@@ -1317,15 +1341,21 @@ const detailsCard = await accountPanel.locator(".my-lessons__details").evaluate(
   return {
     card: details.classList.contains("account-card"),
     heading: details.querySelector(".account-card__head h2")?.textContent?.trim() ?? "",
-    menu: Boolean(details.querySelector(".account-card__head #account-menu-button")),
-    back: details.querySelector(".account-card__head .booking-back")?.textContent?.trim() ?? "",
+    current: details.querySelector('.account-card__head #account-menu [aria-current="true"]')?.textContent?.trim() ?? "",
     nestedCards: rows.filter((style) =>
       style.backgroundColor !== "rgba(0, 0, 0, 0)" || style.borderTopWidth !== "0px" || style.borderRadius !== "0px"
     ).length
   };
 });
-if (!detailsCard.card || detailsCard.heading !== "Your details" || !detailsCard.menu || detailsCard.back !== "Your lessons" || detailsCard.nestedCards) {
-  throw new Error(`Your details should be one account card, headed like the lessons card, with no cards inside it: ${JSON.stringify(detailsCard)}.`);
+const detailsPlaces = await readPlaces();
+if (
+  !detailsCard.card ||
+  detailsCard.heading !== "Your details" ||
+  detailsCard.current !== "Done editing" ||
+  detailsCard.nestedCards ||
+  Math.abs((detailsPlaces.placesLeft ?? 0) - (lessonsPlaces.placesLeft ?? -99)) > 2
+) {
+  throw new Error(`Your details should be one account card, headed like the lessons card with its places where they were, and no cards inside it: ${JSON.stringify({ detailsCard, detailsPlaces })}.`);
 }
 const desktopDetailRows = await accountPanel.locator(".my-lessons__details-row").evaluateAll((rows) =>
   rows.map((row) => {
@@ -1357,7 +1387,7 @@ if (await accountPage.getByRole("button", { name: "Cancel all booked lessons", e
   throw new Error("Bulk sequence cancellation should appear only when one recurring lesson is selected.");
 }
 const lessonsAccountMenu = accountPanel.locator("#account-menu");
-await accountMenuButton.click();
+if (await accountMenuButton.isVisible()) await accountMenuButton.click();
 await lessonsAccountMenu.waitFor({ state: "visible" });
 if ((await lessonsAccountMenu.getByRole("button").count()) !== 4) {
   throw new Error("Your lessons, Past lessons, Edit details and Sign out should live together in the account menu.");
@@ -1382,44 +1412,52 @@ const pastLessonsCard = await accountPanel.locator("#account-past-lessons").eval
   return {
     card: card.classList.contains("account-card"),
     heading: bounds("#past-lessons-heading"),
-    name: bounds(".account-card__head #account-menu-button"),
-    back: bounds(".account-card__head .booking-back")
+    name: bounds(".account-card__head .account-menu__label"),
+    signOut: bounds(".account-card__head .account-menu__sign-out"),
+    current: card.querySelector('.account-card__head #account-menu [aria-current="true"]')?.textContent?.trim() ?? ""
   };
 });
+const pastPlaces = await readPlaces();
 if (
   !pastLessonsCard.card ||
-  !pastLessonsCard.heading ||
-  !pastLessonsCard.name ||
-  !pastLessonsCard.back ||
-  pastLessonsCard.name.top < pastLessonsCard.heading.bottom - 1 ||
-  pastLessonsCard.back.left <= pastLessonsCard.name.right
+  (pastLessonsCard.heading?.width ?? 0) > 1 ||
+  !pastLessonsCard.name?.width ||
+  !pastLessonsCard.signOut?.width ||
+  pastLessonsCard.signOut.top < pastLessonsCard.name.bottom - 1 ||
+  pastLessonsCard.current !== "Past lessons" ||
+  Math.abs((pastPlaces.placesLeft ?? 0) - (lessonsPlaces.placesLeft ?? -99)) > 2 ||
+  Math.abs(pastPlaces.thumb.left - pastPlaces.current.left) > 2
 ) {
-  throw new Error(`Past lessons should be its own card, headed like Your lessons, with the way back at its right: ${JSON.stringify(pastLessonsCard)}.`);
+  throw new Error(`Past lessons should be its own card, headed like Your lessons, its places where they were with the thumb on Past lessons: ${JSON.stringify({ pastLessonsCard, pastPlaces })}.`);
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-past-lessons-desktop.png"), fullPage: true });
 await accountPanel.getByRole("button", { name: /^Your lessons/ }).first().click();
 await accountPanel.locator("#account-past-lessons").waitFor({ state: "detached" });
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 
-await accountMenuButton.click();
 const laterLessonsToggle = accountActions.getByRole("button", { name: /^Your lessons/ });
 if (!/3\s*$/.test((await laterLessonsToggle.innerText()).trim())) {
   throw new Error("The Your lessons badge should count each repeating schedule once, plus each one-off lesson.");
 }
-await accountPage.keyboard.press("Escape");
-await accountActions.waitFor({ state: "hidden" });
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 await waitForOrientation(accountPage);
 const calendarToolbarAlignment = await accountPage.evaluate(() => {
-  const legend = document.querySelector("#lesson-calendar .unified-calendar__legend")?.getBoundingClientRect();
+  const title = document.querySelector("#lesson-calendar .unified-calendar__title")?.getBoundingClientRect();
   const range = document.querySelector("#lesson-calendar .unified-calendar__range-actions")?.getBoundingClientRect();
+  const weeks = document.querySelector("#lesson-calendar .calendar-weeks")?.getBoundingClientRect();
+  const legend = document.querySelector("#lesson-calendar .unified-calendar__legend")?.getBoundingClientRect();
   return {
-    legendCenter: legend ? (legend.top + legend.bottom) / 2 : -Infinity,
-    rangeCenter: range ? (range.top + range.bottom) / 2 : Infinity
+    titleCenter: title ? (title.top + title.bottom) / 2 : -Infinity,
+    rangeCenter: range ? (range.top + range.bottom) / 2 : Infinity,
+    weeksBottom: weeks?.bottom ?? Infinity,
+    legendTop: legend?.top ?? -Infinity
   };
 });
-if (Math.abs(calendarToolbarAlignment.legendCenter - calendarToolbarAlignment.rangeCenter) > 1) {
-  throw new Error(`The calendar key and range label should share one vertical centre: ${JSON.stringify(calendarToolbarAlignment)}.`);
+if (
+  Math.abs(calendarToolbarAlignment.titleCenter - calendarToolbarAlignment.rangeCenter) > 1 ||
+  calendarToolbarAlignment.legendTop < calendarToolbarAlignment.weeksBottom
+) {
+  throw new Error(`The calendar's month and arrows should share one line, with the key beneath the weeks: ${JSON.stringify(calendarToolbarAlignment)}.`);
 }
 // Every booked lesson lives on this calendar: a day shows its times, weekly
 // lessons keep their own colour, and the next lesson leads the card.
@@ -1463,7 +1501,7 @@ if (
 // paging reaches every one.
 const earlierWeeks = accountPage.getByRole("button", { name: "Earlier weeks", exact: true });
 const laterWeeks = accountPage.getByRole("button", { name: /^Later weeks/ });
-const calendarRangeLabel = accountPage.locator("#lesson-calendar .calendar-pager .unified-calendar__range");
+const calendarRangeLabel = accountPage.locator("#lesson-calendar .unified-calendar__month");
 const qaLaterDay = accountPage.locator(`#lesson-calendar button[data-date-key="${qaLaterDate}"]`);
 if (
   !(await earlierWeeks.isDisabled()) ||
@@ -1587,7 +1625,7 @@ if (
   throw new Error(`The calendar tooltip should float over the card on its dark surface without moving anything: ${JSON.stringify({ tooltipNextTopBefore, ...tooltipLayout })}.`);
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-upcoming-lessons-tooltip-desktop.png"), fullPage: true });
-await accountMenuButton.focus();
+await accountPage.locator(".lesson-overview__book").focus();
 await accountPage.mouse.move(1, 1);
 await calendarTip.waitFor({ state: "hidden" });
 if ((await accountPage.locator("#lesson-calendar .calendar-week").count()) !== 4) {
@@ -1825,7 +1863,35 @@ const mobileAccountName = await accountPanel.locator(".account-menu__name").eval
 if (mobileAccountName.scrollWidth > mobileAccountName.clientWidth + 1) {
   throw new Error("The student's name should stay readable as the account's menu on a phone.");
 }
+// Narrow, the name is the menu. It stays closed until chosen, then opens
+// beneath the name and over the calendar rather than under it.
+if (
+  (await accountPage.getByRole("button", { name: "Account: Ana Martins", exact: true }).count()) !== 1 ||
+  await accountActions.isVisible()
+) {
+  throw new Error("On a phone the student's name should be the account's menu, closed until chosen.");
+}
 await accountMenuButton.click();
+await accountActions.waitFor({ state: "visible" });
+const openAccountMenu = await accountPage.evaluate(() => {
+  const name = document.querySelector("#account-menu-button")?.getBoundingClientRect();
+  const panel = document.querySelector("#account-menu")?.getBoundingClientRect();
+  const atFoot = panel ? document.elementFromPoint(panel.left + panel.width / 2, panel.bottom - 8) : null;
+  return {
+    name: name ? { left: name.left, bottom: name.bottom } : null,
+    panel: panel ? { top: panel.top, left: panel.left, bottom: panel.bottom } : null,
+    onTop: Boolean(atFoot?.closest("#account-menu"))
+  };
+});
+if (
+  !openAccountMenu.name ||
+  !openAccountMenu.panel ||
+  openAccountMenu.panel.top < openAccountMenu.name.bottom - 1 ||
+  Math.abs(openAccountMenu.panel.left - openAccountMenu.name.left) > 2 ||
+  !openAccountMenu.onTop
+) {
+  throw new Error(`The account menu should open beneath the name and over the calendar: ${JSON.stringify(openAccountMenu)}.`);
+}
 await accountPanel.getByRole("button", { name: /Past lessons/ }).click();
 await accountPanel.locator("#account-past-lessons").waitFor({ state: "visible" });
 await accountPanel.locator("#account-menu").waitFor({ state: "hidden" });

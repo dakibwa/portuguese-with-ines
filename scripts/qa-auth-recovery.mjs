@@ -9,6 +9,8 @@ if (!browserType) throw new Error(`Unknown QA_BROWSER: ${engine}`);
 const browser = await browserType.launch({ headless: true });
 const student = { id: "auth-recovery", name: "Auth Student", email: "auth@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "student" };
 const replacementSession = "isolated-replacement-session";
+// A wide card shows the name plain while the folded menu's copy of it stays
+// hidden, so a name is checked where it is visible.
 const replacementStudent = { ...student, id: "replacement-student", name: "Replacement Student" };
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 let googleChecks = 0;
@@ -240,7 +242,7 @@ try {
           await expect(panel.getByRole("button", { name: "Create my account", exact: true })).toBeEnabled();
         } else if (action === "replacement") {
           await replaceSession(state.page);
-          await expect(state.page.getByText(replacementStudent.name, { exact: true })).toBeVisible();
+          await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
         } else {
           await state.page.locator(".site-header__brand").click();
           await expect.poll(() => new URL(state.page.url()).pathname).toBe("/");
@@ -251,7 +253,7 @@ try {
         if (action === "register") {
           await expect(panel.getByRole("tab", { name: "Create an account", exact: true })).toHaveAttribute("aria-selected", "true");
           await expect(panel.getByRole("alert")).toHaveCount(0);
-        } else if (action === "replacement") await expect(state.page.getByText(replacementStudent.name, { exact: true })).toBeVisible();
+        } else if (action === "replacement") await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
         assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), action === "replacement" ? replacementSession : null);
         assert.deepEqual(state.errors, []);
       } finally { waiting.resolve(); await state.context.close(); }
@@ -278,14 +280,14 @@ try {
         await started.promise;
         if (action === "replacement") {
           await replaceSession(state.page);
-          await expect(state.page.getByText(replacementStudent.name, { exact: true })).toBeVisible();
+          await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
         } else if (action !== "success") await panel.getByRole("button", { name: /forgotten my password/ }).click();
         const response = state.page.waitForResponse("**/auth/google");
         waiting.resolve(); await response;
         await state.page.waitForLoadState("networkidle");
         assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), action === "replacement" ? replacementSession : action === "success" ? "isolated-google-session" : null);
-        if (action === "replacement") await expect(state.page.getByText(replacementStudent.name, { exact: true })).toBeVisible();
-        else if (action === "success") await expect(state.page.getByText(student.name, { exact: true })).toBeVisible();
+        if (action === "replacement") await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
+        else if (action === "success") await expect(state.page.getByText(student.name, { exact: true }).filter({ visible: true })).toBeVisible();
         else {
           await expect(panel.getByRole("heading", { name: "Forgotten password", exact: true })).toBeVisible();
           await expect(panel.getByRole("alert")).toHaveCount(0);
@@ -317,7 +319,7 @@ try {
           await expect(panel.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
           await panel.getByRole("tab", { name: "Create an account", exact: true }).click();
           await panel.getByRole("button", { name: "Continue with Google", exact: true }).click();
-          await expect(state.page.getByText(student.name, { exact: true })).toBeVisible();
+          await expect(state.page.getByText(student.name, { exact: true }).filter({ visible: true })).toBeVisible();
           assert.equal(scripts, 2);
           assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), "isolated-google-retry-session");
         }

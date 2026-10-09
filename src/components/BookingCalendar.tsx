@@ -2,7 +2,7 @@
 
 import { MeetingLink } from "@/components/MeetingLink";
 
-import { type ComponentType, type CSSProperties, Fragment, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type ComponentType, type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import {
   AlertCircle,
@@ -102,10 +102,27 @@ type CalendarWeekCount = 1 | 4;
 /** Every calendar shows four weeks; arrows reach the rest of the horizon. */
 const CALENDAR_PAGE_WEEKS = 4;
 
-const dayMonth = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const monthYear = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+const monthOnly = new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" });
+const shortMonthYear = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+const shortMonthOnly = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" });
 
-function formatDayMonth(key: string) {
-  return dayMonth.format(new Date(`${key}T12:00:00Z`));
+/**
+ * The calendar's title: the months its rows start in, as each row's own label
+ * names them, so "October 2026", or "October – November 2026" where the four
+ * weeks cross into the next ("Oct – Nov 2026" on a phone). It stands where a
+ * calendar names its month, beside the arrows, rather than as a caption row in
+ * the grid.
+ */
+function calendarMonths(weeks: BookingWeek[]) {
+  const [first, last] = [weeks[0], weeks.at(-1)].map((week) => (week ? new Date(`${week.key}T12:00:00Z`) : null));
+  if (!first || !last) return { long: "", short: "" };
+  if (first.getUTCMonth() === last.getUTCMonth() && first.getUTCFullYear() === last.getUTCFullYear()) {
+    return { long: monthYear.format(first), short: monthYear.format(first) };
+  }
+  return first.getUTCFullYear() === last.getUTCFullYear()
+    ? { long: `${monthOnly.format(first)} – ${monthYear.format(last)}`, short: `${shortMonthOnly.format(first)} – ${shortMonthYear.format(last)}` }
+    : { long: `${monthYear.format(first)} – ${monthYear.format(last)}`, short: `${shortMonthYear.format(first)} – ${shortMonthYear.format(last)}` };
 }
 
 /**
@@ -1393,14 +1410,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const startsOnClosedWeekend = (todayWeekday === 0 || todayWeekday === 6) && !currentWeekHasBooking;
   const uncappedCalendarWeeks =
     availabilityLessonTypeId && firstRelevantWeek > 0
-      ? allCalendarWeeks.slice(firstRelevantWeek).map((week, index) =>
-          index === 0 && !week.showMonth ? { ...week, showMonth: true } : week
-        )
+      ? allCalendarWeeks.slice(firstRelevantWeek)
       : !availabilityLessonTypeId && startsOnClosedWeekend
-        ? allCalendarWeeks.slice(1).map((week, index) =>
-            index === 0 && !week.showMonth ? { ...week, showMonth: true } : week
-          )
-      : allCalendarWeeks;
+        ? allCalendarWeeks.slice(1)
+        : allCalendarWeeks;
   // Booking offers the whole horizon, four weeks at a time. The inclusive
   // range can touch one more Monday–Sunday row than the horizon has weeks;
   // that partial row is not shown.
@@ -1417,11 +1430,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const rangeWeeks = isLessonsCalendarOverview ? lessonsRangeWeeks : bookingRangeWeeks;
   const calendarPages: BookingWeek[][] = [];
   for (let index = 0; index < rangeWeeks.length; index += CALENDAR_PAGE_WEEKS) {
-    calendarPages.push(
-      rangeWeeks
-        .slice(index, index + CALENDAR_PAGE_WEEKS)
-        .map((week, position) => (position === 0 && !week.showMonth ? { ...week, showMonth: true } : week))
-    );
+    calendarPages.push(rangeWeeks.slice(index, index + CALENDAR_PAGE_WEEKS));
   }
   const pageAnchor = calendarPageStart || (selectedDate ? weekKeyOf(selectedDate) : "");
   const calendarPageIndex = Math.max(
@@ -1443,14 +1452,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const restrictedWeek = !managed && bookingKind === "recurring" && savedChoices.length
     ? weekKeyOf(dateKeyIn(new Date(savedChoices[0].startAt), viewZone)) : "";
   const displayedCalendarWeeks = restrictedWeek
-    ? rangeWeeks.filter((week) => week.key === restrictedWeek).map((week) => ({ ...week, showMonth: true }))
+    ? rangeWeeks.filter((week) => week.key === restrictedWeek)
     : visibleCalendarWeekCount === 1 && selectedCalendarWeek
-      ? [{ ...selectedCalendarWeek, showMonth: true }]
+      ? [selectedCalendarWeek]
       : pagedCalendarWeeks;
   const returnCalendarWeekCount = visibleCalendarWeekCount === 1 ? CALENDAR_PAGE_WEEKS : null;
-  const shownFirstKey = displayedCalendarWeeks[0]?.cells[0]?.key ?? "";
-  const shownLastKey = displayedCalendarWeeks.at(-1)?.cells.at(-1)?.key ?? "";
-  const calendarRangeLabel = shownFirstKey ? `${formatDayMonth(shownFirstKey)} – ${formatDayMonth(shownLastKey)}` : "";
+  const calendarMonthsLabel = calendarMonths(displayedCalendarWeeks);
   const visibleCalendarDates = new Set(displayedCalendarWeeks.flatMap((week) => week.cells.map((cell) => cell.key)));
   const calendarWindowBookings = calendarBookings.filter((booking) =>
     visibleCalendarDates.has(lessonDateKey(booking))
@@ -1470,16 +1477,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       Date.parse(choice.endAt) + lessonGapMs > Date.parse(slot.startAt))
   ));
   const rawDaySlots = selectedDate ? selectableSlots(selectedDate) : [];
-  // The first free time on each of the next few free days, for anyone who
-  // simply wants the soonest lesson.
-  const soonestSlots: Slot[] = [];
-  if (intent === "book" && !managed && !selectedDate && !loadingSlots) {
-    for (const cell of (restrictedWeek ? displayedCalendarWeeks : rangeWeeks).flatMap((week) => week.cells)) {
-      if (soonestSlots.length === 3) break;
-      const first = selectableSlots(cell.key)[0];
-      if (first) soonestSlots.push(first);
-    }
-  }
+  // Until a day is chosen the times panel waits out of sight, so a window with
+  // nothing free says so on the calendar itself.
+  const noFreeTimes = intent === "book" && !managed && !selectedDate && !loadingSlots && Boolean(lessonType) &&
+    !(restrictedWeek ? displayedCalendarWeeks : rangeWeeks).some((week) => week.cells.some((cell) => selectableSlots(cell.key).length));
   const managedDate = managed ? dateKeyIn(new Date(managed.booking.startAt), viewZone) : "";
   const shouldShowCurrentManagedSlot = Boolean(
     managed &&
@@ -2281,7 +2282,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     });
   }
 
-  /** A time from the day's grid or from the soonest times. */
+  /** A time from the chosen day's grid. */
   function chooseSlot(slot: Slot) {
     transitionBooking(() => {
       setSelectedDate(dateKeyIn(new Date(slot.startAt), viewZone));
@@ -3339,25 +3340,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           <p className="booking-state-note booking-state-note--initial">Loading lessons…</p>
         ) : null}
 
-        {/* A student whose clock differs from Porto's is told, where the times
-            begin, that they are on their own clock (or on Porto's, for a
-            lesson in Porto). */}
-        {showWorkflowCalendar && studentClockDiffers && !(managed && isManagedReschedule) ? (
-          <p className="calendar-zone-note">
-            <Globe size={17} aria-hidden="true" />
-            {viewZone === BOOKING_TIME_ZONE ? (
-              <span>Times are in <strong>Porto time</strong>, where lessons in Porto happen.</span>
-            ) : (
-              <span>
-                Times are in your time zone: <strong>{viewZoneName}</strong>
-                {isLessonsCalendarOverview && calendarBookings.some((booking) => booking.location === "porto")
-                  ? ". Lessons in Porto are in Porto time."
-                  : ""}
-              </span>
-            )}
-          </p>
-        ) : null}
-
         {showWorkflowCalendar ? (
           <div
             className="unified-calendar-shell"
@@ -3417,17 +3399,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   <div className="lesson-overview__heading">
                     <div className="upcoming-lessons__title-line">
                       <h2 className="eyebrow" id="upcoming-lessons-heading" tabIndex={-1}>Your lessons</h2>
-                      <button
-                        aria-describedby="upcoming-lessons-tip"
-                        aria-label="How your lesson calendar works"
-                        className="upcoming-lessons__hint"
-                        type="button"
-                      >
-                        <CircleHelp size={16} aria-hidden="true" />
-                      </button>
-                      <span className="upcoming-lessons__tip" id="upcoming-lessons-tip" role="tooltip">
-                        Choose a booked lesson to see its details, change it or cancel it. Choose any other day to book a lesson then.
-                      </span>
                     </div>
                     {student ? (
                       <AccountMenu
@@ -3458,10 +3429,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     />
                     <button className="lesson-overview__next-open" onClick={(event) => openBookedLesson(nextLesson, event.currentTarget)} type="button">
                       <span className="eyebrow">{Date.parse(nextLesson.startAt) <= clock ? "Happening now" : "Next lesson"}</span>
+                      {/* One plain line: the calendar's header says which
+                          clock the times are on. */}
                       <strong>
                         <WhenText
-                          long={`${formatLongDate(nextLesson.startAt, zoneOf(nextLesson))}, ${lessonTime(nextLesson.startAt, zoneOf(nextLesson))}`}
-                          short={`${formatShortDay(nextLesson.startAt, zoneOf(nextLesson))}, ${lessonTime(nextLesson.startAt, zoneOf(nextLesson))}`}
+                          long={`${formatLongDate(nextLesson.startAt, zoneOf(nextLesson))}, ${formatSlotTime(nextLesson.startAt, zoneOf(nextLesson))}`}
+                          short={`${formatShortDay(nextLesson.startAt, zoneOf(nextLesson))}, ${formatSlotTime(nextLesson.startAt, zoneOf(nextLesson))}`}
                         />
                       </strong>
                       <span>
@@ -3476,52 +3449,76 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 )}
               </div>
             ) : null}
+            {/* The calendar's own header, as any calendar has one: its month,
+                which clock its times are on and the arrows. The key sits under
+                the grid, with the days it explains. */}
             <div className="unified-calendar__toolbar">
-              <div className="unified-calendar__legend" aria-label="Calendar key">
-                {/* Only once there is a booked lesson to point to: a first visit
-                    has nothing booked, so the key would explain nothing. */}
-                {calendarBookings.length ? (
-                  <span>
-                    <i className="is-booked" aria-hidden="true" />{" "}
-                    {isLessonsCalendarOverview && calendarBookings.some(isWeeklyLesson) ? "One-off lesson" : "Booked lesson"}
-                  </span>
-                ) : null}
-                {isLessonsCalendarOverview && calendarBookings.some(isWeeklyLesson) ? (
-                  <span><i className="is-weekly" aria-hidden="true" /> Weekly lesson</span>
-                ) : null}
-                {intent === "book" || isManagedReschedule ? (
-                  <span><i className="is-free" aria-hidden="true" /> Free to book</span>
+              <div className="unified-calendar__heading">
+                <div className="unified-calendar__title">
+                  <p aria-live="polite" className="unified-calendar__month">
+                    <WhenText long={calendarMonthsLabel.long} short={calendarMonthsLabel.short} />
+                  </p>
+                  {isLessonsCalendarOverview ? (
+                    <>
+                      <button
+                        aria-describedby="upcoming-lessons-tip"
+                        aria-label="How your lesson calendar works"
+                        className="upcoming-lessons__hint"
+                        type="button"
+                      >
+                        <CircleHelp size={16} aria-hidden="true" />
+                      </button>
+                      <span className="upcoming-lessons__tip" id="upcoming-lessons-tip" role="tooltip">
+                        Choose a booked lesson to see its details, change it or cancel it. Choose any other day to book a lesson then.
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+                {/* A student whose clock differs from Porto's is told which clock
+                    the times are on: their own, or Porto's for a lesson there. */}
+                {studentClockDiffers && !(managed && isManagedReschedule) ? (
+                  <p className="calendar-zone">
+                    <Globe size={15} aria-hidden="true" />
+                    <span>
+                      <span className="visually-hidden">Times are in </span>
+                      {viewZone === BOOKING_TIME_ZONE ? (
+                        <strong>Porto time</strong>
+                      ) : (
+                        <>
+                          <strong>{viewZoneName}</strong>
+                          {isLessonsCalendarOverview && calendarBookings.some((booking) => booking.location === "porto")
+                            ? " · Porto time for lessons in Porto"
+                            : null}
+                        </>
+                      )}
+                    </span>
+                  </p>
                 ) : null}
               </div>
               <div className="unified-calendar__range-actions">
-                {restrictedWeek ? <span className="unified-calendar__range">{calendarRangeLabel}</span> : visibleCalendarWeekCount !== 1 ? (
+                {!restrictedWeek && visibleCalendarWeekCount !== 1 && calendarPages.length > 1 ? (
                   <div className="calendar-pager">
-                    {calendarPages.length > 1 ? (
-                      <button
-                        aria-controls="booking-calendar-weeks"
-                        aria-label="Earlier weeks"
-                        className="calendar-pager__step"
-                        disabled={manageWorking || calendarPageIndex === 0}
-                        onClick={() => turnCalendarPage(-1)}
-                        type="button"
-                      >
-                        <ChevronLeft size={18} aria-hidden="true" />
-                      </button>
-                    ) : null}
-                    <span className="unified-calendar__range" aria-live="polite">{calendarRangeLabel}</span>
-                    {calendarPages.length > 1 ? (
-                      <button
-                        aria-controls="booking-calendar-weeks"
-                        aria-label={laterLessonCount ? `Later weeks, ${laterLessonCount} more ${laterLessonCount === 1 ? "lesson" : "lessons"}` : "Later weeks"}
-                        className="calendar-pager__step"
-                        disabled={manageWorking || calendarPageIndex >= calendarPages.length - 1}
-                        onClick={() => turnCalendarPage(1)}
-                        type="button"
-                      >
-                        <ChevronRight size={18} aria-hidden="true" />
-                        {laterLessonCount ? <span className="calendar-pager__count" aria-hidden="true">{laterLessonCount}</span> : null}
-                      </button>
-                    ) : null}
+                    <button
+                      aria-controls="booking-calendar-weeks"
+                      aria-label="Earlier weeks"
+                      className="calendar-pager__step"
+                      disabled={manageWorking || calendarPageIndex === 0}
+                      onClick={() => turnCalendarPage(-1)}
+                      type="button"
+                    >
+                      <ChevronLeft size={18} aria-hidden="true" />
+                    </button>
+                    <button
+                      aria-controls="booking-calendar-weeks"
+                      aria-label={laterLessonCount ? `Later weeks, ${laterLessonCount} more ${laterLessonCount === 1 ? "lesson" : "lessons"}` : "Later weeks"}
+                      className="calendar-pager__step"
+                      disabled={manageWorking || calendarPageIndex >= calendarPages.length - 1}
+                      onClick={() => turnCalendarPage(1)}
+                      type="button"
+                    >
+                      <ChevronRight size={18} aria-hidden="true" />
+                      {laterLessonCount ? <span className="calendar-pager__count" aria-hidden="true">{laterLessonCount}</span> : null}
+                    </button>
                   </div>
                 ) : null}
                 {returnCalendarWeekCount && !restrictedWeek ? (
@@ -3538,6 +3535,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               </div>
             </div>
             <div className="calendar-weekdays" aria-hidden="true">
+              <span className="calendar-weekdays__corner" />
               {weekdayLabels.map((label) => (
                 <span key={label}>{label}</span>
               ))}
@@ -3553,93 +3551,118 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 visibleCalendarWeekCount === 1 && selectedCalendarWeek ? `compact-${selectedCalendarWeek.key}` : `page-${pageFirstKey}`
               }`}
             >
-              {displayedCalendarWeeks.map((week) => (
-                <Fragment key={week.key}>
-                  {week.showMonth ? <p className="calendar-month">{week.month}</p> : null}
-                  <div className="calendar-week">
-                    {week.cells.map((cell) => {
-                      const slots = selectableSlots(cell.key);
-                      const lessons = bookingsByDate[cell.key] ?? [];
-                      const lessonLabel = lessons.length === 1 ? "1 lesson" : `${lessons.length} lessons`;
-                      const dateLabel = formatLongDate(`${cell.key}T12:00:00Z`);
-                      const canStartBooking = isLessonsCalendarOverview && cell.key >= viewTodayKey;
-                      const weeklyDay = lessons.length > 0 && lessons.every(isWeeklyLesson);
-                      return (
-                        <button
-                          aria-label={`${dateLabel}${
-                            lessons.length ? `, ${lessonLabel}` : ""
-                          }${
-                            slots.length
-                              ? `, ${slots.length} times free`
-                              : lessons.length
-                                ? isLessonsCalendarOverview ? (lessons.length === 1 ? ", open lesson" : ", choose a lesson to open") : ""
-                                : canStartBooking ? ", book a lesson" : ", unavailable"
-                          }`}
-                          aria-haspopup={isLessonsCalendarOverview && lessons.length ? "dialog" : undefined}
-                          aria-pressed={!isLessonsCalendarOverview && selectedDate === cell.key}
-                          className={`${slots.length ? "has-availability" : ""}${canStartBooking ? " can-start-booking" : ""}${
-                            lessons.length ? " has-booking" : ""
-                          }${weeklyDay ? " has-weekly-booking" : ""}${!isLessonsCalendarOverview && selectedDate === cell.key ? " is-selected" : ""}${cell.isToday ? " is-today" : ""}`}
-                          data-date-key={cell.key}
-                          disabled={manageWorking || (!canStartBooking && !slots.length && !lessons.length)}
-                          key={cell.key}
-                          onClick={(event) => {
-                            if (isLessonsCalendarOverview && lessons.length === 1) {
-                              openBookedLesson(lessons[0], event.currentTarget);
-                              return;
+              {displayedCalendarWeeks.map((week, row) => (
+                <div className="calendar-week" key={week.key}>
+                  {/* Each week starts with its month, so a date is never far
+                      from it; a month that begins mid-week marks its 1st. The
+                      days' own labels carry the full date. */}
+                  <span
+                    aria-hidden="true"
+                    className={`calendar-week__month${
+                      row > 0 && displayedCalendarWeeks[row - 1].cells[0].month === week.cells[0].month ? " is-repeat" : ""
+                    }`}
+                  >
+                    {shortMonth(week.cells[0].month, week.cells[0].key)}
+                  </span>
+                  {week.cells.map((cell, column) => {
+                    const slots = selectableSlots(cell.key);
+                    const lessons = bookingsByDate[cell.key] ?? [];
+                    const lessonLabel = lessons.length === 1 ? "1 lesson" : `${lessons.length} lessons`;
+                    const dateLabel = formatLongDate(`${cell.key}T12:00:00Z`);
+                    const canStartBooking = isLessonsCalendarOverview && cell.key >= viewTodayKey;
+                    const weeklyDay = lessons.length > 0 && lessons.every(isWeeklyLesson);
+                    return (
+                      <button
+                        aria-label={`${dateLabel}${
+                          lessons.length ? `, ${lessonLabel}` : ""
+                        }${
+                          slots.length
+                            ? `, ${slots.length} times free`
+                            : lessons.length
+                              ? isLessonsCalendarOverview ? (lessons.length === 1 ? ", open lesson" : ", choose a lesson to open") : ""
+                              : canStartBooking ? ", book a lesson" : ", unavailable"
+                        }`}
+                        aria-haspopup={isLessonsCalendarOverview && lessons.length ? "dialog" : undefined}
+                        aria-pressed={!isLessonsCalendarOverview && selectedDate === cell.key}
+                        className={`${slots.length ? "has-availability" : ""}${canStartBooking ? " can-start-booking" : ""}${
+                          lessons.length ? " has-booking" : ""
+                        }${weeklyDay ? " has-weekly-booking" : ""}${!isLessonsCalendarOverview && selectedDate === cell.key ? " is-selected" : ""}${cell.isToday ? " is-today" : ""}`}
+                        data-date-key={cell.key}
+                        disabled={manageWorking || (!canStartBooking && !slots.length && !lessons.length)}
+                        key={cell.key}
+                        onClick={(event) => {
+                          if (isLessonsCalendarOverview && lessons.length === 1) {
+                            openBookedLesson(lessons[0], event.currentTarget);
+                            return;
+                          }
+                          if (isLessonsCalendarOverview && lessons.length) {
+                            promptTrigger.current = event.currentTarget;
+                            setBookingPromptDate(cell.key);
+                            return;
+                          }
+                          if (isLessonsCalendarOverview && canStartBooking) {
+                            startBookingJourney(cell.key);
+                            return;
+                          }
+                          transitionBooking(() => {
+                            setSelectedDate(cell.key);
+                            setCalendarWeekCount(managed && !changeFormBesideCalendar() ? 1 : CALENDAR_PAGE_WEEKS);
+                            setSlotNotice("");
+                            setSelectedSlot(
+                              managed &&
+                              isManagedReschedule &&
+                              cell.key === managedDate &&
+                              (managedLessonTypeId || managed.booking.lessonType.id) === managed.booking.lessonType.id
+                                ? managed.booking.startAt
+                                : ""
+                            );
+                            if (lessonType && !managed) {
+                              setStep("time");
+                              setSubmitError("");
                             }
-                            if (isLessonsCalendarOverview && lessons.length) {
-                              promptTrigger.current = event.currentTarget;
-                              setBookingPromptDate(cell.key);
-                              return;
-                            }
-                            if (isLessonsCalendarOverview && canStartBooking) {
-                              startBookingJourney(cell.key);
-                              return;
-                            }
-                            transitionBooking(() => {
-                              setSelectedDate(cell.key);
-                              setCalendarWeekCount(managed && !changeFormBesideCalendar() ? 1 : CALENDAR_PAGE_WEEKS);
-                              setSlotNotice("");
-                              setSelectedSlot(
-                                managed &&
-                                isManagedReschedule &&
-                                cell.key === managedDate &&
-                                (managedLessonTypeId || managed.booking.lessonType.id) === managed.booking.lessonType.id
-                                  ? managed.booking.startAt
-                                  : ""
-                              );
-                              if (lessonType && !managed) {
-                                setStep("time");
-                                setSubmitError("");
-                              }
-                            });
-                            orientTo("booking-next-step", false, true);
-                          }}
-                          type="button"
-                        >
-                          <span>
-                            {cell.day}
-                            {cell.month !== week.monthNumber ? <em>{shortMonth(cell.month, cell.key)}</em> : null}
-                            {lessons.length ? (
-                              <small className="calendar-booking-times">
-                                {(lessons.length <= 2 ? lessons : lessons.slice(0, 1)).map((booking) => (
-                                  <span className={isWeeklyLesson(booking) ? "is-weekly" : undefined} key={booking.reference}>
-                                    {formatSlotTime(booking.startAt, zoneOf(booking))}
-                                  </span>
-                                ))}
-                                {lessons.length > 2 ? <span>+{lessons.length - 1} more</span> : null}
-                              </small>
-                            ) : null}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </Fragment>
+                          });
+                          orientTo("booking-next-step", false, true);
+                        }}
+                        type="button"
+                      >
+                        <span>
+                          {cell.day}
+                          {cell.day === 1 && column > 0 ? <em>{shortMonth(cell.month, cell.key)}</em> : null}
+                          {lessons.length ? (
+                            <small className="calendar-booking-times">
+                              {(lessons.length <= 2 ? lessons : lessons.slice(0, 1)).map((booking) => (
+                                <span className={isWeeklyLesson(booking) ? "is-weekly" : undefined} key={booking.reference}>
+                                  {formatSlotTime(booking.startAt, zoneOf(booking))}
+                                </span>
+                              ))}
+                              {lessons.length > 2 ? <span>+{lessons.length - 1} more</span> : null}
+                            </small>
+                          ) : null}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               ))}
             </div>
+            <div className="unified-calendar__legend" aria-label="Calendar key">
+              {/* Only once there is a booked lesson to point to: a first visit
+                  has nothing booked, so the key would explain nothing. */}
+              {calendarBookings.length ? (
+                <span>
+                  <i className="is-booked" aria-hidden="true" />{" "}
+                  {isLessonsCalendarOverview && calendarBookings.some(isWeeklyLesson) ? "One-off lesson" : "Booked lesson"}
+                </span>
+              ) : null}
+              {isLessonsCalendarOverview && calendarBookings.some(isWeeklyLesson) ? (
+                <span><i className="is-weekly" aria-hidden="true" /> Weekly lesson</span>
+              ) : null}
+              {intent === "book" || isManagedReschedule ? (
+                <span><i className="is-free" aria-hidden="true" /> Free to book</span>
+              ) : null}
+            </div>
             {loadingSlots ? <p className="booking-state-note">Checking what&rsquo;s free…</p> : null}
+            {noFreeTimes ? <p className="booking-state-note">No free times in these weeks.</p> : null}
           </div>
 
           {!isLessonsCalendarOverview ? (
@@ -3827,9 +3850,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       ? formatLongDate(`${selectedDate}T12:00:00Z`)
                       : intent === "lessons" && !calendarWindowBookings.length
                         ? "Nothing booked yet"
-                        : soonestSlots.length
-                          ? "Soonest times"
-                          : "Choose a day"}
+                        : "Choose a day"}
                   </h3>
                   {/* On a phone the times take the calendar's place, so the way
                       back to it sits beside the date, which is short enough to
@@ -3878,31 +3899,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
                 {lessonType ? (
                   <div className="unified-calendar__availability">
-                    {!selectedDate ? (
-                      soonestSlots.length ? (
-                        <div className="booking-soonest">
-                          <ul aria-labelledby="unified-calendar-panel-heading">
-                            {soonestSlots.map((slot) => (
-                              <li key={slot.startAt}>
-                                <button
-                                  aria-label={`${formatLongDate(slot.startAt, viewZone)}, ${formatTimeIn(slot.startAt, viewZone)}`}
-                                  onClick={() => chooseSlot(slot)}
-                                  type="button"
-                                >
-                                  <span>{formatShortDay(slot.startAt, viewZone)}</span>
-                                  <strong>{formatSlotTime(slot.startAt, viewZone)}</strong>
-                                  <ChevronRight size={16} aria-hidden="true" />
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : loadingSlots ? (
-                        <p className="booking-state-note">Checking what&rsquo;s free…</p>
-                      ) : (
-                        <p className="booking-state-note">No free times in these weeks.</p>
-                      )
-                    ) : loadingSlots ? (
+                    {!selectedDate ? null : loadingSlots ? (
                       <p className="booking-state-note">Checking what&rsquo;s free…</p>
                     ) : daySlots.length ? (
                       <TimePicker

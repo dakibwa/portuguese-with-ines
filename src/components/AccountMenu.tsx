@@ -6,10 +6,13 @@ import { useEffect, useRef, useState } from "react";
 export type AccountSection = "upcoming" | "history" | "profile";
 
 /**
- * The account's one menu: the student's name, beneath the heading of whichever
- * account card is showing (Your lessons, Past lessons or Your details), opening
- * the account's places and Sign out. Living in the card, it spares the page a
- * second bar above the calendar.
+ * The account's one menu, in the heading of whichever account card is showing
+ * (Your lessons, Past lessons or Your details), sparing the page a second bar
+ * above the calendar. Where the card is wide, its places sit open in the
+ * middle of the header as one sliding control, and the student's name stands
+ * plain at the left with Sign out beneath it; where it is narrow, the name
+ * opens them as a dropdown. The same buttons serve both, so either way there
+ * is one menu.
  */
 export function AccountMenu({
   current,
@@ -52,8 +55,11 @@ export function AccountMenu({
     onSelect(section);
   }
 
+  const place = current === "upcoming" ? 0 : current === "history" ? 1 : 2;
+
   return (
     <div className="account-menu" ref={menuRef}>
+      <span className="account-menu__label">{name}</span>
       <button
         aria-controls="account-menu"
         aria-expanded={open}
@@ -67,16 +73,22 @@ export function AccountMenu({
         <ChevronDown size={16} aria-hidden="true" />
       </button>
       <div className={`account-menu__panel${open ? " is-open" : ""}`} id="account-menu">
-        <button aria-current={current === "upcoming" ? "true" : undefined} onClick={() => choose("upcoming")} type="button">
-          Your lessons {upcomingCount ? <span>{upcomingCount}</span> : null}
-        </button>
-        <button aria-current={current === "history" ? "true" : undefined} onClick={() => choose("history")} type="button">
-          Past lessons
-        </button>
-        <button aria-current={current === "profile" ? "true" : undefined} onClick={() => choose(current === "profile" ? "upcoming" : "profile")} type="button">
-          {current === "profile" ? "Done editing" : "Edit details"}
-        </button>
+        {/* Open in the header, the places are one sliding control, like the
+            booking bar's; the thumb rests on the card that is showing. */}
+        <div className={`account-menu__places account-menu__places--at-${place}`}>
+          <span aria-hidden="true" className="account-menu__thumb" />
+          <button aria-current={current === "upcoming" ? "true" : undefined} onClick={() => choose("upcoming")} type="button">
+            Your lessons {upcomingCount ? <span>{upcomingCount}</span> : null}
+          </button>
+          <button aria-current={current === "history" ? "true" : undefined} onClick={() => choose("history")} type="button">
+            Past lessons
+          </button>
+          <button aria-current={current === "profile" ? "true" : undefined} onClick={() => choose(current === "profile" ? "upcoming" : "profile")} type="button">
+            {current === "profile" ? "Done editing" : "Edit details"}
+          </button>
+        </div>
         <button
+          className="account-menu__sign-out"
           onClick={() => {
             setOpen(false);
             onSignOut();

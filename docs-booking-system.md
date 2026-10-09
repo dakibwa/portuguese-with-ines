@@ -248,8 +248,9 @@ depending on them having kept the right confirmation email.
   halves, from Inês's earliest start across the loaded weeks to 14:00 and from
   14:00 to her latest, so the toggle's labels are the same every day. On
   another clock they divide where 14:00 in Porto falls on the student's, or at
-  noon when her day crosses the student's midnight. Before a day is chosen, wide screens offer the soonest free time
-  on each of the next three free days.
+  noon when her day crosses the student's midnight. Before a day is chosen the
+  times panel stays out of sight and the calendar takes the whole row; a
+  window with nothing free says so beneath the calendar.
   Available times use one compact grid without headings, one half of the day
   at a time, and fit accessible time buttons across a phone. The confirmation keeps the
   choices bar beside the chosen lessons, so kind, place, length and repeat still
@@ -260,19 +261,25 @@ depending on them having kept the right confirmation email.
   second weekly time` is a dashed card beneath the lessons, and while one is
   added the bar gives way to the lessons chosen so far and `Back`. Both calendars page four weeks at a time; `Later weeks`
   counts the booked lessons beyond the page, and the lessons view pages as far
-  as the last booked lesson. Choosing an
+  as the last booked lesson. A calendar's header names the months its weeks
+  start in beside the arrows, each week starts with its own month, a month that
+  begins part-way through a week marks its 1st, and the key sits beneath the
+  weeks. Choosing an
   individual booking opens move and cancel in place. The emailed token still
   opens that same interface without requiring sign-in, so a forgotten password
   never blocks a change. The old `/my-lessons` and `/booking` paths remain valid
   for links already in the world, then normalise to `/book`.
-- **The signed-in account lives in the lessons card.** The student's name,
-  under the heading of whichever account card is showing, is the account's one
+- **The signed-in account lives in the lessons card.** The account has one
   menu: `Your lessons` with the upcoming count, `Past lessons` with no badge,
-  `Edit details` and `Sign out`, at every width. Booking lives on the card, not
+  `Edit details` and `Sign out`. On a wide card its places sit open in the
+  header as one sliding control, with the name and `Sign out` beneath it at
+  the left; on a narrower one the student's name, under the heading of
+  whichever account card is showing, opens it. Booking lives on the card, not
   in the menu. Choosing your or past lessons opens a complete view and switches
   away from any active booking or lesson-management detail. Clicking the
   current destination keeps it open. Past lessons and Your details take the
-  calendar card's place, headed the same way, with a `Your lessons` way back;
+  calendar card's place, headed the same way, with a `Your lessons` way back
+  where the menu is folded;
   neither keeps the future calendar, and `Done editing` returns to Your
   lessons. An empty history gets an empty state rather than losing the menu
   item. While booking the menu waits, and the booking bar's `Your lessons` is
@@ -286,8 +293,8 @@ depending on them having kept the right confirmation email.
   calendar, with the new lesson on its day. The next lesson leads the card. Weekly lessons are
   lilac and one-off lessons coral; a weekly lesson's dialog offers `Manage
   weekly lessons` for the whole run, and `Your lessons` counts an active repeat once.
-  The `?` tooltip explains that booked lessons open and other days start a
-  booking. Once booked, ordinary lessons use the compact duration label (`60
+  The `?` beside the calendar's month explains that booked lessons open and
+  other days start a booking. Once booked, ordinary lessons use the compact duration label (`60
   mins` or `90 mins`) instead of repeating the product name; trial lessons keep
   their name. There is no other context strip or selected-day detail card.
   Opening a lesson leaves the calendar where it is and shows a compact
@@ -468,11 +475,14 @@ lessons, so its cancellation set includes every occurrence committed first.
   the browser's clock and a lesson in Porto on Porto's, regrouping free times
   by the dates of the clock shown. For a student whose clock differs from
   Porto's at any time of year, a time standing alone names its clock (`09:00
-  Los Angeles time`) and one line says which clock the times are on; in
-  Portugal times stay plain. Weekly
+  Los Angeles time`) and the calendar's header says which clock the times are
+  on; in Portugal times stay plain. Weekly
   runs stay anchored to their Porto wall time, so around a clock change their
-  time elsewhere moves by an hour for a few weeks. Emails lead with Porto time
-  and add the student's own beneath it when it differs.
+  time elsewhere moves by an hour for a few weeks. A student's emails follow
+  the same rule: the lesson's own clock (theirs online, Porto's in Porto),
+  named once after the time, from the timezone saved with the booking; Inês's
+  copies lead with Porto time and add the student's own beneath it when it
+  differs.
   A failed length lookup retains the selected dates and offers an in-place
   retry. The pending recheck remains until fresh availability arrives. Rechecks
   compare the whole selection, including the lesson gap, and remove later

@@ -168,6 +168,34 @@ export function differingZonedTime(date, zone, locale = "en-GB") {
   return here === there ? null : `${there} (${timeZoneAbbreviation(date, zone, locale)})`;
 }
 
+const RENAMED_PLACES = {
+  Calcutta: "Kolkata",
+  Katmandu: "Kathmandu",
+  Kiev: "Kyiv",
+  Rangoon: "Yangon",
+  Saigon: "Ho Chi Minh City"
+};
+
+/**
+ * A clock named the way the site names it: by its place ("Porto time",
+ * "Los Angeles time"), taken from the zone's own name. A zone without a
+ * place, such as UTC, is named by its offset at that moment instead.
+ */
+export function zoneName(zone, date = new Date()) {
+  if (!zone || zone === PORTO) return "Porto time";
+  const place = zone.includes("/") && !zone.startsWith("Etc/") ? zone.slice(zone.lastIndexOf("/") + 1).replace(/_/g, " ") : "";
+  if (place) return `${RENAMED_PLACES[place] ?? place} time`;
+  try {
+    const offset = new Intl.DateTimeFormat("en-GB", { timeZone: zone, timeZoneName: "shortOffset" })
+      .formatToParts(date)
+      .find((part) => part.type === "timeZoneName")?.value;
+    if (offset) return offset === "GMT" ? "UTC" : offset;
+  } catch {
+    // An unknown zone keeps its name.
+  }
+  return zone;
+}
+
 /**
  * "Fri 25 Sep, 19:00" — for subject lines, where a full date runs past what an
  * inbox shows and a reference code says nothing to the person reading it.

@@ -41,10 +41,11 @@ async function settle() {
     animation.playState !== "running" || animation.effect?.getTiming().iterations === Infinity));
 }
 
-// The student's name opens the account's menu, in whichever card shows.
+// The account's menu is open in a wide card's header; on a narrow one the
+// student's name opens it.
 async function accountAction(name) {
   const toggle = page.locator("#account-menu-button");
-  if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+  if (await toggle.isVisible() && await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
   await page.locator("#account-menu").getByRole("button", { name, exact: true }).click();
 }
 
@@ -84,21 +85,27 @@ try {
     await settle();
     const layout = await page.evaluate(() => {
       const bounds = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
+      // The name stands plain where the menu is open, and opens it elsewhere.
+      const named = [...document.querySelectorAll(".account-menu__label, #account-menu-button")].find(element => element.getClientRects().length);
       return {
         width: innerWidth, pageWidth: document.documentElement.scrollWidth,
         calendar: bounds("#lesson-calendar .calendar-panel"),
         heading: bounds("#upcoming-lessons-heading"),
-        name: bounds("#account-menu-button"),
+        name: named.getBoundingClientRect().toJSON(),
         book: bounds(".lesson-overview__book")
       };
     });
     assert.ok(layout.pageWidth <= width + 1, `Page overflow at ${width}`);
-    // One card holds the lessons and the account at every width: the name's
-    // menu under its heading, and booking at its top right.
-    aligned(layout.name.left, layout.heading.left, `The name's menu lines up under the heading at ${width}`);
-    assert.ok(layout.name.top >= layout.heading.bottom - 1, `The name's menu sits under the heading at ${width}`);
-    assert.ok(layout.heading.top >= layout.calendar.top && layout.name.right <= layout.calendar.right,
-      `The name's menu is inside the calendar card at ${width}`);
+    // One card holds the lessons and the account at every width, with booking
+    // at its top right. Where the places are open they name the card, so its
+    // heading is for screen readers and the name leads the header; elsewhere
+    // the name's menu sits under the heading.
+    if (layout.heading.width > 1) {
+      aligned(layout.name.left, layout.heading.left, `The name's menu lines up under the heading at ${width}`);
+      assert.ok(layout.name.top >= layout.heading.bottom - 1, `The name's menu sits under the heading at ${width}`);
+    }
+    assert.ok(layout.name.top >= layout.calendar.top && layout.name.left >= layout.calendar.left && layout.name.right <= layout.calendar.right,
+      `The name is inside the calendar card at ${width}`);
     assert.ok(layout.book.top < layout.calendar.top + 120 && layout.book.right <= layout.calendar.right + 1,
       `Book a lesson sits at the calendar's top right at ${width}`);
     layouts.push(layout);
