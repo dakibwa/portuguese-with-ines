@@ -653,7 +653,7 @@ get wrong:
 
 ### Time and availability
 
-Instants are stored as ISO-8601 UTC. Weekly teaching hours are stored as
+Instants are stored as ISO-8601 UTC. Inês's weekly hours are stored as
 minutes-from-midnight in Porto time and resolved against `Europe/Lisbon` at query
 time, so the rules survive DST instead of drifting an hour twice a year. The
 25-hour and 23-hour transition days are covered by tests.

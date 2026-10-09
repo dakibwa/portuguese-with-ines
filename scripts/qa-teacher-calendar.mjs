@@ -353,7 +353,7 @@ try {
     .click();
   await page
     .getByRole("status")
-    .filter({ hasText: "Teaching hours saved" })
+    .filter({ hasText: "Weekly hours saved" })
     .waitFor();
   assert.deepEqual(
     state.rules
@@ -675,7 +675,7 @@ try {
     .click();
   await mobile.page
     .getByRole("status")
-    .filter({ hasText: "Teaching hours saved" })
+    .filter({ hasText: "Weekly hours saved" })
     .waitFor();
   for (const width of [390, 320, 827]) {
     await mobile.page.setViewportSize({ width, height: 900 });

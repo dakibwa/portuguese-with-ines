@@ -276,9 +276,9 @@ try {
         await save.click();
         await expect(page.getByRole("alert").filter({ hasText: unreadable })).toBeVisible();
         await expect(save).toBeEnabled();
-        await expect(page.getByText("Teaching hours saved. Students can now book these times.", { exact: true })).toHaveCount(0);
+        await expect(page.getByText("Weekly hours saved. Students can now book these times.", { exact: true })).toHaveCount(0);
         await save.click();
-        await expect(page.getByText("Teaching hours saved. Students can now book these times.", { exact: true })).toBeVisible();
+        await expect(page.getByText("Weekly hours saved. Students can now book these times.", { exact: true })).toBeVisible();
         await expect(save).toBeDisabled();
         await check(state); assert.equal(writes, 2); cases += 1;
       } finally { await state.context.close(); }

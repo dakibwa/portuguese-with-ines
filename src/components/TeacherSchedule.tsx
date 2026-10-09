@@ -269,7 +269,7 @@ export function TeacherSchedule() {
       );
       if (account !== accountGeneration.current) return;
       setSavedHours(submitted);
-      setStatus("Teaching hours saved. Students can now book these times.");
+      setStatus("Weekly hours saved. Students can now book these times.");
     } catch (caught) {
       if (account !== accountGeneration.current) return;
       setError(

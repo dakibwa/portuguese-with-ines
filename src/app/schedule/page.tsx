@@ -7,7 +7,7 @@ import "./teacher-schedule.css";
 
 export const metadata: Metadata = {
   title: "Schedule · Português com a Inês",
-  description: "Teaching hours and bookings.",
+  description: "Weekly hours and bookings.",
   robots: { index: false, follow: false },
 };
 

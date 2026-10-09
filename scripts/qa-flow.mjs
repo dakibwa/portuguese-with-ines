@@ -1525,7 +1525,7 @@ const calendarHint = accountPage.getByRole("button", { name: "How your lesson ca
 const calendarTip = accountPage.locator("#upcoming-lessons-tip");
 if (
   ((await calendarTip.textContent()) ?? "").trim() !==
-  "Choose a booked lesson to see its details, move it or cancel it. Choose any other day to book a lesson then."
+  "Choose a booked lesson to see its details, change it or cancel it. Choose any other day to book a lesson then."
 ) {
   throw new Error("The question mark should explain how the lessons calendar works.");
 }

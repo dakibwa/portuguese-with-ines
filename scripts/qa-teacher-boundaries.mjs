@@ -88,7 +88,7 @@ async function activate(control, method) {
 async function save(state, expected, count) {
   await state.page.getByRole("button", { name: "Save weekly hours", exact: true }).click();
   await expect.poll(() => state.writes.length).toBe(count);
-  await expect(state.page.getByText("Teaching hours saved. Students can now book these times.", { exact: true })).toBeVisible();
+  await expect(state.page.getByText("Weekly hours saved. Students can now book these times.", { exact: true })).toBeVisible();
   assert.deepEqual(sortedRules(state.writes.at(-1).body.rules), sortedRules(expected));
 }
 async function drag(page, from, to) {
