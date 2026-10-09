@@ -179,21 +179,26 @@ const RENAMED_PLACES = {
 /**
  * A clock named the way the site names it: by its place ("Porto time",
  * "Los Angeles time"), taken from the zone's own name. A zone without a
- * place, such as UTC, is named by its offset at that moment instead.
+ * place is named by its offset at that moment ("UTC", "GMT-5"), worked out
+ * here rather than worded by Intl, whose offset names differ between ICU
+ * builds and so between runtimes.
  */
 export function zoneName(zone, date = new Date()) {
   if (!zone || zone === PORTO) return "Porto time";
   const place = zone.includes("/") && !zone.startsWith("Etc/") ? zone.slice(zone.lastIndexOf("/") + 1).replace(/_/g, " ") : "";
   if (place) return `${RENAMED_PLACES[place] ?? place} time`;
+  let minutes;
   try {
-    const offset = new Intl.DateTimeFormat("en-GB", { timeZone: zone, timeZoneName: "shortOffset" })
-      .formatToParts(date)
-      .find((part) => part.type === "timeZoneName")?.value;
-    if (offset) return offset === "GMT" ? "UTC" : offset;
+    // Whole minutes: the parts carry no milliseconds, the instant does.
+    minutes = Math.round(offsetMinutes(date, zone));
   } catch {
     // An unknown zone keeps its name.
+    return zone;
   }
-  return zone;
+  if (!minutes) return "UTC";
+  const hours = Math.floor(Math.abs(minutes) / 60);
+  const rest = Math.abs(minutes) % 60;
+  return `GMT${minutes < 0 ? "-" : "+"}${hours}${rest ? `:${String(rest).padStart(2, "0")}` : ""}`;
 }
 
 /**
