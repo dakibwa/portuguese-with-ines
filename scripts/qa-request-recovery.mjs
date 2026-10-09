@@ -73,6 +73,13 @@ async function fixture(width, reply = async () => null) {
     errors.push(`Unexpected request: ${request.method()} ${pathname}`);
     return route.abort();
   });
+  // Google's sign-in script, stubbed as the other journey checks stub it.
+  // Signed out, the page shows the sign-in panel; in CI, where the build has
+  // a real Google client, the real script would make waiting for a quiet
+  // network wait on Google's servers too (release run 258).
+  await page.route("https://accounts.google.com/gsi/client", route => route.fulfill({
+    contentType: "application/javascript", body: "window.google={accounts:{id:{initialize(){},renderButton(){}}}};"
+  }));
   return { page, context, errors, logouts };
 }
 
