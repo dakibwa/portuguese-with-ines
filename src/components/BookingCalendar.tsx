@@ -4122,12 +4122,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             </div>
             <div className="booking-confirmation-main">
               {/* Signed out, the sign-in card's "Almost there" is the visible heading.
-                  This one stays for screen readers and as the step's focus target. */}
+                  This one stays for screen readers and as the step's focus target.
+                  Weekly lessons are simply "lessons" here: the bar above already
+                  says they repeat (9 October 2026, at Dan's request). */}
               <h2 className={student ? "booking-step-heading" : "booking-step-heading visually-hidden"} id="booking-step-heading" tabIndex={-1}>
                 {student
-                  ? form.repeat === "once"
-                    ? bookingChoices.length > 1 ? "Confirm your lessons" : "Confirm your lesson"
-                    : "Confirm your weekly lessons"
+                  ? form.repeat === "once" && bookingChoices.length < 2 ? "Confirm your lesson" : "Confirm your lessons"
                   : "Sign in to confirm"}
               </h2>
 
@@ -4188,7 +4188,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         <textarea
                           disabled={submitting}
                           onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                          rows={2}
+                          rows={1}
                           value={form.notes}
                         />
                       </label>

@@ -30,9 +30,9 @@ function inViewTransition() {
   }
 }
 
-// The wordmark's hats tip now and then on their own (globals.css). Their beat
-// is the wall clock's: each hat's place in its cycle comes from the time of
-// day, so a page turn, or a full page load, never restarts the rhythm.
+// The wordmark's hats dance on a four-second bar (globals.css). Their beat is
+// the wall clock's: the hats' place in the bar comes from the time of day, so
+// a page turn, or a full page load, never restarts the dance.
 function keepWordmarkHatsOnTheBeat() {
   if (typeof CSSAnimation === "undefined" || !("getAnimations" in document)) return;
   for (const animation of document.getAnimations()) {

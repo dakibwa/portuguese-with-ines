@@ -1157,7 +1157,7 @@ async function bookQaLessonAndReturnToUpcoming({ recurring }) {
   await accountPage.locator("#lesson-calendar .unified-calendar__availability .slot-grid button").first().click();
 
   if (recurring) {
-    await accountPage.getByRole("heading", { name: "Confirm your weekly lessons", exact: true }).waitFor();
+    await accountPage.getByRole("heading", { name: "Confirm your lessons", exact: true }).waitFor();
     await recurrencePreview;
     await accountPage.locator(".booking-repeat-choice").waitFor({ state: "detached" });
     if (await accountPage.getByText(/week clashes/i).count()) {
@@ -1166,7 +1166,7 @@ async function bookQaLessonAndReturnToUpcoming({ recurring }) {
   }
 
   await accountPage
-    .getByRole("heading", { name: recurring ? "Confirm your weekly lessons" : "Confirm your lesson", exact: true })
+    .getByRole("heading", { name: recurring ? "Confirm your lessons" : "Confirm your lesson", exact: true })
     .waitFor();
 
   if (recurring && (await accountPage.locator(".booking-repeat-choice").count())) {
@@ -2225,7 +2225,7 @@ await accountPage.screenshot({ path: path.join(outDir, "booking-repeat-length-mo
 previewHasClash = true;
 await accountPage.getByRole("button", { name: /times free/ }).first().click();
 await accountPage.locator("#lesson-calendar .unified-calendar__availability .slot-grid button").first().click();
-await accountPage.getByRole("heading", { name: "Confirm your weekly lessons", exact: true }).waitFor();
+await accountPage.getByRole("heading", { name: "Confirm your lessons", exact: true }).waitFor();
 await accountPage.getByText("One week is already taken", { exact: false }).waitFor();
 if ((await accountPage.locator(".booking-confirmation-stage .booking-skipped li").count()) !== 1) {
   throw new Error("Recurring confirmation should list the exact clashing week before booking.");
@@ -2245,7 +2245,7 @@ const sixWeekPreview = accountPage.waitForRequest(
 );
 await reviewBar.getByRole("radio", { name: "6 weeks", exact: true }).check();
 await sixWeekPreview;
-await accountPage.getByRole("heading", { name: "Confirm your weekly lessons", exact: true }).waitFor();
+await accountPage.getByRole("heading", { name: "Confirm your lessons", exact: true }).waitFor();
 // A single lesson at the same length keeps the chosen time.
 await reviewBar.getByRole("radio", { name: "Single", exact: true }).check();
 await accountPage.getByRole("heading", { name: "Confirm your lesson", exact: true }).waitFor();

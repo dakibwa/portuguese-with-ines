@@ -57,7 +57,7 @@ Use these names in review so recurring problems are easy to recognise:
   choreography for a page's text, controls or sections as it loads, or any
   movement that makes a reader wait or does not explain a state change. The
   page turn, the phone menu opening, the little splats' one-time landing, the
-  rules drawn under the headings and the wordmark's hats tipping now and then
+  rules drawn under the headings and the wordmark's hats dancing on their beat
   (see Motion direction) are deliberate.
 
 ## Contrast and accessibility
@@ -395,9 +395,13 @@ location choices, addresses, qualifications and Porto time where they help
 someone attend a lesson or understand a deadline.
 
 Keep booking confirmation in one column at every width: a compact optional notes
-box, the payment summary underneath, then the agreement and final action. Limit
-the notes box's height while the whole column fills the booking workspace,
-including on desktop. Let visitors resize the notes box for longer notes. The
+box, the payment summary underneath, then the agreement and final action. The
+notes box is one line tall, like the fields beside it, until a note needs
+more, growing with what is typed where the browser can, up to a limit; let
+visitors resize it for longer notes. Signed in, these final details are one
+card on the booking sheet, as the times are beside the calendar, headed simply
+`Confirm your lesson` or `Confirm your lessons`, weekly lessons included: the
+bar above already says they repeat (9 October 2026, at Dan's request). The
 agreement fills the same width as the final action, with centred text and its
 terms link retaining a separate action. Keep prices visible
 with the chosen lessons. The short payment summary explains payment after each
@@ -493,13 +497,14 @@ the phone menu's destinations drop in one after another as their marks land.
 
 The header wordmark is the way home, and pointing at it changes nothing: it
 keeps its own blue (the coral writing on hover was removed at Dan's request on
-9 October 2026). Its two circumflexes over ê (the chapéu, the hat) tip now and
-then on their own, so the site feels lightly alive: a lift of a few pixels and
-a small turn, the two hats turning opposite ways and settling on the soft
-spring, Português every nine seconds and Inês every thirteen, so they seldom
-coincide. The beat is the wall clock's, not the page's, so the rhythm carries
-on unbroken from page to page. It is the one ambient motion on the site.
-Reduced motion keeps the hats still.
+9 October 2026). Its two circumflexes over ê (the chapéu, the hat) dance (9
+October 2026, at Dan's request; before, each tipped once in nine or thirteen
+seconds): every four seconds they hop in turn, Português, Inês, Português,
+Inês, each hop a lift of a few pixels that tips the other way from the last
+and lands on the soft spring, then they rest for the rest of the bar. The beat
+is the wall clock's, not the page's, so the dance carries on unbroken from
+page to page. It is the one ambient motion on the site. Reduced motion keeps
+the hats still.
 
 The little splats land. Each small emblem mark arrives once like a dab of
 paint: it blooms from its middle outwards, soft at first and then sharp, a touch
@@ -842,15 +847,16 @@ calmer, without new content:
 
 - one price at the point of payment: with Weekly chosen, each length shows the
   account's saved weekly rate, the same price as the line under `Confirm your
-  weekly lessons`;
+  lessons`;
 - the payment summary is a short list rather than a paragraph: one fact per
-  item, two to a row where the column allows and one on a phone, each after a
-  little dab of paint cut from the FAQ mark and turned and coloured
-  differently from its neighbours. Every fee fact stays, with the amount in
-  coral. Paying on the lesson day, `The full rules are in terms & privacy` is
-  the last item rather than a link standing alone above the final action; with
-  card payment the agreement control is unchanged. The step heading leaves room
-  for Beth Ellen's descenders;
+  item, read top to bottom in one column at every width (paired, they wrapped
+  raggedly in a narrow column; one column since 9 October 2026, at Dan's
+  request), each after a little dab of paint cut from the FAQ mark and turned
+  and coloured differently from its neighbours. Every fee fact stays, with the
+  amount in coral. Paying on the lesson day, `The full rules are in terms &
+  privacy` is the last item rather than a link standing alone above the final
+  action; with card payment the agreement control is unchanged. The step
+  heading leaves room for Beth Ellen's descenders;
 - in a narrow booking column a lesson row's date reads short
   (`Fri 16 Oct, 18:00`), as does the next lesson, with the long form kept for
   screen readers. The row's `Change` keeps its 14 px label (see Contrast and
