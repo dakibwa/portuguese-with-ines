@@ -2,9 +2,8 @@
 
 import { MeetingLink } from "@/components/MeetingLink";
 
-import { type CSSProperties, Fragment, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type ComponentType, type CSSProperties, Fragment, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
-import dynamic from "next/dynamic";
 import {
   AlertCircle,
   ArrowLeft,
@@ -12,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  Globe,
   CircleHelp,
   CircleX,
   MessageSquareText,
@@ -20,22 +20,22 @@ import {
   X
 } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
+import { AccountMenu, type AccountSection } from "@/components/AccountMenu";
 import { CalendarBookingPrompt } from "@/components/CalendarBookingPrompt";
 /*
  * Loaded when it is needed, not before. The sign-in panel — with the Google
  * button, the segmented tabs and the whole account form behind it — is only
  * reached at the last step, and having it in the first chunk meant a student
- * choosing a lesson waited for code they might never see. It is fetched while
- * they are picking a date.
+ * choosing a lesson waited for code they might never see. It is fetched once
+ * the calendar is showing and the page is idle, so it is there by the time a
+ * time is chosen. The account's own code is fetched with the page whenever a
+ * session is stored, since a signed-in student opens on it.
  */
-const AuthPanel = dynamic(() => import("@/components/AuthPanel").then((m) => m.AuthPanel), {
-  loading: () => <p className="booking-state-note">Loading…</p>
-});
-const AccountControls = dynamic(() => import("@/components/MyLessons").then((m) => m.MyLessons), {
-  loading: () => <p className="booking-state-note">Loading your account…</p>
-});
+const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/components/AuthPanel").then((m) => m.AuthPanel), "Loading…");
+const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons));
+if (typeof window !== "undefined" && readSession()) void loadAccountControls();
 import { LessonMark } from "@/components/LessonMarks";
-import { fetchMe, isReturningDevice, readSession, rememberReturningStudent, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
+import { clearSession, fetchMe, isReturningDevice, readSession, rememberReturningStudent, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { SITE_BASE_PATH } from "@/lib/paths";
@@ -45,11 +45,11 @@ import {
   buildBookingWeeks,
   cancelBooking,
   createBooking,
-  differingLocalTime,
-  formatSlotTimeForStudent,
   stripePaymentUrl,
+  timeZoneName,
   fetchAvailability,
   fetchBooking,
+  peekAvailability,
   fetchRecurringRates,
   recoverBookingPayment,
   formatBookedLessonLabel,
@@ -57,8 +57,15 @@ import {
   formatMoneyCents,
   formatSlotTime,
   listLessonTypes,
+  clockDiffersFromPorto,
+  dateKeyIn,
+  formatShortDay,
+  formatTimeIn,
   portoDateKey,
+  portoTimeToUtc,
   portoWeekKey,
+  slotsByDateIn,
+  weekKeyOf,
   previewSeries,
   rescheduleBooking,
   rescheduleSeries,
@@ -96,7 +103,6 @@ type CalendarWeekCount = 1 | 4;
 const CALENDAR_PAGE_WEEKS = 4;
 
 const dayMonth = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-const shortDay = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: BOOKING_TIME_ZONE });
 
 function formatDayMonth(key: string) {
   return dayMonth.format(new Date(`${key}T12:00:00Z`));
@@ -109,38 +115,42 @@ function formatDayMonth(key: string) {
  * wrapping.
  */
 /**
- * A day's free times in two fixed halves, split at 14:00 Porto time and named
- * by the same span every day (from Inês's earliest start to 14:00, and from
- * 14:00 to her latest), so a full day of quarter hours is never one wall of
- * buttons and the choice never shifts under the student. A half with nothing
+ * A day's free times in two fixed halves, divided where Inês's day divides
+ * (14:00 in Porto) and named by the same span every day (from her earliest
+ * start to the divide, and from it to her latest), so a full day of quarter
+ * hours is never one wall of buttons and the choice never shifts under the
+ * student. It reads the clock the calendar shows (`zone`). A half with nothing
  * free that day says so. Each half is a small timetable: one row per hour,
  * each start minute in its own column. It opens on the half holding the time
  * already chosen, or the first with free times.
  */
-function TimePicker({ day, renderTime, selected = "", slots }: {
-  /** The earliest and latest start across every loaded day, Porto time. */
-  day: { first: string; last: string };
+function TimePicker({ halves, renderTime, selected = "", slots, zone }: {
+  /** Where the day divides and the span its halves are named by; null keeps one list. */
+  halves: { first: string; last: string; split: string } | null;
   renderTime: (slot: Slot, place: CSSProperties | undefined) => ReactNode;
   selected?: string;
   slots: Slot[];
+  zone: string;
 }) {
   const name = useId();
-  const clock = (startAt: string) => formatSlotTime(startAt);
-  const partOf = (startAt: string) => (clock(startAt) < DAY_SPLIT ? "early" : "late");
-  const split = day.first < DAY_SPLIT && day.last >= DAY_SPLIT;
+  const clock = (startAt: string) => formatSlotTime(startAt, zone);
+  const divide = halves?.split ?? "";
+  const partOf = (startAt: string) => (clock(startAt) < divide ? "early" : "late");
   const parts = useMemo(
     () => (["early", "late"] as const).map((id) => ({
       id,
-      label: id === "early" ? `${day.first}–${DAY_SPLIT}` : day.last === DAY_SPLIT ? DAY_SPLIT : `${DAY_SPLIT}–${day.last}`,
+      label: !halves
+        ? ""
+        : id === "early" ? `${halves.first}–${halves.split}` : halves.last === halves.split ? halves.split : `${halves.split}–${halves.last}`,
       slots: slots.filter((slot) => partOf(slot.startAt) === id)
     })),
-    // partOf reads only the slot times.
+    // partOf reads only the slot times, in this zone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [slots, day.first, day.last]
+    [slots, halves, zone]
   );
   const [chosen, setChosen] = useState(selected ? partOf(selected) : "");
   if (!slots.length) return null;
-  const current = split
+  const current = halves
     ? parts.find((part) => part.id === chosen) ?? parts.find((part) => part.slots.length) ?? parts[0]
     : { id: "all", label: "", slots };
   const minutes = [...new Set(slots.map((slot) => clock(slot.startAt).slice(3, 5)))].sort();
@@ -148,9 +158,9 @@ function TimePicker({ day, renderTime, selected = "", slots }: {
   const timetable = minutes.length <= 4;
   return (
     <div className="time-picker">
-      {split ? (
+      {halves ? (
         <div
-          aria-label="Part of the day, Porto time"
+          aria-label={`Part of the day, ${timeZoneName(zone)}`}
           className={`segmented time-picker__parts segmented--position-${current.id === "late" ? 1 : 0}`}
           role="radiogroup"
         >
@@ -175,13 +185,13 @@ function TimePicker({ day, renderTime, selected = "", slots }: {
           } : undefined))}
         </div>
       ) : (
-        <p className="booking-state-note time-picker__empty">Nothing free {current.id === "early" ? "before" : "from"} {DAY_SPLIT} on this day.</p>
+        <p className="booking-state-note time-picker__empty">Nothing free {current.id === "early" ? "before" : "from"} {divide} on this day.</p>
       )}
     </div>
   );
 }
 
-/** Where a day's times divide: the morning's, and the rest of the day's. */
+/** Where Inês's day divides in Porto: the morning's times, and the rest. */
 const DAY_SPLIT = "14:00";
 
 function daysBetween(fromKey: string, toKey: string) {
@@ -220,13 +230,15 @@ function RepeatAvailability({
   error,
   previewing,
   preview,
-  setup = false
+  setup = false,
+  zone
 }: {
   chosen: boolean;
   error: string;
   previewing: boolean;
   preview: { bookable: string[]; skipped: string[] } | null;
   setup?: boolean;
+  zone: string;
 }) {
   // A fully available repeat is the expected state, so it should not consume
   // space. Guidance, loading, a failed check, and clashing weeks are the only
@@ -272,8 +284,8 @@ function RepeatAvailability({
                 <li key={startAt}>
                   {/* A missing clock-change time has no instant. The legacy
                       skipped value identifies its date, never its wall time. */}
-                  <span className="visually-hidden">{formatLongDate(startAt)}</span>
-                  <span aria-hidden="true">{shortDay.format(new Date(startAt))}</span>
+                  <span className="visually-hidden">{formatLongDate(startAt, zone)}</span>
+                  <span aria-hidden="true">{formatShortDay(startAt, zone)}</span>
                 </li>
               ))}
             </ul>
@@ -312,8 +324,8 @@ function WhenText({ long, short }: { long: string; short?: string }) {
   );
 }
 
-function shortWhen(startAt: string) {
-  return `${shortDay.format(new Date(startAt))}, ${formatSlotTime(startAt)}`;
+function shortWhen(startAt: string, zone: string) {
+  return `${formatShortDay(startAt, zone)}, ${formatSlotTime(startAt, zone)}`;
 }
 
 function BookingSelectionSummary({
@@ -421,13 +433,48 @@ function loadStripeJs() {
 }
 
 let bookingMotionTimer: number | null = null;
+let stageResize: Animation | null = null;
 
+// `booking-transitioning` on the root marks a decision's motion while it runs.
+// Nothing is styled by it; the journey checks wait for it to clear.
 function finishBookingMotion() {
   if (bookingMotionTimer !== null) window.clearTimeout(bookingMotionTimer);
   document.documentElement.classList.remove("booking-transitioning");
   bookingMotionTimer = null;
 }
 
+/*
+ * What a decision can bring into view. Each one that is new after the
+ * decision dissolves in; whatever was already there stays perfectly still,
+ * rather than every surface on the page fading again at every click.
+ */
+const BOOKING_SURFACES = [
+  ".unified-calendar",
+  ".account-card",
+  ".auth-panel",
+  ".booking-success",
+  ".booking-alert",
+  ".booking-bar",
+  ".booking-confirmation-stage",
+  ".booking-outcome",
+  ".booking-selection-stack",
+  ".booking-workflow-sign-in",
+  ".calendar-weeks",
+  ".lesson-overview",
+  ".managed-lesson__head",
+  ".unified-calendar__panel-content",
+  ".unified-calendar__toolbar"
+].join(",");
+
+const MOTION_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+/**
+ * A booking decision happens at once; the workspace then moves to it. The
+ * surfaces it brought dissolve in from a few pixels below, and the workspace
+ * eases from its old height to its new one, carrying the page beneath with
+ * it, instead of snapping. Controls are live throughout; reduced motion gets
+ * the new state as it is.
+ */
 function transitionBooking(update: () => void) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     update();
@@ -435,9 +482,138 @@ function transitionBooking(update: () => void) {
   }
 
   if (bookingMotionTimer !== null) finishBookingMotion();
+  // The steps section stays put while its content changes, the booking's
+  // confirmation card included.
+  const stage = document.querySelector<HTMLElement>(".booking-steps");
+  const present = new Set(stage ? stage.querySelectorAll(BOOKING_SURFACES) : []);
+  // Mid-resize this is the height on screen, so a quick second decision
+  // carries on from where the first one had got to.
+  const fromHeight = stage?.getBoundingClientRect().height ?? 0;
+  const floor = stage ? fillingHeight(stage, fromHeight) : 0;
+  // Held through the update: measuring a shorter page would otherwise snap the
+  // scroll position up before anything could ease.
+  if (stage && fromHeight) stage.style.minHeight = `${fromHeight}px`;
   document.documentElement.classList.add("booking-transitioning");
-  flushSync(update);
-  bookingMotionTimer = window.setTimeout(finishBookingMotion, 200);
+  try {
+    flushSync(update);
+  } finally {
+    bookingMotionTimer = window.setTimeout(finishBookingMotion, 260);
+    if (stage?.isConnected) settleStage(stage, fromHeight, floor, present);
+    else if (stage) stage.style.minHeight = "";
+  }
+}
+
+/**
+ * A component whose code is fetched when it is needed. Once the code is here
+ * it renders in the same commit as the decision that shows it, so that
+ * decision's transition eases to its real height. (next/dynamic suspended on
+ * every first render, even with the code already fetched, and React then held
+ * its fallback for 300ms before the form popped in.) Code still on its way
+ * eases in when it arrives.
+ */
+function deferred<Props extends object>(fetchComponent: () => Promise<ComponentType<Props>>, waiting = "") {
+  let ready: ComponentType<Props> | null = null;
+  let loading: Promise<ComponentType<Props>> | null = null;
+  const load = () =>
+    (loading ??= fetchComponent().then(
+      (component) => (ready = component),
+      (error: unknown) => {
+        loading = null;
+        throw error;
+      }
+    ));
+  function Deferred(props: Props) {
+    const [Loaded, setLoaded] = useState(() => ready);
+    const [failed, setFailed] = useState(false);
+    useEffect(() => {
+      if (Loaded || failed) return;
+      let live = true;
+      load().then(
+        (component) => {
+          if (live) transitionBooking(() => setLoaded(() => component));
+        },
+        () => {
+          if (live) setFailed(true);
+        }
+      );
+      return () => {
+        live = false;
+      };
+    }, [Loaded, failed]);
+    if (Loaded) return <Loaded {...props} />;
+    if (failed) {
+      return (
+        <p className="booking-state-note" role="alert">
+          This part of the page couldn&rsquo;t load.{" "}
+          <button className="text-action" onClick={() => setFailed(false)} type="button">
+            Try again
+          </button>
+        </p>
+      );
+    }
+    return waiting ? <p className="booking-state-note">{waiting}</p> : null;
+  }
+  return { Component: Deferred, load };
+}
+
+function settleStage(stage: HTMLElement, fromHeight: number, floor: number, present: Set<Element>) {
+  stageResize?.cancel();
+  stageResize = null;
+  const toHeight = contentHeight(stage);
+  stage.style.minHeight = "";
+  // Only the part of the change that shows is eased.
+  const start = Math.max(fromHeight, floor);
+  const end = Math.max(toHeight, floor);
+  if (fromHeight && Math.abs(end - start) > 4) {
+    stageResize = stage.animate(
+      [{ height: `${start}px`, overflow: "clip" }, { height: `${end}px`, overflow: "clip" }],
+      { duration: Math.round(Math.min(460, 240 + Math.abs(end - start) * 0.25)), easing: MOTION_EASE }
+    );
+  }
+
+  // Already visible as they start, so a decision never leaves a blank moment.
+  // The rise is a `translate`, which leaves a surface's own transform alone.
+  const arrived: Element[] = [];
+  for (const surface of stage.querySelectorAll(BOOKING_SURFACES)) {
+    if (present.has(surface) || arrived.some((outer) => outer.contains(surface))) continue;
+    arrived.push(surface);
+    // An overlay, like Change's, arrives with the dialogs' own fade.
+    if (getComputedStyle(surface).position === "fixed") continue;
+    surface.animate(
+      [{ opacity: 0.4, translate: "0 6px" }, { opacity: 1, translate: "0 0" }],
+      { duration: 260, easing: MOTION_EASE }
+    );
+  }
+}
+
+/**
+ * The workspace's height at which the page exactly fills the window. A short
+ * page is held at the window's height with the footer at its foot, so below
+ * this nothing on screen moves. Easing through that part spent the ease's
+ * quick start where it couldn't be seen, and the part that showed snapped.
+ */
+function fillingHeight(stage: HTMLElement, height: number) {
+  const column = stage.parentElement;
+  if (!column) return 0;
+  const columnStyle = getComputedStyle(column);
+  const roomBelow =
+    column.getBoundingClientRect().bottom - parseFloat(columnStyle.borderBottomWidth) - parseFloat(columnStyle.paddingBottom) -
+    stage.getBoundingClientRect().bottom - parseFloat(getComputedStyle(stage).marginBottom);
+  const pastWindow = document.documentElement.scrollHeight - window.innerHeight;
+  return height + Math.max(0, roomBelow) - Math.max(0, pastWindow);
+}
+
+/** The workspace's height as its content lays out, whatever it is held at. */
+function contentHeight(stage: HTMLElement) {
+  const box = stage.getBoundingClientRect();
+  const style = getComputedStyle(stage);
+  let bottom = box.top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop);
+  for (const child of stage.children) {
+    const childStyle = getComputedStyle(child);
+    if (childStyle.display === "none" || childStyle.position === "fixed" || childStyle.position === "absolute") continue;
+    bottom = Math.max(bottom, child.getBoundingClientRect().bottom + parseFloat(childStyle.marginBottom));
+  }
+  return bottom - box.top + parseFloat(style.paddingBottom) + parseFloat(style.borderBottomWidth);
 }
 
 /**
@@ -635,6 +811,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     | "confirm-cancel-sequence"
   >("view");
   const [manageLoading, setManageLoading] = useState(false);
+  // The lesson as the calendar already knows it, shown while its full details
+  // load, so opening it is immediate and the dialog never changes size.
+  const [managePreview, setManagePreview] = useState<MyBooking | null>(null);
   const managedRequest = useRef(0);
   const accountRequest = useRef(0);
   const bookingRequest = useRef(0);
@@ -700,6 +879,32 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       : managed.durationPrices?.[selectedManagedType.duration_minutes] ?? selectedManagedType.price_cents
     : undefined;
   const isManagedReschedule = manageMode === "reschedule" || manageMode === "reschedule-sequence";
+
+  /*
+   * The clock each view reads. Online, a lesson is at the student's own time,
+   * wherever they are; a lesson in Porto happens there, so it stays on Porto's
+   * clock. Booking and changing a lesson follow the place chosen, and Your
+   * lessons shows each lesson by its own. Dates follow the same clock, so a
+   * lesson falls on the student's own day.
+   */
+  const zoneOf = (lesson: { location: "online" | "porto" }) => (lesson.location === "porto" ? BOOKING_TIME_ZONE : studentZone);
+  const viewZone = managed && isManagedReschedule
+    ? zoneOf({ location: managedLocation })
+    : intent === "book" && !managed
+      ? zoneOf(form)
+      : studentZone;
+  const viewZoneName = timeZoneName(viewZone);
+  const viewTodayKey = todayKey ? dateKeyIn(new Date(clock), viewZone) : "";
+  // Free times on the shown clock's days (the Worker groups them by Porto's).
+  const viewSlotsByDate = useMemo(() => slotsByDateIn(slotsByDate, viewZone), [slotsByDate, viewZone]);
+  const studentClockDiffers = useMemo(() => clockDiffersFromPorto(studentZone), [studentZone]);
+  // A time standing on its own names its clock only for a student whose clock
+  // differs from Porto's. In Portugal a plain time is unambiguous, as it was;
+  // the confirmation and the day's times still name the clock once.
+  const lessonTime = useCallback(
+    (startAt: string, zone: string) => (studentClockDiffers ? formatTimeIn(startAt, zone) : formatSlotTime(startAt, zone)),
+    [studentClockDiffers]
+  );
   const canChangeManagedDuration =
     managedDurationChoices.length > 1 && ["not_required", "scheduled"].includes(managedPaymentStatus);
 
@@ -958,7 +1163,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         setManaged(result);
         setManagedLessonTypeId(result.booking.lessonType.id);
         setManagedLocation(result.booking.location);
-        setSelectedDate(portoDateKey(new Date(result.booking.startAt)));
+        // Read here rather than from render state: this callback outlives renders.
+        setSelectedDate(dateKeyIn(new Date(result.booking.startAt), result.booking.location === "porto" ? BOOKING_TIME_ZONE : browserTimeZone()));
         setManageMode(initialMode);
         setManageLoading(false);
       });
@@ -1040,9 +1246,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         return;
       }
 
-      setLoadingSlots(true);
-      setAvailabilityError("");
-
       /*
        * Ask for more than the horizon and let the Worker clamp it, rather than
        * hard-coding a window that has to be remembered every time the horizon
@@ -1051,11 +1254,24 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
        * drawn weeks of empty cells announcing "no times free", which would have
        * been a lie rather than a gap.
        */
-      fetchAvailability(availabilityLessonTypeId, todayKey, addDaysToKey(todayKey, 140), signal, {
-        manageToken: movingToken,
-        seriesId: movingSeriesId,
-        session: movingSeriesId ? readSession() : ""
-      })
+      const until = addDaysToKey(todayKey, 140);
+      const moving = { manageToken: movingToken, seriesId: movingSeriesId, session: movingSeriesId ? readSession() : "" };
+      // Times fetched a moment ago (or ahead of time, while the page was idle)
+      // show at once, with no "Checking what's free…" in between.
+      const ready = peekAvailability(availabilityLessonTypeId, todayKey, until, moving);
+      if (ready) {
+        setSlotsByDate(ready.slotsByDate);
+        setHorizonDays(ready.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
+        setLessonGapMinutes(Math.max(0, Number(ready.bufferMinutes) || 0));
+        setAvailabilityError("");
+        setLoadingSlots(false);
+        return;
+      }
+
+      setLoadingSlots(true);
+      setAvailabilityError("");
+
+      fetchAvailability(availabilityLessonTypeId, todayKey, until, signal, moving)
         .then((data) => {
           if (request !== availabilityVersion.current || signal?.aborted || readSession() !== session) return;
           setSlotsByDate(data.slotsByDate);
@@ -1084,6 +1300,45 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       controller.abort();
     };
   }, [loadAvailability]);
+
+  /*
+   * While the page is idle, fetch what the next likely step needs, so it shows
+   * at once rather than after a round trip: the other lessons on offer while
+   * booking, the lesson a signed-in student would book next from their
+   * lessons, and an open lesson's own free times for Change. Signed out, the
+   * account form's code comes too, ready for the confirmation.
+   */
+  useEffect(() => {
+    if (!todayKey || checkingSession || loadingSlots) return;
+    const until = addDaysToKey(todayKey, 140);
+    const wanted: { typeId: string; manageToken?: string }[] = [];
+    if (managed) {
+      if (!isManagedReschedule && managed.booking.status === "confirmed" && !managed.isPast && !managed.changeLocked && managedToken) {
+        wanted.push({ typeId: managed.booking.lessonType.id, manageToken: managedToken });
+      }
+    } else if (intent === "book") {
+      for (const type of lessonTypes) {
+        if (type.id !== lessonTypeId && (type.id !== "trial" || (offerTrial && !hasPriorBooking))) wanted.push({ typeId: type.id });
+      }
+    } else if (intent === "lessons" && student) {
+      wanted.push({ typeId: defaultLessonChoice(false).typeId });
+    }
+    const signedOut = !student && intent === "book";
+    if (!wanted.length && !signedOut) return;
+    const run = () => {
+      for (const { typeId, manageToken } of wanted) {
+        if (typeId) void fetchAvailability(typeId, todayKey, until, undefined, { manageToken }).catch(() => {});
+      }
+      if (signedOut) void loadAuthPanel();
+    };
+    const idle = window.requestIdleCallback ? window.requestIdleCallback(run, { timeout: 2000 }) : window.setTimeout(run, 400);
+    return () => {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idle);
+      else window.clearTimeout(idle);
+    };
+  // defaultLessonChoice reads the lesson types and preferences listed here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayKey, checkingSession, loadingSlots, managed, isManagedReschedule, managedToken, intent, lessonTypes, lessonTypeId, offerTrial, hasPriorBooking, student, preferredLessonTypeId]);
 
   const calendarBookings = myBookings
     .filter((booking) => booking.status === "confirmed" && Date.parse(booking.endAt) > clock)
@@ -1119,20 +1374,22 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     .filter((booking) => booking.status === "confirmed")
     .sort((a, b) => b.startAt.localeCompare(a.startAt))[0]?.location === "porto" ? "porto" : "online";
 
+  // Each lesson on its own clock's day.
+  const lessonDateKey = (booking: MyBooking) => dateKeyIn(new Date(booking.startAt), zoneOf(booking));
   const allBookingsByDate = calendarBookings.reduce<Record<string, MyBooking[]>>((dates, booking) => {
-    const key = portoDateKey(new Date(booking.startAt));
+    const key = lessonDateKey(booking);
     (dates[key] ??= []).push(booking);
     return dates;
   }, {});
   const isLessonsCalendarOverview = intent === "lessons" && !isManagedReschedule;
-  const allCalendarWeeks = todayKey ? buildBookingWeeks(todayKey, horizonDays) : [];
+  const allCalendarWeeks = viewTodayKey ? buildBookingWeeks(viewTodayKey, horizonDays) : [];
   const firstRelevantWeek = allCalendarWeeks.findIndex((week) =>
-    week.cells.some((cell) => Boolean(slotsByDate[cell.key]?.length || allBookingsByDate[cell.key]?.length))
+    week.cells.some((cell) => Boolean(viewSlotsByDate[cell.key]?.length || allBookingsByDate[cell.key]?.length))
   );
   const currentWeekHasBooking = Boolean(
     allCalendarWeeks[0]?.cells.some((cell) => Boolean(allBookingsByDate[cell.key]?.length))
   );
-  const todayWeekday = todayKey ? new Date(`${todayKey}T12:00:00Z`).getUTCDay() : -1;
+  const todayWeekday = viewTodayKey ? new Date(`${viewTodayKey}T12:00:00Z`).getUTCDay() : -1;
   const startsOnClosedWeekend = (todayWeekday === 0 || todayWeekday === 6) && !currentWeekHasBooking;
   const uncappedCalendarWeeks =
     availabilityLessonTypeId && firstRelevantWeek > 0
@@ -1152,11 +1409,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // Your lessons pages the same way, from this week through the horizon or to
   // the last booked lesson if that is later (an ongoing run is kept twelve
   // weeks ahead), so every lesson can be reached from the calendar.
-  const lastLessonKey = calendarBookings.length
-    ? portoDateKey(new Date(calendarBookings[calendarBookings.length - 1].startAt))
-    : "";
-  const lessonsRangeWeeks = todayKey
-    ? buildBookingWeeks(todayKey, Math.max(horizonDays, lastLessonKey ? daysBetween(todayKey, lastLessonKey) : 0))
+  const lastLessonKey = calendarBookings.map(lessonDateKey).sort().at(-1) ?? "";
+  const lessonsRangeWeeks = viewTodayKey
+    ? buildBookingWeeks(viewTodayKey, Math.max(horizonDays, lastLessonKey ? daysBetween(viewTodayKey, lastLessonKey) : 0))
         .filter((week, index) => index < horizonWeekCount || week.cells[0].key <= lastLessonKey)
     : [];
   const rangeWeeks = isLessonsCalendarOverview ? lessonsRangeWeeks : bookingRangeWeeks;
@@ -1168,7 +1423,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         .map((week, position) => (position === 0 && !week.showMonth ? { ...week, showMonth: true } : week))
     );
   }
-  const pageAnchor = calendarPageStart || (selectedDate ? portoWeekKey(`${selectedDate}T12:00:00Z`) : "");
+  const pageAnchor = calendarPageStart || (selectedDate ? weekKeyOf(selectedDate) : "");
   const calendarPageIndex = Math.max(
     0,
     pageAnchor ? calendarPages.findIndex((page) => page.some((week) => week.key === pageAnchor)) : 0
@@ -1177,14 +1432,16 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const pageFirstKey = pagedCalendarWeeks[0]?.cells[0]?.key ?? "";
   const pageLastKey = pagedCalendarWeeks.at(-1)?.cells.at(-1)?.key ?? "";
   const laterLessonCount = isLessonsCalendarOverview && pageLastKey
-    ? calendarBookings.filter((booking) => portoDateKey(new Date(booking.startAt)) > pageLastKey).length
+    ? calendarBookings.filter((booking) => lessonDateKey(booking) > pageLastKey).length
     : 0;
   const selectedCalendarWeek = selectedDate
     ? rangeWeeks.find((week) => week.cells.some((cell) => cell.key === selectedDate))
     : undefined;
   const visibleCalendarWeekCount = calendarWeekCount === 1 && !selectedCalendarWeek ? CALENDAR_PAGE_WEEKS : calendarWeekCount;
+  // A second weekly time is chosen in the first one's week, shown on the
+  // calendar's clock. (Which times qualify is Porto's week: see selectionWeek.)
   const restrictedWeek = !managed && bookingKind === "recurring" && savedChoices.length
-    ? portoWeekKey(savedChoices[0].startAt) : "";
+    ? weekKeyOf(dateKeyIn(new Date(savedChoices[0].startAt), viewZone)) : "";
   const displayedCalendarWeeks = restrictedWeek
     ? rangeWeeks.filter((week) => week.key === restrictedWeek).map((week) => ({ ...week, showMonth: true }))
     : visibleCalendarWeekCount === 1 && selectedCalendarWeek
@@ -1196,17 +1453,17 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const calendarRangeLabel = shownFirstKey ? `${formatDayMonth(shownFirstKey)} – ${formatDayMonth(shownLastKey)}` : "";
   const visibleCalendarDates = new Set(displayedCalendarWeeks.flatMap((week) => week.cells.map((cell) => cell.key)));
   const calendarWindowBookings = calendarBookings.filter((booking) =>
-    visibleCalendarDates.has(portoDateKey(new Date(booking.startAt)))
+    visibleCalendarDates.has(lessonDateKey(booking))
   );
   const bookingsByDate = calendarWindowBookings.reduce<Record<string, MyBooking[]>>((dates, booking) => {
-    const key = portoDateKey(new Date(booking.startAt));
+    const key = lessonDateKey(booking);
     (dates[key] ??= []).push(booking);
     return dates;
   }, {});
   const selectionWeek = !managed && bookingKind === "recurring" && savedChoices.length
     ? portoWeekKey(savedChoices[0].startAt) : "";
   const lessonGapMs = lessonGapMinutes * 60000;
-  const selectableSlots = (date: string) => (slotsByDate[date] ?? []).filter((slot) => managed || intent !== "book" || (
+  const selectableSlots = (date: string) => (viewSlotsByDate[date] ?? []).filter((slot) => managed || intent !== "book" || (
     (!selectionWeek || portoWeekKey(slot.startAt) === selectionWeek) &&
     !savedChoices.some((choice) =>
       Date.parse(choice.startAt) < Date.parse(slot.endAt) + lessonGapMs &&
@@ -1223,7 +1480,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       if (first) soonestSlots.push(first);
     }
   }
-  const managedDate = managed ? portoDateKey(new Date(managed.booking.startAt)) : "";
+  const managedDate = managed ? dateKeyIn(new Date(managed.booking.startAt), viewZone) : "";
   const shouldShowCurrentManagedSlot = Boolean(
     managed &&
     isManagedReschedule &&
@@ -1237,20 +1494,40 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         { startAt: managed.booking.startAt, endAt: managed.booking.endAt }
       ].sort((a, b) => a.startAt.localeCompare(b.startAt))
     : rawDaySlots;
-  // The halves a day's times split into are named the same every day: from
-  // the hour of the earliest start in the loaded weeks to the latest, in whole
-  // hours so a 90-minute lesson's earlier last start does not move them.
   const managedStartAt = shouldShowCurrentManagedSlot && managed ? managed.booking.startAt : "";
-  const startSpan = useMemo(() => {
-    const clocks = Object.values(slotsByDate).flat().map((slot) => formatSlotTime(slot.startAt));
-    if (managedStartAt) clocks.push(formatSlotTime(managedStartAt));
-    clocks.sort();
-    const first = clocks[0] ?? "";
-    const last = clocks[clocks.length - 1] ?? "";
+  /*
+   * Inês's day divides at 14:00 in Porto. On another clock it divides at that
+   * same moment, unless her day runs across the student's midnight, when it
+   * divides at their noon instead. Named in the shown clock, from the earliest
+   * start in the loaded weeks to the latest, in whole hours so a 90-minute
+   * lesson's earlier last start does not move them.
+   */
+  const timeHalves = useMemo(() => {
+    const starts = Object.values(slotsByDate).flat().map((slot) => slot.startAt);
+    if (managedStartAt) starts.push(managedStartAt);
+    if (!starts.length) return null;
+    const clocks = starts.map((startAt) => formatSlotTime(startAt, viewZone)).sort();
+    let split = DAY_SPLIT;
+    if (viewZone !== BOOKING_TIME_ZONE) {
+      const portoClocks = starts.map((startAt) => formatSlotTime(startAt)).sort();
+      const reference = todayKey || portoDateKey(new Date());
+      const shown = (portoClock: string) => {
+        try {
+          return formatSlotTime(portoTimeToUtc(reference, portoClock), viewZone);
+        } catch {
+          return "";
+        }
+      };
+      const wraps = shown(portoClocks[0]) > shown(portoClocks[portoClocks.length - 1]);
+      split = wraps ? "12:00" : shown(DAY_SPLIT) || "12:00";
+    }
+    const early = clocks.filter((clock) => clock < split);
+    const late = clocks.filter((clock) => clock >= split);
+    if (!early.length || !late.length) return null;
     const upToHour = (clock: string) =>
       clock.endsWith(":00") ? clock : `${String(Number(clock.slice(0, 2)) + 1).padStart(2, "0")}:00`;
-    return { first: first && `${first.slice(0, 2)}:00`, last: last && upToHour(last) };
-  }, [slotsByDate, managedStartAt]);
+    return { first: `${early[0].slice(0, 2)}:00`, last: upToHour(late[late.length - 1]), split };
+  }, [slotsByDate, managedStartAt, viewZone, todayKey]);
   // A refreshed availability response must not erase a date from the review
   // after a failed submission. Keep it visible so the student can change it.
   const reviewedSlot = useMemo(() => step === "details" && selectedSlot && lessonType && !managed
@@ -1284,6 +1561,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     ? lessonSeries.find((entry) => entry.id === resolvedManagedSeriesId) ?? null
     : null;
   const manageDialogOpen = Boolean(manageLoading || manageError || managed);
+  const lessonPreview = manageLoading && managePreview?.manageToken === managedToken ? managePreview : null;
   const regularLessonTypes = lessonTypes.filter((type) => type.id !== "trial");
   const trialLessonType = lessonTypes.find((type) => type.id === "trial") ?? null;
   const panelMotionKey = showAccountSignIn && !student
@@ -1380,7 +1658,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     }));
     if (!rejected.length) return;
     const describe = (starts: string[], reason: string) => starts.length
-      ? `${starts.map((startAt) => `${formatLongDate(startAt)}, ${formatSlotTime(startAt)}`).join("; ")} ${starts.length === 1 ? "is" : "are"} ${reason}.`
+      ? `${starts.map((startAt) => `${formatLongDate(startAt, viewZone)}, ${lessonTime(startAt, viewZone)}`).join("; ")} ${starts.length === 1 ? "is" : "are"} ${reason}.`
       : "";
     setSlotNotice([
       describe(taken, "not free at this length"),
@@ -1391,7 +1669,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setSelectedSlot("");
       goTo("time");
     }
-  }, [loadingSlots, slotsByDate, selectedSlot, step, loadError, lessonGapMs, savedChoices]);
+  }, [loadingSlots, slotsByDate, selectedSlot, step, loadError, lessonGapMs, savedChoices, viewZone, lessonTime]);
 
   useEffect(() => {
     if (!isConfirmingBooking) return;
@@ -1409,7 +1687,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
    */
   useEffect(() => {
     if (!confirmation) return;
-    const frame = requestAnimationFrame(() => document.getElementById("booking-success-heading")?.focus());
+    const frame = requestAnimationFrame(() => document.getElementById("booking-success-heading")?.focus({ preventScroll: true }));
+    orientTo("booking-success");
     return () => cancelAnimationFrame(frame);
   }, [confirmation]);
 
@@ -1467,6 +1746,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     lessonTrigger.current = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     const seriesId = booking.seriesId && activeLessonSeriesIds.has(booking.seriesId) ? booking.seriesId : null;
     transitionBooking(() => {
+      setManagePreview(booking);
       void openManaged(booking.manageToken, seriesId);
     });
   }
@@ -1526,10 +1806,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     closeManagedLesson();
     setIntent("lessons");
     setAccountView(section);
-    // Wide, the account bar's Your lessons is the way back from booking, so
-    // leaving booking by it refreshes the list just as the booking bar's own
-    // way back does. From the profile or past lessons nothing has changed, and
-    // a reload there could only bring back an older copy of a field just saved.
+    // Leaving booking for Your lessons refreshes the list, as the booking
+    // bar's own way back does. From the profile or past lessons nothing has
+    // changed, and a reload there could only bring back an older copy of a
+    // field just saved.
     if (section === "upcoming" && intent === "book") setUpcomingRequestKey((current) => current + 1);
     setShowAccountSignIn(false);
     setBookingKind("");
@@ -1686,14 +1966,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         setManaged(saved);
         setManagedLessonTypeId(saved.booking.lessonType.id);
         setManagedLocation(saved.booking.location);
-        setSelectedDate(portoDateKey(new Date(saved.booking.startAt)));
+        setSelectedDate(dateKeyIn(new Date(saved.booking.startAt), zoneOf(saved.booking)));
         setSelectedSlot("");
         setManageMode("view");
         setManageOutcome(
           movingSequence
             ? `Your upcoming weekly lessons have moved. We’ve emailed you and updated your calendar.${
                 keptStarts.length
-                  ? ` ${keptStarts.map((startAt) => `${formatLongDate(startAt)} at ${formatSlotTime(startAt)}`).join(" and ")} stays where it is, as it’s less than ${NOTICE_HOURS} hours away.`
+                  ? ` ${keptStarts.map((startAt) => `${formatLongDate(startAt, viewZone)} at ${lessonTime(startAt, viewZone)}`).join(" and ")} stays where it is, as it’s less than ${NOTICE_HOURS} hours away.`
                   : ""
               }`
             : saved.booking.lessonType.id === previousLessonTypeId
@@ -1857,12 +2137,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   function beginManagedReschedule() {
     if (!managed) return;
-    const managedDate = portoDateKey(new Date(managed.booking.startAt));
+    const managedDate = dateKeyIn(new Date(managed.booking.startAt), zoneOf(managed.booking));
     const isInCalendar = bookingRangeWeeks.some((week) => week.cells.some((cell) => cell.key === managedDate));
     const calendarHeight = managedRescheduleRef.current?.getBoundingClientRect().height ?? 0;
     transitionBooking(() => {
       setManagedCalendarPlaceholderHeight(calendarHeight);
-      setCalendarPageStart(isInCalendar ? portoWeekKey(managed.booking.startAt) : "");
+      setCalendarPageStart(isInCalendar ? weekKeyOf(managedDate) : "");
       setAvailabilityRequest((current) => current + 1);
       setManageMode("reschedule");
       setManagedLessonTypeId(managed.booking.lessonType.id);
@@ -1877,12 +2157,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   function beginManagedSeriesReschedule() {
     if (!managed || !activeManagedSeries) return;
-    const managedDate = portoDateKey(new Date(managed.booking.startAt));
+    const managedDate = dateKeyIn(new Date(managed.booking.startAt), zoneOf(managed.booking));
     const isInCalendar = bookingRangeWeeks.some((week) => week.cells.some((cell) => cell.key === managedDate));
     const calendarHeight = managedRescheduleRef.current?.getBoundingClientRect().height ?? 0;
     transitionBooking(() => {
       setManagedCalendarPlaceholderHeight(calendarHeight);
-      setCalendarPageStart(isInCalendar ? portoWeekKey(managed.booking.startAt) : "");
+      setCalendarPageStart(isInCalendar ? weekKeyOf(managedDate) : "");
       setAvailabilityRequest((current) => current + 1);
       setManageMode("reschedule-sequence");
       setManagedLessonTypeId(managed.booking.lessonType.id);
@@ -1915,6 +2195,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setPaymentError("");
       setUpcomingRequestKey((current) => current + 1);
     });
+    orientTo("account-controls");
+    window.requestAnimationFrame(() => document.getElementById("upcoming-lessons-heading")?.focus({ preventScroll: true }));
   }
 
   // What shapes a booking changes in place, in the bar, without moving the
@@ -1950,8 +2232,21 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         ? `${dropped.length === 1 ? "Your other chosen lesson" : `Your other ${dropped.length} chosen lessons`} came off with the change of lesson. Add ${dropped.length === 1 ? "it" : "them"} again if you need to.`
         : "");
       if (typeId !== lessonTypeId) {
-        setLoadingSlots(true);
-        setSlotsByDate({});
+        const ready = todayKey ? peekAvailability(typeId, todayKey, addDaysToKey(todayKey, 140)) : null;
+        if (ready) {
+          // Usually fetched while the page was idle: the days simply change,
+          // with the new lesson's gap in the same commit, so the times kept
+          // below are checked against it.
+          setSlotsByDate(ready.slotsByDate);
+          setHorizonDays(ready.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
+          setLessonGapMinutes(Math.max(0, Number(ready.bufferMinutes) || 0));
+        } else {
+          // The four weeks on show stay where they are while the new lesson's
+          // times arrive, rather than snapping back to this week and out again.
+          if (!calendarPageStart && pagedCalendarWeeks[0]) setCalendarPageStart(pagedCalendarWeeks[0].key);
+          setLoadingSlots(true);
+          setSlotsByDate({});
+        }
         setLessonTypeId(typeId);
       }
       if (keepTime) {
@@ -1970,7 +2265,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   function changeDateChoice() {
     transitionBooking(() => {
       // Back to the four weeks that held the date, not to the first page.
-      if (selectedDate) setCalendarPageStart(portoWeekKey(`${selectedDate}T12:00:00Z`));
+      if (selectedDate) setCalendarPageStart(weekKeyOf(selectedDate));
       setSelectedDate("");
       setSelectedSlot("");
       setSlotNotice("");
@@ -1989,7 +2284,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   /** A time from the day's grid or from the soonest times. */
   function chooseSlot(slot: Slot) {
     transitionBooking(() => {
-      setSelectedDate(portoDateKey(new Date(slot.startAt)));
+      setSelectedDate(dateKeyIn(new Date(slot.startAt), viewZone));
       setChangingChoice(null);
       setSelectedSlot(slot.startAt);
       setSlotNotice("");
@@ -2019,7 +2314,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     transitionBooking(() => {
       if (activeChange) setChangingChoice(null);
       else setSavedChoices(savedChoices.slice(0, -1));
-      setSelectedDate(portoDateKey(new Date(last.startAt)));
+      setSelectedDate(dateKeyIn(new Date(last.startAt), viewZone));
       setSelectedSlot(last.startAt);
       goTo("details");
     });
@@ -2058,7 +2353,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     transitionBooking(() => {
       setChangingChoice(null);
       setSavedChoices(savedChoices.slice(0, -1));
-      setSelectedDate(last ? portoDateKey(new Date(last.startAt)) : "");
+      setSelectedDate(last ? dateKeyIn(new Date(last.startAt), viewZone) : "");
       setSelectedSlot(last?.startAt ?? "");
       setSubmitError("");
       goTo(last ? "details" : "day");
@@ -2068,24 +2363,21 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   function selectedLessonsList(choices: Slot[], editable: boolean) {
     return (
       <ol className="booking-chosen-lessons" aria-label={bookingKind === "recurring" ? "Starting times" : "Selected lessons"}>
-        {choices.map((choice, index) => {
-          const local = differingLocalTime(choice.startAt, studentZone);
-          return (
-            <li key={choice.startAt}>
-              <BookingSelectionSummary
-                actionLabel={editable && !payment ? `Change lesson ${index + 1}` : undefined}
-                actionText="Change"
-                ariaLabel={`Lesson ${index + 1}`}
-                detail={`Porto time${local ? ` · ${local} your time` : ""}`}
-                disabled={submitting}
-                mark={LESSON_MARKS[index % LESSON_MARKS.length]}
-                onAction={() => changeSelectedLesson(index)}
-                shortTitle={shortWhen(choice.startAt)}
-                title={`${formatLongDate(choice.startAt)}, ${formatSlotTime(choice.startAt)}`}
-              />
-            </li>
-          );
-        })}
+        {choices.map((choice, index) => (
+          <li key={choice.startAt}>
+            <BookingSelectionSummary
+              actionLabel={editable && !payment ? `Change lesson ${index + 1}` : undefined}
+              actionText="Change"
+              ariaLabel={`Lesson ${index + 1}`}
+              detail={viewZoneName}
+              disabled={submitting}
+              mark={LESSON_MARKS[index % LESSON_MARKS.length]}
+              onAction={() => changeSelectedLesson(index)}
+              shortTitle={shortWhen(choice.startAt, viewZone)}
+              title={`${formatLongDate(choice.startAt, viewZone)}, ${formatSlotTime(choice.startAt, viewZone)}`}
+            />
+          </li>
+        ))}
       </ol>
     );
   }
@@ -2096,7 +2388,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
    */
   function bookingSelectionSummaries() {
     if (!lessonType || !bookingKind) return null;
-    const localTime = chosen ? differingLocalTime(chosen.startAt, studentZone) : "";
     const canAddLesson = !payment && bookingKind !== "trial" && bookingChoices.length < (bookingKind === "recurring" ? 2 : 8);
 
     return (
@@ -2106,12 +2397,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             actionLabel={!payment ? "Change date or time" : undefined}
             actionText="Change"
             ariaLabel="Selected lesson"
-            detail={`Porto time${localTime ? ` · ${localTime} your time` : ""}`}
+            detail={viewZoneName}
             disabled={submitting}
             mark="/visuals/v2-splats/booking-availability-splat-v2.svg"
             onAction={changeTimeChoice}
-            shortTitle={shortWhen(chosen.startAt)}
-            title={`${formatLongDate(chosen.startAt)}, ${formatSlotTime(chosen.startAt)}`}
+            shortTitle={shortWhen(chosen.startAt, viewZone)}
+            title={`${formatLongDate(chosen.startAt, viewZone)}, ${formatSlotTime(chosen.startAt, viewZone)}`}
           />
         ) : null}
         {bookingChoices.length > 1 ? selectedLessonsList(bookingChoices, true) : null}
@@ -2131,6 +2422,96 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
    * While another lesson is added or one is changed, the lesson itself is
    * settled, so the bar gives way to what has been chosen so far.
    */
+  /*
+   * The lesson's dialog as it will look, drawn from what the calendar already
+   * holds while the full details load. Its actions are held still (inert, not
+   * greyed) for that moment, so nothing can be decided before the details —
+   * the fee rules, any payment due — are in. It mirrors the view below.
+   */
+  /*
+   * A weekly run's time. It is kept in Porto, so on Porto's clock it is simply
+   * that; on another clock it is the time most of its lessons fall at there,
+   * since a few weeks a year around a clock change differ by an hour (each
+   * lesson's own time is on the calendar).
+   */
+  function weeklyTimeLabel(series: LessonSeries, lesson: { startAt: string; location: "online" | "porto" }) {
+    const zone = zoneOf(lesson);
+    if (zone === BOOKING_TIME_ZONE) return `${weekdayNames[series.weekday]} at ${minutesToClock(series.minuteOfDay)} Porto time`;
+    const weekdayAt = (startAt: string) =>
+      `${weekdayNames[new Date(`${dateKeyIn(new Date(startAt), zone)}T12:00:00Z`).getUTCDay()]} at ${formatSlotTime(startAt, zone)}`;
+    const counts = new Map<string, number>();
+    for (const booking of myBookings) {
+      if (booking.seriesId !== series.id || booking.status !== "confirmed") continue;
+      const label = weekdayAt(booking.startAt);
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    const usual = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? weekdayAt(lesson.startAt);
+    return `${usual} ${timeZoneName(zone)}`;
+  }
+
+  function renderLessonPreview(preview: MyBooking) {
+    const changeable = preview.status === "confirmed" && !preview.isPast && !preview.changeLocked;
+    const feeCents = loadedAccount?.sameDayFeeCents ?? SAME_DAY_RESCHEDULE_FEE_CENTS;
+    return (
+      <>
+        <p className={`lesson-calendar__status${preview.status !== "cancelled" && activeManagedSeries ? " lesson-calendar__status--recurring" : ""}`}>
+          {preview.status === "cancelled"
+            ? <CircleX size={13} aria-hidden="true" />
+            : preview.status === "pending_payment"
+              ? <AlertCircle size={13} aria-hidden="true" />
+              : activeManagedSeries ? <Repeat size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
+          {preview.status === "cancelled"
+            ? "Cancelled"
+            : preview.status === "pending_payment"
+              ? "Not confirmed"
+              : activeManagedSeries
+                ? "Weekly lesson"
+                : "Booked"}
+        </p>
+        <h2 id="lesson-manage-heading">Manage this lesson</h2>
+        <div className="lesson-manage-dialog__lesson">
+          <strong>{formatLongDate(preview.startAt, zoneOf(preview))}, {lessonTime(preview.startAt, zoneOf(preview))}</strong>
+          <span>{formatBookedLessonLabel(preview.lessonType)} · {preview.location === "porto" ? "In Porto" : "Online"}</span>
+          <MeetingLink meetingUrl={preview.meetingUrl} location={preview.location} status={preview.status} />
+        </div>
+        {preview.changeLocked && preview.status === "confirmed" ? (
+          <p className="lesson-calendar__notice">
+            This lesson is less than {NOTICE_HOURS} hours away and can&rsquo;t be changed or cancelled.
+          </p>
+        ) : preview.sameDayFeeApplies && preview.status === "confirmed" ? (
+          <p className="lesson-calendar__notice">
+            This lesson is less than {NOTICE_HOURS} hours away, so changing or cancelling it now costs{" "}
+            {formatMoneyCents(feeCents)}.
+            {preview.sameDayFeeAutomatic ? " Your saved card is charged when you confirm." : ""}
+            {" "}This fee applies once per lesson.
+          </p>
+        ) : null}
+        {changeable ? (
+          <div className="lesson-manage-dialog__actions" inert>
+            <button className="button button--coral" type="button">Change</button>
+            <button className="button button--quiet" type="button">Cancel</button>
+          </div>
+        ) : null}
+        {resolvedManagedSeriesId && preview.status === "confirmed" ? (
+          <div className="lesson-manage-dialog__series" inert>
+            <Repeat aria-hidden="true" size={17} />
+            <div>
+              <strong>
+                {activeManagedSeries
+                  ? weeklyTimeLabel(activeManagedSeries, preview)
+                  : "No longer repeating"}
+              </strong>
+              {activeManagedSeries ? null : <span>The lessons already booked stay in your calendar.</span>}
+            </div>
+            {activeManagedSeries ? (
+              <button className="button button--outline button--compact" type="button">Manage weekly lessons</button>
+            ) : null}
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
   function bookingProgressBar() {
     return (
       <div className="booking-bar booking-bar--progress">
@@ -2143,7 +2524,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         {selectedLessonsList(savedChoices, false)}
         {activeChange ? (
           <p className="booking-bar__note">
-            Changing {formatLongDate(activeChange.startAt)}, {formatSlotTime(activeChange.startAt)}.{" "}
+            Changing {formatLongDate(activeChange.startAt, viewZone)}, {lessonTime(activeChange.startAt, viewZone)}.{" "}
             <button className="text-action" type="button" onClick={removeChangingLesson}>Remove this lesson</button>
           </p>
         ) : null}
@@ -2322,7 +2703,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   ) : null;
 
   if (confirmation) {
-    const localTime = differingLocalTime(confirmation.startAt, studentZone);
+    // On the clock of the place it happens: the student's own online, Porto's in Porto.
+    const zone = zoneOf(confirmation);
+    const zoneName = timeZoneName(zone);
     // Every lesson this booking made, the first included, and any time that
     // was already taken. Several lessons are named, each once; a weekly run
     // reads as its weekly time rather than as a list of dates.
@@ -2331,138 +2714,200 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     const weekly = Boolean(confirmation.series || confirmation.selection?.recurring);
     const several = bookedStarts.length > 1;
     const openEnded = confirmation.series ? confirmation.series.openEnded : confirmation.selection?.weeks === null;
-    const weeklyTimes = [...new Set(bookedStarts.map((startAt) =>
-      `${weekdayNames[new Date(`${portoDateKey(new Date(startAt))}T12:00:00Z`).getUTCDay()]} at ${formatSlotTime(startAt)}`
-    ))];
+    // A weekly time is kept in Porto, so each is read from its first lesson:
+    // on another clock, a few weeks a year around a clock change differ by an
+    // hour, and those must not read as a second weekly time.
+    const firstOfEachWeeklyTime = [...new Map(bookedStarts.map((startAt) => [
+      `${new Date(`${portoDateKey(new Date(startAt))}T12:00:00Z`).getUTCDay()} ${formatSlotTime(startAt)}`,
+      startAt
+    ] as const).reverse()).values()].sort();
+    const weeklyTimes = firstOfEachWeeklyTime.map((startAt) =>
+      `${weekdayNames[new Date(`${dateKeyIn(new Date(startAt), zone)}T12:00:00Z`).getUTCDay()]} at ${formatSlotTime(startAt, zone)}`
+    );
     return (
-      <section className="booking-success" aria-live="polite">
-        {/* Good news gets one small celebration: the lesson's own mark, the
-            one it wears on the calendar from now on, lands in the card's top
-            corner, as each Lessons card carries its own. It is also the card's
-            only seal: the heading says the rest. Decorative; it lands once. */}
-        {lessonType ? (
-          <LessonMark
-            className="booking-success__mark"
-            durationMinutes={lessonType.duration_minutes}
-            lands
-            lessonTypeId={lessonType.id}
-            location={confirmation.location}
-            recurring={Boolean(confirmation.series || confirmation.selection?.recurring)}
-          />
-        ) : null}
-        {/* One good-news card, read top to bottom: what happened, when,
-            where the details went, what next, then the small print. */}
-        <div className="booking-success__head">
-          <h2 id="booking-success-heading" tabIndex={-1}>
-            You&rsquo;re booked in.
-          </h2>
-        </div>
-        <div className="booking-success__when">
+      // The same section as every other step, so the workspace eases between
+      // this card and the next view instead of being swapped for it.
+      <section className="booking-steps" aria-label="Book a Portuguese lesson">
+        <section className="booking-success" aria-live="polite" id="booking-success">
+          {/* Good news gets one small celebration: the lesson's own mark, the
+              one it wears on the calendar from now on, lands in the card's top
+              corner, as each Lessons card carries its own. It is also the card's
+              only seal: the heading says the rest. Decorative; it lands once. */}
+          {lessonType ? (
+            <LessonMark
+              className="booking-success__mark"
+              durationMinutes={lessonType.duration_minutes}
+              lands
+              lessonTypeId={lessonType.id}
+              location={confirmation.location}
+              recurring={Boolean(confirmation.series || confirmation.selection?.recurring)}
+            />
+          ) : null}
+          {/* One good-news card, read top to bottom: what happened, when,
+              where the details went, what next, then the small print. */}
+          <div className="booking-success__head">
+            <h2 id="booking-success-heading" tabIndex={-1}>
+              You&rsquo;re booked in.
+            </h2>
+          </div>
+          <div className="booking-success__when">
+            {weekly ? (
+              <>
+                <strong>{weeklyTimes.join(" and ")}</strong>{" "}
+                <span>
+                  {zoneName} · from {formatShortDay(bookedStarts[0], zone)}
+                </span>
+              </>
+            ) : several ? (
+              <>
+                <ul>
+                  {bookedStarts.map((startAt) => (
+                    <li key={startAt}>
+                      <strong>{formatShortDay(startAt, zone)}, {formatSlotTime(startAt, zone)}</strong>
+                    </li>
+                  ))}
+                </ul>
+                <span>{zoneName}</span>
+              </>
+            ) : (
+              <>
+                <strong>{formatLongDate(confirmation.startAt, zone)}</strong>{" "}
+                <span>at {formatTimeIn(confirmation.startAt, zone)}</span>
+              </>
+            )}
+          </div>
           {weekly ? (
-            <>
-              <strong>{weeklyTimes.join(" and ")}</strong>{" "}
-              <span>
-                Porto time{localTime ? ` · ${localTime} your time` : ""} · from {shortDay.format(new Date(bookedStarts[0]))}
-              </span>
-            </>
-          ) : several ? (
-            <>
+            <p className="booking-success__count">
+              <strong>{bookedStarts.length === 1 ? "1 lesson" : `${bookedStarts.length} lessons`} booked</strong>
+              {openEnded
+                ? weeklyTimes.length > 1
+                  ? " so far. These times stay yours every week until you stop them."
+                  : " so far. This time stays yours every week until you stop it."
+                : "."}
+            </p>
+          ) : null}
+          {skippedStarts.length ? (
+            <div className="booking-success__skipped">
+              <p>
+                {skippedStarts.length === 1
+                  ? `One ${weekly ? "week" : "time"} was already taken, so it isn’t booked:`
+                  : `${skippedStarts.length} ${weekly ? "weeks" : "times"} were already taken, so they aren’t booked:`}
+              </p>
               <ul>
-                {bookedStarts.map((startAt) => (
+                {skippedStarts.map((startAt) => (
                   <li key={startAt}>
-                    <strong>{shortDay.format(new Date(startAt))}, {formatSlotTime(startAt)}</strong>
+                    {formatShortDay(startAt, zone)}
+                    {weekly ? "" : `, ${formatSlotTime(startAt, zone)}`}
                   </li>
                 ))}
               </ul>
-              <span>Porto time</span>
-            </>
-          ) : (
-            <>
-              <strong>{formatLongDate(confirmation.startAt)}</strong>{" "}
-              <span>
-                at {formatSlotTime(confirmation.startAt)} Porto time
-                {localTime ? ` · ${localTime} your time` : ""}
-              </span>
-            </>
-          )}
-        </div>
-        {weekly ? (
-          <p className="booking-success__count">
-            <strong>{bookedStarts.length === 1 ? "1 lesson" : `${bookedStarts.length} lessons`} booked</strong>
-            {openEnded
-              ? weeklyTimes.length > 1
-                ? " so far. These times stay yours every week until you stop them."
-                : " so far. This time stays yours every week until you stop it."
-              : "."}
+            </div>
+          ) : null}
+          <p className="booking-success__sent">
+            {several ? "A confirmation with calendar invitations is on its" : "A confirmation and calendar invitation are on their"}{" "}
+            way to <strong>{confirmation.email}</strong>.
           </p>
-        ) : null}
-        {skippedStarts.length ? (
-          <div className="booking-success__skipped">
-            <p>
-              {skippedStarts.length === 1
-                ? `One ${weekly ? "week" : "time"} was already taken, so it isn’t booked:`
-                : `${skippedStarts.length} ${weekly ? "weeks" : "times"} were already taken, so they aren’t booked:`}
-            </p>
-            <ul>
-              {skippedStarts.map((startAt) => (
-                <li key={startAt}>
-                  {shortDay.format(new Date(startAt))}
-                  {weekly ? "" : `, ${formatSlotTime(startAt)}`}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-        <p className="booking-success__sent">
-          {several ? "A confirmation with calendar invitations is on its" : "A confirmation and calendar invitation are on their"}{" "}
-          way to <strong>{confirmation.email}</strong>.
-        </p>
 
-        <MeetingLink meetingUrl={confirmation.meetingUrl} location={confirmation.location} status="confirmed" />
+          <MeetingLink meetingUrl={confirmation.meetingUrl} location={confirmation.location} status="confirmed" />
 
-        <div className="booking-success__actions">
-          <button
-            className="button button--coral"
-            onClick={returnFromConfirmationToUpcoming}
-            type="button"
-          >
-            Back to your lessons
-          </button>
-          {/* One lesson can be changed straight from here. Several are each
-              on the calendar, where every one opens on its own. */}
-          {several ? null : (
+          <div className="booking-success__actions">
             <button
-              className="button button--outline"
-              onClick={() => {
-                if (confirmation.manageToken) {
-                  transitionBooking(() => {
-                    setConfirmation(null);
-                    void openManaged(confirmation.manageToken, confirmation.series?.id ?? null);
-                  });
-                } else {
-                  window.location.assign(confirmation.manageUrl);
-                }
-              }}
+              className="button button--coral"
+              onClick={returnFromConfirmationToUpcoming}
               type="button"
             >
-              Change or cancel this one
+              Back to your lessons
             </button>
-          )}
-        </div>
-        {accountRefreshNotice}
-        <div className="booking-success__foot">
-          <dl className="booking-success__reference">
-            <dt>Your reference</dt>
-            <dd>{confirmation.reference}</dd>
-          </dl>
-          <p className="booking-success__note">
-            {several ? "These lessons are" : "This lesson is"} now on your calendar. Changing or cancelling{" "}
-            {several ? "one" : "it"} is free up to {NOTICE_HOURS} hours before; after that it costs{" "}
-            {formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.
-          </p>
-        </div>
+            {/* One lesson can be changed straight from here. Several are each
+                on the calendar, where every one opens on its own. */}
+            {several ? null : (
+              <button
+                className="button button--outline"
+                onClick={() => {
+                  if (confirmation.manageToken) {
+                    transitionBooking(() => {
+                      setConfirmation(null);
+                      void openManaged(confirmation.manageToken, confirmation.series?.id ?? null);
+                    });
+                  } else {
+                    window.location.assign(confirmation.manageUrl);
+                  }
+                }}
+                type="button"
+              >
+                Change or cancel this one
+              </button>
+            )}
+          </div>
+          {accountRefreshNotice}
+          <div className="booking-success__foot">
+            <dl className="booking-success__reference">
+              <dt>Your reference</dt>
+              <dd>{confirmation.reference}</dd>
+            </dl>
+            <p className="booking-success__note">
+              {several ? "These lessons are" : "This lesson is"} now on your calendar. Changing or cancelling{" "}
+              {several ? "one" : "it"} is free up to {NOTICE_HOURS} hours before; after that it costs{" "}
+              {formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.
+            </p>
+          </div>
+        </section>
       </section>
     );
+  }
+
+  // Signed in, the workspace is the student's account: one section holding the
+  // lessons calendar card, or Past lessons or Your details in its place.
+  const StageElement = student ? "section" : "div";
+  // A repeating schedule counts once, however many of its dates are booked.
+  const upcomingCount = new Set(
+    myBookings
+      .filter((booking) => !booking.isPast && booking.status === "confirmed")
+      .map((booking) => (isWeeklyLesson(booking) ? `series:${booking.seriesId}` : `booking:${booking.reference}`))
+  ).size;
+
+  /** The account's places, from the name's menu or a card's way back. */
+  function openAccountView(section: AccountSection) {
+    // Choosing the card already open keeps it open.
+    if (!(intent === "lessons" && accountView === section)) transitionBooking(() => openAccountShortcut(section));
+    orientTo("account-controls");
+    if (section !== "profile") {
+      window.requestAnimationFrame(() =>
+        document.getElementById(section === "history" ? "account-past-lessons" : "upcoming-lessons-heading")?.focus({ preventScroll: true })
+      );
+    }
+  }
+
+  function signOut() {
+    transitionBooking(() => {
+      clearSession();
+      managedRequest.current += 1;
+      setManageLoading(false);
+      setStudent(null);
+      setMyBookings([]);
+      setLessonSeries([]);
+      setLoadedAccount(null);
+      setManaged(null);
+      setManagedToken("");
+      setManagedSeriesId(null);
+      setManagedLessonTypeId("");
+      setManagedLocation("online");
+      setManageMode("view");
+      setHasPriorBooking(false);
+      // Signed out, the page is what any visitor sees: ready to book.
+      setIntent("book");
+      setAccountView("upcoming");
+      setBookingKind("");
+      setLessonTypeId("");
+      setSavedChoices([]);
+      setChangingChoice(null);
+      setSelectedDate("");
+      setSelectedSlot("");
+      setCalendarWeekCount(4);
+      setCalendarPageStart("");
+      setStep("day");
+      setForm(emptyForm);
+    });
   }
 
   return (
@@ -2472,7 +2917,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           date={bookingPromptDate}
           lessons={(bookingsByDate[bookingPromptDate] ?? []).map((booking) => ({
             key: booking.reference,
-            title: formatSlotTimeForStudent(booking.startAt, studentZone),
+            title: lessonTime(booking.startAt, zoneOf(booking)),
             detail: `${formatBookedLessonLabel(booking.lessonType)} · ${booking.location === "porto" ? "In Porto" : "Online"}${isWeeklyLesson(booking) ? " · Weekly" : ""}`,
             mark: (
               <LessonMark
@@ -2516,18 +2961,16 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         </div>
       ) : null}
 
-      <div className={`booking-stage${intent === "lessons" && student && accountView === "upcoming" ? " booking-stage--lessons" : ""}`}>
+      <StageElement
+        aria-label={student ? "Account, upcoming and past lessons" : undefined}
+        className={`booking-stage${intent === "lessons" && student && accountView === "upcoming" ? " booking-stage--lessons" : ""}`}
+        id={student ? "account-controls" : undefined}
+      >
         {student ? (
-          <section
-            className="unified-account-area"
-            id="account-controls"
-            aria-label="Account, upcoming and past lessons"
-          >
+          <div className="unified-account-area">
             <AccountControls
               key={student.id}
-              bookingActive={intent === "book"}
               initialAccount={loadedAccount?.student.id === student.id ? loadedAccount : null}
-              onOpenAccountSection={openAccountShortcut}
               onRatesChange={(rates) => {
                 // A code saved under Edit details prices the next weekly booking.
                 // An unchanged answer keeps the same object, so nothing re-prices.
@@ -2536,37 +2979,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 setRatesReady(true);
                 setRatesError("");
               }}
-              onTransition={transitionBooking}
-              onSignedOut={() => {
-                managedRequest.current += 1;
-                setManageLoading(false);
-                setStudent(null);
-                setMyBookings([]);
-                setLessonSeries([]);
-                setLoadedAccount(null);
-                setManaged(null);
-                setManagedToken("");
-                setManagedSeriesId(null);
-                setManagedLessonTypeId("");
-                setManagedLocation("online");
-                setManageMode("view");
-                setHasPriorBooking(false);
-                // Signed out, the page is what any visitor sees: ready to book.
-                setIntent("book");
-                setBookingKind("");
-                setLessonTypeId("");
-                setSavedChoices([]);
-                setChangingChoice(null);
-                setSelectedDate("");
-                setSelectedSlot("");
-                setCalendarWeekCount(4);
-                setCalendarPageStart("");
-                setStep("day");
-                setForm(emptyForm);
-              }}
+              onSelectSection={openAccountView}
+              onSignOut={signOut}
               openUpcomingRequest={upcomingRequestKey}
+              section={intent === "lessons" ? accountView : "upcoming"}
             />
-          </section>
+          </div>
         ) : null}
 
         {manageDialogOpen ? (
@@ -2599,9 +3017,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
               <div
                 className="lesson-manage-dialog__content"
-                key={manageLoading ? "loading" : !managed ? "error" : manageOutcome ? "outcome" : manageMode}
+                key={manageLoading && !lessonPreview ? "loading" : !managed && !lessonPreview ? "error" : manageOutcome ? "outcome" : manageMode}
               >
-              {manageLoading ? (
+              {manageLoading && lessonPreview ? (
+                renderLessonPreview(lessonPreview)
+              ) : manageLoading ? (
                 <div className="lesson-manage-dialog__loading">
                   <p className="eyebrow">One moment</p>
                   <h2 id="lesson-manage-heading">Opening your lesson…</h2>
@@ -2651,7 +3071,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   ) : null}
 
                   <div className="lesson-manage-dialog__lesson">
-                    <strong>{formatLongDate(managed.booking.startAt)}, {formatSlotTimeForStudent(managed.booking.startAt, studentZone)}</strong>
+                    <strong>{formatLongDate(managed.booking.startAt, zoneOf(managed.booking))}, {lessonTime(managed.booking.startAt, zoneOf(managed.booking))}</strong>
                     <span>{formatBookedLessonLabel(managed.booking.lessonType)} · {managed.booking.location === "porto" ? "In Porto" : "Online"}</span>
                     <MeetingLink meetingUrl={managed.booking.meetingUrl} location={managed.booking.location} status={managed.booking.status} />
                   </div>
@@ -2729,7 +3149,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           <div>
                             <strong>
                               {activeManagedSeries
-                                ? `${weekdayNames[activeManagedSeries.weekday]} at ${minutesToClock(activeManagedSeries.minuteOfDay)} Porto time`
+                                ? weeklyTimeLabel(activeManagedSeries, managed.booking)
                                 : "No longer repeating"}
                             </strong>
                             {activeManagedSeries ? null : <span>The lessons already booked stay in your calendar.</span>}
@@ -2919,6 +3339,25 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           <p className="booking-state-note booking-state-note--initial">Loading lessons…</p>
         ) : null}
 
+        {/* A student whose clock differs from Porto's is told, where the times
+            begin, that they are on their own clock (or on Porto's, for a
+            lesson in Porto). */}
+        {showWorkflowCalendar && studentClockDiffers && !(managed && isManagedReschedule) ? (
+          <p className="calendar-zone-note">
+            <Globe size={17} aria-hidden="true" />
+            {viewZone === BOOKING_TIME_ZONE ? (
+              <span>Times are in <strong>Porto time</strong>, where lessons in Porto happen.</span>
+            ) : (
+              <span>
+                Times are in your time zone: <strong>{viewZoneName}</strong>
+                {isLessonsCalendarOverview && calendarBookings.some((booking) => booking.location === "porto")
+                  ? ". Lessons in Porto are in Porto time."
+                  : ""}
+              </span>
+            )}
+          </p>
+        ) : null}
+
         {showWorkflowCalendar ? (
           <div
             className="unified-calendar-shell"
@@ -2933,6 +3372,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               managed && isManagedReschedule ? " unified-calendar--managed-overlay" : ""
             }${intent === "book" && !managed ? " unified-calendar--booking" : ""}`}
             id="lesson-calendar"
+            // Your lessons, booking and changing a lesson are different views of
+            // the calendar: moving between them brings a new one, which dissolves
+            // in, rather than one card's edges jumping to the next one's.
+            key={isLessonsCalendarOverview ? "lessons" : managed && isManagedReschedule ? "change" : "booking"}
             onKeyDown={managed && isManagedReschedule ? keepDialogFocus : undefined}
             ref={managedRescheduleRef}
             role={managed && isManagedReschedule ? "dialog" : undefined}
@@ -2959,7 +3402,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               </h3>
               <p className="managed-lesson__current-time">
                 {manageMode === "reschedule-sequence" ? "Currently repeats from " : "Currently "}
-                {shortDay.format(new Date(managed.booking.startAt))}, {formatSlotTimeForStudent(managed.booking.startAt, studentZone)}
+                {formatShortDay(managed.booking.startAt, zoneOf(managed.booking))}, {lessonTime(managed.booking.startAt, zoneOf(managed.booking))}
                 {manageMode === "reschedule-sequence" ? null : ` · ${formatBookedLessonLabel(managed.booking.lessonType)}`}
               </p>
             </div>
@@ -2971,19 +3414,30 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             {isLessonsCalendarOverview ? (
               <div className="lesson-overview">
                 <div className="lesson-overview__header">
-                  <div className="upcoming-lessons__title-line">
-                    <h2 className="eyebrow" id="upcoming-lessons-heading" tabIndex={-1}>Your lessons</h2>
-                    <button
-                      aria-describedby="upcoming-lessons-tip"
-                      aria-label="How your lesson calendar works"
-                      className="upcoming-lessons__hint"
-                      type="button"
-                    >
-                      <CircleHelp size={16} aria-hidden="true" />
-                    </button>
-                    <span className="upcoming-lessons__tip" id="upcoming-lessons-tip" role="tooltip">
-                      Choose a booked lesson to see its details, change it or cancel it. Choose any other day to book a lesson then.
-                    </span>
+                  <div className="lesson-overview__heading">
+                    <div className="upcoming-lessons__title-line">
+                      <h2 className="eyebrow" id="upcoming-lessons-heading" tabIndex={-1}>Your lessons</h2>
+                      <button
+                        aria-describedby="upcoming-lessons-tip"
+                        aria-label="How your lesson calendar works"
+                        className="upcoming-lessons__hint"
+                        type="button"
+                      >
+                        <CircleHelp size={16} aria-hidden="true" />
+                      </button>
+                      <span className="upcoming-lessons__tip" id="upcoming-lessons-tip" role="tooltip">
+                        Choose a booked lesson to see its details, change it or cancel it. Choose any other day to book a lesson then.
+                      </span>
+                    </div>
+                    {student ? (
+                      <AccountMenu
+                        current="upcoming"
+                        name={student.name}
+                        onSelect={openAccountView}
+                        onSignOut={signOut}
+                        upcomingCount={upcomingCount}
+                      />
+                    ) : null}
                   </div>
                   <button
                     className="button button--coral button--compact lesson-overview__book"
@@ -3006,8 +3460,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       <span className="eyebrow">{Date.parse(nextLesson.startAt) <= clock ? "Happening now" : "Next lesson"}</span>
                       <strong>
                         <WhenText
-                          long={`${formatLongDate(nextLesson.startAt)}, ${formatSlotTimeForStudent(nextLesson.startAt, studentZone)}`}
-                          short={`${shortDay.format(new Date(nextLesson.startAt))}, ${formatSlotTimeForStudent(nextLesson.startAt, studentZone)}`}
+                          long={`${formatLongDate(nextLesson.startAt, zoneOf(nextLesson))}, ${lessonTime(nextLesson.startAt, zoneOf(nextLesson))}`}
+                          short={`${formatShortDay(nextLesson.startAt, zoneOf(nextLesson))}, ${lessonTime(nextLesson.startAt, zoneOf(nextLesson))}`}
                         />
                       </strong>
                       <span>
@@ -3093,9 +3547,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               aria-busy={loadingSlots}
               className="calendar-weeks"
               id="booking-calendar-weeks"
-              key={visibleCalendarWeekCount === 1 && selectedCalendarWeek
-                ? `compact-${selectedCalendarWeek.key}`
-                : `page-${pageFirstKey}`}
+              // A new page, a different lesson or another view is a new set of
+              // weeks, and so dissolves in (see transitionBooking).
+              key={`${isLessonsCalendarOverview ? "lessons" : managed ? "managed" : "book"}-${availabilityLessonTypeId}-${
+                visibleCalendarWeekCount === 1 && selectedCalendarWeek ? `compact-${selectedCalendarWeek.key}` : `page-${pageFirstKey}`
+              }`}
             >
               {displayedCalendarWeeks.map((week) => (
                 <Fragment key={week.key}>
@@ -3106,7 +3562,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       const lessons = bookingsByDate[cell.key] ?? [];
                       const lessonLabel = lessons.length === 1 ? "1 lesson" : `${lessons.length} lessons`;
                       const dateLabel = formatLongDate(`${cell.key}T12:00:00Z`);
-                      const canStartBooking = isLessonsCalendarOverview && cell.key >= todayKey;
+                      const canStartBooking = isLessonsCalendarOverview && cell.key >= viewTodayKey;
                       const weeklyDay = lessons.length > 0 && lessons.every(isWeeklyLesson);
                       return (
                         <button
@@ -3169,7 +3625,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                               <small className="calendar-booking-times">
                                 {(lessons.length <= 2 ? lessons : lessons.slice(0, 1)).map((booking) => (
                                   <span className={isWeeklyLesson(booking) ? "is-weekly" : undefined} key={booking.reference}>
-                                    {formatSlotTime(booking.startAt)}
+                                    {formatSlotTime(booking.startAt, zoneOf(booking))}
                                   </span>
                                 ))}
                                 {lessons.length > 2 ? <span>+{lessons.length - 1} more</span> : null}
@@ -3285,15 +3741,16 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   </div>
                 ) : null}
                 <p className="booking-state-note">
-                  {selectedDate ? `${shortDay.format(new Date(`${selectedDate}T12:00:00Z`))} · Porto time` : "Choose a free day on the calendar."}
+                  {selectedDate ? `${formatShortDay(`${selectedDate}T12:00:00Z`)} · ${viewZoneName}` : "Choose a free day on the calendar."}
                 </p>
                 {accountRefreshNotice}
                 {loadingSlots ? (
                   <p className="booking-state-note">Checking what&rsquo;s free…</p>
                 ) : daySlots.length ? (
                   <TimePicker
-                    day={startSpan}
+                    halves={timeHalves}
                     key={selectedDate}
+                    zone={viewZone}
                     renderTime={(slot, place) => (
                       <button
                         aria-pressed={selectedSlot === slot.startAt}
@@ -3304,7 +3761,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         style={place}
                         type="button"
                       >
-                        {formatSlotTime(slot.startAt)}
+                        {formatSlotTime(slot.startAt, viewZone)}
                       </button>
                     )}
                     selected={selectedSlot}
@@ -3337,7 +3794,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         : selectedSlot
                         ? selectedSlot === managed.booking.startAt
                           ? "Save changes"
-                          : `Change to ${formatSlotTime(selectedSlot)}`
+                          : `Change to ${formatSlotTime(selectedSlot, viewZone)}`
                         : "Choose a time"}
                   </button>
                   <button
@@ -3363,7 +3820,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       <>
                         <span className="unified-calendar__date-long">{formatLongDate(`${selectedDate}T12:00:00Z`)}</span>
                         <span aria-hidden="true" className="unified-calendar__date-short">
-                          {shortDay.format(new Date(`${selectedDate}T12:00:00Z`))} {selectedDate.slice(0, 4)}
+                          {formatShortDay(`${selectedDate}T12:00:00Z`)} {selectedDate.slice(0, 4)}
                         </span>
                       </>
                     ) : selectedDate
@@ -3408,7 +3865,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           <span className="lesson-calendar__status">
                             <CheckCircle2 size={13} aria-hidden="true" /> Booked
                           </span>
-                          <strong>{formatSlotTime(booking.startAt)} Porto time</strong>
+                          <strong>{formatTimeIn(booking.startAt, zoneOf(booking))}</strong>
                           <span>
                             {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}
                           </span>
@@ -3425,25 +3882,19 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       soonestSlots.length ? (
                         <div className="booking-soonest">
                           <ul aria-labelledby="unified-calendar-panel-heading">
-                            {soonestSlots.map((slot) => {
-                              const local = differingLocalTime(slot.startAt, studentZone);
-                              return (
-                                <li key={slot.startAt}>
-                                  <button
-                                    aria-label={`${formatLongDate(slot.startAt)}, ${formatSlotTime(slot.startAt)} Porto time${local ? `, ${local} your time` : ""}`}
-                                    onClick={() => chooseSlot(slot)}
-                                    type="button"
-                                  >
-                                    <span>{shortDay.format(new Date(slot.startAt))}</span>
-                                    <strong>
-                                      {formatSlotTime(slot.startAt)}
-                                      {local ? <small>{local} your time</small> : null}
-                                    </strong>
-                                    <ChevronRight size={16} aria-hidden="true" />
-                                  </button>
-                                </li>
-                              );
-                            })}
+                            {soonestSlots.map((slot) => (
+                              <li key={slot.startAt}>
+                                <button
+                                  aria-label={`${formatLongDate(slot.startAt, viewZone)}, ${formatTimeIn(slot.startAt, viewZone)}`}
+                                  onClick={() => chooseSlot(slot)}
+                                  type="button"
+                                >
+                                  <span>{formatShortDay(slot.startAt, viewZone)}</span>
+                                  <strong>{formatSlotTime(slot.startAt, viewZone)}</strong>
+                                  <ChevronRight size={16} aria-hidden="true" />
+                                </button>
+                              </li>
+                            ))}
                           </ul>
                         </div>
                       ) : loadingSlots ? (
@@ -3455,22 +3906,19 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       <p className="booking-state-note">Checking what&rsquo;s free…</p>
                     ) : daySlots.length ? (
                       <TimePicker
-                        day={startSpan}
+                        halves={timeHalves}
                         key={selectedDate}
-                        renderTime={(slot, place) => {
-                          const local = differingLocalTime(slot.startAt, studentZone);
-                          return (
-                            <button
-                              key={slot.startAt}
-                              style={place}
-                              onClick={() => chooseSlot(slot)}
-                              type="button"
-                            >
-                              {formatSlotTime(slot.startAt)}
-                              {local ? <small>{local} your time</small> : null}
-                            </button>
-                          );
-                        }}
+                        renderTime={(slot, place) => (
+                          <button
+                            key={slot.startAt}
+                            style={place}
+                            onClick={() => chooseSlot(slot)}
+                            type="button"
+                          >
+                            {formatSlotTime(slot.startAt, viewZone)}
+                          </button>
+                        )}
+                        zone={viewZone}
                         selected={selectedSlot}
                         slots={daySlots}
                       />
@@ -3513,6 +3961,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   error={seriesPreviewError}
                   preview={seriesPreview}
                   previewing={previewing}
+                  zone={viewZone}
                 />
               ) : null}
             </div>
@@ -3676,7 +4125,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             </div>
           </div>
         ) : null}
-      </div>
+      </StageElement>
 
     </section>
   );

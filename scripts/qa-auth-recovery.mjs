@@ -124,14 +124,14 @@ try {
         }
         await expect(panel.getByRole("alert")).toContainText("couldn’t save your sign-in");
         assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), null);
-        await expect(state.page.locator(".my-lessons__account-name")).toHaveCount(0);
+        await expect(state.page.locator(".account-menu__name")).toHaveCount(0);
         await state.page.evaluate(() => { window.qaRefuseSessionWrites = false; });
         if (action === "register") {
           await panel.getByRole("alert").getByRole("button", { name: "Sign in", exact: true }).click();
           await expect(panel.getByLabel("Email", { exact: true })).toHaveValue(student.email);
         }
         await panel.getByRole("button", { name: action === "google" ? "Continue with Google" : "Sign in", exact: true }).click();
-        await expect(state.page.locator(".my-lessons__account-name")).toContainText(student.name);
+        await expect(state.page.locator(".account-menu__name")).toContainText(student.name);
         assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), session);
         assert.deepEqual(state.errors, []);
         storageChecks += 1;
@@ -170,7 +170,7 @@ try {
         await panel.getByLabel("Email", { exact: true }).fill(verified.email);
         await panel.getByLabel("Password", { exact: true }).fill("isolated-password");
         await panel.getByRole("button", { name: "Sign in", exact: true }).click();
-        await expect(state.page.locator(".my-lessons__account-name")).toContainText(student.name);
+        await expect(state.page.locator(".account-menu__name")).toContainText(student.name);
         assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), renewed);
         assert.equal(confirmations, 1);
         assert.deepEqual(state.errors, []);

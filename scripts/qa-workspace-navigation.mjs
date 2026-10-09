@@ -6,7 +6,7 @@ const base = (process.env.QA_BASE_URL ?? "http://localhost:3000").replace(/\/$/,
 const out = "tmp/qa/navigation";
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext({ viewport: { width: 1920, height: 1100 } });
+const context = await browser.newContext({ viewport: { width: 1920, height: 1100 }, timezoneId: "Europe/Lisbon" });
 const student = { id: "navigation-preview", name: "Ana Martins", email: "preview@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "student" };
 const lessonType = { id: "single-60", name: "Single lesson", durationMinutes: 60, priceCents: 2500 };
 let bookings = Array.from({ length: 12 }, (_, index) => ({
@@ -41,9 +41,10 @@ async function settle() {
     animation.playState !== "running" || animation.effect?.getTiming().iterations === Infinity));
 }
 
+// The student's name opens the account's menu, in whichever card shows.
 async function accountAction(name) {
-  const toggle = page.locator(".my-lessons__menu-toggle");
-  if (await toggle.isVisible() && await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+  const toggle = page.locator("#account-menu-button");
+  if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
   await page.locator("#account-menu").getByRole("button", { name, exact: true }).click();
 }
 
@@ -85,29 +86,19 @@ try {
       const bounds = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
       return {
         width: innerWidth, pageWidth: document.documentElement.scrollWidth,
-        account: bounds(".unified-account-controls"),
         calendar: bounds("#lesson-calendar .calendar-panel"),
-        book: bounds(".lesson-overview__book"),
-        introLabels: [...document.querySelectorAll(".booking-intro__points li")]
-          .filter(item => item.getClientRects().length)
-          .map(item => {
-            const label = item.lastElementChild;
-            const range = document.createRange();
-            range.selectNodeContents(label);
-            return { text: label.textContent, box: label.getBoundingClientRect().toJSON(), ink: range.getBoundingClientRect().toJSON() };
-          })
+        heading: bounds("#upcoming-lessons-heading"),
+        name: bounds("#account-menu-button"),
+        book: bounds(".lesson-overview__book")
       };
     });
     assert.ok(layout.pageWidth <= width + 1, `Page overflow at ${width}`);
-    for (const label of layout.introLabels) {
-      assert.ok(label.ink.left >= label.box.left - 1 && label.ink.right <= label.box.right + 1,
-        `Booking label overflows its column at ${width}: ${label.text}`);
-    }
-    // One calendar holds the lessons: it shares the account bar's edges at
-    // every width, with booking at its own top right.
-    aligned(layout.account.left, layout.calendar.left, "Account and calendar left edges");
-    aligned(layout.account.right, layout.calendar.right, "Account and visible calendar right edges");
-    assert.ok(layout.calendar.top > layout.account.bottom, "The calendar follows the account bar");
+    // One card holds the lessons and the account at every width: the name's
+    // menu under its heading, and booking at its top right.
+    aligned(layout.name.left, layout.heading.left, `The name's menu lines up under the heading at ${width}`);
+    assert.ok(layout.name.top >= layout.heading.bottom - 1, `The name's menu sits under the heading at ${width}`);
+    assert.ok(layout.heading.top >= layout.calendar.top && layout.name.right <= layout.calendar.right,
+      `The name's menu is inside the calendar card at ${width}`);
     assert.ok(layout.book.top < layout.calendar.top + 120 && layout.book.right <= layout.calendar.right + 1,
       `Book a lesson sits at the calendar's top right at ${width}`);
     layouts.push(layout);
@@ -119,9 +110,9 @@ try {
   await accountAction("Past lessons");
   await page.locator("#account-past-lessons").waitFor();
   assert.equal(await page.locator("#lesson-calendar").count(), 0, "History must not retain the future calendar");
+  // Past lessons takes the lessons card's place, at its width.
   const history = await page.locator("#account-past-lessons").boundingBox();
-  const bar = await page.locator(".unified-account-controls").boundingBox();
-  aligned(history.width, bar.width, "History uses the account width");
+  aligned(history.width, layouts[0].calendar.width, "History uses the lessons card's width");
   await settle();
   await page.screenshot({ path: `${out}/history-desktop.png`, fullPage: true });
   for (const width of [1920, 390]) {

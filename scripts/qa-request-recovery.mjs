@@ -179,7 +179,7 @@ try {
         await expect(dialog).toHaveCount(0);
         await expect(state.page.getByRole("radio", { name: "Single", exact: true })).toBeChecked();
         await state.page.getByRole("button", { name: /^Your lessons/ }).first().click();
-        const toggle = state.page.locator(".my-lessons__menu-toggle");
+        const toggle = state.page.locator("#account-menu-button");
         if (await toggle.isVisible()) await toggle.click();
         await state.page.locator("#account-menu").getByRole("button", { name: "Past lessons", exact: true }).click();
         await expect(state.page.locator("#account-past-lessons")).toBeVisible();
@@ -416,10 +416,12 @@ try {
       const state = await fixture(width);
       try {
         await state.page.goto(`${base}/book/?view=book`);
-        await expect(state.page.getByText(student.name, { exact: true })).toBeVisible();
+        // While booking, the account shows as the bar's way back to it.
+        await expect(state.page.locator(".booking-bar__back")).toBeVisible();
         await expect(state.page.locator(".calendar-week button.has-booking")).toHaveCount(1);
         await replaceSession(state.page, null);
         await expect(state.page.locator(".calendar-week button.has-booking")).toHaveCount(0);
+        await expect(state.page.locator(".booking-bar__back")).toHaveCount(0);
         await expect(state.page.getByText(student.name, { exact: true })).toHaveCount(0);
         assert.deepEqual(state.errors, []);
       } finally { await state.context.close(); }
@@ -499,7 +501,7 @@ try {
         waiting.resolve(); await response;
         await page.waitForLoadState("networkidle");
         await expect(page.getByText(student.name, { exact: true })).toHaveCount(0);
-        await expect(page.locator(".unified-account-controls")).toHaveCount(0);
+        await expect(page.locator("#account-menu-button")).toHaveCount(0);
         assert.equal(await currentSession(page), null);
         assert.deepEqual(state.errors, []);
       } finally { waiting.resolve(); await context.close(); }

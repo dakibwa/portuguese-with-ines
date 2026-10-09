@@ -48,20 +48,6 @@ export function BookingFlow({ initialView = "book" }: { initialView?: BookingVie
               <span className="display-second-line">Lessons</span>
             </h1>
             <div className="editorial-rule" aria-hidden="true" />
-            <ul className="booking-intro__points">
-              <li>
-                <AssetMark asset="/visuals/v2-splats/one-to-one-splat-v2.svg" lands />
-                <span>View your calendar</span>
-              </li>
-              <li>
-                <AssetMark asset="/visuals/v2-splats/flexible-rescheduling-splat-v2.svg" lands />
-                <span>Change or cancel here</span>
-              </li>
-              <li>
-                <AssetMark asset="/visuals/v2-splats/lesson-format-splat-v2.svg" lands />
-                <span>Porto time</span>
-              </li>
-            </ul>
             <AssetMark
               asset="/visuals/v2-splats/booking-availability-splat-v2.svg"
               className="booking-intro__time-window"

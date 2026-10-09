@@ -239,7 +239,7 @@ try {
         waiting.resolve();
         await expect(controls[first].save).toBeDisabled();
         await expect(controls[second].save).toBeDisabled();
-        await expect(state.page.locator(".my-lessons__account-name strong")).toHaveText("Ana Updated");
+        await expect(state.page.locator(".account-menu__name")).toHaveText("Ana Updated");
         assert.deepEqual(posts, [{ [first]: controls[first].value }, { [second]: controls[second].value }]);
         await chooseAccount(state.page, "Done editing");
         await chooseAccount(state.page, "Edit details");
@@ -360,7 +360,7 @@ try {
           await check(state);
           broken = false;
           await state.page.getByRole("button", { name: "Try again", exact: true }).click();
-          await expect(state.page.locator(".my-lessons__account-name strong")).toHaveText(student.name);
+          await expect(state.page.locator(".account-menu__name")).toHaveText(student.name);
           await check(state);
         } finally { await state.context.close(); }
       }
@@ -383,7 +383,7 @@ try {
           await check(state);
           broken = false;
           await panel.getByRole("button", { name: "Sign in", exact: true }).click();
-          await expect(state.page.locator(".my-lessons__account-name strong")).toHaveText(student.name);
+          await expect(state.page.locator(".account-menu__name")).toHaveText(student.name);
           await check(state);
         } finally { await state.context.close(); }
       }

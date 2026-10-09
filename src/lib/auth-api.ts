@@ -266,12 +266,23 @@ export async function confirmEmailChange(token: string, changeToken: string) {
   return result;
 }
 
+declare global {
+  interface Window {
+    /** The account, asked for by /book's inline script for the stored session. */
+    __inesMe?: { token: string; response: Promise<Response> } | null;
+  }
+}
+
 export async function fetchMe(token: string) {
+  // The document's request is used once, and only for the session it was
+  // sent with; any later read asks again.
+  const primed = typeof window !== "undefined" ? window.__inesMe : null;
+  if (primed) window.__inesMe = null;
   let response: Response;
   try {
-    response = await fetch(`${BOOKING_API_BASE_URL}/me`, {
+    response = await (primed?.token === token ? primed.response : fetch(`${BOOKING_API_BASE_URL}/me`, {
       headers: { Accept: "application/json", Authorization: `Bearer ${token}` }
-    });
+    }));
   } catch {
     throw new Error("We couldn’t reach the booking system. Please check your connection and try again.");
   }
