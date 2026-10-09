@@ -1067,7 +1067,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     // `fetchMe` already clears a genuinely invalid session on a 401. A network
     // interruption (including a quick reload while this request is in flight)
     // must not sign the student out as a side effect.
-    refreshStudent()
+    // A read overtaken by a newer one, as when another tab signs in again,
+    // says nothing about who is signed in now: its refusal of the old session
+    // is not a sign-out. Ask again for the session the page holds, and open on
+    // that answer instead of on booking.
+    const loadAccount = (): ReturnType<typeof refreshStudent> =>
+      refreshStudent().then((data) => (data || !readSession() ? data : loadAccount()));
+    loadAccount()
       .then((data) => {
         // Returning students came here for their next commitment, not for a
         // fork asking whether they want to see it. Explicit lesson, sign-in,

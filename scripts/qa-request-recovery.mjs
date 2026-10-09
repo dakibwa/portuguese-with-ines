@@ -414,6 +414,11 @@ try {
       try {
         await page.goto(`${base}/book/`);
         await started.promise;
+        // Sign in again only once the page itself waits on the old session's
+        // read, having taken over the document's early request. Before that it
+        // simply reads the new session, and this passed by luck until release
+        // run 259 caught a stale refusal opening the page on booking.
+        await page.waitForFunction(() => !window.__inesMe);
         await replaceSession(page, newSession);
         const response = page.waitForResponse(url => new URL(url.url()).pathname === endpoint);
         waiting.resolve(); await response;
