@@ -160,10 +160,9 @@ the same identity or action:
   buttons rather than plain links or a second strip beneath the hero; on a
   phone they share a row beneath it, and below 414 px each takes the full
   width so neither label wraps. The blue
-  hero carries its own painted field: a cream wave curling in from its right
-  edge beside the heading, as if breaking against the lilac column, clear of
-  the words and the actions at every width. Stacked, it rides higher beside the
-  heading; on phones it comes in beside `Lessons` (8 October 2026);
+  hero has no painted field of its own: the heading, its rule and the actions
+  have the panel to themselves (the cream wave tried on 8 October 2026 was
+  removed at Dan's request on 9 October);
 - Approach, Lessons, FAQ, and Booking follow the same hierarchy: the brand
   anchors the shared header and footer, while each page owns a task-specific
   heading and only the actions that meaningfully advance its reading path.
@@ -431,9 +430,8 @@ and card checkout so the choices beside the card form describe its held times.
 Motion is calm, quick and physical, and never makes anyone wait (7 October
 2026, at Dan's request for tasteful animation on the little splats, beautiful
 transitions between pages and a premium feel throughout; on 8 October the
-wordmark's writing, the buttons' shifting cut, the Lessons cards' turning
-marks, the drawn rules and the booking celebration followed, kept in style and
-tasteful). What lands or
+buttons' shifting cut, the Lessons cards' turning marks, the drawn rules and
+the booking celebration followed, kept in style and tasteful). What lands or
 travels moves on a soft spring that gives a few per cent and settles; controls
 answer on a firm one; everything else decelerates long.
 
@@ -467,19 +465,15 @@ draws on the
 same firm spring, the FAQ's plus turns into its minus with a little give, and
 the phone menu's destinations drop in one after another as their marks land.
 
-The header wordmark is the way home, and it answers in Inês's own hand.
-Pointing at it, or focusing it from the keyboard, writes the lettering again
-in coral, left to right at a pen's steady pace, with a pink-violet wet edge on
-the slant of her writing; leaving it draws the ink back quickly. As the ink
-reaches each ê, its circumflex (the chapéu, the hat) tips: a lift of a few
-pixels and a small turn, the two hats turning opposite ways, settling on the
-soft spring. A tap on a phone simply goes home. Clicked, it arrives on Home
-still written rather than written twice. The hats also tip now and then on
-their own, so the site feels lightly alive: Português every nine seconds and
-Inês every thirteen, so they seldom coincide. The beat is the wall clock's, not
-the page's, so the rhythm carries on unbroken from page to page. It is the one
-ambient motion on the site. Reduced motion changes the colour without the
-writing, and the hats stay still.
+The header wordmark is the way home, and pointing at it changes nothing: it
+keeps its own blue (the coral writing on hover was removed at Dan's request on
+9 October 2026). Its two circumflexes over ê (the chapéu, the hat) tip now and
+then on their own, so the site feels lightly alive: a lift of a few pixels and
+a small turn, the two hats turning opposite ways and settling on the soft
+spring, Português every nine seconds and Inês every thirteen, so they seldom
+coincide. The beat is the wall clock's, not the page's, so the rhythm carries
+on unbroken from page to page. It is the one ambient motion on the site.
+Reduced motion keeps the hats still.
 
 The little splats land. Each small emblem mark arrives once like a dab of
 paint: it blooms from its middle outwards, soft at first and then sharp, a touch
@@ -492,8 +486,8 @@ as far. Marks in the first screen land as the page arrives; those further down
 wait until the reader reaches them, so none lands unseen. The phone menu's
 marks land each time it opens, in step with its links, while the splat cropped
 into its foot blooms a little more slowly. The large painted fields on the
-pages (the Home wave, the Approach fan, the Lessons hero splat and the booking
-banner's corner splat) stay still: they are the paper the marks land on. Text, buttons and the
+pages (the Approach fan, the Lessons hero splat and the booking banner's
+corner splat) stay still: they are the paper the marks land on. Text, buttons and the
 booking workspace never move or wait for a landing, nothing else loops, and a
 landed mark stays still, except that a Lessons card turns its mark a few
 degrees while it is pointed at. A confirmed booking is celebrated once: the

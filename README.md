@@ -300,31 +300,16 @@ booking journey's control grammar keeps its own radius.
 The wordmark is three CSS masks over one artwork, so its colour is whatever is
 painted behind it. `BrandWordmark` renders the lettering with two small windows
 subtracted (`mask-composite: subtract`) and each circumflex over ê in its own
-window (`intersect`); at rest the three print as one. Hovering over the header
-wordmark, or focusing it from the keyboard, writes it in coral: a registered,
-inheriting `--wordmark-ink` percentage carries the edge of a 105° gradient
-across all three layers in 720 ms on `--motion-pen`, mixed in OKLCH so that the
-wet edge runs through pink and violet, and draws it back in 400 ms. As the
-edge reaches each ê, a registered `--wordmark-hat` number runs from 0 to 1 on
-the soft spring and its `sin()` lifts and turns that hat; leaving resets it at
-once, so leaving never tips a hat again, and a browser without `@property`, or
-reduced motion, jumps straight to 1, where the arc is back at rest. The ink's
-value is declared on the element, never as a `var()` fallback, which Chromium
-does not repaint until the transition has ended. The header wordmark's box is
-sized to the artwork's 760 × 236 ratio, so the ink crosses letters rather than
-empty header and the windows sit where they were measured. `(hover: hover) and
-(pointer: fine)` leaves touch screens out. A browser does not check hover
-again until a view transition has finished, so a click on a written wordmark
-would bring the new page's wordmark in bare and then write it a second time.
-Instead, `PageTurn` holds it written, hats included, with
-`data-wordmark="inked"` until a few frames after the turn. Without `@property`
-it simply turns coral. The hats also tip now and then on their own, the site's
-one ambient motion: paused CSS animations on a registered `--wordmark-idle`,
-nine seconds for Português and thirteen for Inês, sharing the hover's arc
-through `max()` so the two never add up. `PageTurn` starts them on every page
-at `Date.now() % period`, so the rhythm is the wall clock's and carries on
-unbroken across page turns and full page loads; without JavaScript, and with
-reduced motion, the hats stay still.
+window (`intersect`); at rest the three print as one. The header wordmark has
+no hover state (its coral writing was removed on 9 October 2026), and its box
+is sized to the artwork's 760 × 236 ratio so the windows sit where they were
+measured. The hats tip now and then on their own, the site's one ambient
+motion: paused CSS animations on a registered `--wordmark-idle` number, nine
+seconds for Português and thirteen for Inês, whose `sin()` lifts and turns each
+hat in one arc on the soft spring. `PageTurn` starts them on every page at
+`Date.now() % period`, so the rhythm is the wall clock's and carries on
+unbroken across page turns and full page loads; without JavaScript, without
+`@property` and with reduced motion, the hats stay still.
 
 The rules under the display headings (`.editorial-rule`, the Home principles'
 `.short-rule`, and the FAQ section header's `::after`, which replaced its
@@ -365,11 +350,11 @@ card's text inside an isolated stacking context.
 `prefers-reduced-motion: reduce` removes page turns, booking transitions,
 smooth scrolling, the splat landings, the phone menu's entrance, the button
 and navigation hover and press transforms, the buttons' shifting cut, the
-cards' turning marks, the drawn rules, and the wordmark's writing and tipping
-hats, keeping colour changes so states stay distinguishable. Splats are also
+cards' turning marks, the drawn rules, and the wordmark's tipping hats,
+keeping colour changes so states stay distinguishable. Splats are also
 shown at rest in print and without JavaScript, and the rules in print.
 
-Home, Approach and Lessons hero artwork is served as AVIF with a WebP fallback — the
+Approach and Lessons hero artwork is served as AVIF with a WebP fallback — the
 painterly splats cost less than half as much in AVIF as they did in WebP — and
 fetched eagerly, with dedicated 800 px sources for screens up to 720 px;
 non-critical marks load lazily. The display font is

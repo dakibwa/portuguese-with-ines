@@ -61,8 +61,8 @@
   --motion-page: 620ms;
   /* Decelerates hard and long: things arrive quickly, then take their time. */
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  /* A pen's steady pace, easing only as it lifts: for what is drawn or
-     written, the wordmark's ink and the rules under the headings. */
+  /* A pen's steady pace, easing only as it lifts: for what is drawn, the
+     rules under the headings. */
   --motion-pen: cubic-bezier(0.61, 1, 0.88, 1);
   /*
    * Springs, sampled from a damped oscillator. The soft one gives about 4% and
@@ -780,74 +780,36 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 }
 
 .header-wordmark {
-  /* Sized to the artwork, so the ink below crosses letters rather than empty
-     paper, and so the hats' windows sit where they were measured. */
+  /* Sized to the artwork, so the hats' windows sit where they were measured. */
   width: min(100%, calc(72px * 760 / 236));
 }
 
 /*
- * The wordmark is the way home, so pointing at it re-inks Inês's lettering in
- * coral, written left to right at a pen's steady pace, with the wet edge of
- * the ink on the slant of her hand. Mixed in OKLCH, that edge runs through
- * pink and violet rather than mud; a browser without it mixes plainly, and one
- * that cannot animate the ink (no @property) simply turns coral. As the edge
- * reaches each ê, its hat tips: a lift of a few pixels and a small turn that
- * settles on the soft spring. Only a pointer that can rest there writes it: a
- * tap simply goes home.
+ * Lightly alive: each hat over ê (the chapéu) tips once in a while by itself,
+ * on its own rhythm (nine seconds for Português, thirteen for Inês, so they
+ * seldom coincide and never feel mechanical): a lift of a few pixels and a
+ * small turn, the two hats turning opposite ways, settling on the soft spring.
+ * The beat is the wall clock's, not the page's: PageTurn sets each hat's place
+ * in its cycle from the time of day, so moving between pages, even by a full
+ * page load, never restarts the rhythm. Until it does, without JavaScript and
+ * with reduced motion, the hats stay still. The one ambient motion on the
+ * site, kept to the two smallest marks in it; pointing at the wordmark changes
+ * nothing.
  */
-@property --wordmark-ink {
-  syntax: "<percentage>";
-  inherits: true;
-  initial-value: 0%;
-}
-
-@property --wordmark-hat {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
-}
-
 @property --wordmark-idle {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
 }
 
-.header-wordmark {
-  /* Declared, not left to the registration, so that a browser without
-     @property still has a value; and never as a var() fallback, which
-     Chromium does not repaint until the transition has ended. */
-  --wordmark-ink: 0%;
-  transition: --wordmark-ink 400ms var(--motion-pen);
-}
-
-.header-wordmark > * {
-  background: linear-gradient(105deg, var(--coral) calc(var(--wordmark-ink) - 12%), currentColor var(--wordmark-ink));
-  background: linear-gradient(in oklch 105deg, var(--coral) calc(var(--wordmark-ink) - 12%), currentColor var(--wordmark-ink));
-}
-
-/* A hat's tip is one arc, from 0 to 1: up and back, with the spring's give
-   as it lands. Leaving resets it at once, so leaving never tips it again; a
-   browser that cannot animate it, or reduced motion, jumps straight to 1,
-   where the arc is back at rest. The hats also tip now and then on their own
-   (below), on the same arc; the higher of the two arcs wins, so a hover and
-   an idle tip never add up. */
+/* A tip is one arc, from 0 to 1: up and back, with the spring's give as it
+   lands. Without @property the hats simply stay still. */
 .header-wordmark .brand-wordmark__hat {
-  --wordmark-hat: 0;
-  --hat-lift: max(sin(var(--wordmark-hat) * 180deg), sin(var(--wordmark-idle) * 180deg));
+  --hat-lift: sin(var(--wordmark-idle) * 180deg);
   translate: 0 calc(-2.5px * var(--hat-lift));
   rotate: calc(var(--hat-turn) * var(--hat-lift));
 }
 
-/*
- * Lightly alive: each hat tips once in a while by itself, on its own rhythm
- * (nine seconds for Português, thirteen for Inês, so they seldom coincide and
- * never feel mechanical). The beat is the wall clock's, not the page's:
- * PageTurn sets each hat's place in its cycle from the time of day, so moving
- * between pages, even by a full page load, never restarts the rhythm. Until
- * it does, and without JavaScript, the hats stay still. The one ambient
- * motion on the site, kept to the two smallest marks in it.
- */
 /* Each cycle opens with one 630 ms tip, then rests at 1, where the arc is
    flat, until the next. */
 @keyframes wordmark-hat-idle-9s {
@@ -886,54 +848,10 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 
 .header-wordmark .brand-wordmark__hat--portugues {
   --hat-turn: -14deg;
-  --hat-delay: 210ms;
 }
 
 .header-wordmark .brand-wordmark__hat--ines {
   --hat-turn: 12deg;
-  --hat-delay: 400ms;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .site-header__brand:hover .header-wordmark {
-    --wordmark-ink: 112%;
-    transition-duration: 720ms;
-  }
-
-  .site-header__brand:hover .brand-wordmark__hat {
-    --wordmark-hat: 1;
-    transition: --wordmark-hat 620ms var(--motion-spring) var(--hat-delay);
-  }
-
-  /* Clicked while written, it arrives home written (PageTurn), rather than
-     bare and then written again once the page has turned. */
-  :root[data-wordmark="inked"] .header-wordmark {
-    --wordmark-ink: 112%;
-    transition: none;
-  }
-
-  :root[data-wordmark="inked"] .header-wordmark .brand-wordmark__hat {
-    --wordmark-hat: 1;
-    transition: none;
-  }
-}
-
-.site-header__brand:focus-visible .header-wordmark {
-  --wordmark-ink: 112%;
-  transition-duration: 720ms;
-}
-
-.site-header__brand:focus-visible .brand-wordmark__hat {
-  --wordmark-hat: 1;
-  transition: --wordmark-hat 620ms var(--motion-spring) var(--hat-delay);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .header-wordmark,
-  .header-wordmark .brand-wordmark__hat,
-  .site-header__brand:is(:hover, :focus-visible) .brand-wordmark__hat {
-    transition: none;
-  }
 }
 
 .site-nav {
@@ -1351,21 +1269,6 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   background-color: var(--green);
   background-image: var(--paper-texture);
   color: var(--paper);
-}
-
-/* The hero's own painted field: a cream wave curling in from the blue
-   panel's right edge beside the heading, as if breaking against the lilac
-   column, clear of the words and the actions at every width. Like the other
-   large fields it stays still: it is the paper the marks land on. */
-.home-hero__splat {
-  position: absolute;
-  top: 50%;
-  right: -14%;
-  z-index: -1;
-  width: min(48%, 420px);
-  aspect-ratio: 1;
-  translate: 0 -56%;
-  pointer-events: none;
 }
 
 .home-hero__copy h1 {
@@ -7228,15 +7131,6 @@ dialog[open]::backdrop {
 }
 
 @media (max-width: 900px) {
-  /* Stacked, the actions run wide, so the wave rides higher, beside the
-     heading and above them. */
-  .home-hero__splat {
-    top: 34%;
-    right: -8%;
-    width: min(34%, 300px);
-    translate: 0 -50%;
-  }
-
   .home-hero {
     grid-template-columns: 1fr;
     min-height: auto;
@@ -7473,14 +7367,6 @@ dialog[open]::backdrop {
     min-height: 420px;
     padding-top: 3rem;
     padding-bottom: 3rem;
-  }
-
-  /* Beside "Lessons" and the line beneath it, in from the right edge. */
-  .home-hero__splat {
-    top: 5.6rem;
-    right: -12%;
-    width: min(40%, 150px);
-    translate: none;
   }
 
   .home-hero__copy h1 {
