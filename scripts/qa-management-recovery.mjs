@@ -66,6 +66,12 @@ async function fixture(width, reply = async () => null, signed = true) {
   return { page, context, errors };
 }
 
+// The next lesson opens from its row on a phone, or from its day where a
+// pointer reads it off the calendar.
+function nextLessonOpener(page) {
+  return page.locator(".lesson-overview__next-open:visible, #lesson-calendar .calendar-week button.is-next:visible").first();
+}
+
 async function chooseAccount(page, name) {
   await page.locator("#account-menu").waitFor({ state: "attached" });
   const toggle = page.locator("#account-menu-button");
@@ -444,7 +450,7 @@ try {
         await page.getByLabel("Your name", { exact: true }).fill("Ana draft");
         await page.getByLabel("NIF (optional)").fill("248899945");
         await chooseAccount(page, "Done editing");
-        await page.locator(".lesson-overview__next-open").click();
+        await nextLessonOpener(page).click();
         await expect(page.getByRole("dialog").getByRole("link", { name: "Join Google Meet", exact: true })).toBeVisible();
         await check(state);
         await page.getByRole("button", { name: "Close lesson management", exact: true }).click();

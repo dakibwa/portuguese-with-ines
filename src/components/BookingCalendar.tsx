@@ -11,12 +11,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
-  Globe,
   CircleHelp,
+  Clock3,
+  Globe,
   CircleX,
   MessageSquareText,
   Plus,
   Repeat,
+  UserRound,
   X
 } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
@@ -1065,7 +1067,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     // `fetchMe` already clears a genuinely invalid session on a 401. A network
     // interruption (including a quick reload while this request is in flight)
     // must not sign the student out as a side effect.
-    refreshStudent()
+    // A read overtaken by a newer one, as when another tab signs in again,
+    // says nothing about who is signed in now: its refusal of the old session
+    // is not a sign-out. Ask again for the session the page holds, and open on
+    // that answer instead of on booking.
+    const loadAccount = (): ReturnType<typeof refreshStudent> =>
+      refreshStudent().then((data) => (data || !readSession() ? data : loadAccount()));
+    loadAccount()
       .then((data) => {
         // Returning students came here for their next commitment, not for a
         // fork asking whether they want to see it. Explicit lesson, sign-in,
@@ -1459,6 +1467,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const returnCalendarWeekCount = visibleCalendarWeekCount === 1 ? CALENDAR_PAGE_WEEKS : null;
   const calendarMonthsLabel = calendarMonths(displayedCalendarWeeks);
   const visibleCalendarDates = new Set(displayedCalendarWeeks.flatMap((week) => week.cells.map((cell) => cell.key)));
+  // Where a pointer can hover, the next lesson is read off the calendar: its
+  // day stands out and hovering shows the details. The row above the calendar
+  // is for touch screens, narrow cards and a next lesson beyond the first four
+  // weeks, where the calendar can't show it.
+  const nextLessonKey = nextLesson ? lessonDateKey(nextLesson) : "";
+  const nextLessonOnFirstPage = Boolean(
+    nextLessonKey && calendarPages[0]?.some((week) => week.cells.some((cell) => cell.key === nextLessonKey))
+  );
   const calendarWindowBookings = calendarBookings.filter((booking) =>
     visibleCalendarDates.has(lessonDateKey(booking))
   );
@@ -3419,7 +3435,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   </button>
                 </div>
                 {nextLesson ? (
-                  <div className="lesson-overview__next">
+                  <div className={`lesson-overview__next${nextLessonOnFirstPage ? " lesson-overview__next--on-calendar" : ""}`}>
                     <LessonMark
                       className="lesson-overview__next-mark"
                       durationMinutes={nextLesson.lessonType.durationMinutes}
@@ -3475,24 +3491,29 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   ) : null}
                 </div>
                 {/* A student whose clock differs from Porto's is told which clock
-                    the times are on: their own, or Porto's for a lesson there. */}
+                    the times are on, one at a time: their own, or Porto's for
+                    a lesson there. Booking follows the place chosen. Your
+                    lessons, holding both, names the next lesson's clock and
+                    switches while another lesson is hovered or focused. */}
                 {studentClockDiffers && !(managed && isManagedReschedule) ? (
-                  <p className="calendar-zone">
-                    <Globe size={15} aria-hidden="true" />
-                    <span>
-                      <span className="visually-hidden">Times are in </span>
-                      {viewZone === BOOKING_TIME_ZONE ? (
-                        <strong>Porto time</strong>
-                      ) : (
-                        <>
-                          <strong>{viewZoneName}</strong>
-                          {isLessonsCalendarOverview && calendarBookings.some((booking) => booking.location === "porto")
-                            ? " · Porto time for lessons in Porto"
-                            : null}
-                        </>
-                      )}
-                    </span>
-                  </p>
+                  isLessonsCalendarOverview && calendarBookings.some((booking) => booking.location === "porto") ? (
+                    <p className={`calendar-zone calendar-zone--switching${nextLesson?.location === "porto" ? " calendar-zone--porto" : ""}`}>
+                      <Clock3 size={15} aria-hidden="true" />
+                      <span className="visually-hidden">Times are in {viewZoneName}; lessons in Porto are in Porto time</span>
+                      <strong aria-hidden="true">
+                        <span className="calendar-zone__own">{viewZoneName}</span>
+                        <span className="calendar-zone__porto">Porto time</span>
+                      </strong>
+                    </p>
+                  ) : (
+                    <p className="calendar-zone">
+                      <Clock3 size={15} aria-hidden="true" />
+                      <span>
+                        <span className="visually-hidden">Times are in </span>
+                        <strong>{viewZone === BOOKING_TIME_ZONE ? "Porto time" : viewZoneName}</strong>
+                      </span>
+                    </p>
+                  )
                 ) : null}
               </div>
               <div className="unified-calendar__range-actions">
@@ -3571,8 +3592,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     const dateLabel = formatLongDate(`${cell.key}T12:00:00Z`);
                     const canStartBooking = isLessonsCalendarOverview && cell.key >= viewTodayKey;
                     const weeklyDay = lessons.length > 0 && lessons.every(isWeeklyLesson);
+                    // Your lessons spells each booked day out: when it starts and
+                    // ends, online or in person, and in full on hover or focus.
+                    const lessonTip = isLessonsCalendarOverview && lessons.length ? `lesson-tip-${cell.key}` : undefined;
+                    const nextDay = Boolean(lessonTip && lessons.some((booking) => booking.reference === nextLesson?.reference));
+                    const dayClock = !lessonTip
+                      ? ""
+                      : lessons.every((booking) => booking.location === "porto")
+                        ? " is-porto-day"
+                        : lessons.every((booking) => booking.location !== "porto") ? " is-own-day" : "";
                     return (
                       <button
+                        aria-describedby={lessonTip}
                         aria-label={`${dateLabel}${
                           lessons.length ? `, ${lessonLabel}` : ""
                         }${
@@ -3586,7 +3617,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         aria-pressed={!isLessonsCalendarOverview && selectedDate === cell.key}
                         className={`${slots.length ? "has-availability" : ""}${canStartBooking ? " can-start-booking" : ""}${
                           lessons.length ? " has-booking" : ""
-                        }${weeklyDay ? " has-weekly-booking" : ""}${!isLessonsCalendarOverview && selectedDate === cell.key ? " is-selected" : ""}${cell.isToday ? " is-today" : ""}`}
+                        }${weeklyDay ? " has-weekly-booking" : ""}${!isLessonsCalendarOverview && selectedDate === cell.key ? " is-selected" : ""}${cell.isToday ? " is-today" : ""}${
+                          nextDay ? " is-next" : ""
+                        }${dayClock}${lessonTip && row === 0 ? " has-tip-below" : ""}`}
                         data-date-key={cell.key}
                         disabled={manageWorking || (!canStartBooking && !slots.length && !lessons.length)}
                         key={cell.key}
@@ -3632,13 +3665,46 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             <small className="calendar-booking-times">
                               {(lessons.length <= 2 ? lessons : lessons.slice(0, 1)).map((booking) => (
                                 <span className={isWeeklyLesson(booking) ? "is-weekly" : undefined} key={booking.reference}>
-                                  {formatSlotTime(booking.startAt, zoneOf(booking))}
+                                  {lessonTip ? (
+                                    booking.location === "porto"
+                                      ? <UserRound aria-hidden="true" className="calendar-booking-times__place" size={12} strokeWidth={2.4} />
+                                      : <Globe aria-hidden="true" className="calendar-booking-times__place" size={12} strokeWidth={2.4} />
+                                  ) : null}
+                                  <span className="calendar-booking-times__when">
+                                    <time dateTime={booking.startAt}>{formatSlotTime(booking.startAt, zoneOf(booking))}</time>
+                                    {lessonTip ? <span className="calendar-booking-times__until">–{formatSlotTime(booking.endAt, zoneOf(booking))}</span> : null}
+                                  </span>
                                 </span>
                               ))}
                               {lessons.length > 2 ? <span>+{lessons.length - 1} more</span> : null}
                             </small>
                           ) : null}
                         </span>
+                        {lessonTip ? (
+                          // Hovering a booked day, or reaching it by keyboard, shows its
+                          // lessons in full: when, with the clock named as a time on its
+                          // own names it, how long, where and whether weekly.
+                          <span
+                            className={`calendar-lesson-tip${column === 0 ? " calendar-lesson-tip--start" : column === 6 ? " calendar-lesson-tip--end" : ""}`}
+                            id={lessonTip}
+                            role="tooltip"
+                          >
+                            {lessons.map((booking) => (
+                              <span className="calendar-lesson-tip__lesson" key={booking.reference}>
+                                {booking.reference === nextLesson?.reference ? (
+                                  <span className="calendar-lesson-tip__next">
+                                    {Date.parse(booking.startAt) <= clock ? "Happening now" : "Next lesson"}
+                                  </span>
+                                ) : null}
+                                <strong>{formatLongDate(booking.startAt, zoneOf(booking))}, {lessonTime(booking.startAt, zoneOf(booking))}</strong>
+                                <span>
+                                  {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}
+                                  {isWeeklyLesson(booking) ? " · Weekly" : ""}
+                                </span>
+                              </span>
+                            ))}
+                          </span>
+                        ) : null}
                       </button>
                     );
                   })}
@@ -3656,6 +3722,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               ) : null}
               {isLessonsCalendarOverview && calendarBookings.some(isWeeklyLesson) ? (
                 <span><i className="is-weekly" aria-hidden="true" /> Weekly lesson</span>
+              ) : null}
+              {/* What the marks on each booked day mean, for the kinds booked. */}
+              {isLessonsCalendarOverview && calendarBookings.some((booking) => booking.location !== "porto") ? (
+                <span><Globe aria-hidden="true" size={12} strokeWidth={2.4} /> Online</span>
+              ) : null}
+              {isLessonsCalendarOverview && calendarBookings.some((booking) => booking.location === "porto") ? (
+                <span><UserRound aria-hidden="true" size={12} strokeWidth={2.4} /> In Porto</span>
               ) : null}
               {intent === "book" || isManagedReschedule ? (
                 <span><i className="is-free" aria-hidden="true" /> Free to book</span>

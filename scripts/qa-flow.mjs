@@ -1240,11 +1240,12 @@ await accountPage.waitForFunction(
 // Wide, the card's header is one row: the student's name with Sign out
 // beneath it, the account's places open in the middle, centred on the card,
 // and Book at the right. The places name the card, so its title is there for
-// screen readers only. The card is one lilac sheet, the next lesson raised on
-// it in cream without an outline.
+// screen readers only. The card is one lilac sheet. Where a pointer can
+// hover, the next lesson is read off the calendar, its day filled in, so the
+// row above the calendar shows only when that day is beyond the first weeks.
 const initialWorkflowLayout = await accountPage.evaluate(() => {
   const bounds = (selector) => document.querySelector(selector)?.getBoundingClientRect().toJSON() ?? null;
-  const next = document.querySelector(".lesson-overview__next");
+  const nextDay = document.querySelector("#lesson-calendar .calendar-week button.is-next");
   return {
     calendar: bounds("#lesson-calendar .calendar-panel"),
     heading: bounds("#upcoming-lessons-heading"),
@@ -1252,9 +1253,10 @@ const initialWorkflowLayout = await accountPage.evaluate(() => {
     signOut: bounds(".account-menu__sign-out"),
     places: bounds(".account-menu__places"),
     book: bounds(".lesson-overview__book"),
-    next: bounds(".lesson-overview__next"),
+    next: bounds("#lesson-calendar .unified-calendar__toolbar"),
     sheet: getComputedStyle(document.querySelector("#lesson-calendar .calendar-panel")).backgroundColor,
-    nextSurface: next ? `${getComputedStyle(next).backgroundColor} ${getComputedStyle(next).borderTopWidth}` : "",
+    nextRowShown: Boolean(document.querySelector(".lesson-overview__next")?.getClientRects().length),
+    nextDay: nextDay ? getComputedStyle(nextDay).backgroundColor : "",
     toggleShown: Boolean(document.querySelector("#account-menu-button")?.getClientRects().length),
     separateBars: document.querySelectorAll(".unified-account-controls, .unified-account-area:not(:empty)").length
   };
@@ -1266,8 +1268,9 @@ if (
   (initialWorkflowLayout.heading?.width ?? 0) > 1 ||
   initialWorkflowLayout.separateBars ||
   initialWorkflowLayout.toggleShown ||
-  initialWorkflowLayout.sheet !== "rgb(229, 224, 240)" ||
-  initialWorkflowLayout.nextSurface !== "rgb(251, 244, 229) 0px" ||
+  initialWorkflowLayout.sheet !== "rgba(170, 164, 230, 0.13)" ||
+  initialWorkflowLayout.nextRowShown === Boolean(initialWorkflowLayout.nextDay) ||
+  (initialWorkflowLayout.nextDay && !["rgb(180, 58, 38)", "rgb(85, 79, 145)"].includes(initialWorkflowLayout.nextDay)) ||
   initialWorkflowLayout.signOut.top < initialWorkflowLayout.name.bottom - 1 ||
   Math.abs(initialWorkflowLayout.signOut.left - initialWorkflowLayout.name.left) > 2 ||
   initialWorkflowLayout.places.left <= Math.max(initialWorkflowLayout.name.right, initialWorkflowLayout.signOut.right) ||
@@ -1472,15 +1475,21 @@ const qaStartDay = accountPage.locator(`#lesson-calendar button[data-date-key="$
 const qaStartDayState = await qaStartDay.evaluate((day) => ({
   classes: day.className,
   label: day.getAttribute("aria-label") ?? "",
-  times: [...day.querySelectorAll(".calendar-booking-times span")].map((time) => ({
-    text: time.textContent?.trim() ?? "",
+  times: [...day.querySelectorAll(".calendar-booking-times > span")].map((time) => ({
+    text: time.querySelector("time")?.textContent?.trim() ?? "",
     weekly: time.classList.contains("is-weekly")
-  }))
+  })),
+  // On a wide card each lesson runs from its time until its end, after the
+  // globe that marks it online.
+  spelledOut: [...day.querySelectorAll(".calendar-booking-times > span")].every((time) =>
+    /^–\d\d:\d\d$/.test(time.querySelector(".calendar-booking-times__until")?.textContent ?? "") &&
+    Boolean(time.querySelector("svg.calendar-booking-times__place")))
 }));
 if (
   !qaStartDayState.classes.includes("has-booking") ||
   qaStartDayState.classes.includes("has-weekly-booking") ||
   !qaStartDayState.label.endsWith("2 lessons, choose a lesson to open") ||
+  !qaStartDayState.spelledOut ||
   JSON.stringify(qaStartDayState.times) !== JSON.stringify([
     { text: formatQaTime(qaStart), weekly: true },
     { text: formatQaTime(qaSecondStart), weekly: false }
@@ -1596,7 +1605,8 @@ if (
 ) {
   throw new Error("The question mark should explain how the lessons calendar works.");
 }
-const tooltipNextTopBefore = await accountPage.locator(".lesson-overview__next").evaluate((row) => row.getBoundingClientRect().top);
+// The weeks beneath the ? stand where they were while its tip floats over them.
+const tooltipNextTopBefore = await accountPage.locator("#lesson-calendar .calendar-weeks").evaluate((weeks) => weeks.getBoundingClientRect().top);
 await calendarHint.focus();
 await calendarTip.waitFor({ state: "visible" });
 await accountPage.waitForFunction(() => getComputedStyle(document.querySelector("#upcoming-lessons-tip")).opacity === "1");
@@ -1606,7 +1616,7 @@ const tooltipLayout = await accountPage.evaluate(() => {
   return {
     calendar: bounds("#lesson-calendar .calendar-panel"),
     tip: bounds("#upcoming-lessons-tip"),
-    next: bounds(".lesson-overview__next"),
+    next: bounds("#lesson-calendar .calendar-weeks"),
     tipStyles: { backgroundColor: tipStyles.backgroundColor, opacity: tipStyles.opacity, position: tipStyles.position }
   };
 });
@@ -1665,7 +1675,7 @@ if (
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-account-desktop.png"), fullPage: true });
 
-const desktopBookingTimes = accountPage.locator("#lesson-calendar .calendar-booking-times span");
+const desktopBookingTimes = accountPage.locator("#lesson-calendar .calendar-booking-times > span");
 if ((await desktopBookingTimes.count()) !== 2) {
   throw new Error("A day with two lessons should show both booked times, not a cramped count badge.");
 }
@@ -2029,7 +2039,7 @@ if (defaultCalendarWeekCount !== 4) {
 if (await accountPage.getByRole("button", { name: "Show all", exact: true }).count()) {
   throw new Error("The upcoming-lessons calendar should show four weeks by default, without an expansion control.");
 }
-const bookingTimes = accountPage.locator("#lesson-calendar .calendar-booking-times span");
+const bookingTimes = accountPage.locator("#lesson-calendar .calendar-booking-times > span");
 if ((await bookingTimes.count()) !== 2) {
   throw new Error("The mobile booked day should show both lesson times.");
 }

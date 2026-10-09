@@ -290,7 +290,12 @@ depending on them having kept the right confirmation email.
 - **Your lessons is the calendar.** It opens first for a signed-in student
   and remains available as `Your lessons` in the account menu.
   After a successful booking, `Back to your lessons` opens this same
-  calendar, with the new lesson on its day. The next lesson leads the card. Weekly lessons are
+  calendar, with the new lesson on its day. On a wide card each booked day
+  shows the time its lessons run from and until with a globe (online) or a
+  little person (in Porto), the next lesson's day is filled in, and hovering or
+  focusing a day shows its lessons in full; on phones and narrow cards, or when
+  the next lesson is beyond the first four weeks, the next lesson also leads
+  the card as a row with its Meet link. Weekly lessons are
   lilac and one-off lessons coral; a weekly lesson's dialog offers `Manage
   weekly lessons` for the whole run, and `Your lessons` counts an active repeat once.
   The `?` beside the calendar's month explains that booked lessons open and
@@ -476,7 +481,9 @@ lessons, so its cancellation set includes every occurrence committed first.
   by the dates of the clock shown. For a student whose clock differs from
   Porto's at any time of year, a time standing alone names its clock (`09:00
   Los Angeles time`) and the calendar's header says which clock the times are
-  on; in Portugal times stay plain. Weekly
+  on, one at a time: the place chosen's while booking, and on Your lessons the
+  next lesson's, switching while a lesson on the other clock is hovered or
+  focused; in Portugal times stay plain. Weekly
   runs stay anchored to their Porto wall time, so around a clock change their
   time elsewhere moves by an hour for a few weeks. A student's emails follow
   the same rule: the lesson's own clock (theirs online, Porto's in Porto),

@@ -279,6 +279,63 @@ try {
   await legacy.getByRole("heading", { name: "Your account", exact: true }).waitFor();
   assert.ok(legacy.url().includes("/book/?view=lessons"));
   await legacy.close();
+
+  // Where a pointer can hover, the next lesson is read off the calendar: its
+  // day is filled in and hovering a lesson shows its details, so there is no
+  // row above the calendar to say it. The clock line names one clock at a
+  // time, the next lesson's, and Porto's while a lesson there is hovered. A
+  // narrow card keeps the row.
+  const abroad = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: "America/Los_Angeles" });
+  await abroad.addInitScript(() => localStorage.setItem("ines-student-session", "navigation-abroad"));
+  const abroadLesson = (reference, location, startAt) => ({
+    reference, status: "confirmed", location, notes: "", startAt, endAt: new Date(Date.parse(startAt) + 3_600_000).toISOString(),
+    lessonType, isPast: false, sameDayFeeApplies: false, seriesId: null, manageToken: reference.toLowerCase()
+  });
+  const abroadLessons = [abroadLesson("ABROAD-ONLINE", "online", "2026-09-09T16:00:00Z"), abroadLesson("ABROAD-PORTO", "porto", "2026-09-16T09:00:00Z")];
+  await abroad.route("**/me", route => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ student: { ...student, timezone: "America/Los_Angeles" }, bookings: abroadLessons, series: [], sameDayFeeCents: 500 })
+  }));
+  await abroad.route("**/me/recurring-rates", route => route.fulfill({ contentType: "application/json", body: '{"rates":{}}' }));
+  const abroadPage = await abroad.newPage();
+  abroadPage.on("pageerror", error => errors.push(error.message));
+  await abroadPage.clock.setFixedTime(new Date("2026-09-05T12:00:00Z"));
+  await abroadPage.goto(`${base}/book/`);
+  await abroadPage.locator("#upcoming-lessons-heading").waitFor({ state: "attached" });
+  const clockLine = abroadPage.locator("#lesson-calendar .calendar-zone");
+  await clockLine.waitFor();
+  const shownClock = () => clockLine.evaluate(line =>
+    [...line.querySelectorAll("strong > span")].find(name => getComputedStyle(name).opacity === "1")?.textContent ?? "");
+  const day = key => abroadPage.locator(`#lesson-calendar button[data-date-key="${key}"]`);
+  assert.equal(await abroadPage.locator(".lesson-overview__next").isVisible(), false, "A pointer reads the next lesson off the calendar");
+  assert.match(await day("2026-09-09").getAttribute("class"), /\bis-next\b/);
+  assert.equal(await day("2026-09-09").evaluate(button => getComputedStyle(button).backgroundColor), "rgb(180, 58, 38)");
+  assert.equal(await shownClock(), "Los Angeles time");
+  // Each day says when and where without a hover: the time it runs from and
+  // until, after a globe for online or a little person for in Porto.
+  const spelledOut = key => day(key).evaluate(button => ({
+    when: button.querySelector(".calendar-booking-times__when")?.textContent?.trim(),
+    place: [...(button.querySelector(".calendar-booking-times__place")?.classList ?? [])].find(name => /^lucide-(globe|user-round)$/.test(name))
+  }));
+  assert.deepEqual(await spelledOut("2026-09-09"), { when: "09:00–10:00", place: "lucide-globe" });
+  assert.deepEqual(await spelledOut("2026-09-16"), { when: "10:00–11:00", place: "lucide-user-round" });
+  await day("2026-09-09").hover();
+  const onlineTip = abroadPage.locator("#lesson-tip-2026-09-09");
+  await onlineTip.waitFor({ state: "visible" });
+  assert.match((await onlineTip.textContent()).replace(/\s+/g, " "), /^Next lesson ?Wednesday,? 9 September 2026, 09:00 Los Angeles time ?60 mins · Online$/);
+  await day("2026-09-16").hover();
+  const portoTip = abroadPage.locator("#lesson-tip-2026-09-16");
+  await portoTip.waitFor({ state: "visible" });
+  assert.match((await portoTip.textContent()).replace(/\s+/g, " "), /^Wednesday,? 16 September 2026, 10:00 Porto time ?60 mins · In Porto$/);
+  await abroadPage.waitForFunction(() => getComputedStyle(document.querySelector(".calendar-zone__porto")).opacity === "1");
+  assert.equal(await shownClock(), "Porto time");
+  await abroadPage.screenshot({ path: `${out}/lesson-hover-porto-desktop.png` });
+  await abroadPage.mouse.move(1, 1);
+  await abroadPage.waitForFunction(() => getComputedStyle(document.querySelector(".calendar-zone__own")).opacity === "1");
+  assert.equal(await shownClock(), "Los Angeles time");
+  await abroadPage.setViewportSize({ width: 390, height: 844 });
+  await abroadPage.locator(".lesson-overview__next").waitFor({ state: "visible" });
+  await abroad.close();
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, layouts, screenshots: out }, null, 2));
 } catch (error) {

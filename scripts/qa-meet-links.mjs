@@ -50,10 +50,18 @@ try {
       return route.abort();
     });
     await page.goto(`${base}/book/`);
-    // The next lesson leads the calendar, with its Meet link one tap away.
+    // On a phone the next lesson leads the calendar, with its Meet link one
+    // tap away. Where a pointer can hover, the next lesson's day stands out
+    // on the calendar instead and opens the lesson, whose Meet link is
+    // checked below.
     const upcoming = page.locator(".lesson-overview__next");
-    await expect(upcoming.getByRole("link", { name: "Join Google Meet", exact: true })).toHaveCount(1);
-    await expect(upcoming.getByRole("link", { name: "Join Google Meet", exact: true })).toHaveAttribute("href", meetingUrl);
+    if (width < 700) {
+      await expect(upcoming.getByRole("link", { name: "Join Google Meet", exact: true })).toHaveCount(1);
+      await expect(upcoming.getByRole("link", { name: "Join Google Meet", exact: true })).toHaveAttribute("href", meetingUrl);
+    } else {
+      await expect(page.locator("#lesson-calendar .calendar-week button.is-next")).toHaveCount(1);
+      await expect(upcoming).toBeHidden();
+    }
     await page.locator(".lesson-overview").screenshot({ path: `tmp/qa/meet/upcoming-${width}.png` });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Overflow at ${width}`);
     for (const booking of bookings) {

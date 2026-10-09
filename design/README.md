@@ -91,11 +91,11 @@ Text colours must meet these accessible contrast requirements:
   panel, giving small feedback text 4.78:1 contrast. The coral action colour
   measured 4.25:1 on that surface.
 
-- the booking cards' lilac sheet is `--lavender-soft` laid 70% over
-  `--paper-light` (`#e5e0f0`), the lightest lift that keeps coral action text
-  on it at AA (4.55:1; 4.25:1 on `--lavender-soft` itself). A booked day is
-  `--coral` 15% over `--paper-light` and a weekly one `--lavender` 50%, each
-  the lightest that keeps its own coral or lilac-ink text above 4.5:1.
+- the booking cards' sheet is `--lavender` at 13% over the page, the booking
+  panels' wash from before, which Dan chose back over a solid lilac; coral
+  action text on it measures 4.63:1. A booked day is `--coral` 15% over
+  `--paper-light` and a weekly one `--lavender` 50%, each the lightest that
+  keeps its own coral or lilac-ink text above 4.5:1.
 
 The `--blue`, `--blue-deep`, `--lavender`, `--paper`, and `--coral` fill
 colours are unchanged.
@@ -603,10 +603,20 @@ Preserve these desktop and mobile states:
   right. On a narrower card it reads `Your lessons`, the student's name
   beneath it as the account's menu, and `Book a lesson` at its top right
   (`Book` on phones, keeping the full name for assistive technology).
-  Beneath the header, the next lesson, or `Happening now`, shows its date and
-  time in one plain line (the calendar's header names the clock), then its
-  length, location, `Weekly` when it repeats and its Meet link, and opens that
-  lesson directly. With nothing booked, one line says so above the same
+  On a wide card each booked day spells its lessons out (9 October 2026, at
+  Dan's request): the time each runs from and until (`09:00–10:00`), after a
+  globe for online or a little person for in Porto, both named in the key. The
+  next lesson's day is filled in its kind's colour, coral or, for a weekly
+  lesson, lilac ink, so no row stretches across the card to say it. Hovering
+  or focusing a booked day still shows its lessons in full in a small dark tip
+  pointing at the day: `Next lesson` or `Happening now` on the next one, then
+  when (the clock named, as a lone time names it), how long, where and
+  `Weekly`. Clicking opens the lesson, with its Meet link, `Change` and
+  `Cancel`. On a phone a day shows the mark over the start time, and the next
+  lesson, or `Happening now`, keeps its row beneath the header, as it does on
+  any card when the next lesson lies beyond the first four weeks: its date and
+  time in one plain line, then its length, location, `Weekly` when it repeats
+  and its Meet link, opening that lesson directly. With nothing booked, one line says so above the same
   calendar. Free times do not appear in this lesson overview.
   A signed-out visitor can browse lesson types, dates, and times first; sign-in
   is requested only when they open their lessons or confirm a booking.
@@ -908,8 +918,10 @@ empty middle, then to make the card feel premium rather than a bundle of
 parts, in the site's own colours with a colour of its own, with the month
 where a calendar puts it and nothing taking room it doesn't earn:
 
-- every booking card is one lilac sheet in the site's palette (see Contrast
-  and accessibility), and what sits on it to be pressed or read is raised in
+- every booking card is one sheet in the site's palette (see Contrast and
+  accessibility): first a solid lilac, then, at Dan's choice, the warmer wash
+  the booking panels had before. What sits on it to be pressed or read is
+  raised in
   the paper cream of the lesson cards and dialogs, without an outline of its
   own: the next lesson, a free day, a time, a control's track, a past lesson.
   Blue marks where you are and what you have chosen; coral is booking and the
@@ -918,11 +930,19 @@ where a calendar puts it and nothing taking room it doesn't earn:
   places as one sliding control in the middle, and `Book a lesson` at the
   right (see Booking workspace). The next lesson's date and time are one plain
   line;
-- the calendar's header holds its months, the clock (`Los Angeles time`, with
-  `Porto time for lessons in Porto` on Your lessons when one is booked, or
-  `Porto time` once In Porto is chosen) and the arrows; the `?` sits beside
-  the months, and the key beneath the weeks. Each week starts with its month,
-  instead of a caption row across the grid;
+- the calendar's header holds its months, the clock (marked with a clock, since
+  a globe means online) and the arrows; the `?` sits beside the months, and
+  the key beneath the weeks. Each week starts with
+  its month, instead of a caption row across the grid. The clock line names
+  one clock at a time: while booking, the place chosen's (`Los Angeles time`
+  online, `Porto time` in Porto); on Your lessons, the next lesson's, switching
+  to the other while a lesson on it is hovered or focused, the two names
+  sharing one place so nothing moves;
+- on a wide card each booked day shows when it runs from and until and, by a
+  globe or a little person, whether it is online or in Porto; the next
+  lesson's day is filled in, so the row that stretched across the card stays
+  for phones. Hovering a day still shows its lessons in full, and clicking
+  opens one to change or cancel;
 - `Soonest times` is gone: until a day is chosen the booking calendar takes
   the whole row, and a chosen day brings its times in beside it;
 - the student's emails lead with the lesson's own clock, as the site does:
