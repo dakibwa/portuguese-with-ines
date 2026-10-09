@@ -100,7 +100,7 @@ export function hoursProblem(week: WeekHours) {
         window.lastStart > 1440 ||
         window.lastStart < window.start
       ) {
-        return `Check ${day.name}'s hours: the last start must be at or after the first.`;
+        return `Check ${day.name}’s hours: the last start must be at or after the first.`;
       }
     }
   }

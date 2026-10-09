@@ -124,8 +124,8 @@ async function moveForm(page, sequence = false) {
   await page.goto(`${base}/book/?manage=fixture`);
   const dialog = page.getByRole("dialog");
   if (sequence) {
-    await dialog.getByRole("button", { name: "Manage sequence", exact: true }).click();
-    await dialog.getByRole("button", { name: "Move recurrence", exact: true }).click();
+    await dialog.getByRole("button", { name: "Manage weekly lessons", exact: true }).click();
+    await dialog.getByRole("button", { name: "Move weekly time", exact: true }).click();
   } else await dialog.getByRole("button", { name: "Change", exact: true }).click();
   const date = page.locator('button[data-date-key="2026-10-06"]');
   if (!await date.isVisible()) await dialog.getByRole("button", { name: "Show all", exact: true }).click();
@@ -133,7 +133,7 @@ async function moveForm(page, sequence = false) {
   const early = page.locator('.time-picker__parts input[value="early"]');
   if (await early.count()) await early.check();
   await dialog.getByRole("button", { name: "10:00", exact: true }).click();
-  return dialog.getByRole("button", { name: sequence ? "Move recurrence" : "Change to 10:00", exact: true });
+  return dialog.getByRole("button", { name: sequence ? "Move weekly time" : "Change to 10:00", exact: true });
 }
 
 function managedReply(booking, sequence = false) {
@@ -149,7 +149,7 @@ function savedMove(booking, body) {
 }
 
 async function countIs(page, count) {
-  await expect(page.locator("#account-menu").getByRole("button", { name: /^View lessons/, includeHidden: true })).toHaveText(count ? `View lessons ${count}` : "View lessons");
+  await expect(page.locator("#account-menu").getByRole("button", { name: /^Your lessons/, includeHidden: true })).toHaveText(count ? `Your lessons ${count}` : "Your lessons");
 }
 
 function stripeFixture(failInit) {
@@ -283,14 +283,14 @@ try {
             await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
             await dialog.getByRole("button", { name: "Yes, cancel it", exact: true }).click();
           } else {
-            await dialog.getByRole("button", { name: "Manage sequence", exact: true }).click();
+            await dialog.getByRole("button", { name: "Manage weekly lessons", exact: true }).click();
             await dialog.getByRole("button", { name: action === "bulk" ? "Cancel all booked lessons" : "Stop repeating", exact: true }).click();
             await dialog.getByRole("button", { name: action === "bulk" ? "Yes, cancel all" : "Yes, stop repeating", exact: true }).click();
           }
         }
         const dialog = page.getByRole("dialog");
         await expect(dialog.getByRole("heading", { name: "All sorted", exact: true })).toBeVisible();
-        await expect(dialog.getByRole("status")).toContainText(action === "move" ? "has been moved" : action === "cancel" ? "has been cancelled" : "sequence has stopped");
+        await expect(dialog.getByRole("status")).toContainText(action === "move" ? "has been changed" : action === "cancel" ? "has been cancelled" : "weekly lessons have stopped");
         const warning = page.getByRole("alert").filter({ hasText: "We couldn’t refresh your account just now." });
         await expect(warning).toBeVisible();
         await expect(dialog.getByRole("button", { name: "Try again", exact: true })).toBeVisible();
@@ -341,7 +341,7 @@ try {
         await chooseBooking(page);
         await page.getByRole("button", { name: "Book lesson & agree to pay", exact: true }).click();
         await started.promise;
-        const length = page.getByRole("radio", { name: "90 minutes lesson · €35", exact: true });
+        const length = page.getByRole("radio", { name: "90-minute lesson · €35", exact: true });
         await length.check();
         await expect(page.getByRole("button", { name: "13:00", exact: true })).toBeVisible();
         const response = page.waitForResponse(r => new URL(r.url()).pathname === "/availability" && new URL(r.url()).searchParams.get("lessonType") === "single");
@@ -374,7 +374,7 @@ try {
         await chooseBooking(page);
         await page.getByRole("button", { name: "Book lesson & agree to pay", exact: true }).click();
         const warning = page.locator(".booking-payment").getByRole("alert");
-        await expect(warning).toContainText(failure === "initialization" ? "Payment setup interrupted." : "The payment form couldn't load.");
+        await expect(warning).toContainText(failure === "initialization" ? "Payment setup interrupted." : "The payment form couldn’t load.");
         await check(state);
         if (failure === "missing" && width !== 390) await page.screenshot({ path: `${output}/payment-form-retry-${width}.png`, fullPage: true });
         await warning.getByRole("button", { name: "Try again", exact: true }).click();

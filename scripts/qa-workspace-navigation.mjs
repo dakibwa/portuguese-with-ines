@@ -137,12 +137,12 @@ try {
   await settle();
   await page.screenshot({ path: `${out}/profile-desktop.png`, fullPage: true });
   await accountAction("Done editing");
-  await accountAction("View lessons");
-  await accountAction("View lessons");
+  await accountAction("Your lessons");
+  await accountAction("Your lessons");
   await page.locator("#upcoming-lessons-heading").waitFor();
   await page.locator(".lesson-overview__book").click();
   await page.locator("#lesson-calendar .booking-bar").waitFor();
-  await page.getByRole("button", { name: "Your lessons", exact: true }).click();
+  await page.getByRole("button", { name: /^Your lessons/ }).first().click();
   await page.locator("#upcoming-lessons-heading").waitFor();
   assert.equal(await page.locator(".booking-bar").count(), 0);
 

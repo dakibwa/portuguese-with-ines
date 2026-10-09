@@ -50,7 +50,7 @@ export function TeacherMeetConnection({ token }: { token: string }) {
     fetchGoogleMeetConnection(token)
       .then(result => { if (active) setConnection(result); })
       .catch(caught => {
-        if (active) setError(caught instanceof Error ? caught.message : "Google Meet status could not be loaded.");
+        if (active) setError(caught instanceof Error ? caught.message : "Google Meet status couldn’t be loaded.");
       });
     return () => { active = false; };
   }, [token, attempt]);
@@ -66,12 +66,12 @@ export function TeacherMeetConnection({ token }: { token: string }) {
       if (request !== connectRequest.current || readSession() !== token) return;
       const url = new URL(result.url);
       if (url.origin !== "https://accounts.google.com" || url.pathname !== "/o/oauth2/v2/auth" || url.username || url.password) {
-        throw new Error("The Google connection could not be opened. Please try again.");
+        throw new Error("The Google connection couldn’t be opened. Please try again.");
       }
       window.location.assign(url.href);
     } catch (caught) {
       if (request !== connectRequest.current || readSession() !== token) return;
-      setError(caught instanceof Error ? caught.message : "The Google connection could not be opened. Please try again.");
+      setError(caught instanceof Error ? caught.message : "The Google connection couldn’t be opened. Please try again.");
       setBusy(false);
     }
   }
@@ -95,7 +95,7 @@ export function TeacherMeetConnection({ token }: { token: string }) {
     : callbackResult === "cancelled"
       ? "Connection cancelled. You can try again when you’re ready."
       : callbackResult === "error"
-        ? "Google Meet could not be connected. Please try again."
+        ? "Google Meet couldn’t be connected. Please try again."
         : "";
 
   return (

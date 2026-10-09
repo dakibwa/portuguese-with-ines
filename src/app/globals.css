@@ -760,7 +760,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   position: relative;
   z-index: 20;
   min-height: var(--header-height);
-  border-bottom: 1px solid rgba(11, 81, 57, 0.1);
+  border-bottom: 1px solid rgba(26, 49, 105, 0.1);
   background-color: var(--paper);
   background-image: var(--paper-texture);
 }
@@ -1049,6 +1049,20 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   box-shadow: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
 }
 
+/* Until it can act, a filled button is the same quiet outline as the booking's
+   final action, so coral and blue appear only when the action is live. White
+   on a faded fill read as broken. A disabled button does not answer either. */
+.button--coral:disabled,
+.button--blue:disabled {
+  border: 1px solid var(--rule);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
 /*
  * The second choice beside a coral one. Same hand, same type, outlined rather
  * than filled, so "How I teach" or "Payment questions" reads as something to
@@ -1109,7 +1123,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  border-bottom: 1px solid rgba(8, 43, 36, 0.2);
+  border-bottom: 1px solid rgba(26, 49, 105, 0.2);
   font-family: var(--ui);
   font-size: 0.76rem;
   font-weight: 700;
@@ -1429,6 +1443,18 @@ html:active-view-transition-type(document)::view-transition-new(root) {
     padding-right: 0.6rem;
     padding-left: 0.6rem;
     letter-spacing: 0.1em;
+  }
+}
+
+/* Narrower, "Lessons and prices" would break onto a second line beside a
+   one-line "How I teach", so each takes the full width instead. */
+@media (max-width: 413px) {
+  .home-hero__actions {
+    align-self: stretch;
+  }
+
+  .home-hero__links {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2432,6 +2458,30 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   gap: 0.8rem;
 }
 
+/* Missing page */
+
+/* One handwritten line in the middle of the paper, between the site's own
+   header and footer. */
+.not-found-page {
+  display: grid;
+  place-items: center;
+  padding: clamp(4rem, 10vw, 7rem) var(--page-pad);
+  text-align: center;
+}
+
+.not-found-page h1 {
+  max-width: 13em;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.3rem, 5vw, 3.8rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  /* Wrapped, each line drops the 0.4em Beth Ellen's descenders need, as a
+     two-line display heading's second line does, so none crosses the next. */
+  line-height: 1.55;
+  text-wrap: balance;
+}
+
 /* Booking */
 
 /* The workspace runs down to the footer. With a short first step it used to
@@ -2895,13 +2945,6 @@ html.booking-transitioning .booking-confirmation-stage {
   opacity: 0.5;
 }
 
-.booking-selection-back {
-  min-height: 44px;
-  padding: 0.6rem 0.9rem;
-  gap: 0.35rem;
-  white-space: nowrap;
-}
-
 .booking-selection-summary {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto;
@@ -3180,6 +3223,15 @@ html.booking-transitioning .booking-confirmation-stage {
   }
 }
 
+/* Just past the stacked layout, the times would get under two fifths of a
+   narrow row and four quarter-hours squeeze to 54px buttons; give them close
+   to half until the column is wide enough to share as usual. */
+@container booking (min-width: 700px) and (max-width: 860px) {
+  .unified-calendar.unified-calendar--booking {
+    grid-template-columns: minmax(0, 1fr) minmax(245px, 0.82fr);
+  }
+}
+
 /* On a phone a chosen day's times take the calendar's place, and the panel
    waits out of the way until there is a day to show. */
 @container booking (max-width: 699.98px) {
@@ -3220,11 +3272,15 @@ html.booking-transitioning .booking-confirmation-stage {
   line-height: 1.4;
 }
 
+/* Of a piece with each lesson row's `Change`: the same small outline with the
+   same 14 px label. */
 .unified-calendar__panel-head .button {
   width: auto;
   min-height: 44px;
   flex: none;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.06em;
 }
 
 .unified-calendar__date-short {
@@ -3891,11 +3947,11 @@ html.booking-transitioning .booking-confirmation-stage {
   top: 0.85rem;
   right: 0.85rem;
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--squiggle-pill);
   background: rgba(170, 164, 230, 0.18);
   color: var(--ink);
   cursor: pointer;
@@ -3909,6 +3965,7 @@ html.booking-transitioning .booking-confirmation-stage {
 
 .lesson-manage-dialog {
   position: relative;
+  isolation: isolate;
   display: grid;
   width: min(100%, 440px);
   max-height: min(82vh, 680px);
@@ -3949,7 +4006,7 @@ html.booking-transitioning .booking-confirmation-stage {
   height: 44px;
   place-items: center;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--squiggle-pill);
   background: rgba(170, 164, 230, 0.18);
   color: var(--ink);
   cursor: pointer;
@@ -3967,12 +4024,15 @@ html.booking-transitioning .booking-confirmation-stage {
   margin-right: 2.8rem;
 }
 
+/* Every pop-up's title is set alike: the lesson's, Terms & privacy, a day's
+   lessons and Inês's lesson details. */
 .lesson-manage-dialog h2 {
   max-width: calc(100% - 2.8rem);
   margin: 0;
   font-family: var(--ui);
-  font-size: clamp(1.3rem, 4vw, 1.65rem);
-  line-height: 1.15;
+  font-size: clamp(1.2rem, 3.4vw, 1.45rem);
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .lesson-manage-dialog__loading {
@@ -4068,6 +4128,7 @@ html.booking-transitioning .booking-confirmation-stage {
 .lesson-manage-dialog__series .button {
   grid-column: 2;
   justify-self: start;
+  width: auto;
   min-height: 44px;
   margin-top: 0.45rem;
   padding: 0.55rem 1.1rem;
@@ -4149,7 +4210,7 @@ html.booking-transitioning .booking-confirmation-stage {
   grid-area: head;
   min-width: 0;
   /* Level with the calendar's own content, and clear of the close button. */
-  padding: 0.2rem 3rem 0 clamp(1rem, 2.4vw, 1.75rem);
+  padding: 0.2rem 3.75rem 0 clamp(1rem, 2.4vw, 1.75rem);
 }
 
 /* Beneath the head the calendar and the form start together, close under it. */
@@ -4221,7 +4282,7 @@ html.booking-transitioning .booking-confirmation-stage {
   gap: 0.55rem;
 }
 
-/* Lesson history keeps the useful anatomy of Upcoming lessons without making
+/* Lesson history keeps the useful anatomy of Your lessons without making
    an old or cancelled booking look interactive. The status changes; the mark,
    date, duration and location stay in the same places. Every record is cut
    in the same hand on the same soft lavender wash, and only its status pill
@@ -5135,14 +5196,17 @@ html.booking-transitioning .booking-confirmation-stage {
   font: inherit;
 }
 
-/* The layered focus ring is drawn outside the field, so without room for it the
-   outer band sat on top of the label above. */
+/* A little more room between each label and its field. */
 .auth-panel label > span {
   margin-bottom: 0.45rem;
 }
 
+/* One clear blue boundary, as on the booking notes, rather than the coral
+   and blue rings drawn around buttons and links. */
 .auth-panel input:focus-visible {
-  outline-offset: 3px;
+  border: 2px solid var(--blue-deep);
+  outline: 0;
+  box-shadow: none;
 }
 
 /* The masking dots render small and faint at body size; more size and tracking
@@ -5288,7 +5352,7 @@ html.booking-transitioning .booking-confirmation-stage {
 
 .nav-mobile__heading {
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(11, 81, 57, 0.1);
+  border-bottom: 1px solid rgba(26, 49, 105, 0.1);
 }
 
 .nav-mobile__links,
@@ -5482,7 +5546,7 @@ button.text-action {
   align-items: center;
   justify-content: center;
   border: 0;
-  border-bottom: 1px solid rgba(8, 43, 36, 0.2);
+  border-bottom: 1px solid rgba(26, 49, 105, 0.2);
   background: transparent;
   cursor: pointer;
   font: inherit;
@@ -5689,6 +5753,13 @@ button.text-action {
     display: none;
   }
 
+  /* Here the account bar names Your lessons itself, so a way back from
+     booking or from past lessons would only say it a second time. */
+  .booking-bar__back,
+  .my-lessons__back {
+    display: none;
+  }
+
   .my-lessons__menu-panel,
   .my-lessons__menu-panel.is-open {
     position: static;
@@ -5785,7 +5856,7 @@ button.text-action {
   left: 0;
   width: min(300px, calc(100vw - 5rem));
   border: 1px solid rgba(220, 216, 245, 0.72);
-  border-radius: 12px 20px 14px 18px;
+  border-radius: var(--squiggle-field);
   padding: 0.62rem 0.76rem;
   background: rgba(26, 49, 105, 0.97);
   box-shadow: 0 14px 30px rgba(17, 31, 72, 0.3);
@@ -5881,15 +5952,11 @@ button.text-action {
   font: inherit;
 }
 
+/* The booking notes' single blue boundary, never a ring outside the border. */
 .my-lessons__details input:focus-visible {
-  outline: 2px solid var(--blue-deep);
-  outline-offset: 2px;
+  border: 2px solid var(--blue-deep);
+  outline: 0;
   box-shadow: none;
-}
-
-.my-lessons__details button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
 }
 
 .my-lessons__details-row .button {
@@ -5915,9 +5982,11 @@ button.text-action {
   opacity: 0.8;
 }
 
-.my-lessons__details-note--ok {
-  color: var(--coral-action);
-  opacity: 1;
+/* A saved field's good news is the site's calm success panel, compact here
+   beneath the fields it speaks for. */
+.my-lessons__details-outcome {
+  grid-column: 1 / -1;
+  margin: 0.35rem 0 0;
 }
 
 /* A student's saved weekly rates, when they have any, and the small disclosure
@@ -6033,7 +6102,9 @@ button.text-action {
   font-size: 0.92rem;
 }
 
-.lesson-calendar__lesson-copy > span,
+/* The status pill is a span here too, but keeps the pill's own size and
+   full strength, as it has in the lesson dialog. */
+.lesson-calendar__lesson-copy > span:not(.lesson-calendar__status),
 .lesson-calendar__lesson-copy > small {
   font-size: 0.76rem;
   line-height: 1.35;
@@ -6071,12 +6142,6 @@ button.text-action {
   font-size: 0.84rem;
   line-height: 1.5;
   opacity: 0.85;
-}
-
-.booking-success__series {
-  align-self: stretch;
-  border-left: 3px solid var(--lavender);
-  padding: 0.15rem 0 0.15rem 0.85rem;
 }
 
 /* The weeks a student will NOT have: a card shaped like the lesson rows above
@@ -6378,13 +6443,6 @@ button.text-action {
   box-shadow: none;
 }
 
-.booking-alert--warn {
-  border-radius: 0 12px 12px 0;
-  border-left: 3px solid var(--coral);
-  padding: 0.7rem 0.85rem;
-  background: rgba(239, 93, 60, 0.09);
-}
-
 /*
  * Confirmation shown in place of the calendar once a booking succeeds: one
  * hand-cut card in the booking panels' own wash and outline, read top to
@@ -6460,6 +6518,56 @@ button.text-action {
   font-weight: 600;
 }
 
+/* Several lessons: each date once, short, one to a line. */
+.booking-success__when ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: 0.1rem;
+}
+
+.booking-success__count {
+  margin: 0.7rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* Weeks or times that were already taken: a short line and coral chips, the
+   same chips as the clash card at the confirm step, with no box around them. */
+.booking-success__skipped {
+  margin-top: 0.9rem;
+}
+
+.booking-success__skipped p {
+  margin: 0;
+  color: var(--coral-action);
+  font-family: var(--ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.booking-success__skipped ul {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+  gap: 0.4rem;
+}
+
+.booking-success__skipped li {
+  border: 1px solid var(--coral);
+  border-radius: var(--squiggle-chip);
+  padding: 0.3rem 0.7rem;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--coral-action);
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 .booking-success__sent {
   max-width: 36rem;
   margin: 0.7rem 0 0;
@@ -6469,7 +6577,6 @@ button.text-action {
 }
 
 .booking-success .meeting-link,
-.booking-success .booking-success__series,
 .booking-success > .booking-alert {
   margin-top: 1rem;
 }
@@ -6595,40 +6702,48 @@ button.text-action {
  * replaced, leaving the icon with no flex context — which is why it floated
  * above the words instead of sitting on the first line of them.
  */
+/* Something to read before trying again sits in the same coral panel as the
+   clash card, wherever it appears, rather than reading as a line of text.
+   (`--error` remains as a name for the same panel.) */
 .booking-alert {
   display: flex;
   align-items: flex-start;
   gap: 0.55rem;
+  border: 1.5px solid var(--coral);
+  border-radius: var(--squiggle-field);
+  padding: 0.8rem 0.95rem;
+  background: rgba(239, 93, 60, 0.1);
   text-align: left;
 }
 
 .booking-alert svg {
   flex: none;
   margin-top: 0.14em;
+  color: var(--coral-action);
 }
 
 .booking-alert p {
   margin: 0;
+  color: var(--ink);
   font-size: 0.9rem;
+  font-weight: 600;
   line-height: 1.5;
 }
 
-/* A form's error is what to read before trying again, so it sits in the same
-   coral panel as the clash card rather than reading as a line of text. */
-.booking-alert--error {
-  border: 1.5px solid var(--coral);
-  border-radius: var(--squiggle-field);
-  padding: 0.8rem 0.95rem;
-  background: rgba(239, 93, 60, 0.1);
+/* A retry inside the panel's sentence reads as part of it, underlined on the
+   line, rather than as a control whose rule floats beneath the text. */
+.booking-provider .booking-alert p button.text-action {
+  min-height: 0;
+  border-bottom: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  vertical-align: baseline;
 }
 
-.booking-alert--error svg {
-  color: var(--coral-action);
-}
-
-.booking-alert--error p {
-  color: var(--ink);
-  font-weight: 600;
+/* The account's own notice sits above the calendar card, never against it. */
+.booking-alert--account {
+  margin-bottom: 1rem;
 }
 
 .booking-alert__action {
@@ -6655,15 +6770,20 @@ button.text-action {
   opacity: 0.55;
 }
 
+/* The same outline as every other secondary action: a quieter name for the
+   same button, so Keep lesson and Manage weekly lessons match in one dialog. */
 .button--quiet {
-  border: 1px solid var(--rule);
+  border: 1.5px solid rgba(26, 49, 105, 0.55);
+  border-radius: var(--squiggle-button-alt);
   background: transparent;
   color: var(--ink);
   cursor: pointer;
 }
 
-.button--quiet:hover {
-  border-color: var(--green);
+.button--quiet:hover,
+.button--quiet:focus-visible {
+  border-color: var(--ink);
+  background: rgba(170, 164, 230, 0.2);
 }
 
 /* Good news is a calm lavender panel in the fields' hand with a tick, never a
@@ -6762,9 +6882,9 @@ dialog[open]::backdrop {
 .policy-dialog__heading h2 {
   margin: 0;
   font-family: var(--ui);
-  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-size: clamp(1.2rem, 3.4vw, 1.45rem);
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.2;
 }
 
 .policy-dialog__heading button {
@@ -6776,18 +6896,17 @@ dialog[open]::backdrop {
   border: 0;
   border-radius: var(--squiggle-pill);
   padding: 0;
-  background: rgba(170, 164, 230, 0.16);
+  background: rgba(170, 164, 230, 0.18);
   color: var(--ink);
   cursor: pointer;
 }
 
-.policy-dialog__heading button:hover {
-  background: rgba(170, 164, 230, 0.3);
-}
-
-.policy-dialog :focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 3px;
+/* The lesson dialog's own close, so every pop-up's way out looks and answers
+   alike; focus keeps the site's ring. */
+.policy-dialog__heading button:hover,
+.policy-dialog__heading button:focus-visible {
+  background: rgba(170, 164, 230, 0.34);
+  color: var(--coral-action);
 }
 
 .policy-dialog__content {

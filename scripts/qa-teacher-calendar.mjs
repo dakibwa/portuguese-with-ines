@@ -320,6 +320,14 @@ try {
     await noOverflow(page);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
+  // Wide, the week stands at its full height: no lesson hides in an inner box.
+  assert.equal(
+    await page
+      .locator(".teacher-timetable-scroll")
+      .evaluate((box) => box.scrollHeight - box.clientHeight <= 1),
+    true,
+    "The desktop timetable must not scroll inside itself",
+  );
   await showHours(page);
   await dragDown(page, slot(page, 1, 480), slot(page, 1, 540));
   for (const minute of [480, 510, 540])
@@ -333,7 +341,7 @@ try {
   assert.equal(state.writes.length, 0, "Selection alone must not save hours");
   state.failHours = 1;
   await page
-    .getByRole("button", { name: "Save teaching hours", exact: true })
+    .getByRole("button", { name: "Save weekly hours", exact: true })
     .click();
   await page
     .getByRole("alert")
@@ -341,11 +349,11 @@ try {
     .waitFor();
   await expect(slot(page, 1, 570)).toHaveAttribute("aria-pressed", "true");
   await page
-    .getByRole("button", { name: "Save teaching hours", exact: true })
+    .getByRole("button", { name: "Save weekly hours", exact: true })
     .click();
   await page
     .getByRole("status")
-    .filter({ hasText: "Teaching hours saved" })
+    .filter({ hasText: "Weekly hours saved" })
     .waitFor();
   assert.deepEqual(
     state.rules
@@ -370,7 +378,7 @@ try {
   );
   await page.getByLabel("Wednesday window 1, last start").fill("09:00");
   await expect(
-    page.getByRole("button", { name: "Save teaching hours", exact: true }),
+    page.getByRole("button", { name: "Save weekly hours", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Discard", exact: true }).click();
 
@@ -603,16 +611,29 @@ try {
     page.getByText("No lessons booked this week.", { exact: false }),
   ).toHaveCount(0);
   state.failBookings = false;
-  await page.getByRole("button", { name: "Reload lessons" }).click();
+  await page.getByRole("button", { name: "Try again", exact: true }).click();
   await expect(page.locator(".teacher-timetable")).toBeVisible();
   await noOverflow(page);
   assert.deepEqual(state.errors, []);
   await page.close();
 
   const mobile = await fixture(390);
+  // A phone's day scrolls in its own box, opening at her first teaching hour
+  // or the day's first lesson, whichever is earlier: Monday at 10:00, ahead
+  // of Alex at 11:00, and Tuesday, which has no hours, at Sam's 14:00.
+  const opensAt = (minute) =>
+    mobile.page.locator(".teacher-timetable-scroll").evaluate((box, at) => {
+      const top = Math.min(
+        box.querySelector(`[data-axis-minute="${at}"]`).offsetTop,
+        box.scrollHeight - box.clientHeight,
+      );
+      return Math.abs(box.scrollTop - top) <= 1;
+    }, minute);
+  assert.equal(await opensAt(600), true, "Monday should open at 10:00");
   await mobile.page
     .getByRole("button", { name: "Tuesday 8 September, show lessons" })
     .tap();
+  assert.equal(await opensAt(840), true, "Tuesday should open at Sam's lesson");
   const tuesdayOff = mobile.page.getByRole("switch", {
     name: "Day off, Tuesday 8 September",
   });
@@ -642,7 +663,7 @@ try {
     .waitFor();
   await showHours(mobile.page);
   await mobile.page
-    .getByRole("button", { name: "Saturday, show teaching hours" })
+    .getByRole("button", { name: "Saturday, show weekly hours" })
     .tap();
   await slot(mobile.page, 6, 600).tap();
   await expect(slot(mobile.page, 6, 600)).toHaveAttribute(
@@ -650,11 +671,11 @@ try {
     "true",
   );
   await mobile.page
-    .getByRole("button", { name: "Save teaching hours", exact: true })
+    .getByRole("button", { name: "Save weekly hours", exact: true })
     .click();
   await mobile.page
     .getByRole("status")
-    .filter({ hasText: "Teaching hours saved" })
+    .filter({ hasText: "Weekly hours saved" })
     .waitFor();
   for (const width of [390, 320, 827]) {
     await mobile.page.setViewportSize({ width, height: 900 });

@@ -29,6 +29,8 @@ export type AvailabilityException = {
 export type AdminBooking = {
   id: string;
   reference: string;
+  /** The lesson type, so a trial can keep its name where others show their length. */
+  lesson_type_id?: string;
   lesson_name: string;
   student_name: string;
   student_email: string;
@@ -77,7 +79,7 @@ async function adminRequest<T>(
     });
   } catch {
     // The browser's own "Failed to fetch" says nothing useful to Inês.
-    throw new Error("We couldn't reach the booking system. Please check your connection.");
+    throw new Error("We couldn’t reach the booking system. Please check your connection and try again.");
   }
 
   const data: unknown = await response.json().catch(() => null);

@@ -54,7 +54,7 @@ const RETURNING_KEY = "ines-returning-student";
 export const SESSION_CHANGE_EVENT = "ines:student-session-change";
 
 export class SessionStorageError extends Error {
-  constructor(message = "Your browser couldn't save your sign-in. Allow site storage, then try signing in again.") {
+  constructor(message = "Your browser couldn’t save your sign-in. Allow site storage, then try signing in again.") {
     super(message);
     this.name = "SessionStorageError";
   }
@@ -173,7 +173,7 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
       body: JSON.stringify(body)
     });
   } catch {
-    throw new Error("We couldn't reach the booking system. Please check your connection and try again.");
+    throw new Error("We couldn’t reach the booking system. Please check your connection and try again.");
   }
 
   const data: unknown = await response.json().catch(() => null);
@@ -260,7 +260,7 @@ export async function confirmEmailChange(token: string, changeToken: string) {
       storeSession(result.session, { previousSession: token, studentId: result.student.id });
     } catch (caught) {
       if (!(caught instanceof SessionStorageError)) throw caught;
-      throw new SessionStorageError("Your email was changed, but your browser couldn't save your sign-in. Allow site storage, then sign in with your new email.");
+      throw new SessionStorageError("Your email was changed, but your browser couldn’t save your sign-in. Allow site storage, then sign in with your new email.");
     }
   }
   return result;
@@ -273,7 +273,7 @@ export async function fetchMe(token: string) {
       headers: { Accept: "application/json", Authorization: `Bearer ${token}` }
     });
   } catch {
-    throw new Error("We couldn't reach the booking system. Please check your connection and try again.");
+    throw new Error("We couldn’t reach the booking system. Please check your connection and try again.");
   }
 
   const data: unknown = await response.json().catch(() => null);
@@ -286,7 +286,7 @@ export async function fetchMe(token: string) {
   }
   if (!response.ok) {
     const error = isApiRecord(data) && typeof data.error === "string" ? data.error : "";
-    throw new AuthApiError(error || "Could not load your lessons.", response.status);
+    throw new AuthApiError(error || "We couldn’t load your lessons.", response.status);
   }
   if (!isApiRecord(data) || !validStudent(data.student) || !Array.isArray(data.bookings) || !data.bookings.every(isApiLesson) ||
     (data.series !== undefined && (!Array.isArray(data.series) || !data.series.every((series) =>

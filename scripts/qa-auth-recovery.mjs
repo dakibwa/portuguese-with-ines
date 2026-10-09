@@ -114,13 +114,15 @@ try {
         } else {
           if (action === "register") {
             await panel.getByRole("tab", { name: "Create an account", exact: true }).click();
-            await panel.getByLabel("First name", { exact: true }).fill(student.name);
+            // Only someone signing in has a password to forget.
+            await expect(panel.getByRole("button", { name: /forgotten my password/ })).toHaveCount(0);
+            await panel.getByLabel("Your name", { exact: true }).fill(student.name);
           }
           await panel.getByLabel("Email", { exact: true }).fill(student.email);
           await panel.getByLabel(/^Password/).fill("isolated-password");
           await panel.getByRole("button", { name: action === "register" ? "Create my account" : "Sign in", exact: true }).click();
         }
-        await expect(panel.getByRole("alert")).toContainText("couldn't save your sign-in");
+        await expect(panel.getByRole("alert")).toContainText("couldn’t save your sign-in");
         assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), null);
         await expect(state.page.locator(".my-lessons__account-name")).toHaveCount(0);
         await state.page.evaluate(() => { window.qaRefuseSessionWrites = false; });
@@ -190,7 +192,7 @@ try {
         await state.page.getByRole("button", { name: "Save my new password", exact: true }).click();
         await expect(state.page.getByRole("status")).toContainText("Your password has been changed");
         await expect(state.page.getByRole("status")).not.toContainText("You’re signed in");
-        await expect(state.page.getByRole("status")).toContainText("couldn't save your sign-in");
+        await expect(state.page.getByRole("status")).toContainText("couldn’t save your sign-in");
         await expect(state.page.getByRole("button", { name: "Save my new password", exact: true })).toHaveCount(0);
         assert.equal(state.requests.length, 1);
         assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), null);
@@ -404,7 +406,7 @@ try {
         await state.page.locator(".auth-panel").getByLabel(/^New password/).fill("isolated-password");
         await state.page.locator(".auth-panel").getByLabel("Again, to be sure", { exact: true }).fill("different-password");
         await state.page.getByRole("button", { name: "Save my new password", exact: true }).click();
-        await expect(state.page.locator(".booking-alert")).toContainText("don't match");
+        await expect(state.page.locator(".booking-alert")).toContainText("don’t match");
         assert.equal(state.requests.length, 0);
         await state.page.locator(".auth-panel").getByLabel("Again, to be sure", { exact: true }).fill("isolated-password");
         await state.page.getByRole("button", { name: "Save my new password", exact: true }).click();

@@ -153,7 +153,7 @@ try {
       await saveMove(page, dialog);
       await expect(page.getByRole("alert").filter({ hasText: "Isolated calendar read failure" })).toBeVisible();
       await expect(page.locator("#teacher-week-title")).toBeFocused();
-      await press(page, page.getByRole("button", { name: "Reload lessons", exact: true }));
+      await press(page, page.getByRole("button", { name: "Try again", exact: true }));
       await expect(page.locator("#teacher-week-title")).toBeFocused();
     });
     const started = deferred(), waiting = deferred();

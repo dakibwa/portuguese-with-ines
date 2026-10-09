@@ -97,7 +97,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     // A network failure here is indistinguishable from the Worker being down,
     // and both mean the same thing to a student: use another way to reach her.
-    throw new BookingApiError("We couldn't reach the booking system. Please check your connection.", 0);
+    throw new BookingApiError("We couldn’t reach the booking system. Please check your connection and try again.", 0);
   }
 
   const data: unknown = await response.json().catch(() => null);
@@ -539,7 +539,7 @@ export function stripePaymentUrl(value: string) {
   }
   const onStripe = url !== null && (url.hostname === "stripe.com" || url.hostname.endsWith(".stripe.com"));
   if (!url || url.protocol !== "https:" || !onStripe || url.username || url.password) {
-    throw new Error("The secure payment page could not be opened. Please try again shortly.");
+    throw new Error("The secure payment page couldn’t be opened. Please try again shortly.");
   }
   return url.href;
 }

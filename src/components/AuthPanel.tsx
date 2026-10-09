@@ -87,7 +87,7 @@ export function AuthPanel({
   const headingNamesTab = !heading || heading === "Sign in";
   const introText =
     mode === "forgot"
-      ? `Give us the email you booked with and we'll send you a link to choose a new password. ${RESET_LINK_LIFETIME}`
+      ? `Give us the email you booked with and we’ll send you a link to choose a new password. ${RESET_LINK_LIFETIME}`
       : mode === "register" && !keepCopy
         ? "Keeps all your lessons in one place, so you can change them yourself."
         : intro;
@@ -139,7 +139,7 @@ export function AuthPanel({
       if (request !== authRequest.current || readSession() !== session) return;
       setError(mode === "register" && caught instanceof SessionStorageError
         ? `Your account was created. ${caught.message}`
-        : caught instanceof Error ? caught.message : "That didn't work. Please try again.");
+        : caught instanceof Error ? caught.message : "That didn’t work. Please try again.");
       setAccountExists(mode === "register" && (
         caught instanceof SessionStorageError || caught instanceof AuthApiError && caught.status === 409
       ));
@@ -225,7 +225,7 @@ export function AuthPanel({
           <label>
             <span>
               <UserRound size={16} aria-hidden="true" />
-              First name
+              Your name
             </span>
             <input
               autoComplete="given-name"
@@ -304,7 +304,7 @@ export function AuthPanel({
             than a coral warning. */}
         {notice ? (
           <div className="booking-outcome" role="status">
-            <CheckCircle2 size={18} aria-hidden="true" />
+            <CheckCircle2 size={20} aria-hidden="true" />
             <p>{mode === "forgot" ? notice : `${notice} ${RESET_LINK_LIFETIME}`}</p>
           </div>
         ) : null}
@@ -320,17 +320,21 @@ export function AuthPanel({
         </button>
       </form>
 
-      <p className="auth-panel__aside">
-        {mode === "forgot" ? (
-          <button className="auth-panel__link" onClick={() => switchMode("signin")} type="button">
-            Back to signing in
-          </button>
-        ) : (
-          <button className="auth-panel__link" onClick={() => switchMode("forgot")} type="button">
-            I&rsquo;ve forgotten my password
-          </button>
-        )}
-      </p>
+      {/* Only someone signing in has a password to forget, so creating an
+          account carries no recovery link. */}
+      {mode !== "register" ? (
+        <p className="auth-panel__aside">
+          {mode === "forgot" ? (
+            <button className="auth-panel__link" onClick={() => switchMode("signin")} type="button">
+              Back to signing in
+            </button>
+          ) : (
+            <button className="auth-panel__link" onClick={() => switchMode("forgot")} type="button">
+              I&rsquo;ve forgotten my password
+            </button>
+          )}
+        </p>
+      ) : null}
     </div>
   );
 }

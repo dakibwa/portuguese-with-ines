@@ -3,7 +3,7 @@ import { BookingFlow } from "@/components/BookingFlow";
 
 export const metadata: Metadata = {
   title: "My lessons · Português com a Inês",
-  description: "See, move or cancel your booked Portuguese lessons.",
+  description: "See, change or cancel your booked Portuguese lessons.",
   robots: { index: false, follow: false }
 };
 

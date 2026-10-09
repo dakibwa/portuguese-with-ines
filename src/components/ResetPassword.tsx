@@ -30,7 +30,7 @@ export function ResetPassword() {
     if (!token) return;
 
     if (password !== confirm) {
-      setError("Those two passwords don't match.");
+      setError("Those two passwords don’t match.");
       return;
     }
 
@@ -57,7 +57,7 @@ export function ResetPassword() {
       setDone(true);
     } catch (caught) {
       if (request !== resetRequest.current) return;
-      setError(caught instanceof Error ? caught.message : "That didn't work. Please request a new link.");
+      setError(caught instanceof Error ? caught.message : "That didn’t work. Please request a new link.");
     } finally {
       if (request === resetRequest.current) setBusy(false);
     }
@@ -66,7 +66,7 @@ export function ResetPassword() {
   if (done) {
     return (
       <div className="booking-outcome" role="status">
-        <CheckCircle2 size={22} aria-hidden="true" />
+        <CheckCircle2 size={20} aria-hidden="true" />
         <div>
           <strong>Your password has been changed.</strong>
           <p>

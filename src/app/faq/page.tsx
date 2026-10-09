@@ -177,28 +177,28 @@ const faqSections = [
     questions: [
       {
         question: `What is the ${NOTICE_HOURS}-hour rule?`,
-        answer: `Give at least ${notice}’ notice to book, cancel or change a lesson. For a lesson at 10:00 on Tuesday, that means by 20:00 on Monday. After that, cancelling or changing costs ${lateFee}. If you don’t turn up, you’ll also be charged ${lateFee} instead of the full lesson price.`
+        answer: `Give at least ${notice}’ notice to book, change or cancel a lesson. For a lesson at 10:00 on Tuesday, that means by 20:00 on Monday. After that, changing or cancelling costs ${lateFee}. If you don’t turn up, you’ll also be charged ${lateFee} instead of the lesson price.`
       },
       {
-        question: "How do I cancel or change a lesson?",
-        answer: `Open it from your lessons on the booking page, or use the link in your confirmation email. Cancel or change it at least ${notice} before it starts and there’s no charge.`
+        question: "How do I change or cancel a lesson?",
+        answer: `Open it from your lessons on the booking page, or use the link in your confirmation email. Change or cancel it at least ${notice} before it starts and there’s no charge.`
       },
       {
         question: `What if my lesson is less than ${notice} away?`,
         answer: [
-          `If you cancel with less than ${notice}’ notice or don’t show up to your lesson, you’re charged ${lateFee} instead of the full lesson price.`,
+          `If you cancel with less than ${notice}’ notice or don’t show up to your lesson, you’re charged ${lateFee} instead of the lesson price.`,
           `If you change your lesson with less than ${notice}’ notice, you’re charged ${lateFee} when you confirm the change. You pay for the lesson after it takes place.`,
-          `You must cancel or change before the lesson starts. The change or cancellation fee applies once per lesson.`
+          `You must change or cancel before the lesson starts. The late change fee applies once per lesson.`
         ]
       },
       {
         question: "What if I don’t turn up?",
-        answer: `If you miss your lesson without cancelling, you’ll be charged ${lateFee} instead of the full lesson price. That’s the same amount as a late cancellation or change. Any earlier late-change fee still applies.`
+        answer: `If you miss your lesson without cancelling, you’ll be charged ${lateFee} instead of the lesson price. That’s the same amount as a late change or cancellation. Any earlier late change fee still applies.`
       },
       {
         question: "What if I need to stop for a while?",
         answer:
-          `You can stop your regular lessons from your calendar and choose which future lessons to keep or cancel. A lesson less than ${notice} away stays booked unless you cancel it separately. You’re welcome to book again whenever you’re ready.`
+          `You can stop your weekly lessons from your calendar and choose which future lessons to keep or cancel. A lesson less than ${notice} away stays booked unless you cancel it separately. You’re welcome to book again whenever you’re ready.`
       }
     ]
   }
@@ -226,11 +226,11 @@ export default function FAQPage() {
           <p className="eyebrow">Not sure yet?</p>
           <h2>Ask me before you book.</h2>
           <div className="faq-contact__actions">
-            <a className="button button--coral" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
+            <a className="button button--coral button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
               Message on WhatsApp
             </a>
-            <Link className="button button--outline" href="/book/?view=book">
-              Go to booking
+            <Link className="button button--outline button--compact" href="/book/?view=book">
+              Book a lesson
             </Link>
           </div>
         </section>

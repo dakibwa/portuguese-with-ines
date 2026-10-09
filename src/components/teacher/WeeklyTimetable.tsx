@@ -79,6 +79,8 @@ export function WeeklyTimetable({
   const [drag, setDrag] = useState<Drag | null>(null);
   const exactRef = useRef<HTMLDetailsElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const openShownDay = useRef(() => {});
   const pendingFocus = useRef(false);
   const pointerType = useRef("");
   const segments = useMemo(
@@ -132,6 +134,42 @@ export function WeeklyTimetable({
       )
       ?.focus();
   }, [focus, mobileDay]);
+
+  /**
+   * On a phone the day scrolls inside its box. It opens at her first teaching
+   * hour that day or the day's first lesson, whichever is earlier, so nothing
+   * of her day sits above it out of sight; a day with neither opens at her
+   * usual first hour. Wide, the timetable has no scroll of its own and this
+   * changes nothing.
+   */
+  function openDay(index: number) {
+    const box = scrollRef.current;
+    if (!box) return;
+    const date = shiftDate(weekStart, index);
+    const firsts = [
+      ...(hours[WEEKDAYS[index].value] ?? []).map((window) => window.start),
+      ...(editing
+        ? []
+        : segments
+            .filter((segment) => segment.date === date)
+            .map((segment) => segment.start)),
+    ].filter(Number.isFinite);
+    const usual = allWindows.map((window) => window.start);
+    const minute = Math.min(...(firsts.length ? firsts : usual.length ? usual : [start]));
+    const hour = box.querySelector<HTMLElement>(
+      `[data-axis-minute="${Math.max(start, Math.floor(minute / 60) * 60)}"]`,
+    );
+    box.scrollTop = hour?.offsetTop ?? 0;
+  }
+
+  // Reopen the shown day when the timetable appears or the week changes, but
+  // not when keyboard focus moves to another day: the focused time stays put.
+  useLayoutEffect(() => {
+    openShownDay.current = () => openDay(mobileDay);
+  });
+  useLayoutEffect(() => {
+    openShownDay.current();
+  }, [weekStart]);
 
   function openExact(day: number) {
     setExactDay(day);
@@ -300,11 +338,12 @@ export function WeeklyTimetable({
                 type="button"
                 aria-label={
                   editing
-                    ? `${day.name}, show teaching hours`
+                    ? `${day.name}, show weekly hours`
                     : `${dateLabel(date)}, show lessons`
                 }
                 aria-pressed={mobileDay === index}
                 onClick={() => {
+                  if (index !== mobileDay) openDay(index);
                   onSelectDay(index);
                   setFocus((current) => ({ ...current, day: day.value }));
                 }}
@@ -362,9 +401,10 @@ export function WeeklyTimetable({
         ) : null}
         <div
           className="teacher-timetable-scroll"
+          ref={scrollRef}
           aria-label={
             editing
-              ? "Weekly teaching hours"
+              ? "Weekly hours"
               : "Your lessons and time off this week"
           }
         >
@@ -377,6 +417,7 @@ export function WeeklyTimetable({
                 minute % 60 === 0 ? (
                   <span
                     key={minute}
+                    data-axis-minute={minute}
                     style={{
                       top: `calc(${index} * var(--teacher-slot-height))`,
                     }}
@@ -503,7 +544,7 @@ export function WeeklyTimetable({
                         aria-label={
                           fixed
                             ? `${minuteLabel(minute)}, ${dateLabel(date)}, ${reason}`
-                            : `Take ${minuteLabel(minute)}–${minuteLabel(cellEnd)} off, ${dateLabel(date)}${usual ? ", usual teaching time" : ""}`
+                            : `Take ${minuteLabel(minute)}–${minuteLabel(cellEnd)} off, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}`
                         }
                         {...pointer}
                         onClick={(event) => {
@@ -581,7 +622,7 @@ export function WeeklyTimetable({
         <div className="teacher-calendar-key" aria-label="Timetable key">
           <span>
             <i className="teacher-key-starts" />
-            {editing ? "Lesson starts" : "Usual hours"}
+            {editing ? "Lesson starts" : "Weekly hours"}
           </span>
           {!editing ? (
             <>

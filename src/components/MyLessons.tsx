@@ -67,7 +67,7 @@ function HistoryLessonCard({ booking, zone }: { booking: MyBooking; zone: string
 
 /**
  * The account bar above the booking workspace: who is signed in, and the
- * account's own views. Upcoming lessons live on the calendar beneath it, which
+ * account's own views. Your lessons live on the calendar beneath it, which
  * opens each lesson directly; this component owns Past lessons and the
  * profile fields.
  */
@@ -222,7 +222,7 @@ export function MyLessons({
       setSeries(data.series ?? []);
     } catch (caught) {
       if (request !== accountRequest.current || readSession() !== session) return;
-      setLoadError(caught instanceof Error ? caught.message : "Could not load your lessons.");
+      setLoadError(caught instanceof Error ? caught.message : "We couldn’t load your lessons.");
     } finally {
       if (request === accountRequest.current && readSession() === session) setLoading(false);
     }
@@ -237,7 +237,7 @@ export function MyLessons({
   }, [load]);
 
   // Coming back to the lessons view (after a booking, a move or a
-  // cancellation) refreshes the history and the count beside View lessons.
+  // cancellation) refreshes the history and the count beside Your lessons.
   // Only a later request reloads: arriving already loads once, above.
   const seenUpcomingRequest = useRef(openUpcomingRequest);
   useEffect(() => {
@@ -294,11 +294,11 @@ export function MyLessons({
         if (emailDraftVersion.current === confirmationDraftVersion.current) {
           setDetails((current) => ({ ...current, email: result.student.email }));
         }
-        setDetailsNote("That's your email address updated.");
+        setDetailsNote("That’s your email address updated.");
         setEmailPending("");
       })
       .catch((caught) => {
-        if (active) setError(caught instanceof Error ? caught.message : "That link could not be used.");
+        if (active) setError(caught instanceof Error ? caught.message : "That link couldn’t be used.");
       });
     return () => { active = false; };
   }, []);
@@ -317,7 +317,7 @@ export function MyLessons({
       setDetailsNote("Saved.");
     } catch (caught) {
       if (readSession() !== session) return;
-      setError(caught instanceof Error ? caught.message : "That could not be saved.");
+      setError(caught instanceof Error ? caught.message : "That couldn’t be saved.");
     } finally {
       setSavingName(false);
     }
@@ -337,10 +337,10 @@ export function MyLessons({
       const savedNif = result.student.nif ?? "";
       setStudent((current) => current && { ...current, nif: savedNif });
       setDetails((current) => current.nif === submittedNif ? { ...current, nif: savedNif } : current);
-      setDetailsNote(result.student.nif ? "Saved. Your receipts will show this NIF." : "Saved. Your receipts won't show a NIF.");
+      setDetailsNote(result.student.nif ? "Saved. Your receipts will show this NIF." : "Saved. Your receipts won’t show a NIF.");
     } catch (caught) {
       if (readSession() !== session) return;
-      setError(caught instanceof Error ? caught.message : "That could not be saved.");
+      setError(caught instanceof Error ? caught.message : "That couldn’t be saved.");
     } finally {
       setSavingNif(false);
     }
@@ -369,7 +369,7 @@ export function MyLessons({
           : "Saved."
       );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That code could not be saved.");
+      setError(caught instanceof Error ? caught.message : "That code couldn’t be saved.");
     } finally {
       setSavingRate(false);
       // The button is disabled once the field is empty, so focus goes back to
@@ -390,7 +390,7 @@ export function MyLessons({
       if (readSession() !== session) return;
       setEmailPending(result.pending);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That could not be sent.");
+      setError(caught instanceof Error ? caught.message : "That couldn’t be sent.");
     } finally {
       setEmailBusy(false);
     }
@@ -510,7 +510,7 @@ export function MyLessons({
                   onClick={() => openAccountSection("upcoming")}
                   type="button"
                 >
-                  View lessons {upcomingCount ? <span>{upcomingCount}</span> : null}
+                  Your lessons {upcomingCount ? <span>{upcomingCount}</span> : null}
                 </button>
                 <button
                   aria-controls="account-past-lessons"
@@ -570,7 +570,7 @@ export function MyLessons({
             <div className="my-lessons__field">
               <div className="my-lessons__details-row">
                 <label>
-                  <span>Email address</span>
+                  <span>Email</span>
                   <input
                     autoComplete="email"
                     onChange={(event) => {
@@ -646,7 +646,7 @@ export function MyLessons({
                 </ul>
               ) : null}
               {ratesFailed ? (
-                <p className="my-lessons__details-note">We couldn&rsquo;t check your saved rates just now.</p>
+                <p className="my-lessons__details-note">We couldn&rsquo;t check your saved weekly rates just now.</p>
               ) : null}
               <details className="my-lessons__code">
                 <summary>Have a code from Inês?</summary>
@@ -675,13 +675,16 @@ export function MyLessons({
                   </button>
                 </form>
                 <p className="my-lessons__details-note">
-                  Your code sets the price for future weekly lessons of the matching length.
+                  Your code sets the rate for future weekly lessons of the matching length.
                 </p>
               </details>
             </div>
 
             {detailsNote ? (
-              <p className="my-lessons__details-note my-lessons__details-note--ok" role="status">{detailsNote}</p>
+              <div className="booking-outcome my-lessons__details-outcome" role="status">
+                <CheckCircle2 size={20} aria-hidden="true" />
+                <p>{detailsNote}</p>
+              </div>
             ) : null}
           </section>
         ) : null}
@@ -698,8 +701,8 @@ export function MyLessons({
         <section className="my-lessons__account-section my-lessons__account-section--detached" id="account-past-lessons" aria-labelledby="past-lessons-heading" tabIndex={-1}>
           <div className="my-lessons__account-section-heading">
             <h3 className="eyebrow" id="past-lessons-heading">Past lessons</h3>
-            <button className="booking-back booking-back--tertiary" onClick={() => openAccountSection("upcoming")} type="button">
-              <ArrowLeft size={16} aria-hidden="true" /> Upcoming lessons
+            <button className="booking-back booking-back--tertiary my-lessons__back" onClick={() => openAccountSection("upcoming")} type="button">
+              <ArrowLeft size={16} aria-hidden="true" /> Your lessons
             </button>
           </div>
           {past.length ? (

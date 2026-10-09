@@ -118,7 +118,7 @@ weekly blocks alongside the upcoming one-off rows so the calendar shows every
 time students cannot book.
 
 `Weekly hours`, top right, edits the usual weekly pattern with click/drag,
-touch or keyboard input. `Save teaching hours` writes the existing first-start and
+touch or keyboard input. `Save weekly hours` writes the existing first-start and
 last-start rule format; it does not reinterpret the last start as a finishing
 time. Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
@@ -264,28 +264,30 @@ depending on them having kept the right confirmation email.
   for links already in the world, then normalise to `/book`.
 - **Signed-in account controls stay in the shared workspace.** They sit above
   the active workflow rather than behind an Account/Close disclosure. The account
-  bar names the student once and keeps `View lessons`, past lessons, profile
+  bar names the student once and keeps `Your lessons`, past lessons, profile
   editing and sign out directly in the bar on wide desktop and inside one
   compact menu at narrower widths. Booking lives on the calendar, not in the
   bar. The upcoming count may
-  sit beside `View lessons`; Past lessons has no badge. Choosing view or past lessons opens a
+  sit beside `Your lessons`; Past lessons has no badge. Choosing your or past lessons opens a
   complete view and switches away from any active booking or lesson-management
   detail. Clicking the current destination keeps it open. History occupies the
   full workspace without the future calendar. Profile editing also hides the
-  calendar; `Done editing` returns to Upcoming lessons.
+  calendar; `Done editing` returns to Your lessons.
   `Past lessons` stays in the menu throughout every signed-in
   booking state, including while booking and while a
-  recurring occurrence is open; an empty history gets an empty state rather
-  than losing the menu item. History returns through `Upcoming lessons`.
+  weekly lesson is open; an empty history gets an empty state rather
+  than losing the menu item. History and booking return through a
+  `Your lessons` link where the menu is folded away; on wide desktop the bar's
+  own `Your lessons` is that way back, and the links are left out.
   There is only one `Booking`
   destination in the site navigation — no separate `My lessons` tab — because
   booking and managing lessons are the same workspace.
-- **Upcoming lessons is the calendar.** It opens first for a signed-in student
-  and remains available as `View lessons`.
-  After a successful booking, `Back to upcoming lessons` opens this same
+- **Your lessons is the calendar.** It opens first for a signed-in student
+  and remains available as `Your lessons` in the account bar.
+  After a successful booking, `Back to your lessons` opens this same
   calendar, with the new lesson on its day. The next lesson leads the card. Weekly lessons are
   lilac and one-off lessons coral; a weekly lesson's dialog offers `Manage
-  sequence` for the whole run, and `View lessons` counts an active repeat once.
+  weekly lessons` for the whole run, and `Your lessons` counts an active repeat once.
   The `?` tooltip explains that booked lessons open and other days start a
   booking. Once booked, ordinary lessons use the compact duration label (`60
   mins` or `90 mins`) instead of repeating the product name; trial lessons keep
@@ -385,7 +387,7 @@ lessons, so its cancellation set includes every occurrence committed first.
   `cancelRemaining` cancels them too. It applies the same payment policy as an
   individual cancellation: a future paid lesson is refunded, an uncharged one
   is never charged, and a lesson inside the 14-hour window remains booked. A selected
-  recurring occurrence exposes `Manage sequence`, keeps both outcomes visibly
+  weekly lesson exposes `Manage weekly lessons`, keeps both outcomes visibly
   distinct, and asks for confirmation before calling the stop endpoint.
 - **Moving a recurrence moves every future confirmed occurrence together.**
   The student chooses the new weekly anchor, length, and location through the
@@ -651,7 +653,7 @@ get wrong:
 
 ### Time and availability
 
-Instants are stored as ISO-8601 UTC. Weekly teaching hours are stored as
+Instants are stored as ISO-8601 UTC. Inês's weekly hours are stored as
 minutes-from-midnight in Porto time and resolved against `Europe/Lisbon` at query
 time, so the rules survive DST instead of drifting an hour twice a year. The
 25-hour and 23-hour transition days are covered by tests.

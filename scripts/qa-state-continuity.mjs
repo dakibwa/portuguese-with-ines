@@ -24,7 +24,7 @@ const lesson = {
   isPast: false, sameDayFeeApplies: false, seriesId: null, manageToken: "fixture"
 };
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization,content-type", "Access-Control-Allow-Methods": "GET,POST,OPTIONS" };
-const replyError = "We couldn't read the booking system's reply. Please try again.";
+const replyError = "We couldn’t read the booking system’s reply. Please try again.";
 
 function deferred() {
   let resolve;
@@ -160,7 +160,7 @@ try {
           await response;
           await state.page.waitForLoadState("networkidle");
           await expect(state.page.getByRole("list", { name: "Your saved weekly rates" })).toContainText("€15 each");
-          await expect(state.page.getByText("We couldn’t check your saved rates just now.", { exact: true })).toHaveCount(0);
+          await expect(state.page.getByText("We couldn’t check your saved weekly rates just now.", { exact: true })).toHaveCount(0);
           await chooseAccount(state.page, "Done editing");
           await state.page.getByRole("button", { name: /^Book a (new )?lesson$/ }).first().click();
           await state.page.getByRole("radio", { name: "Weekly", exact: true }).check();
@@ -168,7 +168,7 @@ try {
           const part = state.page.locator('.time-picker__parts input[value="early"]');
           if (await part.count()) await part.check();
           await state.page.getByRole("button", { name: "10:00", exact: true }).click();
-          await expect(state.page.getByText("€15 per recurring lesson", { exact: true })).toBeVisible();
+          await expect(state.page.getByText("€15 per lesson", { exact: true })).toBeVisible();
           await check(state);
         } finally { waiting.resolve(); await state.context.close(); }
       }
@@ -401,7 +401,7 @@ try {
           await check(state);
           broken = false;
           const response = state.page.waitForResponse(r => new URL(r.url()).pathname === endpoint && r.request().method() === "GET");
-          await state.page.getByRole("button", { name: endpoint === "/admin/availability" ? "Reload schedule" : "Reload lessons", exact: true }).click();
+          await state.page.getByRole("button", { name: "Try again", exact: true }).click();
           await response;
           await expect(state.page.locator(".teacher-workspace")).toBeVisible();
           await expect(state.page.getByText("Your week at a glance", { exact: true })).toBeVisible();

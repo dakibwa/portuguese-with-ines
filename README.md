@@ -17,7 +17,7 @@ five responsive routes:
 - `/my-lessons` — backwards-compatible account entry; it resolves into the
   `/book` workspace (noindex)
 - `/reset-password` — reached from a reset email (noindex)
-- `/schedule` — Inês's own view: teaching hours, days off, and what is booked
+- `/schedule` — Inês's own view: weekly hours, days off, and what is booked
   (noindex, teacher account or emergency access key required)
 
 Every route carries a booking action within reach of its closing content, not

@@ -45,6 +45,16 @@ async function open(width, path, { session = "", me = student, reply = () => nul
 
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
 
+// Every text field shows focus as the booking notes do: one 2px deep-blue
+// border, with no coral or blue ring drawn outside it.
+async function oneBlueBoundary(field) {
+  await expect(field).toBeFocused();
+  await expect(field).toHaveCSS("border-top-width", "2px");
+  await expect(field).toHaveCSS("border-top-color", "rgb(32, 62, 130)");
+  await expect(field).toHaveCSS("outline-style", "none");
+  await expect(field).toHaveCSS("box-shadow", "none");
+}
+
 try {
   for (const width of [1280, 390]) {
     // Sign-up: optional, last, explained in two words, and a refused NIF says why.
@@ -60,13 +70,14 @@ try {
     const form = signUp.page.locator(".auth-panel__form");
     const fields = await form.locator("label > span").allInnerTexts();
     assert.match(fields.at(-1).replace(/\s+/g, " "), /^NIF \(optional\)$/i, `NIF should be the last, optional field: ${fields}`);
-    await form.getByLabel("First name").fill("Ana");
+    await form.getByLabel("Your name").fill("Ana");
     await form.getByLabel("Email").fill("ana@example.invalid");
     await form.getByLabel("Password").fill("a-long-password");
     const nif = form.getByLabel("NIF (optional)");
     await expect(nif).toHaveAttribute("inputmode", "numeric");
     await expect(form).toContainText("Added to your receipts.");
     await nif.fill(" 123456788 ");
+    await oneBlueBoundary(nif);
     await form.getByRole("button", { name: "Create my account", exact: true }).click();
     await expect(form.getByRole("alert")).toContainText("That NIF isn't valid");
     assert.ok(await noOverflow(signUp.page));
@@ -87,7 +98,7 @@ try {
     });
     await taken.page.getByRole("tab", { name: "Create an account", exact: true }).click();
     const takenForm = taken.page.locator(".auth-panel__form");
-    await takenForm.getByLabel("First name").fill("Ana");
+    await takenForm.getByLabel("Your name").fill("Ana");
     await takenForm.getByLabel("Email").fill("ana@example.invalid");
     await takenForm.getByLabel("Password").fill("a-long-password");
     await takenForm.getByRole("button", { name: "Create my account", exact: true }).click();
@@ -126,12 +137,15 @@ try {
     const field = editor.getByLabel("NIF (optional)");
     const save = editor.getByRole("button", { name: "Save NIF", exact: true });
     await expect(save).toBeDisabled();
+    // Until it can act it is a quiet outline, not a faded coral fill.
+    await expect(save).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     // A late second account load can still reset the field after typing, so
     // type again until the edit sticks.
     await expect(async () => {
       await field.fill("123 456 789");
       await expect(save).toBeEnabled({ timeout: 1_000 });
     }).toPass({ timeout: 10_000 });
+    await oneBlueBoundary(field);
     await save.click();
     await expect(editor).toContainText("Saved. Your receipts will show this NIF.");
     await expect(field).toHaveValue("123456789");
@@ -144,7 +158,7 @@ try {
     assert.equal(saved, "123456789");
     await field.fill("");
     await save.click();
-    await expect(editor).toContainText("Saved. Your receipts won't show a NIF.");
+    await expect(editor).toContainText("Saved. Your receipts won’t show a NIF.");
     assert.deepEqual(details.posts.filter((post) => post.endpoint === "/me").map((post) => post.body), [{ nif: "123 456 789" }, { nif: "12345" }, { nif: "" }]);
     assert.deepEqual(details.errors, []);
     await details.page.close();
@@ -165,10 +179,14 @@ try {
     await schedule.page.getByRole("button", { name: /^Carla, .*View lesson$/ }).click();
     await expect(dialog).toContainText("without-nif@example.invalid");
     await expect(dialog).toContainText("NIF not given (consumidor final)");
+    await schedule.page.getByRole("button", { name: "Move lesson", exact: true }).click();
+    const newDate = schedule.page.getByLabel("New date");
+    await newDate.focus();
+    await oneBlueBoundary(newDate);
     assert.deepEqual(schedule.errors, []);
     await schedule.page.close();
   }
-  console.log("Student NIF passed: optional sign-up field, refused typo, edit/clear in details and Inês's lesson view; desktop/mobile.");
+  console.log("Student NIF passed: optional sign-up field, refused typo, edit/clear in details and Inês's lesson view, one blue focus boundary on each form's fields; desktop/mobile.");
 } finally {
   await browser.close();
 }

@@ -79,16 +79,16 @@ const untouchedWire = [wire(1, 705, 705), wire(2, 607, 637)];
 function sortedRules(rules) { return [...rules].sort((a, b) => a.weekday - b.weekday || a.startMinute - b.startMinute || a.lastStartMinute - b.lastStartMinute); }
 async function hours(page) {
   await page.getByRole("button", { name: /^Weekly hours/ }).click();
-  await page.getByRole("button", { name: "Monday, show teaching hours", exact: true }).click();
+  await page.getByRole("button", { name: "Monday, show weekly hours", exact: true }).click();
 }
 async function activate(control, method) {
   if (method === "keyboard") { await control.focus(); await control.press("Space"); }
   else await control.click();
 }
 async function save(state, expected, count) {
-  await state.page.getByRole("button", { name: "Save teaching hours", exact: true }).click();
+  await state.page.getByRole("button", { name: "Save weekly hours", exact: true }).click();
   await expect.poll(() => state.writes.length).toBe(count);
-  await expect(state.page.getByText("Teaching hours saved. Students can now book these times.", { exact: true })).toBeVisible();
+  await expect(state.page.getByText("Weekly hours saved. Students can now book these times.", { exact: true })).toBeVisible();
   assert.deepEqual(sortedRules(state.writes.at(-1).body.rules), sortedRules(expected));
 }
 async function drag(page, from, to) {
@@ -177,7 +177,7 @@ try {
       await expect(state.page.locator(".teacher-exact-hours")).toHaveAttribute("open", "");
       await expect(state.page.getByLabel("Monday window 1, first start", { exact: true })).toHaveValue("10:07");
       await expect(state.page.getByLabel("Monday window 1, last start", { exact: true })).toHaveValue("10:37");
-      await expect(state.page.getByRole("button", { name: "Save teaching hours", exact: true })).toBeDisabled();
+      await expect(state.page.getByRole("button", { name: "Save weekly hours", exact: true })).toBeDisabled();
       assert.deepEqual(state.writes, []);
     });
     for (const action of ["manual", "move"]) {

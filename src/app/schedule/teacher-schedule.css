@@ -37,12 +37,16 @@
 .teacher-lesson-dialog button:disabled {
   cursor: not-allowed;
 }
+/* Set as the booking workspace's buttons are (0.7 rem, 700, 0.12 em, the
+   hand-drawn button cut), at the denser 44 px a schedule needs. */
 .teacher-workspace .button,
 .teacher-lesson-dialog .button {
   min-height: 44px;
-  font-size: 0.69rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   padding: 0.8rem 1.25rem;
-  border-radius: var(--squiggle-pill);
+  border-radius: var(--squiggle-button);
 }
 .teacher-workspace .button:disabled {
   opacity: 0.48;
@@ -150,8 +154,8 @@
 .teacher-icon-button {
   display: inline-grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   flex: none;
   border: 0;
   border-radius: 50%;
@@ -161,6 +165,17 @@
 }
 .teacher-icon-button:hover:not(:disabled) {
   background: var(--lavender-soft);
+}
+/* A lesson's way out is the student pop-ups' own: the same hand-cut button
+   on the same wash. */
+.teacher-dialog-top > .teacher-icon-button {
+  border-radius: var(--squiggle-pill);
+  background: rgba(170, 164, 230, 0.18);
+}
+.teacher-dialog-top > .teacher-icon-button:hover:not(:disabled),
+.teacher-dialog-top > .teacher-icon-button:focus-visible {
+  background: rgba(170, 164, 230, 0.34);
+  color: var(--coral-action);
 }
 .teacher-icon-button:disabled {
   opacity: 0.3;
@@ -318,12 +333,12 @@
 .teacher-day-toggle[aria-checked="true"] .teacher-day-toggle__track::after {
   transform: translateX(11px);
 }
+/* Wide, the day stands at its full height with no scroll of its own, so an
+   evening lesson is never left below the fold of an inner box; the page
+   scrolls instead. A phone scrolls the day inside its box (below). */
 .teacher-timetable-scroll {
-  max-height: 650px;
-  overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--lavender) var(--paper-light);
-  overscroll-behavior: contain;
 }
 .teacher-time-grid {
   min-height: calc(var(--slot-count) * var(--teacher-slot-height));
@@ -512,7 +527,7 @@
 }
 .teacher-lesson-no-show {
   margin-left: 0.35rem;
-  border-radius: 999px;
+  border-radius: var(--squiggle-pill);
   padding: 0 0.35rem;
   background: var(--coral-action);
   color: #fff;
@@ -661,15 +676,18 @@
   min-width: 0;
   min-height: 44px;
   border: 1px solid var(--rule);
-  border-radius: 8px 11px 9px 7px;
+  border-radius: var(--squiggle-field);
   padding: 0.6rem 0.7rem;
   background: var(--paper-light);
   color: var(--ink);
   font: 500 0.84rem/1.3 var(--ui);
 }
+/* One clear blue boundary, as on every text field, never a ring outside it. */
 .teacher-form input:focus,
 .teacher-form select:focus {
-  border-color: var(--blue);
+  border: 2px solid var(--blue-deep);
+  outline: 0;
+  box-shadow: none;
 }
 .teacher-exact-hours {
   margin-top: 0.5rem;
@@ -765,17 +783,21 @@
   gap: 0.5rem;
   padding: 0.85rem 1rem;
   margin-bottom: 1.2rem;
-  border-radius: 6px 10px 8px 7px;
+  border-radius: var(--squiggle-field);
   font: 500 0.8rem/1.6 var(--ui);
   overflow-wrap: anywhere;
 }
+/* The student pages' own notices: problems in the coral panel, good news on
+   lavender, never a stripe down one side. */
 .teacher-inline-error {
-  border-left: 3px solid var(--coral-action);
-  background: rgba(239, 93, 60, 0.08);
-  color: var(--coral-action);
+  border: 1.5px solid var(--coral);
+  background: rgba(239, 93, 60, 0.1);
+  color: var(--ink);
+  font-weight: 600;
 }
 .teacher-inline-success {
-  background: var(--lavender-soft);
+  border: 1px solid var(--rule-soft);
+  background: rgba(170, 164, 230, 0.22);
   color: var(--ink);
 }
 .teacher-inline-notice {
@@ -814,7 +836,7 @@
   max-height: calc(100dvh - 2rem);
   margin: auto;
   border: 1px solid var(--rule);
-  border-radius: 20px 36px 25px 18px;
+  border-radius: var(--squiggle-panel);
   padding: 1.25rem 1.4rem 1.35rem;
   background: var(--paper);
   color: var(--ink);
@@ -838,9 +860,9 @@
 .teacher-dialog-heading {
   min-width: 0;
 }
+/* Set as the student pages' pop-up titles are. */
 .teacher-lesson-dialog h2 {
-  font: 600 1.45rem/1.2 var(--ui);
-  letter-spacing: -0.035em;
+  font: 600 clamp(1.2rem, 3.4vw, 1.45rem)/1.2 var(--ui);
   margin-top: 0.1rem;
   overflow-wrap: anywhere;
 }
@@ -1092,8 +1114,13 @@
   .teacher-time-axis > span {
     font-size: 0.68rem;
   }
+  /* The seven-day selector stays in view above a day that scrolls in its own
+     box, opening at her first teaching hour or lesson (WeeklyTimetable). At
+     either end the page carries on scrolling rather than trapping the
+     gesture. */
   .teacher-timetable-scroll {
     max-height: 504px;
+    overflow: auto;
   }
   .teacher-timetable--editing .teacher-time-slot > span {
     opacity: 1;
@@ -1177,9 +1204,6 @@
   }
   .teacher-lesson-facts {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .teacher-lesson-dialog h2 {
-    font-size: 1.3rem;
   }
 }
 
