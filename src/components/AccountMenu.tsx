@@ -10,9 +10,9 @@ export type AccountSection = "upcoming" | "history" | "profile";
  * (Your lessons, Past lessons or Your details), sparing the page a second bar
  * above the calendar. Where the card is wide, its places sit open in the
  * middle of the header as one sliding control, and the student's name stands
- * plain at the left with Sign out beneath it; where it is narrow, the name
- * opens them as a dropdown. The same buttons serve both, so either way there
- * is one menu.
+ * plain at the left with Sign out beneath it; where it is narrow, a button
+ * with their initial and name opens them as a dropdown. The same buttons serve
+ * both, so either way there is one menu.
  */
 export function AccountMenu({
   current,
@@ -56,6 +56,8 @@ export function AccountMenu({
   }
 
   const place = current === "upcoming" ? 0 : current === "history" ? 1 : 2;
+  // The first character as written, whole even outside the Basic Latin.
+  const initial = Array.from(name.trim())[0]?.toLocaleUpperCase() ?? "";
 
   return (
     <div className="account-menu" ref={menuRef}>
@@ -68,6 +70,7 @@ export function AccountMenu({
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
+        {initial ? <span aria-hidden="true" className="account-menu__avatar">{initial}</span> : null}
         <span className="visually-hidden">Account: </span>
         <span className="account-menu__name">{name}</span>
         <ChevronDown size={16} aria-hidden="true" />

@@ -1961,10 +1961,14 @@ await accountMenuButton.focus();
 await accountPage.mouse.move(1, 1);
 await calendarTip.waitFor({ state: "hidden" });
 await waitForOrientation(accountPage);
+// The row sits on the card's own colour (9 October 2026, at Dan's request),
+// so it needs no inset of its own: its mark and details sit inside it, side
+// by side, the mark on the card's edge like everything else.
 const mobileNextLessonLayout = await accountPage.locator(".lesson-overview__next").evaluate((row) => {
   const bounds = (selector) => row.querySelector(selector)?.getBoundingClientRect().toJSON() ?? null;
   return {
     row: row.getBoundingClientRect().toJSON(),
+    background: getComputedStyle(row).backgroundColor,
     mark: bounds(".lesson-overview__next-mark"),
     copy: bounds(".lesson-overview__next-open")
   };
@@ -1972,11 +1976,12 @@ const mobileNextLessonLayout = await accountPage.locator(".lesson-overview__next
 if (
   !mobileNextLessonLayout.mark ||
   !mobileNextLessonLayout.copy ||
-  mobileNextLessonLayout.mark.left < mobileNextLessonLayout.row.left + 6 ||
+  mobileNextLessonLayout.background !== "rgba(0, 0, 0, 0)" ||
+  mobileNextLessonLayout.mark.left < mobileNextLessonLayout.row.left - 1 ||
   mobileNextLessonLayout.copy.left < mobileNextLessonLayout.mark.right - 2 ||
-  mobileNextLessonLayout.copy.right > mobileNextLessonLayout.row.right - 6
+  mobileNextLessonLayout.copy.right > mobileNextLessonLayout.row.right + 1
 ) {
-  throw new Error(`The next lesson should keep its mark and details inside one clean row on a phone: ${JSON.stringify(mobileNextLessonLayout)}.`);
+  throw new Error(`The next lesson should keep its mark and details inside one clean row, on the card's colour, on a phone: ${JSON.stringify(mobileNextLessonLayout)}.`);
 }
 const mobileLaterLessonsLayout = await accountPage.evaluate(() => ({
   clientWidth: document.documentElement.clientWidth,

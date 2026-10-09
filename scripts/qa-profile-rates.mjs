@@ -127,8 +127,11 @@ try {
     const add = editor.getByRole("button", { name: "Add code", exact: true });
     await expect(code).toBeVisible();
     await expect(add).toBeDisabled();
-    // Like every other field here, the action sits beside it whenever the row is
-    // wide enough, and drops beneath it on a phone.
+    // Like every other field here, the action appears once there is something
+    // to add: beside its field whenever the row is wide enough, beneath it on
+    // a phone.
+    await code.fill(" test15 ");
+    await expect(add).toBeEnabled();
     const [fieldRight, actionLeft, fieldBottom, actionTop] = await editor.locator("details.my-lessons__code .my-lessons__details-row").evaluate((row) => {
       const field = row.querySelector("label").getBoundingClientRect();
       const action = row.querySelector("button").getBoundingClientRect();
@@ -136,7 +139,6 @@ try {
     });
     if (width >= 700) assert.ok(actionLeft >= fieldRight - 1, `Add code sits beside its field at ${width}px`);
     else assert.ok(actionTop >= fieldBottom - 1, `Add code sits under its field at ${width}px`);
-    await code.fill(" test15 ");
     await add.click();
     await expect(editor.getByRole("status")).toHaveText("Saved. Your 60-minute weekly lessons are now €15 each.");
     const rows = editor.locator(".my-lessons__rates-list li");

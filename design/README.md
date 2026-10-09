@@ -409,9 +409,13 @@ lesson management pairs blue `Move weekly time`, an outline `Stop repeating`, an
 coral `Cancel all booked lessons`; profile editing pairs coral `Save name` with
 blue `Send confirmation link`. Keep the existing labels and state indicators so
 colour is never the only way to tell the controls apart. A filled button that
-cannot act yet, such as `Save name` before the name changes, is drawn as the
-same quiet outline as the booking's final action, so coral and blue appear
-only when the action is live.
+cannot act yet is drawn as the same quiet outline as the booking's final
+action, so coral and blue appear only when the action is live. Your details
+goes one step further: a field's action, such as `Save name`, stays clear
+until there is something to save, then appears in its live colour. It keeps
+its place, beside the field or, on a phone, beneath the field's note, so
+nothing moves as it appears, and assistive technology still finds it,
+unavailable, as before.
 
 Confirmed email changes preserve an open profile editor and newer drafts while
 renewing that account's session. Opening the profile editor initially focuses
@@ -461,7 +465,16 @@ still, and the workspace eases from its old height to its new one, carrying
 the page beneath it rather than snapping it or jolting the scroll position.
 The booking's confirmation card belongs to the same workspace, so booking and
 the way back from it ease too. Only the part of a resize that shows is eased,
-so a short page's footer never lurches. Nothing pops in late: a form or times
+so a short page's footer never lurches, and a resize starts and settles
+gently, carrying the page rather than flinging it most of the way at once. A
+decision that replaces the workspace's content outright (a time bringing the
+confirmation, `Change` or `Back` taking it away, a phone's times taking the
+calendar's place) hands over in two beats: what goes fades down in a moment,
+then the next step dissolves in from nothing, so one view never cuts straight
+to another. Choosing a day on a wider card opens the times' column beside the
+calendar, which narrows with it rather than jumping, and the times are
+uncovered as the column opens rather than squeezed (9 October 2026, at Dan's
+request for smoother, less jolty selections). Nothing pops in late: a form or times
 still on their way ease in when they arrive, and until the calendar first
 arrives its room is held, so the footer never shows and then drops away (9
 October 2026, at Dan's request for smooth transitions rather than jolty ones).
@@ -600,9 +613,10 @@ Preserve these desktop and mobile states:
   no bar above it and no separate list to keep in step with it. On a wide card
   its header is one row: the student's name with a quiet `Sign out` beneath
   it, the account's places in the middle and the coral `Book a lesson` at the
-  right. On a narrower card it reads `Your lessons`, the student's name
-  beneath it as the account's menu, and `Book a lesson` at its top right
-  (`Book` on phones, keeping the full name for assistive technology).
+  right. On a narrower card the student's name leads it as the account's menu, with
+  `Book a lesson` at its top right (`Book` on phones, keeping the full name
+  for assistive technology); the banner above already says Your lessons, so
+  the card's own title is for screen readers, as on a wide card.
   On a wide card each booked day spells its lessons out (9 October 2026, at
   Dan's request): the time each runs from and until (`09:00–10:00`), after a
   globe for online or a little person for in Porto, both named in the key. The
@@ -613,7 +627,8 @@ Preserve these desktop and mobile states:
   when (the clock named, as a lone time names it), how long, where and
   `Weekly`. Clicking opens the lesson, with its Meet link, `Change` and
   `Cancel`. On a phone a day shows the mark over the start time, and the next
-  lesson, or `Happening now`, keeps its row beneath the header, as it does on
+  lesson, or `Happening now`, keeps its row beneath the header, on the card's
+  own colour, as it does on
   any card when the next lesson lies beyond the first four weeks: its date and
   time in one plain line, then its length, location, `Weekly` when it repeats
   and its Meet link, opening that lesson directly. With nothing booked, one line says so above the same
@@ -632,10 +647,11 @@ Preserve these desktop and mobile states:
   showing; the name stands plain at the left with `Sign out` beneath it, since
   signing out belongs to the person, not among the places, and the card's
   title is kept for screen readers because the places already name it. On a
-  narrower card the name, beneath the card's title, is the menu: it reads
-  quietly as the name with a small coral chevron, never the site menu's three
-  lines, so a phone shows one `☰` for the site and one clearly different
-  account menu, and it opens over the card. Booking is not repeated there: its
+  narrower card the name is the menu, and plainly a button (9 October 2026,
+  at Dan's request): a cream pill holding the student's initial in a blue
+  circle, their name and a chevron, never the site menu's three lines, so a
+  phone shows one `☰` for the site and one clearly different account menu,
+  and it opens over the card. Booking is not repeated there: its
   one coral action belongs to the card. `Your lessons` may show the useful
   upcoming count; `Past lessons` deliberately has no count competing for
   attention. The menu lives in the account cards, behind an open lesson too;
@@ -646,14 +662,14 @@ Preserve these desktop and mobile states:
   and Your details each take the lessons card's place, in the same hand and
   headed the same way: on a wide card the same row, with the places exactly
   where they were and the thumb on the card showing; on a narrower one the
-  title, the name's menu beneath it and, at the right, a `Your lessons` way
-  back to the current schedule. History has two
+  title with a `Your lessons` way back to the current schedule at its right,
+  and the name's menu beneath them. History has two
   readable columns of records on wide desktop and one on mobile; order records
   by when each lesson ended or was cancelled, newest first, so cancelled
   future dates do not bury recently completed lessons.
-  Profile editing has paired fields on wide desktop; `Done editing` returns
-  to Your lessons. Its last item is the
-  small `Have a code from Inês?` disclosure, one field with a blue `Add code`
+  Profile editing has paired fields on wide desktop, name beside email and
+  NIF beside the code disclosure; `Done editing` returns to Your lessons. Its
+  last item is the small `Have a code from Inês?` disclosure, one field with a blue `Add code`
   beside it that stays open for the second length's code, with any saved weekly
   rate listed above it. History and profile
   editing never leave a future calendar floating beside or underneath them.
@@ -687,8 +703,8 @@ Preserve these desktop and mobile states:
   There is no second `My lessons` navigation destination.
   The workflow choices and calendar share the same left and right edges.
   Profile fields sit directly in the Your details card, without a second
-  framed card inside it; their actions sit beside the field whenever the
-  available width permits. Profile inputs use the same single blue focus
+  framed card inside it; their actions appear once there is something to save,
+  beside the field whenever the available width permits. Profile inputs use the same single blue focus
   boundary as the booking notes field;
 - after a successful one-off or weekly booking, the confirmation's primary
   `Back to your lessons` opens the lessons calendar so the new booking is immediately
@@ -708,7 +724,8 @@ Preserve these desktop and mobile states:
   scroll. Its header is the one every calendar has: its months on the left
   (`October 2026`, or `October – November 2026` where the weeks cross into the
   next, `Oct – Nov 2026` on a phone), with the clock beside them for a student
-  elsewhere, and the `Earlier weeks` and `Later weeks` arrows on the right.
+  elsewhere, and the `Earlier weeks` and `Later weeks` arrows on the right,
+  solid blue with white arrows.
   `Later weeks` carries a small coral count of the booked lessons beyond the
   page, so nothing booked is out of sight without a sign. Each week starts with
   its month (`OCT`), in ink where a month begins and lilac ink where it carries
@@ -923,7 +940,9 @@ where a calendar puts it and nothing taking room it doesn't earn:
   the booking panels had before. What sits on it to be pressed or read is
   raised in
   the paper cream of the lesson cards and dialogs, without an outline of its
-  own: the next lesson, a free day, a time, a control's track, a past lesson.
+  own: a free day, a time, a control's track, a past lesson, the account's
+  menu button. The next lesson's row, at Dan's request, sits on the card's
+  own colour.
   Blue marks where you are and what you have chosen; coral is booking and the
   lessons booked. The time-zone pill above the card is gone;
 - on a wide card the header is one row: the name with `Sign out` beneath, the
@@ -949,7 +968,16 @@ where a calendar puts it and nothing taking room it doesn't earn:
   theirs for an online lesson, Porto's for one in Porto, its clock named once
   after the time (`… 09:00, Los Angeles time`), with no second clock. Inês's
   copies stay on Porto time and add the student's own beneath it when it
-  differs.
+  differs;
+- later the same day, at Dan's request for something cleaner and smoother:
+  the calendar's arrows are solid blue with a white arrow; on a narrower card
+  the name's menu is a cream button with the student's initial, and the
+  card's `Your lessons` title, which the banner already gives, is for screen
+  readers; the next lesson's row sits on the card's colour; Your details shows
+  its fields plainly, each action appearing once there is something to save,
+  with the code disclosure beside NIF where the fields pair; and choosing a
+  day, or a time that completes a lesson, moves the workspace smoothly rather
+  than cutting (see Motion direction).
 
 ## Simpler, quicker booking on the student's own clock — 9 October 2026
 

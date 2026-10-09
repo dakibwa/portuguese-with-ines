@@ -453,6 +453,10 @@ function loadStripeJs() {
 
 let bookingMotionTimer: number | null = null;
 let stageResize: Animation | null = null;
+// A handover's first beat, while what it replaces fades down: its update
+// waits here, with whatever should follow it, such as guiding the page to the
+// next decision.
+let handover: { land: () => void; after: (() => void)[] } | null = null;
 
 // `booking-transitioning` on the root marks a decision's motion while it runs.
 // Nothing is styled by it; the journey checks wait for it to clear.
@@ -485,7 +489,36 @@ const BOOKING_SURFACES = [
   ".unified-calendar__toolbar"
 ].join(",");
 
+// What a decision that replaces the workspace's content leaves behind.
+const BOOKING_CALENDAR = ".unified-calendar-shell";
+const CALENDAR_GRID = "#lesson-calendar .unified-calendar__grid";
+const CONFIRMATION_STAGE = "#booking-confirmation-stage";
+const TIMES_PANEL = "#booking-next-step";
+
 const MOTION_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+// A resize starts gently, so a long one carries the page rather than flinging
+// it most of the way in the first few frames.
+const RESIZE_EASE = "cubic-bezier(0.45, 0, 0.2, 1)";
+const HANDOVER_MS = 140;
+
+/** On screen now: laid out and not hidden. A surface that only groups its children counts. */
+function showing(element: Element) {
+  const style = getComputedStyle(element);
+  if (style.display === "contents") return true;
+  return element.getClientRects().length > 0 && style.visibility !== "hidden";
+}
+
+/**
+ * Whether a chosen day's times stand in for the calendar, as on a phone, or
+ * sit beside it: the booking column's own width, as its container queries
+ * read it.
+ */
+function timesTakeCalendarsPlace() {
+  const column = document.querySelector<HTMLElement>(".booking-provider");
+  if (!column) return false;
+  const style = getComputedStyle(column);
+  return column.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) < 700;
+}
 
 /**
  * A booking decision happens at once; the workspace then moves to it. The
@@ -493,18 +526,63 @@ const MOTION_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
  * eases from its old height to its new one, carrying the page beneath with
  * it, instead of snapping. Controls are live throughout; reduced motion gets
  * the new state as it is.
+ *
+ * A decision that replaces the workspace's content outright (a time bringing
+ * the confirmation, Change or Back taking it away, a phone's times taking the
+ * calendar's place) names what it replaces in `leaving`, and hands over in two
+ * beats: that fades down first, briefly, then the next step dissolves in from
+ * nothing, so one view never cuts straight to another (9 October 2026, at
+ * Dan's request for smoother booking). A decision taken in the meantime lands
+ * the first one before its own.
  */
-function transitionBooking(update: () => void) {
+function transitionBooking(update: () => void, leaving?: string) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     update();
     return;
   }
 
+  handover?.land();
+  const stage = document.querySelector<HTMLElement>(".booking-steps");
+  const going = leaving && stage ? [...stage.querySelectorAll<HTMLElement>(leaving)].filter(showing) : [];
+  if (!going.length) {
+    moveBooking(update, false);
+    return;
+  }
+
+  if (bookingMotionTimer !== null) finishBookingMotion();
+  document.documentElement.classList.add("booking-transitioning");
+  const fades = going.map((element) =>
+    element.animate([{ opacity: 1, translate: "0 0" }, { opacity: 0, translate: "0 -4px" }], {
+      duration: HANDOVER_MS,
+      easing: "cubic-bezier(0.4, 0, 1, 1)",
+      fill: "forwards"
+    })
+  );
+  const step = {
+    after: [] as (() => void)[],
+    timer: 0,
+    land() {
+      if (handover !== step) return;
+      handover = null;
+      window.clearTimeout(step.timer);
+      moveBooking(update, true);
+      // Whatever the update kept, it keeps as it was.
+      for (const fade of fades) fade.cancel();
+      for (const follow of step.after) follow();
+    }
+  };
+  step.timer = window.setTimeout(() => step.land(), HANDOVER_MS);
+  handover = step;
+}
+
+function moveBooking(update: () => void, fromBlank: boolean) {
   if (bookingMotionTimer !== null) finishBookingMotion();
   // The steps section stays put while its content changes, the booking's
   // confirmation card included.
   const stage = document.querySelector<HTMLElement>(".booking-steps");
-  const present = new Set(stage ? stage.querySelectorAll(BOOKING_SURFACES) : []);
+  // What shows now stays still; what was hidden, like a phone's calendar
+  // behind its times, arrives like anything new when it shows again.
+  const present = new Set(stage ? [...stage.querySelectorAll(BOOKING_SURFACES)].filter(showing) : []);
   // Mid-resize this is the height on screen, so a quick second decision
   // carries on from where the first one had got to.
   const fromHeight = stage?.getBoundingClientRect().height ?? 0;
@@ -516,8 +594,8 @@ function transitionBooking(update: () => void) {
   try {
     flushSync(update);
   } finally {
-    bookingMotionTimer = window.setTimeout(finishBookingMotion, 260);
-    if (stage?.isConnected) settleStage(stage, fromHeight, floor, present);
+    bookingMotionTimer = window.setTimeout(finishBookingMotion, fromBlank ? 320 : 260);
+    if (stage?.isConnected) settleStage(stage, fromHeight, floor, present, fromBlank);
     else if (stage) stage.style.minHeight = "";
   }
 }
@@ -575,7 +653,7 @@ function deferred<Props extends object>(fetchComponent: () => Promise<ComponentT
   return { Component: Deferred, load };
 }
 
-function settleStage(stage: HTMLElement, fromHeight: number, floor: number, present: Set<Element>) {
+function settleStage(stage: HTMLElement, fromHeight: number, floor: number, present: Set<Element>, fromBlank = false) {
   stageResize?.cancel();
   stageResize = null;
   const toHeight = contentHeight(stage);
@@ -586,21 +664,24 @@ function settleStage(stage: HTMLElement, fromHeight: number, floor: number, pres
   if (fromHeight && Math.abs(end - start) > 4) {
     stageResize = stage.animate(
       [{ height: `${start}px`, overflow: "clip" }, { height: `${end}px`, overflow: "clip" }],
-      { duration: Math.round(Math.min(460, 240 + Math.abs(end - start) * 0.25)), easing: MOTION_EASE }
+      { duration: Math.round(Math.min(520, 260 + Math.abs(end - start) * 0.3)), easing: RESIZE_EASE }
     );
   }
 
-  // Already visible as they start, so a decision never leaves a blank moment.
+  // Already visible as they start, so a decision never leaves a blank moment;
+  // after a handover, whose first beat already cleared the way, from nothing.
   // The rise is a `translate`, which leaves a surface's own transform alone.
   const arrived: Element[] = [];
   for (const surface of stage.querySelectorAll(BOOKING_SURFACES)) {
-    if (present.has(surface) || arrived.some((outer) => outer.contains(surface))) continue;
+    if (present.has(surface) || arrived.some((outer) => outer.contains(surface)) || !showing(surface)) continue;
     arrived.push(surface);
     // An overlay, like Change's, arrives with the dialogs' own fade.
     if (getComputedStyle(surface).position === "fixed") continue;
     surface.animate(
-      [{ opacity: 0.4, translate: "0 6px" }, { opacity: 1, translate: "0 0" }],
-      { duration: 260, easing: MOTION_EASE }
+      fromBlank
+        ? [{ opacity: 0, translate: "0 8px" }, { opacity: 1, translate: "0 0" }]
+        : [{ opacity: 0.4, translate: "0 6px" }, { opacity: 1, translate: "0 0" }],
+      { duration: fromBlank ? 320 : 260, easing: MOTION_EASE }
     );
   }
 }
@@ -665,8 +746,10 @@ function orientTo(id: string, focus = false, forceOnMobile = false) {
 
   // The final DOM exists synchronously. Start guiding immediately rather than
   // waiting for the decorative fade to finish, which previously created a
-  // noticeable pause followed by a second, separate movement.
-  orient();
+  // noticeable pause followed by a second, separate movement. A handover's
+  // final DOM comes with its second beat, so the guiding waits for that.
+  if (handover) handover.after.push(orient);
+  else orient();
 }
 
 export function BookingCalendar({ initialManageToken = "", initialLessonsView = false }: { initialManageToken?: string; initialLessonsView?: boolean } = {}) {
@@ -2288,14 +2371,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setSlotNotice("");
       setCalendarWeekCount(4);
       goTo("day");
-    });
+    }, step === "details" ? CONFIRMATION_STAGE : timesTakeCalendarsPlace() ? TIMES_PANEL : undefined);
   }
 
   function changeTimeChoice() {
     transitionBooking(() => {
       setSelectedSlot("");
       goTo("time");
-    });
+    }, CONFIRMATION_STAGE);
   }
 
   /** A time from the chosen day's grid. */
@@ -2306,7 +2389,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setSelectedSlot(slot.startAt);
       setSlotNotice("");
       goTo("details");
-    });
+    }, BOOKING_CALENDAR);
   }
 
   function addAnotherLesson() {
@@ -2318,7 +2401,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setCalendarWeekCount(4);
       setSubmitError("");
       setStep("day");
-    });
+    }, CONFIRMATION_STAGE);
     orientTo("booking-bar-heading", true);
   }
 
@@ -2334,7 +2417,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setSelectedDate(dateKeyIn(new Date(last.startAt), viewZone));
       setSelectedSlot(last.startAt);
       goTo("details");
-    });
+    }, BOOKING_CALENDAR);
   }
 
   function selectionBackButton() {
@@ -2361,7 +2444,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setCalendarWeekCount(4);
       setSubmitError("");
       setStep("day");
-    });
+    }, CONFIRMATION_STAGE);
     orientTo("booking-bar-heading", true);
   }
 
@@ -2374,7 +2457,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setSelectedSlot(last?.startAt ?? "");
       setSubmitError("");
       goTo(last ? "details" : "day");
-    });
+    }, last ? BOOKING_CALENDAR : undefined);
   }
 
   function selectedLessonsList(choices: Slot[], editable: boolean) {
@@ -3637,6 +3720,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             startBookingJourney(cell.key);
                             return;
                           }
+                          // On a phone the day's times take the calendar's place.
+                          const handsOver = Boolean(lessonType && !managed && !selectedDate && timesTakeCalendarsPlace());
                           transitionBooking(() => {
                             setSelectedDate(cell.key);
                             setCalendarWeekCount(managed && !changeFormBesideCalendar() ? 1 : CALENDAR_PAGE_WEEKS);
@@ -3653,7 +3738,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                               setStep("time");
                               setSubmitError("");
                             }
-                          });
+                          }, handsOver ? CALENDAR_GRID : undefined);
                           orientTo("booking-next-step", false, true);
                         }}
                         type="button"
