@@ -341,7 +341,7 @@ try {
   assert.equal(state.writes.length, 0, "Selection alone must not save hours");
   state.failHours = 1;
   await page
-    .getByRole("button", { name: "Save teaching hours", exact: true })
+    .getByRole("button", { name: "Save weekly hours", exact: true })
     .click();
   await page
     .getByRole("alert")
@@ -349,7 +349,7 @@ try {
     .waitFor();
   await expect(slot(page, 1, 570)).toHaveAttribute("aria-pressed", "true");
   await page
-    .getByRole("button", { name: "Save teaching hours", exact: true })
+    .getByRole("button", { name: "Save weekly hours", exact: true })
     .click();
   await page
     .getByRole("status")
@@ -378,7 +378,7 @@ try {
   );
   await page.getByLabel("Wednesday window 1, last start").fill("09:00");
   await expect(
-    page.getByRole("button", { name: "Save teaching hours", exact: true }),
+    page.getByRole("button", { name: "Save weekly hours", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Discard", exact: true }).click();
 
@@ -611,7 +611,7 @@ try {
     page.getByText("No lessons booked this week.", { exact: false }),
   ).toHaveCount(0);
   state.failBookings = false;
-  await page.getByRole("button", { name: "Reload lessons" }).click();
+  await page.getByRole("button", { name: "Try again", exact: true }).click();
   await expect(page.locator(".teacher-timetable")).toBeVisible();
   await noOverflow(page);
   assert.deepEqual(state.errors, []);
@@ -663,7 +663,7 @@ try {
     .waitFor();
   await showHours(mobile.page);
   await mobile.page
-    .getByRole("button", { name: "Saturday, show teaching hours" })
+    .getByRole("button", { name: "Saturday, show weekly hours" })
     .tap();
   await slot(mobile.page, 6, 600).tap();
   await expect(slot(mobile.page, 6, 600)).toHaveAttribute(
@@ -671,7 +671,7 @@ try {
     "true",
   );
   await mobile.page
-    .getByRole("button", { name: "Save teaching hours", exact: true })
+    .getByRole("button", { name: "Save weekly hours", exact: true })
     .click();
   await mobile.page
     .getByRole("status")

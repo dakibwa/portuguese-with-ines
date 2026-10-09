@@ -5,6 +5,7 @@ import {
   AlertCircle,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Repeat2,
@@ -193,7 +194,7 @@ export function TeacherSchedule() {
           setScheduleError(
             caught instanceof Error
               ? caught.message
-              : "Your teaching hours could not be loaded.",
+              : "Your weekly hours couldn’t be loaded.",
           );
       });
     return () => {
@@ -226,7 +227,7 @@ export function TeacherSchedule() {
         setBookingsError(
           caught instanceof Error
             ? caught.message
-            : "The lessons for this week could not be loaded.",
+            : "The lessons for this week couldn’t be loaded.",
         );
     } finally {
       if (request === bookingRequest.current) setBookingsLoading(false);
@@ -274,7 +275,7 @@ export function TeacherSchedule() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Your hours could not be saved. Your changes are still here.",
+          : "Your hours couldn’t be saved. Your changes are still here.",
       );
     } finally {
       if (account === accountGeneration.current) setSavingHours(false);
@@ -435,7 +436,7 @@ export function TeacherSchedule() {
       <AuthPanel
         heading="Sign in"
         headingLevel={2}
-        intro="Your teaching hours, your days off, and everything that's booked."
+        intro="Your weekly hours, your days off, and everything that’s booked."
         onSignedIn={(student) => {
           setMe(student);
           if (student.role === "teacher") setToken(readSession());
@@ -452,14 +453,14 @@ export function TeacherSchedule() {
           type="button"
           onClick={() => setScheduleAttempt((value) => value + 1)}
         >
-          Reload schedule
+          Try again
         </button>
       </div>
     );
   if (!initialised)
     return (
       <p className="teacher-loading" role="status">
-        Loading your teaching hours…
+        Loading your weekly hours…
       </p>
     );
 
@@ -473,7 +474,7 @@ export function TeacherSchedule() {
     <div className="teacher-workspace">
       <section className="teacher-account" aria-label="Your account">
         <p>
-          <span className="teacher-eyebrow">Signed in as</span>
+          <span className="teacher-eyebrow">Account</span>
           <strong>{me?.name || me?.email}</strong>
         </p>
         <button
@@ -507,7 +508,7 @@ export function TeacherSchedule() {
       ) : null}
       {status ? (
         <div className="teacher-inline-success" role="status">
-          <Check size={17} aria-hidden="true" />
+          <CheckCircle2 size={20} aria-hidden="true" />
           {status}
         </div>
       ) : null}
@@ -525,7 +526,7 @@ export function TeacherSchedule() {
             </span>
             <h2 id="teacher-week-title" ref={calendarTitleRef} tabIndex={-1}>
               {editing
-                ? "Your usual week"
+                ? "Your weekly hours"
                 : `${dateLabel(weekStart, { day: "numeric", month: "short" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}`}
             </h2>
           </div>
@@ -617,7 +618,7 @@ export function TeacherSchedule() {
                 void reloadBookings();
               }}
             >
-              Reload lessons
+              Try again
             </button>
           </div>
         ) : (
@@ -687,7 +688,7 @@ export function TeacherSchedule() {
                 disabled={savingHours || !hoursDirty || Boolean(invalidHours)}
                 onClick={() => void saveHours()}
               >
-                {savingHours ? "Saving…" : "Save teaching hours"}
+                {savingHours ? "Saving…" : "Save weekly hours"}
               </button>
             </div>
             {invalidHours ? (
@@ -698,7 +699,7 @@ export function TeacherSchedule() {
           </div>
         ) : !bookingsLoading && !bookingsError && !weekCount ? (
           <p className="teacher-empty-week">
-            No lessons booked this week. Your usual hours are shown above.
+            No lessons booked this week. Your weekly hours are shown above.
           </p>
         ) : null}
       </section>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { CheckCircle2, Plus } from "lucide-react";
 import { createBookingFor } from "@/lib/admin-api";
 import { portoTimeToUtc } from "@/lib/booking-api";
 import { SITE_BASE_PATH } from "@/lib/paths";
@@ -71,7 +71,7 @@ export function ManualLessonForm({
               setError(
                 caught instanceof Error
                   ? caught.message
-                  : "This lesson could not be added.",
+                  : "This lesson couldn’t be added.",
               );
             } finally {
               setBusy(false);
@@ -106,9 +106,9 @@ export function ManualLessonForm({
                 setLesson({ ...lesson, lessonType: e.target.value })
               }
             >
-              <option value="trial">Trial · 60 minutes</option>
-              <option value="single">60 minutes</option>
-              <option value="long">90 minutes</option>
+              <option value="trial">Trial · 60 mins</option>
+              <option value="single">60 mins</option>
+              <option value="long">90 mins</option>
             </select>
           </label>
           <label>
@@ -163,9 +163,10 @@ export function ManualLessonForm({
           </p>
         ) : null}
         {status ? (
-          <p className="teacher-inline-success" role="status">
+          <div className="teacher-inline-success" role="status">
+            <CheckCircle2 size={20} aria-hidden="true" />
             {status}
-          </p>
+          </div>
         ) : null}
       </div>
     </details>

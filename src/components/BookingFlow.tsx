@@ -55,7 +55,7 @@ export function BookingFlow({ initialView = "book" }: { initialView?: BookingVie
               </li>
               <li>
                 <AssetMark asset="/visuals/v2-splats/flexible-rescheduling-splat-v2.svg" lands />
-                <span>Move or cancel here</span>
+                <span>Change or cancel here</span>
               </li>
               <li>
                 <AssetMark asset="/visuals/v2-splats/lesson-format-splat-v2.svg" lands />

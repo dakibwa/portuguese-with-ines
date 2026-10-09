@@ -122,7 +122,7 @@ export function LessonDetails({
       setError(
         caught instanceof Error
           ? caught.message
-          : "This lesson could not be updated.",
+          : "This lesson couldn’t be updated.",
       );
     } finally {
       setBusy(false);
@@ -312,7 +312,7 @@ export function LessonDetails({
                   ? "The lesson will be removed from the calendar and the student will be emailed."
                   : noShow
                     ? "The lesson price will be charged as normal."
-                    : `Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the full lesson price.`}
+                    : `Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the lesson price.`}
               </p>
               <div className="teacher-dialog-actions">
                 <button

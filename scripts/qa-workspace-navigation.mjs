@@ -137,12 +137,12 @@ try {
   await settle();
   await page.screenshot({ path: `${out}/profile-desktop.png`, fullPage: true });
   await accountAction("Done editing");
-  await accountAction("View lessons");
-  await accountAction("View lessons");
+  await accountAction("Your lessons");
+  await accountAction("Your lessons");
   await page.locator("#upcoming-lessons-heading").waitFor();
   await page.locator(".lesson-overview__book").click();
   await page.locator("#lesson-calendar .booking-bar").waitFor();
-  await page.getByRole("button", { name: "Your lessons", exact: true }).click();
+  await page.getByRole("button", { name: /^Your lessons/ }).first().click();
   await page.locator("#upcoming-lessons-heading").waitFor();
   assert.equal(await page.locator(".booking-bar").count(), 0);
 
@@ -220,6 +220,11 @@ try {
   assert.ok(await page.evaluate(() => document.activeElement.classList.contains("site-footer__menu")));
   assert.equal(await page.locator("main").getAttribute("inert"), null);
   const faqUrl = page.url();
+  // Before the page's script is ready the link simply follows #terms-privacy,
+  // and the dialog opens from that address as the page finishes loading. These
+  // checks are of the dialog opening over the page, so they wait for it, as
+  // qa-flow's do: a slow CI browser reached the link first.
+  await page.locator('#terms-privacy[data-ready="true"]').waitFor({ state: "attached" });
   await page.locator(".site-footer__legal").getByRole("link", { name: "Terms & privacy", exact: true }).click();
   await page.locator("#terms-privacy[open]").waitFor();
   assert.equal(page.url(), faqUrl, "Footer terms open over the current page");
@@ -247,6 +252,7 @@ try {
   await menu.getByRole("link", { name: "Booking", exact: true }).click();
   await page.locator("#booking-title").waitFor();
   const bookingUrl = page.url();
+  await page.locator('#terms-privacy[data-ready="true"]').waitFor({ state: "attached" });
   await page.locator(".site-footer__legal").getByRole("link", { name: "Terms & privacy", exact: true }).click();
   await page.locator("#terms-privacy[open]").waitFor();
   assert.equal(await page.locator(".site-footer__legal a").count(), 1);
@@ -278,7 +284,17 @@ try {
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, layouts, screenshots: out }, null, 2));
 } catch (error) {
-  console.error(JSON.stringify({ url: page.url(), headings: await page.locator("h1").allTextContents(), errors }));
+  // What the page was doing, read without waiting on a frame: a page that has
+  // stopped drawing still answers script.
+  const state = await Promise.race([
+    page.evaluate(() => ({
+      readyState: document.readyState,
+      termsReady: document.querySelector("#terms-privacy")?.getAttribute("data-ready") ?? null,
+      turning: (() => { try { return document.documentElement.matches(":active-view-transition"); } catch { return null; } })()
+    })),
+    new Promise(resolve => setTimeout(() => resolve("no answer in 5s"), 5000))
+  ]).catch(reason => String(reason));
+  console.error(JSON.stringify({ url: page.url(), headings: await page.locator("h1").allTextContents(), errors, state }));
   // The failure itself first: a screenshot that times out must not hide it.
   console.error(error);
   await page.screenshot({ path: `${out}/failure.png`, fullPage: true, timeout: 10000 }).catch(() => {});

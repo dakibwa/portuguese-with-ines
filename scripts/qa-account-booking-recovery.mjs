@@ -154,7 +154,7 @@ try {
           };
         });
         await chooseAccount(page, "Edit details");
-        const input = page.getByLabel(field === "name" ? "Your name" : field === "email" ? "Email address" : "NIF (optional)", { exact: true });
+        const input = page.getByLabel(field === "name" ? "Your name" : field === "email" ? "Email" : "NIF (optional)", { exact: true });
         const value = field === "name" ? "Ana Draft" : field === "email" ? "draft@example.invalid" : "248899945";
         await input.fill(value);
         await page.evaluate(() => window.qaReleaseEditorFrames());
@@ -199,7 +199,7 @@ try {
           await chooseAccount(page, "Edit details");
           const name = page.getByLabel("Your name", { exact: true });
           const nif = page.getByLabel("NIF (optional)");
-          const email = page.getByLabel("Email address", { exact: true });
+          const email = page.getByLabel("Email", { exact: true });
           const saveName = page.getByRole("button", { name: "Save name", exact: true });
           const saveNif = page.getByRole("button", { name: "Save NIF", exact: true });
           await name.fill("Ana Saved");
@@ -210,7 +210,7 @@ try {
           const response = page.waitForResponse("**/me/email/confirm");
           waiting.resolve();
           await response;
-          await expect(page.getByRole("status").filter({ hasText: "That's your email address updated." })).toBeVisible();
+          await expect(page.getByRole("status").filter({ hasText: "That’s your email address updated." })).toBeVisible();
           await expect(name).toHaveValue("Ana Saved");
           await expect(saveName).toBeDisabled();
           await expect(nif).toHaveValue("248899945");
@@ -292,7 +292,7 @@ try {
         const { page } = state;
         await page.goto(`${base}/book/?view=book`);
         await page.getByRole("radio", { name: "Single", exact: true }).check();
-        await page.getByRole("button", { name: "Your lessons", exact: true }).click();
+        await page.getByRole("button", { name: /^Your lessons/ }).first().click();
         await started.promise;
         await chooseAccount(page, "Edit details");
         const input = page.getByLabel(field === "name" ? "Your name" : "NIF (optional)", { exact: true });
@@ -432,8 +432,8 @@ try {
         await warning.getByRole("button", { name: "Try again", exact: true }).click();
         await expect(warning).toHaveCount(0);
         await expect(page.locator(".booking-success__reference")).toContainText("PT-KKMMMM");
-        await page.getByRole("button", { name: "Back to upcoming lessons", exact: true }).click();
-        await expect(page.locator("#account-menu").getByRole("button", { name: /^View lessons/, includeHidden: true })).toContainText("2");
+        await page.getByRole("button", { name: "Back to your lessons", exact: true }).click();
+        await expect(page.locator("#account-menu").getByRole("button", { name: /^Your lessons/, includeHidden: true })).toContainText("2");
         await check(state);
         assert.equal(posts, 1);
         cases += 1;

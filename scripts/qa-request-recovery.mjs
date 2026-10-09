@@ -173,12 +173,12 @@ try {
         await expect(dialog.getByText("Not confirmed", { exact: true })).toBeVisible();
         await expect(dialog).toContainText("Checkout has not confirmed this lesson.");
         await expect(dialog.getByText("Booked", { exact: true })).toHaveCount(0);
-        await expect(dialog.getByRole("button", { name: /^(Change|Cancel|Manage sequence)$/ })).toHaveCount(0);
+        await expect(dialog.getByRole("button", { name: /^(Change|Cancel|Manage weekly lessons)$/ })).toHaveCount(0);
         await expect(state.page.locator(".calendar-week button.has-booking")).toHaveCount(0);
         await dialog.getByRole("button", { name: "Book a lesson", exact: true }).click();
         await expect(dialog).toHaveCount(0);
         await expect(state.page.getByRole("radio", { name: "Single", exact: true })).toBeChecked();
-        await state.page.getByRole("button", { name: "Your lessons", exact: true }).click();
+        await state.page.getByRole("button", { name: /^Your lessons/ }).first().click();
         const toggle = state.page.locator(".my-lessons__menu-toggle");
         if (await toggle.isVisible()) await toggle.click();
         await state.page.locator("#account-menu").getByRole("button", { name: "Past lessons", exact: true }).click();
@@ -243,7 +243,7 @@ try {
       try {
         await state.page.goto(`${base}/`);
         await state.page.getByRole("link", { name: "Book a lesson", exact: true }).click();
-        await state.page.getByRole("button", { name: "Your lessons", exact: true }).click();
+        await state.page.getByRole("button", { name: /^Your lessons/ }).first().click();
         await state.page.locator(".lesson-overview__next-open").click();
         await state.page.getByRole("button", { name: "Pay €25 securely", exact: true }).click();
         await started.promise;

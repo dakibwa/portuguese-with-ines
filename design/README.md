@@ -82,7 +82,7 @@ Text colours must meet these accessible contrast requirements:
 - the second half of the Approach page heading (`way to learn.`) uses `--blue`
   on the lavender panel. Cream measured 1.95:1 there, while blue on lavender
   holds 3.2:1, the same tonal relationship the home hero uses for lilac on blue;
-- body ink uses `#1a3169`, and the eyebrow lilac uses `#665fa6`, so small text
+- body ink uses `#1a3169`, and the eyebrow lilac uses `#554f91`, so small text
   clears AA on the lavender and cream panels. Both are imperceptible on cream
   and neither changes a fill colour;
 - booking reassurance labels use `#dcd8f5` to clear AA on the blue booking
@@ -244,7 +244,7 @@ Dan's 22 September review tightened the public pages:
   splat comes in large from the card's top-right corner, cropped by its edge;
   once landed it moves only to turn a little while its card is pointed at. The
   trial card is lavender. Their rows align across
-  the cards: name, the price with its length as a small tag beside it (`60 min`),
+  the cards: name, the price with its length as a small tag beside it (`60 mins`),
   a one-line description, then one full-width button, so no card has an empty
   foot. The whole card opens booking with that lesson chosen. Hover and
   keyboard focus add a quiet colour wash to the card, the button answers on
@@ -335,7 +335,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - `Weekly hours`, top right, opens the repeating weekly pattern. Clicking or
   dragging marks lesson start times. Preserve exact existing first/last-start
   values and provide an exact-time editor. The last start is not a finishing
-  time. Weekly edits remain a draft until `Save teaching hours`, and booking
+  time. Weekly edits remain a draft until `Save weekly hours`, and booking
   activity must never silently discard that draft.
   Half-hour cells include both quarter-hour starts when the booking interval
   is 15 minutes. A partly available cell names its actual start and shows a
@@ -356,7 +356,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   preserves its original occurrence while its wall time remains unchanged.
   Skipped weekly occurrences are listed by date in previews, confirmations
   and emails; a missing wall time never appears as a different real time.
-- The timetable spans 08:00–20:00 and widens to fit any teaching hours or
+- The timetable spans 08:00–20:00 and widens to fit any weekly hours or
   lessons outside it. There is no 24-hour view; early or late hours are set
   with the exact-time editor.
 - Google Meet is one line above the week: its logo, its name and `Configure`.
@@ -401,8 +401,8 @@ with the chosen lessons. The short payment summary explains payment after each
 lesson and €5 rules, with the full terms available by link.
 
 Use different treatments for neighbouring booking controls instead of two coral
-fills. Selected agreement uses blue beside the coral booking action. Recurring
-lesson management pairs blue `Move recurrence`, an outline `Stop repeating`, and
+fills. Selected agreement uses blue beside the coral booking action. Weekly
+lesson management pairs blue `Move weekly time`, an outline `Stop repeating`, and
 coral `Cancel all booked lessons`; profile editing pairs coral `Save name` with
 blue `Send confirmation link`. Keep the existing labels and state indicators so
 colour is never the only way to tell the controls apart. A filled button that
@@ -455,7 +455,8 @@ time that section is chosen.
 Decisions inside the booking flow resize and dissolve the existing calendar
 workspace rather than turning the page, and keep the rest of the page fixed.
 Without view transitions a new page dissolves in. Reduced-motion users get
-each page at once, without animation or smooth scrolling.
+each page at once, without animation or smooth scrolling, and a full page load
+is an ordinary load rather than a turn.
 
 Buttons answer like objects. They lift on hover, the filled ones casting a
 soft shadow in their own colour, and their hand-cut outline shifts a little and
@@ -511,8 +512,8 @@ and dismissal take effect immediately; reduced motion removes the fade.
 Booking is one page. A visitor lands on the calendar, ready to book, beneath a
 choices bar that is already filled in: `Trial`, `Single` or `Weekly` (the trial
 only for a first-time visitor, and then the default), Online or In Porto, the
-length with its price (`60 min · €25`, `90 min · €35`; a trial's fixed
-`60 min · €20` is the same control with its one option chosen), and for weekly
+length with its price (`60 mins · €25`, `90 mins · €35`; a trial's fixed
+`60 mins · €20` is the same control with its one option chosen), and for weekly
 lessons 4, 6 or 8 weeks or `Ongoing`. Each choice changes in place without moving the page, and the free
 days follow it; there is no fork, setup screen or `Continue` step. A returning
 student starts from a single lesson at their usual location. A student who is
@@ -580,7 +581,7 @@ Preserve these desktop and mobile states:
   the banner's right edge, halfway down, rather than floating as a small
   isolated icon;
 - between 821px and 1100px, the booking title and two of the reassurances
-  (`View your calendar`, `Move or cancel here`) share one row, without the
+  (`View your calendar`, `Change or cancel here`) share one row, without the
   large corner splat; `Porto time` waits for wider screens, since every time
   below names it. Give each label room for whole words; never squeeze labels
   into narrow columns that collide with neighbouring artwork. The phone layout
@@ -606,12 +607,12 @@ Preserve these desktop and mobile states:
   Completed decisions collapse into a compact row, so account tools, the
   calendar, and confirmation never compete at once;
 - the signed-in identity appears once, inside a generously padded account bar.
-  On wide desktop, `View lessons`, `Past lessons`, `Edit details`, and `Sign
+  On wide desktop, `Your lessons`, `Past lessons`, `Edit details`, and `Sign
   out` sit directly in that bar, in that order; narrower layouts retain them
   inside a small `Menu` that opens with a dropdown chevron, never the site
   menu's three lines, so a phone shows one `☰` for the site and one clearly
   different account menu. Booking is not repeated there: its one coral action
-  belongs to the calendar. `View lessons` may show the useful
+  belongs to the calendar. `Your lessons` may show the useful
   upcoming count; `Past lessons` deliberately has no count competing for
   attention. It remains present on the lessons calendar, while booking, and
   while an individual lesson is open;
@@ -622,9 +623,11 @@ Preserve these desktop and mobile states:
   bar, with two readable columns of records on wide desktop and one on mobile;
   order records by when each lesson ended or was cancelled, newest first,
   so cancelled future dates do not bury recently completed lessons.
-  Its `Upcoming lessons` action returns directly to the current schedule.
+  Its `Your lessons` link returns directly to the current schedule, as does
+  the one beside `Book a lesson`; on wide desktop, where the bar itself shows
+  `Your lessons`, both are left out rather than say it twice.
   Profile editing uses the account bar on its own, with paired fields on wide
-  desktop; `Done editing` returns to Upcoming lessons. Its last item is the
+  desktop; `Done editing` returns to Your lessons. Its last item is the
   small `Have a code from Inês?` disclosure, one field with a blue `Add code`
   beside it that stays open for the second length's code, with any saved weekly
   rate listed above it. History and profile
@@ -641,11 +644,11 @@ Preserve these desktop and mobile states:
   Weekly lessons are lilac on the calendar and one-off lessons coral; a day
   holding both keeps each time in its own colour, and the key names the two
   kinds only when a weekly lesson exists. A weekly lesson opens with a lavender
-  `Recurring lesson` status and `Manage sequence`, which moves, stops or cancels
-  the whole run. Stopping a repeat turns every retained date back into an
-  ordinary coral lesson; `View lessons` counts an active repeat once and each
+  `Weekly lesson` status and `Manage weekly lessons`, which moves, stops or
+  cancels the whole run. Stopping a repeat turns every retained date back into an
+  ordinary coral lesson; `Your lessons` counts an active repeat once and each
   retained date on its own. The `?` tooltip says that a booked lesson opens its
-  details, move and cancel choices, and that any other day starts a booking; it
+  details, change and cancel choices, and that any other day starts a booking; it
   floats over the card on a dark blue surface without moving anything beneath
   it. In these already-booked summaries, ordinary lesson product names are
   replaced by their useful compact duration (`60 mins` or `90 mins`), while a
@@ -662,8 +665,8 @@ Preserve these desktop and mobile states:
   bar, without a second framed card; their actions sit beside the field whenever
   the available width permits. Profile inputs use the same single blue focus
   boundary as the booking notes field;
-- after a successful one-off or recurring booking, the confirmation's primary
-  back action opens the lessons calendar so the new booking is immediately
+- after a successful one-off or weekly booking, the confirmation's primary
+  `Back to your lessons` opens the lessons calendar so the new booking is immediately
   visible on its day;
 - the confirmation itself is one hand-cut card in the booking panels' wash,
   read top to bottom: `You're booked in.`, the day with its times beneath it,
@@ -689,7 +692,7 @@ Preserve these desktop and mobile states:
   without redundant “no lesson booked” or lesson-summary copy. A day's times
   come in two fixed halves, chosen with a two-way toggle that reads the same
   every day: from Inês's earliest start to 14:00, and from 14:00 to her latest
-  (`09:00 – 14:00`, `14:00 – 19:00`), taken from her whole calendar rather than
+  (`09:00–14:00`, `14:00–19:00`), taken from her whole calendar rather than
   that day's gaps, so the labels never shift. A half with nothing free that day
   says so; the half holding a chosen time, or else the first with times, opens
   first. Never a wall of every quarter hour. Each half is a small timetable without subheadings: one row per hour, one column
@@ -787,7 +790,7 @@ calmer, without new content:
 
 - one price at the point of payment: with Weekly chosen, each length shows the
   account's saved weekly rate, the same price as the line under `Confirm your
-  recurring lessons`;
+  weekly lessons`;
 - the payment summary is a short list rather than a paragraph: one fact per
   item, two to a row where the column allows and one on a phone, each after a
   little dab of paint cut from the FAQ mark and turned and coloured
@@ -801,10 +804,10 @@ calmer, without new content:
   screen readers. The row's `Change` keeps its 14 px label (see Contrast and
   accessibility);
 - the lesson dialog drops the question that repeated its heading and buttons,
-  and the rules around the lesson's date. Its pill is `Recurring lesson` only
+  and the rules around the lesson's date. Its pill is `Weekly lesson` only
   while the repeat is running, `Booked` once it stops, and `Cancelled` carries
-  the past lessons' ⊗. `Manage sequence` is a compact outline button. Cancelling
-  a sequence states what happens rather than asking again. On a phone a
+  the past lessons' ⊗. `Manage weekly lessons` is a compact outline button.
+  Cancelling weekly lessons states what happens rather than asking again. On a phone a
   decision's pair of actions (`Yes, cancel it` / `Keep lesson` and the like)
   stacks so no label wraps, while `Change` and `Cancel` stay side by side;
 - booked times in calendar tiles are big enough to read and to tell the weekly
@@ -820,14 +823,58 @@ calmer, without new content:
   times reads short, and a phone drops the length and place legends. A day
   filled coral shows every booked time in white.
 - cancelling a one-off lesson doesn't say "only this date", which matters only
-  where other weeks stay booked; `Manage sequence` keeps its own width on a
+  where other weeks stay booked; `Manage weekly lessons` keeps its own width on a
   phone; and just past the stacked layout the chosen day's times take close
   to half the row, so a quarter-hour timetable never squeezes;
 - `Terms & privacy` and a day's list of lessons are one family with the lesson
   dialog: the same hand-cut panel on light paper with its warm corner, over the
   same lightly dimmed page. The day's list needs no ruled header, and each of
   its rows wears the lesson's own mark, as on the calendar. Terms keeps the
-  rule under its title, where a long text scrolls beneath it.
+  rule under its title, where a long text scrolls beneath it;
+- a lesson that repeats is `weekly` wherever a student reads about it, never
+  `recurring` or a `sequence`: `Weekly lesson`, `Manage weekly lessons`,
+  `Move weekly time`, `Stop repeating`, the `weekly rate`. The run's own line
+  in the lesson dialog is simply its weekly time, such as `Thursdays at 18:00
+  Porto time`, or `No longer repeating` once stopped;
+- the lessons calendar has one name, `Your lessons`: the account bar's item
+  with its count, the way back from booking or past lessons, and `Back to your
+  lessons` after a booking. Where the bar shows `Your lessons` itself, the
+  separate ways back are left out.
+
+## One voice and one hand — 9 October 2026
+
+A site-wide pass for things said or drawn two ways. The words:
+
+- a student `change`s or cancels a lesson, in that order, as the `Change`
+  button and the late change fee say; Inês keeps `Move lesson`, and the weekly
+  run keeps `Move weekly time`. The €5 is the `late change fee` wherever it is
+  named, and a no-show costs it instead of the `lesson price`;
+- a length is `60 mins` as a label (the choices bar, the Lessons cards, booked
+  lessons, Inês's form) and `60-minute` before `lesson`;
+- apostrophes are curly, failures say `couldn’t` (the 404 keeps `This page
+  could not be found.`), and every retry is `Try again`;
+- a weekly clash is a week `already taken`, before booking as after it;
+- one label per field (`Your name`, `Email`), one name for a code's price (the
+  `saved weekly rate`), one name for the policy (`Terms & privacy`), and Inês's
+  pattern is her `weekly hours`, under an `Account` bar like the students';
+- a time range closes up (`09:00–14:00`); a date range keeps its spaces
+  (`5 Oct – 1 Nov`).
+
+And the drawing:
+
+- anything to read before trying again sits in one coral panel, on the
+  student pages and Inês's alike; good news is the lavender panel with a 20 px
+  tick, including a saved profile field;
+- secondary actions share one outline (`Keep lesson` and `Manage weekly
+  lessons` match in one dialog), and going back is always the small coral
+  arrow link, never an outline button or an underlined word;
+- every pop-up's title is set alike, and its way out is the same 44 px
+  hand-cut button; focus keeps the site's own ring;
+- the date's `Change` carries the same 14 px label as a lesson row's; Inês's
+  buttons take the booking workspace's type at her denser 44 px;
+- the FAQ's closing actions are compact, and its booking action says `Book a
+  lesson`, as every other one does; the past lessons' status pill keeps the
+  pill's own size; faint rules are drawn in ink, not the old green.
 
 ## Reading and account pages, simplified — 8 October 2026
 
@@ -872,10 +919,10 @@ tools, again without new content:
 
 ## Account interaction states
 
-Selecting an occurrence from a recurring sequence identifies it in the compact
+Selecting one date of a weekly lesson identifies it in the compact
 management overlay. `Change` and `Cancel` affect only that date; `Manage
-sequence` owns the recurring schedule in that same overlay. It can move the
-upcoming recurrence with the compact length, location, day, and time controls;
+weekly lessons` owns the weekly schedule in that same overlay. It can move the
+weekly time with the compact length, location, day, and time controls;
 stop adding new lessons while keeping booked dates; or cancel all cancellable
 upcoming dates as well. The action labels stand alone without an explanatory
 sentence above them. Confirm either destructive action at desktop and mobile
@@ -887,7 +934,7 @@ The change workflow has no decorative horizontal dividers. Lesson length uses
 the same sliding two-option control as `Online` / `In Porto`, so changing an
 existing lesson feels like the booking flow rather than a separate tool. The
 policy band follows the Worker's payment mode. Saved-card bookings say that the
-lesson price is charged after it, while moving or cancelling less than
+lesson price is charged after it, while changing or cancelling less than
 14 hours before it costs €5.
 
 Inês's lesson card is shaped like the student side's lesson rows: its splat, the

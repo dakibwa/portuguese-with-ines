@@ -70,7 +70,7 @@ try {
     const form = signUp.page.locator(".auth-panel__form");
     const fields = await form.locator("label > span").allInnerTexts();
     assert.match(fields.at(-1).replace(/\s+/g, " "), /^NIF \(optional\)$/i, `NIF should be the last, optional field: ${fields}`);
-    await form.getByLabel("First name").fill("Ana");
+    await form.getByLabel("Your name").fill("Ana");
     await form.getByLabel("Email").fill("ana@example.invalid");
     await form.getByLabel("Password").fill("a-long-password");
     const nif = form.getByLabel("NIF (optional)");
@@ -98,7 +98,7 @@ try {
     });
     await taken.page.getByRole("tab", { name: "Create an account", exact: true }).click();
     const takenForm = taken.page.locator(".auth-panel__form");
-    await takenForm.getByLabel("First name").fill("Ana");
+    await takenForm.getByLabel("Your name").fill("Ana");
     await takenForm.getByLabel("Email").fill("ana@example.invalid");
     await takenForm.getByLabel("Password").fill("a-long-password");
     await takenForm.getByRole("button", { name: "Create my account", exact: true }).click();
@@ -158,7 +158,7 @@ try {
     assert.equal(saved, "123456789");
     await field.fill("");
     await save.click();
-    await expect(editor).toContainText("Saved. Your receipts won't show a NIF.");
+    await expect(editor).toContainText("Saved. Your receipts won’t show a NIF.");
     assert.deepEqual(details.posts.filter((post) => post.endpoint === "/me").map((post) => post.body), [{ nif: "123 456 789" }, { nif: "12345" }, { nif: "" }]);
     assert.deepEqual(details.errors, []);
     await details.page.close();

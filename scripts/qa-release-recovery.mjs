@@ -10,7 +10,7 @@ if (!browserType) throw new Error(`Unknown QA_BROWSER: ${engine}`);
 const browser = await browserType.launch({ headless: true });
 const output = `tmp/qa/release-recovery/${engine}`;
 await mkdir(output, { recursive: true });
-const unreadable = "We couldn't read the booking system's reply. Please try again.";
+const unreadable = "We couldn’t read the booking system’s reply. Please try again.";
 const student = { id: "release-fixture", name: "Ana Martins", email: "ana@example.invalid", phone: "", nif: "", timezone: "Europe/Lisbon", role: "student" };
 const teacher = { ...student, id: "teacher", name: "Inês", role: "teacher" };
 const types = [
@@ -117,28 +117,28 @@ try {
           await page.getByRole("button", { name: "Open menu", exact: true }).click();
           await page.getByRole("dialog", { name: "Site navigation" }).getByRole("link", { name: "Booking", exact: true }).click();
         }
-        await expect(page.getByRole("heading", { name: "Upcoming lessons", exact: true })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Your lessons", exact: true })).toBeVisible();
         await settle(state);
         await page.goBack();
         await expect(page).toHaveURL(/view=book/);
         await expect(page.getByRole("radio", { name: "Single", exact: true })).toHaveCount(1);
         await settle(state);
         await page.goForward();
-        await expect(page.getByRole("heading", { name: "Upcoming lessons", exact: true })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Your lessons", exact: true })).toBeVisible();
       });
     }
-    if (width < 821) for (const section of ["Upcoming lessons", "Edit details"]) {
+    if (width < 821) for (const section of ["Your lessons", "Edit details"]) {
       await run(width, `navigation-cta-${section === "Edit details" ? "profile" : "upcoming"}`, async () => null, async state => {
         const { page } = state;
         await page.goto(`${base}/book/?view=lessons`);
-        await expect(page.getByRole("heading", { name: "Upcoming lessons", exact: true })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Your lessons", exact: true })).toBeVisible();
         if (section === "Edit details") await account(page, section);
         await settle(state);
         await page.getByRole("button", { name: "Open menu", exact: true }).click();
         await page.getByRole("link", { name: "Book a lesson", exact: true }).click();
         await expect(page).toHaveURL(/view=book/);
         await expect(page.getByRole("radio", { name: "Single", exact: true })).toHaveCount(1);
-        await expect(page.getByRole("heading", { name: "Upcoming lessons", exact: true })).toHaveCount(0);
+        await expect(page.getByRole("heading", { name: "Your lessons", exact: true })).toHaveCount(0);
       });
     }
 
@@ -171,15 +171,15 @@ try {
       }, async ({ page }) => {
         await page.goto(`${base}/book/?manage=fixture`);
         const dialog = page.getByRole("dialog");
-        await dialog.getByRole("button", { name: "Manage sequence", exact: true }).click();
+        await dialog.getByRole("button", { name: "Manage weekly lessons", exact: true }).click();
         await dialog.getByRole("button", { name: bulk ? "Cancel all booked lessons" : "Stop repeating", exact: true }).click();
         const retry = dialog.getByRole("button", { name: bulk ? "Yes, cancel all" : "Yes, stop repeating", exact: true });
         await retry.click();
         await expect(dialog.getByRole("alert")).toContainText(unreadable);
-        await expect(dialog.getByRole("status").filter({ hasText: "sequence has stopped" })).toHaveCount(0);
+        await expect(dialog.getByRole("status").filter({ hasText: "weekly lessons have stopped" })).toHaveCount(0);
         await expect(retry).toBeEnabled();
         await retry.click();
-        await expect(dialog.getByRole("status")).toContainText("sequence has stopped");
+        await expect(dialog.getByRole("status")).toContainText("weekly lessons have stopped");
         assert.equal(posts, 2);
       });
     }
@@ -269,7 +269,7 @@ try {
       await expect(retry).toBeEnabled();
       await retry.click();
       await expect(dialog.getByRole("status")).toContainText("Your lesson has been cancelled");
-      await expect(dialog.getByRole("status")).not.toContainText("late-change fee");
+      await expect(dialog.getByRole("status")).not.toContainText("late change fee");
       assert.equal(cancels, 2);
     });
 

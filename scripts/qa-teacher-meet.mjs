@@ -114,7 +114,7 @@ try {
   const reconnect = await fixture(1280, { ...disconnected, connected: true, needsReconnect: true }, { callback: "?meet=error&retained=1" });
   await expect(reconnect.panel).toContainText("Needs reconnecting");
   await expect(reconnect.panel.getByRole("button", { name: "Reconnect Google Meet", exact: true })).toBeVisible();
-  await expect(reconnect.panel.getByRole("status")).toHaveText(/could not be connected/);
+  await expect(reconnect.panel.getByRole("status")).toHaveText(/couldn’t be connected/);
   assert.equal(new URL(reconnect.page.url()).search, "?retained=1");
   await reconnect.page.close();
 
@@ -139,7 +139,7 @@ try {
     const unsafe = await fixture(1280, disconnected, { connectResult: { url } });
     await unsafe.panel.getByRole("button", { name: "Configure", exact: true }).click();
     await unsafe.panel.getByRole("button", { name: "Connect Google Meet", exact: true }).click();
-    await expect(unsafe.panel.getByRole("alert")).toContainText("could not be opened");
+    await expect(unsafe.panel.getByRole("alert")).toContainText("couldn’t be opened");
     assert.equal(new URL(unsafe.page.url()).origin, new URL(base).origin);
     await expect(unsafe.panel.getByRole("button", { name: "Connect Google Meet", exact: true })).toBeEnabled();
     await unsafe.page.close();

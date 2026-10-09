@@ -18,8 +18,8 @@ export function PolicyRedirect({ section }: { section?: "booking" | "privacy" })
   return (
     <>
       <main className="policy-redirect" id="main-content">
-        <h1>Booking information</h1>
-        <p><Link href={destination}>Read the booking and privacy information</Link>.</p>
+        <h1>Terms &amp; privacy</h1>
+        <p><Link href={destination}>Read the terms &amp; privacy</Link>.</p>
       </main>
     </>
   );

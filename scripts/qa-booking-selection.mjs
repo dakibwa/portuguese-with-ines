@@ -180,10 +180,10 @@ try {
     assert.equal(requests.at(-1).startAts.length, 2);
     assert.equal(requests.at(-1).repeat, 4);
     assert.equal(requests.at(-1).expectedPriceCents, 1500, "The recurring private rate applies to both weekly times");
-    await page.getByRole("button", { name: "Back to upcoming lessons", exact: true }).click();
+    await page.getByRole("button", { name: "Back to your lessons", exact: true }).click();
     await page.locator("#upcoming-lessons-heading").waitFor();
     // Both weekly times are on the calendar as weekly lessons; each opens into
-    // its own lesson, where Manage sequence owns the repeat.
+    // its own lesson, where Manage weekly lessons owns the repeat.
     for (const day of ["2026-09-14", "2026-09-15"]) {
       assert.equal(await page.locator(`#lesson-calendar button[data-date-key="${day}"].has-weekly-booking`).count(), 1, `Weekly time on ${day} is marked`);
     }

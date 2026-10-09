@@ -35,7 +35,7 @@ function loadGoogleScript() {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${SCRIPT_SRC}"]`);
     if (existing) {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => { existing.remove(); reject(new Error("Google sign-in could not load.")); });
+      existing.addEventListener("error", () => { existing.remove(); reject(new Error("Google sign-in couldn’t load.")); });
       return;
     }
 
@@ -44,7 +44,7 @@ function loadGoogleScript() {
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
-    script.onerror = () => { script.remove(); reject(new Error("Google sign-in could not load.")); };
+    script.onerror = () => { script.remove(); reject(new Error("Google sign-in couldn’t load.")); };
     document.head.appendChild(script);
   });
 }
@@ -111,7 +111,7 @@ export function GoogleSignInButton({
       onSignedInRef.current(result.student);
     } catch (caught) {
       if (request !== authRequest.current || readSession() !== session) return;
-      onErrorRef.current(caught instanceof Error ? caught.message : "That Google sign-in didn't work.");
+      onErrorRef.current(caught instanceof Error ? caught.message : "That Google sign-in didn’t work.");
     }
   }, []);
 

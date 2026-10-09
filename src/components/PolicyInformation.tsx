@@ -10,17 +10,17 @@ export function TermsPrivacyInformation() {
       <ul>
         <li>No payment is taken when you book.</li>
         <li><strong>Automatic payment.</strong> Securely save a card to confirm your booking. Stripe charges it after each lesson and collects any fees automatically.</li>
-        <li>Each recurring lesson is paid separately. Prepaid bookings follow the rules shown in your calendar.</li>
+        <li>Each weekly lesson is paid separately. Prepaid bookings follow the rules shown in your calendar.</li>
       </ul>
 
       <h2 id="change-booking">Changes</h2>
-      <p>Move or cancel in your calendar before the lesson starts.</p>
+      <p>Change or cancel in your calendar before the lesson starts.</p>
       <ul>
         <li><strong>{NOTICE_HOURS} hours or more before:</strong> free.</li>
         <li><strong>Less than {NOTICE_HOURS} hours before:</strong> {SAME_DAY_FEE_LABEL} once per lesson, charged to your saved card when you confirm the change or cancellation.</li>
-        <li>If you move a lesson, its price is charged after it takes place. If you cancel, there is no lesson charge.</li>
-        <li><strong>No-show:</strong> {SAME_DAY_FEE_LABEL} instead of the lesson price if recorded by Inês. Any earlier {SAME_DAY_FEE_LABEL} change fee still applies.</li>
-        <li>If Inês moves or cancels, there is no change fee.</li>
+        <li>If you change a lesson, its price is charged after it takes place. If you cancel, there is no lesson charge.</li>
+        <li><strong>No-show:</strong> {SAME_DAY_FEE_LABEL} instead of the lesson price if recorded by Inês. Any earlier {SAME_DAY_FEE_LABEL} late change fee still applies.</li>
+        <li>If Inês changes or cancels a lesson, there is no late change fee.</li>
       </ul>
       <p>
         Ongoing lessons repeat until you stop them in your calendar. Any lesson less than {NOTICE_HOURS} hours away stays booked.

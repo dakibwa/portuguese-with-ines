@@ -98,6 +98,7 @@ export const SAME_DAY_FEE_LABEL = formatMoney(SAME_DAY_RESCHEDULE_FEE_CENTS);
  * for the same lesson, and "1 hour 30 minutes" was long enough to wrap its own
  * column on a phone. One unit compares at a glance and never wraps.
  */
+/** The length as a lesson's adjective: a `60-minute` lesson. */
 export function formatLessonDuration(minutes = LESSON_DURATION_MINUTES) {
-  return `${minutes} minutes`;
+  return `${minutes}-minute`;
 }

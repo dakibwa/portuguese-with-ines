@@ -338,7 +338,7 @@ export function WeeklyTimetable({
                 type="button"
                 aria-label={
                   editing
-                    ? `${day.name}, show teaching hours`
+                    ? `${day.name}, show weekly hours`
                     : `${dateLabel(date)}, show lessons`
                 }
                 aria-pressed={mobileDay === index}
@@ -404,7 +404,7 @@ export function WeeklyTimetable({
           ref={scrollRef}
           aria-label={
             editing
-              ? "Weekly teaching hours"
+              ? "Weekly hours"
               : "Your lessons and time off this week"
           }
         >
@@ -544,7 +544,7 @@ export function WeeklyTimetable({
                         aria-label={
                           fixed
                             ? `${minuteLabel(minute)}, ${dateLabel(date)}, ${reason}`
-                            : `Take ${minuteLabel(minute)}–${minuteLabel(cellEnd)} off, ${dateLabel(date)}${usual ? ", usual teaching time" : ""}`
+                            : `Take ${minuteLabel(minute)}–${minuteLabel(cellEnd)} off, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}`
                         }
                         {...pointer}
                         onClick={(event) => {
@@ -622,7 +622,7 @@ export function WeeklyTimetable({
         <div className="teacher-calendar-key" aria-label="Timetable key">
           <span>
             <i className="teacher-key-starts" />
-            {editing ? "Lesson starts" : "Usual hours"}
+            {editing ? "Lesson starts" : "Weekly hours"}
           </span>
           {!editing ? (
             <>

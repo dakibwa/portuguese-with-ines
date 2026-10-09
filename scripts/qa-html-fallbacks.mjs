@@ -66,7 +66,7 @@ try {
       await expect(page.locator(".policy-information-fallback > h2")).toBeInViewport();
       for (const [path, hash] of [["/privacy/", "privacy"], ["/booking-terms/", "booking"], ["/terms/", "terms-privacy"]]) {
         await page.goto(`${base}${path}`);
-        await page.getByRole("link", { name: "Read the booking and privacy information" }).click();
+        await page.getByRole("link", { name: "Read the terms & privacy" }).click();
         assert.equal(new URL(page.url()).hash, `#${hash}`);
         await expect(page.locator(`#${hash}`)).toBeInViewport();
       }

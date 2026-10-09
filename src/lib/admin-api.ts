@@ -79,7 +79,7 @@ async function adminRequest<T>(
     });
   } catch {
     // The browser's own "Failed to fetch" says nothing useful to Inês.
-    throw new Error("We couldn't reach the booking system. Please check your connection.");
+    throw new Error("We couldn’t reach the booking system. Please check your connection and try again.");
   }
 
   const data: unknown = await response.json().catch(() => null);

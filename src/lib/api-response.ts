@@ -1,4 +1,4 @@
-export const BOOKING_REPLY_ERROR = "We couldn't read the booking system's reply. Please try again.";
+export const BOOKING_REPLY_ERROR = "We couldn’t read the booking system’s reply. Please try again.";
 
 export function isApiRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

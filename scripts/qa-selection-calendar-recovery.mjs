@@ -99,7 +99,7 @@ function bookingDefaults(path) {
   return null;
 }
 
-const unreadable = "We couldn't read the booking system's reply. Please try again.";
+const unreadable = "We couldn’t read the booking system’s reply. Please try again.";
 const teacher = { ...student, id: "teacher", name: "Inês", role: "teacher" };
 const rules = [{ id: 1, weekday: 1, start_minute: 600, last_start_minute: 720 }];
 const adminLesson = { id: "lesson", reference: "PT-ACDEFG", status: "confirmed", starts_at: lesson.startAt, ends_at: lesson.endAt, lesson_name: "60 minutes", student_name: student.name, student_email: student.email, student_phone: "", location: "online", notes: "", payment_status: "scheduled", attendance_status: "expected", same_day_change: 0, same_day_fee_status: "not_required", reschedule_count: 0 };
@@ -196,8 +196,8 @@ try {
         await page.clock.setFixedTime(new Date("2027-03-20T10:00:00Z"));
         await startChoices(page, [startAt]);
         await selectRadio(page, "Weekly");
-        const warning = page.getByRole("region", { name: "Recurring lesson availability", exact: true });
-        await expect(warning).toContainText("One lesson time is unavailable");
+        const warning = page.getByRole("region", { name: "Weekly lesson availability", exact: true });
+        await expect(warning).toContainText("One week is already taken");
         await expect(warning.locator("li [aria-hidden=true]")).toHaveText(skipped.label);
         await expect(warning).not.toContainText(/01:30|02:30/);
         if (width !== 390) await warning.screenshot({ path: `${output}/weekly-skipped-${skipped.startAt.slice(0, 10)}-${width}.png` });
@@ -270,9 +270,9 @@ try {
       try {
         const { page } = state;
         await monday(page); await page.getByRole("button", { name: /^Weekly hours/ }).click();
-        await page.getByRole("button", { name: "Monday, show teaching hours", exact: true }).click();
+        await page.getByRole("button", { name: "Monday, show weekly hours", exact: true }).click();
         await slot(page, 1, 600).click();
-        const save = page.getByRole("button", { name: "Save teaching hours", exact: true });
+        const save = page.getByRole("button", { name: "Save weekly hours", exact: true });
         await save.click();
         await expect(page.getByRole("alert").filter({ hasText: unreadable })).toBeVisible();
         await expect(save).toBeEnabled();
@@ -330,7 +330,7 @@ try {
       try {
         const { page } = state;
         await startChoices(page, order);
-        await selectRadio(page, "90 minutes lesson · €35");
+        await selectRadio(page, "90-minute lesson · €35");
         await expect(page.locator(".booking-state-note--notice")).toContainText("too close to another chosen lesson at this length");
         await check(state); assert.equal(posts.length, 0);
         if (mode === "forward" || mode === "buffer") {
@@ -366,7 +366,7 @@ try {
         const { page } = state;
         await startChoices(page, starts);
         const previous = await page.locator(".booking-chosen-lessons").textContent();
-        await selectRadio(page, "90 minutes lesson · €35");
+        await selectRadio(page, "90-minute lesson · €35");
         const warning = page.getByRole("status").filter({ hasText: "New length temporarily unavailable." });
         await expect(warning).toBeVisible();
         await expect(page.locator(".booking-chosen-lessons")).toHaveText(previous);
@@ -413,7 +413,7 @@ try {
       try {
         const { page } = state;
         await startChoices(page, starts);
-        await selectRadio(page, "90 minutes lesson · €35");
+        await selectRadio(page, "90-minute lesson · €35");
         const warning = page.getByRole("status").filter({ hasText: "New length temporarily unavailable." });
         await expect(warning).toBeVisible();
         await page.getByRole("button", { name: mode === "add" ? "Add another lesson" : mode === "change-overlap" ? "Change lesson 1" : "Change lesson 2", exact: true }).click();
@@ -465,14 +465,14 @@ try {
         const radios = page.locator(".booking-bar--review input[type=radio]");
         for (const radio of await radios.all()) await expect(radio).toBeDisabled();
         await expect(page.getByRole("button", { name: "Change date or time", exact: true })).toBeDisabled();
-        await expect(page.getByRole("radio", { name: "60 minutes lesson · €25", exact: true })).toBeChecked();
+        await expect(page.getByRole("radio", { name: "60-minute lesson · €25", exact: true })).toBeChecked();
         await expect(page.getByRole("radio", { name: "Online", exact: true })).toBeChecked();
         waiting.resolve();
         await expect(page.locator(".booking-payment__mount")).toHaveText("Isolated secure payment form");
         for (const radio of await radios.all()) await expect(radio).toBeDisabled();
         await expect(page.getByRole("button", { name: "Change date or time", exact: true })).toHaveCount(0);
         await expect(page.getByRole("button", { name: weekly ? "Add a second weekly time" : "Add another lesson", exact: true })).toHaveCount(0);
-        await expect(page.locator(".booking-payment__summary")).toContainText("60 minutes lesson · €25");
+        await expect(page.locator(".booking-payment__summary")).toContainText("60-minute lesson · €25");
         assert.equal(posts.length, 1);
         assert.equal(posts[0].lessonType, "single"); assert.equal(posts[0].location, "online");
         assert.equal(posts[0].expectedPriceCents, 2500); assert.equal(posts[0].repeat, weekly ? 4 : undefined);
@@ -496,14 +496,14 @@ try {
         await page.goto(`${base}/book/?view=lessons${mode === "session" ? "&emailToken=isolated" : ""}`);
         if (mode === "pending") {
           await chooseAccount(page, "Edit details");
-          await page.getByLabel("Email address", { exact: true }).fill("updated@example.invalid");
+          await page.getByLabel("Email", { exact: true }).fill("updated@example.invalid");
           await page.getByRole("button", { name: "Send confirmation link", exact: true }).click();
-          await expect(page.getByLabel("Email address", { exact: true })).toHaveValue("updated@example.invalid");
+          await expect(page.getByLabel("Email", { exact: true })).toHaveValue("updated@example.invalid");
         }
         await expect(page.getByRole("alert").filter({ hasText: unreadable })).toBeVisible();
         assert.equal(writes, 1);
         assert.equal(await page.evaluate(() => localStorage.getItem("ines-student-session")), "isolated-continuity");
-        await expect(page.getByText("That's your email address updated.", { exact: true })).toHaveCount(0);
+        await expect(page.getByText("That’s your email address updated.", { exact: true })).toHaveCount(0);
         await check(state); cases += 1;
       } finally { await state.context.close(); }
     }
@@ -571,11 +571,11 @@ try {
             await dialog.getByRole("button", { name: "Yes, cancel it", exact: true }).click();
           } else {
             if (mode === "move-series") {
-              await dialog.getByRole("button", { name: "Manage sequence", exact: true }).click();
-              await dialog.getByRole("button", { name: "Move recurrence", exact: true }).click();
+              await dialog.getByRole("button", { name: "Manage weekly lessons", exact: true }).click();
+              await dialog.getByRole("button", { name: "Move weekly time", exact: true }).click();
             } else await dialog.getByRole("button", { name: "Change", exact: true }).click();
             await choose(page, at(9));
-            await dialog.getByRole("button", { name: mode === "move-series" ? "Move recurrence" : "Change to 10:00", exact: true }).click();
+            await dialog.getByRole("button", { name: mode === "move-series" ? "Move weekly time" : "Change to 10:00", exact: true }).click();
           }
           // The change form names the lesson as it stands in its short form.
           if (mode === "cancel") await expect(dialog.locator(".lesson-manage-dialog__lesson")).toContainText("Monday, 5 October 2026, 11:00");
@@ -611,11 +611,11 @@ try {
         if (malformed.startsWith("preview-")) {
           await startChoices(page, [at(9)]);
           await selectRadio(page, "Weekly");
-          await expect(page.getByRole("status").filter({ hasText: "We couldn't check the later weeks just now." })).toBeVisible();
+          await expect(page.getByRole("status").filter({ hasText: "We couldn’t check the later weeks just now." })).toBeVisible();
           await expect(page.getByText("Thu 1 Jan", { exact: false })).toHaveCount(0);
           recovered = true;
           await selectRadio(page, "6 weeks");
-          await expect(page.getByRole("region", { name: "Recurring lesson availability", exact: true })).toHaveCount(0);
+          await expect(page.getByRole("region", { name: "Weekly lesson availability", exact: true })).toHaveCount(0);
         } else {
           await page.goto(`${base}${malformed.startsWith("teacher-") ? "/schedule/" : malformed === "managed" ? "/book/?manage=fixture" : "/book/?view=lessons"}`);
           const warning = page.getByRole("alert").filter({ hasText: malformed.startsWith("account-") ? "account just now" : unreadable });
@@ -624,7 +624,7 @@ try {
           assert.equal(await page.evaluate(() => localStorage.getItem("ines-student-session")), "isolated-continuity");
           recovered = true;
           if (malformed.startsWith("teacher-")) {
-            await page.getByRole("button", { name: ["teacher-booking", "teacher-name", "teacher-reconciliation"].includes(malformed) ? "Reload lessons" : "Reload schedule", exact: true }).click();
+            await page.getByRole("button", { name: "Try again", exact: true }).click();
             await expect(page.getByRole("button", { name: /^Weekly hours/ })).toBeVisible();
           } else if (malformed === "managed") {
             await page.getByRole("button", { name: "Close lesson management", exact: true }).click();
