@@ -49,6 +49,10 @@ try {
 
       await page.goto(`${base}/faq/#faq-payment`);
       await expect(page.locator(".faq-group:visible")).toHaveCount(7);
+      // Lands on the linked category. This waits for a rendered frame and must
+      // stay before the keys below: Chromium clears focus on the first frame
+      // after a #fragment navigation, which can follow the load event.
+      await expect(page.locator("#faq-payment")).toBeInViewport();
       for (const section of await page.locator(".faq-group").all()) {
         const firstQuestion = section.locator("details").first();
         const summary = firstQuestion.locator("summary");
