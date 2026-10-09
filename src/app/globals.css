@@ -78,6 +78,9 @@
   --motion-page: 620ms;
   /* Decelerates hard and long: things arrive quickly, then take their time. */
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A change of size or place starts gently and settles gently, so a long
+     one carries what it moves rather than flinging it. */
+  --motion-ease-in-out: cubic-bezier(0.45, 0, 0.2, 1);
   /* A pen's steady pace, easing only as it lifts: for what is drawn, the
      rules under the headings. */
   --motion-pen: cubic-bezier(0.61, 1, 0.88, 1);
@@ -3157,17 +3160,38 @@ textarea,
 
 /* Until a day is chosen there are no times to show, so the times panel waits
    out of sight and the calendar takes the whole row, as Your lessons does.
-   A chosen day brings its times in beside it. */
+   A chosen day opens the times' column beside it: the column eases open and
+   the calendar narrows with it, rather than jumping across in one frame (9
+   October 2026, at Dan's request for smoother booking). The times keep their
+   width meanwhile, uncovered as the column opens rather than squeezed. */
 .unified-calendar__panel.unified-calendar__panel--waiting {
   display: none;
 }
 
 @container booking (min-width: 700px) {
+  .unified-calendar.unified-calendar--booking {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.62fr);
+    transition:
+      grid-template-columns 420ms var(--motion-ease-in-out),
+      column-gap 420ms var(--motion-ease-in-out);
+  }
+
   .unified-calendar.unified-calendar--booking:has(> .unified-calendar__panel--waiting) {
-    grid-template-areas:
-      "bar"
-      "calendar";
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0fr);
+    column-gap: 0;
+  }
+
+  .unified-calendar--booking > .unified-calendar__panel {
+    overflow: hidden;
+  }
+
+  .unified-calendar--booking > .unified-calendar__panel.unified-calendar__panel--waiting {
+    display: block;
+    visibility: hidden;
+  }
+
+  .unified-calendar--booking > .unified-calendar__panel > .unified-calendar__panel-content {
+    min-width: 245px;
   }
 }
 
@@ -3176,7 +3200,7 @@ textarea,
    to half until the column is wide enough to share as usual. */
 @container booking (min-width: 700px) and (max-width: 860px) {
   .unified-calendar.unified-calendar--booking {
-    grid-template-columns: minmax(0, 1fr) minmax(245px, 0.82fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr);
   }
 }
 
@@ -3461,13 +3485,13 @@ textarea,
   gap: 0.35rem;
 }
 
+/* On the card's own colour, as everything around it is (9 October 2026, at
+   Dan's request): the lesson's mark and its words carry the row. */
 .lesson-overview__next {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  border-radius: var(--squiggle-tile);
-  padding: 0.55rem 1rem 0.55rem 0.75rem;
-  background: var(--raised);
+  padding: 0.2rem 0;
   gap: 0.25rem 0.9rem;
 }
 
@@ -3554,6 +3578,8 @@ textarea,
   gap: 0.45rem;
 }
 
+/* Solid blue with a white arrow (9 October 2026, at Dan's request): the
+   calendar's one way through the weeks reads as a control at a glance. */
 .calendar-pager__step {
   position: relative;
   display: inline-grid;
@@ -3562,21 +3588,21 @@ textarea,
   place-items: center;
   border: 0;
   border-radius: 50%;
-  background: var(--raised);
-  color: var(--ink);
+  background: var(--blue);
+  color: #fff;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background 120ms ease, opacity 120ms ease;
 }
 
 .calendar-pager__step:hover:not(:disabled),
 .calendar-pager__step:focus-visible {
-  background: var(--green);
-  color: var(--paper);
+  background: var(--blue-deep);
+  color: #fff;
 }
 
 .calendar-pager__step:disabled {
   cursor: default;
-  opacity: 0.32;
+  opacity: 0.3;
 }
 
 /* How many booked lessons lie beyond the four weeks on show. */
@@ -4537,6 +4563,45 @@ textarea,
 
 .account-card__head > .booking-back {
   flex: none;
+}
+
+/* A narrower card's header: the name's menu leads Your lessons, with Book
+   beside it, or beneath at the right where the two don't fit; on Past
+   lessons and Your details the card's title and the way back share the first
+   line, and the menu takes the next to itself, so the name never pushes the
+   way back off the card. A name too long for its line is cut short. */
+.lesson-overview__header,
+.account-menu {
+  min-width: 0;
+}
+
+@container booking (max-width: 1099.98px) {
+  .account-card__head {
+    display: grid;
+    grid-template-areas:
+      "title back"
+      "menu menu";
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.6rem 1rem;
+  }
+
+  .account-card__title {
+    display: contents;
+  }
+
+  .account-card__title > .eyebrow {
+    grid-area: title;
+  }
+
+  .account-card__title > .account-menu {
+    grid-area: menu;
+    justify-self: start;
+  }
+
+  .account-card__head > .booking-back {
+    grid-area: back;
+  }
 }
 
 @container booking (min-width: 700px) {
@@ -5666,9 +5731,11 @@ button.text-action {
 }
 
 /*
- * The account's menu is the student's name, beneath the heading of whichever
- * account card is showing. It reads quietly as the name, and opens like any
- * dropdown: a chevron, never the site menu's three lines.
+ * On a narrower card the account's menu is the student's name, at the top of
+ * whichever account card is showing. It is plainly a button (9 October 2026,
+ * at Dan's request): a cream pill holding their initial in a blue circle,
+ * their name and a chevron, opening like any dropdown and never the site
+ * menu's three lines.
  */
 .account-menu {
   position: relative;
@@ -5678,40 +5745,51 @@ button.text-action {
 .account-menu__toggle {
   display: inline-flex;
   max-width: 100%;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
   border: 0;
-  padding: 0;
-  background: none;
+  border-radius: var(--squiggle-pill);
+  padding: 0.3rem 0.8rem 0.3rem 0.3rem;
+  background: var(--raised);
   color: var(--ink);
   cursor: pointer;
-  gap: 0.3rem;
+  gap: 0.55rem;
   font-family: var(--ui);
   font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.25;
+  transition: background 160ms var(--motion-ease);
+}
+
+.account-menu__toggle:hover,
+.account-menu__toggle:focus-visible,
+.account-menu__toggle[aria-expanded="true"] {
+  background: #fff;
+}
+
+.account-menu__avatar {
+  display: inline-grid;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .account-menu__name {
   overflow: hidden;
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  text-decoration-thickness: 1px;
   text-overflow: ellipsis;
-  text-underline-offset: 0.25em;
-  transition: text-decoration-color 160ms var(--motion-ease);
   white-space: nowrap;
-}
-
-.account-menu__toggle:hover .account-menu__name,
-.account-menu__toggle:focus-visible .account-menu__name,
-.account-menu__toggle[aria-expanded="true"] .account-menu__name {
-  text-decoration-color: currentColor;
 }
 
 .account-menu__toggle svg {
   flex: none;
-  color: var(--coral-action);
+  color: var(--ink);
   transition: rotate 200ms var(--motion-ease);
 }
 
@@ -5722,7 +5800,7 @@ button.text-action {
 .account-menu__panel {
   position: absolute;
   z-index: 20;
-  top: calc(100% + 0.15rem);
+  top: calc(100% + 0.35rem);
   left: 0;
   display: none;
   overflow: hidden;
@@ -5819,11 +5897,6 @@ button.text-action {
     display: contents;
   }
 
-  .upcoming-lessons__title-line {
-    display: contents;
-  }
-
-  .upcoming-lessons__title-line > .eyebrow,
   .account-card__title > .eyebrow {
     position: absolute;
     width: 1px;
@@ -5973,7 +6046,9 @@ button.text-action {
   }
 
   /* Paired fields line up at the top, so the note under one never pushes its
-     neighbour down; the code disclosure stays the quiet last item under NIF. */
+     neighbour down. Who you are sits on the first row, name and email; your
+     receipts and rates on the second, the code disclosure quietly beside NIF
+     rather than alone beneath it. */
   .my-lessons__details {
     align-items: start;
   }
@@ -5989,16 +6064,24 @@ button.text-action {
   }
 
   .my-lessons__rates {
-    grid-column: 1;
+    grid-column: 2;
   }
 }
 
+/* The banner above already says Your lessons, so the card's own title is
+   kept for screen readers alone, at every width (9 October 2026, at Dan's
+   request): the name's menu is the first thing on the card. */
 .upcoming-lessons__title-line {
-  display: flex;
-  width: max-content;
-  max-width: 100%;
-  min-width: 0;
-  align-items: center;
+  display: contents;
+}
+
+.upcoming-lessons__title-line > .eyebrow {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* The question mark explains the calendar, so it sits by the calendar's month,
@@ -6147,13 +6230,60 @@ button.text-action {
   box-shadow: none;
 }
 
+/*
+ * Your details shows its fields plainly. Each field's action appears once
+ * there is something to save (9 October 2026, at Dan's request for a cleaner
+ * card), in its live coral or blue, so no row waits behind a greyed button.
+ * Until then it is clear rather than gone: it keeps its place, so nothing
+ * moves as it appears, and assistive technology still finds it, unavailable.
+ * Shorter actions share one width, so the fields above one another end
+ * together.
+ */
 .my-lessons__details-row .button {
   width: auto;
+  min-width: 9.5rem;
   min-height: 46px;
   justify-self: end;
   padding-right: 1rem;
   padding-left: 1rem;
   white-space: nowrap;
+  transition:
+    opacity 220ms var(--motion-ease),
+    translate 220ms var(--motion-ease),
+    visibility 220ms,
+    background 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    box-shadow 320ms var(--motion-ease-out),
+    transform 420ms var(--motion-spring-firm),
+    border-radius 640ms var(--motion-spring);
+}
+
+.my-lessons__details-row .button:disabled {
+  opacity: 0;
+  pointer-events: none;
+  translate: 0 -4px;
+}
+
+/* On a phone each note sits straight under its field, and the action's place
+   beneath the note, where it reads as the field's last word. */
+@container booking (max-width: 519.98px) {
+  .my-lessons__field {
+    display: grid;
+  }
+
+  .my-lessons__field > .my-lessons__details-row {
+    display: contents;
+  }
+
+  .my-lessons__field > .my-lessons__details-note {
+    order: 1;
+  }
+
+  .my-lessons__field .button {
+    order: 2;
+    margin-top: 0.65rem;
+  }
 }
 
 @container booking (min-width: 520px) {
@@ -7732,8 +7862,9 @@ dialog[open]::backdrop {
   .upcoming-lessons__tip,
   .calendar-lesson-tip,
   .calendar-zone--switching strong > span,
+  .my-lessons__details-row .button,
+  .account-menu__toggle,
   .account-menu__toggle svg,
-  .account-menu__name,
   .account-menu__thumb,
   .account-menu__panel button {
     transition: none;
@@ -7746,6 +7877,10 @@ dialog[open]::backdrop {
   .lesson-manage-dialog__content,
   .unified-calendar--managed-overlay {
     animation: none;
+  }
+
+  .unified-calendar.unified-calendar--booking {
+    transition: none;
   }
 
   .text-action,
