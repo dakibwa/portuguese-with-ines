@@ -655,7 +655,12 @@ Preserve these desktop and mobile states:
   where the confirmation went, then the two actions, and a small-print foot
   under a soft rule with the reference and the fee rule. The lesson's own mark
   lands in its top corner as its only seal, so there is no separate `Booked`
-  badge (8 October 2026);
+  badge (8 October 2026). Several lessons are each named once, short
+  (`Tue 20 Oct, 10:00`), and a weekly booking reads as its weekly time
+  (`Tuesdays at 10:00`, from its first date) with the count beneath; a week or
+  time that was already taken is a coral chip under one short line, never a
+  box inside a ruled block. With several lessons the second action goes, since
+  each opens from the calendar, and the foot speaks of them all;
 - the calendar shows four Monday-to-Sunday weeks at a time, never one long
   scroll. `Earlier weeks` and `Later weeks` arrows sit either side of the range
   label, and `Later weeks` carries a small coral count of the booked lessons
@@ -799,6 +804,10 @@ calmer, without new content:
   and a one-line `Currently …` come first, even on a phone, the day above the
   times reads short, and a phone drops the length and place legends. A day
   filled coral shows every booked time in white.
+- cancelling a one-off lesson doesn't say "only this date", which matters only
+  where other weeks stay booked; `Manage sequence` keeps its own width on a
+  phone; and just past the stacked layout the chosen day's times take close
+  to half the row, so a quarter-hour timetable never squeezes;
 - `Terms & privacy` and a day's list of lessons are one family with the lesson
   dialog: the same hand-cut panel on light paper with its warm corner, over the
   same lightly dimmed page. The day's list needs no ruled header, and each of

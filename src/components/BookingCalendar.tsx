@@ -2318,6 +2318,17 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   if (confirmation) {
     const localTime = differingLocalTime(confirmation.startAt, studentZone);
+    // Every lesson this booking made, the first included, and any time that
+    // was already taken. Several lessons are named, each once; a weekly run
+    // reads as its weekly time rather than as a list of dates.
+    const bookedStarts = confirmation.selection?.booked ?? confirmation.series?.booked ?? [confirmation.startAt];
+    const skippedStarts = confirmation.selection?.skipped ?? confirmation.series?.skipped ?? [];
+    const weekly = Boolean(confirmation.series || confirmation.selection?.recurring);
+    const several = bookedStarts.length > 1;
+    const openEnded = confirmation.series ? confirmation.series.openEnded : confirmation.selection?.weeks === null;
+    const weeklyTimes = [...new Set(bookedStarts.map((startAt) =>
+      `${weekdayNames[new Date(`${portoDateKey(new Date(startAt))}T12:00:00Z`).getUTCDay()]} at ${formatSlotTime(startAt)}`
+    ))];
     return (
       <section className="booking-success" aria-live="polite">
         {/* Good news gets one small celebration: the lesson's own mark, the
@@ -2341,60 +2352,69 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             You&rsquo;re booked in.
           </h2>
         </div>
-        <p className="booking-success__when">
-          <strong>{formatLongDate(confirmation.startAt)}</strong>{" "}
-          <span>
-            at {formatSlotTime(confirmation.startAt)} Porto time
-            {localTime ? ` · ${localTime} your time` : ""}
-          </span>
-        </p>
+        <div className="booking-success__when">
+          {weekly ? (
+            <>
+              <strong>{weeklyTimes.join(" and ")}</strong>{" "}
+              <span>
+                Porto time{localTime ? ` · ${localTime} your time` : ""} · from {shortDay.format(new Date(bookedStarts[0]))}
+              </span>
+            </>
+          ) : several ? (
+            <>
+              <ul>
+                {bookedStarts.map((startAt) => (
+                  <li key={startAt}>
+                    <strong>{shortDay.format(new Date(startAt))}, {formatSlotTime(startAt)}</strong>
+                  </li>
+                ))}
+              </ul>
+              <span>Porto time</span>
+            </>
+          ) : (
+            <>
+              <strong>{formatLongDate(confirmation.startAt)}</strong>{" "}
+              <span>
+                at {formatSlotTime(confirmation.startAt)} Porto time
+                {localTime ? ` · ${localTime} your time` : ""}
+              </span>
+            </>
+          )}
+        </div>
+        {weekly ? (
+          <p className="booking-success__count">
+            <strong>{bookedStarts.length === 1 ? "1 lesson" : `${bookedStarts.length} lessons`} booked</strong>
+            {openEnded
+              ? weeklyTimes.length > 1
+                ? " so far. These times stay yours every week until you stop them."
+                : " so far. This time stays yours every week until you stop it."
+              : "."}
+          </p>
+        ) : null}
+        {skippedStarts.length ? (
+          <div className="booking-success__skipped">
+            <p>
+              {skippedStarts.length === 1
+                ? `One ${weekly ? "week" : "time"} was already taken, so it isn’t booked:`
+                : `${skippedStarts.length} ${weekly ? "weeks" : "times"} were already taken, so they aren’t booked:`}
+            </p>
+            <ul>
+              {skippedStarts.map((startAt) => (
+                <li key={startAt}>
+                  {shortDay.format(new Date(startAt))}
+                  {weekly ? "" : `, ${formatSlotTime(startAt)}`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <p className="booking-success__sent">
-          A confirmation and calendar invitation are on their way to <strong>{confirmation.email}</strong>.
+          {several ? "A confirmation with calendar invitations is" : "A confirmation and calendar invitation are"} on their
+          way to <strong>{confirmation.email}</strong>.
         </p>
 
         <MeetingLink meetingUrl={confirmation.meetingUrl} location={confirmation.location} status="confirmed" />
 
-        {confirmation.selection ? (
-          <div className="booking-success__series">
-            <p><strong>{confirmation.selection.booked.length === 1 ? "1 lesson" : `${confirmation.selection.booked.length} lessons`} booked.</strong>{" "}
-              {confirmation.selection.recurring
-                ? confirmation.selection.weeks === null ? "Both weekly times continue until you stop them." : "Both times repeat each week."
-                : "Each lesson is in your calendar and can be managed individually."}
-            </p>
-            {confirmation.selection.skipped.length ? <p>{confirmation.selection.skipped.length === 1 ? "1 unavailable lesson time was" : `${confirmation.selection.skipped.length} unavailable lesson times were`} left out.</p> : null}
-          </div>
-        ) : confirmation.series ? (
-          <div className="booking-success__series">
-            <p>
-              <strong>
-                {confirmation.series.booked.length}{" "}
-                {confirmation.series.booked.length === 1 ? "lesson" : "lessons"} booked
-              </strong>
-              {confirmation.series.openEnded
-                ? ". This time stays yours every week until you stop it."
-                : " at the same time each week."}
-            </p>
-            {confirmation.series.skipped.length ? (
-              <div className="booking-alert booking-alert--warn booking-skipped">
-                <AlertCircle size={18} aria-hidden="true" />
-                <div>
-                  <p>
-                    <strong>
-                      {confirmation.series.skipped.length === 1
-                        ? "One week was unavailable, so it is not booked"
-                        : `${confirmation.series.skipped.length} weeks were unavailable, so they are not booked`}
-                    </strong>
-                  </p>
-                  <ul>
-                    {confirmation.series.skipped.map((startAt) => (
-                      <li key={startAt}>{formatLongDate(startAt)}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
         <div className="booking-success__actions">
           <button
             className="button button--coral"
@@ -2403,22 +2423,26 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           >
             Back to upcoming lessons
           </button>
-          <button
-            className="button button--outline"
-            onClick={() => {
-              if (confirmation.manageToken) {
-                transitionBooking(() => {
-                  setConfirmation(null);
-                  void openManaged(confirmation.manageToken, confirmation.series?.id ?? null);
-                });
-              } else {
-                window.location.assign(confirmation.manageUrl);
-              }
-            }}
-            type="button"
-          >
-            Change or cancel this one
-          </button>
+          {/* One lesson can be changed straight from here. Several are each
+              on the calendar, where every one opens on its own. */}
+          {several ? null : (
+            <button
+              className="button button--outline"
+              onClick={() => {
+                if (confirmation.manageToken) {
+                  transitionBooking(() => {
+                    setConfirmation(null);
+                    void openManaged(confirmation.manageToken, confirmation.series?.id ?? null);
+                  });
+                } else {
+                  window.location.assign(confirmation.manageUrl);
+                }
+              }}
+              type="button"
+            >
+              Change or cancel this one
+            </button>
+          )}
         </div>
         {accountRefreshNotice}
         <div className="booking-success__foot">
@@ -2427,8 +2451,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             <dd>{confirmation.reference}</dd>
           </dl>
           <p className="booking-success__note">
-            This lesson is now on your calendar. Moving or cancelling it is free up to {NOTICE_HOURS} hours before;
-            after that it costs {formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.
+            {several ? "These lessons are" : "This lesson is"} now on your calendar. Moving or cancelling{" "}
+            {several ? "one" : "it"} is free up to {NOTICE_HOURS} hours before; after that it costs{" "}
+            {formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.
           </p>
         </div>
       </section>
@@ -2714,17 +2739,21 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
                   {manageMode === "confirm-cancel" ? (
                     <div className="lesson-manage-dialog__decision">
-                      <p>
-                        This only cancels the lesson on this date.
-                        {managed.refundOnCancel && managed.booking.amountCents
-                          ? ` Your ${formatMoneyCents(managed.booking.amountCents)} comes back to your card.`
-                          : ""}
-                        {managed.sameDayFeeApplies
-                          ? managed.sameDayFeeAutomatic
-                            ? ` Your saved card is charged the ${formatMoneyCents(managed.booking.sameDayFeeCents)} fee when you confirm the cancellation. This fee applies once per lesson. There’s no lesson charge.`
-                            : ` The ${formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee applies once per lesson.`
-                          : ""}
-                      </p>
+                      {/* "Only this date" matters where other weeks stay booked;
+                          a one-off lesson needs no such reassurance. */}
+                      {resolvedManagedSeriesId || (managed.refundOnCancel && managed.booking.amountCents) || managed.sameDayFeeApplies ? (
+                        <p>
+                          {resolvedManagedSeriesId ? "This only cancels the lesson on this date." : ""}
+                          {managed.refundOnCancel && managed.booking.amountCents
+                            ? ` Your ${formatMoneyCents(managed.booking.amountCents)} comes back to your card.`
+                            : ""}
+                          {managed.sameDayFeeApplies
+                            ? managed.sameDayFeeAutomatic
+                              ? ` Your saved card is charged the ${formatMoneyCents(managed.booking.sameDayFeeCents)} fee when you confirm the cancellation. This fee applies once per lesson. There’s no lesson charge.`
+                              : ` The ${formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee applies once per lesson.`
+                            : ""}
+                        </p>
+                      ) : null}
                       <div className="lesson-manage-dialog__actions">
                         <button className="button button--coral" disabled={manageWorking} onClick={cancelManagedLesson} type="button">
                           {manageWorking ? "Cancelling…" : "Yes, cancel it"}

@@ -3176,6 +3176,15 @@ html.booking-transitioning .booking-confirmation-stage {
   }
 }
 
+/* Just past the stacked layout, the times would get under two fifths of a
+   narrow row and four quarter-hours squeeze to 54px buttons; give them close
+   to half until the column is wide enough to share as usual. */
+@container booking (min-width: 700px) and (max-width: 860px) {
+  .unified-calendar.unified-calendar--booking {
+    grid-template-columns: minmax(0, 1fr) minmax(245px, 0.82fr);
+  }
+}
+
 /* On a phone a chosen day's times take the calendar's place, and the panel
    waits out of the way until there is a day to show. */
 @container booking (max-width: 699.98px) {
@@ -3905,6 +3914,7 @@ html.booking-transitioning .booking-confirmation-stage {
 
 .lesson-manage-dialog {
   position: relative;
+  isolation: isolate;
   display: grid;
   width: min(100%, 440px);
   max-height: min(82vh, 680px);
@@ -4064,6 +4074,7 @@ html.booking-transitioning .booking-confirmation-stage {
 .lesson-manage-dialog__series .button {
   grid-column: 2;
   justify-self: start;
+  width: auto;
   min-height: 44px;
   margin-top: 0.45rem;
   padding: 0.55rem 1.1rem;
@@ -6069,12 +6080,6 @@ button.text-action {
   opacity: 0.85;
 }
 
-.booking-success__series {
-  align-self: stretch;
-  border-left: 3px solid var(--lavender);
-  padding: 0.15rem 0 0.15rem 0.85rem;
-}
-
 /* The weeks a student will NOT have: a card shaped like the lesson rows above
    it, in coral, with each clashing lesson a coral chip, so it reads as part of
    the selection rather than a footnote to it. */
@@ -6456,6 +6461,56 @@ button.text-action {
   font-weight: 600;
 }
 
+/* Several lessons: each date once, short, one to a line. */
+.booking-success__when ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: 0.1rem;
+}
+
+.booking-success__count {
+  margin: 0.7rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* Weeks or times that were already taken: a short line and coral chips, the
+   same chips as the clash card at the confirm step, with no box around them. */
+.booking-success__skipped {
+  margin-top: 0.9rem;
+}
+
+.booking-success__skipped p {
+  margin: 0;
+  color: var(--coral-action);
+  font-family: var(--ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.booking-success__skipped ul {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+  gap: 0.4rem;
+}
+
+.booking-success__skipped li {
+  border: 1px solid var(--coral);
+  border-radius: var(--squiggle-chip);
+  padding: 0.25rem 0.65rem;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--coral-action);
+  font-family: var(--ui);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .booking-success__sent {
   max-width: 36rem;
   margin: 0.7rem 0 0;
@@ -6465,7 +6520,6 @@ button.text-action {
 }
 
 .booking-success .meeting-link,
-.booking-success .booking-success__series,
 .booking-success > .booking-alert {
   margin-top: 1rem;
 }
