@@ -479,10 +479,14 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
  * (PageTurn); on phones every page settles in place. Nothing waits for
  * the motion: the new page is live, and clickable, from its first frame.
  * A full page load into Booking crossfades the same way between documents.
+ * With reduced motion that turn would animate nothing, so a full load is left
+ * as an ordinary load: the browser never holds the new page back for it.
  */
-@view-transition {
-  navigation: auto;
-  types: document;
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+    types: document;
+  }
 }
 
 .site-header {
