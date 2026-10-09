@@ -279,7 +279,9 @@ try {
   console.log(JSON.stringify({ ok: true, layouts, screenshots: out }, null, 2));
 } catch (error) {
   console.error(JSON.stringify({ url: page.url(), headings: await page.locator("h1").allTextContents(), errors }));
-  await page.screenshot({ path: `${out}/failure.png`, fullPage: true });
+  // The failure itself first: a screenshot that times out must not hide it.
+  console.error(error);
+  await page.screenshot({ path: `${out}/failure.png`, fullPage: true, timeout: 10000 }).catch(() => {});
   throw error;
 } finally {
   await browser.close();

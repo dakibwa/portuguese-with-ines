@@ -8,6 +8,20 @@ const row = ["/", "/approach/", "/lessons/", "/faq/", "/book/"];
 let shown: string | null = null;
 let previous: string | null = null;
 
+// A page turn the browser skips, because the visitor moved on before it
+// finished, rejects its `ready` promise with "Transition was skipped". Nothing
+// is lost: the next page simply arrives without the turn. React's view
+// transitions leave that rejection unhandled, which would report a harmless
+// skip as a page error, so it is let pass here and nothing else is.
+if (typeof window !== "undefined") {
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason: unknown = event.reason;
+    if (reason instanceof DOMException && reason.name === "AbortError" && reason.message.includes("Transition was skipped")) {
+      event.preventDefault();
+    }
+  });
+}
+
 function inViewTransition() {
   try {
     return document.documentElement.matches(":active-view-transition");
