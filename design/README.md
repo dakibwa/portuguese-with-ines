@@ -1031,6 +1031,12 @@ as a form:
   and `Weekly hours` a coral button in the middle of the week's row. A lesson opens in the student's own dialog: status, the student,
   the time in bold with its length and place beneath, then `Move lesson` in
   coral beside `Cancel lesson`, with `Mark no-show` a quiet link below;
+- emails read as the site does: Montserrat (falling back to Arial) rather
+  than a serif, the lesson's date on one line and its time and clock beneath
+  with no `at`, each fact beside one of the confirm step's dabs with its label
+  small above it, Google Meet's mark beside a lesson's call and on its button,
+  and a hand-cut button. The dabs and mark are PNGs on the live site
+  (`public/email/`, `npm run build:email-icons`);
 - shorter helper copy: `Nothing booked yet.` alone; no intro sentence on the
   `Your account` sign-in; a clashing week `won't be booked; the rest go ahead`
   without the advice the choices bar already gives; the change overlay asks
