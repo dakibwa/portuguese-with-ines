@@ -11,6 +11,11 @@ export type Student = {
   phone: string;
   /** Optional Portuguese tax number for receipts; empty when none was given. */
   nif?: string;
+  /**
+   * The splat the student wears beside their name (src/lib/student-marks.ts);
+   * empty for their initial. Absent until the Worker can save one.
+   */
+  mark?: string;
   timezone: string;
   /** "teacher" unlocks the schedule page's admin tools. */
   role: "student" | "teacher";
@@ -189,7 +194,7 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
 function validStudent(value: unknown): value is Student {
   return isApiRecord(value) && typeof value.id === "string" && Boolean(value.id) &&
     typeof value.name === "string" && typeof value.email === "string" &&
-    ["nif", "phone", "timezone"].every((field) => value[field] == null || typeof value[field] === "string") &&
+    ["nif", "mark", "phone", "timezone"].every((field) => value[field] == null || typeof value[field] === "string") &&
     (value.role === undefined || value.role === "student" || value.role === "teacher");
 }
 
@@ -234,7 +239,7 @@ export function resetPassword(token: string, password: string) {
   return post<{ student: Student; session: string }>("/auth/reset", { token, password }).then(validateSignInReply);
 }
 
-export function updateProfile(token: string, input: { name?: string; phone?: string; nif?: string; timezone?: string }) {
+export function updateProfile(token: string, input: { name?: string; phone?: string; nif?: string; mark?: string; timezone?: string }) {
   return post<{ student: Student }>("/me", input, token).then(validateStudentReply);
 }
 

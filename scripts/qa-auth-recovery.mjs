@@ -242,7 +242,7 @@ try {
           await expect(panel.getByRole("button", { name: "Create my account", exact: true })).toBeEnabled();
         } else if (action === "replacement") {
           await replaceSession(state.page);
-          await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
+          await expect(state.page.locator(".account-menu__name").first()).toHaveText(replacementStudent.name);
         } else {
           await state.page.locator(".site-header__brand").click();
           await expect.poll(() => new URL(state.page.url()).pathname).toBe("/");
@@ -253,7 +253,7 @@ try {
         if (action === "register") {
           await expect(panel.getByRole("tab", { name: "Create an account", exact: true })).toHaveAttribute("aria-selected", "true");
           await expect(panel.getByRole("alert")).toHaveCount(0);
-        } else if (action === "replacement") await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
+        } else if (action === "replacement") await expect(state.page.locator(".account-menu__name").first()).toHaveText(replacementStudent.name);
         assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), action === "replacement" ? replacementSession : null);
         assert.deepEqual(state.errors, []);
       } finally { waiting.resolve(); await state.context.close(); }
@@ -280,14 +280,14 @@ try {
         await started.promise;
         if (action === "replacement") {
           await replaceSession(state.page);
-          await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
+          await expect(state.page.locator(".account-menu__name").first()).toHaveText(replacementStudent.name);
         } else if (action !== "success") await panel.getByRole("button", { name: /forgotten my password/ }).click();
         const response = state.page.waitForResponse("**/auth/google");
         waiting.resolve(); await response;
         await state.page.waitForLoadState("networkidle");
         assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), action === "replacement" ? replacementSession : action === "success" ? "isolated-google-session" : null);
-        if (action === "replacement") await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
-        else if (action === "success") await expect(state.page.getByText(student.name, { exact: true }).filter({ visible: true })).toBeVisible();
+        if (action === "replacement") await expect(state.page.locator(".account-menu__name").first()).toHaveText(replacementStudent.name);
+        else if (action === "success") await expect(state.page.locator(".account-menu__name").first()).toHaveText(student.name);
         else {
           await expect(panel.getByRole("heading", { name: "Forgotten password", exact: true })).toBeVisible();
           await expect(panel.getByRole("alert")).toHaveCount(0);
@@ -319,7 +319,7 @@ try {
           await expect(panel.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
           await panel.getByRole("tab", { name: "Create an account", exact: true }).click();
           await panel.getByRole("button", { name: "Continue with Google", exact: true }).click();
-          await expect(state.page.getByText(student.name, { exact: true }).filter({ visible: true })).toBeVisible();
+          await expect(state.page.locator(".account-menu__name").first()).toHaveText(student.name);
           assert.equal(scripts, 2);
           assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), "isolated-google-retry-session");
         }

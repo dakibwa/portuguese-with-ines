@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  CircleHelp,
   Repeat2,
 } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
@@ -436,7 +437,7 @@ export function TeacherSchedule() {
       <AuthPanel
         heading="Sign in"
         headingLevel={2}
-        intro="Your weekly hours, your days off, and everything that’s booked."
+        signInOnly
         onSignedIn={(student) => {
           setMe(student);
           if (student.role === "teacher") setToken(readSession());
@@ -472,21 +473,20 @@ export function TeacherSchedule() {
 
   return (
     <div className="teacher-workspace">
-      <section className="teacher-account" aria-label="Your account">
-        <p>
-          <span className="teacher-eyebrow">Account</span>
-          <strong>{me?.name || me?.email}</strong>
-        </p>
+      {/* Meet's status and a small Sign out share one line at the top, so the
+          page opens onto the week rather than an account card (10 October
+          2026, at Dan's request). */}
+      <div className="teacher-topline">
+        <TeacherMeetConnection token={token} />
         <button
-          className="button button--quiet"
+          className="teacher-sign-out"
           disabled={savingDays || savingHours}
           onClick={signOut}
           type="button"
         >
           Sign out
         </button>
-      </section>
-      <TeacherMeetConnection token={token} />
+      </div>
       {paymentReview.length ? (
         <div className="teacher-inline-notice" role="status">
           <AlertCircle size={19} aria-hidden="true" />
@@ -524,15 +524,41 @@ export function TeacherSchedule() {
             <span className="teacher-eyebrow">
               {editing ? "Set your rhythm" : "Your week at a glance"}
             </span>
-            <h2 id="teacher-week-title" ref={calendarTitleRef} tabIndex={-1}>
-              {editing
-                ? "Your weekly hours"
-                : `${dateLabel(weekStart, { day: "numeric", month: "short" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}`}
-            </h2>
+            <div className="teacher-week-heading">
+              <h2 id="teacher-week-title" ref={calendarTitleRef} tabIndex={-1}>
+                {editing
+                  ? "Your weekly hours"
+                  : `${dateLabel(weekStart, { day: "numeric", month: "short" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}`}
+              </h2>
+              {/* How to take time off waits behind a question mark beside the
+                  week, as on a student's calendar (10 October 2026, at Dan's
+                  request). */}
+              {editing ? null : (
+                <span className="teacher-week-help">
+                  <button
+                    aria-describedby="teacher-week-tip"
+                    aria-label="How to take time off"
+                    className="teacher-week-help__button"
+                    type="button"
+                  >
+                    <CircleHelp size={17} aria-hidden="true" />
+                  </button>
+                  <span className="teacher-week-help__tip" id="teacher-week-tip" role="tooltip">
+                    <span className="teacher-hint-mouse">
+                      Click a time to take it off, or drag across several. Click it
+                      again to reopen it.
+                    </span>
+                    <span className="teacher-hint-touch">
+                      Tap a time to take it off, and tap it again to reopen it.
+                    </span>
+                  </span>
+                </span>
+              )}
+            </div>
           </div>
           {editing ? (
             <button
-              className="teacher-mode-button"
+              className="button button--outline teacher-mode-button"
               type="button"
               onClick={() => setEditing(false)}
             >
@@ -541,7 +567,7 @@ export function TeacherSchedule() {
             </button>
           ) : (
             <button
-              className="teacher-mode-button"
+              className="button button--coral teacher-mode-button"
               type="button"
               onClick={() => setEditing(true)}
             >
@@ -555,21 +581,9 @@ export function TeacherSchedule() {
               ) : null}
             </button>
           )}
-          <p className="teacher-week-hint">
-            {editing ? (
-              "Click or drag down a day to mark lesson start times."
-            ) : (
-              <>
-                <span className="teacher-hint-mouse">
-                  Click a time to take it off, or drag across several. Click it
-                  again to reopen it.
-                </span>
-                <span className="teacher-hint-touch">
-                  Tap a time to take it off, and tap it again to reopen it.
-                </span>
-              </>
-            )}
-          </p>
+          {editing ? (
+            <p className="teacher-week-hint">Click or drag down a day to mark lesson start times.</p>
+          ) : null}
           {editing ? (
             <span className="teacher-repeat-note">
               <Repeat2 size={15} aria-hidden="true" />

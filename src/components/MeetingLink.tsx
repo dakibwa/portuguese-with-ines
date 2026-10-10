@@ -8,7 +8,7 @@ type Props = {
 };
 
 /** Only the Google Meet join URL belongs in a lesson's external action. */
-export function MeetingLink({ meetingUrl, location, status }: Props) {
+export function meetingHref({ meetingUrl, location, status }: Props) {
   if (location !== "online" || status !== "confirmed" || !meetingUrl) return null;
   let url: URL;
   try {
@@ -21,9 +21,15 @@ export function MeetingLink({ meetingUrl, location, status }: Props) {
     url.username || url.password ||
     !/^\/[a-z0-9-]+\/?$/i.test(url.pathname)
   ) return null;
+  return url.href;
+}
+
+export function MeetingLink(props: Props) {
+  const href = meetingHref(props);
+  if (!href) return null;
 
   return (
-    <a className="meeting-link" href={url.href} target="_blank" rel="noopener noreferrer">
+    <a className="meeting-link" href={href} target="_blank" rel="noopener noreferrer">
       <Video size={17} aria-hidden="true" />
       Join Google Meet
     </a>

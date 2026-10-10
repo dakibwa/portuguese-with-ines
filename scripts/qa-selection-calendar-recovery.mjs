@@ -501,6 +501,7 @@ try {
         await page.goto(`${base}/book/?view=lessons${mode === "session" ? "&emailToken=isolated" : ""}`);
         if (mode === "pending") {
           await chooseAccount(page, "Edit details");
+          await page.getByRole("button", { name: "Change email", exact: true }).click();
           await page.getByLabel("Email", { exact: true }).fill("updated@example.invalid");
           await page.getByRole("button", { name: "Send confirmation link", exact: true }).click();
           await expect(page.getByLabel("Email", { exact: true })).toHaveValue("updated@example.invalid");

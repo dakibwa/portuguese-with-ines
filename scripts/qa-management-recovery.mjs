@@ -447,8 +447,9 @@ try {
         await page.goto(`${base}/book/?view=lessons`);
         await countIs(page, 1);
         await chooseAccount(page, "Edit details");
+        const nameRow = page.locator('.my-lessons__fact[data-field="name"]');
+        await nameRow.locator(".my-lessons__change").click();
         await page.getByLabel("Your name", { exact: true }).fill("Ana draft");
-        await page.getByLabel("NIF (optional)").fill("248899945");
         await chooseAccount(page, "Done editing");
         await nextLessonOpener(page).click();
         await expect(page.getByRole("dialog").getByRole("link", { name: "Join Google Meet", exact: true })).toBeVisible();
@@ -456,9 +457,11 @@ try {
         await page.getByRole("button", { name: "Close lesson management", exact: true }).click();
         await countIs(page, 2);
         await expect(page.locator('button[data-date-key="2026-10-06"]')).toHaveClass(/has-booking/);
+        // Leaving Your details closed the open detail: the refreshed account
+        // shows what is saved, with no unsaved draft passing for it.
         await chooseAccount(page, "Edit details");
-        await expect(page.getByLabel("Your name", { exact: true })).toHaveValue("Ana draft");
-        await expect(page.getByLabel("NIF (optional)")).toHaveValue("248899945");
+        await expect(page.getByLabel("Your name", { exact: true })).toHaveCount(0);
+        await expect(nameRow.locator(".my-lessons__fact-value")).toHaveText(student.name);
         await check(state);
         cases += 1;
       } finally { await state.context.close(); }

@@ -85,8 +85,9 @@ try {
     await settle();
     const layout = await page.evaluate(() => {
       const bounds = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
-      // The name stands plain where the menu is open, and opens it elsewhere.
-      const named = [...document.querySelectorAll(".account-menu__label, #account-menu-button")].find(element => element.getClientRects().length);
+      // Where the menu folds, the name's button opens it; where it is open,
+      // the places lead the header and the name lives in Your details.
+      const named = [...document.querySelectorAll("#account-menu-button, .account-menu__places")].find(element => element.getClientRects().length);
       return {
         width: innerWidth, pageWidth: document.documentElement.scrollWidth,
         calendar: bounds("#lesson-calendar .calendar-panel"),
@@ -130,7 +131,7 @@ try {
   }
   await page.setViewportSize({ width: 1920, height: 1100 });
   await accountAction("Edit details");
-  await page.getByLabel("Your name", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Change name", exact: true }).waitFor();
   assert.equal(await page.locator("#lesson-calendar, #account-past-lessons").count(), 0);
   await settle();
   await page.screenshot({ path: `${out}/profile-desktop.png`, fullPage: true });

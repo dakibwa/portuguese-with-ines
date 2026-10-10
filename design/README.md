@@ -184,7 +184,8 @@ the same identity or action:
   sign-in card shows `Almost there` as the step's only visible heading, then
   Google sign-in and the account form, with no data-use summary, privacy
   details, Google password note or consent checkbox. The account form ends
-  with an optional NIF field whose only note is that it is added to receipts;
+  with an optional NIF field labelled `NIF (optional, for your receipts)`, with no
+  note beneath it (10 October 2026, at Dan's request);
   students add, change or clear it under Edit details. The final booking
   action follows the payment and change conditions for the selected method.
   A `Terms & privacy` overlay holds the details, without adding a disclosure
@@ -414,17 +415,12 @@ coral `Cancel all booked lessons`; profile editing pairs coral `Save name` with
 blue `Send confirmation link`. Keep the existing labels and state indicators so
 colour is never the only way to tell the controls apart. A filled button that
 cannot act yet is drawn as the same quiet outline as the booking's final
-action, so coral and blue appear only when the action is live. Your details
-goes one step further: a field's action, such as `Save name`, stays clear
-until there is something to save, then appears in its live colour. It keeps
-its place, beside the field or, on a phone, beneath the field's note, so
-nothing moves as it appears, and assistive technology still finds it,
-unavailable, as before.
+action, so coral and blue appear only when the action is live.
 
-Confirmed email changes preserve an open profile editor and newer drafts while
-renewing that account's session. Opening the profile editor initially focuses
-the name field before interaction; later browser frames never move focus away
-from a field the student has selected. If the calendar cannot refresh after booking,
+Confirmed email changes preserve an open detail and newer drafts while
+renewing that account's session. Opening a detail focuses its field before
+interaction; later browser frames never move focus away from a field the
+student has selected. If the calendar cannot refresh after booking,
 moving, cancelling or stopping a sequence, retain the successful outcome and
 show the account warning with `Try again`, including inside lesson management.
 That action reloads the account without repeating the change. Disable change
@@ -616,9 +612,9 @@ Preserve these desktop and mobile states:
 - a returning signed-in student opens directly on their lessons. Their
   lessons are one calendar card, which carries the account as well: there is
   no bar above it and no separate list to keep in step with it. On a wide card
-  its header is one row: the student's name with a quiet `Sign out` beneath
-  it, the account's places in the middle and the coral `Book a lesson` at the
-  right. On a narrower card the student's name leads it as the account's menu, with
+  its header is one row: the account's places at the top left and the coral
+  `Book a lesson` at the right; the name and `Sign out` live in Your details
+  (10 October 2026, at Dan's request). On a narrower card the student's name leads it as the account's menu, with
   `Book a lesson` at its top right (`Book` on phones, keeping the full name
   for assistive technology); the banner above already says Your lessons, so
   the card's own title is for screen readers, as on a wide card.
@@ -636,8 +632,8 @@ Preserve these desktop and mobile states:
   own colour, as it does on
   any card when the next lesson lies beyond the first four weeks: its date and
   time in one plain line, then its length, location, `Weekly` when it repeats
-  and its Meet link, opening that lesson directly. With nothing booked, one line says so above the same
-  calendar. Free times do not appear in this lesson overview.
+  and its Meet link, opening that lesson directly. With nothing booked, `Nothing booked yet.` says so
+  above the same calendar; `Book a lesson` says the rest. Free times do not appear in this lesson overview.
   A signed-out visitor can browse lesson types, dates, and times first; sign-in
   is requested only when they open their lessons or confirm a booking.
   Completed decisions collapse into a compact row, so account tools, the
@@ -646,15 +642,16 @@ Preserve these desktop and mobile states:
   2026, at Dan's request to fold the separate account bar into the calendar
   card, then to show the menu in the header's empty middle). Its places are
   `Your lessons`, `Past lessons` and `Edit details` (`Done editing` while
-  editing), then `Sign out`, in that order. On a wide card (1100 px of booking
-  column and up) they sit open in the header, centred on the card, as one
-  sliding control of the booking bar's kind, its blue thumb on the card that is
-  showing; the name stands plain at the left with `Sign out` beneath it, since
-  signing out belongs to the person, not among the places, and the card's
-  title is kept for screen readers because the places already name it. On a
-  narrower card the name is the menu, and plainly a button (9 October 2026,
-  at Dan's request): a cream pill holding the student's initial in a blue
-  circle, their name and a chevron, never the site menu's three lines, so a
+  editing), then, where the menu folds, `Sign out`, in that order. On a wide
+  card (1100 px of booking column and up) they sit open at the top left of
+  the header as one sliding control of the booking bar's kind, its blue thumb
+  on the card that is showing, and the card's title is kept for screen
+  readers because the places already name it. The name is not repeated there:
+  it, the student's splat and `Sign out` live in Your details (10 October
+  2026, at Dan's request). On a narrower card the name is the menu, and
+  plainly a button (9 October 2026, at Dan's request): a cream pill holding
+  the student's splat, or their initial in a blue circle until they choose
+  one, their name and a chevron, never the site menu's three lines, so a
   phone shows one `☰` for the site and one clearly different account menu,
   and it opens over the card. Booking is not repeated there: its
   one coral action belongs to the card. `Your lessons` may show the useful
@@ -667,13 +664,24 @@ Preserve these desktop and mobile states:
   and Your details each take the lessons card's place, in the same hand and
   headed the same way: on a wide card the same row, with the places exactly
   where they were and the thumb on the card showing; on a narrower one the
-  title with a `Your lessons` way back to the current schedule at its right,
-  and the name's menu beneath them. History has two
+  title centred at the top (10 October 2026, at Dan's request) and the name's
+  menu beneath it, which holds the way back to Your lessons. History has two
   readable columns of records on wide desktop and one on mobile; order records
   by when each lesson ended or was cancelled, newest first, so cancelled
   future dates do not bury recently completed lessons.
-  Profile editing has paired fields on wide desktop, name beside email and
-  NIF beside the code disclosure; `Done editing` returns to Your lessons. Its
+  Your details reads as a short list of what is saved rather than a form (10
+  October 2026, at Dan's request): the student's splat, name, email and NIF,
+  each with its value and a quiet outline `Change` beside it, or `Add NIF`
+  where there is none. Changing one opens its field in place with its action
+  (`Save name`, `Send confirmation link`, `Save NIF`) and `Cancel`, and closes
+  once saved; only an open email carries a short note, the NIF's purpose being
+  in its label. Text fields are 44 px tall, the usual touch height. In the
+  change dialog, whose cream matches a track's, the sliders' tracks take a
+  lilac wash so they read as sliders. The splat
+  opens as a row of the site's own marks, all but the FAQ's question, with the
+  initial first; choosing one saves it, and it shows wherever the name's menu
+  does. A small `Sign out` waits at the card's foot, on the right. `Done
+  editing` returns to Your lessons. Its
   last item is the small `Have a code from Inês?` disclosure, one field with a blue `Add code`
   beside it that stays open for the second length's code, with any saved weekly
   rate listed above it. History and profile
@@ -707,10 +715,9 @@ Preserve these desktop and mobile states:
   records rather than actions.
   There is no second `My lessons` navigation destination.
   The workflow choices and calendar share the same left and right edges.
-  Profile fields sit directly in the Your details card, without a second
-  framed card inside it; their actions appear once there is something to save,
-  beside the field whenever the available width permits. Profile inputs use the same single blue focus
-  boundary as the booking notes field;
+  Profile details sit directly in the Your details card, without a second
+  framed card inside it, divided by soft rules. Profile inputs use the same
+  single blue focus boundary as the booking notes field;
 - after a successful one-off or weekly booking, the confirmation's primary
   `Back to your lessons` opens the lessons calendar so the new booking is immediately
   visible on its day;
@@ -988,6 +995,52 @@ where a calendar puts it and nothing taking room it doesn't earn:
   with the code disclosure beside NIF where the fields pair; and choosing a
   day, or a time that completes a lesson, moves the workspace smoothly rather
   than cutting (see Motion direction).
+
+## Your account, plainer — 10 October 2026
+
+At Dan's request, the account cards say less and Your details stops reading
+as a form:
+
+- on a wide card the header holds only the places, at the top left, and
+  `Book a lesson` at the right; the student's name, their splat and `Sign out`
+  live in Your details. On a narrower card Past lessons and Your details
+  centre their title above the name's menu, which holds the way back;
+- Your details lists the splat, name, email and NIF with a `Change`, or `Add
+  NIF`, beside each, opening one field at a time in place; a small `Sign out`
+  sits at its foot. A student can wear one of the site's splats beside their
+  name instead of their initial (`students.mark`, migration 0022);
+- in the phone menu, `Message on WhatsApp` is a lilac fill beside the coral
+  `Book a lesson`, and the close fills with lilac and gives its cross a
+  quarter turn when pointed at (never on touch, where the opening tap lands
+  on it);
+- signed in, booking is headed by the account's own bar, as Your lessons is:
+  the name's menu, or the places open on a wide card, holding the way back;
+- Inês's schedule reads as the same place: the booking page's blue band,
+  Google Meet's status raised in cream with a small `Sign out` beside it
+  instead of an account card, the way to take time off behind a `?` beside the
+  week, sliders for a lesson's length and place in `Add a lesson for a
+  student`, her sign-in with no `Create an account`, and each student's chosen
+  splat beside their name when she opens a lesson. Her week is set as the
+  student's calendar: a hand-cut card, quiet capital weekdays with `Today`
+  in words, the solid blue arrows, blue lessons over a faint coral wash for
+  her weekly hours, Monday to Friday only (a weekend day appears when it
+  holds a lesson or hours of its own), and each lesson marks its place
+  as the student's calendar does, a globe or a person in its top right
+  corner, explained in the key, with a small `Meet` pill at the foot of an
+  online lesson whose call is ready,
+  and `Weekly hours` a coral button in the middle of the week's row. A lesson opens in the student's own dialog: status, the student,
+  the time in bold with its length and place beneath, then `Move lesson` in
+  coral beside `Cancel lesson`, with `Mark no-show` a quiet link below;
+- emails read as the site does: Montserrat (falling back to Arial) rather
+  than a serif, the lesson's date on one line and its time and clock beneath
+  with no `at`, each fact beside one of the confirm step's dabs with its label
+  small above it, Google Meet's mark beside a lesson's call and on its button,
+  and a hand-cut button. The dabs and mark are PNGs on the live site
+  (`public/email/`, `npm run build:email-icons`);
+- shorter helper copy: `Nothing booked yet.` alone; no intro sentence on the
+  `Your account` sign-in; a clashing week `won't be booked; the rest go ahead`
+  without the advice the choices bar already gives; the change overlay asks
+  for a day once, and a day with nothing free says so.
 
 ## Simpler, quicker booking on the student's own clock — 9 October 2026
 

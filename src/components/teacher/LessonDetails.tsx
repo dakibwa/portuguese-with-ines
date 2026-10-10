@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { X, MapPin, Video, Clock, Mail, ArrowLeft, ReceiptText } from "lucide-react";
+import { X, Mail, ArrowLeft, ReceiptText, CheckCircle2, CircleX } from "lucide-react";
 import {
   cancelBookingAs,
   rescheduleBookingAs,
@@ -12,6 +12,7 @@ import { formatBookedLessonLabel, formatSlotTime, portoTimeToUtc } from "@/lib/b
 import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { AssetMark } from "@/components/BrandMarks";
+import { studentMark } from "@/lib/student-marks";
 import { MeetingLink } from "@/components/MeetingLink";
 import { restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
@@ -140,64 +141,60 @@ export function LessonDetails({
         if (!busy) onClose();
       }}
     >
+      {/* Set as a student's own lesson is (10 October 2026, at Dan's
+          request): the status, who, then when in bold with its length and
+          place beneath, and the actions side by side. */}
+      <button
+        className="teacher-dialog-close"
+        type="button"
+        aria-label="Close lesson details"
+        disabled={busy}
+        onClick={onClose}
+      >
+        <X size={20} aria-hidden="true" />
+      </button>
+      <p className={`lesson-calendar__status${booking.status === "cancelled" ? " lesson-calendar__status--cancelled" : ""}`}>
+        {booking.status === "cancelled" ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
+        {booking.status === "cancelled" ? "Cancelled" : "Booked"}
+      </p>
       <div className="teacher-dialog-top">
-        <AssetMark asset="/visuals/v2-splats/one-to-one-splat-v2.svg" className="teacher-lesson-mark" />
-        <div className="teacher-dialog-heading">
-          {/* The length and short date, as the student's own lesson rows
-              read: `60 mins · Thu 8 Oct`, while a trial keeps its name. */}
-          <span className="teacher-eyebrow">
-            {formatBookedLessonLabel({
-              id: booking.lesson_type_id ?? "",
-              name: booking.lesson_name,
-              durationMinutes: Math.round(
-                (Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) /
-                  60_000,
-              ),
-            })}{" "}
-            ·{" "}
-            {dateLabel(dateKey(new Date(booking.starts_at)), {
-              weekday: "short",
-              day: "numeric",
-              month: "short",
-            })}
-          </span>
-          <h2 id="teacher-lesson-title">{booking.student_name}</h2>
-        </div>
-        <button
-          className="teacher-icon-button"
-          type="button"
-          aria-label="Close lesson details"
-          disabled={busy}
-          onClick={onClose}
-        >
-          <X size={21} aria-hidden="true" />
-        </button>
+        {/* The student's own splat when they have chosen one, so Inês knows
+            them at a glance (10 October 2026, at Dan's request). */}
+        <AssetMark
+          asset={studentMark(booking.student_mark)?.src ?? "/visuals/v2-splats/one-to-one-splat-v2.svg"}
+          className="teacher-lesson-mark"
+        />
+        <h2 id="teacher-lesson-title">{booking.student_name}</h2>
+      </div>
+      <div className="teacher-lesson-when">
+        <strong>
+          {dateLabel(dateKey(new Date(booking.starts_at)), { weekday: "long", day: "numeric", month: "long" })},{" "}
+          {formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}
+        </strong>
+        <span>
+          {formatBookedLessonLabel({
+            id: booking.lesson_type_id ?? "",
+            name: booking.lesson_name,
+            durationMinutes: Math.round(
+              (Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) /
+                60_000,
+            ),
+          })}{" "}
+          · {booking.location === "porto" ? "In Porto" : "Online"} · Porto time
+        </span>
+        <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
       </div>
       <div className="teacher-lesson-facts">
-        <span>
-          <Clock size={16} aria-hidden="true" />
-          {formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}{" "}
-          · Porto time
-        </span>
-        <span>
-          {booking.location === "porto" ? (
-            <MapPin size={16} aria-hidden="true" />
-          ) : (
-            <Video size={16} aria-hidden="true" />
-          )}
-          {booking.location === "porto" ? "In Porto" : "Online"}
-        </span>
         <a href={`mailto:${booking.student_email}`}>
-          <Mail size={16} aria-hidden="true" />
+          <Mail size={15} aria-hidden="true" />
           {booking.student_email}
         </a>
         {/* Her receipt automation reads this, so absence is stated too. */}
         <span>
-          <ReceiptText size={16} aria-hidden="true" />
+          <ReceiptText size={15} aria-hidden="true" />
           {booking.student_nif ? `NIF ${booking.student_nif}` : "NIF not given (consumidor final)"}
         </span>
       </div>
-      <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
       {booking.notes ? (
         <p className="teacher-lesson-note">{booking.notes}</p>
       ) : null}
@@ -222,7 +219,7 @@ export function LessonDetails({
       {action === "view" ? (
         <div className="teacher-dialog-actions">
           <button
-            className="button button--blue"
+            className="button button--coral"
             type="button"
             disabled={locked}
             onClick={() => setAction("move")}
@@ -230,7 +227,7 @@ export function LessonDetails({
             Move lesson
           </button>
           <button
-            className="button button--outline teacher-button--danger"
+            className="button button--outline"
             type="button"
             disabled={locked}
             onClick={() => setAction("cancel")}
@@ -241,7 +238,7 @@ export function LessonDetails({
             <div className="teacher-no-show">
               <button
                 aria-describedby={noShowLater ? "teacher-no-show-hint" : undefined}
-                className="button button--outline"
+                className="text-action"
                 type="button"
                 disabled={!canMarkAttendance}
                 onClick={() => setAction("no-show")}
@@ -289,7 +286,7 @@ export function LessonDetails({
               <p>The student will be emailed the new time.</p>
               <div className="teacher-dialog-actions">
                 <button
-                  className="button button--blue"
+                  className="button button--coral"
                   type="submit"
                   disabled={busy}
                 >

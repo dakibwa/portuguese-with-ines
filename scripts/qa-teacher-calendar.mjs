@@ -312,6 +312,20 @@ try {
         .getByRole("button", { name: "Monday 7 September, show lessons" })
         .click();
     await lessonLocation(page, "Alex", "Online");
+    // An online lesson carries its call on the timetable, clear of its time.
+    const meet = page.getByRole("link", { name: /^Join Google Meet with Alex,/ });
+    await expect(meet).toBeVisible();
+    await expect(meet).toHaveAttribute("href", "https://meet.google.com/abc-defg-hij");
+    const time = await page
+      .getByRole("button", { name: /^Alex,.*View lesson$/ })
+      .locator(".teacher-lesson-time")
+      .boundingBox();
+    const pill = await meet.boundingBox();
+    assert.ok(
+      pill.y >= time.y + time.height || pill.x >= time.x + time.width,
+      `Meet pill covers the lesson time at ${width}px`,
+    );
+    await expect(page.getByRole("link", { name: /^Join Google Meet with Sam,/ })).toHaveCount(0);
     if (width < 741)
       await page
         .getByRole("button", { name: "Tuesday 8 September, show lessons" })
@@ -573,7 +587,7 @@ try {
   await manual.locator("summary").click();
   await manual.getByLabel("Student’s email").fill("manual@example.invalid");
   await manual.getByLabel("Student’s name").fill("Robin");
-  await manual.getByLabel("Where").selectOption("porto");
+  await manual.getByRole("radio", { name: "In Porto", exact: true }).check();
   await manual.getByLabel("Date", { exact: true }).fill("2026-09-11");
   await manual
     .getByRole("button", { name: "Add lesson and email student" })
@@ -662,10 +676,21 @@ try {
     .filter({ hasText: "18:00–18:30 on Tue 8 Sept is off." })
     .waitFor();
   await showHours(mobile.page);
+  // Weekends are left out of her week until they have hours of their own, so
+  // Saturday is added through Set exact hours, and then appears.
+  await expect(
+    mobile.page.getByRole("button", { name: "Saturday, show weekly hours" }),
+  ).toHaveCount(0);
+  await mobile.page.getByText("Set exact hours", { exact: true }).tap();
+  await mobile.page
+    .locator(".teacher-exact-hours__body select")
+    .selectOption({ label: "Saturday" });
+  await mobile.page
+    .getByRole("button", { name: "Add a time window", exact: true })
+    .tap();
   await mobile.page
     .getByRole("button", { name: "Saturday, show weekly hours" })
     .tap();
-  await slot(mobile.page, 6, 600).tap();
   await expect(slot(mobile.page, 6, 600)).toHaveAttribute(
     "aria-pressed",
     "true",

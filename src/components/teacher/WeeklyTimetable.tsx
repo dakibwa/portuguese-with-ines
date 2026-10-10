@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useMemo,
   useLayoutEffect,
   useRef,
@@ -10,8 +11,9 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { Plus, Trash2, Video, MapPin } from "lucide-react";
+import { Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
 import type { AdminBooking, AvailabilityException } from "@/lib/admin-api";
+import { meetingHref } from "@/components/MeetingLink";
 import { formatSlotTime } from "@/lib/booking-api";
 import {
   WEEKDAYS,
@@ -88,6 +90,19 @@ export function WeeklyTimetable({
     [bookings, weekStart],
   );
   const offDays = useMemo(() => daysOff(exceptions), [exceptions]);
+  // Inês doesn't teach at weekends, so Saturday and Sunday stay out of her
+  // week (10 October 2026, at Dan's request) unless one holds a lesson that
+  // week or weekly hours of its own; Set exact hours still offers every day.
+  const shown = WEEKDAYS.map((_, index) => index).filter(
+    (index) =>
+      index < 5 ||
+      (hours[WEEKDAYS[index].value] ?? []).length > 0 ||
+      (!editing &&
+        segments.some((segment) => segment.date === shiftDate(weekStart, index))),
+  );
+  const activeDay = shown.includes(mobileDay)
+    ? mobileDay
+    : [...shown].reverse().find((index) => index < mobileDay) ?? shown[0];
   // Rows stay half-hourly even when lessons can start every 15 minutes: a
   // lesson at :15 or :45 still sits at its exact time, and her week stays one
   // screen tall instead of doubling. The exact-time editor covers quarter hours.
@@ -165,7 +180,7 @@ export function WeeklyTimetable({
   // Reopen the shown day when the timetable appears or the week changes, but
   // not when keyboard focus moves to another day: the focused time stays put.
   useLayoutEffect(() => {
-    openShownDay.current = () => openDay(mobileDay);
+    openShownDay.current = () => openDay(activeDay);
   });
   useLayoutEffect(() => {
     openShownDay.current();
@@ -294,11 +309,14 @@ export function WeeklyTimetable({
     day: number,
     minute: number,
   ) {
-    const dayIndex = WEEKDAYS.findIndex((entry) => entry.value === day);
-    let nextDay = dayIndex;
+    const position = shown.indexOf(
+      WEEKDAYS.findIndex((entry) => entry.value === day),
+    );
+    let nextPosition = position;
     let nextMinute = minute;
-    if (event.key === "ArrowLeft") nextDay = Math.max(0, dayIndex - 1);
-    else if (event.key === "ArrowRight") nextDay = Math.min(6, dayIndex + 1);
+    if (event.key === "ArrowLeft") nextPosition = Math.max(0, position - 1);
+    else if (event.key === "ArrowRight")
+      nextPosition = Math.min(shown.length - 1, position + 1);
     else if (event.key === "ArrowUp") nextMinute -= step;
     else if (event.key === "ArrowDown") nextMinute += step;
     else if (event.key === "Home") nextMinute = start;
@@ -306,6 +324,7 @@ export function WeeklyTimetable({
     else return;
     event.preventDefault();
     nextMinute = Math.max(start, Math.min(end - step, nextMinute));
+    const nextDay = shown[nextPosition];
     const weekday = WEEKDAYS[nextDay].value;
     pendingFocus.current = true;
     onSelectDay(nextDay);
@@ -326,14 +345,16 @@ export function WeeklyTimetable({
       <div
         className={`teacher-timetable ${editing ? "teacher-timetable--editing" : ""}`}
         ref={gridRef}
+        style={{ "--teacher-days": shown.length } as CSSProperties}
       >
         <div className="teacher-week-days">
           <span className="teacher-axis-heading">Porto</span>
-          {WEEKDAYS.map((day, index) => {
+          {shown.map((index) => {
+            const day = WEEKDAYS[index];
             const date = shiftDate(weekStart, index);
             return (
               <button
-                className={`teacher-day-heading ${mobileDay === index ? "is-selected" : ""} ${!editing && date === today ? "is-today" : ""}`}
+                className={`teacher-day-heading ${activeDay === index ? "is-selected" : ""} ${!editing && date === today ? "is-today" : ""}`}
                 key={day.value}
                 type="button"
                 aria-label={
@@ -341,9 +362,9 @@ export function WeeklyTimetable({
                     ? `${day.name}, show weekly hours`
                     : `${dateLabel(date)}, show lessons`
                 }
-                aria-pressed={mobileDay === index}
+                aria-pressed={activeDay === index}
                 onClick={() => {
-                  if (index !== mobileDay) openDay(index);
+                  if (index !== activeDay) openDay(index);
                   onSelectDay(index);
                   setFocus((current) => ({ ...current, day: day.value }));
                 }}
@@ -356,6 +377,9 @@ export function WeeklyTimetable({
                     {day.name.slice(3)}
                   </span>
                 )}
+                {!editing && date === today ? (
+                  <small className="teacher-day-today" aria-hidden="true">Today</small>
+                ) : null}
                 {!editing &&
                 segments.some((segment) => segment.date === date) ? (
                   <i
@@ -370,13 +394,14 @@ export function WeeklyTimetable({
         {!editing ? (
           <div className="teacher-day-toggles">
             <span aria-hidden="true" />
-            {WEEKDAYS.map((day, index) => {
+            {shown.map((index) => {
+              const day = WEEKDAYS[index];
               const date = shiftDate(weekStart, index);
               const off = offDays.has(date);
               return (
                 <div
                   className="teacher-day-toggle-cell"
-                  data-mobile-active={mobileDay === index}
+                  data-mobile-active={activeDay === index}
                   key={day.value}
                 >
                   <button
@@ -427,7 +452,8 @@ export function WeeklyTimetable({
                 ) : null,
               )}
             </div>
-            {WEEKDAYS.map((day, index) => {
+            {shown.map((index) => {
+              const day = WEEKDAYS[index];
               const date = shiftDate(weekStart, index);
               const off = !editing && offDays.has(date);
               const past = date < today;
@@ -455,7 +481,7 @@ export function WeeklyTimetable({
               return (
                 <div
                   key={day.value}
-                  data-mobile-active={mobileDay === index}
+                  data-mobile-active={activeDay === index}
                   className={`teacher-time-day ${off ? "teacher-time-day--off" : ""} ${!editing && past ? "teacher-time-day--past" : ""}`}
                 >
                   {off ? (
@@ -476,7 +502,7 @@ export function WeeklyTimetable({
                     const usual = startsInCell.length > 0;
                     const inWeekly = overlapsSpan(weekly, minute, cellEnd);
                     const focusable =
-                      WEEKDAYS[mobileDay].value === day.value &&
+                      WEEKDAYS[activeDay].value === day.value &&
                       focusMinute === minute;
                     const pointer = {
                       tabIndex: focusable ? 0 : -1,
@@ -577,14 +603,22 @@ export function WeeklyTimetable({
                         (
                           { booking, start: bookingStart, end: bookingEnd },
                           position,
-                        ) => (
+                        ) => {
+                          const top = `calc(${(bookingStart - start) / step} * var(--teacher-slot-height) + 2px)`;
+                          const height = `max(38px, calc(${(bookingEnd - bookingStart) / step} * var(--teacher-slot-height) - 4px))`;
+                          const meet = meetingHref({
+                            meetingUrl: booking.meeting_url,
+                            location: booking.location,
+                            status: booking.status,
+                          });
+                          return (
+                          <Fragment key={`${booking.id}-${position}`}>
                           <button
-                            key={`${booking.id}-${position}`}
                             type="button"
                             className={`teacher-calendar-lesson ${booking.location === "porto" ? "teacher-calendar-lesson--porto" : ""}${booking.attendance_status === "no_show" ? " teacher-calendar-lesson--no-show" : ""}`}
                             style={{
-                              top: `calc(${(bookingStart - start) / step} * var(--teacher-slot-height) + 2px)`,
-                              height: `max(38px, calc(${(bookingEnd - bookingStart) / step} * var(--teacher-slot-height) - 4px))`,
+                              top,
+                              height,
                             }}
                             aria-label={`${booking.student_name}, ${dateLabel(date)}, ${formatSlotTime(booking.starts_at)} to ${formatSlotTime(booking.ends_at)}, ${booking.location === "porto" ? "in Porto" : "online"}${booking.attendance_status === "no_show" ? ", marked as a no-show" : ""}. View lesson`}
                             onClick={() => onSelectBooking(booking)}
@@ -597,18 +631,43 @@ export function WeeklyTimetable({
                               ) : null}
                             </span>
                             <strong>{booking.student_name}</strong>
+                            {/* Marked as on the student's calendar, a globe
+                                or a person in the top right corner, with the
+                                key beneath the week saying which is which
+                                (10 October 2026, at Dan's request). */}
                             <span className="teacher-lesson-location">
                               {booking.location === "porto" ? (
-                                <MapPin size={12} aria-hidden="true" />
+                                <UserRound size={12} strokeWidth={2.4} aria-hidden="true" />
                               ) : (
-                                <Video size={12} aria-hidden="true" />
+                                <Globe size={12} strokeWidth={2.4} aria-hidden="true" />
                               )}
-                              {booking.location === "porto"
-                                ? "In Porto"
-                                : "Online"}
+                              <span className="visually-hidden">
+                                {booking.location === "porto"
+                                  ? "In Porto"
+                                  : "Online"}
+                              </span>
                             </span>
                           </button>
-                        ),
+                          {/* Over the lesson's foot rather than inside it,
+                              since a link can't sit within a button: one tap
+                              to the lesson's call (10 October 2026, at Dan's
+                              request). */}
+                          {meet ? (
+                            <a
+                              className="teacher-lesson-meet"
+                              href={meet}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Join Google Meet with ${booking.student_name}, ${formatSlotTime(booking.starts_at)}`}
+                              style={{ top: `calc(${top} + ${height} - 24px)` }}
+                            >
+                              <Video size={12} aria-hidden="true" />
+                              Meet
+                            </a>
+                          ) : null}
+                          </Fragment>
+                          );
+                        },
                       )
                     : null}
                 </div>
@@ -633,6 +692,14 @@ export function WeeklyTimetable({
               <span>
                 <i className="teacher-key-off" />
                 Time off
+              </span>
+              <span>
+                <Globe size={12} strokeWidth={2.4} aria-hidden="true" />
+                Online
+              </span>
+              <span>
+                <UserRound size={12} strokeWidth={2.4} aria-hidden="true" />
+                In Porto
               </span>
             </>
           ) : null}

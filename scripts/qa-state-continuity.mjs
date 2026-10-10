@@ -71,7 +71,14 @@ async function chooseAccount(page, name) {
 async function edit(page) {
   await page.goto(`${base}/book/?view=lessons`);
   await chooseAccount(page, "Edit details");
-  await expect(page.getByLabel("Your name", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Change name", exact: true })).toBeVisible();
+}
+
+// Your details lists each value with its own Change (or Add); one opens at a time.
+const detailRow = (page, field) => page.locator(`.my-lessons__fact[data-field="${field}"]`);
+async function openDetail(page, field) {
+  if (!(await detailRow(page, field).locator("input").count())) await detailRow(page, field).locator(".my-lessons__change").click();
+  await expect(detailRow(page, field).locator("input")).toBeVisible();
 }
 
 async function check(state) {
@@ -103,17 +110,21 @@ try {
       });
       try {
         await edit(state.page);
-        const field = state.page.getByLabel("NIF (optional)"), save = state.page.getByRole("button", { name: "Save NIF", exact: true });
+        await openDetail(state.page, "nif");
+        const field = state.page.getByLabel(/^NIF \(optional/), save = state.page.getByRole("button", { name: "Save NIF", exact: true });
         await field.fill("123456789");
         await save.click();
         await started.promise;
         await field.fill("248899945");
         waiting.resolve();
         await expect(state.page.getByRole("status").filter({ hasText: "Your receipts will show this NIF." })).toBeVisible();
+        // A newer number typed while the first saved keeps its row open.
         await expect(field).toHaveValue("248899945");
         await expect(save).toBeEnabled();
         await save.click();
-        await expect(save).toBeDisabled();
+        // Saved as typed, the row closes on the number it now holds.
+        await expect(field).toHaveCount(0);
+        await expect(detailRow(state.page, "nif").locator(".my-lessons__fact-value")).toHaveText("248899945");
         assert.deepEqual(posts, [{ nif: "123456789" }, { nif: "248899945" }]);
         await check(state);
       } finally { waiting.resolve(); await state.context.close(); }
@@ -227,24 +238,25 @@ try {
         await edit(state.page);
         const controls = {
           name: { field: state.page.getByLabel("Your name", { exact: true }), save: state.page.getByRole("button", { name: "Save name", exact: true }), value: "Ana Updated" },
-          nif: { field: state.page.getByLabel("NIF (optional)"), save: state.page.getByRole("button", { name: "Save NIF", exact: true }), value: "123456789" }
+          nif: { field: state.page.getByLabel(/^NIF \(optional/), save: state.page.getByRole("button", { name: "Save NIF", exact: true }), value: "123456789" }
         };
         const second = first === "name" ? "nif" : "name";
+        await openDetail(state.page, first);
         await controls[first].field.fill(controls[first].value);
         await controls[first].save.click();
         await started.promise;
+        // The other detail opens while the first is still saving.
+        await openDetail(state.page, second);
         await controls[second].field.fill(controls[second].value);
         await controls[second].save.click();
-        await expect(controls[second].save).toBeDisabled();
         waiting.resolve();
-        await expect(controls[first].save).toBeDisabled();
-        await expect(controls[second].save).toBeDisabled();
-        await expect(state.page.locator(".account-menu__name")).toHaveText("Ana Updated");
+        for (const field of ["name", "nif"]) await expect(detailRow(state.page, field).locator("input")).toHaveCount(0);
+        await expect(state.page.locator(".account-menu__name").first()).toHaveText("Ana Updated");
         assert.deepEqual(posts, [{ [first]: controls[first].value }, { [second]: controls[second].value }]);
         await chooseAccount(state.page, "Done editing");
         await chooseAccount(state.page, "Edit details");
-        await expect(controls.name.field).toHaveValue("Ana Updated");
-        await expect(controls.nif.field).toHaveValue("123456789");
+        await expect(detailRow(state.page, "name").locator(".my-lessons__fact-value")).toHaveText("Ana Updated");
+        await expect(detailRow(state.page, "nif").locator(".my-lessons__fact-value")).toHaveText("123456789");
         await check(state);
       } finally { waiting.resolve(); await state.context.close(); }
     }

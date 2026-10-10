@@ -7,7 +7,7 @@
  */
 
 import assert from "node:assert/strict";
-import { renderEmail } from "./email.mjs";
+import { renderEmail, splitWhen } from "./email.mjs";
 import { candidateStartMinutes, computeAvailability, DEFAULT_BOOKING_HORIZON_DAYS, isSlotBookable } from "./availability.mjs";
 import {
   chargeSavedCard,
@@ -1532,6 +1532,18 @@ await test("Meet email links are clickable, present in plain text, and reject ot
   assert.ok(!invalid.html.includes('href="https://meet.google.com.evil'));
   assert.ok(!invalid.html.includes("<script>"));
   assert.ok(!invalid.text.includes("evil.invalid"));
+  // The Meet mark sits only beside a real Meet link.
+  assert.match(valid.html, /google-meet\.png/);
+  assert.ok(!invalid.html.includes("google-meet.png"));
+});
+
+await test("an email's time reads as its date, then its time and clock, without 'at'", () => {
+  assert.deepEqual(splitWhen("Tuesday, 13 October 2026 at 17:00, Porto time"), { date: "Tuesday 13 October 2026", time: "17:00 · Porto time" });
+  assert.deepEqual(splitWhen("Wednesday 14 October 2026 at 09:00"), { date: "Wednesday 14 October 2026", time: "09:00" });
+  assert.deepEqual(splitWhen("Sometime soon"), { date: "Sometime soon", time: "" });
+  const { html, text } = renderEmail({ heading: "Lesson", intro: "Hi", hero: "Tuesday, 13 October 2026 at 17:00, Porto time", rows: [], footer: "" });
+  assert.ok(!/ at 17:00/.test(html) && !/ at 17:00/.test(text));
+  assert.match(text, /Tuesday 13 October 2026\n17:00 · Porto time/);
 });
 
 // --- Report -----------------------------------------------------------------

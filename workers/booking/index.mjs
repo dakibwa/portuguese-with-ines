@@ -928,7 +928,10 @@ function publicStudent(row) {
     phone: row.phone,
     nif: row.nif ?? "",
     timezone: row.timezone,
-    role: row.role ?? "student"
+    role: row.role ?? "student",
+    // Only once migration 0022 has added the column, so the site offers the
+    // choice of splat only where it can be saved.
+    ...("mark" in row ? { mark: row.mark ?? "" } : {})
   };
 }
 
@@ -4082,6 +4085,10 @@ async function handleConfirmEmailChange(request, env) {
   return json({ student: publicStudent(updated), session: await createSession(updated.id, env.BOOKING_TOKEN_SECRET, updated.session_version) }, 200, request, env);
 }
 
+// The splats a student can wear beside their name (the site's
+// src/lib/student-marks.ts names the same set); empty is their initial.
+const STUDENT_MARKS = new Set(["", "burst", "bloom", "pool", "dance", "drift", "four", "duo", "scatter"]);
+
 async function handleUpdateMe(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
@@ -4102,6 +4109,10 @@ async function handleUpdateMe(request, env) {
     fields.push("nif = ?"); values.push(nif);
   }
   if (isValidTimeZone(body.timezone)) { fields.push("timezone = ?"); values.push(body.timezone); }
+  if ("mark" in body) {
+    if (!STUDENT_MARKS.has(body.mark)) return fail("Choose one of the splats.", 400, request, env);
+    fields.push("mark = ?"); values.push(body.mark);
+  }
 
   if (fields.length) {
     await env.DB.prepare(`UPDATE students SET ${fields.join(", ")} WHERE id = ?`)
@@ -4161,13 +4172,23 @@ async function handleAdmin(request, env, ctx, url, path) {
 
   if (request.method === "GET" && path === "/admin/bookings") {
     const from = url.searchParams.get("from") ?? new Date(Date.now() - 7 * 86400000).toISOString();
-    const { results } = await env.DB.prepare(
-      `SELECT b.*, l.name AS lesson_name, COALESCE(s.nif, '') AS student_nif FROM bookings b
+    // Each student's chosen splat travels with their lessons, so Inês sees it
+    // beside their name. Until migration 0022 adds the column the query
+    // without it still answers, so her schedule never depends on the order
+    // the database and the Worker are updated in.
+    const lessonsQuery = (mark) => env.DB.prepare(
+      `SELECT b.*, l.name AS lesson_name, COALESCE(s.nif, '') AS student_nif${mark ? ", COALESCE(s.mark, '') AS student_mark" : ""} FROM bookings b
        JOIN lesson_types l ON l.id = b.lesson_type_id LEFT JOIN students s ON s.id = b.student_id
        WHERE b.starts_at > ? ORDER BY b.starts_at`
     )
       .bind(from)
       .all();
+    let results;
+    try {
+      ({ results } = await lessonsQuery(true));
+    } catch {
+      ({ results } = await lessonsQuery(false));
+    }
     const cutoff = new Date(Date.now() - 23 * 3600000).toISOString();
     const { results: reconciliation } = await env.DB.prepare(`SELECT id, reference, payment_status, same_day_fee_status FROM bookings
       WHERE (payment_status = 'processing' AND (charge_started_at IS NULL OR charge_started_at < ?))

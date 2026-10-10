@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, CheckCircle2, CircleX } from "lucide-react";
-import { AccountMenu, type AccountSection } from "@/components/AccountMenu";
+import { AlertCircle, CheckCircle2, CircleX } from "lucide-react";
+import { AccountAvatar, AccountMenu, AccountSignature, type AccountSection } from "@/components/AccountMenu";
 import { AuthPanel } from "@/components/AuthPanel";
 import { LessonMark } from "@/components/LessonMarks";
 import {
@@ -27,6 +27,7 @@ import {
   redeemRecurringRate
 } from "@/lib/booking-api";
 import { BOOKING_TIME_ZONE } from "@/lib/config";
+import { STUDENT_MARKS } from "@/lib/student-marks";
 
 /** The two lengths a code from Inês can set a weekly price for. */
 const RATE_LENGTHS = [60, 90] as const;
@@ -100,8 +101,15 @@ export function MyLessons({
   const [series, setSeries] = useState<LessonSeries[]>(initialAccount?.series ?? []);
   const editing = section === "profile";
   const [details, setDetails] = useState(() => accountDetails(initialAccount?.student));
+  // What each open row holds now, read when a save returns: a row closes only
+  // if nothing newer was typed into it while it saved.
+  const latestDetails = useRef(details);
+  useEffect(() => { latestDetails.current = details; }, [details]);
   const [savingName, setSavingName] = useState(false);
   const [savingNif, setSavingNif] = useState(false);
+  // Your details shows each value with its own Change; one opens at a time.
+  const [openField, setOpenField] = useState<"name" | "email" | "nif" | "mark" | null>(null);
+  const [savingMark, setSavingMark] = useState<string | null>(null);
   const [emailPending, setEmailPending] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
   const [detailsNote, setDetailsNote] = useState("");
@@ -147,10 +155,17 @@ export function MyLessons({
   const detailsRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     editingRef.current = editing;
-    // Focus as the editor opens, before a student can select another field.
-    // A queued frame could otherwise steal their focus or subsequent typing.
-    if (editing) detailsRef.current?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+    // Leaving Your details closes whatever was open in it.
+    if (!editing) setOpenField(null);
   }, [editing]);
+
+  // Focus a field as it opens, before a student can select anything else: a
+  // queued frame could otherwise steal their focus or subsequent typing.
+  useLayoutEffect(() => {
+    if (openField && openField !== "mark") {
+      detailsRef.current?.querySelector<HTMLInputElement>(`[data-field="${openField}"] input`)?.focus({ preventScroll: true });
+    }
+  }, [openField]);
 
   // Read when the details open, so a rate Inês set by hand shows without a
   // reload, and tell booking what came back: it prices weekly lessons from it.
@@ -266,15 +281,17 @@ export function MyLessons({
 
   async function saveName() {
     const session = readSession();
+    const submittedName = details.name;
     setSavingName(true);
     setError("");
     setDetailsNote("");
     try {
-      const result = await updateProfile(session, { name: details.name.trim() });
+      const result = await updateProfile(session, { name: submittedName.trim() });
       if (readSession() !== session) return;
       profileVersion.current += 1;
       // Other fields may have been saved since this response was prepared.
       setStudent((current) => current && { ...current, name: result.student.name });
+      if (latestDetails.current.name === submittedName) setOpenField((field) => field === "name" ? null : field);
       setDetailsNote("Saved.");
     } catch (caught) {
       if (readSession() !== session) return;
@@ -298,12 +315,33 @@ export function MyLessons({
       const savedNif = result.student.nif ?? "";
       setStudent((current) => current && { ...current, nif: savedNif });
       setDetails((current) => current.nif === submittedNif ? { ...current, nif: savedNif } : current);
+      if (latestDetails.current.nif === submittedNif) setOpenField((field) => field === "nif" ? null : field);
       setDetailsNote(result.student.nif ? "Saved. Your receipts will show this NIF." : "Saved. Your receipts won’t show a NIF.");
     } catch (caught) {
       if (readSession() !== session) return;
       setError(caught instanceof Error ? caught.message : "That couldn’t be saved.");
     } finally {
       setSavingNif(false);
+    }
+  }
+
+  async function saveMark(mark: string) {
+    if (savingMark !== null) return;
+    const session = readSession();
+    setSavingMark(mark);
+    setError("");
+    setDetailsNote("");
+    try {
+      const result = await updateProfile(session, { mark });
+      if (readSession() !== session) return;
+      profileVersion.current += 1;
+      setStudent((current) => current && { ...current, mark: result.student.mark ?? "" });
+      setOpenField((field) => field === "mark" ? null : field);
+    } catch (caught) {
+      if (readSession() !== session) return;
+      setError(caught instanceof Error ? caught.message : "That couldn’t be saved.");
+    } finally {
+      setSavingMark(null);
     }
   }
 
@@ -343,13 +381,15 @@ export function MyLessons({
     // Each request sends two emails, so a double-click must not send four.
     if (emailBusy) return;
     const session = readSession();
+    const submittedEmail = details.email;
     setEmailBusy(true);
     setError("");
     setDetailsNote("");
     try {
-      const result = await requestEmailChange(session, details.email.trim());
+      const result = await requestEmailChange(session, submittedEmail.trim());
       if (readSession() !== session) return;
       setEmailPending(result.pending);
+      if (latestDetails.current.email === submittedEmail) setOpenField((field) => field === "email" ? null : field);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That couldn’t be sent.");
     } finally {
@@ -408,7 +448,6 @@ export function MyLessons({
       <AuthPanel
         heading="Sign in"
         headingLevel={2}
-        intro="Your lessons, and any changes you want to make to them, all live here."
         onSignedIn={(signedIn) => {
           setStudent(signedIn);
           setLoading(true);
@@ -418,24 +457,37 @@ export function MyLessons({
     );
   }
 
+  // Opening a detail starts from what is saved, so a draft abandoned with
+  // Cancel never comes back.
+  const openDetail = (field: "name" | "email" | "nif" | "mark") => {
+    setError("");
+    setDetailsNote("");
+    if (field === "name") setDetails((current) => ({ ...current, name: student.name }));
+    if (field === "email") {
+      emailDraftVersion.current += 1;
+      setDetails((current) => ({ ...current, email: student.email }));
+    }
+    if (field === "nif") setDetails((current) => ({ ...current, nif: student.nif ?? "" }));
+    setOpenField(field);
+  };
+
   const menu = (current: AccountSection) => (
     <AccountMenu
       current={current}
+      mark={student.mark}
       name={student.name}
       onSelect={(next) => onSelectSection?.(next)}
       onSignOut={() => onSignOut?.()}
       upcomingCount={upcomingCount}
     />
   );
-  const heading = (id: string, title: string, current: AccountSection) => (
+  const heading = (id: string, title: string, current: AccountSection, aside?: React.ReactNode) => (
     <div className="account-card__head">
       <div className="account-card__title">
         <h2 className="eyebrow" id={id}>{title}</h2>
         {menu(current)}
       </div>
-      <button className="booking-back booking-back--tertiary my-lessons__back" onClick={() => onSelectSection?.("upcoming")} type="button">
-        <ArrowLeft size={16} aria-hidden="true" /> Your lessons
-      </button>
+      {aside}
     </div>
   );
   const alert = error || loadError ? (
@@ -448,6 +500,7 @@ export function MyLessons({
   if (section === "history") {
     return (
       <section className="account-card my-lessons__history" id="account-past-lessons" aria-labelledby="past-lessons-heading" tabIndex={-1}>
+        <AccountSignature mark={student.mark} />
         {heading("past-lessons-heading", "Past lessons", "history")}
         {alert}
         {past.length ? (
@@ -464,90 +517,190 @@ export function MyLessons({
   if (section === "profile") {
     return (
       <section className="account-card my-lessons__details" aria-labelledby="account-details-heading" ref={detailsRef}>
-        {heading("account-details-heading", "Your details", "profile")}
-        <div className="my-lessons__details-row">
-          <label>
-            <span>Your name</span>
-            <input
-              autoComplete="name"
-              onChange={(event) => setDetails((current) => ({ ...current, name: event.target.value }))}
-              value={details.name}
-            />
-          </label>
-          <button
-            className="button button--coral"
-            disabled={savingName || !details.name.trim() || details.name.trim() === student.name}
-            onClick={saveName}
-            type="button"
-          >
-            {savingName ? "Saving…" : "Save name"}
+        {heading(
+          "account-details-heading",
+          "Your details",
+          "profile",
+          // Signing out ends the visit, so it waits at the top right, small,
+          // where Book stands on Your lessons (10 October 2026, at Dan's request).
+          <button className="my-lessons__sign-out" onClick={() => onSignOut?.()} type="button">
+            Sign out
           </button>
-        </div>
+        )}
+        {/* Each detail reads as itself with its own Change, or Add where it
+            is empty; changing one opens it in place (10 October 2026, at
+            Dan's request). */}
+        <div className="my-lessons__facts">
+          {student.mark !== undefined ? (
+            <div className="my-lessons__fact" data-field="mark">
+              <span className="my-lessons__fact-label">Your splat</span>
+              {openField === "mark" ? (
+                <div aria-label="Choose your splat" className="my-lessons__marks" role="group">
+                  {[{ id: "", label: "Your initial" }, ...STUDENT_MARKS].map((choice) => (
+                    <button
+                      aria-label={choice.label}
+                      aria-pressed={(student.mark ?? "") === choice.id}
+                      className="my-lessons__mark"
+                      disabled={savingMark !== null}
+                      key={choice.id || "initial"}
+                      onClick={() => void saveMark(choice.id)}
+                      type="button"
+                    >
+                      <AccountAvatar mark={choice.id} name={student.name} />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className="my-lessons__fact-value">
+                  <AccountAvatar className="my-lessons__avatar" mark={student.mark} name={student.name} />
+                </span>
+              )}
+              {openField === "mark" ? (
+                <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
+              ) : (
+                <button className="my-lessons__change" onClick={() => openDetail("mark")} type="button">
+                  Change<span className="visually-hidden"> splat</span>
+                </button>
+              )}
+            </div>
+          ) : null}
 
-        {/* Each note travels with its own field, so paired on a wide
-            screen it sits under that field rather than across both. */}
-        <div className="my-lessons__field">
-          <div className="my-lessons__details-row">
-            <label>
-              <span>Email</span>
-              <input
-                autoComplete="email"
-                onChange={(event) => {
-                  emailDraftVersion.current += 1;
-                  setDetails((current) => ({ ...current, email: event.target.value }));
+          <div className="my-lessons__fact" data-field="name">
+            {openField === "name" ? (
+              <form
+                className="my-lessons__edit"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!savingName && details.name.trim() && details.name.trim() !== student.name) void saveName();
                 }}
-                type="email"
-                value={details.email}
-              />
-            </label>
-            {/* Changing the address you sign in with is deliberately the slower
-                of the two: nothing moves until the new address answers. */}
-            <button
-              className="button button--blue"
-              disabled={emailBusy || !details.email.trim() || details.email.trim() === student.email}
-              onClick={changeEmail}
-              type="button"
-            >
-              Send confirmation link
-            </button>
+              >
+                <label>
+                  <span>Your name</span>
+                  <input
+                    autoComplete="name"
+                    onChange={(event) => setDetails((current) => ({ ...current, name: event.target.value }))}
+                    value={details.name}
+                  />
+                </label>
+                <div className="my-lessons__edit-actions">
+                  <button
+                    className="button button--coral"
+                    disabled={savingName || !details.name.trim() || details.name.trim() === student.name}
+                    type="submit"
+                  >
+                    {savingName ? "Saving…" : "Save name"}
+                  </button>
+                  <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <span className="my-lessons__fact-label">Your name</span>
+                <span className="my-lessons__fact-value">{student.name}</span>
+                <button className="my-lessons__change" onClick={() => openDetail("name")} type="button">
+                  Change<span className="visually-hidden"> name</span>
+                </button>
+              </>
+            )}
           </div>
 
-          {emailPending ? (
-            <p className="my-lessons__details-note">
-              Check <strong>{emailPending}</strong>. It only becomes your address once that link is used. Until then
-              you sign in with {student.email}.
-            </p>
-          ) : (
-            <p className="my-lessons__details-note">
-              A new email address only takes effect once you confirm it from the link we send.
-            </p>
-          )}
-        </div>
-
-        <div className="my-lessons__field">
-          <div className="my-lessons__details-row">
-            <label>
-              <span>
-                NIF <em>(optional)</em>
-              </span>
-              <input
-                autoComplete="off"
-                inputMode="numeric"
-                maxLength={20}
-                onChange={(event) => setDetails((current) => ({ ...current, nif: event.target.value }))}
-                value={details.nif}
-              />
-            </label>
-            <button
-              className="button button--coral"
-              disabled={savingNif || details.nif.trim() === (student.nif ?? "")}
-              onClick={saveNif}
-              type="button"
-            >
-              {savingNif ? "Saving…" : "Save NIF"}
-            </button>
+          <div className="my-lessons__fact" data-field="email">
+            {openField === "email" ? (
+              <form
+                className="my-lessons__edit"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!emailBusy && details.email.trim() && details.email.trim() !== student.email) void changeEmail();
+                }}
+              >
+                <label>
+                  <span>Email</span>
+                  <input
+                    autoComplete="email"
+                    onChange={(event) => {
+                      emailDraftVersion.current += 1;
+                      setDetails((current) => ({ ...current, email: event.target.value }));
+                    }}
+                    type="email"
+                    value={details.email}
+                  />
+                </label>
+                {/* Changing the address you sign in with is deliberately the slower
+                    of the two: nothing moves until the new address answers. */}
+                <div className="my-lessons__edit-actions">
+                  <button
+                    className="button button--blue"
+                    disabled={emailBusy || !details.email.trim() || details.email.trim() === student.email}
+                    type="submit"
+                  >
+                    Send confirmation link
+                  </button>
+                  <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
+                </div>
+                <p className="my-lessons__details-note">It changes once you open the link we send to the new address.</p>
+              </form>
+            ) : (
+              <>
+                <span className="my-lessons__fact-label">Email</span>
+                <span className="my-lessons__fact-value">
+                  {student.email}
+                  {emailPending ? (
+                    <small className="my-lessons__details-note">
+                      Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.
+                    </small>
+                  ) : null}
+                </span>
+                <button className="my-lessons__change" onClick={() => openDetail("email")} type="button">
+                  Change<span className="visually-hidden"> email</span>
+                </button>
+              </>
+            )}
           </div>
-          <p className="my-lessons__details-note">Added to your receipts. Leave it blank if you don&rsquo;t need one.</p>
+
+          <div className="my-lessons__fact" data-field="nif">
+            {openField === "nif" ? (
+              <form
+                className="my-lessons__edit"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!savingNif && details.nif.trim() !== (student.nif ?? "")) void saveNif();
+                }}
+              >
+                <label>
+                  <span>
+                    NIF <em>(optional, for your receipts)</em>
+                  </span>
+                  <input
+                    autoComplete="off"
+                    inputMode="numeric"
+                    maxLength={20}
+                    onChange={(event) => setDetails((current) => ({ ...current, nif: event.target.value }))}
+                    value={details.nif}
+                  />
+                </label>
+                <div className="my-lessons__edit-actions">
+                  <button
+                    className="button button--coral"
+                    disabled={savingNif || details.nif.trim() === (student.nif ?? "")}
+                    type="submit"
+                  >
+                    {savingNif ? "Saving…" : "Save NIF"}
+                  </button>
+                  <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <span className="my-lessons__fact-label">NIF</span>
+                <span className={`my-lessons__fact-value${student.nif ? "" : " my-lessons__fact-value--empty"}`}>
+                  {student.nif || "Not added"}
+                </span>
+                <button className="my-lessons__change" onClick={() => openDetail("nif")} type="button">
+                  {student.nif ? <>Change<span className="visually-hidden"> NIF</span></> : "Add NIF"}
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Only some students have a code, so nothing here suggests they should:

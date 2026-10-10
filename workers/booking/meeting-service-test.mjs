@@ -198,6 +198,26 @@ try {
     assert.equal(meetingUrl(await prepareMeeting(env, row(result.id))), link);
     assert.equal(events.size, 1);
   });
+  await test("lessons booked before links reached students hear the day before; new bookings at once", async () => {
+    // The test clock runs before the real cutoff, so this run draws its own.
+    const backlogBefore = iso(-3600000);
+    const before = iso(-2 * 3600000);
+    const far = await prepareMeeting(env, addBooking("backlog-far", { created_at: before, starts_at: iso(3 * 86400000), ends_at: iso(3 * 86400000 + 3600000) }));
+    const near = await prepareMeeting(env, addBooking("backlog-near", { created_at: before, starts_at: iso(20 * 3600000), ends_at: iso(21 * 3600000) }));
+    const fresh = await prepareMeeting(env, addBooking("fresh-far", { starts_at: iso(3 * 86400000 + 60000), ends_at: iso(3 * 86400000 + 3660000) }));
+    for (const ready of [far, near, fresh]) assert.equal(meetingUrl(ready), link);
+    const sent = [];
+    await syncPendingMeetings(env, async booking => { sent.push(booking.id); return true; }, { backlogBefore });
+    assert.ok(sent.includes(near.id), "An older booking within a day of its lesson hears now");
+    assert.ok(sent.includes(fresh.id), "A booking made since hears straight away, however far off");
+    assert.ok(!sent.includes(far.id), "An older booking days away waits");
+    assert.equal(row(far.id).meeting_notified_at, null);
+    clock += 2 * 86400000 + 60000;
+    sent.length = 0;
+    await syncPendingMeetings(env, async booking => { sent.push(booking.id); return true; }, { backlogBefore });
+    assert.deepEqual(sent.filter(id => id === far.id), [far.id], "It hears the day before, once");
+    assert.ok(row(far.id).meeting_notified_at);
+  });
   await test("online and Porto cancellations soft-cancel the existing event", async () => {
     for (const location of ["online", "porto"]) {
       const ready = await prepareMeeting(env, addBooking(`cancel-${location}`, { location }));

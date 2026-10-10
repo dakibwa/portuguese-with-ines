@@ -37,6 +37,7 @@
     "test:www-redirect": "node workers/www-redirect/test.mjs",
     "test:teacher-calendar": "node --experimental-strip-types --test scripts/test-teacher-calendar.mjs",
     "build:email-banner": "node scripts/build-email-banner.mjs",
+    "build:email-icons": "node scripts/build-email-icons.mjs",
     "build:og-image": "node scripts/build-og-image.mjs"
   },
   "dependencies": {

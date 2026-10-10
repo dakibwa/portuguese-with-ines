@@ -69,13 +69,13 @@ try {
     await signUp.page.getByRole("tab", { name: "Create an account", exact: true }).click();
     const form = signUp.page.locator(".auth-panel__form");
     const fields = await form.locator("label > span").allInnerTexts();
-    assert.match(fields.at(-1).replace(/\s+/g, " "), /^NIF \(optional\)$/i, `NIF should be the last, optional field: ${fields}`);
+    assert.match(fields.at(-1).replace(/\s+/g, " "), /^NIF \(optional, for your receipts\)$/i, `NIF should be the last, optional field, saying what it is for: ${fields}`);
     await form.getByLabel("Your name").fill("Ana");
     await form.getByLabel("Email").fill("ana@example.invalid");
     await form.getByLabel("Password").fill("a-long-password");
-    const nif = form.getByLabel("NIF (optional)");
+    const nif = form.getByLabel(/^NIF \(optional/);
     await expect(nif).toHaveAttribute("inputmode", "numeric");
-    await expect(form).toContainText("Added to your receipts.");
+    await expect(form).toContainText("NIF (optional, for your receipts)");
     await nif.fill(" 123456788 ");
     await oneBlueBoundary(nif);
     await form.getByRole("button", { name: "Create my account", exact: true }).click();
@@ -134,8 +134,13 @@ try {
     if (await toggle.isVisible() && await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
     await details.page.locator("#account-menu").getByRole("button", { name: "Edit details", exact: true }).click();
     const editor = details.page.locator(".my-lessons__details");
-    const field = editor.getByLabel("NIF (optional)");
+    const field = editor.getByLabel(/^NIF \(optional/);
     const save = editor.getByRole("button", { name: "Save NIF", exact: true });
+    const nifRow = editor.locator('.my-lessons__fact[data-field="nif"]');
+    // Each detail shows what is saved; an empty NIF offers to add one.
+    await expect(nifRow).toContainText("Not added");
+    await nifRow.getByRole("button", { name: "Add NIF", exact: true }).click();
+    await expect(field).toBeFocused();
     await expect(save).toBeDisabled();
     // Until it can act it is a quiet outline, not a faded coral fill.
     await expect(save).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -148,17 +153,23 @@ try {
     await oneBlueBoundary(field);
     await save.click();
     await expect(editor).toContainText("Saved. Your receipts will show this NIF.");
-    await expect(field).toHaveValue("123456789");
-    await expect(save).toBeDisabled();
+    // Saved, the detail closes and shows what is saved, ready to change.
+    await expect(field).toHaveCount(0);
+    await expect(nifRow).toContainText("123456789");
     assert.ok(await noOverflow(details.page));
     await editor.screenshot({ path: `tmp/qa/nif/details-${width}.png` });
+    await nifRow.getByRole("button", { name: "Change NIF", exact: true }).click();
+    await expect(field).toHaveValue("123456789");
+    await expect(save).toBeDisabled();
     await field.fill("12345");
     await save.click();
     await expect(details.page.locator(".booking-alert[role=alert]")).toContainText("A NIF has 9 digits");
     assert.equal(saved, "123456789");
+    // A refused NIF keeps its field open to put right.
     await field.fill("");
     await save.click();
     await expect(editor).toContainText("Saved. Your receipts won’t show a NIF.");
+    await expect(nifRow).toContainText("Not added");
     assert.deepEqual(details.posts.filter((post) => post.endpoint === "/me").map((post) => post.body), [{ nif: "123 456 789" }, { nif: "12345" }, { nif: "" }]);
     assert.deepEqual(details.errors, []);
     await details.page.close();

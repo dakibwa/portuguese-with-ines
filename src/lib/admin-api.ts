@@ -37,6 +37,8 @@ export type AdminBooking = {
   student_phone: string;
   /** The student's NIF for their receipt; empty when none was given. */
   student_nif?: string;
+  /** The splat the student chose to wear beside their name; empty for none. */
+  student_mark?: string;
   starts_at: string;
   ends_at: string;
   status: "confirmed" | "cancelled";

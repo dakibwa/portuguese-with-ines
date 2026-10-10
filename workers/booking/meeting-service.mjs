@@ -11,6 +11,16 @@ const hash = async value => hex(await digest(value));
 const base64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const callback = env => env.GOOGLE_CALENDAR_REDIRECT_URI;
 
+/**
+ * Lessons booked before Meet links began reaching students (10 October 2026)
+ * never had theirs. Rather than all arriving at once, out of the blue, days
+ * early, each of those waits until the day before its lesson; anything booked
+ * since gets its link straight away, in the confirmation or just after it
+ * (at Dan's request).
+ */
+export const MEETING_BACKLOG_BEFORE = "2026-10-10T10:00:00.000Z";
+export const MEETING_BACKLOG_NOTICE_MS = 24 * 3600000;
+
 export function meetingUrl(row) {
   if (row?.location !== "online" || row.status !== "confirmed") return null;
   return /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(row.meeting_url ?? "") ? row.meeting_url : null;
@@ -152,11 +162,16 @@ export async function prepareMeeting(env, input) {
     } else {
       const meeting = await ensureCalendarMeeting(env, account, {
         bookingId: row.id, iCalUID: calendarUid(row.id), eventId: row.meeting_event_id,
-        requestId: `pwi-${row.id}-${row.sequence}-${row.meeting_attempts ?? 0}`, summary: `Portuguese lesson · ${row.student_name}`,
+        // A fresh request each attempt: Google treats a repeated requestId as
+        // the same request, so an event left without a room was asked for it
+        // again and again under the one id and never given one. No Meet link
+        // had reached any lesson since the calendar was connected.
+        requestId: `pwi-${row.id}-${row.sequence}-${row.meeting_attempts ?? 0}-${now.getTime().toString(36)}`, summary: `Portuguese lesson · ${row.student_name}`,
         description: `${row.location === "online" ? "Online" : "In-person Porto"} Portuguese lesson. Booking reference: ${row.reference}. Manage lessons on https://portuguesewithines.com/schedule/`,
         online: row.location === "online",
         startAt: row.starts_at, endAt: row.ends_at,
       });
+      if (meeting.status !== "ready") console.warn("google-calendar-sync", row.reference, "meeting_pending", meeting.conference ?? "unknown");
       // Persist provider identity even if the student changed/cancelled while
       // Google worked; the next sweep then reconciles the same event.
       await env.DB.prepare(`UPDATE bookings SET meeting_notified_at = CASE WHEN meeting_url IS ? THEN meeting_notified_at ELSE NULL END,
@@ -185,7 +200,7 @@ export async function markMeetingNotified(env, row) {
   }
 }
 
-export async function syncPendingMeetings(env, notifyReady) {
+export async function syncPendingMeetings(env, notifyReady, { backlogBefore = MEETING_BACKLOG_BEFORE } = {}) {
   if (!enabled(env)) return;
   const account = await completeCalendarSetup(env);
   if (!account || account.status !== "active" || !account.calendar_id) return;
@@ -198,8 +213,10 @@ export async function syncPendingMeetings(env, notifyReady) {
   // Give the ordinary confirmation a chance to include a synchronously-ready
   // link. Later-created links get one dedicated email, retried on send failure.
   const { results: ready } = await env.DB.prepare(`SELECT * FROM bookings WHERE status = 'confirmed' AND location = 'online'
-    AND meeting_url IS NOT NULL AND meeting_notified_at IS NULL AND ends_at > ? AND created_at < ? ORDER BY starts_at LIMIT 6`)
-    .bind(now, new Date(Date.now() - 120000).toISOString()).all();
+    AND meeting_url IS NOT NULL AND meeting_notified_at IS NULL AND ends_at > ? AND created_at < ?
+    AND (created_at >= ? OR starts_at <= ?) ORDER BY starts_at LIMIT 6`)
+    .bind(now, new Date(Date.now() - 120000).toISOString(), backlogBefore,
+      new Date(Date.now() + MEETING_BACKLOG_NOTICE_MS).toISOString()).all();
   for (const row of ready ?? []) {
     if (!meetingUrl(row)) continue;
     const leaseUntil = new Date(Date.now() + 300000).toISOString();
