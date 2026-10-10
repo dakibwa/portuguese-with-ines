@@ -558,7 +558,7 @@ export function TeacherSchedule() {
           </div>
           {editing ? (
             <button
-              className="teacher-mode-button"
+              className="button button--outline teacher-mode-button"
               type="button"
               onClick={() => setEditing(false)}
             >
@@ -567,7 +567,7 @@ export function TeacherSchedule() {
             </button>
           ) : (
             <button
-              className="teacher-mode-button"
+              className="button button--coral teacher-mode-button"
               type="button"
               onClick={() => setEditing(true)}
             >
