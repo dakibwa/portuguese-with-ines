@@ -1022,8 +1022,9 @@ as a form:
   student`, her sign-in with no `Create an account`, and each student's chosen
   splat beside their name when she opens a lesson. Her week is set as the
   student's calendar: a hand-cut card, quiet capital weekdays with `Today`
-  in words, the solid blue arrows, blue lessons over a quiet lilac for her
-  weekly hours,
+  in words, the solid blue arrows, blue lessons over a faint coral wash for
+  her weekly hours, Monday to Friday only (a weekend day appears when it
+  holds a lesson or hours of its own),
   and `Weekly hours` a coral button in the middle of the week's row. A lesson opens in the student's own dialog: status, the student,
   the time in bold with its length and place beneath, then `Move lesson` in
   coral beside `Cancel lesson`, with `Mark no-show` a quiet link below;

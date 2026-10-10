@@ -88,6 +88,19 @@ export function WeeklyTimetable({
     [bookings, weekStart],
   );
   const offDays = useMemo(() => daysOff(exceptions), [exceptions]);
+  // Inês doesn't teach at weekends, so Saturday and Sunday stay out of her
+  // week (10 October 2026, at Dan's request) unless one holds a lesson that
+  // week or weekly hours of its own; Set exact hours still offers every day.
+  const shown = WEEKDAYS.map((_, index) => index).filter(
+    (index) =>
+      index < 5 ||
+      (hours[WEEKDAYS[index].value] ?? []).length > 0 ||
+      (!editing &&
+        segments.some((segment) => segment.date === shiftDate(weekStart, index))),
+  );
+  const activeDay = shown.includes(mobileDay)
+    ? mobileDay
+    : [...shown].reverse().find((index) => index < mobileDay) ?? shown[0];
   // Rows stay half-hourly even when lessons can start every 15 minutes: a
   // lesson at :15 or :45 still sits at its exact time, and her week stays one
   // screen tall instead of doubling. The exact-time editor covers quarter hours.
@@ -165,7 +178,7 @@ export function WeeklyTimetable({
   // Reopen the shown day when the timetable appears or the week changes, but
   // not when keyboard focus moves to another day: the focused time stays put.
   useLayoutEffect(() => {
-    openShownDay.current = () => openDay(mobileDay);
+    openShownDay.current = () => openDay(activeDay);
   });
   useLayoutEffect(() => {
     openShownDay.current();
@@ -294,11 +307,14 @@ export function WeeklyTimetable({
     day: number,
     minute: number,
   ) {
-    const dayIndex = WEEKDAYS.findIndex((entry) => entry.value === day);
-    let nextDay = dayIndex;
+    const position = shown.indexOf(
+      WEEKDAYS.findIndex((entry) => entry.value === day),
+    );
+    let nextPosition = position;
     let nextMinute = minute;
-    if (event.key === "ArrowLeft") nextDay = Math.max(0, dayIndex - 1);
-    else if (event.key === "ArrowRight") nextDay = Math.min(6, dayIndex + 1);
+    if (event.key === "ArrowLeft") nextPosition = Math.max(0, position - 1);
+    else if (event.key === "ArrowRight")
+      nextPosition = Math.min(shown.length - 1, position + 1);
     else if (event.key === "ArrowUp") nextMinute -= step;
     else if (event.key === "ArrowDown") nextMinute += step;
     else if (event.key === "Home") nextMinute = start;
@@ -306,6 +322,7 @@ export function WeeklyTimetable({
     else return;
     event.preventDefault();
     nextMinute = Math.max(start, Math.min(end - step, nextMinute));
+    const nextDay = shown[nextPosition];
     const weekday = WEEKDAYS[nextDay].value;
     pendingFocus.current = true;
     onSelectDay(nextDay);
@@ -326,14 +343,16 @@ export function WeeklyTimetable({
       <div
         className={`teacher-timetable ${editing ? "teacher-timetable--editing" : ""}`}
         ref={gridRef}
+        style={{ "--teacher-days": shown.length } as CSSProperties}
       >
         <div className="teacher-week-days">
           <span className="teacher-axis-heading">Porto</span>
-          {WEEKDAYS.map((day, index) => {
+          {shown.map((index) => {
+            const day = WEEKDAYS[index];
             const date = shiftDate(weekStart, index);
             return (
               <button
-                className={`teacher-day-heading ${mobileDay === index ? "is-selected" : ""} ${!editing && date === today ? "is-today" : ""}`}
+                className={`teacher-day-heading ${activeDay === index ? "is-selected" : ""} ${!editing && date === today ? "is-today" : ""}`}
                 key={day.value}
                 type="button"
                 aria-label={
@@ -341,9 +360,9 @@ export function WeeklyTimetable({
                     ? `${day.name}, show weekly hours`
                     : `${dateLabel(date)}, show lessons`
                 }
-                aria-pressed={mobileDay === index}
+                aria-pressed={activeDay === index}
                 onClick={() => {
-                  if (index !== mobileDay) openDay(index);
+                  if (index !== activeDay) openDay(index);
                   onSelectDay(index);
                   setFocus((current) => ({ ...current, day: day.value }));
                 }}
@@ -373,13 +392,14 @@ export function WeeklyTimetable({
         {!editing ? (
           <div className="teacher-day-toggles">
             <span aria-hidden="true" />
-            {WEEKDAYS.map((day, index) => {
+            {shown.map((index) => {
+              const day = WEEKDAYS[index];
               const date = shiftDate(weekStart, index);
               const off = offDays.has(date);
               return (
                 <div
                   className="teacher-day-toggle-cell"
-                  data-mobile-active={mobileDay === index}
+                  data-mobile-active={activeDay === index}
                   key={day.value}
                 >
                   <button
@@ -430,7 +450,8 @@ export function WeeklyTimetable({
                 ) : null,
               )}
             </div>
-            {WEEKDAYS.map((day, index) => {
+            {shown.map((index) => {
+              const day = WEEKDAYS[index];
               const date = shiftDate(weekStart, index);
               const off = !editing && offDays.has(date);
               const past = date < today;
@@ -458,7 +479,7 @@ export function WeeklyTimetable({
               return (
                 <div
                   key={day.value}
-                  data-mobile-active={mobileDay === index}
+                  data-mobile-active={activeDay === index}
                   className={`teacher-time-day ${off ? "teacher-time-day--off" : ""} ${!editing && past ? "teacher-time-day--past" : ""}`}
                 >
                   {off ? (
@@ -479,7 +500,7 @@ export function WeeklyTimetable({
                     const usual = startsInCell.length > 0;
                     const inWeekly = overlapsSpan(weekly, minute, cellEnd);
                     const focusable =
-                      WEEKDAYS[mobileDay].value === day.value &&
+                      WEEKDAYS[activeDay].value === day.value &&
                       focusMinute === minute;
                     const pointer = {
                       tabIndex: focusable ? 0 : -1,

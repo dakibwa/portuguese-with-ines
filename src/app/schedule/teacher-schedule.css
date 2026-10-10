@@ -127,14 +127,16 @@
   }
 }
 .teacher-week-heading {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 /* The way to take time off waits behind a question mark, its tip a small
    dark card beneath it, as on a student's calendar. */
+/* The tip hangs from the week's heading rather than the mark, so on a narrow
+   phone it starts at the page's edge instead of running off it. */
 .teacher-week-help {
-  position: relative;
   display: inline-flex;
 }
 .teacher-week-help__button {
@@ -261,7 +263,7 @@
 .teacher-week-days,
 .teacher-time-grid {
   display: grid;
-  grid-template-columns: 56px repeat(7, minmax(0, 1fr));
+  grid-template-columns: 56px repeat(var(--teacher-days, 7), minmax(0, 1fr));
 }
 .teacher-week-days {
   background: var(--paper);
@@ -326,7 +328,7 @@
 }
 .teacher-day-toggles {
   display: grid;
-  grid-template-columns: 56px repeat(7, minmax(0, 1fr));
+  grid-template-columns: 56px repeat(var(--teacher-days, 7), minmax(0, 1fr));
   background: var(--paper);
   border-bottom: 1px solid var(--rule);
 }
@@ -432,10 +434,10 @@
 .teacher-time-slot.is-hour {
   border-top: 1px solid var(--rule-soft);
 }
-/* A quieter lilac for her hours, under blue lessons (10 October 2026, at
-   Dan's request). */
+/* Her weekly hours are a faint coral wash under blue lessons (10 October
+   2026, at Dan's request); while editing, marked starts stay lilac. */
 .teacher-time-slot.is-available {
-  background: rgba(170, 164, 230, 0.13);
+  background: rgba(239, 93, 60, 0.08);
 }
 .teacher-timetable--editing .teacher-time-slot.is-available {
   background: var(--lavender-soft);
@@ -675,6 +677,10 @@
   border: 1px solid transparent;
 }
 .teacher-key-starts {
+  background: rgba(239, 93, 60, 0.14);
+  border-color: rgba(239, 93, 60, 0.35) !important;
+}
+.teacher-timetable--editing + .teacher-grid-footnote .teacher-key-starts {
   background: var(--lavender-soft);
   border-color: var(--lavender) !important;
 }
@@ -1218,7 +1224,7 @@
     min-height: 44px;
   }
   .teacher-week-days {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--teacher-days, 7), minmax(0, 1fr));
   }
   .teacher-axis-heading {
     display: none;

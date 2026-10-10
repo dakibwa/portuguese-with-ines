@@ -662,10 +662,21 @@ try {
     .filter({ hasText: "18:00–18:30 on Tue 8 Sept is off." })
     .waitFor();
   await showHours(mobile.page);
+  // Weekends are left out of her week until they have hours of their own, so
+  // Saturday is added through Set exact hours, and then appears.
+  await expect(
+    mobile.page.getByRole("button", { name: "Saturday, show weekly hours" }),
+  ).toHaveCount(0);
+  await mobile.page.getByText("Set exact hours", { exact: true }).tap();
+  await mobile.page
+    .locator(".teacher-exact-hours__body select")
+    .selectOption({ label: "Saturday" });
+  await mobile.page
+    .getByRole("button", { name: "Add a time window", exact: true })
+    .tap();
   await mobile.page
     .getByRole("button", { name: "Saturday, show weekly hours" })
     .tap();
-  await slot(mobile.page, 6, 600).tap();
   await expect(slot(mobile.page, 6, 600)).toHaveAttribute(
     "aria-pressed",
     "true",
