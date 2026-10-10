@@ -301,7 +301,7 @@
 }
 /* Set as the student's calendar is (10 October 2026, at Dan's request):
    quiet capitals over the date, and today said in words beneath it. */
-.teacher-day-heading > span:first-child {
+.teacher-day-heading > span {
   opacity: 0.7;
 }
 .teacher-day-heading strong {
