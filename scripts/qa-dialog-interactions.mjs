@@ -139,6 +139,8 @@ try {
           }
           await expect(dialog).toHaveCount(0); await expect(page.locator(".teacher-calendar-loading")).toHaveCount(0);
           await expect(page.locator("#teacher-week-title")).toBeFocused();
+          // The week's help sits beside its heading, then Weekly hours.
+          await page.keyboard.press("Tab"); await expect(page.getByRole("button", { name: "How to take time off", exact: true })).toBeFocused();
           await page.keyboard.press("Tab"); await expect(page.getByRole("button", { name: /^Weekly hours/ })).toBeFocused();
           assert.equal(state.writes.length, 1);
         }

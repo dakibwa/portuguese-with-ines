@@ -122,6 +122,14 @@ function bookingDefaults(path) {
   return null;
 }
 
+// Your details lists each value with its own Change (or Add); one opens at a time.
+const detailRow = (page, field) => page.locator(`.my-lessons__fact[data-field="${field}"]`);
+const detailValue = (page, field) => detailRow(page, field).locator(".my-lessons__fact-value");
+async function openDetail(page, field) {
+  await detailRow(page, field).locator(".my-lessons__change").click();
+  await expect(detailRow(page, field).locator("input")).toBeVisible();
+}
+
 let cases = 0;
 try {
   for (const width of [320, 390, 1280]) {
@@ -154,13 +162,14 @@ try {
           };
         });
         await chooseAccount(page, "Edit details");
+        await detailRow(page, field).locator(".my-lessons__change").click();
         const input = page.getByLabel(field === "name" ? "Your name" : field === "email" ? "Email" : /^NIF \(optional/, { exact: true });
         const value = field === "name" ? "Ana Draft" : field === "email" ? "draft@example.invalid" : "248899945";
         await input.fill(value);
         await page.evaluate(() => window.qaReleaseEditorFrames());
         await expect(input).toBeFocused();
         await expect(input).toHaveValue(value);
-        if (field !== "name") await expect(page.getByLabel("Your name", { exact: true })).toHaveValue(student.name);
+        if (field !== "name") await expect(detailValue(page, "name")).toHaveText(student.name);
         await check(state); cases += 1;
       } finally { await state.context.close(); }
     }
@@ -202,41 +211,49 @@ try {
           const email = page.getByLabel("Email", { exact: true });
           const saveName = page.getByRole("button", { name: "Save name", exact: true });
           const saveNif = page.getByRole("button", { name: "Save NIF", exact: true });
+          const sendEmail = page.getByRole("button", { name: "Send confirmation link", exact: true });
+          await openDetail(page, "name");
           await name.fill("Ana Saved");
           await saveName.click();
-          await expect(saveName).toBeDisabled();
-          await nif.fill("248899945");
+          await expect(name).toHaveCount(0);
+          await expect(detailValue(page, "name")).toHaveText("Ana Saved");
+          // One detail is open while the confirmation lands: a newer email, or a NIF.
+          await openDetail(page, newerEmail ? "email" : "nif");
           if (newerEmail) await email.fill("later@example.invalid");
+          else await nif.fill("248899945");
           const response = page.waitForResponse("**/me/email/confirm");
           waiting.resolve();
           await response;
           await expect(page.getByRole("status").filter({ hasText: "That’s your email address updated." })).toBeVisible();
-          await expect(name).toHaveValue("Ana Saved");
-          await expect(saveName).toBeDisabled();
-          await expect(nif).toHaveValue("248899945");
-          await expect(saveNif).toBeEnabled();
-          await expect(email).toHaveValue(newerEmail ? "later@example.invalid" : "verified@example.invalid");
-          const sendEmail = page.getByRole("button", { name: "Send confirmation link", exact: true });
-          if (newerEmail) await expect(sendEmail).toBeEnabled();
-          else await expect(sendEmail).toBeDisabled();
+          await expect(detailValue(page, "name")).toHaveText("Ana Saved");
+          if (newerEmail) {
+            await expect(email).toHaveValue("later@example.invalid");
+            await expect(sendEmail).toBeEnabled();
+          } else {
+            await expect(nif).toHaveValue("248899945");
+            await expect(saveNif).toBeEnabled();
+            await expect(detailValue(page, "email")).toHaveText("verified@example.invalid");
+          }
           assert.equal(await page.evaluate(() => localStorage.getItem("ines-student-session")), rotate ? "renewed-continuity" : "isolated-continuity");
           assert.equal(new URL(page.url()).search, "?view=lessons&source=email");
           assert.equal(new URL(page.url()).hash, "#account");
           assert.equal(confirmations, 1);
           await check(state);
           if (rotate && !newerEmail && width !== 390) await page.screenshot({ path: `${output}/email-renewal-${width}.png`, fullPage: true });
-          await saveNif.click();
-          await expect(saveNif).toBeDisabled();
-          assert.deepEqual(profilePosts, [{ name: "Ana Saved" }, { nif: "248899945" }]);
+          if (!newerEmail) {
+            await saveNif.click();
+            await expect(nif).toHaveCount(0);
+          }
+          assert.deepEqual(profilePosts, newerEmail ? [{ name: "Ana Saved" }] : [{ name: "Ana Saved" }, { nif: "248899945" }]);
           await chooseAccount(page, "Done editing");
           await chooseAccount(page, "Edit details");
-          await expect(name).toHaveValue("Ana Saved");
-          await expect(nif).toHaveValue("248899945");
-          await expect(email).toHaveValue(newerEmail ? "later@example.invalid" : "verified@example.invalid");
+          await expect(detailValue(page, "name")).toHaveText("Ana Saved");
+          if (!newerEmail) await expect(detailValue(page, "nif")).toHaveText("248899945");
+          await expect(detailValue(page, "email")).toHaveText("verified@example.invalid");
           await check(state);
           await page.reload();
           await chooseAccount(page, "Edit details");
-          await expect(email).toHaveValue("verified@example.invalid");
+          await expect(detailValue(page, "email")).toHaveText("verified@example.invalid");
           assert.equal(confirmations, 1);
           assert.equal(await page.evaluate(() => localStorage.getItem("ines-student-session")), rotate ? "renewed-continuity" : "isolated-continuity");
           await check(state);
@@ -292,25 +309,29 @@ try {
         const { page } = state;
         await page.goto(`${base}/book/?view=book`);
         await page.getByRole("radio", { name: "Single", exact: true }).check();
-        await page.getByRole("button", { name: /^Your lessons/ }).first().click();
+        // Signed in, booking is headed by the account's own bar.
+        const head = page.locator(".booking-bar__head--account");
+        await head.waitFor({ state: "visible" });
+        if (await head.locator("#account-menu-button").isVisible()) await head.locator("#account-menu-button").click();
+        await head.getByRole("button", { name: /^Your lessons/ }).click();
         await started.promise;
         await chooseAccount(page, "Edit details");
+        await openDetail(page, field);
         const input = page.getByLabel(field === "name" ? "Your name" : /^NIF \(optional/, { exact: true });
         const save = page.getByRole("button", { name: field === "name" ? "Save name" : "Save NIF", exact: true });
         const value = field === "name" ? "Ana Saved" : "248899945";
         await input.fill(value);
         await save.click();
-        await expect(save).toBeDisabled();
+        await expect(input).toHaveCount(0);
         const response = page.waitForResponse(r => r.request().method() === "GET" && new URL(r.url()).pathname === "/me");
         waiting.resolve();
         await response;
         await check(state);
-        await expect(input).toHaveValue(value);
-        await expect(save).toBeDisabled();
+        // The older snapshot arriving afterwards does not undo the save.
+        await expect(detailValue(page, field)).toHaveText(value);
         await chooseAccount(page, "Done editing");
         await chooseAccount(page, "Edit details");
-        await expect(input).toHaveValue(value);
-        await expect(save).toBeDisabled();
+        await expect(detailValue(page, field)).toHaveText(value);
         await check(state);
         cases += 1;
       } finally { waiting.resolve(); await state.context.close(); }
