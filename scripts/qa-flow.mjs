@@ -2510,7 +2510,12 @@ await changeDate.waitFor({ state: "visible" });
 await accountPage.locator("#lesson-calendar .unified-calendar__availability .slot-grid button").first().click();
 await confirmHeading.waitFor();
 await changeLessonTime.click();
-await accountPage.getByRole("button", { name: /^Your lessons/ }).first().click();
+// Signed in, booking is headed by the account's own bar: its places are open
+// on a wide card and folded into the name's menu on a narrow one.
+await accountPage.locator(".booking-bar__head--account").waitFor({ state: "visible" });
+const bookingBarMenu = accountPage.locator(".booking-bar__head #account-menu-button");
+if (await bookingBarMenu.isVisible()) await bookingBarMenu.click();
+await accountPage.locator(".booking-bar__head").getByRole("button", { name: /^Your lessons/ }).click();
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 await bookQaLessonAndReturnToUpcoming({ recurring: false });
 await bookQaLessonAndReturnToUpcoming({ recurring: true });

@@ -101,6 +101,10 @@ export function MyLessons({
   const [series, setSeries] = useState<LessonSeries[]>(initialAccount?.series ?? []);
   const editing = section === "profile";
   const [details, setDetails] = useState(() => accountDetails(initialAccount?.student));
+  // What each open row holds now, read when a save returns: a row closes only
+  // if nothing newer was typed into it while it saved.
+  const latestDetails = useRef(details);
+  useEffect(() => { latestDetails.current = details; }, [details]);
   const [savingName, setSavingName] = useState(false);
   const [savingNif, setSavingNif] = useState(false);
   // Your details shows each value with its own Change; one opens at a time.
@@ -277,16 +281,17 @@ export function MyLessons({
 
   async function saveName() {
     const session = readSession();
+    const submittedName = details.name;
     setSavingName(true);
     setError("");
     setDetailsNote("");
     try {
-      const result = await updateProfile(session, { name: details.name.trim() });
+      const result = await updateProfile(session, { name: submittedName.trim() });
       if (readSession() !== session) return;
       profileVersion.current += 1;
       // Other fields may have been saved since this response was prepared.
       setStudent((current) => current && { ...current, name: result.student.name });
-      setOpenField((field) => field === "name" ? null : field);
+      if (latestDetails.current.name === submittedName) setOpenField((field) => field === "name" ? null : field);
       setDetailsNote("Saved.");
     } catch (caught) {
       if (readSession() !== session) return;
@@ -310,7 +315,7 @@ export function MyLessons({
       const savedNif = result.student.nif ?? "";
       setStudent((current) => current && { ...current, nif: savedNif });
       setDetails((current) => current.nif === submittedNif ? { ...current, nif: savedNif } : current);
-      setOpenField((field) => field === "nif" ? null : field);
+      if (latestDetails.current.nif === submittedNif) setOpenField((field) => field === "nif" ? null : field);
       setDetailsNote(result.student.nif ? "Saved. Your receipts will show this NIF." : "Saved. Your receipts won’t show a NIF.");
     } catch (caught) {
       if (readSession() !== session) return;
@@ -376,14 +381,15 @@ export function MyLessons({
     // Each request sends two emails, so a double-click must not send four.
     if (emailBusy) return;
     const session = readSession();
+    const submittedEmail = details.email;
     setEmailBusy(true);
     setError("");
     setDetailsNote("");
     try {
-      const result = await requestEmailChange(session, details.email.trim());
+      const result = await requestEmailChange(session, submittedEmail.trim());
       if (readSession() !== session) return;
       setEmailPending(result.pending);
-      setOpenField((field) => field === "email" ? null : field);
+      if (latestDetails.current.email === submittedEmail) setOpenField((field) => field === "email" ? null : field);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That couldn’t be sent.");
     } finally {

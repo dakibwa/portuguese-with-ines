@@ -3,6 +3,15 @@ import { chromium, firefox, webkit, expect } from "@playwright/test";
 
 // Delayed API replies are isolated fixtures. No accounts, emails, lessons or
 // payments are created, and the checks work with a local or deployed API URL.
+// Signed in, booking is headed by the account's own bar: its places are open
+// on a wide card and folded into the name's menu on a narrow one.
+async function openLessonsFromBooking(page) {
+  const head = page.locator(".booking-bar__head--account");
+  await head.waitFor({ state: "visible" });
+  const menu = head.locator("#account-menu-button");
+  if (await menu.isVisible()) await menu.click();
+  await head.getByRole("button", { name: /^Your lessons/ }).click();
+}
 const base = (process.env.QA_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const engine = process.env.QA_BROWSER ?? "chromium";
 const browserType = { chromium, firefox, webkit }[engine];
@@ -193,7 +202,7 @@ try {
         await dialog.getByRole("button", { name: "Book a lesson", exact: true }).click();
         await expect(dialog).toHaveCount(0);
         await expect(state.page.getByRole("radio", { name: "Single", exact: true })).toBeChecked();
-        await state.page.getByRole("button", { name: /^Your lessons/ }).first().click();
+        await openLessonsFromBooking(state.page);
         const toggle = state.page.locator("#account-menu-button");
         if (await toggle.isVisible()) await toggle.click();
         await state.page.locator("#account-menu").getByRole("button", { name: "Past lessons", exact: true }).click();
@@ -258,7 +267,7 @@ try {
       try {
         await state.page.goto(`${base}/`);
         await state.page.getByRole("link", { name: "Book a lesson", exact: true }).click();
-        await state.page.getByRole("button", { name: /^Your lessons/ }).first().click();
+        await openLessonsFromBooking(state.page);
         await nextLessonOpener(state.page).click();
         await state.page.getByRole("button", { name: "Pay €25 securely", exact: true }).click();
         await started.promise;
@@ -424,7 +433,7 @@ try {
         waiting.resolve(); await response;
         await page.waitForLoadState("networkidle");
         assert.equal(await currentSession(page), newSession, `${endpoint} must preserve the new session at ${width}px`);
-        await expect(page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
+        await expect(page.locator(".account-menu__name").first()).toHaveText(replacementStudent.name);
         assert.deepEqual(state.logouts, [], "An old refusal must never revoke the new session");
         assert.deepEqual(state.errors, []);
       } finally { waiting.resolve(); await context.close(); }
@@ -461,12 +470,12 @@ try {
         await state.page.goto(`${base}/book/?view=lessons&emailToken=isolated-change-token`);
         await started.promise;
         await replaceSession(state.page, newSession);
-        await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
+        await expect(state.page.locator(".account-menu__name").first()).toHaveText(replacementStudent.name);
         const response = state.page.waitForResponse("**/me/email/confirm");
         waiting.resolve(); await response;
         await state.page.waitForLoadState("networkidle");
         assert.equal(await currentSession(state.page), newSession);
-        await expect(state.page.getByText(replacementStudent.name, { exact: true }).filter({ visible: true })).toBeVisible();
+        await expect(state.page.locator(".account-menu__name").first()).toHaveText(replacementStudent.name);
         assert.deepEqual(state.errors, []);
       } finally { waiting.resolve(); await state.context.close(); }
     }
