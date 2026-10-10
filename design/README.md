@@ -906,7 +906,11 @@ A site-wide pass for things said or drawn two ways. The words:
 - a student `change`s or cancels a lesson, in that order, as the `Change`
   button and the late change fee say; Inês keeps `Move lesson`, and the weekly
   run keeps `Move weekly time`. The €5 is the `late change fee` wherever it is
-  named, and a no-show costs it instead of the `lesson price`;
+  named, and a no-show costs it instead of the `lesson price`. At the confirm
+  step each fee is one short line, `€5 to move or cancel less than 14 hours
+  before` and `€5 if you don’t show up to a lesson`, with when it is charged
+  and the no-show's place of the lesson price left to the linked terms (10
+  October 2026, at Dan's request);
 - a length is `60 mins` as a label (the choices bar, the Lessons cards, booked
   lessons, Inês's form) and `60-minute` before `lesson`;
 - apostrophes are curly, failures say `couldn’t` (the 404 keeps `This page
