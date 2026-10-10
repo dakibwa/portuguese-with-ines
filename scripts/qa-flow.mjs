@@ -863,7 +863,10 @@ await accountPage.route("**/me", async (route) => {
         name: "Ana Martins",
         phone: "",
         timezone: "Europe/Lisbon",
-        role: "student"
+        role: "student",
+        // Since migration 0022 the Worker returns the student's splat, empty
+        // until they choose one.
+        mark: ""
       },
       bookings: [
         {
@@ -1271,7 +1274,8 @@ if (
   initialWorkflowLayout.sheet !== "rgba(170, 164, 230, 0.13)" ||
   initialWorkflowLayout.nextRowShown === Boolean(initialWorkflowLayout.nextDay) ||
   (initialWorkflowLayout.nextDay && !["rgb(180, 58, 38)", "rgb(85, 79, 145)"].includes(initialWorkflowLayout.nextDay)) ||
-  Math.abs(initialWorkflowLayout.places.left - initialWorkflowLayout.calendar.left) > 2 ||
+  // The places start where the calendar's own content does, inside the card's padding.
+  Math.abs(initialWorkflowLayout.places.left - initialWorkflowLayout.next.left) > 2 ||
   initialWorkflowLayout.book.left <= initialWorkflowLayout.places.right ||
   initialWorkflowLayout.book.right > initialWorkflowLayout.calendar.right - 12 ||
   Math.abs(centreOf(initialWorkflowLayout.places) - centreOf(initialWorkflowLayout.book)) > 4 ||
@@ -1920,7 +1924,10 @@ if (mobilePastLessonsLayout.scrollWidth > mobilePastLessonsLayout.clientWidth + 
   throw new Error("The separate past-lessons panel overflows on a phone.");
 }
 await accountPanel.screenshot({ path: path.join(outDir, "booking-past-lessons-mobile.png") });
-await accountPanel.getByRole("button", { name: /^Your lessons/ }).first().click();
+// The way back is the name's menu, centred beneath the title; there is no
+// separate back link.
+await accountPanel.locator("#account-menu-button").click();
+await accountPanel.locator("#account-menu").getByRole("button", { name: /^Your lessons/ }).click();
 await accountPanel.locator("#account-past-lessons").waitFor({ state: "detached" });
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 await accountMenuButton.click();

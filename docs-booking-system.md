@@ -1332,6 +1332,14 @@ Google reports (`none`, `no-request`, `pending`), visible with `npx wrangler
 tail`. If links still do not arrive after the Worker is deployed, that log line
 names the cause.
 
+The lessons booked before then (`MEETING_BACKLOG_BEFORE` in
+`meeting-service.mjs`) get their link on the booking page as soon as Google
+makes it, but their `Your online lesson link` email waits until 24 hours before
+the lesson, so nobody is sent a link days early out of the blue. Anything
+booked since gets its link straight away, in the confirmation or, when Google
+is slower, in its own email a couple of minutes later. Google itself emails no
+one: events carry no attendees and are written with `sendUpdates=none`.
+
 Expired or revoked Google permission shows **Needs reconnecting** beside Google
 Meet in her schedule; **Configure → Reconnect Google Meet** restores it.
 Reconnection reuses the stored calendar and event identities. If the first
