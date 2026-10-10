@@ -11,7 +11,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { Plus, Trash2, Video, MapPin } from "lucide-react";
+import { Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
 import type { AdminBooking, AvailabilityException } from "@/lib/admin-api";
 import { meetingHref } from "@/components/MeetingLink";
 import { formatSlotTime } from "@/lib/booking-api";
@@ -631,21 +631,27 @@ export function WeeklyTimetable({
                               ) : null}
                             </span>
                             <strong>{booking.student_name}</strong>
+                            {/* Marked as on the student's calendar, a globe
+                                or a person in the top right corner, with the
+                                key beneath the week saying which is which
+                                (10 October 2026, at Dan's request). */}
                             <span className="teacher-lesson-location">
                               {booking.location === "porto" ? (
-                                <MapPin size={12} aria-hidden="true" />
+                                <UserRound size={12} strokeWidth={2.4} aria-hidden="true" />
                               ) : (
-                                <Video size={12} aria-hidden="true" />
+                                <Globe size={12} strokeWidth={2.4} aria-hidden="true" />
                               )}
-                              {booking.location === "porto"
-                                ? "In Porto"
-                                : "Online"}
+                              <span className="visually-hidden">
+                                {booking.location === "porto"
+                                  ? "In Porto"
+                                  : "Online"}
+                              </span>
                             </span>
                           </button>
-                          {/* Over the lesson's bottom corner rather than
-                              inside it, since a link can't sit within a
-                              button: one tap to the lesson's call (10
-                              October 2026, at Dan's request). */}
+                          {/* Over the lesson's foot rather than inside it,
+                              since a link can't sit within a button: one tap
+                              to the lesson's call (10 October 2026, at Dan's
+                              request). */}
                           {meet ? (
                             <a
                               className="teacher-lesson-meet"
@@ -653,7 +659,7 @@ export function WeeklyTimetable({
                               target="_blank"
                               rel="noopener noreferrer"
                               aria-label={`Join Google Meet with ${booking.student_name}, ${formatSlotTime(booking.starts_at)}`}
-                              style={{ top: `calc(${top} + ${height} - 28px)` }}
+                              style={{ top: `calc(${top} + ${height} - 24px)` }}
                             >
                               <Video size={12} aria-hidden="true" />
                               Meet
@@ -686,6 +692,14 @@ export function WeeklyTimetable({
               <span>
                 <i className="teacher-key-off" />
                 Time off
+              </span>
+              <span>
+                <Globe size={12} strokeWidth={2.4} aria-hidden="true" />
+                Online
+              </span>
+              <span>
+                <UserRound size={12} strokeWidth={2.4} aria-hidden="true" />
+                In Porto
               </span>
             </>
           ) : null}

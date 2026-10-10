@@ -603,16 +603,16 @@
   background: var(--blue);
   box-shadow: 0 3px 0 rgba(32, 62, 130, 0.15);
 }
-/* A lesson's call, a small cream pill in its bottom right corner. */
+/* A lesson's call, a small cream pill at its foot, where its place was. */
 .teacher-lesson-meet {
   position: absolute;
   z-index: 4;
-  right: 10px;
+  left: 12px;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  min-height: 22px;
-  padding: 0.15rem 0.5rem;
+  min-height: 19px;
+  padding: 0.1rem 0.45rem;
   border-radius: var(--squiggle-pill);
   background: var(--paper-light);
   color: var(--blue-deep);
@@ -648,13 +648,14 @@
   font-variant-numeric: tabular-nums;
 }
 .teacher-lesson-location {
+  position: absolute;
+  top: 7px;
+  right: 7px;
   display: flex;
-  flex: none;
-  align-items: center;
-  gap: 0.25rem;
   color: var(--lavender-soft);
-  font: 500 0.61rem/1.3 var(--ui);
-  white-space: nowrap;
+}
+.teacher-lesson-time {
+  padding-right: 14px;
 }
 .teacher-lesson-location svg {
   flex: none;
@@ -1332,8 +1333,11 @@
     font-size: 0.71rem;
   }
   .teacher-lesson-location {
-    font-size: 0.68rem;
-    margin-top: 3px;
+    top: 11px;
+    right: 12px;
+  }
+  .teacher-lesson-meet {
+    left: 18px;
   }
   .teacher-grid-footnote {
     align-items: flex-start;
