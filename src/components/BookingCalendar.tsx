@@ -4217,11 +4217,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                               <li>No payment is taken now</li>
                               <li>Your card is charged after each lesson</li>
                               <li>
-                                <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> to move or cancel less than {NOTICE_HOURS} hours
-                                before, charged when you confirm
+                                <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> to move or cancel less than {NOTICE_HOURS} hours before
                               </li>
                               <li>
-                                <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> for a no-show, instead of the lesson price
+                                <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> for a no-show
                               </li>
                             </>
                           ) : (
