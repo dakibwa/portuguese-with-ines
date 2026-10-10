@@ -968,6 +968,26 @@ await test("students add, keep, change and clear their own NIF, and a typo chang
   }
 });
 
+await test("students choose a splat from the set, clear it, and anything else changes nothing", async () => {
+  try {
+    assert.equal((await (await call("/me", { method: "GET" })).json()).student.mark, "");
+    let saved = await call("/me", { body: { mark: "bloom" } });
+    assert.equal(saved.status, 200);
+    assert.equal((await saved.json()).student.mark, "bloom");
+    saved = await call("/me", { body: { name: "Test Student" } });
+    assert.equal((await saved.json()).student.mark, "bloom", "a field that isn't sent keeps its value");
+    for (const mark of ["<svg>", "BLOOM", 3, null]) {
+      const refused = await call("/me", { body: { mark, name: "Renamed" } });
+      assert.equal(refused.status, 400);
+    }
+    assert.deepEqual({ ...db.prepare("SELECT mark, name FROM students WHERE id='alice'").get() }, { mark: "bloom", name: "Test Student" });
+    saved = await call("/me", { body: { mark: "" } });
+    assert.equal((await saved.json()).student.mark, "");
+  } finally {
+    db.prepare("UPDATE students SET mark='' WHERE id='alice'").run();
+  }
+});
+
 await test("payment emails carry the NIF: Inês's reminder always, the student's own when given", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   db.prepare("UPDATE students SET nif='123456789' WHERE id='alice'").run();

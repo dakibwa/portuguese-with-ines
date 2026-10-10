@@ -22,7 +22,7 @@ import {
   X
 } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
-import { AccountMenu, type AccountSection } from "@/components/AccountMenu";
+import { AccountMenu, AccountSignature, type AccountSection } from "@/components/AccountMenu";
 import { CalendarBookingPrompt } from "@/components/CalendarBookingPrompt";
 /*
  * Loaded when it is needed, not before. The sign-in panel — with the Google
@@ -296,7 +296,6 @@ function RepeatAvailability({
             </p>
             <p>
               {preview.skipped.length === 1 ? "It won’t be booked" : "They won’t be booked"}; the rest go ahead.
-              Change the time or length to book every week.
             </p>
             <ul>
               {preview.skipped.map((startAt) => (
@@ -3421,7 +3420,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               heading="Your account"
               headingLevel={2}
               initialMode="signin"
-              intro="Your upcoming lessons will appear first, with your calendar beneath them."
               onSignedIn={(signedIn) => {
                 transitionBooking(() => {
                   setStudent(signedIn);
@@ -3492,6 +3490,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           <div
             className={`calendar-panel unified-calendar__grid${bookingDateChosen ? " unified-calendar__grid--date-chosen" : ""}`}
           >
+            {isLessonsCalendarOverview ? <AccountSignature mark={student?.mark} /> : null}
             {isLessonsCalendarOverview ? (
               <div className="lesson-overview">
                 <div className="lesson-overview__header">
@@ -3502,6 +3501,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     {student ? (
                       <AccountMenu
                         current="upcoming"
+                        mark={student.mark}
                         name={student.name}
                         onSelect={openAccountView}
                         onSignOut={signOut}
@@ -3544,7 +3544,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     <MeetingLink meetingUrl={nextLesson.meetingUrl} location={nextLesson.location} status={nextLesson.status} />
                   </div>
                 ) : (
-                  <p className="lesson-overview__empty">Nothing booked yet. Choose a day below, or book a lesson.</p>
+                  <p className="lesson-overview__empty">Nothing booked yet.</p>
                 )}
               </div>
             ) : null}
@@ -3948,9 +3948,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     selected={selectedSlot}
                     slots={daySlots}
                   />
-                ) : (
-                  <p className="booking-state-note">Choose a day marked free.</p>
-                )}
+                ) : selectedDate ? (
+                  <p className="booking-state-note">No free times on this day.</p>
+                ) : null}
                 {manageMode === "reschedule" && managed.sameDayFeeApplies ? (
                   <p className="lesson-calendar__notice" id="managed-change-fee">
                     Changing this lesson with less than {NOTICE_HOURS} hours&rsquo; notice costs{" "}

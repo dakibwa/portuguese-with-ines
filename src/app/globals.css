@@ -4577,6 +4577,36 @@ textarea,
   gap: 0.85rem;
 }
 
+/* The student's chosen splat, signed in the bottom right corner of Your
+   lessons, level with the calendar's key, and of Past lessons, behind what
+   the card holds (10 October 2026, at Dan's request). Your details shows it
+   in its own row instead. */
+.account-card,
+.calendar-panel {
+  position: relative;
+  isolation: isolate;
+}
+
+.account-signature,
+.calendar-panel > .account-signature {
+  position: absolute;
+  z-index: -1;
+  right: 10px;
+  bottom: 4px;
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  /* Half there, so it never hides what it sits behind. */
+  opacity: 0.4;
+  pointer-events: none;
+  rotate: -10deg;
+}
+
+/* Room at a history's foot, so the splat never sits under its last record. */
+.my-lessons__history:has(> .account-signature) {
+  padding-bottom: 4.5rem;
+}
+
 .account-card:focus {
   outline: none;
 }
@@ -4602,15 +4632,11 @@ textarea,
   margin: 0;
 }
 
-.account-card__head > .booking-back {
-  flex: none;
-}
-
 /* A narrower card's header: the name's menu leads Your lessons, with Book
-   beside it, or beneath at the right where the two don't fit; on Past
-   lessons and Your details the card's title and the way back share the first
-   line, and the menu takes the next to itself, so the name never pushes the
-   way back off the card. A name too long for its line is cut short. */
+   beside it, or beneath at the right where the two don't fit. Past lessons
+   and Your details open with their title centred above the menu (10 October
+   2026, at Dan's request); the menu holds the way back to Your lessons. A
+   name too long for its line is cut short. */
 .lesson-overview__header,
 .account-menu {
   min-width: 0;
@@ -4620,11 +4646,11 @@ textarea,
   .account-card__head {
     display: grid;
     grid-template-areas:
-      "title back"
-      "menu menu";
+      "title title"
+      "menu out";
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.6rem 1rem;
+    gap: 0.9rem 1rem;
   }
 
   .account-card__title {
@@ -4633,15 +4659,13 @@ textarea,
 
   .account-card__title > .eyebrow {
     grid-area: title;
+    justify-self: center;
+    text-align: center;
   }
 
   .account-card__title > .account-menu {
     grid-area: menu;
     justify-self: start;
-  }
-
-  .account-card__head > .booking-back {
-    grid-area: back;
   }
 }
 
@@ -5835,7 +5859,8 @@ button.text-action {
   background: #fff;
 }
 
-.account-menu__avatar {
+/* The student's initial in a blue circle, or the splat they chose instead. */
+.account-avatar {
   display: inline-grid;
   flex: none;
   width: 32px;
@@ -5844,9 +5869,19 @@ button.text-action {
   border-radius: 50%;
   background: var(--blue);
   color: #fff;
+  font-family: var(--ui);
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1;
+}
+
+.account-avatar--splat {
+  width: 36px;
+  height: 36px;
+  margin: -2px;
+  border-radius: 0;
+  background: none;
+  object-fit: contain;
 }
 
 .account-menu__name {
@@ -5927,9 +5962,8 @@ button.text-action {
   letter-spacing: 0;
 }
 
-/* Folded, the places are rows of the dropdown; the plain name and the sliding
-   thumb belong to the open form below. */
-.account-menu__label,
+/* Folded, the places are rows of the dropdown; the sliding thumb belongs to
+   the open form below. */
 .account-menu__thumb {
   display: none;
 }
@@ -5939,20 +5973,22 @@ button.text-action {
 }
 
 /*
- * A wide card has room for the menu open, in one row: the student's name with
- * Sign out beneath it on the left, the places in the middle as one sliding
- * control of the booking bar's kind, and Book on the right. The places name
- * the card, so its title stays for screen readers; the middle is centred on
- * the card, so the places stay put from card to card.
+ * A wide card has room for the menu open, in one row: the places at the top
+ * left as one sliding control of the booking bar's kind, and Book on the
+ * right. The places name the card, so its title stays for screen readers. The
+ * name and Sign out live in Your details instead (10 October 2026, at Dan's
+ * request).
  */
 @container booking (min-width: 1100px) {
+  .account-card__head > .my-lessons__sign-out {
+    grid-area: book;
+  }
+
   .lesson-overview__header,
   .account-card__head {
     display: grid;
-    grid-template-areas:
-      "name nav book"
-      "out nav book";
-    grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+    grid-template-areas: "nav book";
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 0 1.5rem;
   }
@@ -5971,21 +6007,6 @@ button.text-action {
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .account-menu__label {
-    display: block;
-    grid-area: name;
-    align-self: end;
-    max-width: 16rem;
-    overflow: hidden;
-    color: var(--ink);
-    font-family: var(--ui);
-    font-size: 1rem;
-    font-weight: 700;
-    line-height: 1.35;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -6065,32 +6086,8 @@ button.text-action {
     color: var(--coral-action);
   }
 
-  /* Sign out belongs to the name, so it sits beneath it: quiet words, not a
-     place among the places. */
   .account-menu__panel .account-menu__sign-out {
-    grid-area: out;
-    justify-self: start;
-    align-self: start;
-    min-height: 26px;
-    border: 0;
-    padding: 0;
-    background: none;
-    color: var(--lavender-ink);
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: 0;
-    text-decoration: underline;
-    text-decoration-color: transparent;
-    text-transform: none;
-    text-underline-offset: 0.2em;
-    transition: color 160ms var(--motion-ease), text-decoration-color 160ms var(--motion-ease);
-  }
-
-  .account-menu__panel .account-menu__sign-out:hover,
-  .account-menu__panel .account-menu__sign-out:focus-visible {
-    background: none;
-    color: var(--coral-action);
-    text-decoration-color: currentColor;
+    display: none;
   }
 
   .lesson-overview__book {
@@ -6098,41 +6095,12 @@ button.text-action {
     justify-self: end;
     white-space: nowrap;
   }
-
-  /* The places hold Your lessons, so the card's own way back would say it
-     twice. */
-  .account-card__head > .booking-back {
-    display: none;
-  }
 }
 
 @container booking (min-width: 1040px) {
-  .my-lessons__history-bookings,
-  .my-lessons__details {
+  .my-lessons__history-bookings {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: 1.5rem;
-  }
-
-  /* Paired fields line up at the top, so the note under one never pushes its
-     neighbour down. Who you are sits on the first row, name and email; your
-     receipts and rates on the second, the code disclosure quietly beside NIF
-     rather than alone beneath it. */
-  .my-lessons__details {
-    align-items: start;
-  }
-
-  .my-lessons__details > .account-card__head,
-  .my-lessons__details > .booking-alert,
-  .my-lessons__details > .my-lessons__details-note {
-    grid-column: 1 / -1;
-  }
-
-  .my-lessons__details > .my-lessons__details-note {
-    margin-bottom: 0;
-  }
-
-  .my-lessons__rates {
-    grid-column: 2;
   }
 }
 
@@ -6247,7 +6215,7 @@ button.text-action {
   visibility: visible;
 }
 
-/* Your details: an account card of fields, each with its action beside it. */
+/* Your details: an account card of details, each with its action beside it. */
 .my-lessons__details {
   gap: 1rem;
 }
@@ -6368,6 +6336,230 @@ button.text-action {
   opacity: 0.8;
 }
 
+/*
+ * Your details reads as a short list of what is saved: each detail's name,
+ * its value, and a Change beside it, or Add where it is empty. Changing one
+ * opens its field in place, with Save and Cancel, and closes once saved (10
+ * October 2026, at Dan's request: the card of open fields read as a form to
+ * fill in rather than an account to look over).
+ */
+.my-lessons__facts {
+  display: grid;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.my-lessons__fact {
+  display: grid;
+  min-height: 64px;
+  grid-template-columns: 9rem minmax(0, 1fr) auto;
+  align-items: center;
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 0.75rem 0;
+  gap: 0.35rem 1rem;
+}
+
+.my-lessons__fact-label {
+  color: var(--lavender-ink);
+  font-family: var(--ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.my-lessons__fact-value {
+  display: grid;
+  min-width: 0;
+  justify-items: start;
+  color: var(--ink);
+  font-size: 1rem;
+  gap: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
+.my-lessons__fact-value--empty {
+  color: var(--lavender-ink);
+}
+
+.my-lessons__fact-value > .my-lessons__details-note {
+  margin: 0;
+}
+
+/* A quiet outline action, the size of the booking bar's labels. */
+.my-lessons__change {
+  min-height: 40px;
+  justify-self: end;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-pill);
+  padding: 0.45rem 0.95rem;
+  background: transparent;
+  color: var(--blue);
+  cursor: pointer;
+  font-family: var(--ui);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: background 160ms var(--motion-ease), border-color 160ms var(--motion-ease);
+}
+
+.my-lessons__change:hover,
+.my-lessons__change:focus-visible {
+  border-color: var(--blue);
+  background: var(--raised);
+}
+
+.my-lessons__change:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.my-lessons__change:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* Open, a detail is its field with Save and Cancel beside it. */
+.my-lessons__edit {
+  display: grid;
+  grid-column: 1 / -1;
+  align-items: end;
+  gap: 0.6rem 0.8rem;
+}
+
+.my-lessons__edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.my-lessons__edit-actions .button {
+  width: auto;
+  min-height: 46px;
+  padding-right: 1.1rem;
+  padding-left: 1.1rem;
+  white-space: nowrap;
+}
+
+.my-lessons__edit > .my-lessons__details-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+@container booking (min-width: 520px) {
+  .my-lessons__edit {
+    grid-template-columns: minmax(0, 26rem) auto;
+    justify-content: start;
+  }
+}
+
+/* On a phone the detail's name sits above its value, Change to the right. */
+@container booking (max-width: 519.98px) {
+  .my-lessons__fact {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .my-lessons__fact-label {
+    grid-column: 1;
+  }
+
+  .my-lessons__fact-value {
+    grid-column: 1;
+  }
+
+  .my-lessons__fact > .my-lessons__change {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+.my-lessons__avatar.account-avatar {
+  width: 38px;
+  height: 38px;
+  font-size: 0.9rem;
+}
+
+.my-lessons__avatar.account-avatar--splat {
+  width: 46px;
+  height: 46px;
+  margin: -4px;
+}
+
+/* The splats to choose from, the current one ringed in blue. */
+.my-lessons__marks {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 0.4rem;
+}
+
+.my-lessons__mark {
+  display: inline-grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 2px solid transparent;
+  border-radius: var(--squiggle-chip);
+  padding: 0;
+  background: var(--raised);
+  cursor: pointer;
+  transition: border-color 160ms var(--motion-ease), transform 220ms var(--motion-spring);
+}
+
+.my-lessons__mark:hover {
+  transform: scale(1.06);
+}
+
+.my-lessons__mark[aria-pressed="true"] {
+  border-color: var(--blue);
+}
+
+.my-lessons__mark:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.my-lessons__mark .account-avatar--splat {
+  width: 40px;
+  height: 40px;
+  margin: 0;
+}
+
+@container booking (max-width: 519.98px) {
+  .my-lessons__fact[data-field="mark"] > .my-lessons__marks {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Signing out ends the visit, so it waits small at the card's top right,
+   where Book stands on Your lessons (10 October 2026, at Dan's request). */
+.my-lessons__sign-out {
+  grid-area: out;
+  min-height: 40px;
+  justify-self: end;
+  align-self: center;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--lavender-ink);
+  cursor: pointer;
+  font-family: var(--ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.2em;
+  transition: color 160ms var(--motion-ease), text-decoration-color 160ms var(--motion-ease);
+}
+
+.my-lessons__sign-out:hover,
+.my-lessons__sign-out:focus-visible {
+  color: var(--coral-action);
+  text-decoration-color: currentColor;
+}
+
 /* A saved field's good news is the site's calm success panel, compact here
    beneath the fields it speaks for. */
 .my-lessons__details-outcome {
@@ -6380,6 +6572,7 @@ button.text-action {
    heading, no rule, and nothing at all until there is a rate to show. */
 .my-lessons__rates {
   display: grid;
+  max-width: 46rem;
   gap: 0.6rem;
 }
 

@@ -928,7 +928,10 @@ function publicStudent(row) {
     phone: row.phone,
     nif: row.nif ?? "",
     timezone: row.timezone,
-    role: row.role ?? "student"
+    role: row.role ?? "student",
+    // Only once migration 0022 has added the column, so the site offers the
+    // choice of splat only where it can be saved.
+    ...("mark" in row ? { mark: row.mark ?? "" } : {})
   };
 }
 
@@ -4082,6 +4085,10 @@ async function handleConfirmEmailChange(request, env) {
   return json({ student: publicStudent(updated), session: await createSession(updated.id, env.BOOKING_TOKEN_SECRET, updated.session_version) }, 200, request, env);
 }
 
+// The splats a student can wear beside their name (the site's
+// src/lib/student-marks.ts names the same set); empty is their initial.
+const STUDENT_MARKS = new Set(["", "burst", "bloom", "pool", "dance", "drift", "four", "duo", "scatter"]);
+
 async function handleUpdateMe(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
@@ -4102,6 +4109,10 @@ async function handleUpdateMe(request, env) {
     fields.push("nif = ?"); values.push(nif);
   }
   if (isValidTimeZone(body.timezone)) { fields.push("timezone = ?"); values.push(body.timezone); }
+  if ("mark" in body) {
+    if (!STUDENT_MARKS.has(body.mark)) return fail("Choose one of the splats.", 400, request, env);
+    fields.push("mark = ?"); values.push(body.mark);
+  }
 
   if (fields.length) {
     await env.DB.prepare(`UPDATE students SET ${fields.join(", ")} WHERE id = ?`)

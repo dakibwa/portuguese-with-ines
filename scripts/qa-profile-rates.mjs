@@ -111,7 +111,7 @@ try {
     const { page, state } = account;
     await chooseFromMenu(page, "Edit details");
     const editor = page.locator(".my-lessons__details");
-    await editor.getByLabel("Your name").waitFor();
+    await editor.getByRole("button", { name: "Change name", exact: true }).waitFor();
     const disclosure = editor.locator("details.my-lessons__code");
     await expect(disclosure.locator("summary")).toHaveText("Have a code from Inês?");
     await expect(disclosure).not.toHaveAttribute("open", "");

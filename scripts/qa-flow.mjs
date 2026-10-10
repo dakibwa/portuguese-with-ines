@@ -1209,7 +1209,9 @@ async function bookQaLessonAndReturnToUpcoming({ recurring }) {
   await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 }
 
-if ((await accountPanel.getByText("Ana Martins", { exact: true }).filter({ visible: true }).count()) !== 1) {
+// The name is the account's menu where it folds; where it is open, the name
+// lives in Your details instead.
+if ((await accountPanel.getByText("Ana Martins", { exact: true }).filter({ visible: true }).count()) !== ((await accountMenuButton.isVisible()) ? 1 : 0)) {
   throw new Error("The signed-in identity should appear once, with the account's menu.");
 }
 for (const duplicateIdentity of ["Signed in as", "Booking as", "Not you?"]) {
@@ -1237,10 +1239,9 @@ await accountPage.waitForFunction(
   null,
   { timeout: 2_000 }
 );
-// Wide, the card's header is one row: the student's name with Sign out
-// beneath it, the account's places open in the middle, centred on the card,
-// and Book at the right. The places name the card, so its title is there for
-// screen readers only. The card is one lilac sheet. Where a pointer can
+// Wide, the card's header is one row: the account's places open at the top
+// left and Book at the right; the name and Sign out live in Your details.
+// The places name the card, so its title is there for screen readers only. The card is one lilac sheet. Where a pointer can
 // hover, the next lesson is read off the calendar, its day filled in, so the
 // row above the calendar shows only when that day is beyond the first weeks.
 const initialWorkflowLayout = await accountPage.evaluate(() => {
@@ -1249,8 +1250,7 @@ const initialWorkflowLayout = await accountPage.evaluate(() => {
   return {
     calendar: bounds("#lesson-calendar .calendar-panel"),
     heading: bounds("#upcoming-lessons-heading"),
-    name: bounds(".account-menu__label"),
-    signOut: bounds(".account-menu__sign-out"),
+    signOutShown: Boolean(document.querySelector(".account-menu__sign-out")?.getClientRects().length),
     places: bounds(".account-menu__places"),
     book: bounds(".lesson-overview__book"),
     next: bounds("#lesson-calendar .unified-calendar__toolbar"),
@@ -1262,25 +1262,22 @@ const initialWorkflowLayout = await accountPage.evaluate(() => {
   };
 });
 const centreOf = (box) => (box.top + box.bottom) / 2;
-const middleOf = (box) => (box.left + box.right) / 2;
 if (
-  ["calendar", "name", "signOut", "places", "book", "next"].some((key) => !initialWorkflowLayout[key]?.width) ||
+  ["calendar", "places", "book", "next"].some((key) => !initialWorkflowLayout[key]?.width) ||
+  initialWorkflowLayout.signOutShown ||
   (initialWorkflowLayout.heading?.width ?? 0) > 1 ||
   initialWorkflowLayout.separateBars ||
   initialWorkflowLayout.toggleShown ||
   initialWorkflowLayout.sheet !== "rgba(170, 164, 230, 0.13)" ||
   initialWorkflowLayout.nextRowShown === Boolean(initialWorkflowLayout.nextDay) ||
   (initialWorkflowLayout.nextDay && !["rgb(180, 58, 38)", "rgb(85, 79, 145)"].includes(initialWorkflowLayout.nextDay)) ||
-  initialWorkflowLayout.signOut.top < initialWorkflowLayout.name.bottom - 1 ||
-  Math.abs(initialWorkflowLayout.signOut.left - initialWorkflowLayout.name.left) > 2 ||
-  initialWorkflowLayout.places.left <= Math.max(initialWorkflowLayout.name.right, initialWorkflowLayout.signOut.right) ||
-  Math.abs(middleOf(initialWorkflowLayout.places) - middleOf(initialWorkflowLayout.calendar)) > 4 ||
+  Math.abs(initialWorkflowLayout.places.left - initialWorkflowLayout.calendar.left) > 2 ||
   initialWorkflowLayout.book.left <= initialWorkflowLayout.places.right ||
   initialWorkflowLayout.book.right > initialWorkflowLayout.calendar.right - 12 ||
   Math.abs(centreOf(initialWorkflowLayout.places) - centreOf(initialWorkflowLayout.book)) > 4 ||
-  initialWorkflowLayout.next.top < Math.max(initialWorkflowLayout.book.bottom, initialWorkflowLayout.places.bottom, initialWorkflowLayout.signOut.bottom)
+  initialWorkflowLayout.next.top < Math.max(initialWorkflowLayout.book.bottom, initialWorkflowLayout.places.bottom)
 ) {
-  throw new Error(`The signed-in overview should be one lilac lessons card headed by the name with Sign out, the account's places and Book: ${JSON.stringify(initialWorkflowLayout)}.`);
+  throw new Error(`The signed-in overview should be one lilac lessons card headed by the account's places at the left and Book at the right: ${JSON.stringify(initialWorkflowLayout)}.`);
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-lessons-overview-desktop.png"), fullPage: true });
 
@@ -1292,11 +1289,11 @@ const initialAccountActionLabels = (await initialAccountMenu.getByRole("button")
   label.replace(/\s+/g, " ").trim()
 );
 if (
-  initialAccountActionLabels.length !== 4 ||
+  initialAccountActionLabels.length !== 3 ||
   !initialAccountActionLabels[0]?.startsWith("Your lessons") ||
-  initialAccountActionLabels.slice(1).join(" | ") !== "Past lessons | Edit details | Sign out"
+  initialAccountActionLabels.slice(1).join(" | ") !== "Past lessons | Edit details"
 ) {
-  throw new Error(`The account menu should hold Your lessons, Past lessons, Edit details and Sign out: ${JSON.stringify(initialAccountActionLabels)}.`);
+  throw new Error(`A wide card's places should be Your lessons, Past lessons and Edit details, Sign out being in Your details: ${JSON.stringify(initialAccountActionLabels)}.`);
 }
 // The places are one sliding control, its thumb on the card that is showing,
 // and the one highlighted action on the card stays Book.
@@ -1360,17 +1357,28 @@ if (
 ) {
   throw new Error(`Your details should be one account card, headed like the lessons card with its places where they were, and no cards inside it: ${JSON.stringify({ detailsCard, detailsPlaces })}.`);
 }
-const desktopDetailRows = await accountPanel.locator(".my-lessons__details-row").evaluateAll((rows) =>
+// Each detail reads as itself with its own Change, or Add where it is empty,
+// on one line: the splat, the name, the email and the NIF. Sign out waits at
+// the card's foot.
+const desktopDetailRows = await accountPanel.locator(".my-lessons__fact").evaluateAll((rows) =>
   rows.map((row) => {
-    const field = row.querySelector("label")?.getBoundingClientRect();
-    const action = row.querySelector("button")?.getBoundingClientRect();
-    return { fieldRight: field?.right ?? Infinity, actionLeft: action?.left ?? 0 };
+    const value = row.querySelector(".my-lessons__fact-value")?.getBoundingClientRect();
+    const action = row.querySelector(".my-lessons__change")?.getBoundingClientRect();
+    return {
+      field: row.dataset.field,
+      action: row.querySelector(".my-lessons__change")?.textContent?.trim() ?? "",
+      beside: Boolean(value && action && action.left >= value.right - 1 && Math.abs((value.top + value.bottom) / 2 - (action.top + action.bottom) / 2) < 12)
+    };
   })
 );
-// Name, email and NIF, plus the code field inside its "Have a code from Inês?"
-// disclosure. qa-profile-rates.mjs opens that one and checks it.
-if (desktopDetailRows.length !== 4 || desktopDetailRows.some((row) => row.actionLeft < row.fieldRight - 1)) {
-  throw new Error(`Account field actions should sit beside their fields when they fit: ${JSON.stringify(desktopDetailRows)}.`);
+const detailsSignOut = await accountPanel.locator(".my-lessons__sign-out").boundingBox();
+if (
+  desktopDetailRows.map((row) => row.field).join() !== "mark,name,email,nif" ||
+  desktopDetailRows.some((row) => !row.beside) ||
+  desktopDetailRows.at(-1)?.action !== "Add NIF" ||
+  !detailsSignOut
+) {
+  throw new Error(`Your details should list the splat, name, email and NIF, each with its action beside it, and Sign out: ${JSON.stringify({ desktopDetailRows, detailsSignOut })}.`);
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-account-edit-desktop.png"), fullPage: true });
 await chooseAccountAction("Done editing");
@@ -1390,10 +1398,13 @@ if (await accountPage.getByRole("button", { name: "Cancel all booked lessons", e
   throw new Error("Bulk sequence cancellation should appear only when one recurring lesson is selected.");
 }
 const lessonsAccountMenu = accountPanel.locator("#account-menu");
-if (await accountMenuButton.isVisible()) await accountMenuButton.click();
+// Folded into a dropdown, the menu also holds Sign out; open on a wide card,
+// Sign out is in Your details instead.
+const accountMenuFolded = await accountMenuButton.isVisible();
+if (accountMenuFolded) await accountMenuButton.click();
 await lessonsAccountMenu.waitFor({ state: "visible" });
-if ((await lessonsAccountMenu.getByRole("button").count()) !== 4) {
-  throw new Error("Your lessons, Past lessons, Edit details and Sign out should live together in the account menu.");
+if ((await lessonsAccountMenu.getByRole("button").count()) !== (accountMenuFolded ? 4 : 3)) {
+  throw new Error("Your lessons, Past lessons and Edit details, with Sign out where the menu folds, should live together in the account menu.");
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-account-menu-desktop.png"), fullPage: true });
 await lessonsAccountMenu.getByRole("button", { name: /Past lessons/ }).click();
@@ -1415,8 +1426,6 @@ const pastLessonsCard = await accountPanel.locator("#account-past-lessons").eval
   return {
     card: card.classList.contains("account-card"),
     heading: bounds("#past-lessons-heading"),
-    name: bounds(".account-card__head .account-menu__label"),
-    signOut: bounds(".account-card__head .account-menu__sign-out"),
     current: card.querySelector('.account-card__head #account-menu [aria-current="true"]')?.textContent?.trim() ?? ""
   };
 });
@@ -1424,9 +1433,6 @@ const pastPlaces = await readPlaces();
 if (
   !pastLessonsCard.card ||
   (pastLessonsCard.heading?.width ?? 0) > 1 ||
-  !pastLessonsCard.name?.width ||
-  !pastLessonsCard.signOut?.width ||
-  pastLessonsCard.signOut.top < pastLessonsCard.name.bottom - 1 ||
   pastLessonsCard.current !== "Past lessons" ||
   Math.abs((pastPlaces.placesLeft ?? 0) - (lessonsPlaces.placesLeft ?? -99)) > 2 ||
   Math.abs(pastPlaces.thumb.left - pastPlaces.current.left) > 2

@@ -2,26 +2,56 @@
 
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { studentMark } from "@/lib/student-marks";
 
 export type AccountSection = "upcoming" | "history" | "profile";
 
 /**
  * The account's one menu, in the heading of whichever account card is showing
  * (Your lessons, Past lessons or Your details), sparing the page a second bar
- * above the calendar. Where the card is wide, its places sit open in the
- * middle of the header as one sliding control, and the student's name stands
- * plain at the left with Sign out beneath it; where it is narrow, a button
- * with their initial and name opens them as a dropdown. The same buttons serve
+ * above the calendar. Where the card is wide, its places sit open at the top
+ * left as one sliding control, without the name: the name, and Sign out, live
+ * in Your details (10 October 2026, at Dan's request). Where it is narrow, a
+ * button with the student's splat, or their initial, and their name opens the
+ * places as a dropdown with Sign out beneath them. The same buttons serve
  * both, so either way there is one menu.
  */
+/**
+ * The student's splat when they have chosen one, otherwise their initial in a
+ * blue circle: the same mark in the menu button and in Your details.
+ */
+export function AccountAvatar({ className = "", mark, name }: { className?: string; mark?: string; name: string }) {
+  const splat = studentMark(mark);
+  // The first character as written, whole even outside the Basic Latin.
+  const initial = Array.from(name.trim())[0]?.toLocaleUpperCase() ?? "";
+  if (splat) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img alt="" aria-hidden="true" className={`account-avatar account-avatar--splat ${className}`} src={splat.src} />;
+  }
+  return initial ? <span aria-hidden="true" className={`account-avatar ${className}`}>{initial}</span> : null;
+}
+
+/**
+ * The splat a student chose, signed large in the bottom right corner of their
+ * account's cards (10 October 2026, at Dan's request). Nothing until they
+ * choose one: the initial stays in the menu alone.
+ */
+export function AccountSignature({ mark }: { mark?: string }) {
+  const splat = studentMark(mark);
+  // eslint-disable-next-line @next/next/no-img-element
+  return splat ? <img alt="" aria-hidden="true" className="account-signature" src={splat.src} /> : null;
+}
+
 export function AccountMenu({
   current,
+  mark,
   name,
   onSelect,
   onSignOut,
   upcomingCount = 0
 }: {
   current: AccountSection;
+  mark?: string;
   name: string;
   onSelect: (section: AccountSection) => void;
   onSignOut: () => void;
@@ -56,12 +86,9 @@ export function AccountMenu({
   }
 
   const place = current === "upcoming" ? 0 : current === "history" ? 1 : 2;
-  // The first character as written, whole even outside the Basic Latin.
-  const initial = Array.from(name.trim())[0]?.toLocaleUpperCase() ?? "";
 
   return (
     <div className="account-menu" ref={menuRef}>
-      <span className="account-menu__label">{name}</span>
       <button
         aria-controls="account-menu"
         aria-expanded={open}
@@ -70,7 +97,7 @@ export function AccountMenu({
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
-        {initial ? <span aria-hidden="true" className="account-menu__avatar">{initial}</span> : null}
+        <AccountAvatar className="account-menu__avatar" mark={mark} name={name} />
         <span className="visually-hidden">Account: </span>
         <span className="account-menu__name">{name}</span>
         <ChevronDown size={16} aria-hidden="true" />
