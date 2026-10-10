@@ -662,7 +662,7 @@ export function MyLessons({
               >
                 <label>
                   <span>
-                    NIF <em>(optional)</em>
+                    NIF <em>(optional, for your receipts)</em>
                   </span>
                   <input
                     autoComplete="off"
@@ -682,7 +682,6 @@ export function MyLessons({
                   </button>
                   <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
                 </div>
-                <p className="my-lessons__details-note">For your receipts.</p>
               </form>
             ) : (
               <>

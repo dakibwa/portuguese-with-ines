@@ -69,13 +69,13 @@ try {
     await signUp.page.getByRole("tab", { name: "Create an account", exact: true }).click();
     const form = signUp.page.locator(".auth-panel__form");
     const fields = await form.locator("label > span").allInnerTexts();
-    assert.match(fields.at(-1).replace(/\s+/g, " "), /^NIF \(optional\)$/i, `NIF should be the last, optional field: ${fields}`);
+    assert.match(fields.at(-1).replace(/\s+/g, " "), /^NIF \(optional, for your receipts\)$/i, `NIF should be the last, optional field, saying what it is for: ${fields}`);
     await form.getByLabel("Your name").fill("Ana");
     await form.getByLabel("Email").fill("ana@example.invalid");
     await form.getByLabel("Password").fill("a-long-password");
-    const nif = form.getByLabel("NIF (optional)");
+    const nif = form.getByLabel(/^NIF \(optional/);
     await expect(nif).toHaveAttribute("inputmode", "numeric");
-    await expect(form).toContainText("Added to your receipts.");
+    await expect(form).toContainText("NIF (optional, for your receipts)");
     await nif.fill(" 123456788 ");
     await oneBlueBoundary(nif);
     await form.getByRole("button", { name: "Create my account", exact: true }).click();
@@ -134,7 +134,7 @@ try {
     if (await toggle.isVisible() && await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
     await details.page.locator("#account-menu").getByRole("button", { name: "Edit details", exact: true }).click();
     const editor = details.page.locator(".my-lessons__details");
-    const field = editor.getByLabel("NIF (optional)");
+    const field = editor.getByLabel(/^NIF \(optional/);
     const save = editor.getByRole("button", { name: "Save NIF", exact: true });
     const nifRow = editor.locator('.my-lessons__fact[data-field="nif"]');
     // Each detail shows what is saved; an empty NIF offers to add one.

@@ -103,7 +103,7 @@ try {
       });
       try {
         await edit(state.page);
-        const field = state.page.getByLabel("NIF (optional)"), save = state.page.getByRole("button", { name: "Save NIF", exact: true });
+        const field = state.page.getByLabel(/^NIF \(optional/), save = state.page.getByRole("button", { name: "Save NIF", exact: true });
         await field.fill("123456789");
         await save.click();
         await started.promise;
@@ -227,7 +227,7 @@ try {
         await edit(state.page);
         const controls = {
           name: { field: state.page.getByLabel("Your name", { exact: true }), save: state.page.getByRole("button", { name: "Save name", exact: true }), value: "Ana Updated" },
-          nif: { field: state.page.getByLabel("NIF (optional)"), save: state.page.getByRole("button", { name: "Save NIF", exact: true }), value: "123456789" }
+          nif: { field: state.page.getByLabel(/^NIF \(optional/), save: state.page.getByRole("button", { name: "Save NIF", exact: true }), value: "123456789" }
         };
         const second = first === "name" ? "nif" : "name";
         await controls[first].field.fill(controls[first].value);

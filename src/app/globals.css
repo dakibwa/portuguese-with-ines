@@ -4342,6 +4342,15 @@ textarea,
   margin-bottom: 0;
 }
 
+/* The change dialog is the track's own cream, so there its tracks and free
+   days take a lilac wash and read as sliders and days to choose, as they do
+   on the booking sheet, rather than a blue tile beside loose words (10
+   October 2026, at Dan's request). */
+.unified-calendar--managed-overlay .segmented,
+.unified-calendar--managed-overlay .calendar-week button.has-availability:not(.is-selected):not(.has-booking) {
+  background: rgba(170, 164, 230, 0.2);
+}
+
 .managed-lesson__duration-note {
   margin: 0 0 0.85rem;
   border-radius: 16px;
@@ -5462,11 +5471,14 @@ textarea,
   text-transform: uppercase;
 }
 
+/* 44 px, the usual touch height, rather than taller (10 October 2026, at
+   Dan's request for smaller fields). */
 .auth-panel input {
   width: 100%;
+  min-height: 44px;
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-field);
-  padding: 0.85rem 0.9rem;
+  padding: 0.55rem 0.85rem;
   background: rgba(255, 255, 255, 0.75);
   font: inherit;
 }
@@ -6251,7 +6263,7 @@ button.text-action {
 
 .my-lessons__details input {
   width: 100%;
-  min-height: 46px;
+  min-height: 44px;
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-field);
   padding: 0 0.85rem;
@@ -6437,7 +6449,7 @@ button.text-action {
 
 .my-lessons__edit-actions .button {
   width: auto;
-  min-height: 46px;
+  min-height: 44px;
   padding-right: 1.1rem;
   padding-left: 1.1rem;
   white-space: nowrap;

@@ -154,7 +154,7 @@ try {
           };
         });
         await chooseAccount(page, "Edit details");
-        const input = page.getByLabel(field === "name" ? "Your name" : field === "email" ? "Email" : "NIF (optional)", { exact: true });
+        const input = page.getByLabel(field === "name" ? "Your name" : field === "email" ? "Email" : /^NIF \(optional/, { exact: true });
         const value = field === "name" ? "Ana Draft" : field === "email" ? "draft@example.invalid" : "248899945";
         await input.fill(value);
         await page.evaluate(() => window.qaReleaseEditorFrames());
@@ -198,7 +198,7 @@ try {
           await started.promise;
           await chooseAccount(page, "Edit details");
           const name = page.getByLabel("Your name", { exact: true });
-          const nif = page.getByLabel("NIF (optional)");
+          const nif = page.getByLabel(/^NIF \(optional/);
           const email = page.getByLabel("Email", { exact: true });
           const saveName = page.getByRole("button", { name: "Save name", exact: true });
           const saveNif = page.getByRole("button", { name: "Save NIF", exact: true });
@@ -295,7 +295,7 @@ try {
         await page.getByRole("button", { name: /^Your lessons/ }).first().click();
         await started.promise;
         await chooseAccount(page, "Edit details");
-        const input = page.getByLabel(field === "name" ? "Your name" : "NIF (optional)", { exact: true });
+        const input = page.getByLabel(field === "name" ? "Your name" : /^NIF \(optional/, { exact: true });
         const save = page.getByRole("button", { name: field === "name" ? "Save name" : "Save NIF", exact: true });
         const value = field === "name" ? "Ana Saved" : "248899945";
         await input.fill(value);

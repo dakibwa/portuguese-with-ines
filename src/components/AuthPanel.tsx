@@ -273,7 +273,7 @@ export function AuthPanel({
           <label>
             <span>
               <ReceiptText size={16} aria-hidden="true" />
-              NIF <em>(optional)</em>
+              NIF <em>(optional, for your receipts)</em>
             </span>
             <input
               autoComplete="off"
@@ -282,7 +282,6 @@ export function AuthPanel({
               onChange={(event) => update({ nif: event.target.value })}
               value={form.nif}
             />
-            <small>Added to your receipts.</small>
           </label>
         ) : null}
 

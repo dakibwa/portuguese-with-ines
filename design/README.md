@@ -184,7 +184,8 @@ the same identity or action:
   sign-in card shows `Almost there` as the step's only visible heading, then
   Google sign-in and the account form, with no data-use summary, privacy
   details, Google password note or consent checkbox. The account form ends
-  with an optional NIF field whose only note is that it is added to receipts;
+  with an optional NIF field labelled `NIF (optional, for your receipts)`, with no
+  note beneath it (10 October 2026, at Dan's request);
   students add, change or clear it under Edit details. The final booking
   action follows the payment and change conditions for the selected method.
   A `Terms & privacy` overlay holds the details, without adding a disclosure
@@ -673,7 +674,10 @@ Preserve these desktop and mobile states:
   each with its value and a quiet outline `Change` beside it, or `Add NIF`
   where there is none. Changing one opens its field in place with its action
   (`Save name`, `Send confirmation link`, `Save NIF`) and `Cancel`, and closes
-  once saved; only an open email or NIF carries its one short note. The splat
+  once saved; only an open email carries a short note, the NIF's purpose being
+  in its label. Text fields are 44 px tall, the usual touch height. In the
+  change dialog, whose cream matches a track's, the sliders' tracks take a
+  lilac wash so they read as sliders. The splat
   opens as a row of the site's own marks, all but the FAQ's question, with the
   initial first; choosing one saves it, and it shows wherever the name's menu
   does. A small `Sign out` waits at the card's foot, on the right. `Done

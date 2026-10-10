@@ -448,7 +448,7 @@ try {
         await countIs(page, 1);
         await chooseAccount(page, "Edit details");
         await page.getByLabel("Your name", { exact: true }).fill("Ana draft");
-        await page.getByLabel("NIF (optional)").fill("248899945");
+        await page.getByLabel(/^NIF \(optional/).fill("248899945");
         await chooseAccount(page, "Done editing");
         await nextLessonOpener(page).click();
         await expect(page.getByRole("dialog").getByRole("link", { name: "Join Google Meet", exact: true })).toBeVisible();
@@ -458,7 +458,7 @@ try {
         await expect(page.locator('button[data-date-key="2026-10-06"]')).toHaveClass(/has-booking/);
         await chooseAccount(page, "Edit details");
         await expect(page.getByLabel("Your name", { exact: true })).toHaveValue("Ana draft");
-        await expect(page.getByLabel("NIF (optional)")).toHaveValue("248899945");
+        await expect(page.getByLabel(/^NIF \(optional/)).toHaveValue("248899945");
         await check(state);
         cases += 1;
       } finally { await state.context.close(); }
