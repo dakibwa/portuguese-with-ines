@@ -437,7 +437,7 @@
 /* Her weekly hours are a faint coral wash under blue lessons (10 October
    2026, at Dan's request); while editing, marked starts stay lilac. */
 .teacher-time-slot.is-available {
-  background: rgba(239, 93, 60, 0.08);
+  background: rgba(239, 93, 60, 0.13);
 }
 .teacher-timetable--editing .teacher-time-slot.is-available {
   background: var(--lavender-soft);
@@ -677,8 +677,8 @@
   border: 1px solid transparent;
 }
 .teacher-key-starts {
-  background: rgba(239, 93, 60, 0.14);
-  border-color: rgba(239, 93, 60, 0.35) !important;
+  background: rgba(239, 93, 60, 0.2);
+  border-color: rgba(239, 93, 60, 0.4) !important;
 }
 .teacher-timetable--editing + .teacher-grid-footnote .teacher-key-starts {
   background: var(--lavender-soft);
