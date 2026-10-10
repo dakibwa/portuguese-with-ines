@@ -356,6 +356,9 @@ export function WeeklyTimetable({
                     {day.name.slice(3)}
                   </span>
                 )}
+                {!editing && date === today ? (
+                  <small className="teacher-day-today" aria-hidden="true">Today</small>
+                ) : null}
                 {!editing &&
                 segments.some((segment) => segment.date === date) ? (
                   <i
