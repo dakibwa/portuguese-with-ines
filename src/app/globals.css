@@ -5682,6 +5682,21 @@ textarea,
   gap: 0.6rem;
 }
 
+/* In the menu, WhatsApp is a lilac fill beside the coral Book, so the pair
+   reads as two filled choices rather than one and an outline (10 October
+   2026, at Dan's request). */
+.nav-mobile__cta .button--outline-light {
+  border-color: var(--lavender);
+  background: var(--lavender);
+  color: var(--ink);
+}
+
+.nav-mobile__cta .button--outline-light:hover,
+.nav-mobile__cta .button--outline-light:focus-visible {
+  border-color: var(--lavender-soft);
+  background: var(--lavender-soft);
+}
+
 .nav-mobile__splat {
   --land-start: 90ms;
   --land-scale: 0.8;
@@ -5739,6 +5754,34 @@ textarea,
   background: transparent;
   color: var(--blue-deep);
   cursor: pointer;
+  transition: background 200ms var(--motion-ease), border-color 200ms var(--motion-ease);
+}
+
+/* Pointed at, the close fills with lilac and its cross gives a quarter turn
+   on the soft spring (10 October 2026, at Dan's request). Only where there
+   is a pointer: the finger that opened the menu lands where the close
+   appears, and a touch would otherwise leave it turned. */
+.nav-mobile__close:focus-visible {
+  border-color: var(--lavender);
+  background: var(--lavender-soft);
+}
+
+@media (hover: hover) {
+  .nav-mobile__close:hover {
+    border-color: var(--lavender);
+    background: var(--lavender-soft);
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .nav-mobile__close svg {
+    transition: rotate 420ms var(--motion-spring);
+  }
+
+  .nav-mobile__close:hover svg,
+  .nav-mobile__close:focus-visible svg {
+    rotate: 90deg;
+  }
 }
 
 .nav-mobile__link {

@@ -1009,6 +1009,10 @@ as a form:
   NIF`, beside each, opening one field at a time in place; a small `Sign out`
   sits at its foot. A student can wear one of the site's splats beside their
   name instead of their initial (`students.mark`, migration 0022);
+- in the phone menu, `Message on WhatsApp` is a lilac fill beside the coral
+  `Book a lesson`, and the close fills with lilac and gives its cross a
+  quarter turn when pointed at (never on touch, where the opening tap lands
+  on it);
 - shorter helper copy: `Nothing booked yet.` alone; no intro sentence on the
   `Your account` sign-in; a clashing week `won't be booked; the rest go ahead`
   without the advice the choices bar already gives; the change overlay asks
