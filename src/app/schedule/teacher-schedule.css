@@ -432,8 +432,10 @@
 .teacher-time-slot.is-hour {
   border-top: 1px solid var(--rule-soft);
 }
+/* A quieter lilac for her hours, under blue lessons (10 October 2026, at
+   Dan's request). */
 .teacher-time-slot.is-available {
-  background: rgba(170, 164, 230, 0.24);
+  background: rgba(170, 164, 230, 0.13);
 }
 .teacher-timetable--editing .teacher-time-slot.is-available {
   background: var(--lavender-soft);
@@ -568,8 +570,8 @@
   padding: 6px 8px;
   border: 0;
   border-radius: 9px 13px 10px 12px / 12px 9px 13px 10px;
-  background: var(--coral-action);
-  color: #fff;
+  background: var(--blue-deep);
+  color: var(--paper);
   text-align: left;
   cursor: pointer;
   transition:
@@ -591,9 +593,13 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+.teacher-calendar-lesson--porto {
+  border-left: 3px solid var(--coral);
+  padding-left: 6px;
+}
 .teacher-calendar-lesson:hover {
-  background: #a3331f;
-  box-shadow: 0 3px 0 rgba(120, 36, 20, 0.18);
+  background: var(--blue);
+  box-shadow: 0 3px 0 rgba(32, 62, 130, 0.15);
 }
 .teacher-calendar-lesson strong {
   display: block;
@@ -615,7 +621,7 @@
   flex: none;
   align-items: center;
   gap: 0.25rem;
-  color: rgba(255, 255, 255, 0.86);
+  color: var(--lavender-soft);
   font: 500 0.61rem/1.3 var(--ui);
   white-space: nowrap;
 }
@@ -673,7 +679,7 @@
   border-color: var(--lavender) !important;
 }
 .teacher-key-booked {
-  background: var(--coral-action);
+  background: var(--blue-deep);
 }
 .teacher-key-off {
   border-color: var(--rule) !important;
