@@ -436,12 +436,12 @@ try {
       const state = await fixture(width);
       try {
         await state.page.goto(`${base}/book/?view=book`);
-        // While booking, the account shows as the bar's way back to it.
-        await expect(state.page.locator(".booking-bar__back")).toBeVisible();
+        // While booking, the account's own bar heads the booking bar.
+        await expect(state.page.locator(".booking-bar__head .account-menu")).toBeVisible();
         await expect(state.page.locator(".calendar-week button.has-booking")).toHaveCount(1);
         await replaceSession(state.page, null);
         await expect(state.page.locator(".calendar-week button.has-booking")).toHaveCount(0);
-        await expect(state.page.locator(".booking-bar__back")).toHaveCount(0);
+        await expect(state.page.locator(".booking-bar__head .account-menu")).toHaveCount(0);
         await expect(state.page.getByText(student.name, { exact: true })).toHaveCount(0);
         assert.deepEqual(state.errors, []);
       } finally { await state.context.close(); }

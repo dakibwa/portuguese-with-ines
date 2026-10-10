@@ -163,7 +163,12 @@ function meetingResult(event) {
   if (url !== undefined && url !== null && !/^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(url)) {
     throw problem("calendar_invalid_meeting_url", 502);
   }
-  return { eventId: event.id, meetingUrl: url || null, status: url ? "ready" : "pending" };
+  // What Google says about the room while there is no link, so a link that
+  // never arrives can be told apart in the logs: no conference requested at
+  // all, or one Google holds as pending.
+  if (url) return { eventId: event.id, meetingUrl: url, status: "ready" };
+  const conference = event.conferenceData?.createRequest?.status?.statusCode ?? (event.conferenceData ? "no-request" : "none");
+  return { eventId: event.id, meetingUrl: null, status: "pending", conference };
 }
 
 async function findEvent(accessToken, root, input) {

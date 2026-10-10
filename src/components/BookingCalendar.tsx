@@ -2651,12 +2651,20 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     return (
       <div className={`booking-bar${inConfirmation ? " booking-bar--review" : ""}`}>
         {!inConfirmation ? (
-          <div className="booking-bar__head">
-            <h2 className="eyebrow" id="booking-bar-heading" tabIndex={-1}>Book a lesson</h2>
+          <div className={`booking-bar__head${student ? " booking-bar__head--account" : ""}`}>
+            {/* Signed in, the account's own bar heads booking as it heads Your
+                lessons: the name's menu, or the places open on a wide card,
+                which hold the way back (10 October 2026, at Dan's request). */}
+            <h2 className={student ? "visually-hidden" : "eyebrow"} id="booking-bar-heading" tabIndex={-1}>Book a lesson</h2>
             {student ? (
-              <button className="booking-back booking-back--tertiary booking-bar__back" onClick={openLessonsJourney} type="button">
-                <ArrowLeft size={16} aria-hidden="true" /> Your lessons
-              </button>
+              <AccountMenu
+                current={null}
+                mark={student.mark}
+                name={student.name}
+                onSelect={openAccountView}
+                onSignOut={signOut}
+                upcomingCount={upcomingCount}
+              />
             ) : returningDevice ? (
               <p className="booking-bar__sign-in">
                 <span className="booking-bar__sign-in-note">Already booked?</span>

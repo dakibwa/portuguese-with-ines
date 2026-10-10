@@ -573,7 +573,7 @@ try {
   await manual.locator("summary").click();
   await manual.getByLabel("Student’s email").fill("manual@example.invalid");
   await manual.getByLabel("Student’s name").fill("Robin");
-  await manual.getByLabel("Where").selectOption("porto");
+  await manual.getByRole("radio", { name: "In Porto", exact: true }).check();
   await manual.getByLabel("Date", { exact: true }).fill("2026-09-11");
   await manual
     .getByRole("button", { name: "Add lesson and email student" })

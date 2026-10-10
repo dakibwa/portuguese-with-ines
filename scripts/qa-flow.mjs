@@ -2689,8 +2689,10 @@ for (const width of [1440, 390]) {
 }
 await accountPage.setViewportSize({ width: 390, height: 844 });
 
-// Sign out is in the account's menu, back on Your lessons.
-await accountPage.locator(".booking-bar__back").click();
+// Sign out is in the account's menu, back on Your lessons. While booking,
+// that menu heads the booking bar and holds the way back.
+await accountPage.locator(".booking-bar__head #account-menu-button").click();
+await accountPage.locator(".booking-bar__head #account-menu").getByRole("button", { name: /^Your lessons/ }).click();
 await accountPage.locator("#upcoming-lessons-heading").waitFor();
 await accountMenuButton.click();
 await accountPanel.getByRole("button", { name: "Sign out", exact: true }).click();

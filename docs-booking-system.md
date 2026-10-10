@@ -1324,6 +1324,14 @@ that connection. The existing Google sign-in client remains separate.
    no Meet link. Verify changing online ↔ Porto preserves the event identity.
    Only then enable production and connect Inês’s production account.
 
+Until 10 October 2026 no online lesson had received a Meet link: every event
+existed but each retry asked Google for its room under the same `requestId`,
+which Google treats as the request it already has. Each attempt now sends a
+fresh `requestId`, and a link still pending logs `meeting_pending` with what
+Google reports (`none`, `no-request`, `pending`), visible with `npx wrangler
+tail`. If links still do not arrive after the Worker is deployed, that log line
+names the cause.
+
 Expired or revoked Google permission shows **Needs reconnecting** beside Google
 Meet in her schedule; **Configure → Reconnect Google Meet** restores it.
 Reconnection reuses the stored calendar and event identities. If the first

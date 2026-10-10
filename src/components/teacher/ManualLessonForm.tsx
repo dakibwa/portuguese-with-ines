@@ -97,36 +97,48 @@ export function ManualLessonForm({
               onChange={(e) => setLesson({ ...lesson, name: e.target.value })}
             />
           </label>
-          <label>
-            <span>Lesson</span>
-            <select
-              disabled={busy}
-              value={lesson.lessonType}
-              onChange={(e) =>
-                setLesson({ ...lesson, lessonType: e.target.value })
-              }
+          {/* Length and place as the booking's sliders, rather than menus to
+              open (10 October 2026, at Dan's request). */}
+          <fieldset className="teacher-manual-choice">
+            <legend>Lesson</legend>
+            <div
+              className={`segmented segmented--three segmented--position-${["trial", "single", "long"].indexOf(lesson.lessonType)}`}
             >
-              <option value="trial">Trial · 60 mins</option>
-              <option value="single">60 mins</option>
-              <option value="long">90 mins</option>
-            </select>
-          </label>
-          <label>
-            <span>Where</span>
-            <select
-              disabled={busy}
-              value={lesson.location}
-              onChange={(e) =>
-                setLesson({
-                  ...lesson,
-                  location: e.target.value as "online" | "porto",
-                })
-              }
-            >
-              <option value="online">Online</option>
-              <option value="porto">In Porto</option>
-            </select>
-          </label>
+              <span aria-hidden="true" className="segmented__thumb" />
+              {([["trial", "Trial"], ["single", "60 mins"], ["long", "90 mins"]] as const).map(([value, label]) => (
+                <label className={lesson.lessonType === value ? "is-active" : ""} key={value}>
+                  <input
+                    checked={lesson.lessonType === value}
+                    disabled={busy}
+                    name="teacher-manual-lesson"
+                    onChange={() => setLesson({ ...lesson, lessonType: value })}
+                    type="radio"
+                    value={value}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="teacher-manual-choice">
+            <legend>Where</legend>
+            <div className={`segmented segmented--${lesson.location}`}>
+              <span aria-hidden="true" className="segmented__thumb" />
+              {([["online", "Online"], ["porto", "In Porto"]] as const).map(([value, label]) => (
+                <label className={lesson.location === value ? "is-active" : ""} key={value}>
+                  <input
+                    checked={lesson.location === value}
+                    disabled={busy}
+                    name="teacher-manual-location"
+                    onChange={() => setLesson({ ...lesson, location: value })}
+                    type="radio"
+                    value={value}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label>
             <span>Date</span>
             <input

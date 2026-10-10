@@ -3116,10 +3116,6 @@ textarea,
   margin-left: 0.35rem;
 }
 
-.booking-bar__back {
-  gap: 0.35rem;
-}
-
 /* Each group starts as wide as its options need and a row shares out what is
    left, so a wide screen fills the line and a narrower one moves a group down
    rather than squeezing a label onto two lines. */
@@ -6094,6 +6090,11 @@ button.text-action {
 
   .account-menu__places--at-1 .account-menu__thumb {
     transform: translateX(calc(100% + 4px));
+  }
+
+  /* While booking no card is showing, so no place is marked. */
+  .account-menu__places--at-none .account-menu__thumb {
+    display: none;
   }
 
   .account-menu__places--at-2 .account-menu__thumb {

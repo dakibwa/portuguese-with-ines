@@ -12,6 +12,7 @@ import { formatBookedLessonLabel, formatSlotTime, portoTimeToUtc } from "@/lib/b
 import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { AssetMark } from "@/components/BrandMarks";
+import { studentMark } from "@/lib/student-marks";
 import { MeetingLink } from "@/components/MeetingLink";
 import { restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
@@ -141,7 +142,12 @@ export function LessonDetails({
       }}
     >
       <div className="teacher-dialog-top">
-        <AssetMark asset="/visuals/v2-splats/one-to-one-splat-v2.svg" className="teacher-lesson-mark" />
+        {/* The student's own splat when they have chosen one, so Inês knows
+            them at a glance (10 October 2026, at Dan's request). */}
+        <AssetMark
+          asset={studentMark(booking.student_mark)?.src ?? "/visuals/v2-splats/one-to-one-splat-v2.svg"}
+          className="teacher-lesson-mark"
+        />
         <div className="teacher-dialog-heading">
           {/* The length and short date, as the student's own lesson rows
               read: `60 mins · Thu 8 Oct`, while a trial keeps its name. */}

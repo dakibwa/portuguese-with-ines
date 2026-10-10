@@ -26,7 +26,8 @@ export function AuthPanel({
   onSignedIn,
   heading,
   headingLevel = 3,
-  intro
+  intro,
+  signInOnly = false
 }: {
   initialMode?: Mode;
   /**
@@ -41,6 +42,8 @@ export function AuthPanel({
   heading?: string;
   headingLevel?: 2 | 3;
   intro?: string;
+  /** Only signing in, with no tabs: Inês's schedule has no accounts to make. */
+  signInOnly?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const tabsId = useId();
@@ -179,7 +182,7 @@ export function AuthPanel({
           have never been here before. Signing in follows it rather than
           fronting it, and the surfaces that are only ever reached by a
           returning student open on it instead. */}
-      {mode !== "forgot" ? (
+      {mode !== "forgot" && !signInOnly ? (
         <div aria-label="Your account" className={`auth-tabs auth-tabs--${mode}`} role="tablist">
           <span aria-hidden="true" className="auth-tabs__thumb" />
           <button
@@ -214,12 +217,12 @@ export function AuthPanel({
       ) : null}
 
       <form
-        aria-labelledby={mode !== "forgot" ? `${tabsId}-${mode}` : undefined}
+        aria-labelledby={mode !== "forgot" && !signInOnly ? `${tabsId}-${mode}` : undefined}
         className="auth-panel__form"
         id={`${tabsId}-panel`}
         key={mode}
         onSubmit={submit}
-        role={mode !== "forgot" ? "tabpanel" : undefined}
+        role={mode !== "forgot" && !signInOnly ? "tabpanel" : undefined}
       >
         {mode === "register" ? (
           <label>

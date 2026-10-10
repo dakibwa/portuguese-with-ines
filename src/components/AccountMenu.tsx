@@ -50,7 +50,8 @@ export function AccountMenu({
   onSignOut,
   upcomingCount = 0
 }: {
-  current: AccountSection;
+  /** The card showing; none while booking, when the bar stands for the account. */
+  current: AccountSection | null;
   mark?: string;
   name: string;
   onSelect: (section: AccountSection) => void;
@@ -85,7 +86,7 @@ export function AccountMenu({
     onSelect(section);
   }
 
-  const place = current === "upcoming" ? 0 : current === "history" ? 1 : 2;
+  const place = current === "upcoming" ? 0 : current === "history" ? 1 : current === "profile" ? 2 : "none";
 
   return (
     <div className="account-menu" ref={menuRef}>

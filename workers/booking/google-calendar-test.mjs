@@ -144,7 +144,7 @@ await test("pending conference polls are bounded and preserve event identity", a
   let gets = 0;
   const pending = event({ conferenceData: { createRequest: { status: { statusCode: "pending" } } } });
   const { connection } = await fixture(() => { gets += 1; return response(pending); });
-  assert.deepEqual(await ensureCalendarMeeting(env, connection, { ...input, eventId: "event-1" }), { eventId: "event-1", meetingUrl: null, status: "pending" });
+  assert.deepEqual(await ensureCalendarMeeting(env, connection, { ...input, eventId: "event-1" }), { eventId: "event-1", meetingUrl: null, status: "pending", conference: "pending" });
   assert.equal(gets, 3);
 });
 await test("pending conference can become ready during bounded polling", async () => {

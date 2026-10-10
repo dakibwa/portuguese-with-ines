@@ -1013,6 +1013,14 @@ as a form:
   `Book a lesson`, and the close fills with lilac and gives its cross a
   quarter turn when pointed at (never on touch, where the opening tap lands
   on it);
+- signed in, booking is headed by the account's own bar, as Your lessons is:
+  the name's menu, or the places open on a wide card, holding the way back;
+- Inês's schedule reads as the same place: the booking page's blue band,
+  Google Meet's status raised in cream with a small `Sign out` beside it
+  instead of an account card, the way to take time off behind a `?` beside the
+  week, sliders for a lesson's length and place in `Add a lesson for a
+  student`, her sign-in with no `Create an account`, and each student's chosen
+  splat beside their name when she opens a lesson;
 - shorter helper copy: `Nothing booked yet.` alone; no intro sentence on the
   `Your account` sign-in; a clashing week `won't be booked; the rest go ahead`
   without the advice the choices bar already gives; the change overlay asks

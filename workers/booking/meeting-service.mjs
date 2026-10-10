@@ -152,11 +152,16 @@ export async function prepareMeeting(env, input) {
     } else {
       const meeting = await ensureCalendarMeeting(env, account, {
         bookingId: row.id, iCalUID: calendarUid(row.id), eventId: row.meeting_event_id,
-        requestId: `pwi-${row.id}-${row.sequence}-${row.meeting_attempts ?? 0}`, summary: `Portuguese lesson · ${row.student_name}`,
+        // A fresh request each attempt: Google treats a repeated requestId as
+        // the same request, so an event left without a room was asked for it
+        // again and again under the one id and never given one. No Meet link
+        // had reached any lesson since the calendar was connected.
+        requestId: `pwi-${row.id}-${row.sequence}-${row.meeting_attempts ?? 0}-${now.getTime().toString(36)}`, summary: `Portuguese lesson · ${row.student_name}`,
         description: `${row.location === "online" ? "Online" : "In-person Porto"} Portuguese lesson. Booking reference: ${row.reference}. Manage lessons on https://portuguesewithines.com/schedule/`,
         online: row.location === "online",
         startAt: row.starts_at, endAt: row.ends_at,
       });
+      if (meeting.status !== "ready") console.warn("google-calendar-sync", row.reference, "meeting_pending", meeting.conference ?? "unknown");
       // Persist provider identity even if the student changed/cancelled while
       // Google worked; the next sweep then reconciles the same event.
       await env.DB.prepare(`UPDATE bookings SET meeting_notified_at = CASE WHEN meeting_url IS ? THEN meeting_notified_at ELSE NULL END,
