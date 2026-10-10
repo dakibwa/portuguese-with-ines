@@ -312,6 +312,20 @@ try {
         .getByRole("button", { name: "Monday 7 September, show lessons" })
         .click();
     await lessonLocation(page, "Alex", "Online");
+    // An online lesson carries its call on the timetable, clear of its time.
+    const meet = page.getByRole("link", { name: /^Join Google Meet with Alex,/ });
+    await expect(meet).toBeVisible();
+    await expect(meet).toHaveAttribute("href", "https://meet.google.com/abc-defg-hij");
+    const time = await page
+      .getByRole("button", { name: /^Alex,.*View lesson$/ })
+      .locator(".teacher-lesson-time")
+      .boundingBox();
+    const pill = await meet.boundingBox();
+    assert.ok(
+      pill.y >= time.y + time.height || pill.x >= time.x + time.width,
+      `Meet pill covers the lesson time at ${width}px`,
+    );
+    await expect(page.getByRole("link", { name: /^Join Google Meet with Sam,/ })).toHaveCount(0);
     if (width < 741)
       await page
         .getByRole("button", { name: "Tuesday 8 September, show lessons" })

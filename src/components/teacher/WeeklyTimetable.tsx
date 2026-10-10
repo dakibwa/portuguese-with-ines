@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useMemo,
   useLayoutEffect,
   useRef,
@@ -12,6 +13,7 @@ import {
 } from "react";
 import { Plus, Trash2, Video, MapPin } from "lucide-react";
 import type { AdminBooking, AvailabilityException } from "@/lib/admin-api";
+import { meetingHref } from "@/components/MeetingLink";
 import { formatSlotTime } from "@/lib/booking-api";
 import {
   WEEKDAYS,
@@ -601,14 +603,22 @@ export function WeeklyTimetable({
                         (
                           { booking, start: bookingStart, end: bookingEnd },
                           position,
-                        ) => (
+                        ) => {
+                          const top = `calc(${(bookingStart - start) / step} * var(--teacher-slot-height) + 2px)`;
+                          const height = `max(38px, calc(${(bookingEnd - bookingStart) / step} * var(--teacher-slot-height) - 4px))`;
+                          const meet = meetingHref({
+                            meetingUrl: booking.meeting_url,
+                            location: booking.location,
+                            status: booking.status,
+                          });
+                          return (
+                          <Fragment key={`${booking.id}-${position}`}>
                           <button
-                            key={`${booking.id}-${position}`}
                             type="button"
                             className={`teacher-calendar-lesson ${booking.location === "porto" ? "teacher-calendar-lesson--porto" : ""}${booking.attendance_status === "no_show" ? " teacher-calendar-lesson--no-show" : ""}`}
                             style={{
-                              top: `calc(${(bookingStart - start) / step} * var(--teacher-slot-height) + 2px)`,
-                              height: `max(38px, calc(${(bookingEnd - bookingStart) / step} * var(--teacher-slot-height) - 4px))`,
+                              top,
+                              height,
                             }}
                             aria-label={`${booking.student_name}, ${dateLabel(date)}, ${formatSlotTime(booking.starts_at)} to ${formatSlotTime(booking.ends_at)}, ${booking.location === "porto" ? "in Porto" : "online"}${booking.attendance_status === "no_show" ? ", marked as a no-show" : ""}. View lesson`}
                             onClick={() => onSelectBooking(booking)}
@@ -632,7 +642,26 @@ export function WeeklyTimetable({
                                 : "Online"}
                             </span>
                           </button>
-                        ),
+                          {/* Over the lesson's bottom corner rather than
+                              inside it, since a link can't sit within a
+                              button: one tap to the lesson's call (10
+                              October 2026, at Dan's request). */}
+                          {meet ? (
+                            <a
+                              className="teacher-lesson-meet"
+                              href={meet}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Join Google Meet with ${booking.student_name}, ${formatSlotTime(booking.starts_at)}`}
+                              style={{ top: `calc(${top} + ${height} - 28px)` }}
+                            >
+                              <Video size={12} aria-hidden="true" />
+                              Meet
+                            </a>
+                          ) : null}
+                          </Fragment>
+                          );
+                        },
                       )
                     : null}
                 </div>

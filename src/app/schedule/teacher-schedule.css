@@ -603,6 +603,35 @@
   background: var(--blue);
   box-shadow: 0 3px 0 rgba(32, 62, 130, 0.15);
 }
+/* A lesson's call, a small cream pill in its bottom right corner. */
+.teacher-lesson-meet {
+  position: absolute;
+  z-index: 4;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 22px;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--squiggle-pill);
+  background: var(--paper-light);
+  color: var(--blue-deep);
+  font: 700 0.58rem/1 var(--ui);
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: background-color 150ms, color 150ms;
+}
+.teacher-lesson-meet::after {
+  position: absolute;
+  inset: -8px -6px;
+  content: "";
+}
+.teacher-lesson-meet:hover,
+.teacher-lesson-meet:focus-visible {
+  background: var(--coral-action);
+  color: #fff;
+}
 .teacher-calendar-lesson strong {
   display: block;
   flex: none;
