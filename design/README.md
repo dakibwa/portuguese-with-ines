@@ -1009,6 +1009,10 @@ as a form:
   NIF`, beside each, opening one field at a time in place; a small `Sign out`
   sits at its foot. A student can wear one of the site's splats beside their
   name instead of their initial (`students.mark`, migration 0022);
+- moving between Your lessons, Past lessons and Your details, the places'
+  thumb glides from where it stood to the card now showing, and that card's
+  contents slide in from the side it was reached from (forward from the
+  right, back from the left); with reduced motion both simply appear;
 - in the phone menu, `Message on WhatsApp` is a lilac fill beside the coral
   `Book a lesson`, and the close fills with lilac and gives its cross a
   quarter turn when pointed at (never on touch, where the opening tap lands
