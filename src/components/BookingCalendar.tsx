@@ -1,6 +1,7 @@
 "use client";
 
 import { MeetingLink } from "@/components/MeetingLink";
+import { LessonsLoading } from "@/components/LessonsLoading";
 
 import { type ComponentType, type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -37,7 +38,7 @@ const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/c
 const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons));
 if (typeof window !== "undefined" && readSession()) void loadAccountControls();
 import { LessonMark } from "@/components/LessonMarks";
-import { clearSession, fetchMe, isReturningDevice, readSession, rememberReturningStudent, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
+import { clearSession, fetchMe, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { SITE_BASE_PATH } from "@/lib/paths";
@@ -873,6 +874,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // than asking for the same account again the moment it appears.
   const [loadedAccount, setLoadedAccount] = useState<Awaited<ReturnType<typeof fetchMe>>>(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  // Read after mount, as the server's render cannot know it.
+  const [hasStoredSession, setHasStoredSession] = useState(false);
   // The Worker treats any non-cancelled booking as the start of the student's
   // relationship with Inês, including an upcoming first lesson. Mirror that
   // exact rule here: a card the server will refuse is a trap, not a choice.
@@ -1009,6 +1012,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const canChangeManagedDuration =
     managedDurationChoices.length > 1 && ["not_required", "scheduled"].includes(managedPaymentStatus);
 
+  const applyAccount = useCallback((data: Awaited<ReturnType<typeof fetchMe>>) => {
+    setLoadedAccount(data);
+    setStudent(data?.student ?? null);
+    setMyBookings(data?.bookings ?? []);
+    setLessonSeries(data?.series ?? []);
+    // An unfinished card-setup hold is released by the next booking, so it is
+    // not a lesson yet and must not hide the trial.
+    const booked = (data?.bookings ?? []).some((booking) => booking.status === "confirmed");
+    setHasPriorBooking(booked);
+    if (booked && data?.student?.role !== "teacher") rememberReturningStudent();
+  }, []);
+
   const refreshStudent = useCallback(async () => {
     const request = ++accountRequest.current;
     const session = readSession();
@@ -1030,17 +1045,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     }
     if (request !== accountRequest.current || readSession() !== session) return null;
     setAccountLoadError("");
-    setLoadedAccount(data);
-    setStudent(data?.student ?? null);
-    setMyBookings(data?.bookings ?? []);
-    setLessonSeries(data?.series ?? []);
-    // An unfinished card-setup hold is released by the next booking, so it is
-    // not a lesson yet and must not hide the trial.
-    const booked = (data?.bookings ?? []).some((booking) => booking.status === "confirmed");
-    setHasPriorBooking(booked);
-    if (booked && data?.student?.role !== "teacher") rememberReturningStudent();
+    applyAccount(data);
     return data;
-  }, []);
+  }, [applyAccount]);
 
   const refreshStudentInBackground = useCallback(() => {
     const session = readSession();
@@ -1107,6 +1114,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     const params = new URLSearchParams(window.location.search);
     const key = portoDateKey(new Date());
     setTodayKey(key);
+    setHasStoredSession(Boolean(readSession()));
     setStudentZone(browserTimeZone());
     const returningFromCard = params.get("card") === "saved";
     if (returningFromCard) {
@@ -1155,23 +1163,48 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     // that answer instead of on booking.
     const loadAccount = (): ReturnType<typeof refreshStudent> =>
       refreshStudent().then((data) => (data || !readSession() ? data : loadAccount()));
+    // Opens on where the student was going for their next commitment.
+    const openOnLessons = (data: Awaited<ReturnType<typeof refreshStudent>>) => {
+      if (
+        data?.student &&
+        !["lessons", "book"].includes(params.get("view") ?? "") &&
+        !params.get("lesson") &&
+        !params.has("manage") &&
+        !params.has("token") &&
+        !params.has("emailToken")
+      ) {
+        setIntent("lessons");
+        setCalendarWeekCount(4);
+        setStep("day");
+        setUpcomingRequestKey((current) => current + 1);
+        return true;
+      }
+      return false;
+    };
+    // A return visit to Your lessons opens on the account as this session
+    // last read it, at once, and the reply below replaces it moments later.
+    // Booking and emailed links wait for the reply as before.
+    const remembered = rememberedAccount(readSession());
+    const lessonsByAddress = Boolean(initialLessonsView || returningFromCard || params.get("view") === "lessons");
+    let openedFromMemory = false;
+    if (remembered && (lessonsByAddress || (
+      !params.get("view") && !params.get("lesson") && !params.has("manage") && !params.has("token") && !params.has("emailToken")
+    ))) {
+      applyAccount(remembered);
+      if (!lessonsByAddress) openOnLessons(remembered);
+      openedFromMemory = true;
+      setCheckingSession(false);
+    }
     loadAccount()
       .then((data) => {
         // Returning students came here for their next commitment, not for a
         // fork asking whether they want to see it. Explicit lesson, sign-in,
         // and emailed-management URLs retain their own destination.
-        if (
-          data?.student &&
-          !["lessons", "book"].includes(params.get("view") ?? "") &&
-          !params.get("lesson") &&
-          !params.has("manage") &&
-          !params.has("token") &&
-          !params.has("emailToken")
-        ) {
-          setIntent("lessons");
-          setCalendarWeekCount(4);
-          setStep("day");
-          setUpcomingRequestKey((current) => current + 1);
+        // Already open from memory: the student may have moved on since.
+        if (openedFromMemory && data?.student) {
+          // Nothing to open.
+        } else if (openOnLessons(data)) {
+          // Opened above.
         } else if (!data?.student) {
           // Anyone not signed in came to book, so the calendar opens ready to
           // book, with the account a click away. Explicit destinations keep
@@ -1186,7 +1219,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         else setIntent((current) => (current === "choose" ? "book" : current));
       })
       .finally(() => setCheckingSession(false));
-  }, [initialLessonsView, refreshStudent]);
+  }, [applyAccount, initialLessonsView, refreshStudent]);
 
   // Link creation can finish just after booking confirmation. Refresh the
   // affected lesson a few times without extending the booking request itself.
@@ -1646,7 +1679,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const needsLessonsSignIn = intent === "lessons" && !student && (
     showAccountSignIn || !checkingSession && !readSession()
   );
+  // A signed-in student's first visit draws Your lessons straight away, its
+  // lessons filling in when the account arrives (LessonsLoading).
+  const lessonsLoading = checkingSession && hasStoredSession && !managed && Boolean(todayKey) &&
+    (intent === "choose" || intent === "lessons");
   const showWorkflowCalendar =
+    !lessonsLoading &&
     !isConfirmingBooking &&
     !needsLessonsSignIn &&
     ((intent === "lessons" && accountView === "upcoming") ||
@@ -3415,9 +3453,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
         {!manageDialogOpen && accountRefreshNotice}
 
-        {checkingSession && intent === "choose" && !managed ? (
-          <p className="booking-state-note booking-state-note--initial">Loading your lessons…</p>
-        ) : null}
+        {lessonsLoading ? <LessonsLoading todayKey={viewTodayKey || todayKey} /> : null}
 
         {needsLessonsSignIn ? (
           <section className="booking-workflow-sign-in" id="booking-lessons-sign-in" tabIndex={-1}>

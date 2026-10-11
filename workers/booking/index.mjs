@@ -913,10 +913,12 @@ async function currentStudent(request, env) {
   const studentId = await readSession(bearer, env.BOOKING_TOKEN_SECRET);
   if (!studentId) return null;
 
-  const student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(studentId).first();
+  // Both reads at once: every signed-in request waits on this.
+  const [student, revoked] = await Promise.all([
+    env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(studentId).first(),
+    sessionHash(bearer).then((hash) => env.DB.prepare("SELECT token_hash FROM revoked_sessions WHERE token_hash = ?").bind(hash).first())
+  ]);
   if (!student || sessionVersion(bearer) !== (student.session_version ?? 0)) return null;
-  const revoked = await env.DB.prepare("SELECT token_hash FROM revoked_sessions WHERE token_hash = ?")
-    .bind(await sessionHash(bearer)).first();
   return revoked ? null : student;
 }
 
@@ -3853,16 +3855,31 @@ async function handleMe(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
 
-  const settings = await loadSettings(env);
-  const { results } = await env.DB.prepare(
-    `SELECT b.*, l.name AS lesson_name, l.duration_minutes, l.price_cents
-     FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
-     WHERE b.student_id = ? ORDER BY b.starts_at DESC`
-  )
-    .bind(student.id)
-    .all();
-
+  // The settings, lessons and weekly runs are read at once rather than one
+  // after another: Your lessons waits on this reply.
   const now = new Date();
+  const [settings, { results }, { results: seriesRows }] = await Promise.all([
+    loadSettings(env),
+    env.DB.prepare(
+      `SELECT b.*, l.name AS lesson_name, l.duration_minutes, l.price_cents
+       FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
+       WHERE b.student_id = ? ORDER BY b.starts_at DESC`
+    )
+      .bind(student.id)
+      .all(),
+    // Only what the page needs to say "this repeats, and here is how to stop it".
+    env.DB.prepare(
+      `SELECT s.*, COUNT(b.id) AS upcoming
+       FROM booking_series s
+       LEFT JOIN bookings b
+         ON b.series_id = s.id AND b.status = 'confirmed' AND b.starts_at > ?
+       WHERE s.student_id = ? AND s.status = 'active'
+       GROUP BY s.id`
+    )
+      .bind(now.toISOString(), student.id)
+      .all()
+  ]);
+
   const bookings = await Promise.all(
     (results ?? []).map(async (row) => ({
       reference: row.reference,
@@ -3888,18 +3905,6 @@ async function handleMe(request, env) {
       manageToken: await createManageToken(row.id, env.BOOKING_TOKEN_SECRET)
     }))
   );
-
-  // Only what the page needs to say "this repeats, and here is how to stop it".
-  const { results: seriesRows } = await env.DB.prepare(
-    `SELECT s.*, COUNT(b.id) AS upcoming
-     FROM booking_series s
-     LEFT JOIN bookings b
-       ON b.series_id = s.id AND b.status = 'confirmed' AND b.starts_at > ?
-     WHERE s.student_id = ? AND s.status = 'active'
-     GROUP BY s.id`
-  )
-    .bind(now.toISOString(), student.id)
-    .all();
 
   const series = (seriesRows ?? []).map((row) => ({
     id: row.id,

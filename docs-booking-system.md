@@ -133,6 +133,15 @@ their existing booking, payment and email safeguards.
 Booking requires an account, so a student's lessons persist together rather than
 depending on them having kept the right confirmation email.
 
+- **Opening quickly.** `/book/` asks for `/me` from its HTML, before its code
+  loads. `/me` reads the session's student and its revocation together, then
+  the settings, lessons and weekly runs together: two database round trips
+  rather than five. The browser keeps the account as its session last read it
+  (`ines-account-snapshot` in localStorage, a week at most, removed on signing
+  out or when the session is refused) and opens Your lessons on it at once on a
+  return visit while it asks again; booking and emailed links still wait for
+  the reply.
+
 - **Email and password.** Hashed with PBKDF2-HMAC-SHA256 at the OWASP iteration
   count — bcrypt and argon2 do not exist in the Workers runtime. The stored
   record carries its own algorithm, cost and salt, so the cost can be raised

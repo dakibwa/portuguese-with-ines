@@ -57,6 +57,12 @@ const SESSION_KEY = "ines-student-session";
 // Outlives the session: a student with a booked lesson has signed in here.
 const RETURNING_KEY = "ines-returning-student";
 export const SESSION_CHANGE_EVENT = "ines:student-session-change";
+// The account as last read, so Your lessons opens at once on a return visit
+// while the page asks again (11 October 2026, at Dan's request: as near
+// instant as it can be). It belongs to the session that read it, lasts a
+// week at most and goes with signing out.
+const ACCOUNT_KEY = "ines-account-snapshot";
+const ACCOUNT_MAX_AGE_MS = 7 * 86_400_000;
 
 export class SessionStorageError extends Error {
   constructor(message = "Your browser couldn’t save your sign-in. Allow site storage, then try signing in again.") {
@@ -101,6 +107,7 @@ export function clearSession() {
   }
   try {
     window.localStorage.removeItem(SESSION_KEY);
+    window.localStorage.removeItem(ACCOUNT_KEY);
     window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
   } catch {
     // Nothing to clear.
@@ -118,6 +125,7 @@ export function forgetSession(expectedSession?: string) {
     const session = window.localStorage.getItem(SESSION_KEY);
     if (!session || (expectedSession !== undefined && session !== expectedSession)) return;
     window.localStorage.removeItem(SESSION_KEY);
+    window.localStorage.removeItem(ACCOUNT_KEY);
     window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
   } catch {
     // Nothing stored.
@@ -278,6 +286,38 @@ declare global {
   }
 }
 
+type Account = { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; sameDayFeeCents: number };
+
+function isAccount(data: unknown): data is Account {
+  return isApiRecord(data) && validStudent(data.student) && Array.isArray(data.bookings) && data.bookings.every(isApiLesson) &&
+    (data.series === undefined || (Array.isArray(data.series) && data.series.every((series) =>
+      isApiRecord(series) && typeof series.id === "string" && Boolean(series.id)
+    )));
+}
+
+/** The account this session last read here, if it is recent enough to show while asking again. */
+export function rememberedAccount(token: string): Account | null {
+  if (!token) return null;
+  try {
+    const saved: unknown = JSON.parse(window.localStorage.getItem(ACCOUNT_KEY) ?? "null");
+    if (!isApiRecord(saved) || saved.token !== token || typeof saved.savedAt !== "number" ||
+      Date.now() - saved.savedAt > ACCOUNT_MAX_AGE_MS || !isAccount(saved.data)) return null;
+    return saved.data;
+  } catch {
+    return null;
+  }
+}
+
+function rememberAccount(token: string, data: Account) {
+  try {
+    // Only while that session is still the one signed in.
+    if (window.localStorage.getItem(SESSION_KEY) !== token) return;
+    window.localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ token, savedAt: Date.now(), data }));
+  } catch {
+    // Storage full or blocked: the page simply asks each time.
+  }
+}
+
 export async function fetchMe(token: string) {
   // The document's request is used once, and only for the session it was
   // sent with; any later read asks again.
@@ -304,9 +344,7 @@ export async function fetchMe(token: string) {
     const error = isApiRecord(data) && typeof data.error === "string" ? data.error : "";
     throw new AuthApiError(error || "We couldn’t load your lessons.", response.status);
   }
-  if (!isApiRecord(data) || !validStudent(data.student) || !Array.isArray(data.bookings) || !data.bookings.every(isApiLesson) ||
-    (data.series !== undefined && (!Array.isArray(data.series) || !data.series.every((series) =>
-      isApiRecord(series) && typeof series.id === "string" && Boolean(series.id)
-    )))) throw new AuthApiError(BOOKING_REPLY_ERROR, response.status);
-  return data as { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; sameDayFeeCents: number };
+  if (!isAccount(data)) throw new AuthApiError(BOOKING_REPLY_ERROR, response.status);
+  rememberAccount(token, data);
+  return data;
 }
