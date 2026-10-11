@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { studentMark } from "@/lib/student-marks";
 
 export type AccountSection = "upcoming" | "history" | "profile";
@@ -41,6 +41,15 @@ export function AccountSignature({ mark }: { mark?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
   return splat ? <img alt="" aria-hidden="true" className="account-signature" src={splat.src} /> : null;
 }
+
+/**
+ * Where the places' thumb last rested. Your lessons, Past lessons and Your
+ * details are separate cards, each with its own menu, so a new card's thumb
+ * starts where the last one stood and glides to its own place, and the card's
+ * contents slide in from the side it was reached from (11 October 2026, at
+ * Dan's request: the slider did not slide between pages).
+ */
+let lastPlace: number | null = null;
 
 export function AccountMenu({
   current,
@@ -87,6 +96,28 @@ export function AccountMenu({
   }
 
   const place = current === "upcoming" ? 0 : current === "history" ? 1 : current === "profile" ? 2 : "none";
+  const numericPlace = typeof place === "number" ? place : null;
+  const [shownPlace, setShownPlace] = useState<number | "none">(() => lastPlace ?? place);
+
+  useLayoutEffect(() => {
+    const from = lastPlace;
+    lastPlace = numericPlace;
+    if (numericPlace === null || from === null || from === numericPlace) {
+      setShownPlace(numericPlace ?? "none");
+      return;
+    }
+    const card = menuRef.current?.closest<HTMLElement>(".account-card, .calendar-panel");
+    if (card) {
+      card.dataset.accountSlide = numericPlace > from ? "forward" : "back";
+      window.setTimeout(() => { delete card.dataset.accountSlide; }, 480);
+    }
+    // Two frames: the thumb is painted where it was before it moves.
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setShownPlace(numericPlace));
+    });
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+  }, [numericPlace]);
 
   return (
     <div className="account-menu" ref={menuRef}>
@@ -106,7 +137,7 @@ export function AccountMenu({
       <div className={`account-menu__panel${open ? " is-open" : ""}`} id="account-menu">
         {/* Open in the header, the places are one sliding control, like the
             booking bar's; the thumb rests on the card that is showing. */}
-        <div className={`account-menu__places account-menu__places--at-${place}`}>
+        <div className={`account-menu__places account-menu__places--at-${shownPlace}`}>
           <span aria-hidden="true" className="account-menu__thumb" />
           <button aria-current={current === "upcoming" ? "true" : undefined} onClick={() => choose("upcoming")} type="button">
             Your lessons {upcomingCount ? <span>{upcomingCount}</span> : null}

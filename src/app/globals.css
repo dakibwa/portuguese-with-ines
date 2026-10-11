@@ -6097,6 +6097,7 @@ button.text-action {
     display: none;
   }
 
+
   .account-menu__places--at-2 .account-menu__thumb {
     transform: translateX(calc(200% + 8px));
   }
@@ -8293,4 +8294,31 @@ dialog[open]::backdrop {
 
 .meeting-link:hover {
   color: var(--coral-action);
+}
+
+/* Moving between Your lessons, Past lessons and Your details, the card's
+   contents slide in from the side they were reached from while the places'
+   thumb glides above them (AccountMenu). */
+@media (prefers-reduced-motion: no-preference) {
+  [data-account-slide="forward"] > :not(:has(.account-menu)):not(.account-signature) {
+    animation: account-slide-forward 360ms var(--motion-ease) both;
+  }
+
+  [data-account-slide="back"] > :not(:has(.account-menu)):not(.account-signature) {
+    animation: account-slide-back 360ms var(--motion-ease) both;
+  }
+}
+
+@keyframes account-slide-forward {
+  from {
+    opacity: 0;
+    transform: translateX(42px);
+  }
+}
+
+@keyframes account-slide-back {
+  from {
+    opacity: 0;
+    transform: translateX(-42px);
+  }
 }
