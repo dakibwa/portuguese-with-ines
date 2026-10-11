@@ -110,6 +110,9 @@ export function MyLessons({
   // Your details shows each value with its own Change; one opens at a time.
   const [openField, setOpenField] = useState<"name" | "email" | "nif" | "mark" | null>(null);
   const [savingMark, setSavingMark] = useState<string | null>(null);
+  // Just chosen: the new splat lands in its row (11 October 2026, at Dan's
+  // request: choosing one felt abrupt).
+  const [markLanding, setMarkLanding] = useState(false);
   const [emailPending, setEmailPending] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
   const [detailsNote, setDetailsNote] = useState("");
@@ -158,6 +161,40 @@ export function MyLessons({
     // Leaving Your details closes whatever was open in it.
     if (!editing) setOpenField(null);
   }, [editing]);
+
+  useEffect(() => {
+    if (!markLanding) return;
+    const timer = window.setTimeout(() => setMarkLanding(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [markLanding]);
+
+  // A detail opening or closing eases its row to the new height, carrying the
+  // rows below with it, instead of the card jumping (11 October 2026, at Dan's
+  // request). Heights are read after every commit so the next change starts
+  // from what is on screen.
+  const factHeights = useRef<{ field: typeof openField; width: number; heights: Map<string, number> } | null>(null);
+  useLayoutEffect(() => {
+    const facts = detailsRef.current?.querySelector<HTMLElement>(".my-lessons__facts");
+    if (!facts) {
+      factHeights.current = null;
+      return;
+    }
+    const rows = [...facts.querySelectorAll<HTMLElement>(":scope > .my-lessons__fact")];
+    const heights = new Map(rows.map((row) => [row.dataset.field ?? "", row.getBoundingClientRect().height]));
+    const before = factHeights.current;
+    factHeights.current = { field: openField, width: facts.clientWidth, heights };
+    if (!before || before.field === openField || before.width !== facts.clientWidth ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    for (const row of rows) {
+      const from = before.heights.get(row.dataset.field ?? "");
+      const to = heights.get(row.dataset.field ?? "");
+      if (from === undefined || to === undefined || Math.abs(from - to) < 2) continue;
+      row.animate([{ height: `${from}px`, overflow: "clip" }, { height: `${to}px`, overflow: "clip" }], {
+        duration: Math.round(Math.min(440, 260 + Math.abs(to - from) * 0.5)),
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)"
+      });
+    }
+  });
 
   // Focus a field as it opens, before a student can select anything else: a
   // queued frame could otherwise steal their focus or subsequent typing.
@@ -336,6 +373,7 @@ export function MyLessons({
       if (readSession() !== session) return;
       profileVersion.current += 1;
       setStudent((current) => current && { ...current, mark: result.student.mark ?? "" });
+      setMarkLanding(true);
       setOpenField((field) => field === "mark" ? null : field);
     } catch (caught) {
       if (readSession() !== session) return;
@@ -536,14 +574,16 @@ export function MyLessons({
               <span className="my-lessons__fact-label">Your splat</span>
               {openField === "mark" ? (
                 <div aria-label="Choose your splat" className="my-lessons__marks" role="group">
-                  {[{ id: "", label: "Your initial" }, ...STUDENT_MARKS].map((choice) => (
+                  {[{ id: "", label: "Your initial" }, ...STUDENT_MARKS].map((choice, order) => (
                     <button
                       aria-label={choice.label}
+                      aria-busy={savingMark === choice.id || undefined}
                       aria-pressed={(student.mark ?? "") === choice.id}
                       className="my-lessons__mark"
                       disabled={savingMark !== null}
                       key={choice.id || "initial"}
                       onClick={() => void saveMark(choice.id)}
+                      style={{ "--mark-order": order } as React.CSSProperties}
                       type="button"
                     >
                       <AccountAvatar mark={choice.id} name={student.name} />
@@ -552,7 +592,7 @@ export function MyLessons({
                 </div>
               ) : (
                 <span className="my-lessons__fact-value">
-                  <AccountAvatar className="my-lessons__avatar" mark={student.mark} name={student.name} />
+                  <AccountAvatar className={`my-lessons__avatar${markLanding ? " is-landing" : ""}`} mark={student.mark} name={student.name} />
                 </span>
               )}
               {openField === "mark" ? (

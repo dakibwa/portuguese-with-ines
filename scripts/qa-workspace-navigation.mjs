@@ -141,7 +141,9 @@ try {
   await page.locator("#upcoming-lessons-heading").waitFor();
   await page.locator(".lesson-overview__book").click();
   await page.locator("#lesson-calendar .booking-bar").waitFor();
-  await page.getByRole("button", { name: /^Your lessons/ }).first().click();
+  // While booking the account is its name's menu, at every width.
+  await page.locator(".booking-bar__head #account-menu-button").click();
+  await page.locator(".booking-bar__head").getByRole("button", { name: /^Your lessons/ }).click();
   await page.locator("#upcoming-lessons-heading").waitFor();
   assert.equal(await page.locator(".booking-bar").count(), 0);
 

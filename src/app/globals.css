@@ -958,15 +958,15 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   transform: scaleX(1);
 }
 
-/* Booking stands out as the site's one coral button in the nav. Its
-   current line is the other links', level with theirs beneath it. */
+/* Booking stands out as the nav's one button, in the links' own dark blue,
+   with no line beneath it (11 October 2026, at Dan's request). */
 .site-nav__book {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
   border-radius: var(--squiggle-pill);
   padding: 0 1.35rem;
-  background: var(--coral-action);
+  background: var(--blue-deep);
   color: var(--paper-light);
   transition:
     background 200ms ease,
@@ -976,11 +976,10 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 
 .site-nav__link--book:hover .site-nav__book {
   border-radius: var(--squiggle-button);
-  background: #95301f;
-  box-shadow: 0 12px 22px -14px rgba(149, 48, 31, 0.75);
+  background: var(--ink);
+  box-shadow: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
 }
 
-/* The button answers the pointer itself; only the current page's line shows. */
 .site-nav__link--book::after {
   display: none;
 }
@@ -3156,6 +3155,8 @@ textarea,
    left, so a wide screen fills the line and a narrower one moves a group down
    rather than squeezing a label onto two lines. */
 .booking-bar__choices {
+  /* Holds a leaving choice's picture while it fades (glideBarGroups). */
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem 1rem;
@@ -6615,6 +6616,42 @@ button.text-action {
   width: 40px;
   height: 40px;
   margin: 0;
+}
+
+/* Choosing a splat is a small landing (11 October 2026, at Dan's request):
+   the picker's splats land one after another as it opens, the one chosen
+   wobbles while it saves, and the new one lands in its row and in the card's
+   corner, as paint does elsewhere on the site. */
+@media screen and (prefers-reduced-motion: no-preference) {
+  .my-lessons__mark > .account-avatar {
+    animation:
+      splat-appear 320ms var(--motion-ease-out) backwards,
+      splat-land 640ms var(--motion-spring) backwards;
+    animation-delay: calc(var(--mark-order, 0) * 45ms);
+  }
+
+  .my-lessons__mark[aria-busy="true"] > .account-avatar {
+    animation: mark-saving 760ms var(--motion-ease) infinite;
+  }
+
+  .my-lessons__avatar.is-landing,
+  .account-signature.is-landing {
+    --land-turn: -14deg;
+    animation:
+      splat-appear 480ms var(--motion-ease-out) backwards,
+      splat-spread 720ms var(--motion-ease-out) backwards,
+      splat-land var(--motion-land) var(--motion-spring) backwards;
+  }
+
+  .account-signature.is-landing {
+    animation-delay: 140ms;
+  }
+}
+
+@keyframes mark-saving {
+  50% {
+    transform: scale(0.88) rotate(-8deg);
+  }
 }
 
 @container booking (max-width: 519.98px) {

@@ -478,6 +478,17 @@ request for smoother, less jolty selections). Nothing pops in late: a form or ti
 still on their way ease in when they arrive, and until the calendar first
 arrives its room is held, so the footer never shows and then drops away (9
 October 2026, at Dan's request for smooth transitions rather than jolty ones).
+The calendar's arrows turn it as the account's places turn its cards: the
+weeks showing slide away to one side and are nearly gone before the next ones
+slide in from the other, each seen only within the weeks' own frame, and the
+month's name follows. Choosing Weekly opens Repeat out among the other choices
+as they ease narrower, its options showing once it has room for them (or it
+rises in on a row of its own where the bar wraps); choosing Single fades
+Repeat where it stood and then eases the others wider over its place. A
+Your details row eases open and shut to its new height, and a splat chosen
+there lands in its row and in the card's corner, after the picker's splats
+land one after another as it opens (11 October 2026, at Dan's request that
+these moments feel smooth rather than abrupt).
 Without view transitions a new page dissolves in. Reduced-motion users get
 each page at once, without animation or smooth scrolling, and a full page load
 is an ordinary load rather than a turn.
@@ -847,11 +858,10 @@ for returning students. `Book a trial lesson` opens the trial's location choice;
 existing students receive their eligible ordinary choices. `Book a single
 lesson` and `Book a longer lesson` open booking with that length already
 chosen. The main `Booking` navigation still opens a returning student's
-schedule. In the desktop header it is the one coral button among the plain
-links, since booking is what the site is for (11 October 2026, at Dan's
-request); the current page's coral line still glides beneath it, level with
-the others'. The phone menu keeps it a row like the rest, with its own coral
-`Book a lesson` below. Old `/my-lessons` and emailed `/booking` links retain their
+schedule. In the desktop header it is the one button among the plain links,
+in their own dark blue and with no line beneath it, since booking is what the
+site is for (11 October 2026, at Dan's request). The phone menu keeps it a row
+like the rest, with its own coral `Book a lesson` below. Old `/my-lessons` and emailed `/booking` links retain their
 destination and tokens in `/book/`.
 
 ## Booking, simplified — 8 October 2026

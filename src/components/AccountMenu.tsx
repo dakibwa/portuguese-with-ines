@@ -38,8 +38,14 @@ export function AccountAvatar({ className = "", mark, name }: { className?: stri
  */
 export function AccountSignature({ mark }: { mark?: string }) {
   const splat = studentMark(mark);
-  // eslint-disable-next-line @next/next/no-img-element
-  return splat ? <img alt="" aria-hidden="true" className="account-signature" src={splat.src} /> : null;
+  // A splat chosen while the card shows lands in its corner; moving between
+  // cards it is simply there.
+  const [first] = useState(mark);
+  const landing = mark !== first;
+  return splat ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img alt="" aria-hidden="true" className={`account-signature${landing ? " is-landing" : ""}`} key={splat.src} src={splat.src} />
+  ) : null;
 }
 
 /**
