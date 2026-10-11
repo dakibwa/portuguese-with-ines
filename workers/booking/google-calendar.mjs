@@ -227,6 +227,26 @@ export async function ensureAppCalendar(env, connection) {
 }
 
 /** Caller serializes attempts per booking and stores eventId even when still pending. */
+/**
+ * How long Google may hold a Meet room as pending before it is asked again.
+ * A request Google never finishes stays pending for good, and asking under
+ * the same requestId only returns that same request: no online lesson got a
+ * link until 10 October 2026. Asking afresh every attempt would discard rooms
+ * a few seconds from ready, so a pending request is left this long first.
+ */
+export const STALE_CONFERENCE_MS = 10 * 60000;
+
+/**
+ * When a request of ours was made, read from its requestId's final segment
+ * (meeting-service.mjs ends each with the attempt's time in base 36). Earlier
+ * ids carried no time; they are treated as long since stale.
+ */
+function conferenceRequestedAt(requestId) {
+  const match = /^pwi-.+-([0-9a-z]+)$/.exec(String(requestId ?? ""));
+  const time = match ? parseInt(match[1], 36) : NaN;
+  return Number.isFinite(time) && time > Date.parse("2026-01-01T00:00:00Z") ? time : 0;
+}
+
 export async function ensureCalendarMeeting(env, connection, input) {
   if (!input || !input.bookingId || !input.iCalUID || !input.requestId ||
       typeof input.summary !== "string" || typeof input.description !== "string" ||
@@ -265,9 +285,12 @@ export async function ensureCalendarMeeting(env, connection, input) {
     }
     verifyEvent(event, input);
   } else {
-    const failed = online && event.conferenceData?.createRequest?.status?.statusCode === "failure";
+    const request = event.conferenceData?.createRequest;
+    const failed = online && request?.status?.statusCode === "failure";
+    const stale = online && !event.hangoutLink && request?.status?.statusCode === "pending" &&
+      request.requestId !== input.requestId && Date.now() - conferenceRequestedAt(request.requestId) > STALE_CONFERENCE_MS;
     const hasConference = Boolean(event.hangoutLink || (event.conferenceData && Object.keys(event.conferenceData).length));
-    const createConference = online && (!hasConference || failed);
+    const createConference = online && (!hasConference || failed || stale);
     const clearConference = !online && hasConference;
     if (failed && event.conferenceData.createRequest.requestId === input.requestId) throw problem("calendar_conference_failed", 502);
     if (createConference || clearConference || event.status === "cancelled" || Date.parse(event.start?.dateTime) !== Date.parse(input.startAt) ||

@@ -1326,19 +1326,21 @@ that connection. The existing Google sign-in client remains separate.
 
 Until 10 October 2026 no online lesson had received a Meet link: every event
 existed but each retry asked Google for its room under the same `requestId`,
-which Google treats as the request it already has. Each attempt now sends a
-fresh `requestId`, and a link still pending logs `meeting_pending` with what
+which Google treats as the request it already has, and a request Google held
+as pending was never asked for again at all. Each request now carries its own
+`requestId` and the time it was made; one still pending after ten minutes
+(`STALE_CONFERENCE_MS`), or made before requests were dated, is replaced with
+a fresh request on the same event. A link still pending logs `meeting_pending` with what
 Google reports (`none`, `no-request`, `pending`), visible with `npx wrangler
 tail`. If links still do not arrive after the Worker is deployed, that log line
 names the cause.
 
-The lessons booked before then (`MEETING_BACKLOG_BEFORE` in
-`meeting-service.mjs`) get their link on the booking page as soon as Google
-makes it, but their `Your online lesson link` email waits until 24 hours before
-the lesson, so nobody is sent a link days early out of the blue. Anything
-booked since gets its link straight away, in the confirmation or, when Google
-is slower, in its own email a couple of minutes later. Google itself emails no
-one: events carry no attendees and are written with `sendUpdates=none`.
+A lesson booked before then gets its link, on the booking page and in a `Your
+online lesson link` email, within a couple of minutes of the Worker carrying
+the fix being deployed. Anything booked since gets its link straight away, in
+the confirmation or, when Google is slower, in its own email a couple of
+minutes later. Google itself emails no one: events carry no attendees and are
+written with `sendUpdates=none`.
 
 Expired or revoked Google permission shows **Needs reconnecting** beside Google
 Meet in her schedule; **Configure → Reconnect Google Meet** restores it.

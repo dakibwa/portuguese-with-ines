@@ -41,6 +41,9 @@ const env = {
 };
 const iso = offset => new Date(clock + offset).toISOString();
 const link = "https://meet.google.com/abc-defg-hij";
+// Google treats a repeated conference requestId as the request it already
+// has: one that never produced a room stays roomless however often it is sent.
+const stuckRequests = new Set();
 let requests = [], events = new Map(), mode = "ready", duringImport = null, tokenError = false, oauthProfile = {}, oauthScope = CALENDAR_SCOPE, calendarCreationFailure = false, duringCodeExchange = null;
 const warnings = [];
 console.warn = (...args) => warnings.push(args);
@@ -81,6 +84,8 @@ globalThis.fetch = async (input, options = {}) => {
     await duringImport?.();
     const body = JSON.parse(options.body);
     const event = { ...body, id: `event-${events.size + 1}`, status: "confirmed", ...(mode === "pending" || !body.conferenceData ? {} : { hangoutLink: link }) };
+    // As Google reports it: a requested room without a link is pending.
+    if (event.conferenceData?.createRequest && !event.hangoutLink) event.conferenceData.createRequest.status = { statusCode: "pending" };
     events.set(event.id, event);
     return Response.json(event);
   }
@@ -93,6 +98,8 @@ globalThis.fetch = async (input, options = {}) => {
     if (patch.conferenceData === null) delete event.hangoutLink;
   }
   if (mode === "ready" && event.conferenceData) event.hangoutLink = link;
+  if (mode === "fresh-only" && event.conferenceData?.createRequest && !stuckRequests.has(event.conferenceData.createRequest.requestId)) event.hangoutLink = link;
+  if (event.conferenceData?.createRequest && !event.hangoutLink) event.conferenceData.createRequest.status = { statusCode: "pending" };
   return Response.json(event);
 };
 
@@ -198,25 +205,33 @@ try {
     assert.equal(meetingUrl(await prepareMeeting(env, row(result.id))), link);
     assert.equal(events.size, 1);
   });
-  await test("lessons booked before links reached students hear the day before; new bookings at once", async () => {
-    // The test clock runs before the real cutoff, so this run draws its own.
-    const backlogBefore = iso(-3600000);
-    const before = iso(-2 * 3600000);
-    const far = await prepareMeeting(env, addBooking("backlog-far", { created_at: before, starts_at: iso(3 * 86400000), ends_at: iso(3 * 86400000 + 3600000) }));
-    const near = await prepareMeeting(env, addBooking("backlog-near", { created_at: before, starts_at: iso(20 * 3600000), ends_at: iso(21 * 3600000) }));
-    const fresh = await prepareMeeting(env, addBooking("fresh-far", { starts_at: iso(3 * 86400000 + 60000), ends_at: iso(3 * 86400000 + 3660000) }));
-    for (const ready of [far, near, fresh]) assert.equal(meetingUrl(ready), link);
+  await test("a lesson whose first Meet request never made a room gets one from a fresh request, then one email", async () => {
+    // As PT-LULQXE stood on 10 October 2026: booked days ago, its event made,
+    // its room never, and the event not yet marked as synced.
+    mode = "pending";
+    const stuck = await prepareMeeting(env, addBooking("stuck-room", { created_at: iso(-3 * 86400000), sequence: 1 }));
+    assert.ok(stuck.meeting_event_id);
+    assert.equal(stuck.meeting_url, null);
+    const firstRequest = events.get(stuck.meeting_event_id).conferenceData.createRequest.requestId;
+    stuckRequests.add(firstRequest);
+    db.prepare("UPDATE bookings SET meeting_sequence = NULL, meeting_retry_at = NULL WHERE id = ?").run(stuck.id);
+    mode = "fresh-only";
     const sent = [];
-    await syncPendingMeetings(env, async booking => { sent.push(booking.id); return true; }, { backlogBefore });
-    assert.ok(sent.includes(near.id), "An older booking within a day of its lesson hears now");
-    assert.ok(sent.includes(fresh.id), "A booking made since hears straight away, however far off");
-    assert.ok(!sent.includes(far.id), "An older booking days away waits");
-    assert.equal(row(far.id).meeting_notified_at, null);
-    clock += 2 * 86400000 + 60000;
-    sent.length = 0;
-    await syncPendingMeetings(env, async booking => { sent.push(booking.id); return true; }, { backlogBefore });
-    assert.deepEqual(sent.filter(id => id === far.id), [far.id], "It hears the day before, once");
-    assert.ok(row(far.id).meeting_notified_at);
+    // Within ten minutes a pending room is still waited on, not asked for again.
+    clock += 61000;
+    await syncPendingMeetings(env, async booking => { sent.push(booking.id); return true; });
+    assert.equal(events.get(stuck.meeting_event_id).conferenceData.createRequest.requestId, firstRequest);
+    assert.equal(row(stuck.id).meeting_url, null);
+    clock += 10 * 60000;
+    for (let sweep = 0; sweep < 3 && !row(stuck.id).meeting_notified_at; sweep++) {
+      clock += 61000;
+      await syncPendingMeetings(env, async booking => { sent.push(booking.id); return true; });
+    }
+    assert.equal(meetingUrl(row(stuck.id)), link, "A fresh request makes the room");
+    assert.notEqual(events.get(stuck.meeting_event_id).conferenceData.createRequest.requestId, firstRequest);
+    assert.deepEqual(sent.filter(id => id === stuck.id), [stuck.id], "The student is emailed the link once");
+    assert.equal(events.size >= 1 && [...events.values()].filter(event => event.iCalUID === events.get(stuck.meeting_event_id).iCalUID).length, 1, "Still one calendar event");
+    mode = "ready";
   });
   await test("online and Porto cancellations soft-cancel the existing event", async () => {
     for (const location of ["online", "porto"]) {

@@ -546,7 +546,7 @@ async function notifyMeetingReady(env, input) {
     replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail,
     content: {
       heading: "Your online lesson link",
-      intro: `Hi ${row.student_name}, here’s the Google Meet link for your lesson with Inês.`,
+      intro: `Olá ${row.student_name.split(" ")[0]}, here’s the Google Meet link for your lesson with Inês.`,
       hero: lessonWhen(new Date(row.starts_at), lessonZone(row)),
       preheader: "Join your lesson from your email or booking.",
       rows: [{ label: "Reference", value: row.reference }],

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
   CALENDAR_SCOPE, CalendarProviderError, calendarConfigured, encryptCalendarToken,
-  decryptCalendarToken, calendarAccessToken, ensureAppCalendar, ensureCalendarMeeting, cancelCalendarMeeting,
+  decryptCalendarToken, calendarAccessToken, ensureAppCalendar, ensureCalendarMeeting, cancelCalendarMeeting, STALE_CONFERENCE_MS,
 } from "./google-calendar.mjs";
 
 const env = { GOOGLE_CALENDAR_CLIENT_ID: "test-client", GOOGLE_CALENDAR_CLIENT_SECRET: "test-secret", GOOGLE_CALENDAR_TOKEN_KEY: "a1".repeat(32) };
@@ -142,14 +142,14 @@ await test("reschedule patches times and preserves conference instead of request
 });
 await test("pending conference polls are bounded and preserve event identity", async () => {
   let gets = 0;
-  const pending = event({ conferenceData: { createRequest: { status: { statusCode: "pending" } } } });
+  const pending = event({ conferenceData: { createRequest: { requestId: input.requestId, status: { statusCode: "pending" } } } });
   const { connection } = await fixture(() => { gets += 1; return response(pending); });
   assert.deepEqual(await ensureCalendarMeeting(env, connection, { ...input, eventId: "event-1" }), { eventId: "event-1", meetingUrl: null, status: "pending", conference: "pending" });
   assert.equal(gets, 3);
 });
 await test("pending conference can become ready during bounded polling", async () => {
   let gets = 0;
-  const { connection } = await fixture(() => response(++gets === 1 ? event({ conferenceData: { createRequest: { status: { statusCode: "pending" } } } }) : event()));
+  const { connection } = await fixture(() => response(++gets === 1 ? event({ conferenceData: { createRequest: { requestId: input.requestId, status: { statusCode: "pending" } } } }) : event()));
   assert.equal((await ensureCalendarMeeting(env, connection, { ...input, eventId: "event-1" })).status, "ready");
   assert.equal(gets, 2);
 });
@@ -266,11 +266,27 @@ await test("failed conference gets a fresh request on a later attempt without an
 });
 
 await test("pending conference does not restart just because the caller attempt changed", async () => {
+  const recent = `pwi-lesson-1-0-0-${(Date.now() - 60000).toString(36)}`;
   const { connection } = await fixture((url, options) => {
     assert.equal(options.method, "GET");
-    return response(event({ conferenceData: { createRequest: { requestId: "prior-attempt", status: { statusCode: "pending" } } } }));
+    return response(event({ conferenceData: { createRequest: { requestId: recent, status: { statusCode: "pending" } } } }));
   });
   assert.equal((await ensureCalendarMeeting(env, connection, { ...input, eventId: "event-1" })).status, "pending");
+});
+
+await test("a conference pending past its time, or from before requests were dated, is asked for afresh", async () => {
+  for (const prior of [`pwi-lesson-1-0-0-${(Date.now() - STALE_CONFERENCE_MS - 60000).toString(36)}`, "pwi-lesson-1-1-0"]) {
+    let patches = 0;
+    const { connection } = await fixture((url, options) => {
+      if (options.method === "GET") return response(event({ conferenceData: { createRequest: { requestId: prior, status: { statusCode: "pending" } } } }));
+      assert.equal(options.method, "PATCH");
+      patches += 1;
+      assert.equal(JSON.parse(options.body).conferenceData.createRequest.requestId, input.requestId);
+      return response(event());
+    });
+    assert.equal((await ensureCalendarMeeting(env, connection, { ...input, eventId: "event-1" })).status, "ready", prior);
+    assert.equal(patches, 1, prior);
+  }
 });
 
 await test("new Porto lesson imports no conference and is ready without polling", async () => {
