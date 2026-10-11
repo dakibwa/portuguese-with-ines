@@ -2706,10 +2706,18 @@ await accountPage.setViewportSize({ width: 390, height: 844 });
 await accountPage.locator(".booking-bar__head #account-menu-button").click();
 await accountPage.locator(".booking-bar__head #account-menu").getByRole("button", { name: /^Your lessons/ }).click();
 await accountPage.locator("#upcoming-lessons-heading").waitFor();
+// The account is remembered for a quick return visit, and forgotten on
+// signing out with the session it belonged to.
+if (!(await accountPage.evaluate(() => window.localStorage.getItem("ines-account-snapshot")))) {
+  throw new Error("A signed-in visit should remember its account for the next one.");
+}
 await accountMenuButton.click();
 await accountPanel.getByRole("button", { name: "Sign out", exact: true }).click();
 await accountPage.locator("#lesson-calendar .booking-bar__sign-in").waitFor();
 await accountPanel.waitFor({ state: "detached" });
+if (await accountPage.evaluate(() => window.localStorage.getItem("ines-account-snapshot"))) {
+  throw new Error("Signing out should forget the remembered account.");
+}
 await accountPage.close();
 await accountBrowser.close();
 
