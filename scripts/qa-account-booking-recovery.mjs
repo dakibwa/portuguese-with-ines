@@ -312,7 +312,7 @@ try {
         // Signed in, booking is headed by the account's own bar.
         const head = page.locator(".booking-bar__head--account");
         await head.waitFor({ state: "visible" });
-        if (await head.locator("#account-menu-button").isVisible()) await head.locator("#account-menu-button").click();
+        await head.locator("#account-menu-button").click();
         await head.getByRole("button", { name: /^Your lessons/ }).click();
         await started.promise;
         await chooseAccount(page, "Edit details");

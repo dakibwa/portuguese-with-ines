@@ -478,6 +478,18 @@ request for smoother, less jolty selections). Nothing pops in late: a form or ti
 still on their way ease in when they arrive, and until the calendar first
 arrives its room is held, so the footer never shows and then drops away (9
 October 2026, at Dan's request for smooth transitions rather than jolty ones).
+The calendar's arrows turn it as the account's places turn its cards: the
+weeks showing slide away to one side, then the next ones slide in from the
+other, each seen only within the weeks' own frame, and the month's name
+follows. Choosing Weekly opens Repeat out among the other choices as they ease
+narrower, its options showing once it has room for them (or it rises in on a
+row of its own where the bar wraps); choosing Single eases the others wider
+over Repeat's place. Nothing stands in for what has gone, so the page never
+holds two of a control or a day. A
+Your details row eases open and shut to its new height, and a splat chosen
+there lands in its row and in the card's corner, after the picker's splats
+land one after another as it opens (11 October 2026, at Dan's request that
+these moments feel smooth rather than abrupt).
 Without view transitions a new page dissolves in. Reduced-motion users get
 each page at once, without animation or smooth scrolling, and a full page load
 is an ordinary load rather than a turn.
@@ -656,8 +668,11 @@ Preserve these desktop and mobile states:
   and it opens over the card. Booking is not repeated there: its
   one coral action belongs to the card. `Your lessons` may show the useful
   upcoming count; `Past lessons` deliberately has no count competing for
-  attention. The menu lives in the account cards, behind an open lesson too;
-  while booking it waits, and the booking bar's `Your lessons` is the way
+  attention. The menu lives in the account cards, behind an open lesson too.
+  While booking, the account heads the booking bar as the name's menu at
+  every width, never the open places: booking is not one of the account's
+  places, and a slider with nothing marked read as a place missing (11
+  October 2026, at Dan's request). That menu's `Your lessons` is the way
   back. An empty history says so instead of removing the shortcut. The lessons
   calendar reaches every future commitment. Account destinations open
   consistently: selecting the current view again keeps it open. Past lessons
@@ -844,7 +859,10 @@ for returning students. `Book a trial lesson` opens the trial's location choice;
 existing students receive their eligible ordinary choices. `Book a single
 lesson` and `Book a longer lesson` open booking with that length already
 chosen. The main `Booking` navigation still opens a returning student's
-schedule. Old `/my-lessons` and emailed `/booking` links retain their
+schedule. In the desktop header it is the one button among the plain links,
+in their own dark blue and with no line beneath it, since booking is what the
+site is for (11 October 2026, at Dan's request). The phone menu keeps it a row
+like the rest, with its own coral `Book a lesson` below. Old `/my-lessons` and emailed `/booking` links retain their
 destination and tokens in `/book/`.
 
 ## Booking, simplified — 8 October 2026

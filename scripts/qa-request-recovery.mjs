@@ -3,13 +3,12 @@ import { chromium, firefox, webkit, expect } from "@playwright/test";
 
 // Delayed API replies are isolated fixtures. No accounts, emails, lessons or
 // payments are created, and the checks work with a local or deployed API URL.
-// Signed in, booking is headed by the account's own bar: its places are open
-// on a wide card and folded into the name's menu on a narrow one.
+// Signed in, booking is headed by the account's name, whose menu holds the
+// places.
 async function openLessonsFromBooking(page) {
   const head = page.locator(".booking-bar__head--account");
   await head.waitFor({ state: "visible" });
-  const menu = head.locator("#account-menu-button");
-  if (await menu.isVisible()) await menu.click();
+  await head.locator("#account-menu-button").click();
   await head.getByRole("button", { name: /^Your lessons/ }).click();
 }
 const base = (process.env.QA_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");

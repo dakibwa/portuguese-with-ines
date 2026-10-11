@@ -458,6 +458,10 @@ let stageResize: Animation | null = null;
 // next decision.
 let handover: { land: () => void; after: (() => void)[] } | null = null;
 
+// Which way the calendar's arrows last turned it: the next decision slides
+// the weeks in from that side (11 October 2026, at Dan's request).
+let calendarTurn = 0;
+
 // `booking-transitioning` on the root marks a decision's motion while it runs.
 // Nothing is styled by it; the journey checks wait for it to clear.
 function finishBookingMotion() {
@@ -537,6 +541,7 @@ function timesTakeCalendarsPlace() {
  */
 function transitionBooking(update: () => void, leaving?: string) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    calendarTurn = 0;
     update();
     return;
   }
@@ -551,8 +556,12 @@ function transitionBooking(update: () => void, leaving?: string) {
 
   if (bookingMotionTimer !== null) finishBookingMotion();
   document.documentElement.classList.add("booking-transitioning");
+  // The arrows' weeks leave sideways, away from where the next ones come in.
+  const away: Keyframe[] = calendarTurn
+    ? [{ ...seenAt(0), opacity: 1 }, { ...seenAt(-WEEKS_SLIDE * Math.sign(calendarTurn)), opacity: 0 }]
+    : [{ opacity: 1, translate: "0 0" }, { opacity: 0, translate: "0 -4px" }];
   const fades = going.map((element) =>
-    element.animate([{ opacity: 1, translate: "0 0" }, { opacity: 0, translate: "0 -4px" }], {
+    element.animate(away, {
       duration: HANDOVER_MS,
       easing: "cubic-bezier(0.4, 0, 1, 1)",
       fill: "forwards"
@@ -590,14 +599,108 @@ function moveBooking(update: () => void, fromBlank: boolean) {
   // Held through the update: measuring a shorter page would otherwise snap the
   // scroll position up before anything could ease.
   if (stage && fromHeight) stage.style.minHeight = `${fromHeight}px`;
+  const turn = calendarTurn;
+  calendarTurn = 0;
+  const groups = stage ? barGroups(stage) : [];
   document.documentElement.classList.add("booking-transitioning");
+  let gliding = 0;
   try {
     flushSync(update);
   } finally {
-    bookingMotionTimer = window.setTimeout(finishBookingMotion, fromBlank ? 320 : 260);
-    if (stage?.isConnected) settleStage(stage, fromHeight, floor, present, fromBlank);
-    else if (stage) stage.style.minHeight = "";
+    if (stage?.isConnected) {
+      gliding = Math.max(slideWeeks(stage, turn, present), glideBarGroups(stage, groups));
+      settleStage(stage, fromHeight, floor, present, fromBlank);
+    } else if (stage) stage.style.minHeight = "";
+    bookingMotionTimer = window.setTimeout(finishBookingMotion, Math.max(fromBlank ? 320 : 260, gliding));
   }
+}
+
+const WEEKS_SLIDE = 48;
+
+/** Moved sideways but seen through a fixed window: the clip moves against the slide. */
+function seenAt(x: number): Keyframe {
+  return { translate: `${x}px 0`, clipPath: `inset(-12px ${x}px -12px ${-x}px)` };
+}
+
+/**
+ * The arrows turn the calendar like a page in a book. Their weeks first slide
+ * away to one side (transitionBooking's handover), then the next weeks slide
+ * in from the other, each seen only within the weeks' own frame, and the
+ * month's name follows (11 October 2026, at Dan's request). Returns how long
+ * it runs.
+ */
+function slideWeeks(stage: HTMLElement, turn: number, present: Set<Element>) {
+  const arriving = stage.querySelector<HTMLElement>("#booking-calendar-weeks");
+  if (!turn || !arriving || present.has(arriving) || !showing(arriving)) return 0;
+  const distance = WEEKS_SLIDE * Math.sign(turn);
+  present.add(arriving);
+  arriving.animate([{ ...seenAt(distance), opacity: 0 }, { ...seenAt(0), opacity: 1 }], {
+    duration: 380,
+    easing: MOTION_EASE
+  });
+  stage.querySelector(".unified-calendar__month")?.animate(
+    [{ opacity: 0, translate: `${distance / 3}px 0` }, { opacity: 1, translate: "0 0" }],
+    { duration: 360, easing: MOTION_EASE }
+  );
+  return 420;
+}
+
+type BarGroup = { key: string; element: HTMLElement; rect: DOMRect };
+
+/** The booking bar's choices (Lesson, Where, Length, Repeat) as they stand. */
+function barGroups(stage: HTMLElement): BarGroup[] {
+  return [...stage.querySelectorAll<HTMLElement>(".booking-bar__choices > .booking-bar__group")].filter(showing).map((element) => ({
+    key: element.querySelector("legend")?.textContent ?? "",
+    element,
+    rect: element.getBoundingClientRect()
+  }));
+}
+
+/**
+ * Choosing Weekly brings Repeat, and Single takes it away. Rather than the
+ * row jumping, the choices that stay ease to their new widths while Repeat
+ * opens out among them (or rises in on a row of its own), and when a choice
+ * goes the others ease wider over its place (11 October 2026, at Dan's
+ * request). Nothing stands in for what has gone, so the page never holds two
+ * of a control. Returns how long it runs.
+ */
+function glideBarGroups(stage: HTMLElement, before: BarGroup[]) {
+  const row = stage.querySelector<HTMLElement>(".booking-bar__choices");
+  if (!row || !before.length) return 0;
+  const after = barGroups(stage);
+  const changed =
+    after.length !== before.length ||
+    after.some((group) => {
+      const old = before.find((entry) => entry.key === group.key);
+      return !old || Math.abs(old.rect.width - group.rect.width) > 1 || Math.abs(old.rect.top - group.rect.top) > 1;
+    });
+  if (!changed) return 0;
+  const duration = 400;
+  const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+  const firstTop = after[0]?.rect.top ?? 0;
+  // Exact sizes that never stretch into room a leaving choice frees, a hair
+  // under each end's own, so rounding never wraps the row.
+  const basis = (width: number) => `0 1 ${Math.max(0, width - 0.5)}px`;
+  for (const group of after) {
+    const old = before.find((entry) => entry.key === group.key);
+    const sameRow = Math.abs(group.rect.top - firstTop) < 2;
+    if (!old) {
+      const keyframes: Keyframe[] = sameRow && after.length > 1
+        ? [
+            // Its options show once it has room for them.
+            { flex: basis(0), marginLeft: `${-gap}px`, opacity: 0, overflow: "clip" },
+            { opacity: 0, offset: 0.4 },
+            { flex: basis(group.rect.width), marginLeft: "0px", opacity: 1, overflow: "clip" }
+          ]
+        : [{ opacity: 0, translate: "0 10px" }, { opacity: 1, translate: "0 0" }];
+      group.element.animate(keyframes, { duration, easing: MOTION_EASE });
+    } else if (Math.abs(old.rect.top - group.rect.top) > 1) {
+      group.element.animate([{ opacity: 0.3, translate: "0 8px" }, { opacity: 1, translate: "0 0" }], { duration, easing: MOTION_EASE });
+    } else if (Math.abs(old.rect.width - group.rect.width) > 1) {
+      group.element.animate([{ flex: basis(old.rect.width) }, { flex: basis(group.rect.width) }], { duration, easing: MOTION_EASE });
+    }
+  }
+  return duration + 40;
 }
 
 /**
@@ -1891,7 +1994,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   function turnCalendarPage(step: number) {
     const page = calendarPages[calendarPageIndex + step];
     if (!page) return;
-    transitionBooking(() => setCalendarPageStart(page[0].key));
+    calendarTurn = step;
+    transitionBooking(() => setCalendarPageStart(page[0].key), "#booking-calendar-weeks");
   }
 
   function openLessonsJourney() {
@@ -2690,13 +2794,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       <div className={`booking-bar${inConfirmation ? " booking-bar--review" : ""}`}>
         {!inConfirmation ? (
           <div className={`booking-bar__head${student ? " booking-bar__head--account" : ""}`}>
-            {/* Signed in, the account's own bar heads booking as it heads Your
-                lessons: the name's menu, or the places open on a wide card,
-                which hold the way back (10 October 2026, at Dan's request). */}
+            {/* Signed in, the account heads booking: its name's menu at every
+                width, which holds the way back to Your lessons. Booking is not
+                one of the account's places, so the places stay folded here
+                (11 October 2026, at Dan's request). */}
             <h2 className={student ? "visually-hidden" : "eyebrow"} id="booking-bar-heading" tabIndex={-1}>Book a lesson</h2>
             {student ? (
               <AccountMenu
                 current={null}
+                folded
                 mark={student.mark}
                 name={student.name}
                 onSelect={openAccountView}
