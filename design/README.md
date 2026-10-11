@@ -1014,7 +1014,10 @@ as a form:
   its four weeks with today marked, set exactly where the real card's are,
   so that when the lessons arrive only they appear. Meanwhile the days
   shimmer and a splat turns in the card's corner, or where the next lesson's
-  mark will be on a phone (LessonsLoading);
+  mark will be on a phone (LessonsLoading). A return visit skips even that:
+  the page remembers the account as its session last read it (a week at
+  most, forgotten on signing out) and opens on it at once while asking
+  again, so Your lessons shows in about a seventh of a second;
 - moving between Your lessons, Past lessons and Your details, the places'
   thumb glides from where it stood to the card now showing, and that card's
   contents slide in from the side it was reached from (forward from the
