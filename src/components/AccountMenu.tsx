@@ -53,6 +53,7 @@ let lastPlace: number | null = null;
 
 export function AccountMenu({
   current,
+  folded = false,
   mark,
   name,
   onSelect,
@@ -61,6 +62,8 @@ export function AccountMenu({
 }: {
   /** The card showing; none while booking, when the bar stands for the account. */
   current: AccountSection | null;
+  /** The name's menu at every width, never the open places. */
+  folded?: boolean;
   mark?: string;
   name: string;
   onSelect: (section: AccountSection) => void;
@@ -120,7 +123,7 @@ export function AccountMenu({
   }, [numericPlace]);
 
   return (
-    <div className="account-menu" ref={menuRef}>
+    <div className={`account-menu${folded ? " account-menu--folded" : ""}`} ref={menuRef}>
       <button
         aria-controls="account-menu"
         aria-expanded={open}

@@ -2690,13 +2690,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       <div className={`booking-bar${inConfirmation ? " booking-bar--review" : ""}`}>
         {!inConfirmation ? (
           <div className={`booking-bar__head${student ? " booking-bar__head--account" : ""}`}>
-            {/* Signed in, the account's own bar heads booking as it heads Your
-                lessons: the name's menu, or the places open on a wide card,
-                which hold the way back (10 October 2026, at Dan's request). */}
+            {/* Signed in, the account heads booking: its name's menu at every
+                width, which holds the way back to Your lessons. Booking is not
+                one of the account's places, so the places stay folded here
+                (11 October 2026, at Dan's request). */}
             <h2 className={student ? "visually-hidden" : "eyebrow"} id="booking-bar-heading" tabIndex={-1}>Book a lesson</h2>
             {student ? (
               <AccountMenu
                 current={null}
+                folded
                 mark={student.mark}
                 name={student.name}
                 onSelect={openAccountView}

@@ -115,11 +115,13 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
           const Destination = item.id === "book" ? "a" : Link;
           return <Destination
             aria-current={currentPage === item.id ? "page" : undefined}
-            className="site-nav__link"
+            className={`site-nav__link${item.id === "book" ? " site-nav__link--book" : ""}`}
             href={item.id === "book" ? publicAssetPath(item.href) : item.href}
             key={item.id}
           >
-            {item.label}
+            {/* Booking is what the site is for, so it is a coral button among
+                the plain links (11 October 2026, at Dan's request). */}
+            {item.id === "book" ? <span className="site-nav__book">{item.label}</span> : item.label}
             {/* Its own element, so a page turn can glide it to the next destination. */}
             {currentPage === item.id ? <span aria-hidden="true" className="site-nav__current" /> : null}
           </Destination>;

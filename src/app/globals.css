@@ -958,6 +958,42 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   transform: scaleX(1);
 }
 
+/* Booking stands out as the site's one coral button in the nav. Its
+   current line is the other links', level with theirs beneath it. */
+.site-nav__book {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border-radius: var(--squiggle-pill);
+  padding: 0 1.35rem;
+  background: var(--coral-action);
+  color: var(--paper-light);
+  transition:
+    background 200ms ease,
+    box-shadow 320ms var(--motion-ease-out),
+    border-radius 640ms var(--motion-spring);
+}
+
+.site-nav__link--book:hover .site-nav__book {
+  border-radius: var(--squiggle-button);
+  background: #95301f;
+  box-shadow: 0 12px 22px -14px rgba(149, 48, 31, 0.75);
+}
+
+/* The button answers the pointer itself; only the current page's line shows. */
+.site-nav__link--book::after {
+  display: none;
+}
+
+.site-nav__link--book:focus-visible {
+  outline: 0;
+}
+
+.site-nav__link--book:focus-visible .site-nav__book {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
 /* The current page's line is the same drawing as the hover line, as its own
    element so that a page turn can glide it along the nav to the new page. */
 .site-nav__current {
@@ -6030,6 +6066,9 @@ button.text-action {
  * name and Sign out live in Your details instead (10 October 2026, at Dan's
  * request).
  */
+/* While booking, no card is showing, so the account is folded to the name's
+   menu at every width (11 October 2026, at Dan's request): a slider with no
+   place marked read as a fourth place missing. */
 @container booking (min-width: 1100px) {
   .account-card__head > .my-lessons__sign-out {
     grid-area: book;
@@ -6046,9 +6085,9 @@ button.text-action {
 
   .lesson-overview__heading,
   .account-card__title,
-  .account-menu,
-  .account-menu__panel,
-  .account-menu__panel.is-open {
+  .account-menu:not(.account-menu--folded),
+  .account-menu:not(.account-menu--folded) .account-menu__panel,
+  .account-menu:not(.account-menu--folded) .account-menu__panel.is-open {
     display: contents;
   }
 
@@ -6061,11 +6100,11 @@ button.text-action {
     white-space: nowrap;
   }
 
-  .account-menu__toggle {
+  .account-menu:not(.account-menu--folded) .account-menu__toggle {
     display: none;
   }
 
-  .account-menu__places {
+  .account-menu:not(.account-menu--folded) .account-menu__places {
     position: relative;
     display: grid;
     grid-area: nav;
@@ -6076,7 +6115,7 @@ button.text-action {
     gap: 4px;
   }
 
-  .account-menu__thumb {
+  .account-menu:not(.account-menu--folded) .account-menu__thumb {
     position: absolute;
     top: 4px;
     bottom: 4px;
@@ -6088,21 +6127,15 @@ button.text-action {
     transition: transform 260ms var(--motion-ease);
   }
 
-  .account-menu__places--at-1 .account-menu__thumb {
+  .account-menu:not(.account-menu--folded) .account-menu__places--at-1 .account-menu__thumb {
     transform: translateX(calc(100% + 4px));
   }
 
-  /* While booking no card is showing, so no place is marked. */
-  .account-menu__places--at-none .account-menu__thumb {
-    display: none;
-  }
-
-
-  .account-menu__places--at-2 .account-menu__thumb {
+  .account-menu:not(.account-menu--folded) .account-menu__places--at-2 .account-menu__thumb {
     transform: translateX(calc(200% + 8px));
   }
 
-  .account-menu__places button {
+  .account-menu:not(.account-menu--folded) .account-menu__places button {
     position: relative;
     z-index: 1;
     min-height: 44px;
@@ -6120,30 +6153,30 @@ button.text-action {
     transition: color 260ms var(--motion-ease), opacity 260ms var(--motion-ease);
   }
 
-  .account-menu__places button:hover,
-  .account-menu__places button:focus-visible {
+  .account-menu:not(.account-menu--folded) .account-menu__places button:hover,
+  .account-menu:not(.account-menu--folded) .account-menu__places button:focus-visible {
     background: transparent;
     color: var(--ink);
     opacity: 1;
   }
 
-  .account-menu__places button:focus-visible {
+  .account-menu:not(.account-menu--folded) .account-menu__places button:focus-visible {
     outline: 2px solid var(--ink);
     outline-offset: 2px;
   }
 
-  .account-menu__places button[aria-current="true"] {
+  .account-menu:not(.account-menu--folded) .account-menu__places button[aria-current="true"] {
     background: transparent;
     color: var(--paper);
     opacity: 1;
   }
 
-  .account-menu__places button[aria-current="true"] > span {
+  .account-menu:not(.account-menu--folded) .account-menu__places button[aria-current="true"] > span {
     background: var(--paper);
     color: var(--coral-action);
   }
 
-  .account-menu__panel .account-menu__sign-out {
+  .account-menu:not(.account-menu--folded) .account-menu__panel .account-menu__sign-out {
     display: none;
   }
 

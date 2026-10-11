@@ -656,8 +656,11 @@ Preserve these desktop and mobile states:
   and it opens over the card. Booking is not repeated there: its
   one coral action belongs to the card. `Your lessons` may show the useful
   upcoming count; `Past lessons` deliberately has no count competing for
-  attention. The menu lives in the account cards, behind an open lesson too;
-  while booking it waits, and the booking bar's `Your lessons` is the way
+  attention. The menu lives in the account cards, behind an open lesson too.
+  While booking, the account heads the booking bar as the name's menu at
+  every width, never the open places: booking is not one of the account's
+  places, and a slider with nothing marked read as a place missing (11
+  October 2026, at Dan's request). That menu's `Your lessons` is the way
   back. An empty history says so instead of removing the shortcut. The lessons
   calendar reaches every future commitment. Account destinations open
   consistently: selecting the current view again keeps it open. Past lessons
@@ -844,7 +847,11 @@ for returning students. `Book a trial lesson` opens the trial's location choice;
 existing students receive their eligible ordinary choices. `Book a single
 lesson` and `Book a longer lesson` open booking with that length already
 chosen. The main `Booking` navigation still opens a returning student's
-schedule. Old `/my-lessons` and emailed `/booking` links retain their
+schedule. In the desktop header it is the one coral button among the plain
+links, since booking is what the site is for (11 October 2026, at Dan's
+request); the current page's coral line still glides beneath it, level with
+the others'. The phone menu keeps it a row like the rest, with its own coral
+`Book a lesson` below. Old `/my-lessons` and emailed `/booking` links retain their
 destination and tokens in `/book/`.
 
 ## Booking, simplified — 8 October 2026

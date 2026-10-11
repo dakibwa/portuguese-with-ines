@@ -2510,11 +2510,15 @@ await changeDate.waitFor({ state: "visible" });
 await accountPage.locator("#lesson-calendar .unified-calendar__availability .slot-grid button").first().click();
 await confirmHeading.waitFor();
 await changeLessonTime.click();
-// Signed in, booking is headed by the account's own bar: its places are open
-// on a wide card and folded into the name's menu on a narrow one.
+// Signed in, booking is headed by the account's name and its menu, at every
+// width: booking is not one of the account's places, so they stay folded.
 await accountPage.locator(".booking-bar__head--account").waitFor({ state: "visible" });
 const bookingBarMenu = accountPage.locator(".booking-bar__head #account-menu-button");
-if (await bookingBarMenu.isVisible()) await bookingBarMenu.click();
+await bookingBarMenu.waitFor({ state: "visible" });
+if (await accountPage.locator(".booking-bar__head .account-menu__places button").first().isVisible()) {
+  throw new Error("While booking, the account's places should stay folded into the name's menu.");
+}
+await bookingBarMenu.click();
 await accountPage.locator(".booking-bar__head").getByRole("button", { name: /^Your lessons/ }).click();
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 await bookQaLessonAndReturnToUpcoming({ recurring: false });
