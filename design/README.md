@@ -861,7 +861,9 @@ lesson` and `Book a longer lesson` open booking with that length already
 chosen. The main `Booking` navigation still opens a returning student's
 schedule. In the desktop header it is the one button among the plain links,
 in their own dark blue and with no line beneath it, since booking is what the
-site is for (11 October 2026, at Dan's request). The phone menu keeps it a row
+site is for (11 October 2026, at Dan's request). Pointed at, it answers as
+the links do: it turns coral, keeping its shape, rather than reshaping and
+lifting like the page's own buttons. The phone menu keeps it a row
 like the rest, with its own coral `Book a lesson` below. Old `/my-lessons` and emailed `/booking` links retain their
 destination and tokens in `/book/`.
 

@@ -959,7 +959,8 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 }
 
 /* Booking stands out as the nav's one button, in the links' own dark blue,
-   with no line beneath it (11 October 2026, at Dan's request). */
+   with no line beneath it (11 October 2026, at Dan's request). Pointed at,
+   it answers as the links beside it do: it turns coral, keeping its shape. */
 .site-nav__book {
   display: inline-flex;
   min-height: 44px;
@@ -968,16 +969,11 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   padding: 0 1.35rem;
   background: var(--blue-deep);
   color: var(--paper-light);
-  transition:
-    background 200ms ease,
-    box-shadow 320ms var(--motion-ease-out),
-    border-radius 640ms var(--motion-spring);
+  transition: background 200ms ease;
 }
 
 .site-nav__link--book:hover .site-nav__book {
-  border-radius: var(--squiggle-button);
-  background: var(--ink);
-  box-shadow: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
+  background: var(--coral-action);
 }
 
 .site-nav__link--book::after {
