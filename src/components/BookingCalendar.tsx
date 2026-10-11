@@ -556,8 +556,12 @@ function transitionBooking(update: () => void, leaving?: string) {
 
   if (bookingMotionTimer !== null) finishBookingMotion();
   document.documentElement.classList.add("booking-transitioning");
+  // The arrows' weeks leave sideways, away from where the next ones come in.
+  const away: Keyframe[] = calendarTurn
+    ? [{ ...seenAt(0), opacity: 1 }, { ...seenAt(-WEEKS_SLIDE * Math.sign(calendarTurn)), opacity: 0 }]
+    : [{ opacity: 1, translate: "0 0" }, { opacity: 0, translate: "0 -4px" }];
   const fades = going.map((element) =>
-    element.animate([{ opacity: 1, translate: "0 0" }, { opacity: 0, translate: "0 -4px" }], {
+    element.animate(away, {
       duration: HANDOVER_MS,
       easing: "cubic-bezier(0.4, 0, 1, 1)",
       fill: "forwards"
@@ -597,7 +601,6 @@ function moveBooking(update: () => void, fromBlank: boolean) {
   if (stage && fromHeight) stage.style.minHeight = `${fromHeight}px`;
   const turn = calendarTurn;
   calendarTurn = 0;
-  const leavingWeeks = turn && stage ? weeksInView(stage) : null;
   const groups = stage ? barGroups(stage) : [];
   document.documentElement.classList.add("booking-transitioning");
   let gliding = 0;
@@ -605,73 +608,41 @@ function moveBooking(update: () => void, fromBlank: boolean) {
     flushSync(update);
   } finally {
     if (stage?.isConnected) {
-      gliding = Math.max(slideWeeks(stage, leavingWeeks, turn, present), glideBarGroups(stage, groups));
+      gliding = Math.max(slideWeeks(stage, turn, present), glideBarGroups(stage, groups));
       settleStage(stage, fromHeight, floor, present, fromBlank);
     } else if (stage) stage.style.minHeight = "";
     bookingMotionTimer = window.setTimeout(finishBookingMotion, Math.max(fromBlank ? 320 : 260, gliding));
   }
 }
 
-/** The calendar's weeks as they are, ready to slide away as a picture. */
-function weeksInView(stage: HTMLElement) {
-  const weeks = stage.querySelector<HTMLElement>("#booking-calendar-weeks");
-  const holder = weeks?.parentElement;
-  if (!weeks || !holder || !showing(weeks)) return null;
-  const rect = weeks.getBoundingClientRect();
-  const frame = holder.getBoundingClientRect();
-  const ghost = weeks.cloneNode(true) as HTMLElement;
-  ghost.removeAttribute("id");
-  for (const element of ghost.querySelectorAll("[id]")) element.removeAttribute("id");
-  ghost.setAttribute("aria-hidden", "true");
-  ghost.inert = true;
-  Object.assign(ghost.style, {
-    position: "absolute",
-    top: `${rect.top - frame.top - holder.clientTop}px`,
-    left: `${rect.left - frame.left - holder.clientLeft}px`,
-    width: `${rect.width}px`,
-    margin: "0",
-    pointerEvents: "none"
-  });
-  return { weeks, holder, ghost };
+const WEEKS_SLIDE = 48;
+
+/** Moved sideways but seen through a fixed window: the clip moves against the slide. */
+function seenAt(x: number): Keyframe {
+  return { translate: `${x}px 0`, clipPath: `inset(-12px ${x}px -12px ${-x}px)` };
 }
 
 /**
- * The arrows turn the calendar like a page in a book: the weeks that were
- * showing slide away to one side as the next ones slide in from the other,
- * each seen only within the weeks' own frame. Returns how long it runs.
+ * The arrows turn the calendar like a page in a book. Their weeks first slide
+ * away to one side (transitionBooking's handover), then the next weeks slide
+ * in from the other, each seen only within the weeks' own frame, and the
+ * month's name follows (11 October 2026, at Dan's request). Returns how long
+ * it runs.
  */
-function slideWeeks(stage: HTMLElement, leaving: ReturnType<typeof weeksInView>, turn: number, present: Set<Element>) {
+function slideWeeks(stage: HTMLElement, turn: number, present: Set<Element>) {
   const arriving = stage.querySelector<HTMLElement>("#booking-calendar-weeks");
-  if (!leaving || !arriving || arriving === leaving.weeks || !leaving.holder.isConnected || !showing(arriving)) return 0;
-  // Seen through a fixed window: the clip moves against the slide.
-  const at = (x: number) => ({ translate: `${x}px 0`, clipPath: `inset(-12px ${x}px -12px ${-x}px)` });
-  const distance = 48 * Math.sign(turn);
-  leaving.holder.append(leaving.ghost);
-  // The old weeks are nearly gone before the new ones show, so the two never
-  // print over each other.
-  const away = leaving.ghost.animate([{ ...at(0), opacity: 1 }, { ...at(-distance), opacity: 0 }], {
-    duration: 170,
-    easing: "cubic-bezier(0.4, 0, 1, 1)",
-    fill: "forwards"
-  });
-  const remove = () => leaving.ghost.remove();
-  away.onfinish = remove;
-  away.oncancel = remove;
+  if (!turn || !arriving || present.has(arriving) || !showing(arriving)) return 0;
+  const distance = WEEKS_SLIDE * Math.sign(turn);
   present.add(arriving);
-  arriving.animate([{ ...at(distance), opacity: 0 }, { ...at(0), opacity: 1 }], {
-    delay: 120,
+  arriving.animate([{ ...seenAt(distance), opacity: 0 }, { ...seenAt(0), opacity: 1 }], {
     duration: 380,
-    easing: MOTION_EASE,
-    fill: "backwards"
-  });
-  const month = stage.querySelector(".unified-calendar__month");
-  month?.animate([{ opacity: 0, translate: `${distance / 3}px 0` }, { opacity: 1, translate: "0 0" }], {
-    delay: 60,
-    duration: 360,
-    fill: "backwards",
     easing: MOTION_EASE
   });
-  return 520;
+  stage.querySelector(".unified-calendar__month")?.animate(
+    [{ opacity: 0, translate: `${distance / 3}px 0` }, { opacity: 1, translate: "0 0" }],
+    { duration: 360, easing: MOTION_EASE }
+  );
+  return 420;
 }
 
 type BarGroup = { key: string; element: HTMLElement; rect: DOMRect };
@@ -688,9 +659,10 @@ function barGroups(stage: HTMLElement): BarGroup[] {
 /**
  * Choosing Weekly brings Repeat, and Single takes it away. Rather than the
  * row jumping, the choices that stay ease to their new widths while Repeat
- * opens out among them (or rises in on a row of its own), and a choice that
- * goes fades where it stood as the others close over it (11 October 2026, at
- * Dan's request). Returns how long it runs.
+ * opens out among them (or rises in on a row of its own), and when a choice
+ * goes the others ease wider over its place (11 October 2026, at Dan's
+ * request). Nothing stands in for what has gone, so the page never holds two
+ * of a control. Returns how long it runs.
  */
 function glideBarGroups(stage: HTMLElement, before: BarGroup[]) {
   const row = stage.querySelector<HTMLElement>(".booking-bar__choices");
@@ -706,14 +678,9 @@ function glideBarGroups(stage: HTMLElement, before: BarGroup[]) {
   const duration = 400;
   const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
   const firstTop = after[0]?.rect.top ?? 0;
-  const frame = row.getBoundingClientRect();
   // Exact sizes that never stretch into room a leaving choice frees, a hair
   // under each end's own, so rounding never wraps the row.
   const basis = (width: number) => `0 1 ${Math.max(0, width - 0.5)}px`;
-  // A choice that goes fades first, and the others widen once it has, so
-  // the two never print over each other.
-  const leavingAny = before.some((old) => !after.some((group) => group.key === old.key));
-  const wait = leavingAny ? 100 : 0;
   for (const group of after) {
     const old = before.find((entry) => entry.key === group.key);
     const sameRow = Math.abs(group.rect.top - firstTop) < 2;
@@ -730,38 +697,10 @@ function glideBarGroups(stage: HTMLElement, before: BarGroup[]) {
     } else if (Math.abs(old.rect.top - group.rect.top) > 1) {
       group.element.animate([{ opacity: 0.3, translate: "0 8px" }, { opacity: 1, translate: "0 0" }], { duration, easing: MOTION_EASE });
     } else if (Math.abs(old.rect.width - group.rect.width) > 1) {
-      group.element.animate([{ flex: basis(old.rect.width) }, { flex: basis(group.rect.width) }], {
-        delay: wait,
-        duration,
-        easing: MOTION_EASE,
-        fill: "backwards"
-      });
+      group.element.animate([{ flex: basis(old.rect.width) }, { flex: basis(group.rect.width) }], { duration, easing: MOTION_EASE });
     }
   }
-  for (const old of before) {
-    if (after.some((group) => group.key === old.key)) continue;
-    const ghost = old.element.cloneNode(true) as HTMLElement;
-    for (const input of ghost.querySelectorAll("input")) input.removeAttribute("name");
-    for (const element of ghost.querySelectorAll("[id]")) element.removeAttribute("id");
-    ghost.setAttribute("aria-hidden", "true");
-    ghost.inert = true;
-    Object.assign(ghost.style, {
-      position: "absolute",
-      top: `${old.rect.top - frame.top}px`,
-      left: `${old.rect.left - frame.left}px`,
-      width: `${old.rect.width}px`,
-      pointerEvents: "none"
-    });
-    row.append(ghost);
-    const fade = ghost.animate([{ opacity: 1, scale: "1" }, { opacity: 0, scale: "0.96" }], {
-      duration: 120,
-      easing: "cubic-bezier(0.4, 0, 1, 1)",
-      fill: "forwards"
-    });
-    fade.onfinish = () => ghost.remove();
-    fade.oncancel = () => ghost.remove();
-  }
-  return duration + wait + 40;
+  return duration + 40;
 }
 
 /**
@@ -2056,7 +1995,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     const page = calendarPages[calendarPageIndex + step];
     if (!page) return;
     calendarTurn = step;
-    transitionBooking(() => setCalendarPageStart(page[0].key));
+    transitionBooking(() => setCalendarPageStart(page[0].key), "#booking-calendar-weeks");
   }
 
   function openLessonsJourney() {

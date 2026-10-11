@@ -479,12 +479,13 @@ still on their way ease in when they arrive, and until the calendar first
 arrives its room is held, so the footer never shows and then drops away (9
 October 2026, at Dan's request for smooth transitions rather than jolty ones).
 The calendar's arrows turn it as the account's places turn its cards: the
-weeks showing slide away to one side and are nearly gone before the next ones
-slide in from the other, each seen only within the weeks' own frame, and the
-month's name follows. Choosing Weekly opens Repeat out among the other choices
-as they ease narrower, its options showing once it has room for them (or it
-rises in on a row of its own where the bar wraps); choosing Single fades
-Repeat where it stood and then eases the others wider over its place. A
+weeks showing slide away to one side, then the next ones slide in from the
+other, each seen only within the weeks' own frame, and the month's name
+follows. Choosing Weekly opens Repeat out among the other choices as they ease
+narrower, its options showing once it has room for them (or it rises in on a
+row of its own where the bar wraps); choosing Single eases the others wider
+over Repeat's place. Nothing stands in for what has gone, so the page never
+holds two of a control or a day. A
 Your details row eases open and shut to its new height, and a splat chosen
 there lands in its row and in the card's corner, after the picker's splats
 land one after another as it opens (11 October 2026, at Dan's request that
