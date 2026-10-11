@@ -1,6 +1,7 @@
 "use client";
 
 import { MeetingLink } from "@/components/MeetingLink";
+import { LessonsLoading } from "@/components/LessonsLoading";
 
 import { type ComponentType, type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -873,6 +874,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // than asking for the same account again the moment it appears.
   const [loadedAccount, setLoadedAccount] = useState<Awaited<ReturnType<typeof fetchMe>>>(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  // Read after mount, as the server's render cannot know it.
+  const [hasStoredSession, setHasStoredSession] = useState(false);
   // The Worker treats any non-cancelled booking as the start of the student's
   // relationship with Inês, including an upcoming first lesson. Mirror that
   // exact rule here: a card the server will refuse is a trap, not a choice.
@@ -1107,6 +1110,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     const params = new URLSearchParams(window.location.search);
     const key = portoDateKey(new Date());
     setTodayKey(key);
+    setHasStoredSession(Boolean(readSession()));
     setStudentZone(browserTimeZone());
     const returningFromCard = params.get("card") === "saved";
     if (returningFromCard) {
@@ -1646,7 +1650,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const needsLessonsSignIn = intent === "lessons" && !student && (
     showAccountSignIn || !checkingSession && !readSession()
   );
+  // A signed-in student's first visit draws Your lessons straight away, its
+  // lessons filling in when the account arrives (LessonsLoading).
+  const lessonsLoading = checkingSession && hasStoredSession && !managed && Boolean(todayKey) &&
+    (intent === "choose" || intent === "lessons");
   const showWorkflowCalendar =
+    !lessonsLoading &&
     !isConfirmingBooking &&
     !needsLessonsSignIn &&
     ((intent === "lessons" && accountView === "upcoming") ||
@@ -3415,9 +3424,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
         {!manageDialogOpen && accountRefreshNotice}
 
-        {checkingSession && intent === "choose" && !managed ? (
-          <p className="booking-state-note booking-state-note--initial">Loading your lessons…</p>
-        ) : null}
+        {lessonsLoading ? <LessonsLoading todayKey={viewTodayKey || todayKey} /> : null}
 
         {needsLessonsSignIn ? (
           <section className="booking-workflow-sign-in" id="booking-lessons-sign-in" tabIndex={-1}>

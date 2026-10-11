@@ -8322,3 +8322,178 @@ dialog[open]::backdrop {
     transform: translateX(-42px);
   }
 }
+
+/* Your lessons before the account arrives (LessonsLoading): the card's own
+   places, Book and this month's days, set exactly where the real card's are,
+   with the splat turning in its corner and the days shimmering in a wave. */
+.lessons-loading__places {
+  display: none;
+}
+
+.lessons-loading__name {
+  display: block;
+  width: min(11rem, 52vw);
+  height: 44px;
+  border-radius: var(--squiggle-pill);
+  background: var(--raised);
+}
+
+@container booking (min-width: 1100px) {
+  .lessons-loading__places {
+    display: inline-grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-radius: var(--squiggle-tabs);
+    padding: 4px;
+    background: var(--raised);
+    gap: 4px;
+  }
+
+  .lessons-loading__places > span {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--squiggle-thumb);
+    padding: 0.5rem 1.15rem;
+    color: var(--ink);
+    font: 700 var(--booking-control-font-size) / 1 var(--ui);
+    letter-spacing: var(--booking-control-tracking);
+    opacity: 0.72;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .lessons-loading__places > .is-current {
+    background: var(--green);
+    color: #fff;
+    opacity: 1;
+  }
+
+  .lessons-loading__name {
+    display: none;
+  }
+}
+
+.lessons-loading .lesson-overview__book {
+  pointer-events: none;
+}
+
+.lessons-loading__day {
+  position: relative;
+  display: grid;
+  min-height: 62px;
+  place-content: center;
+  justify-items: center;
+  color: var(--ink);
+  font-size: clamp(0.9rem, 1.6vw, 1.05rem);
+  opacity: 0.55;
+}
+
+.lessons-loading__day.is-past {
+  opacity: 0.3;
+}
+
+.lessons-loading__day small {
+  font: 700 0.5rem / 1 var(--ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Heard, not seen: kept out of the card's flow so nothing shifts on arrival. */
+.calendar-panel.lessons-loading > .visually-hidden {
+  position: absolute;
+  margin: 0;
+}
+
+.lessons-loading__next {
+  display: grid;
+  min-height: 72px;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.lessons-loading__mark {
+  width: 44px;
+  height: 44px;
+}
+
+.lessons-loading__lines {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.lessons-loading__lines > span {
+  display: block;
+  width: 9rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: rgba(85, 79, 145, 0.14);
+}
+
+.lessons-loading__lines > span + span {
+  width: 6rem;
+}
+
+.calendar-panel > .lessons-loading__splat {
+  display: none;
+}
+
+@container booking (min-width: 700px) {
+  .lessons-loading__next {
+    display: none;
+  }
+
+  .calendar-panel > .lessons-loading__splat {
+    display: block;
+  }
+}
+
+.calendar-panel > .lessons-loading__splat {
+  position: absolute;
+  z-index: 0;
+  right: 14px;
+  bottom: 10px;
+  width: 52px;
+  height: 52px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lessons-loading__day {
+    animation: lessons-loading-ink 1.6s ease-in-out infinite both;
+  }
+
+  .lessons-loading__splat,
+  .lessons-loading__mark {
+    animation: lessons-loading-splat 2.4s var(--motion-ease) infinite;
+  }
+
+  .lessons-loading__lines > span {
+    animation: lessons-loading-ink 1.6s ease-in-out infinite both;
+  }
+}
+
+@keyframes lessons-loading-ink {
+  0%,
+  100% {
+    opacity: 0.32;
+  }
+
+  45% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes lessons-loading-splat {
+  0% {
+    transform: rotate(0deg) scale(0.86);
+  }
+
+  50% {
+    transform: rotate(150deg) scale(1.06);
+  }
+
+  100% {
+    transform: rotate(360deg) scale(0.86);
+  }
+}

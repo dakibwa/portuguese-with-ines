@@ -1009,6 +1009,12 @@ as a form:
   NIF`, beside each, opening one field at a time in place; a small `Sign out`
   sits at its foot. A student can wear one of the site's splats beside their
   name instead of their initial (`students.mark`, migration 0022);
+- a signed-in student's Your lessons is drawn at once, before the account
+  arrives: the places (or the name's place on a phone), Book, this month and
+  its four weeks with today marked, set exactly where the real card's are,
+  so that when the lessons arrive only they appear. Meanwhile the days
+  shimmer and a splat turns in the card's corner, or where the next lesson's
+  mark will be on a phone (LessonsLoading);
 - moving between Your lessons, Past lessons and Your details, the places'
   thumb glides from where it stood to the card now showing, and that card's
   contents slide in from the side it was reached from (forward from the
