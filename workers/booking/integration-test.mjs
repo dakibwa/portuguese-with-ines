@@ -1996,6 +1996,15 @@ await test("a card saved from the account pays for the lessons Inês added from 
     const me = await (await call("/me", { method: "GET", token })).json();
     assert.deepEqual([me.student.hasCard, me.student.cardForAllLessons, me.cardsAccepted], [true, true, true]);
 
+    // Stripe may deliver an older setup after a newer one: the newer card stays.
+    const created = Math.floor(Date.now() / 1000);
+    setupIntents.set("seti_card_newer", { status: "succeeded", customer: "cus_card_later", payment_method: "pm_card_newer" });
+    setupIntents.set("seti_card_older", { status: "succeeded", customer: "cus_card_later", payment_method: "pm_card_older" });
+    const replaced = (id, intent, at) => ({ ...event, id, data: { object: { ...session, id: `cs_${intent}`, setup_intent: intent, created: at } } });
+    assert.equal((await webhook(replaced("evt_card_newer", "seti_card_newer", created + 120))).status, 200);
+    assert.equal((await webhook(replaced("evt_card_older", "seti_card_older", created + 60))).status, 200);
+    assert.equal(db.prepare("SELECT stripe_payment_method FROM students WHERE id=?").get(id).stripe_payment_method, "pm_card_newer");
+
     const later = await add("2026-10-09T02:00:00.000Z");
     assert.equal(later.status, 201);
     assert.equal(statusOf("2026-10-09T02:00:00.000Z"), "scheduled", "a lesson she adds now is on the card from the start");

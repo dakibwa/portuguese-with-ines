@@ -80,9 +80,10 @@ works; the invitation still carries the manage link. Her own copy says
 `You added a lesson`.
 
 `How often` adds a weekly slot instead (4, 6 or 8 weeks, or until stopped),
-one email for the run. Like a single lesson she adds, its weeks are checked
-only against her days off and her other lessons, not her published hours or
-the notice window, and the run is marked `booking_series.added_by_teacher` so
+one email for the run. The first date is the one she chose, so it is booked
+like a single lesson she adds (clashes refused, nothing else). The weeks after
+it are checked only against her days off and her other lessons, not her
+published hours or the notice window, and the run is marked `booking_series.added_by_teacher` so
 the nightly top-up keeps doing so. A week that cannot be booked is left out and
 named in both emails.
 
@@ -91,8 +92,10 @@ A lesson Inês adds records its price and `added_by_teacher = 1`. It is paid to
 her as before (`payment_status = 'not_required'`) until the student saves a card
 from their own account (`POST /me/card`, Stripe's hosted setup page,
 `client_reference_id = student:<id>`, `metadata.purpose = student_card`). That
-agreement is stored as `students.card_consent_at` with
-`STUDENT_CARD_CONSENT_VERSION`. When Stripe's signed webhook confirms the
+agreement is stored as `students.card_consent_at` (when the session was
+created, which is when she pressed the button) with
+`STUDENT_CARD_CONSENT_VERSION`; it also orders card changes, so an older
+setup Stripe delivers late never replaces a newer card. When Stripe's signed webhook confirms the
 SetupIntent, the card is saved, every lesson she added that has not yet started
 becomes `scheduled` (charged after it ends, on the same change and no-show terms
 as a lesson the student books), her weekly slots for them turn on

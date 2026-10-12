@@ -1180,20 +1180,33 @@ async function confirmStudentCard(env, session) {
   }
 
   const now = new Date().toISOString();
-  await env.DB.batch([
-    env.DB.prepare("UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ?, card_consent_at = ? WHERE id = ?")
-      .bind(customer, paymentMethod, now, student.id),
+  /*
+   * The agreement is given when the student presses the button that opens
+   * Stripe's page, which is when the session is created; that moment also
+   * orders the card. Stripe does not promise to deliver webhooks in order,
+   * so an older setup arriving after a newer one changes nothing rather
+   * than putting back the card the student replaced.
+   */
+  const consentedAt = Number.isFinite(session.created) ? new Date(session.created * 1000).toISOString() : now;
+  const current = `EXISTS (SELECT 1 FROM students WHERE id = ? AND card_consent_at = ?)`;
+  const [saved] = await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ?, card_consent_at = ?
+       WHERE id = ? AND (card_consent_at IS NULL OR card_consent_at <= ?)`
+    ).bind(customer, paymentMethod, consentedAt, student.id, consentedAt),
     env.DB.prepare(
       `UPDATE bookings SET payment_status = 'scheduled',
          amount_cents = COALESCE(amount_cents, (SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)),
          payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
-       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'not_required' AND starts_at > ?`
-    ).bind(now, STUDENT_CARD_CONSENT_VERSION, now, student.id, now),
+       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'not_required' AND starts_at > ?
+         AND ${current}`
+    ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, now, student.id, consentedAt),
     env.DB.prepare(
       `UPDATE booking_series SET automatic_payment = 1, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
-       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active' AND automatic_payment = 0`
-    ).bind(now, STUDENT_CARD_CONSENT_VERSION, now, student.id)
+       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active' AND automatic_payment = 0 AND ${current}`
+    ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, student.id, consentedAt)
   ]);
+  if (!(saved?.meta?.changes > 0)) console.warn("stripe-student-card-superseded", student.id);
   return new Response("ok", { status: 200 });
 }
 
