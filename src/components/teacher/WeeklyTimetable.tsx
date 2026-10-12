@@ -197,7 +197,7 @@ export function WeeklyTimetable({
     const grid = gridRef.current;
     if (!grid || from === weekStart || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const distance = weekStart > from ? 40 : -40;
-    for (const day of grid.querySelectorAll(".teacher-day-heading, .teacher-time-day")) {
+    for (const day of grid.querySelectorAll(".teacher-day-heading, .teacher-day-toggle-cell, .teacher-time-day")) {
       day.animate([{ opacity: 0, translate: `${distance}px 0` }, { opacity: 1, translate: "0 0" }], {
         duration: 380,
         easing: "cubic-bezier(0.22, 1, 0.36, 1)"

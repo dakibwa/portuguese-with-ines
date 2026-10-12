@@ -271,8 +271,13 @@
 }
 /* The hours stay put above the days sliding beneath them as the week turns. */
 .teacher-axis-heading,
-.teacher-time-axis {
+.teacher-time-axis,
+.teacher-day-toggles > span:first-child {
   z-index: 1;
+}
+.teacher-day-toggles > span:first-child {
+  position: relative;
+  background: var(--paper);
 }
 .teacher-axis-heading {
   position: relative;

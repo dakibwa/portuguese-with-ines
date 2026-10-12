@@ -2797,12 +2797,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     return (
       <div className={`booking-bar${inConfirmation ? " booking-bar--review" : ""}`}>
         {!inConfirmation ? (
-          <div className={`booking-bar__head${student ? " booking-bar__head--account" : ""}`}>
+          <div className={`booking-bar__head${student ? " booking-bar__head--account" : returningDevice ? "" : " booking-bar__head--quiet"}`}>
             {/* Signed in, the account heads booking: its name's menu at every
                 width, which holds the way back to Your lessons. Booking is not
                 one of the account's places, so the places stay folded here
                 (11 October 2026, at Dan's request). */}
-            <h2 className={student ? "visually-hidden" : "eyebrow"} id="booking-bar-heading" tabIndex={-1}>Book a lesson</h2>
+            {/* The banner above already says Book a Lesson (12 October 2026,
+                at Dan's request), so the bar's own title is for screen readers. */}
+            <h2 className="visually-hidden" id="booking-bar-heading" tabIndex={-1}>Book a lesson</h2>
             {student ? (
               <AccountMenu
                 current={null}

@@ -3094,6 +3094,11 @@ textarea,
   margin: 0;
 }
 
+/* With nothing to show but its unseen title, the head takes no row. */
+.booking-bar__head--quiet {
+  display: contents;
+}
+
 .booking-bar__head h2:focus {
   outline: none;
 }

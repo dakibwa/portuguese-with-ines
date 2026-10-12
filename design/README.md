@@ -392,7 +392,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
 Use `Portuguese Lessons` on the home page. Booking's banner reads `Book a
 Lesson` to a visitor without an account and `Your Lessons` to a student, or to
 anyone arriving by a lesson's own link or a link to Your lessons (12 October
-2026, at Dan's request).
+2026, at Dan's request). The banner names the page, so the booking card
+carries no second `Book a lesson` title of its own (its title is kept for
+screen readers): a first-time visitor's card opens on the lesson's choices,
+and a returning one's on `Already booked? Sign in`.
 Marketing copy describes Portuguese lessons without repeated European/Portugal
 positioning. The one statement of it is on Approach: Inês teaches European
 Portuguese, and any variety a student already knows is welcome. Retain actual
