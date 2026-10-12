@@ -337,7 +337,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
   as she clicks; the line under the calendar says what changed or what failed.
   Weekly blocks such as lunch are shown but not toggled per date. Keyboard and
   touch input must work without dragging.
-- `Weekly hours`, top right, opens the repeating weekly pattern. Clicking or
+- A sliding tab bar groups `Week`, `Weekly hours`, `Time off`, `Manage students`
+  and `Google Meet`. Open on `Week`; keep the week pager beside its date heading.
+  On narrow screens only the tab strip scrolls horizontally. Arrow keys, Home
+  and End move between tabs. Unsaved hours and selected dates survive tab changes;
+  an unsaved-hours dot stays visible on its tab.
+- `Weekly hours` opens the repeating weekly pattern. Clicking or
   dragging marks lesson start times. Preserve exact existing first/last-start
   values and provide an exact-time editor. The last start is not a finishing
   time. Weekly edits remain a draft until `Save weekly hours`, and booking
@@ -347,7 +352,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
   mixed state; clearing it removes its selected starts, and enabling an empty
   cell enables both. Dragging includes the final cell, and the exact-time
   editor retains control of off-grid windows.
-- Time off prevents new bookings; existing lessons remain visible and need
+- `Time off` shows a month calendar. Select one or several dates, including
+  across months, then `Mark days off` or `Make available`. Mark saved days off
+  and booked lessons on their dates; list booked lessons before applying a change.
+  Reopening removes the whole-day block and retains weekly hours and partial
+  time off. Failed saves restore that date and name it.
+  Time off prevents new bookings; existing lessons remain visible and need
   their own deliberate move/cancel action.
 - Show the full week on desktop. On small screens, keep a seven-day selector
   above a spacious single-day timetable and that day's `Day off` switch, with
@@ -364,15 +374,14 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - The timetable spans 08:00–20:00 and widens to fit any weekly hours or
   lessons outside it. There is no 24-hour view; early or late hours are set
   with the exact-time editor.
-- Google Meet is one line above the week: its logo, its name and `Configure`.
-  Only a problem adds a short status beside the name. Connection details,
-  connecting or reconnecting, and the Google Calendar link stay behind
-  `Configure`.
+- The `Google Meet` tab holds connection details, connect/reconnect and the
+  Google Calendar link. Its tab shows a dot when the connection needs attention.
+  Returning from Google opens this tab with the connection result.
 - Every booked lesson shows its time, student and explicit `Online` or `In Porto`
   label in both layouts, including 60-minute blocks. Keep the location icons and
   coral marker for Porto lessons.
-- The workspace opens with a quiet bar naming who is signed in, with `Sign
-  out`.
+- Keep `Sign out` beside the tools bar. `Manage students` holds the student
+  cards and their actions, with the add-a-lesson form also available there.
 - A lesson marked as a no-show turns lavender in the calendar and carries a
   small coral `No-show` tag beside its time, so she can see it at a glance.
 - Selecting a booked lesson opens its details and the existing move, cancel,
@@ -1080,8 +1089,8 @@ as a form:
 - signed in, booking is headed by the account's own bar, as Your lessons is:
   the name's menu, or the places open on a wide card, holding the way back;
 - Inês's schedule reads as the same place: the booking page's blue band,
-  Google Meet as a small `Meet ✓` chip beside a small `Sign out` while it
-  works (the cream card returns only when it needs her), sliders for a
+  one sliding bar for `Week`, `Weekly hours`, `Time off`, `Manage students`
+  and `Google Meet`, beside a small `Sign out`; sliders for a
   lesson's length and place in `Add a lesson for a student`, with the
   timetable's globe and person beside Online and In Porto, her sign-in with no `Create an account`, and each student's chosen
   splat beside their name when she opens a lesson. Her week is set as the
@@ -1092,7 +1101,7 @@ as a form:
   as the student's calendar does, a globe or a person in its top right
   corner, explained in the key, with a small `Meet` pill at the foot of an
   online lesson whose call is ready,
-  and `Weekly hours` a coral button in the middle of the week's row. Her
+  and the week pager beside the date heading. Her
   arrows turn the week as the student's turn theirs: the days slide in from
   the side the week was reached from while the hours stay put (12 October
   2026, at Dan's request). Her page is made for what she does daily (12
@@ -1102,9 +1111,10 @@ as a form:
   Porto); choosing a free time offers `Add a lesson here` (her add-a-lesson
   form in a dialog, its date and time already in place) or `Take this time
   off`, while a time already off reopens at once and dragging across several
-  still takes them off together; and `Time off` beside `Weekly hours` takes a
-  holiday from one date to another in one go, naming any lessons already
-  booked in it, which stay until she moves or cancels them. A lesson she
+  still takes them off together. The `Time off` tab has a month calendar:
+  she selects days, then marks them off or makes them available again.
+  Selected days stay selected across months and tabs; booked lessons are
+  named and stay until she moves or cancels them. A lesson she
   added herself, for a booking arranged elsewhere, reads apart from the
   students' own while lessons move onto the site: lilac with a dashed edge
   and `Added` beside its time on the week, `Added by you` in the key, the
@@ -1112,9 +1122,8 @@ as a form:
   booking system records which lessons she added, so they stay hers once a
   student's card pays for them. Her add-a-lesson form asks `How often`:
   `Once` or `Weekly`, and a weekly slot then runs for `4 weeks`, `6 weeks`,
-  `8 weeks` or `Until stopped`, as the student's own choice does. `Your
-  students` sits beneath the form as small sheet cards, two across where
-  there is room: the student's splat (or initial), name and address, one
+  `8 weeks` or `Until stopped`, as the student's own choice does.
+  `Manage students` holds small sheet cards, two across where there is room: the student's splat (or initial), name and address, one
   plain status line (a coral dot and `Not signed in yet · 1 lesson paid by
   hand`, or a check and `All set: signed in, card saved`), the next
   lesson with a `Weekly` pill, and beneath a rule `Add lesson` (her form
@@ -1206,9 +1215,9 @@ tools, again without new content:
   lavender panel with a tick, never a coloured stripe, and says the link's
   one-hour life only where the form above it does not already;
 - Inês's schedule shares the page's left and right edges with the header
-  rather than sitting in a centred box. On a phone the week has its own row,
-  `Weekly hours` and the pager share the next, and the hint follows; a wider
-  phone or small tablet that fits all three keeps them on one row.
+  rather than sitting in a centred box. On a phone the tools occupy one
+  scrollable strip, the week has its own row and the pager follows. A wider
+  phone or small tablet keeps the dates and pager on one row.
 
 ## Account interaction states
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarPlus, CheckCircle2, Repeat, Send, Users } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Repeat, Send } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
 import { formatSlotTime } from "@/lib/booking-api";
@@ -80,18 +80,12 @@ export function StudentList({
   const waiting = (students ?? []).filter((student) => needsHer(student, cards)).length;
 
   return (
-    <details className="teacher-students">
-      <summary>
-        <span>
-          <span className="teacher-eyebrow">Who&rsquo;s on the site</span>
-          <span className="teacher-manual-title">
-            Your students
-            {students ? <span className="teacher-students__count"> · {students.length}</span> : null}
-            {waiting ? <span className="teacher-students__waiting"> · {waiting} to bring in</span> : null}
-          </span>
-        </span>
-        <Users size={22} aria-hidden="true" />
-      </summary>
+    <section className="teacher-students" aria-labelledby="teacher-students-title">
+      <header className="teacher-tool-heading">
+        <span className="teacher-eyebrow">Your students</span>
+        <h2 id="teacher-students-title">Manage students{students ? <span className="teacher-students__count"> · {students.length}</span> : null}</h2>
+        <p>{waiting ? `${waiting} ${waiting === 1 ? "student needs" : "students need"} a hand getting started. ` : ""}Add a lesson or send a link to help someone sign in.</p>
+      </header>
       <div className="teacher-manual-body">
         {students && students.length > 8 ? (
           <label className="teacher-students__search">
@@ -171,6 +165,6 @@ export function StudentList({
           })}
         </ul>
       </div>
-    </details>
+    </section>
   );
 }

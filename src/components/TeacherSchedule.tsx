@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
-  CalendarDays,
-  CalendarOff,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -18,7 +16,8 @@ import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnectio
 import { AddLessonDialog, ManualLessonForm } from "@/components/teacher/ManualLessonForm";
 import { StudentList } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
-import { TimeOffDialog, datesBetween } from "@/components/teacher/TimeOffDialog";
+import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
+import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
 import {
   fetchBookings,
   fetchSchedule,
@@ -73,7 +72,9 @@ export function TeacherSchedule() {
   const [mobileDay, setMobileDay] = useState(
     () => (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7,
   );
-  const [editing, setEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<TeacherTab>("week");
+  const editing = activeTab === "hours";
+  const [meetAttention, setMeetAttention] = useState(false);
   const [savedHours, setSavedHours] = useState<WeekHours>(emptyWeek);
   const [draftHours, setDraftHours] = useState<WeekHours>(emptyWeek);
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
@@ -95,7 +96,6 @@ export function TeacherSchedule() {
   const [studentsError, setStudentsError] = useState("");
   // A student chosen from her list, put straight into the add-a-lesson form.
   const [formStudent, setFormStudent] = useState<{ email: string; name: string; key: number }>();
-  const [timeOffOpen, setTimeOffOpen] = useState(false);
   const [paymentReview, setPaymentReview] = useState<
     { id: string; reference: string }[]
   >([]);
@@ -135,7 +135,8 @@ export function TeacherSchedule() {
     setToken("");
     setMe(null);
     setInitialised(false);
-    setEditing(false);
+    setActiveTab("week");
+    setMeetAttention(false);
     setSelectedBooking(null);
     setBookings([]);
     setPaymentReview([]);
@@ -167,6 +168,11 @@ export function TeacherSchedule() {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const result = new URL(window.location.href).searchParams.get("meet");
+    if (result && ["connected", "cancelled", "error"].includes(result)) setActiveTab("meet");
   }, []);
 
   useEffect(() => {
@@ -425,26 +431,21 @@ export function TeacherSchedule() {
     );
   }
 
-  /**
-   * A holiday: every date from one to another becomes a day off (or opens
-   * again), through the same one-at-a-time saving as a single day, and the
-   * week turns to its start so she sees it marked.
-   */
-  function takeTimeOff(from: string, to: string, off: boolean) {
-    const dates = datesBetween(from, to);
+  /** Selected dates use the calendar's existing, one-at-a-time save path. */
+  function takeTimeOff(dates: string[], off: boolean) {
+    if (savingDays || !dates.length) return;
     const offAlready = daysOff(shownExceptions);
     for (const date of dates) {
       if (offAlready.has(date) !== off) changeDay(date, { dayOff: off }, "");
     }
-    const booked = dates.reduce((count, date) => count + lessonsDuring(date), 0);
+    const booked = bookings.filter(booking => dates.some(date =>
+      dateKey(new Date(booking.starts_at)) <= date && dateKey(new Date(Date.parse(booking.ends_at) - 1)) >= date)).length;
     setDayNote({
       error: false,
       text: off
-        ? `${dates.length === 1 ? `${shortDate(from)} is a day off` : `${shortDate(from)} to ${shortDate(to)} are days off`}.${stayBooked(booked)}`
-        : `${dates.length === 1 ? `${shortDate(from)} is` : `${shortDate(from)} to ${shortDate(to)} are`} open again.`,
+        ? `${dates.length === 1 ? `${shortDate(dates[0])} is a day off` : `${dates.length} selected days are off`}.${stayBooked(booked)}`
+        : `${dates.length === 1 ? `${shortDate(dates[0])} is` : `${dates.length} selected days are`} open again, following your weekly hours.`,
     });
-    setWeekStart(mondayOf(from));
-    setTimeOffOpen(false);
   }
 
   const weekEnd = shiftDate(weekStart, 6);
@@ -531,11 +532,8 @@ export function TeacherSchedule() {
 
   return (
     <div className="teacher-workspace">
-      {/* Meet's status and a small Sign out share one line at the top, so the
-          page opens onto the week rather than an account card (10 October
-          2026, at Dan's request). */}
-      <div className="teacher-topline">
-        <TeacherMeetConnection token={token} />
+      <div className="teacher-tools-header">
+        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} meetAttention={meetAttention} onSelect={setActiveTab} />
         <button
           className="teacher-sign-out"
           disabled={savingDays || savingHours}
@@ -571,16 +569,13 @@ export function TeacherSchedule() {
         </div>
       ) : null}
 
-      {bookingsShown ? (
+      <div className="teacher-tools-panel" id="teacher-tools-panel" role="tabpanel" aria-labelledby={`teacher-tab-${activeTab}`} tabIndex={0}>
+      {activeTab === "week" || editing ? <>
+      {activeTab === "week" && bookingsShown ? (
         <NextLesson bookings={bookings} now={now} onOpen={setSelectedBooking} />
       ) : null}
 
       <section className="teacher-week" aria-labelledby="teacher-week-title">
-        {/* One bar holds the week, Weekly hours, the hint and the pager, in
-            that reading order. Wide, the week and Weekly hours share the top
-            row with the hint and pager beneath. Narrower, the week, Weekly
-            hours and the pager share a row where they fit (on a phone the week
-            has its own, with the other two beneath it), and the hint follows. */}
         <div className="teacher-week-toolbar">
           <div className="teacher-week-title">
             <span className="teacher-eyebrow">
@@ -593,46 +588,6 @@ export function TeacherSchedule() {
                   : `${dateLabel(weekStart, { day: "numeric", month: "short" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}`}
               </h2>
             </div>
-          </div>
-          <div className="teacher-week-actions">
-            {editing ? (
-              <button
-                className="button button--outline teacher-mode-button"
-                type="button"
-                onClick={() => setEditing(false)}
-              >
-                <CalendarDays size={16} aria-hidden="true" />
-                Back to calendar
-              </button>
-            ) : (
-              <>
-                <button
-                  className="button button--coral teacher-mode-button"
-                  type="button"
-                  onClick={() => setEditing(true)}
-                >
-                  <Repeat2 size={16} aria-hidden="true" />
-                  Weekly hours
-                  {hoursDirty ? (
-                    <span
-                      className="teacher-unsaved-dot"
-                      aria-label="unsaved changes"
-                    />
-                  ) : null}
-                </button>
-                {/* A holiday in one go, beside her weekly hours (12 October
-                    2026, at Dan's request). */}
-                <button
-                  className="button button--outline teacher-mode-button"
-                  type="button"
-                  disabled={savingDays}
-                  onClick={() => setTimeOffOpen(true)}
-                >
-                  <CalendarOff size={16} aria-hidden="true" />
-                  Time off
-                </button>
-              </>
-            )}
           </div>
           {editing ? (
             <p className="teacher-week-hint">Click or drag down a day to mark lesson start times.</p>
@@ -771,16 +726,22 @@ export function TeacherSchedule() {
           </p>
         ) : null}
       </section>
-
-      <ManualLessonForm
-        token={token}
-        known={students?.list ?? []}
-        student={formStudent}
-        onCreated={() => {
-          void reloadStudents();
-          void reloadBookings();
-        }}
-      />
+      </> : null}
+      <div className="teacher-tab-view" hidden={activeTab !== "time-off"}>
+        <TimeOffCalendar
+          today={today}
+          hours={savedHours}
+          exceptions={shownExceptions}
+          bookings={bookings}
+          bookingsLoading={bookingsLoading}
+          bookingsError={bookingsError}
+          onReloadBookings={() => void reloadBookings()}
+          busy={savingDays}
+          status={<p className={`teacher-save-state ${dayNote?.error ? "is-error" : ""}`} role={dayNote?.error ? "alert" : "status"}>{savingDays ? "Saving…" : dayNote?.text}</p>}
+          onChange={takeTimeOff}
+        />
+      </div>
+      <div className="teacher-tab-view" hidden={activeTab !== "students"}>
       <StudentList
         token={token}
         students={students?.list ?? null}
@@ -788,6 +749,22 @@ export function TeacherSchedule() {
         error={studentsError}
         onAddLesson={(student) => setFormStudent((current) => ({ email: student.email, name: student.name, key: (current?.key ?? 0) + 1 }))}
       />
+      </div>
+      <div className="teacher-tab-view" hidden={activeTab !== "meet"}>
+        <TeacherMeetConnection token={token} onAttentionChange={setMeetAttention} />
+      </div>
+      <div className="teacher-tab-view" hidden={activeTab !== "week" && activeTab !== "students"}>
+        <ManualLessonForm
+          token={token}
+          known={students?.list ?? []}
+          student={formStudent}
+          onCreated={() => {
+            void reloadStudents();
+            void reloadBookings();
+          }}
+        />
+      </div>
+      </div>
       {addLesson ? (
         <AddLessonDialog
           key={`${addLesson.date}-${addLesson.minute}`}
@@ -804,15 +781,6 @@ export function TeacherSchedule() {
             void reloadStudents();
             void reloadBookings();
           }}
-        />
-      ) : null}
-      {timeOffOpen ? (
-        <TimeOffDialog
-          today={today}
-          bookings={bookings}
-          isDayOff={(date) => daysOff(shownExceptions).has(date)}
-          onClose={() => setTimeOffOpen(false)}
-          onConfirm={takeTimeOff}
         />
       ) : null}
       {selectedBooking ? (
