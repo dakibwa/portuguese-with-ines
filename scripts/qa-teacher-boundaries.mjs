@@ -52,7 +52,7 @@ async function fixture(width, { rules = [], interval = 15, current = booking, re
   page.on("pageerror", error => errors.push(error.message));
   await page.clock.setFixedTime(new Date("2026-10-02T10:00:00Z"));
   await page.goto(`${base}/schedule/`);
-  await expect(page.getByRole("button", { name: /^Weekly hours/ })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^Weekly hours/ })).toBeVisible();
   return { context, page, errors, writes };
 }
 let cases = 0;
@@ -80,7 +80,7 @@ const wire = (weekday, startMinute, lastStartMinute) => ({ weekday, startMinute,
 const untouchedWire = [wire(1, 705, 705), wire(2, 607, 637)];
 function sortedRules(rules) { return [...rules].sort((a, b) => a.weekday - b.weekday || a.startMinute - b.startMinute || a.lastStartMinute - b.lastStartMinute); }
 async function hours(page) {
-  await page.getByRole("button", { name: /^Weekly hours/ }).click();
+  await page.getByRole("tab", { name: /^Weekly hours/ }).click();
   await page.getByRole("button", { name: "Monday, show weekly hours", exact: true }).click();
 }
 async function activate(control, method) {

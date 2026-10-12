@@ -247,9 +247,9 @@ async function fixture(width, options = {}) {
 const slot = (page, day, minute) =>
   page.locator(`[data-slot-day="${day}"][data-slot-minute="${minute}"]`);
 const showHours = (page) =>
-  page.getByRole("button", { name: /^Weekly hours/ }).click();
+  page.getByRole("tab", { name: /^Weekly hours/ }).click();
 const showLessons = (page) =>
-  page.getByRole("button", { name: "Back to calendar", exact: true }).click();
+  page.getByRole("tab", { name: "Week", exact: true }).click();
 const dayWrites = (state, date) =>
   state.writes
     .filter((entry) => entry.path === "/admin/exceptions/day")
@@ -478,7 +478,7 @@ try {
 
   // A free time offers a choice rather than taking itself off: Escape puts
   // the choice away and keeps her place.
-  const note = page.locator(".teacher-save-state");
+  const note = page.locator(".teacher-week .teacher-save-state");
   const writesBeforeChoice = state.writes.length;
   await slot(page, 2, 960).click();
   const choice = page.getByRole("menu");
@@ -631,9 +631,9 @@ try {
   const manual = page.locator(".teacher-manual");
   assert.equal(await manual.getAttribute("open"), null);
   assert.equal(
-    await manual.evaluate((node) =>
-      node.previousElementSibling?.classList.contains("teacher-week"),
-    ),
+    await manual.evaluate((node) => Boolean(
+      node.compareDocumentPosition(document.querySelector(".teacher-week")) & Node.DOCUMENT_POSITION_PRECEDING,
+    )),
     true,
   );
   await manual.locator("summary").click();
@@ -736,7 +736,7 @@ try {
   // Her students: who still needs to come in leads, and each can be sent a
   // way in or given a lesson straight from the list.
   const students = page.locator(".teacher-students");
-  await students.locator("summary").click();
+  await page.getByRole("tab", { name: "Manage students", exact: true }).click();
   await expect(students.locator(".teacher-student").first()).toContainText("Sam Known");
   await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet");
   await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet · 1 lesson paid by hand");
@@ -750,24 +750,21 @@ try {
   await expect(manual.getByLabel("Date", { exact: true })).toBeFocused();
   await manual.locator("summary").click();
 
-  // A holiday is taken in one go, every day from one date to another, and
-  // the week turns to show it.
-  await page.getByRole("button", { name: "Time off", exact: true }).click();
-  const timeOff = page.getByRole("dialog", { name: "Take time off" });
-  await timeOff.getByLabel("From").fill("2026-09-28");
-  await timeOff.getByLabel("Until (and including)").fill("2026-09-30");
-  await expect(timeOff).toContainText("3 days");
-  await timeOff.getByRole("button", { name: "Take these days off", exact: true }).click();
-  await expect(timeOff).toHaveCount(0);
+  // Select a few dates, apply time off, then see those same days in the week.
+  await page.getByRole("tab", { name: "Time off", exact: true }).click();
+  const timeOff = page.locator(".teacher-timeoff");
   const holidayDates = ["2026-09-28", "2026-09-29", "2026-09-30"];
+  for (const date of holidayDates) await timeOff.locator(`[data-timeoff-date="${date}"]`).click();
+  await timeOff.getByRole("button", { name: "Mark days off", exact: true }).click();
   await expect
     .poll(() => holidayDates.map((date) => dayWrites(state, date).at(-1)))
     .toEqual(holidayDates.map((date) => ({ date, dayOff: true })));
+  await expect(timeOff.locator(".teacher-save-state")).toHaveText("3 selected days are off.");
+  for (const date of holidayDates) await expect(timeOff.locator(`[data-timeoff-date="${date}"]`)).toHaveClass(/is-off/);
+  await showLessons(page);
+  for (let index = 0; index < 3; index++) await page.getByRole("button", { name: "Next week" }).click();
   await expect(page.locator("#teacher-week-title")).toHaveText(/^28 Sept/);
-  await expect(
-    page.getByRole("switch", { name: "Day off, Tuesday 29 September" }),
-  ).toHaveAttribute("aria-checked", "true");
-  await expect(note).toHaveText("Mon 28 Sept to Wed 30 Sept are days off.");
+  await expect(page.getByRole("switch", { name: "Day off, Tuesday 29 September" })).toHaveAttribute("aria-checked", "true");
   await page.getByRole("button", { name: "This week" }).click();
   state.failBookings = true;
   await page.getByRole("button", { name: "Next week" }).click();
@@ -811,7 +808,7 @@ try {
   await tuesdayOff.tap();
   await expect(tuesdayOff).toHaveAttribute("aria-checked", "true");
   await mobile.page
-    .locator(".teacher-save-state")
+    .locator(".teacher-week .teacher-save-state")
     .filter({ hasText: "The lesson already booked stays in place." })
     .waitFor();
   await expect(
@@ -826,7 +823,7 @@ try {
     "true",
   );
   await mobile.page
-    .locator(".teacher-save-state")
+    .locator(".teacher-week .teacher-save-state")
     .filter({ hasText: "18:00–18:30 on Tue 8 Sept is off." })
     .waitFor();
   await showHours(mobile.page);
@@ -882,6 +879,93 @@ try {
   assert.equal(mobile.state.writes.filter(entry => entry.path.endsWith("/cancel")).at(-1).data.message, longMessage);
   assert.deepEqual(mobile.state.errors, []);
   await mobile.page.close();
+
+  for (const width of [1280, 390, 320]) {
+    const tabs = await fixture(width);
+    const { page, state } = tabs;
+    const chosenDay = (date) => page.locator(`[data-timeoff-date="${date}"]`);
+    const timeOff = page.locator(".teacher-timeoff");
+    const initialBookings = structuredClone(state.bookings);
+    await expect(page.getByRole("tablist", { name: "Teacher tools" }).getByRole("tab")).toHaveCount(5);
+    await expect(page.getByRole("tab", { name: "Week", exact: true })).toHaveAttribute("aria-selected", "true");
+    await page.getByRole("tab", { name: "Week", exact: true }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("tab", { name: /^Weekly hours/ })).toBeFocused();
+    await slot(page, 1, 600).click();
+    await page.getByRole("tab", { name: "Manage students" }).click();
+    await expect(page.getByRole("tab", { name: /^Weekly hours/ }).locator(".teacher-tab-dot")).toHaveAttribute("aria-label", "unsaved changes");
+    await showHours(page);
+    await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "false");
+    await page.getByRole("button", { name: "Discard", exact: true }).click();
+    await page.getByRole("tab", { name: "Time off", exact: true }).click();
+    await expect(chosenDay("2026-09-06")).toBeDisabled();
+    await chosenDay("2026-09-08").click();
+    await expect(timeOff.locator(".teacher-timeoff-booked")).toContainText("Sam");
+    await expect(timeOff.locator(".teacher-timeoff-booked")).toContainText("It stays booked");
+    await chosenDay("2026-09-21").click();
+    await timeOff.getByRole("button", { name: "Next month" }).click();
+    await chosenDay("2026-10-01").click();
+    await page.getByRole("tab", { name: "Manage students" }).click();
+    const manual = page.locator(".teacher-manual");
+    await manual.locator("summary").click();
+    await manual.getByLabel("Student’s email").fill("draft@example.invalid");
+    await page.getByRole("tab", { name: "Time off", exact: true }).click();
+    await expect(timeOff.getByRole("heading", { name: "3 days selected" })).toBeVisible();
+    const before = state.writes.length;
+    await timeOff.getByRole("button", { name: "Mark days off", exact: true }).click();
+    await expect(timeOff.locator(".teacher-save-state")).toContainText("3 selected days are off");
+    assert.deepEqual(state.writes.slice(before).map(write => write.data), [
+      { date: "2026-09-08", dayOff: true }, { date: "2026-10-01", dayOff: true },
+    ], "Already-off dates do not create another write");
+    await expect(chosenDay("2026-10-01")).toHaveClass(/is-off/);
+    await timeOff.getByRole("button", { name: "Make available", exact: true }).click();
+    await expect(timeOff.locator(".teacher-save-state")).toContainText("following your weekly hours");
+    assert.deepEqual(state.bookings, initialBookings, "Marking dates off and reopening them preserves every lesson");
+    assert.ok(state.exceptions.some(row => row.date === "2026-09-21" && row.start_minute === 600), "Reopening a day preserves its partial time off");
+    assert.ok(state.exceptions.some(row => row.kind === "extra"), "Extra hours remain untouched");
+    await expect(timeOff.getByRole("button", { name: "Make available", exact: true })).toBeDisabled();
+    await timeOff.getByRole("button", { name: "Clear", exact: true }).click();
+    await timeOff.getByRole("button", { name: "This month", exact: true }).click();
+    await chosenDay("2026-09-30").focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(chosenDay("2026-10-07")).toBeFocused();
+    await page.keyboard.press("Space");
+    state.failDay = "2026-10-07";
+    await timeOff.getByRole("button", { name: "Mark day off", exact: true }).click();
+    await expect(timeOff.getByRole("alert")).toContainText("was not changed");
+    await expect(chosenDay("2026-10-07")).not.toHaveClass(/is-off/);
+    await timeOff.getByRole("button", { name: "Mark day off", exact: true }).click();
+    await expect(timeOff.locator(".teacher-save-state")).toContainText("is a day off");
+    await noOverflow(page);
+    await page.getByRole("tab", { name: "Manage students" }).click();
+    await expect(manual.getByLabel("Student’s email")).toHaveValue("draft@example.invalid");
+    await page.getByRole("tab", { name: "Manage students" }).focus();
+    await page.keyboard.press("End");
+    await expect(page.getByRole("tab", { name: /^Google Meet/ })).toBeFocused();
+    await noOverflow(page);
+    if (width === 1280) {
+      await page.setViewportSize({ width: 320, height: 900 });
+      await expect.poll(() => page.getByRole("tab", { name: /^Google Meet/ }).evaluate(node => {
+        const tab = node.getBoundingClientRect();
+        const strip = node.closest(".teacher-tabs-scroll").getBoundingClientRect();
+        return tab.left >= strip.left - 1 && tab.right <= strip.right + 1;
+      })).toBe(true);
+      await page.setViewportSize({ width, height: 900 });
+    }
+    await page.keyboard.press("Home");
+    await expect(page.getByRole("tab", { name: "Week", exact: true })).toBeFocused();
+    state.failBookings = true;
+    await page.getByRole("button", { name: "Next week", exact: true }).click();
+    await expect(page.locator(".teacher-week").getByRole("alert")).toContainText("Lessons could not be loaded");
+    await page.getByRole("tab", { name: "Time off", exact: true }).click();
+    await expect(timeOff.getByRole("alert")).toContainText("Booked lessons could not be checked");
+    await expect(timeOff.getByRole("button", { name: "Make available", exact: true })).toBeDisabled();
+    state.failBookings = false;
+    await timeOff.getByRole("button", { name: "Try again", exact: true }).click();
+    await expect(timeOff.getByRole("button", { name: "Make available", exact: true })).toBeEnabled();
+    assert.deepEqual(state.errors, []);
+    await page.close();
+  }
 
   const student = await fixture(390, { student: true });
   await student.page

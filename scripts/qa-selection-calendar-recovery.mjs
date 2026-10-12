@@ -244,7 +244,7 @@ try {
         await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "true");
         await expect(slot(page, 1, 630)).toHaveAttribute("aria-pressed", "true");
         assert.deepEqual(writes[1], { date: "2026-10-05", ...(failure === "malformed" ? { dayOff: false } : {}), blocks: [{ startMinute: 600, endMinute: 660 }] });
-        await expect(page.locator(".teacher-save-state")).not.toHaveClass(/is-error/);
+        await expect(page.locator(".teacher-week .teacher-save-state")).not.toHaveClass(/is-error/);
         await check(state); cases += 1;
       } finally { waiting.resolve(); await state.context.close(); }
     }
@@ -260,12 +260,12 @@ try {
       try {
         const { page } = state;
         await monday(page); await takeOff(page, slot(page, 1, 600));
-        await expect(page.locator(".teacher-save-state")).toContainText(unreadable);
+        await expect(page.locator(".teacher-week .teacher-save-state")).toContainText(unreadable);
         await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "false");
         await check(state);
         if (width !== 390 && Object.keys(answer).length === 0) await page.screenshot({ path: `${output}/time-off-error-${width}.png`, fullPage: true });
         await takeOff(page, slot(page, 1, 600));
-        await expect(page.locator(".teacher-save-state")).not.toHaveClass(/is-error/);
+        await expect(page.locator(".teacher-week .teacher-save-state")).not.toHaveClass(/is-error/);
         await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "true");
         await check(state); assert.equal(writes, 2); cases += 1;
       } finally { await state.context.close(); }
@@ -278,7 +278,7 @@ try {
       });
       try {
         const { page } = state;
-        await monday(page); await page.getByRole("button", { name: /^Weekly hours/ }).click();
+        await monday(page); await page.getByRole("tab", { name: /^Weekly hours/ }).click();
         await page.getByRole("button", { name: "Monday, show weekly hours", exact: true }).click();
         await slot(page, 1, 600).click();
         const save = page.getByRole("button", { name: "Save weekly hours", exact: true });
@@ -640,7 +640,7 @@ try {
           recovered = true;
           if (malformed.startsWith("teacher-")) {
             await page.getByRole("button", { name: "Try again", exact: true }).click();
-            await expect(page.getByRole("button", { name: /^Weekly hours/ })).toBeVisible();
+            await expect(page.getByRole("tab", { name: /^Weekly hours/ })).toBeVisible();
           } else if (malformed === "managed") {
             await page.getByRole("button", { name: "Close lesson management", exact: true }).click();
             await check(state); await page.goto(`${base}/book/?manage=fixture`);

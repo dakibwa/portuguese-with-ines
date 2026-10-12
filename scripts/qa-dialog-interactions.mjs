@@ -70,7 +70,7 @@ async function fixture(width, { teacher = true, current = lesson, calendarPrompt
   page.on("pageerror", error => errors.push(error.message));
   await page.clock.setFixedTime(new Date("2026-10-02T10:00:00Z"));
   await page.goto(`${base}${teacher ? "/schedule/" : "/book/?view=lessons"}`);
-  if (teacher) await expect(page.getByRole("button", { name: /^Weekly hours/ })).toBeVisible();
+  if (teacher) await expect(page.getByRole("tab", { name: /^Weekly hours/ })).toBeVisible();
   else await expect(page.locator("button[data-date-key='2026-10-05']")).toBeVisible();
   return { context, page, errors, writes };
 }
@@ -140,9 +140,9 @@ try {
           }
           await expect(dialog).toHaveCount(0); await expect(page.locator(".teacher-calendar-loading")).toHaveCount(0);
           await expect(page.locator("#teacher-week-title")).toBeFocused();
-          // After the week's heading comes Weekly hours, then Time off.
-          await page.keyboard.press("Tab"); await expect(page.getByRole("button", { name: /^Weekly hours/ })).toBeFocused();
-          await page.keyboard.press("Tab"); await expect(page.getByRole("button", { name: "Time off", exact: true })).toBeFocused();
+          // The week pager follows the stable heading after a lesson changes.
+          await page.keyboard.press("Tab"); await expect(page.getByRole("button", { name: "Previous week", exact: true })).toBeFocused();
+          await page.keyboard.press("Tab"); await expect(page.getByRole("button", { name: "This week", exact: true })).toBeFocused();
           assert.equal(state.writes.length, 1);
         }
         assert.equal(await page.evaluate(() => document.body.style.overflow), "");

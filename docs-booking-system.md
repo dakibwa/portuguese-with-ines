@@ -119,7 +119,7 @@ never put on a card.
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
-still paid by hand, and any weekly slot. `Your students` on `/schedule` puts
+still paid by hand, and any weekly slot. `Manage students` on `/schedule` puts
 those who still need to sign in or add a card first, each with
 `Send sign-in link` (`POST /admin/students/:id/welcome`, three an hour per
 student).
@@ -162,11 +162,14 @@ no-fee cancellation and automatic refund rules remain the same.
 The week itself is where Inês takes time off. Choosing a free time offers
 `Add a lesson here` or `Take this time off`; dragging across times on a date
 blocks them all for that date only, and choosing a blocked time reopens it.
-The `Day off` switch above each date blocks the whole day, and `Time off`
-beside `Weekly hours` sends a day off for every date from one to another
-through the same queue (at most 92 days at a time), naming any lessons
-already booked in that time. Each
-change saves as she makes it, one request at a time, so quick clicks coalesce
+The `Day off` switch above each date blocks the whole day. The `Time off`
+tab shows a month calendar: select one or several dates, including across
+months, then `Mark days off` or `Make available`. Selected dates survive tab
+changes. Booked lessons are shown before applying changes, and unavailable
+booking data must be retried first. Each selected date uses the same queue;
+already-matching days require no write. Reopening a day removes only its
+whole-day block, retaining partial time off and weekly hours. Each change
+saves one request at a time, so quick clicks coalesce
 into the date's latest choice. A failed older save keeps a newer choice queued;
 failure of the latest choice puts that date back as saved and says so.
 Leaving the teacher page releases its queue: an already submitted write may
@@ -185,19 +188,25 @@ dates, are refused rather than partly saved. `GET /admin/availability` returns
 weekly blocks alongside the upcoming one-off rows so the calendar shows every
 time students cannot book.
 
-`Weekly hours`, top right, edits the usual weekly pattern with click/drag,
+The `Weekly hours` tab edits the usual weekly pattern with click/drag,
 touch or keyboard input. `Save weekly hours` writes the existing first-start and
 last-start rule format; it does not reinterpret the last start as a finishing
 time. Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
-Manual lesson entry is a collapsed backup at the bottom, with online/in-Porto
-location and `How often` (once, or weekly for 4, 6 or 8 weeks or until
+The sliding tools bar groups `Week`, `Weekly hours`, `Time off`,
+`Manage students` and `Google Meet`, with the current week as the default.
+The Google Meet tab exposes the existing connection controls and its tab
+marks connection problems; Google callbacks open it directly.
+
+Manual lesson entry is a collapsed backup in Week and Manage students,
+with online/in-Porto location and `How often` (once, or weekly for 4, 6 or 8 weeks or until
 stopped). Its email field suggests her existing students (read from
 `GET /admin/students` when she first reaches it) and a chosen one fills in
-their name. `Your students` sits beneath it, read each time it opens; each
-row's `Add lesson` opens the form with that student in it. All teacher actions still use the authenticated admin endpoints and
+their name. `Manage students` contains the student cards; each
+row's `Add lesson` opens the form with that student in it. Form drafts survive
+tab changes. All teacher actions still use the authenticated admin endpoints and
 their existing booking, payment and email safeguards.
 
 ## Accounts
@@ -1414,7 +1423,7 @@ that connection. The existing Google sign-in client remains separate.
 4. Set `GOOGLE_CALENDAR_ENABLED` to `1` only after setup, and release Worker
    before frontend. Use the isolated staging Worker/database for live proof,
    with its own callback/client grant and dry-run emails.
-5. Inês signs into `/schedule/`, selects **Configure → Connect Google Meet**,
+5. Inês signs into `/schedule/`, selects **Google Meet → Connect Google Meet**,
    chooses her matching Google account and grants permission. The callback
    checks signed identity, teacher role, session version/revocation, expiring
    single-use state and PKCE. The shared admin token cannot start OAuth.
@@ -1443,7 +1452,7 @@ minutes later. Google itself emails no one: events carry no attendees and are
 written with `sendUpdates=none`.
 
 Expired or revoked Google permission shows **Needs reconnecting** beside Google
-Meet in her schedule; **Configure → Reconnect Google Meet** restores it.
+Meet in her schedule; **Google Meet → Reconnect Google Meet** restores it.
 Reconnection reuses the stored calendar and event identities. If the first
 calendar-create response is lost, the persisted creation-attempt flag prevents
 creating duplicates. An operator must locate the app calendar in Inês’s Google

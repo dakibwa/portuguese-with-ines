@@ -12,10 +12,11 @@ const authorizationUrl = "https://accounts.google.com/o/oauth2/v2/auth?fixture=m
 await mkdir("tmp/qa/meet", { recursive: true });
 
 async function readableMeetFeedback(panel, selector) {
-  const colors = await panel.locator(selector).evaluate(element => ({
-    ink: getComputedStyle(element).color,
-    paper: getComputedStyle(element.closest(".teacher-meet")).backgroundColor
-  }));
+  const colors = await panel.locator(selector).evaluate(element => {
+    let surface = element;
+    while (surface.parentElement && getComputedStyle(surface).backgroundColor === "rgba(0, 0, 0, 0)") surface = surface.parentElement;
+    return { ink: getComputedStyle(element).color, paper: getComputedStyle(surface).backgroundColor };
+  });
   const luminance = color => {
     const channels = color.match(/[\d.]+/g).map(Number);
     assert.ok(channels.length === 3 || channels[3] === 1, "Contrast check needs opaque colors");
@@ -56,6 +57,8 @@ async function fixture(width, connection, { callback = "", failStatus = false, c
     return route.abort();
   });
   await page.goto(`${base}/schedule/${callback}`);
+  if (callback) await expect(page.getByRole("tab", { name: /^Google Meet/ })).toHaveAttribute("aria-selected", "true");
+  else await page.getByRole("tab", { name: /^Google Meet/ }).click();
   await page.locator(".teacher-meet").waitFor();
   return { page, panel: page.locator(".teacher-meet"), calls, errors, recoverStatus: () => { failStatus = false; } };
 }
@@ -72,11 +75,7 @@ try {
     const ready = await fixture(width, disconnected);
     await expect(ready.panel).toContainText("Not connected");
     await readableMeetFeedback(ready.panel, ".teacher-meet-attention");
-    await expect(ready.panel).not.toContainText("waiting to sync");
-    const configure = ready.panel.getByRole("button", { name: "Configure", exact: true });
-    await expect(configure).toHaveAttribute("aria-expanded", "false");
-    await configure.click();
-    await expect(configure).toHaveAttribute("aria-expanded", "true");
+    await expect(ready.page.getByRole("tab", { name: /^Google Meet/ }).locator(".teacher-tab-dot")).toHaveAttribute("aria-label", "needs attention");
     await expect(ready.panel).toContainText("2 lessons are waiting to sync.");
     await expect(ready.panel.getByRole("button", { name: "Connect Google Meet", exact: true })).toBeVisible();
     assert.deepEqual(ready.calls, [], "OAuth never starts without a click");
@@ -89,24 +88,16 @@ try {
     assert.deepEqual(ready.errors, []);
     await ready.page.close();
 
-    // While Meet works it is a small chip, its logo and a tick, which opens
-    // the settings; the full card returns only when it needs her.
+    // The same tab holds the working connection and its settings.
     const working = await fixture(width, { ...disconnected, connected: true, email: "teacher@example.invalid", pending: 0 });
-    await expect(working.panel.getByRole("heading", { name: "Google Meet", exact: true })).toBeAttached();
+    await expect(working.panel.getByRole("heading", { name: "Google Meet", exact: true })).toBeVisible();
     await expect(working.panel.locator(".teacher-meet-logo")).toBeVisible();
-    await expect(working.panel.getByRole("button")).toHaveCount(1);
-    await expect(working.panel.locator("p")).toHaveCount(0);
-    const chip = working.panel.getByRole("button", { name: "Google Meet connected. Show settings", exact: true });
-    const chipBox = await chip.boundingBox();
-    assert.ok(chipBox.width < 200, "A working Meet connection is a small chip");
-    await chip.click();
-    await expect(working.page.locator(".teacher-meet").getByRole("button", { name: "Configure", exact: true })).toHaveAttribute("aria-expanded", "true");
-    working.panel = working.page.locator(".teacher-meet");
+    await expect(working.page.getByRole("tab", { name: /^Google Meet/ }).locator(".teacher-tab-dot")).toHaveCount(0);
     await expect(working.panel).toContainText("Connected as teacher@example.invalid");
     await expect(working.panel.getByRole("button", { name: "Reconnect Google Meet", exact: true })).toBeVisible();
     await expect(working.panel.getByRole("link", { name: "Open Google Calendar", exact: true })).toHaveAttribute("href", "https://calendar.google.com/");
     await expect(working.panel).toContainText("Settings and sharing");
-    assert.deepEqual(working.calls, [], "Configure alone never starts OAuth");
+    assert.deepEqual(working.calls, [], "Opening the tab never starts OAuth");
     assert.ok(await working.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     await working.page.close();
 
@@ -139,19 +130,18 @@ try {
   await readableMeetFeedback(failed.panel, ".teacher-meet-error");
   failed.recoverStatus();
   await failed.panel.getByRole("button", { name: "Try again", exact: true }).click();
-  await expect(failed.panel.getByRole("button", { name: "Configure", exact: true })).toBeVisible();
+  await expect(failed.panel.getByRole("button", { name: "Connect Google Meet", exact: true })).toBeVisible();
   await failed.page.close();
 
   for (const url of ["https://accounts.google.com.example.invalid/o/oauth2/v2/auth", "https://accounts.google.com/other", "http://accounts.google.com/o/oauth2/v2/auth"]) {
     const unsafe = await fixture(1280, disconnected, { connectResult: { url } });
-    await unsafe.panel.getByRole("button", { name: "Configure", exact: true }).click();
     await unsafe.panel.getByRole("button", { name: "Connect Google Meet", exact: true }).click();
     await expect(unsafe.panel.getByRole("alert")).toContainText("couldn’t be opened");
     assert.equal(new URL(unsafe.page.url()).origin, new URL(base).origin);
     await expect(unsafe.panel.getByRole("button", { name: "Connect Google Meet", exact: true })).toBeEnabled();
     await unsafe.page.close();
   }
-  console.log("Teacher Meet connection passed: setup, one-line working state, Configure, explicit authorization, connected/reconnect, callbacks, query preservation, retries and unsafe redirect rejection; desktop/mobile.");
+  console.log("Teacher Meet connection passed: setup, tab navigation, connection attention, explicit authorization, connected/reconnect, callbacks, query preservation, retries and unsafe redirect rejection; desktop/mobile.");
 } finally {
   await browser.close();
 }

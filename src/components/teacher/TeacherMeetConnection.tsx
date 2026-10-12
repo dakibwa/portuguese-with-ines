@@ -22,18 +22,13 @@ export function GoogleMeetLogo() {
   );
 }
 
-/**
- * While Meet works it is a small "Meet ✓" beside Sign out, which opens its
- * settings; it grows into a card only when it needs her (12 October 2026, at
- * Dan's request: a working connection had the top of her page).
- */
-export function TeacherMeetConnection({ token }: { token: string }) {
+/** Connection controls live together in the Google Meet tab. */
+export function TeacherMeetConnection({ token, onAttentionChange }: { token: string; onAttentionChange: (attention: boolean) => void }) {
   const [connection, setConnection] = useState<GoogleMeetConnection | null>(null);
   const [error, setError] = useState("");
   const [callbackResult, setCallbackResult] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(false);
   const connectRequest = useRef(0);
   useEffect(() => () => { connectRequest.current += 1; }, [token]);
 
@@ -42,8 +37,6 @@ export function TeacherMeetConnection({ token }: { token: string }) {
     const result = url.searchParams.get("meet");
     if (result && ["connected", "cancelled", "error"].includes(result)) {
       setCallbackResult(result);
-      // Returning from Google: keep the settings she was using in view.
-      setOpen(true);
       url.searchParams.delete("meet");
       window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     }
@@ -103,43 +96,21 @@ export function TeacherMeetConnection({ token }: { token: string }) {
         ? "Google Meet couldn’t be connected. Please try again."
         : "";
 
-  if (healthy && !open && !feedback && !error) {
-    return (
-      <section className="teacher-meet teacher-meet--compact" aria-labelledby="teacher-meet-title">
-        <h2 className="visually-hidden" id="teacher-meet-title">Google Meet</h2>
-        <button
-          aria-expanded={false}
-          aria-label="Google Meet connected. Show settings"
-          className="teacher-meet-chip"
-          onClick={() => setOpen(true)}
-          type="button"
-        >
-          <GoogleMeetLogo />
-          Meet
-          <Check size={14} strokeWidth={2.6} aria-hidden="true" />
-        </button>
-      </section>
-    );
-  }
+  useEffect(() => {
+    onAttentionChange(Boolean(attention || error || callbackResult === "error"));
+  }, [attention, error, callbackResult, onAttentionChange]);
 
   return (
     <section className="teacher-meet" aria-labelledby="teacher-meet-title">
-      <div className="teacher-meet-bar">
-        <div className="teacher-meet-name">
-          <h2 id="teacher-meet-title"><GoogleMeetLogo /> Google Meet</h2>
-          {attention ? <span className="teacher-meet-attention">{attention}</span> : null}
-        </div>
-        {connection?.configured ? (
-          <button className="button button--quiet" aria-expanded={open} onClick={() => setOpen(value => !value)} type="button">
-            Configure
-          </button>
-        ) : !connection && error ? (
-          <button className="teacher-text-button" onClick={() => setAttempt(value => value + 1)} type="button">Try again</button>
-        ) : null}
-      </div>
+      <header className="teacher-tool-heading">
+        <span className="teacher-eyebrow">Your calendar and calls</span>
+        <h2 id="teacher-meet-title"><GoogleMeetLogo /> Google Meet</h2>
+        {attention ? <p className="teacher-meet-attention">{attention}</p> : healthy ? <p className="teacher-meet-connected"><Check size={16} aria-hidden="true" />Connected</p> : null}
+      </header>
+      {!connection && !error ? <p role="status">Checking Google Meet…</p> : null}
       {feedback ? <p role="status">{feedback}</p> : null}
-      {error ? <p className="teacher-meet-error" role="alert">{error}</p> : null}
-      {connection?.configured && open ? (
+      {error ? <div className="teacher-meet-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={() => setAttempt(value => value + 1)} type="button">Try again</button></div> : null}
+      {connection?.configured ? (
         <div className="teacher-meet-settings">
           <p>
             {healthy

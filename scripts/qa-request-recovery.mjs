@@ -499,7 +499,7 @@ try {
       ));
       try {
         await state.page.goto(`${base}/schedule/`);
-        await state.page.getByRole("button", { name: "Configure", exact: true }).click();
+        await state.page.getByRole("tab", { name: /^Google Meet/ }).click();
         await state.page.getByRole("button", { name: "Connect Google Meet", exact: true }).click();
         await started.promise;
         await replaceSession(state.page, null);
