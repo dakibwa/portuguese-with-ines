@@ -90,6 +90,10 @@ CREATE TABLE IF NOT EXISTS students (
   -- 0009). The card itself lives at Stripe; these are references, not secrets.
   stripe_customer_id    TEXT,
   stripe_payment_method TEXT,
+  -- When the student saved a card for every lesson from their account, which
+  -- lets lessons Inês adds be charged to it after each one (migration 0023).
+  -- A card saved at one booking's checkout leaves this empty.
+  card_consent_at TEXT,
   created_at    TEXT NOT NULL,
   last_login_at TEXT
 );
@@ -120,6 +124,18 @@ CREATE TABLE IF NOT EXISTS password_resets (
 -- A requested address change, held here until the new address proves itself.
 -- Deliberately not on `students`: an unconfirmed address must never sit in the
 -- row that sign-in matches against. See migrations/0008-email-changes.sql.
+-- One-click sign-in links (migration 0023). A row is the record that a link
+-- is unspent; the address it was sent to must still be the account's.
+CREATE TABLE IF NOT EXISTS sign_in_links (
+  nonce      TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL,
+  email      TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS sign_in_links_student ON sign_in_links (student_id);
+
 CREATE TABLE IF NOT EXISTS email_changes (
   nonce      TEXT PRIMARY KEY,
   student_id TEXT NOT NULL REFERENCES students (id),
@@ -196,7 +212,10 @@ CREATE TABLE IF NOT EXISTS bookings (
   -- Set when this lesson is one occurrence of a weekly series. Nullable: a
   -- one-off booking has no series, and everything else about the row behaves
   -- identically either way.
-  series_id         TEXT REFERENCES booking_series (id)
+  series_id         TEXT REFERENCES booking_series (id),
+  -- A lesson Inês added herself rather than one the student booked
+  -- (migration 0023).
+  added_by_teacher  INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS booking_refunds (
@@ -264,6 +283,9 @@ CREATE TABLE IF NOT EXISTS booking_series (
   automatic_payment INTEGER NOT NULL DEFAULT 0,
   payment_consent_at TEXT,
   payment_consent_version TEXT,
+  -- A weekly slot Inês set up; its weeks are checked against her lessons and
+  -- days off only (migration 0023).
+  added_by_teacher INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL,
   ended_at       TEXT

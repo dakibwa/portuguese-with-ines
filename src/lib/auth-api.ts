@@ -19,6 +19,13 @@ export type Student = {
   timezone: string;
   /** "teacher" unlocks the schedule page's admin tools. */
   role: "student" | "teacher";
+  /** A card is saved at Stripe, from a booking or from the account. */
+  hasCard?: boolean;
+  /**
+   * The card was saved from the account, so it pays for every lesson,
+   * including those Inês adds. Absent until the Worker records it.
+   */
+  cardForAllLessons?: boolean;
 };
 
 export type MyBooking = {
@@ -40,6 +47,8 @@ export type MyBooking = {
   paymentStatus?: "not_required" | "pending" | "scheduled" | "processing" | "paid" | "payment_due" | "refunded";
   /** Set when this lesson is one occurrence of a weekly series. */
   seriesId: string | null;
+  /** Inês added it herself rather than the student booking it. */
+  addedByTeacher?: boolean;
   manageToken: string;
 };
 
@@ -243,6 +252,29 @@ export function requestPasswordReset(email: string) {
   });
 }
 
+/** One-click sign-in by email, for an account that already exists. */
+export function requestSignInLink(email: string) {
+  return post<{ ok: true }>("/auth/email-link", { email }).then((data) => {
+    if (data.ok !== true) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
+    return data;
+  });
+}
+
+export function confirmSignInLink(token: string) {
+  return post<{ student: Student; session: string }>("/auth/email-link/confirm", { token }).then(validateSignInReply);
+}
+
+/**
+ * Stripe's page for saving a card to the account. Asking for it is the
+ * student's agreement, given beside the terms it shows.
+ */
+export function openCardPage(token: string) {
+  return post<{ checkoutUrl: string }>("/me/card", { consent: true }, token).then((data) => {
+    if (typeof data.checkoutUrl !== "string" || !/^https:\/\//.test(data.checkoutUrl)) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
+    return data.checkoutUrl;
+  });
+}
+
 export function resetPassword(token: string, password: string) {
   return post<{ student: Student; session: string }>("/auth/reset", { token, password }).then(validateSignInReply);
 }
@@ -286,7 +318,14 @@ declare global {
   }
 }
 
-type Account = { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; sameDayFeeCents: number };
+type Account = {
+  student: Student;
+  bookings: MyBooking[];
+  series?: LessonSeries[];
+  sameDayFeeCents: number;
+  /** Whether a card can be saved from the account just now. */
+  cardsAccepted?: boolean;
+};
 
 function isAccount(data: unknown): data is Account {
   return isApiRecord(data) && validStudent(data.student) && Array.isArray(data.bookings) && data.bookings.every(isApiLesson) &&

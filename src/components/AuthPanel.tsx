@@ -5,16 +5,20 @@ import { AlertCircle, CheckCircle2, Lock, Mail, ReceiptText, UserRound } from "l
 import { AssetMark } from "@/components/BrandMarks";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { browserTimeZone } from "@/lib/booking-api";
-import { AuthApiError, SessionStorageError, login, readSession, register, requestPasswordReset, storeSession, type Student } from "@/lib/auth-api";
+import { AuthApiError, SessionStorageError, login, readSession, register, requestPasswordReset, requestSignInLink, storeSession, type Student } from "@/lib/auth-api";
 
-type Mode = "signin" | "register" | "forgot";
+/** `link` signs in by email, with no password (12 October 2026, Dan). */
+type Mode = "signin" | "register" | "forgot" | "link";
 
 /** Said once wherever the student is reading: the forgotten-password intro
     carries it, so the sent notice repeats it only back at signing in. */
 const RESET_LINK_LIFETIME = "It works for one hour.";
 
+/** The same, for a sign-in link. */
+const SIGN_IN_LINK_LIFETIME = "It works for 30 minutes.";
+
 /**
- * Sign in, create an account, or ask for a reset link.
+ * Sign in, create an account, or ask for a reset or sign-in link.
  *
  * Deliberately placed at the end of the booking flow rather than in front of
  * it: a student can see what is free before being asked to make an account,
@@ -22,6 +26,7 @@ const RESET_LINK_LIFETIME = "It works for one hour.";
  */
 export function AuthPanel({
   initialMode = "signin",
+  initialError = "",
   keepCopy = false,
   onSignedIn,
   heading,
@@ -30,6 +35,8 @@ export function AuthPanel({
   signInOnly = false
 }: {
   initialMode?: Mode;
+  /** Why the panel opened, such as a sign-in link that had already been used. */
+  initialError?: string;
   /**
    * Hold the caller's intro (and a "Sign in" heading) across the two tabs.
    * Without it, the intro follows the tab, and so does a heading that names
@@ -49,7 +56,7 @@ export function AuthPanel({
   const tabsId = useId();
   const tabRefs = useRef<Partial<Record<Mode, HTMLButtonElement | null>>>({});
   const [form, setForm] = useState({ name: "", email: "", password: "", nif: "" });
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState("");
   // Sign-up refused because the address already has an account: the error then
   // offers to sign in, with the address carried over.
@@ -61,6 +68,7 @@ export function AuthPanel({
   // A stale error never follows the student to another form. The "reset link is
   // on its way" notice does stay when they go back to sign in: that is where
   // they wait for it.
+  const [noticeFrom, setNoticeFrom] = useState<Mode>("forgot");
   function switchMode(next: Mode) {
     authRequest.current += 1;
     setBusy(false);
@@ -69,6 +77,9 @@ export function AuthPanel({
     if (next !== "signin") setNotice("");
     setMode(next);
   }
+  // Asking for a link is its own small task, like a forgotten password, so it
+  // leaves the tabs and Google behind.
+  const byEmail = mode === "forgot" || mode === "link";
   // The two tabs follow the usual keys: arrows move between them, Home and End
   // go to the first and last, and focus follows the choice.
   function tabKey(event: KeyboardEvent<HTMLButtonElement>) {
@@ -91,6 +102,8 @@ export function AuthPanel({
   const introText =
     mode === "forgot"
       ? `Give us the email you booked with and we’ll send you a link to choose a new password. ${RESET_LINK_LIFETIME}`
+      : mode === "link"
+        ? `Give us the email you booked with and we’ll send you a link that signs you in, no password needed. ${SIGN_IN_LINK_LIFETIME}`
       : mode === "register" && !keepCopy
         ? "Keeps all your lessons in one place, so you can change them yourself."
         : intro;
@@ -120,7 +133,15 @@ export function AuthPanel({
       if (mode === "forgot") {
         await requestPasswordReset(form.email.trim());
         if (request !== authRequest.current || readSession() !== session) return;
+        setNoticeFrom("forgot");
         setNotice("If that email has an account, a reset link is on its way.");
+        return;
+      }
+      if (mode === "link") {
+        await requestSignInLink(form.email.trim());
+        if (request !== authRequest.current || readSession() !== session) return;
+        setNoticeFrom("link");
+        setNotice("If that email has an account, a sign-in link is on its way. Open it on this device.");
         return;
       }
 
@@ -161,6 +182,8 @@ export function AuthPanel({
       <Heading>
         {mode === "forgot"
           ? "Forgotten password"
+          : mode === "link"
+            ? "Sign in by email"
           : mode === "register" && !keepCopy && headingNamesTab
             ? "Create an account"
             : heading}
@@ -169,7 +192,7 @@ export function AuthPanel({
 
       {/* Booking terms and privacy share one disclosure on the page,
           so signing up carries no explanatory copy of its own. */}
-      {mode !== "forgot" ? <GoogleSignInButton
+      {!byEmail ? <GoogleSignInButton
           key={`google-${mode}`}
           onError={(message) => {
             setAccountExists(false);
@@ -182,7 +205,7 @@ export function AuthPanel({
           have never been here before. Signing in follows it rather than
           fronting it, and the surfaces that are only ever reached by a
           returning student open on it instead. */}
-      {mode !== "forgot" && !signInOnly ? (
+      {!byEmail && !signInOnly ? (
         <div aria-label="Your account" className={`auth-tabs auth-tabs--${mode}`} role="tablist">
           <span aria-hidden="true" className="auth-tabs__thumb" />
           <button
@@ -217,12 +240,12 @@ export function AuthPanel({
       ) : null}
 
       <form
-        aria-labelledby={mode !== "forgot" && !signInOnly ? `${tabsId}-${mode}` : undefined}
+        aria-labelledby={!byEmail && !signInOnly ? `${tabsId}-${mode}` : undefined}
         className="auth-panel__form"
         id={`${tabsId}-panel`}
         key={mode}
         onSubmit={submit}
-        role={mode !== "forgot" && !signInOnly ? "tabpanel" : undefined}
+        role={!byEmail && !signInOnly ? "tabpanel" : undefined}
       >
         {mode === "register" ? (
           <label>
@@ -253,7 +276,7 @@ export function AuthPanel({
           />
         </label>
 
-        {mode !== "forgot" ? (
+        {!byEmail ? (
           <label>
             <span>
               <Lock size={16} aria-hidden="true" />
@@ -307,7 +330,7 @@ export function AuthPanel({
         {notice ? (
           <div className="booking-outcome" role="status">
             <CheckCircle2 size={20} aria-hidden="true" />
-            <p>{mode === "forgot" ? notice : `${notice} ${RESET_LINK_LIFETIME}`}</p>
+            <p>{byEmail ? notice : `${notice} ${noticeFrom === "link" ? SIGN_IN_LINK_LIFETIME : RESET_LINK_LIFETIME}`}</p>
           </div>
         ) : null}
 
@@ -318,7 +341,9 @@ export function AuthPanel({
               ? "Create my account"
               : mode === "forgot"
                 ? "Email me a reset link"
-                : "Sign in"}
+                : mode === "link"
+                  ? "Email me a sign-in link"
+                  : "Sign in"}
         </button>
       </form>
 
@@ -326,14 +351,23 @@ export function AuthPanel({
           account carries no recovery link. */}
       {mode !== "register" ? (
         <p className="auth-panel__aside">
-          {mode === "forgot" ? (
+          {byEmail ? (
             <button className="auth-panel__link" onClick={() => switchMode("signin")} type="button">
               Back to signing in
             </button>
           ) : (
-            <button className="auth-panel__link" onClick={() => switchMode("forgot")} type="button">
-              I&rsquo;ve forgotten my password
-            </button>
+            <>
+              {/* Students Inês brought may never have chosen a password;
+                  her own schedule signs in with one, or with Google. */}
+              {!signInOnly ? (
+                <button className="auth-panel__link" onClick={() => switchMode("link")} type="button">
+                  Email me a sign-in link
+                </button>
+              ) : null}
+              <button className="auth-panel__link" onClick={() => switchMode("forgot")} type="button">
+                I&rsquo;ve forgotten my password
+              </button>
+            </>
           )}
         </p>
       ) : null}

@@ -37,7 +37,7 @@ const primeBooking = BOOKING_API_BASE_URL
     `var s="",r="";try{s=localStorage.getItem("ines-student-session")||"";r=localStorage.getItem("ines-returning-student")||""}catch(e){}` +
     `if(s){window.__inesMe={token:s,response:fetch(b+"/me",{headers:{Accept:"application/json",Authorization:"Bearer "+s}})};return}` +
     `var q=new URLSearchParams(location.search);` +
-    `if(q.get("view")==="lessons"||["manage","token","emailToken","card"].some(function(k){return q.has(k)}))return;` +
+    `if(q.get("view")==="lessons"||["manage","token","emailToken","card","signin"].some(function(k){return q.has(k)}))return;` +
     `var l=q.get("lesson"),t=l==="single"||l==="long"?l:r?"single":"trial";` +
     `var d=new Intl.DateTimeFormat("en-CA",{timeZone:z,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()),p=d.split("-");` +
     `var u=b+"/availability?"+new URLSearchParams({lessonType:t,from:d,to:new Date(Date.UTC(+p[0],p[1]-1,+p[2]+140)).toISOString().slice(0,10)});` +
@@ -53,7 +53,7 @@ const primeBooking = BOOKING_API_BASE_URL
  */
 const markAccount =
   `try{var q=new URLSearchParams(location.search);` +
-  `if(localStorage.getItem("ines-student-session")||q.get("view")==="lessons"||["manage","token","emailToken","card"].some(function(k){return q.has(k)}))` +
+  `if(localStorage.getItem("ines-student-session")||q.get("view")==="lessons"||["manage","token","emailToken","card","signin"].some(function(k){return q.has(k)}))` +
   `document.documentElement.setAttribute("data-booking-account","")}catch(e){}`;
 
 export default function BookPage() {

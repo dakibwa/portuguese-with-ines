@@ -5536,6 +5536,10 @@ textarea,
 }
 
 .auth-panel__aside {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 1.4rem;
   margin-top: 0.9rem;
   text-align: center;
 }

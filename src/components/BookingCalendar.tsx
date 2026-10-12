@@ -38,7 +38,7 @@ const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/c
 const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons));
 if (typeof window !== "undefined" && readSession()) void loadAccountControls();
 import { LessonMark } from "@/components/LessonMarks";
-import { clearSession, fetchMe, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
+import { clearSession, confirmSignInLink, fetchMe, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { SITE_BASE_PATH } from "@/lib/paths";
@@ -935,6 +935,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // once it has started. Ticks once a minute.
   const [clock, setClock] = useState(() => Date.now());
   const [accountLoadError, setAccountLoadError] = useState("");
+  // A one-click sign-in link that could not be used: the sign-in panel then
+  // opens on asking for a new one, saying why.
+  const [signInLinkError, setSignInLinkError] = useState("");
   // Back from saving a card with Stripe: the booking confirms by webhook, so
   // say what is happening until it shows up.
   const [cardReturn, setCardReturn] = useState<{ token: string; state: "confirming" | "confirmed" | "slow" } | null>(null);
@@ -1221,7 +1224,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     const params = new URLSearchParams(window.location.search);
     const key = portoDateKey(new Date());
     setTodayKey(key);
-    setHasStoredSession(Boolean(readSession()));
+    /*
+     * A sign-in link from an email (12 October 2026, Dan): spent from the
+     * address bar at once, so a reload or a shared screenshot cannot reuse it,
+     * and the page opens on Your lessons for the account it signs in.
+     */
+    const signInToken = params.get("signin") ?? "";
+    if (signInToken) {
+      params.delete("signin");
+      params.set("view", "lessons");
+      window.history.replaceState({}, "", `/book/?${params}`);
+    }
+    setHasStoredSession(Boolean(readSession() || signInToken));
     setStudentZone(browserTimeZone());
     const returningFromCard = params.get("card") === "saved";
     if (returningFromCard) {
@@ -1233,7 +1247,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     if (initialLessonsView || returningFromCard || params.get("view") === "lessons") {
       setIntent("lessons");
       setUpcomingRequestKey((current) => current + 1);
-      if (!readSession()) setShowAccountSignIn(true);
+      if (!readSession() && !signInToken) setShowAccountSignIn(true);
     } else if (params.get("view") === "book" || params.get("lesson")) {
       setIntent("book");
       if (params.get("lesson") === "single" || params.get("lesson") === "long") {
@@ -1291,7 +1305,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     // A return visit to Your lessons opens on the account as this session
     // last read it, at once, and the reply below replaces it moments later.
     // Booking and emailed links wait for the reply as before.
-    const remembered = rememberedAccount(readSession());
+    const remembered = signInToken ? null : rememberedAccount(readSession());
     const lessonsByAddress = Boolean(initialLessonsView || returningFromCard || params.get("view") === "lessons");
     let openedFromMemory = false;
     if (remembered && (lessonsByAddress || (
@@ -1302,7 +1316,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       openedFromMemory = true;
       setCheckingSession(false);
     }
-    loadAccount()
+    const signingIn: Promise<unknown> = signInToken
+      ? confirmSignInLink(signInToken)
+          .then((result) => storeSession(result.session))
+          .catch((caught) => {
+            setSignInLinkError(caught instanceof Error ? caught.message : "That sign-in link couldn’t be used. Ask for a new one below.");
+            setShowAccountSignIn(true);
+          })
+      : Promise.resolve();
+    signingIn.then(loadAccount)
       .then((data) => {
         // Returning students came here for their next commitment, not for a
         // fork asking whether they want to see it. Explicit lesson, sign-in,
@@ -3583,8 +3605,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             <AuthPanel
               heading="Your account"
               headingLevel={2}
-              initialMode="signin"
+              initialError={signInLinkError}
+              initialMode={signInLinkError ? "link" : "signin"}
               onSignedIn={(signedIn) => {
+                setSignInLinkError("");
                 transitionBooking(() => {
                   setStudent(signedIn);
                   setShowAccountSignIn(false);

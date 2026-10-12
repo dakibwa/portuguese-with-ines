@@ -179,6 +179,46 @@ export function createCardSetupSession(
 }
 
 /**
+ * A card saved from the student's own account, not tied to any one booking —
+ * how a student Inês added pays for the lessons she adds. Always Stripe's
+ * hosted page: the account page has no checkout to mount one in. The
+ * reference names the student, so the webhook can never mistake it for a
+ * booking's setup.
+ */
+export function createStudentCardSession(env, { student, successUrl, cancelUrl }) {
+  return stripeRequest(
+    env,
+    "/checkout/sessions",
+    {
+      integration_identifier: INTEGRATION_IDENTIFIER,
+      mode: "setup",
+      currency: "eur",
+      payment_method_types: { 0: "card" },
+      client_reference_id: `student:${student.id}`,
+      ...(student.stripe_customer_id
+        ? { customer: student.stripe_customer_id }
+        : { customer_creation: "always", customer_email: student.email }),
+      setup_intent_data: { metadata: { student_id: student.id } },
+      ...uiModeFields(env, { successUrl, cancelUrl, forceHosted: true }),
+      metadata: { purpose: "student_card", student_id: student.id }
+    },
+    // Each press is its own attempt; nothing is held while it is open.
+    { idempotencyKey: `ines:student-card:${student.id}:${crypto.randomUUID()}` }
+  );
+}
+
+export function studentCardSessionProblem(session, student) {
+  if (session?.mode !== "setup") return "session is not a card setup";
+  if (session?.status !== "complete") return "card setup is not complete";
+  if (session?.client_reference_id !== `student:${student?.id}`) return "session does not match";
+  if (session?.metadata?.student_id !== student?.id) return "session does not match";
+  if (!session?.setup_intent || typeof session.setup_intent !== "string") return "setup intent is missing";
+  if (!session?.customer || typeof session.customer !== "string") return "customer is missing";
+  if (student.stripe_customer_id && session.customer !== student.stripe_customer_id) return "customer does not match";
+  return "";
+}
+
+/**
  * Hosted vs embedded is env-driven (`STRIPE_UI_MODE=embedded`): embedded keeps
  * the student on the site — Stripe's payment form mounts inside the booking
  * page and the session answers with a client_secret instead of a redirect URL.

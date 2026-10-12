@@ -22,6 +22,13 @@ import { dateKey, PORTO } from "./time.mjs";
 export const PAYMENT_CONSENT_VERSION = "2026-09-21-fourteen-hours-v1";
 
 /**
+ * The wording a card saved from the student's own account consents to: every
+ * lesson, including those Inês adds for them, charged after it ends, on the
+ * same change and no-show terms (12 October 2026).
+ */
+export const STUDENT_CARD_CONSENT_VERSION = "2026-10-12-card-on-file-v1";
+
+/**
  * How long after a lesson's scheduled end Inês can still record or undo a
  * no-show (Dan, 23 September 2026). A no-show turns the lesson price into the
  * EUR 5 fee, so the lesson's own charge waits until this has closed.

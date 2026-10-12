@@ -183,3 +183,33 @@ export async function readResetToken(token, secret) {
 
   return { studentId, nonce };
 }
+
+/**
+ * One-click sign-in by email: a reset token's shape under its own prefix, so
+ * neither kind of link can ever be spent as the other. Single use is enforced
+ * by the `sign_in_links` row, as with resets.
+ */
+export async function createSignInToken(studentId, secret, minutes = 30) {
+  const expiry = Date.now() + minutes * 60000;
+  const nonce = base64Url(crypto.getRandomValues(new Uint8Array(12)));
+  const payload = `${studentId}.${expiry}.${nonce}`;
+  return { token: `${payload}.${await sign(`signin:${payload}`, secret)}`, nonce, expiresAt: new Date(expiry).toISOString() };
+}
+
+export async function readSignInToken(token, secret) {
+  const parts = String(token ?? "").split(".");
+  if (parts.length !== 4) return null;
+
+  const [studentId, expiry, nonce, signature] = parts;
+  const expected = await sign(`signin:${studentId}.${expiry}.${nonce}`, secret);
+  if (signature.length !== expected.length) return null;
+
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    mismatch |= signature.charCodeAt(index) ^ expected.charCodeAt(index);
+  }
+  if (mismatch !== 0) return null;
+  if (!Number(expiry) || Number(expiry) < Date.now()) return null;
+
+  return { studentId, nonce };
+}
