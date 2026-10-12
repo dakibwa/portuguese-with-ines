@@ -443,8 +443,9 @@ the booking celebration followed, kept in style and tasteful). What lands or
 travels moves on a soft spring that gives a few per cent and settles; controls
 answer on a firm one; everything else decelerates long.
 
-Pages turn into one another. The header stays exactly where it is and the
-nav's coral line glides along to the new destination. The page being left
+Pages turn into one another. The header stays exactly where it is, and the
+nav's coral moves to the new destination's name; the nav draws no line beneath
+it (12 October 2026, at Dan's request). The page being left
 drops out of focus and away almost at once, and the new one pulls into focus as
 it settles, so two pages never print over each other and for a breath the
 paper shows between them. On wider screens the pages sit in a row along the

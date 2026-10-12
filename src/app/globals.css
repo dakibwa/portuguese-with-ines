@@ -493,8 +493,8 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 /*
  * Pages turn into one another. Every navigation runs as a view transition
  * (template.tsx): the page being left lifts away quickly and the new one
- * settles in, while the header holds still and the nav's coral line glides
- * to the new destination. On wider screens the pages sit in a row along the
+ * settles in, while the header holds still and the nav's coral moves to the
+ * new destination. On wider screens the pages sit in a row along the
  * nav, so a later page arrives from the right and an earlier one from the left
  * (PageTurn); on phones every page settles in place. Nothing waits for
  * the motion: the new page is live, and clickable, from its first frame.
@@ -542,12 +542,6 @@ html[data-akibwa-project="true"] .akibwa-project-banner {
 ::view-transition-new(site-header),
 ::view-transition-new(portfolio-banner) {
   animation: none;
-}
-
-::view-transition-group(site-nav-current) {
-  z-index: 4;
-  animation-duration: 640ms;
-  animation-timing-function: var(--motion-spring);
 }
 
 /* A phone menu open over the page recedes with it, above the page being left
@@ -933,34 +927,20 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  transition: color 200ms ease;
 }
 
-.site-nav__link::after {
-  position: absolute;
-  right: 0;
-  bottom: 22px;
-  left: 0;
-  height: 2px;
-  background: var(--coral);
-  content: "";
-  opacity: 0;
-  transform: scaleX(0.5);
-  transition: opacity 200ms ease, transform 420ms var(--motion-spring-firm);
-}
-
+/* The current page and the one pointed at read in coral, with no line
+   beneath them: beside the Booking button a line read as out of place (12
+   October 2026, at Dan's request). */
 .site-nav__link:hover,
 .site-nav__link[aria-current="page"] {
   color: var(--coral-action);
 }
 
-.site-nav__link:hover::after {
-  opacity: 1;
-  transform: scaleX(1);
-}
-
-/* Booking stands out as the nav's one button, in the links' own dark blue,
-   with no line beneath it (11 October 2026, at Dan's request). Pointed at,
-   it answers as the links beside it do: it turns coral, keeping its shape. */
+/* Booking stands out as the nav's one button, in the links' own dark blue
+   (11 October 2026, at Dan's request). Pointed at, it answers as the links
+   beside it do: it turns coral, keeping its shape. */
 .site-nav__book {
   display: inline-flex;
   min-height: 44px;
@@ -976,10 +956,6 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   background: var(--coral-action);
 }
 
-.site-nav__link--book::after {
-  display: none;
-}
-
 .site-nav__link--book:focus-visible {
   outline: 0;
 }
@@ -987,18 +963,6 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 .site-nav__link--book:focus-visible .site-nav__book {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
-}
-
-/* The current page's line is the same drawing as the hover line, as its own
-   element so that a page turn can glide it along the nav to the new page. */
-.site-nav__current {
-  position: absolute;
-  right: 0;
-  bottom: 22px;
-  left: 0;
-  height: 2px;
-  background: var(--coral);
-  view-transition-name: site-nav-current;
 }
 
 .button {
@@ -5850,8 +5814,9 @@ textarea,
   line-height: 1.3;
 }
 
-/* The same coral line the nav links draw, sat on the row's own divider rather
-   than beside it — the menu should answer a pointer the way the header does. */
+/* A coral line drawn along the row's own divider when the row is pointed at
+   or current. The phone menu's rows keep it; the header's links answer with
+   coral alone beside their Booking button. */
 .nav-mobile__link::after {
   position: absolute;
   right: 0;
@@ -8288,8 +8253,6 @@ dialog[open]::backdrop {
     transition: background 160ms ease, color 160ms ease;
   }
 
-  .site-nav__link::after,
-  .site-nav__link:hover::after,
   .nav-mobile__link::after,
   .nav-mobile__link:hover::after,
   .nav-mobile__link[aria-current="page"]::after {

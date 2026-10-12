@@ -122,8 +122,6 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
             {/* Booking is what the site is for, so it is a dark blue button among
                 the plain links (11 October 2026, at Dan's request). */}
             {item.id === "book" ? <span className="site-nav__book">{item.label}</span> : item.label}
-            {/* Its own element, so a page turn can glide it to the next destination. */}
-            {currentPage === item.id && item.id !== "book" ? <span aria-hidden="true" className="site-nav__current" /> : null}
           </Destination>;
         })}
       </nav>
