@@ -264,13 +264,13 @@ export function rescheduleBookingAs(
   ).then(validateBookingAcknowledgment);
 }
 
-export function cancelBookingAs(token: string, bookingId: string) {
+export function cancelBookingAs(token: string, bookingId: string, message?: string) {
   return adminRequest<{ booking: { reference: string } }>(
     token,
     `/admin/bookings/${bookingId}/cancel`,
     {
       method: "POST",
-      body: "{}",
+      body: JSON.stringify({ message }),
     },
   ).then(validateBookingAcknowledgment);
 }

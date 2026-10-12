@@ -302,6 +302,8 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   // second row of five.
   const hero = portoTime;
   const teacherHeroNote = studentTime ? `${studentTime} — the student's time` : "";
+  const cancellationMessage = event === "cancelled" && byTeacher
+    ? row.cancellation_message?.trim() : "";
 
   const baseRows = [
     { label: "Lesson", value: lessonLine(lessonType) },
@@ -430,7 +432,9 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       ? {
           subject: `Inês has cancelled your lesson on ${studentShortWhen}`,
           heading: "Inês has cancelled this lesson",
-          intro: `Olá ${row.student_name.split(" ")[0]}, Inês has cancelled this lesson. Sorry about that — reply to arrange another time. A cancellation update for your calendar is attached.`,
+          intro: cancellationMessage
+            ? `Olá ${row.student_name.split(" ")[0]}, Inês has left you a message below. A cancellation update for your calendar is attached.`
+            : `Olá ${row.student_name.split(" ")[0]}, Inês has cancelled this lesson. Sorry about that — reply to arrange another time. A cancellation update for your calendar is attached.`,
           callout: refundNote,
           footer: wasRefunded ? "Refunded in full — a cancellation she makes never costs you anything." : "No charge for a cancellation she makes."
         }
@@ -523,6 +527,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       content: {
         heading: student.heading,
         intro: student.intro,
+        message: cancellationMessage ? { label: "Message from Inês", body: cancellationMessage } : null,
         callout: student.callout,
         hero: studentWhen,
         heroNote: "",
@@ -557,6 +562,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         content: {
           heading: teacher.heading,
           intro: teacher.intro,
+          message: cancellationMessage ? { label: "Your message to the student", body: cancellationMessage } : null,
           callout: teacher.callout,
           hero,
           heroNote: teacherHeroNote,
@@ -2069,7 +2075,7 @@ export async function retryPaymentRecovery(env) {
   }
 }
 
-async function resendFailedEmails(env) {
+export async function resendFailedEmails(env) {
   const cutoff = new Date(Date.now() - 5 * 60000).toISOString();
   const { results } = await env.DB.prepare(
     `SELECT * FROM email_log
@@ -2106,7 +2112,7 @@ async function resendFailedEmails(env) {
         manageUrl: studentManageUrl(env, token),
         // A lesson she added still reads as hers. A fresh sign-in link is not
         // sent again here; her list can send one.
-        byTeacher: event === "booked" && Boolean(row.added_by_teacher)
+        byTeacher: event === "cancelled" ? row.cancelled_by === "teacher" : Boolean(row.added_by_teacher)
       });
     } catch (error) {
       console.error("email-resend", entry.dedupe_key, String(error?.message ?? error));
@@ -3499,7 +3505,7 @@ async function handleReschedule(request, env, ctx, token) {
   );
 }
 
-async function claimRefund(env, row, requestedBy) {
+async function claimRefund(env, row, requestedBy, cancellationMessage = null) {
   if (!stripeReady(env)) return false;
   const now = new Date().toISOString();
   const request = JSON.stringify({ bookingId: row.id, paymentIntent: row.stripe_payment_intent, amountCents: row.charged_cents ?? row.amount_cents ?? undefined });
@@ -3507,10 +3513,10 @@ async function claimRefund(env, row, requestedBy) {
     env.DB.prepare(`INSERT OR IGNORE INTO booking_refunds (booking_id, request, requested_by, created_at)
       SELECT id, ?, ?, ? FROM bookings WHERE id = ? AND status = 'confirmed' AND payment_status = 'paid' AND sequence = ?`)
       .bind(request, requestedBy, now, row.id, row.sequence),
-    env.DB.prepare(`UPDATE bookings SET payment_status = 'processing', updated_at = ?
+    env.DB.prepare(`UPDATE bookings SET payment_status = 'processing', updated_at = ?, cancellation_message = ?
       WHERE id = ? AND status = 'confirmed' AND payment_status = 'paid' AND sequence = ?
         AND EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = bookings.id AND status = 'pending')`)
-      .bind(now, row.id, row.sequence)
+      .bind(now, cancellationMessage, row.id, row.sequence)
   ]);
   return (results[0]?.meta?.changes ?? 0) > 0 && (results[1]?.meta?.changes ?? 0) > 0;
 }
@@ -5070,12 +5076,21 @@ async function handleAdmin(request, env, ctx, url, path) {
     if (!row) return fail("That booking could not be found.", 404, request, env);
     if (row.status === "cancelled") return fail("That lesson is already cancelled.", 409, request, env);
 
+    const body = await readJson(request);
+    if (body.message !== undefined && typeof body.message !== "string") {
+      return fail("Write the message as text.", 400, request, env);
+    }
+    if ((body.message?.length ?? 0) > 1000) {
+      return fail("Keep the message to 1,000 characters or fewer.", 400, request, env);
+    }
+    const cancellationMessage = body.message?.replace(/\r\n?/g, "\n").trim() || null;
+
     // Her cancellation always refunds a paid lesson — inside the 14-hour window
     // included. A student loses the free change window; she never does, and
     // the money follows automatically so there is nothing to remember.
     const refunded = 0;
     if (row.payment_status === "paid" && row.stripe_payment_intent) {
-      if (!await claimRefund(env, row, "teacher")) return fail("That lesson has just changed. Please reload.", 409, request, env);
+      if (!await claimRefund(env, row, "teacher", cancellationMessage)) return fail("That lesson has just changed. Please reload.", 409, request, env);
       const updated = await completeRefund(env, row.id);
       if (!updated) return fail("The cancellation request is recorded. Its refund is awaiting confirmation; the lesson stays reserved and locked. Review the payment in Stripe before any further action.", 503, request, env);
       const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
@@ -5087,11 +5102,11 @@ async function handleAdmin(request, env, ctx, url, path) {
     const now = new Date().toISOString();
     const cancelled = await env.DB.prepare(
       `UPDATE bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'teacher',
-         sequence = sequence + 1, same_day_change = 0, updated_at = ?,
+         sequence = sequence + 1, same_day_change = 0, updated_at = ?, cancellation_message = ?,
          payment_status = CASE WHEN ? = 1 THEN 'refunded' ELSE payment_status END
        WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'`
     )
-      .bind(now, now, refunded, row.id, row.sequence)
+      .bind(now, now, cancellationMessage, refunded, row.id, row.sequence)
       .run();
 
     if (!(cancelled?.meta?.changes > 0)) return fail("That lesson has just changed. Please reload.", 409, request, env);

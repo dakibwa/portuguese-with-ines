@@ -185,6 +185,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   previous_starts_at TEXT,
   cancelled_at      TEXT,
   cancelled_by      TEXT,
+  cancellation_message TEXT,
   created_at        TEXT NOT NULL,
   updated_at        TEXT NOT NULL,
   payment_status    TEXT NOT NULL DEFAULT 'not_required',

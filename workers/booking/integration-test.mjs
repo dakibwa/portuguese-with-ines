@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
-import worker, { chargeDueLessons, chargeDueSameDayFees, notifySeries, retryPaymentRecovery, retryRefunds } from "./index.mjs";
+import worker, { chargeDueLessons, chargeDueSameDayFees, notifySeries, resendFailedEmails, retryPaymentRecovery, retryRefunds } from "./index.mjs";
 import { createSession, createResetToken, hashPassword, sessionVersion } from "./auth.mjs";
 import { createManageToken, readManageToken } from "./tokens.mjs";
 import { findRecurringCode, recurringLessonType, priceForMove } from "./rates.mjs";
@@ -1503,6 +1503,125 @@ function releaseEmail() {
   Object.assign(env, { EMAIL_DRY_RUN: "1" });
   delete env.RESEND_API_KEY;
 }
+
+await test("teacher cancellation sends an escaped personal message to both inboxes without changing lesson notes or charging a fee", async () => {
+  captureEmail();
+  env.TEACHER_NOTIFICATIONS_ENABLED = "1";
+  env.TEACHER_EMAIL = "ines@example.invalid";
+  const message = 'Olá Alice,\nI’m sorry, I’m unwell today. Reply and we can find another time.\n<em>Obrigada</em> & até breve!';
+  const chargeCount = charges.length;
+  try {
+    booking("cancel-message", { start: "2026-09-05T12:00:00.000Z", end: "2026-09-05T13:00:00.000Z" });
+    db.prepare("UPDATE bookings SET notes='Practise conversation' WHERE id='cancel-message'").run();
+    const response = await call("/admin/bookings/cancel-message/cancel", { user: "teacher", body: { message: `  ${message.replaceAll('\n', '\r\n')}  ` } });
+    assert.equal(response.status, 200, await response.clone().text());
+    await drain();
+    assert.deepEqual({ ...db.prepare("SELECT status,cancelled_by,cancellation_message,notes,sequence,same_day_change FROM bookings WHERE id='cancel-message'").get() },
+      { status: "cancelled", cancelled_by: "teacher", cancellation_message: message, notes: "Practise conversation", sequence: 1, same_day_change: 0 });
+    assert.equal(charges.length, chargeCount);
+    const studentEmail = sentEmails.find(sent => sent.to[0] === "alice@example.invalid");
+    const teacherEmail = sentEmails.find(sent => sent.to[0] !== "alice@example.invalid");
+    assert.ok(studentEmail.text.includes(`Message from Inês\n${message}`));
+    assert.ok(studentEmail.html.includes("Olá Alice,<br>I’m sorry"));
+    assert.ok(studentEmail.html.includes("&lt;em&gt;Obrigada&lt;/em&gt; &amp; até breve!"));
+    assert.ok(!studentEmail.html.includes("<em>Obrigada</em>"));
+    assert.ok(teacherEmail.text.includes(`Your message to the student\n${message}`));
+    const ics = Buffer.from(studentEmail.attachments[0].content, "base64").toString();
+    assert.ok(ics.includes("METHOD:CANCEL") && ics.includes("SEQUENCE:1"));
+    assert.ok(!ics.includes(message), "the note is email text, not calendar markup");
+  } finally {
+    env.TEACHER_NOTIFICATIONS_ENABLED = "0";
+    delete env.TEACHER_EMAIL;
+    releaseEmail();
+  }
+});
+
+await test("teacher cancellation accepts no message, blank text and the limit, but rejects invalid input before refunding", async () => {
+  captureEmail();
+  try {
+    for (const [suffix, body, expected] of [["omitted", {}, null], ["blank", { message: " \n\t " }, null], ["limit", { message: "á".repeat(1000) }, "á".repeat(1000)]]) {
+      const id = `cancel-message-${suffix}`;
+      booking(id, { payment: "not_required" });
+      const response = await call(`/admin/bookings/${id}/cancel`, { user: "teacher", body });
+      assert.equal(response.status, 200);
+      await drain();
+      assert.equal(db.prepare("SELECT cancellation_message FROM bookings WHERE id=?").get(id).cancellation_message, expected);
+      const email = sentEmails.find(sent => sent.text.includes(`Reference: ${id}`));
+      assert.equal(email.text.includes("Message from Inês"), Boolean(expected));
+      assert.equal(email.html.includes("Message from Inês"), Boolean(expected));
+    }
+    booking("cancel-message-invalid", { payment: "paid" });
+    db.prepare("UPDATE bookings SET stripe_payment_intent='pi_invalid_message' WHERE id='cancel-message-invalid'").run();
+    const refundCount = refunds.length;
+    for (const message of [null, 17, {}, [], "a".repeat(1001)]) {
+      assert.equal((await call("/admin/bookings/cancel-message-invalid/cancel", { user: "teacher", body: { message } })).status, 400);
+    }
+    assert.equal((await call("/admin/bookings/cancel-message-invalid/cancel", { body: { message: "Student cannot act as teacher" } })).status, 401);
+    assert.equal(refunds.length, refundCount);
+    assert.deepEqual({ ...db.prepare("SELECT status,payment_status,cancellation_message FROM bookings WHERE id='cancel-message-invalid'").get() },
+      { status: "confirmed", payment_status: "paid", cancellation_message: null });
+  } finally { releaseEmail(); }
+});
+
+await test("a cancellation that loses a move race cannot save its message", async () => {
+  for (const payment of ["scheduled", "paid"]) {
+    const id = `cancel-message-race-${payment}`;
+    booking(id, { payment });
+    db.prepare("UPDATE bookings SET stripe_payment_intent='pi_message_race' WHERE id=?").run(id);
+    beforeRun = sql => {
+      if (sql.startsWith(payment === "paid" ? "INSERT OR IGNORE INTO booking_refunds" : "UPDATE bookings SET status = 'cancelled'")) {
+        beforeRun = null;
+        db.prepare("UPDATE bookings SET sequence=sequence+1 WHERE id=?").run(id);
+      }
+    };
+    const refundCount = refunds.length;
+    assert.equal((await call(`/admin/bookings/${id}/cancel`, { user: "teacher", body: { message: "A stale message" } })).status, 409);
+    assert.equal(refunds.length, refundCount);
+    assert.equal(db.prepare("SELECT cancellation_message FROM bookings WHERE id=?").get(id).cancellation_message, null);
+  }
+});
+
+await test("a paid teacher cancellation keeps its message through an immediate or delayed refund and email retry", async () => {
+  captureEmail();
+  try {
+    for (const delayed of [false, true]) {
+      const id = `cancel-message-refund-${delayed}`;
+      const message = `Sorry, I need to cancel.\nLet’s find another time (${delayed}).`;
+      booking(id, { payment: "paid", start: "2026-09-05T12:00:00.000Z", end: "2026-09-05T13:00:00.000Z" });
+      db.prepare("UPDATE bookings SET stripe_payment_intent=? WHERE id=?").run(`pi_${id}`, id);
+      refundStatus = delayed ? "pending" : "succeeded";
+      const response = await call(`/admin/bookings/${id}/cancel`, { user: "teacher", body: { message } });
+      assert.equal(response.status, delayed ? 503 : 200);
+      await drain();
+      if (delayed) {
+        assert.equal(sentEmails.filter(sent => sent.text.includes(`Reference: ${id}`)).length, 0);
+        assert.equal(db.prepare("SELECT cancellation_message FROM bookings WHERE id=?").get(id).cancellation_message, message);
+        assert.equal((await call(`/admin/bookings/${id}/cancel`, { user: "teacher", body: { message: "Do not overwrite the original" } })).status, 409);
+        db.prepare("UPDATE booking_refunds SET attempted_at='2026-09-05T09:00:00.000Z' WHERE booking_id=?").run(id);
+        refundStatus = "succeeded";
+        const refundCount = refunds.length;
+        await retryRefunds(env);
+        assert.equal(refunds.length, refundCount, "retrieves the pending refund rather than issuing another");
+      }
+      const email = sentEmails.find(sent => sent.text.includes(`Reference: ${id}`));
+      assert.ok(email.text.includes(`Message from Inês\n${message}`));
+      assert.ok(email.text.includes("Refunded in full"));
+      assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(id).payment_status, "refunded");
+      // Simulate a provider failure and the delayed email reconciliation path.
+      db.prepare("UPDATE email_log SET status='failed', created_at='2026-09-05T09:00:00.000Z' WHERE booking_id=?").run(id);
+      await resendFailedEmails(env);
+      const retried = sentEmails.filter(sent => sent.text.includes(`Reference: ${id}`));
+      assert.equal(retried.length, 2);
+      assert.equal(retried[1].text, email.text);
+      assert.equal(retried[1].html, email.html);
+      await resendFailedEmails(env);
+      assert.equal(sentEmails.filter(sent => sent.text.includes(`Reference: ${id}`)).length, 2, "successful retry is deduplicated");
+    }
+  } finally {
+    refundStatus = "succeeded";
+    releaseEmail();
+  }
+});
 const bookedEmailFor = (reference) => sentEmails.find((sent) => sent.subject.startsWith("Inês has booked your Portuguese lesson") && sent.text.includes(`Reference: ${reference}`));
 await test("Inês booking an address someone registered first shuts that registrant out and lets the mailbox's owner in", async () => {
   const ip = { "CF-Connecting-IP": "198.51.100.61" };
