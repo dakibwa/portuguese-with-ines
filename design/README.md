@@ -879,9 +879,11 @@ Preserve these desktop and mobile states:
 
 Public `Book a lesson` calls to action explicitly open new booking, including
 for returning students. `Book a trial lesson` opens the trial's location choice;
-existing students receive their eligible ordinary choices. `Book a single
-lesson` and `Book a longer lesson` open booking with that length already
-chosen. The main `Booking` navigation still opens a returning student's
+existing students receive their eligible ordinary choices. `Book a 60-minute
+lesson` and `Book a 90-minute lesson` open booking with that length already
+chosen. Lessons are named by their length everywhere, the Lessons page, emails,
+calendar invitations and receipts alike, never "single", which read as "only
+one" beside a weekly slot (12 October 2026, Dan); the trial keeps its name. The main `Booking` navigation still opens a returning student's
 schedule. In the desktop header it is the one button among the plain links,
 in their own dark blue and with no line beneath it, since booking is what the
 site is for (11 October 2026, at Dan's request). Pointed at, it answers as
@@ -1105,11 +1107,14 @@ as a form:
   student's card pays for them. Her add-a-lesson form asks `How often`:
   `Once` or `Weekly`, and a weekly slot then runs for `4 weeks`, `6 weeks`,
   `8 weeks` or `Until stopped`, as the student's own choice does. `Your
-  students` sits beneath the form, one row each: the name and address, then
-  lilac pills for what is done (`Signed in`, `Card pays for every lesson`)
-  and plain ones for what isn't, the next lesson, `Add lesson` (which opens
-  her form with them already in it, on the date) and `Send sign-in link`;
-  those still to bring in come first (12 October 2026, Dan). Her form's
+  students` sits beneath the form as small sheet cards, two across where
+  there is room: the student's splat (or initial), name and address, one
+  plain status line (a coral dot and `Not signed in yet · 1 lesson to
+  collect`, or a check and `All set: signed in, card saved`), the next
+  lesson with a `Weekly` pill, and beneath a rule `Add lesson` (her form
+  opens with them in it, on the date) and, only for someone still to bring
+  in, a coral `Send sign-in link`. Those come first, their card edged in
+  coral (12 October 2026, Dan: "can this be more beautiful"). Her form's
   email field suggests the students she already has, and choosing one fills
   in their name (`Already one of your students`): everything she does here
   should take as few steps as it can. A lesson opens in the student's own dialog: status, the student,

@@ -7,6 +7,8 @@ export type AdminStudent = {
   name: string;
   email: string;
   phone: string;
+  /** The splat they chose for their account; empty for their initial. */
+  mark?: string;
   /** Has ever signed in, or set a password or Google sign-in. */
   signedIn?: boolean;
   hasCard?: boolean;

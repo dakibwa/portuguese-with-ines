@@ -188,7 +188,7 @@ function publicBooking(row, lessonType, settings) {
   return {
     reference: row.reference,
     status: row.status,
-    lessonType: { id: lessonType.id, name: lessonType.name, durationMinutes: lessonType.duration_minutes, priceCents: row.amount_cents ?? lessonType.price_cents },
+    lessonType: { id: lessonType.id, name: lessonName(lessonType), durationMinutes: lessonType.duration_minutes, priceCents: row.amount_cents ?? lessonType.price_cents },
     startAt: row.starts_at,
     endAt: row.ends_at,
     location: row.location,
@@ -205,14 +205,28 @@ function publicBooking(row, lessonType, settings) {
   };
 }
 
+/**
+ * A lesson is named by its length, never "Single lesson": next to a weekly
+ * slot that read as "only one" (12 October 2026, Dan). The trial keeps its
+ * own name, being a different thing rather than a different length.
+ */
+function lessonName(lessonType) {
+  return lessonType.id === "trial" ? lessonType.name : `${lessonType.duration_minutes}-minute lesson`;
+}
+
+/** The same, with the trial's length beside it, for a row that names the lesson. */
+function lessonLine(lessonType) {
+  return lessonType.id === "trial" ? `${lessonType.name} · ${lessonType.duration_minutes} minutes` : lessonName(lessonType);
+}
+
 /** Description lines shared by her calendar entry and the emails. */
 function lessonSummary(row, lessonType) {
-  return `${lessonType.name} — ${row.student_name}`;
+  return `${lessonName(lessonType)} — ${row.student_name}`;
 }
 
 function lessonDescription(row, lessonType, manageUrl) {
   const lines = [
-    `${lessonType.name} (${lessonType.duration_minutes} minutes)`,
+    lessonLine(lessonType),
     `Student: ${row.student_name}`,
     `Email: ${row.student_email}`
   ];
@@ -290,7 +304,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const teacherHeroNote = studentTime ? `${studentTime} — the student's time` : "";
 
   const baseRows = [
-    { label: "Lesson", value: `${lessonType.name} · ${lessonType.duration_minutes} minutes` },
+    { label: "Lesson", value: lessonLine(lessonType) },
     { label: "Where", value: meetingUrl(row) ? "Join Google Meet" : locationLabel(row), url: meetingUrl(row) },
     { label: "Reference", value: row.reference }
   ];
@@ -515,7 +529,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         heroNote: "",
         preheader: event === "booked" && welcome
           ? "Inês has booked your lesson. Sign in with one click to see it."
-          : `${lessonType.name} · ${studentWhen}`,
+          : `${lessonName(lessonType)} · ${studentWhen}`,
         rows: studentRows,
         steps: event === "booked" && welcome ? welcomeSteps(welcome) : null,
         action: event === "booked" && welcome
@@ -547,7 +561,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
           callout: teacher.callout,
           hero,
           heroNote: teacherHeroNote,
-          preheader: `${row.student_name} · ${lessonType.name} · ${portoTime}`,
+          preheader: `${row.student_name} · ${lessonName(lessonType)} · ${portoTime}`,
           rows: [
             ...baseRows,
             { label: "Student", value: `${row.student_name}\n${row.student_email}${row.student_phone ? `\n${row.student_phone}` : ""}` },
@@ -662,7 +676,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
 
   // Each copy lists the dates on its reader's clock.
   const rowsOn = (zone) => [
-    { label: "Lesson", value: `${lessonType.name} · ${lessonType.duration_minutes} minutes` },
+    { label: "Lesson", value: lessonLine(lessonType) },
     { label: "Where", value: locationLabel(first) },
     { label: series.oneOff ? "Booking" : "Repeats", value: cadence },
     ...(rows.some(row => meetingUrl(row))
@@ -747,7 +761,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
           callout: skippedNote,
           hero: lessonWhen(new Date(first.starts_at), studentClock),
           heroNote: "",
-          preheader: `${lessonType.name} · ${cadence}`,
+          preheader: `${lessonName(lessonType)} · ${cadence}`,
           rows: studentSeriesRows,
           steps: welcome && !moved ? welcomeSteps(welcome) : null,
           action: welcome ? welcomeAction(welcome) : { label: "See all your lessons", url: siteUrl(env, "/book/?view=lessons") },
@@ -1084,7 +1098,7 @@ async function sendWelcome(env, { student, settings, welcome }) {
 async function teacherStudentList(env) {
   const now = new Date().toISOString();
   const query = (consent) => env.DB.prepare(
-    `SELECT s.id, s.name, s.email, s.phone, s.created_at,
+    `SELECT s.id, s.name, s.email, s.phone, s.created_at, COALESCE(s.mark, '') AS mark,
        (COALESCE(s.stripe_payment_method, '') != '') AS has_card,
        ${consent ? "s.card_consent_at" : "NULL"} AS card_consent_at,
        (s.password_hash != '' OR s.google_sub IS NOT NULL OR s.last_login_at IS NOT NULL) AS signed_in,
@@ -1109,6 +1123,7 @@ async function teacherStudentList(env) {
     name: row.name,
     email: row.email,
     phone: row.phone,
+    mark: row.mark ?? "",
     createdAt: row.created_at,
     signedIn: Boolean(row.signed_in),
     hasCard: Boolean(row.has_card),
@@ -1522,7 +1537,7 @@ export async function chargeDueLessons(env, now = new Date()) {
       const candidate = {
         bookingId: due.id, purpose, customer: student.stripe_customer_id,
         paymentMethod: student.stripe_payment_method, amountCents: plannedAmount,
-        description: `${noShow ? "No-show fee" : lessonType.name} · ${due.reference}`,
+        description: `${noShow ? "No-show fee" : lessonName(lessonType)} · ${due.reference}`,
         metadata: { booking_reference: due.reference, charge_reason: noShow ? "no_show" : "lesson" }
       };
       await env.DB.prepare("UPDATE bookings SET charge_request = COALESCE(charge_request, ?) WHERE id = ?").bind(JSON.stringify(candidate), due.id).run();
@@ -1705,13 +1720,13 @@ async function notifyLessonCharged(env, { row, lessonType, amountCents, noShow =
       replyTo: settings.replyToEmail || teacherEmail || undefined,
       content: {
         heading,
-        preheader: `${lessonType.name} · ${amount} charged to your saved card`,
+        preheader: `${lessonName(lessonType)} · ${amount} charged to your saved card`,
         intro: noShow
           ? `Olá ${row.student_name.split(" ")[0]}, Inês marked this lesson as a no-show. Your saved card was charged ${amount} instead of the lesson price.`
           : `Olá ${row.student_name.split(" ")[0]}, your lesson is finished. ${amount} was charged to your saved card.`,
         callout: "",
         rows: [
-          { label: "Lesson", value: `${lessonType.name} · ${lessonType.duration_minutes} minutes` },
+          { label: "Lesson", value: lessonLine(lessonType) },
           { label: "Reference", value: row.reference },
           // Lets the student check the number before Inês issues the receipt.
           ...(nif ? [{ label: "NIF", value: `${nif} · on your receipt from Inês` }] : [])
@@ -1734,11 +1749,11 @@ async function notifyLessonCharged(env, { row, lessonType, amountCents, noShow =
         replyTo: row.student_email,
         content: {
           heading: noShow ? "A no-show fee was paid" : "A lesson was paid",
-          preheader: `${row.student_name} · ${lessonType.name} · ${amount}`,
+          preheader: `${row.student_name} · ${lessonName(lessonType)} · ${amount}`,
           intro: `${amount} for ${row.student_name}'s ${noShow ? "no-show" : "lesson"} was charged successfully after the scheduled end time.`,
           callout: "Issue the appropriate Portal das Finanças document for this payment today.",
           rows: [
-            { label: "Lesson", value: `${lessonType.name} · ${formatInZone(start, PORTO)}` },
+            { label: "Lesson", value: `${lessonName(lessonType)} · ${formatInZone(start, PORTO)}` },
             { label: "Reference", value: row.reference },
             nifRow
           ],
@@ -1768,7 +1783,7 @@ async function notifySameDayFeeCharged(env, { row, lessonType, amountCents }) {
       replyTo: settings.replyToEmail || teacherEmail || undefined,
       content: {
         heading: "Your late change fee is paid",
-        preheader: `${lessonType.name} · ${amount}`,
+        preheader: `${lessonName(lessonType)} · ${amount}`,
         intro: `Olá ${row.student_name.split(" ")[0]}, your saved card was charged ${amount} for moving or cancelling this lesson less than ${settings.minimumNoticeHours} hours before it.`,
         callout: "You will not be charged this fee again for the same lesson.",
         rows: [
@@ -1800,7 +1815,7 @@ async function notifySameDayFeeCharged(env, { row, lessonType, amountCents }) {
           intro: `The ${amount} fee for ${row.student_name} moving or cancelling less than ${settings.minimumNoticeHours} hours before their lesson was charged successfully.`,
           callout: "Issue the appropriate Portal das Finanças document for this payment today.",
           rows: [
-            { label: "Lesson", value: `${lessonType.name} · ${formatInZone(new Date(row.starts_at), PORTO)}` },
+            { label: "Lesson", value: `${lessonName(lessonType)} · ${formatInZone(new Date(row.starts_at), PORTO)}` },
             { label: "Reference", value: row.reference },
             receiptNifRow(nif)
           ],
@@ -1831,7 +1846,7 @@ async function recoverySession(env, { row, lessonType, amountCents, purpose }) {
     customer: student?.stripe_customer_id ?? null, forceHosted: true,
     checkoutPurpose: `${purpose}-due`, amountCents,
     recoveryGeneration: previousId ?? "",
-    productName: fee ? "Late lesson change fee" : purpose === "no-show" ? "Lesson no-show fee" : lessonType.name,
+    productName: fee ? "Late lesson change fee" : purpose === "no-show" ? "Lesson no-show fee" : lessonName(lessonType),
     productDescription: `${row.reference} · Português com a Inês`,
     successUrl: siteUrl(env, "/book/?view=lessons&paid=1"),
     cancelUrl: studentManageUrl(env, await createManageToken(row.id, env.BOOKING_TOKEN_SECRET))
@@ -1894,11 +1909,11 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
     replyTo: settings.replyToEmail || teacherEmail || undefined,
     content: {
       heading: "The card didn't go through",
-      preheader: `${lessonType.name} · ${amount} still to pay`,
+      preheader: `${lessonName(lessonType)} · ${amount} still to pay`,
       intro: `Olá ${row.student_name.split(" ")[0]}, we couldn't charge the ${amount} ${isSameDayFee ? "late change fee" : isNoShow ? "no-show fee" : "lesson payment"} to your saved card. Please use the secure payment link below.`,
       callout: "",
       rows: [
-        { label: "Lesson", value: `${lessonType.name} · ${lessonType.duration_minutes} minutes` },
+        { label: "Lesson", value: lessonLine(lessonType) },
         { label: "Price", value: amount },
         { label: "Reference", value: row.reference }
       ],
@@ -1918,7 +1933,7 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
       replyTo: row.student_email,
       content: {
         heading: "A card didn't go through",
-        preheader: `${row.student_name} · ${lessonType.name} · ${amount}`,
+        preheader: `${row.student_name} · ${lessonName(lessonType)} · ${amount}`,
         intro: `${row.student_name}'s ${amount} ${isSameDayFee ? "late change fee" : isNoShow ? "no-show fee" : "lesson payment"} couldn't be charged automatically. They've been sent a secure payment link.`,
         callout: "",
         rows: [
@@ -2183,7 +2198,7 @@ async function handleAvailability(request, env, url) {
       bufferMinutes: settings.lessonBufferMinutes,
       lessonType: {
         id: lessonType.id,
-        name: lessonType.name,
+        name: lessonName(lessonType),
         durationMinutes: lessonType.duration_minutes,
         priceCents: lessonType.price_cents
       }
@@ -4271,7 +4286,7 @@ async function handleMe(request, env) {
       notes: row.notes,
       lessonType: {
         id: row.lesson_type_id,
-        name: row.lesson_name,
+        name: lessonName({ id: row.lesson_type_id, name: row.lesson_name, duration_minutes: row.duration_minutes }),
         durationMinutes: row.duration_minutes,
         priceCents: row.amount_cents ?? row.price_cents
       },

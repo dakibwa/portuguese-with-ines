@@ -1320,10 +1320,10 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
   and Options.md` for the full position, including the unresolved IVA exemption
   code.
 - **Reminders** before a lesson.
-- **Migration 0023** (`workers/booking/migrations/0023-transition-kit.sql`) must
-  be applied to staging and production D1 before the Worker that reads it is
-  deployed: adding a lesson writes `added_by_teacher` and sign-in links need
-  their table.
+- **Migration 0023** (`workers/booking/migrations/0023-transition-kit.sql`) was
+  applied by hand to staging and production D1 on 12 October 2026, before the
+  Worker that reads it: adding a lesson writes `added_by_teacher` and sign-in
+  links need their table. Existing rows were unchanged.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
 ## Google Calendar and Meet setup

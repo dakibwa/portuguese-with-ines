@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarPlus, CheckCircle2, CreditCard, Repeat, Send, Users } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Repeat, Send, Users } from "lucide-react";
+import { AccountAvatar } from "@/components/AccountMenu";
 import { fetchStudents, sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
 import { formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
@@ -9,6 +10,16 @@ import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 /** Someone she still needs to bring in comes first: never signed in, or lessons not yet on a card. */
 function needsHer(student: AdminStudent) {
   return !student.signedIn || Boolean(student.unpaidUpcoming && !student.cardForAllLessons);
+}
+
+/** Where they are, in one plain line. */
+function statusOf(student: AdminStudent) {
+  const owed = student.unpaidUpcoming && !student.cardForAllLessons
+    ? `${student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} to collect`
+    : "";
+  if (!student.signedIn) return ["Not signed in yet", owed].filter(Boolean).join(" · ");
+  if (owed) return `No card yet · ${owed}`;
+  return student.cardForAllLessons ? "All set: signed in, card saved" : "Signed in";
 }
 
 function nextLesson(at: string) {
@@ -90,8 +101,7 @@ export function StudentList({ token, onAddLesson }: { token: string; onAddLesson
         ) : null}
         {students && waiting ? (
           <p className="teacher-students__lead">
-            {waiting === 1 ? "1 student still needs" : `${waiting} students still need`} to sign in or add a card. They&rsquo;re
-            first below.
+            {waiting === 1 ? "1 student still needs" : `${waiting} students still need`} to sign in or add a card.
           </p>
         ) : null}
         {error ? (
@@ -104,64 +114,61 @@ export function StudentList({ token, onAddLesson }: { token: string; onAddLesson
           <p className="teacher-students__lead">No students yet. Anyone you add a lesson for appears here.</p>
         ) : null}
         <ul className="teacher-students__list">
-          {shown.map((student) => (
-            <li className="teacher-student" key={student.id}>
-              <div className="teacher-student__who">
-                <strong>{student.name}</strong>
-                <span>{student.email}</span>
-              </div>
-              <div className="teacher-student__facts">
-                <span className={`teacher-student__fact${student.signedIn ? " is-done" : ""}`}>
-                  {student.signedIn ? <CheckCircle2 size={14} aria-hidden="true" /> : null}
-                  {student.signedIn ? "Signed in" : "Not signed in yet"}
-                </span>
-                <span className={`teacher-student__fact${student.cardForAllLessons ? " is-done" : ""}`}>
-                  <CreditCard size={14} aria-hidden="true" />
-                  {student.cardForAllLessons
-                    ? "Card pays for every lesson"
-                    : student.unpaidUpcoming
-                      ? `No card: ${student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} to collect`
-                      : student.hasCard
-                        ? "Card for their own bookings"
-                        : "No card"}
-                </span>
-                {student.weekly ? (
-                  <span className="teacher-student__fact">
-                    <Repeat size={14} aria-hidden="true" />
-                    Weekly
-                  </span>
-                ) : null}
-                <span className="teacher-student__next">
-                  {student.nextLessonAt ? `Next: ${nextLesson(student.nextLessonAt)}` : "No lessons booked"}
-                </span>
-              </div>
-              <div className="teacher-student__action">
-                {onAddLesson ? (
-                  <button className="teacher-student__send" onClick={() => onAddLesson(student)} type="button">
-                    <CalendarPlus size={14} aria-hidden="true" />
+          {shown.map((student) => {
+            const waiting = needsHer(student);
+            return (
+              <li className={`teacher-student${waiting ? " needs-her" : " is-ready"}`} key={student.id}>
+                <AccountAvatar className="teacher-student__avatar" mark={student.mark} name={student.name} />
+                <div className="teacher-student__main">
+                  <strong className="teacher-student__name">{student.name}</strong>
+                  <span className="teacher-student__email">{student.email}</span>
+                  <p className="teacher-student__status">
+                    {waiting ? (
+                      <span aria-hidden="true" className="teacher-student__dot" />
+                    ) : (
+                      <CheckCircle2 size={15} aria-hidden="true" />
+                    )}
+                    {statusOf(student)}
+                  </p>
+                  <p className="teacher-student__next">
+                    {student.nextLessonAt ? `Next lesson ${nextLesson(student.nextLessonAt)}` : "No lessons booked"}
+                    {student.weekly ? (
+                      <span className="teacher-student__weekly">
+                        <Repeat size={13} aria-hidden="true" />
+                        Weekly
+                      </span>
+                    ) : null}
+                  </p>
+                </div>
+                <div className="teacher-student__action">
+                  <button className="teacher-student__button" onClick={() => onAddLesson?.(student)} type="button">
+                    <CalendarPlus size={15} aria-hidden="true" />
                     Add lesson
                     <span className="visually-hidden"> for {student.name}</span>
                   </button>
-                ) : null}
-                {sent[student.id] ? (
-                  <span className="teacher-student__sent" role="status">
-                    {sent[student.id]}
-                  </span>
-                ) : (
-                  <button
-                    className="teacher-student__send"
-                    disabled={sending === student.id}
-                    onClick={() => void welcome(student)}
-                    type="button"
-                  >
-                    <Send size={14} aria-hidden="true" />
-                    {sending === student.id ? "Sending…" : "Send sign-in link"}
-                    <span className="visually-hidden"> to {student.name}</span>
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
+                  {/* Only someone still to bring in needs a way in sent. */}
+                  {waiting ? (
+                    sent[student.id] ? (
+                      <span className="teacher-student__sent" role="status">
+                        {sent[student.id]}
+                      </span>
+                    ) : (
+                      <button
+                        className="teacher-student__button teacher-student__button--send"
+                        disabled={sending === student.id}
+                        onClick={() => void welcome(student)}
+                        type="button"
+                      >
+                        <Send size={15} aria-hidden="true" />
+                        {sending === student.id ? "Sending…" : "Send sign-in link"}
+                        <span className="visually-hidden"> to {student.name}</span>
+                      </button>
+                    )
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </details>

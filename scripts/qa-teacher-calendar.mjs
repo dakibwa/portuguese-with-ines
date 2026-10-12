@@ -719,8 +719,9 @@ try {
   await students.locator("summary").click();
   await expect(students.locator(".teacher-student").first()).toContainText("Sam Known");
   await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet");
-  await expect(students.locator(".teacher-student").first()).toContainText("No card: 1 lesson to collect");
-  await expect(students.locator(".teacher-student").nth(1)).toContainText("Card pays for every lesson");
+  await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet · 1 lesson to collect");
+  await expect(students.locator(".teacher-student").nth(1)).toContainText("All set: signed in, card saved");
+  await expect(students.getByRole("button", { name: "Send sign-in link to Alex" })).toHaveCount(0);
   await students.getByRole("button", { name: "Send sign-in link to Sam Known" }).click();
   await expect(students.locator(".teacher-student").first()).toContainText("Sent: a link to sign in and add a card");
   await students.getByRole("button", { name: "Add lesson for Alex" }).click();
