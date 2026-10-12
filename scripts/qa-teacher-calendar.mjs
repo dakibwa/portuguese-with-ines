@@ -673,7 +673,7 @@ try {
     "the cancellation stays inside the viewport after the calendar has scrolled");
   state.failCancel = 1;
   await page.getByRole("button", { name: "Yes, cancel lesson" }).click();
-  await expect(page.getByRole("alert")).toContainText("Please try again");
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("Please try again");
   await expect(messageField).toHaveValue(cancellationMessage);
   await page.getByRole("button", { name: "Yes, cancel lesson" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
