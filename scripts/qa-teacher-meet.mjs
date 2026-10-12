@@ -88,13 +88,19 @@ try {
     assert.deepEqual(ready.errors, []);
     await ready.page.close();
 
-    // While Meet works, the panel is only its logo, its name and Configure.
+    // While Meet works it is a small chip, its logo and a tick, which opens
+    // the settings; the full card returns only when it needs her.
     const working = await fixture(width, { ...disconnected, connected: true, email: "teacher@example.invalid", pending: 0 });
-    await expect(working.panel.getByRole("heading", { name: "Google Meet", exact: true })).toBeVisible();
+    await expect(working.panel.getByRole("heading", { name: "Google Meet", exact: true })).toBeAttached();
     await expect(working.panel.locator(".teacher-meet-logo")).toBeVisible();
     await expect(working.panel.getByRole("button")).toHaveCount(1);
     await expect(working.panel.locator("p")).toHaveCount(0);
-    await working.panel.getByRole("button", { name: "Configure", exact: true }).click();
+    const chip = working.panel.getByRole("button", { name: "Google Meet connected. Show settings", exact: true });
+    const chipBox = await chip.boundingBox();
+    assert.ok(chipBox.width < 200, "A working Meet connection is a small chip");
+    await chip.click();
+    await expect(working.page.locator(".teacher-meet").getByRole("button", { name: "Configure", exact: true })).toHaveAttribute("aria-expanded", "true");
+    working.panel = working.page.locator(".teacher-meet");
     await expect(working.panel).toContainText("Connected as teacher@example.invalid");
     await expect(working.panel.getByRole("button", { name: "Reconnect Google Meet", exact: true })).toBeVisible();
     await expect(working.panel.getByRole("link", { name: "Open Google Calendar", exact: true })).toHaveAttribute("href", "https://calendar.google.com/");

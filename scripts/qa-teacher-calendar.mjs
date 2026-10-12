@@ -183,9 +183,11 @@ async function fixture(width, options = {}) {
         if (state.failBookings) return fail("Lessons could not be loaded.");
         return route.fulfill({ json: { bookings: state.bookings } });
       }
-      state.bookings.push(
-        lesson("manual", data.name, data.startAt, data.location),
-      );
+      // Her own lessons are never charged through the site.
+      state.bookings.push({
+        ...lesson(`manual-${state.bookings.length}`, data.name, data.startAt, data.location),
+        payment_status: "not_required",
+      });
       return route.fulfill({ json: { booking: { reference: "TEST-manual" } } });
     }
     const match = path.match(
@@ -230,6 +232,15 @@ const dayWrites = (state, date) =>
     .filter((entry) => entry.path === "/admin/exceptions/day")
     .map((entry) => entry.data)
     .filter((entry) => !date || entry.date === date);
+// A free time offers a choice; time off is one of its two options.
+async function takeOff(page, cell, { tap = false } = {}) {
+  if (tap) await cell.tap();
+  else await cell.click();
+  const item = page.getByRole("menu").getByRole("menuitem", { name: "Take this time off", exact: true });
+  if (tap) await item.tap();
+  else await item.click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+}
 async function dragDown(page, from, to) {
   const start = await from.boundingBox();
   const end = await to.boundingBox();
@@ -442,12 +453,24 @@ try {
     "Move must use Porto time across the UTC date boundary",
   );
 
-  // Time off is taken on the calendar itself and saves as she clicks.
+  // A free time offers a choice rather than taking itself off: Escape puts
+  // the choice away and keeps her place.
   const note = page.locator(".teacher-save-state");
+  const writesBeforeChoice = state.writes.length;
   await slot(page, 2, 960).click();
+  const choice = page.getByRole("menu");
+  await expect(choice.getByRole("menuitem")).toHaveText(["Add a lesson here", "Take this time off"]);
+  await expect(choice.getByRole("menuitem", { name: "Add a lesson here" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(choice).toHaveCount(0);
+  await expect(slot(page, 2, 960)).toBeFocused();
+  assert.equal(state.writes.length, writesBeforeChoice, "Choosing a time alone must not save");
+
+  // Time off is taken on the calendar itself and saves as she chooses it.
+  await takeOff(page, slot(page, 2, 960));
   await expect(slot(page, 2, 960)).toHaveAttribute("aria-pressed", "true");
   await expect(note).toHaveText("16:00–16:30 on Tue 8 Sept is off.");
-  await slot(page, 2, 990).click();
+  await takeOff(page, slot(page, 2, 990));
   await expect(note).toHaveText("16:30–17:00 on Tue 8 Sept is off.");
   assert.deepEqual(dayWrites(state).at(-1), {
     date: "2026-09-08",
@@ -471,6 +494,9 @@ try {
   await slot(page, 3, 1050).focus();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitem", { name: "Take this time off" })).toBeFocused();
+  await page.keyboard.press("Enter");
   await expect(note).toHaveText("18:00–18:30 on Wed 9 Sept is off.");
   assert.deepEqual(dayWrites(state).at(-1), {
     date: "2026-09-09",
@@ -479,13 +505,16 @@ try {
 
   // Weekly lunch is shown and cannot be toggled per date.
   const writesBefore = state.writes.length;
-  await expect(slot(page, 1, 750)).toHaveAttribute("aria-disabled", "true");
+  await expect(slot(page, 1, 750)).toHaveAttribute("aria-label", /every week$/);
   await expect(
     page
       .locator(".teacher-block-label.is-weekly", { hasText: "Lunch" })
       .first(),
   ).toBeVisible();
   await slot(page, 1, 750).click({ force: true });
+  // A weekly block can still hold a lesson she arranges, but can't be taken off.
+  await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["Add a lesson here"]);
+  await page.keyboard.press("Escape");
   assert.equal(state.writes.length, writesBefore, "Lunch must not be written");
 
   const mondayOff = page.getByRole("switch", {
@@ -503,14 +532,14 @@ try {
   await expect(
     page.getByRole("button", { name: /^Alex,.*View lesson$/ }),
   ).toBeVisible();
-  await expect(slot(page, 1, 600)).toHaveAttribute("aria-disabled", "true");
+  await expect(slot(page, 1, 600)).toHaveAttribute("aria-label", /day off$/);
   await mondayOff.click();
   await expect(mondayOff).toHaveAttribute("aria-checked", "false");
   await expect(note).toHaveText("Mon 7 Sept is open again.");
 
   // A failed save puts the date back as it is actually saved.
   state.failDay = "2026-09-11";
-  await slot(page, 5, 600).click();
+  await takeOff(page, slot(page, 5, 600));
   await page
     .getByRole("alert")
     .filter({ hasText: "Fri 11 Sept was not changed." })
@@ -520,11 +549,11 @@ try {
   // Quick clicks while a save is in flight coalesce into the latest choice.
   let finishDaySave;
   state.dayGate = new Promise(resolve => { finishDaySave = resolve; });
-  await slot(page, 5, 900).click();
+  await takeOff(page, slot(page, 5, 900));
   await expect.poll(() => dayWrites(state, "2026-09-11").at(-1)).toEqual({
     date: "2026-09-11", blocks: [{ startMinute: 900, endMinute: 930 }],
   });
-  for (const minute of [930, 960]) await slot(page, 5, minute).click();
+  for (const minute of [930, 960]) await takeOff(page, slot(page, 5, minute));
   state.dayGate = null;
   finishDaySave();
   await expect(note).toHaveText("16:00–16:30 on Fri 11 Sept is off.");
@@ -606,15 +635,68 @@ try {
     page.getByRole("heading", { name: "Cancel this lesson?" }),
   ).toBeVisible();
   assert.equal(
-    state.bookings.find((entry) => entry.id === "manual").status,
+    state.bookings.find((entry) => entry.id.startsWith("manual")).status,
     "confirmed",
   );
   await page.getByRole("button", { name: "Yes, cancel lesson" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   assert.equal(
-    state.bookings.find((entry) => entry.id === "manual").status,
+    state.bookings.find((entry) => entry.id.startsWith("manual")).status,
     "cancelled",
   );
+
+  // Her next lesson leads the page with its call: Alex's is happening now.
+  const nextLesson = page.locator(".teacher-next");
+  await expect(nextLesson).toContainText("Happening now");
+  await expect(nextLesson).toContainText("Alex");
+  await expect(
+    nextLesson.getByRole("link", { name: "Join Google Meet with Alex", exact: true }),
+  ).toHaveAttribute("href", "https://meet.google.com/abc-defg-hij");
+  await nextLesson.getByRole("button", { name: /Alex/ }).click();
+  await expect(page.getByRole("dialog")).toContainText("Alex");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  // A free time adds a lesson there, its date and time already in place, and
+  // the lesson reads as hers rather than a student's booking.
+  await slot(page, 4, 1080).click();
+  await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
+  const addDialog = page.getByRole("dialog", { name: "Add a lesson" });
+  await expect(addDialog.getByLabel("Date", { exact: true })).toHaveValue("2026-09-10");
+  await expect(addDialog.getByLabel("Time in Porto")).toHaveValue("18:00");
+  await addDialog.getByLabel("Student’s email").fill("slot@example.invalid");
+  await addDialog.getByLabel("Student’s name").fill("Kai");
+  await addDialog.getByRole("button", { name: "Add lesson and email student" }).click();
+  await expect(addDialog).toHaveCount(0);
+  await expect(page.locator(".teacher-workspace > .teacher-inline-success")).toContainText("Lesson added");
+  assert.equal(
+    state.writes.filter((entry) => entry.path === "/admin/bookings").at(-1).data.startAt,
+    "2026-09-10T17:00:00.000Z",
+    "A lesson added from a time keeps that Porto time",
+  );
+  await expect(
+    page.getByRole("button", { name: /^Kai,.*added by you\. View lesson$/ }),
+  ).toHaveClass(/teacher-calendar-lesson--added/);
+
+  // A holiday is taken in one go, every day from one date to another, and
+  // the week turns to show it.
+  await page.getByRole("button", { name: "Time off", exact: true }).click();
+  const timeOff = page.getByRole("dialog", { name: "Take time off" });
+  await timeOff.getByLabel("From").fill("2026-09-28");
+  await timeOff.getByLabel("Until (and including)").fill("2026-09-30");
+  await expect(timeOff).toContainText("3 days");
+  await timeOff.getByRole("button", { name: "Take these days off", exact: true }).click();
+  await expect(timeOff).toHaveCount(0);
+  const holidayDates = ["2026-09-28", "2026-09-29", "2026-09-30"];
+  await expect
+    .poll(() => holidayDates.map((date) => dayWrites(state, date).at(-1)))
+    .toEqual(holidayDates.map((date) => ({ date, dayOff: true })));
+  await expect(page.locator("#teacher-week-title")).toHaveText(/^28 Sept/);
+  await expect(
+    page.getByRole("switch", { name: "Day off, Tuesday 29 September" }),
+  ).toHaveAttribute("aria-checked", "true");
+  await expect(note).toHaveText("Mon 28 Sept to Wed 30 Sept are days off.");
+  await page.getByRole("button", { name: "This week" }).click();
   state.failBookings = true;
   await page.getByRole("button", { name: "Next week" }).click();
   await page
@@ -666,7 +748,7 @@ try {
   await noOverflow(mobile.page);
   await tuesdayOff.tap();
   await expect(tuesdayOff).toHaveAttribute("aria-checked", "false");
-  await slot(mobile.page, 2, 1080).tap();
+  await takeOff(mobile.page, slot(mobile.page, 2, 1080), { tap: true });
   await expect(slot(mobile.page, 2, 1080)).toHaveAttribute(
     "aria-pressed",
     "true",

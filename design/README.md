@@ -1057,10 +1057,10 @@ as a form:
 - signed in, booking is headed by the account's own bar, as Your lessons is:
   the name's menu, or the places open on a wide card, holding the way back;
 - Inês's schedule reads as the same place: the booking page's blue band,
-  Google Meet's status raised in cream with a small `Sign out` beside it
-  instead of an account card, the way to take time off behind a `?` beside the
-  week, sliders for a lesson's length and place in `Add a lesson for a
-  student`, her sign-in with no `Create an account`, and each student's chosen
+  Google Meet as a small `Meet ✓` chip beside a small `Sign out` while it
+  works (the cream card returns only when it needs her), sliders for a
+  lesson's length and place in `Add a lesson for a student`, with the
+  timetable's globe and person beside Online and In Porto, her sign-in with no `Create an account`, and each student's chosen
   splat beside their name when she opens a lesson. Her week is set as the
   student's calendar: a hand-cut card, quiet capital weekdays with `Today`
   in words, the solid blue arrows, blue lessons over a faint coral wash for
@@ -1072,7 +1072,22 @@ as a form:
   and `Weekly hours` a coral button in the middle of the week's row. Her
   arrows turn the week as the student's turn theirs: the days slide in from
   the side the week was reached from while the hours stay put (12 October
-  2026, at Dan's request). A lesson opens in the student's own dialog: status, the student,
+  2026, at Dan's request). Her page is made for what she does daily (12
+  October 2026, at Dan's request): her next lesson, or the one happening now,
+  leads the page in a blue strip with its `Join Meet` one press away (`Meet
+  link on its way` until the call exists, and nothing for a lesson in
+  Porto); choosing a free time offers `Add a lesson here` (her add-a-lesson
+  form in a dialog, its date and time already in place) or `Take this time
+  off`, while a time already off reopens at once and dragging across several
+  still takes them off together; and `Time off` beside `Weekly hours` takes a
+  holiday from one date to another in one go, naming any lessons already
+  booked in it, which stay until she moves or cancels them. A lesson she
+  added herself, for a booking arranged elsewhere, reads apart from the
+  students' own while lessons move onto the site: lilac with a dashed edge
+  and `Added` beside its time on the week, `Added by you` in the key, the
+  strip and its dialog, which says it isn't charged through the site. The
+  site tells hers apart by payment: her lessons are never charged through
+  it, so theirs stay `not_required`. A lesson opens in the student's own dialog: status, the student,
   the time in bold with its length and place beneath, then `Move lesson` in
   coral beside `Cancel lesson`, with `Mark no-show` a quiet link below;
 - emails read as the site does: Montserrat (falling back to Arial) rather

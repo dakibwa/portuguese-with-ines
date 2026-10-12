@@ -2858,6 +2858,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     type="radio"
                     value={option}
                   />
+                  {/* The calendar's own marks for each place (12 October
+                      2026, at Dan's request). */}
+                  {option === "online" ? (
+                    <Globe size={14} strokeWidth={2.4} aria-hidden="true" />
+                  ) : (
+                    <UserRound size={14} strokeWidth={2.4} aria-hidden="true" />
+                  )}
                   {option === "online" ? "Online" : "In Porto"}
                 </label>
               ))}

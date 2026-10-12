@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { readSession } from "@/lib/auth-api";
 import {
   connectGoogleMeet,
@@ -8,7 +9,7 @@ import {
   type GoogleMeetConnection,
 } from "@/lib/admin-api";
 
-function GoogleMeetLogo() {
+export function GoogleMeetLogo() {
   return (
     <svg className="teacher-meet-logo" viewBox="0 0 87.5 72" aria-hidden="true" focusable="false">
       <path fill="#00832d" d="M49.5 36l8.53 9.75 11.47 7.33 2-17.02-2-16.64-11.69 6.44z" />
@@ -21,7 +22,11 @@ function GoogleMeetLogo() {
   );
 }
 
-/** A single line while Meet works; details and reconnecting live behind Configure. */
+/**
+ * While Meet works it is a small "Meet ✓" beside Sign out, which opens its
+ * settings; it grows into a card only when it needs her (12 October 2026, at
+ * Dan's request: a working connection had the top of her page).
+ */
 export function TeacherMeetConnection({ token }: { token: string }) {
   const [connection, setConnection] = useState<GoogleMeetConnection | null>(null);
   const [error, setError] = useState("");
@@ -97,6 +102,25 @@ export function TeacherMeetConnection({ token }: { token: string }) {
       : callbackResult === "error"
         ? "Google Meet couldn’t be connected. Please try again."
         : "";
+
+  if (healthy && !open && !feedback && !error) {
+    return (
+      <section className="teacher-meet teacher-meet--compact" aria-labelledby="teacher-meet-title">
+        <h2 className="visually-hidden" id="teacher-meet-title">Google Meet</h2>
+        <button
+          aria-expanded={false}
+          aria-label="Google Meet connected. Show settings"
+          className="teacher-meet-chip"
+          onClick={() => setOpen(true)}
+          type="button"
+        >
+          <GoogleMeetLogo />
+          Meet
+          <Check size={14} strokeWidth={2.6} aria-hidden="true" />
+        </button>
+      </section>
+    );
+  }
 
   return (
     <section className="teacher-meet" aria-labelledby="teacher-meet-title">

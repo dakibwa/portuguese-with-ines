@@ -1,8 +1,9 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { X, Mail, ArrowLeft, ReceiptText, CheckCircle2, CircleX } from "lucide-react";
+import { X, Mail, ArrowLeft, ReceiptText, CheckCircle2, CircleX, Globe, UserRound } from "lucide-react";
 import {
+  addedByTeacher,
   cancelBookingAs,
   rescheduleBookingAs,
   setNoShow,
@@ -153,10 +154,16 @@ export function LessonDetails({
       >
         <X size={20} aria-hidden="true" />
       </button>
-      <p className={`lesson-calendar__status${booking.status === "cancelled" ? " lesson-calendar__status--cancelled" : ""}`}>
+      <p className={`lesson-calendar__status${booking.status === "cancelled" ? " lesson-calendar__status--cancelled" : addedByTeacher(booking) ? " lesson-calendar__status--added" : ""}`}>
         {booking.status === "cancelled" ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
-        {booking.status === "cancelled" ? "Cancelled" : "Booked"}
+        {booking.status === "cancelled" ? "Cancelled" : addedByTeacher(booking) ? "Added by you" : "Booked"}
       </p>
+      {addedByTeacher(booking) && booking.status !== "cancelled" ? (
+        <p className="teacher-lesson-added-note">
+          You added this lesson for a booking arranged elsewhere, so it isn&rsquo;t
+          charged through the site.
+        </p>
+      ) : null}
       <div className="teacher-dialog-top">
         {/* The student's own splat when they have chosen one, so Inês knows
             them at a glance (10 October 2026, at Dan's request). */}
@@ -180,7 +187,16 @@ export function LessonDetails({
                 60_000,
             ),
           })}{" "}
-          · {booking.location === "porto" ? "In Porto" : "Online"} · Porto time
+          ·{" "}
+          <span className="teacher-lesson-place">
+            {booking.location === "porto" ? (
+              <UserRound size={13} strokeWidth={2.4} aria-hidden="true" />
+            ) : (
+              <Globe size={13} strokeWidth={2.4} aria-hidden="true" />
+            )}
+            {booking.location === "porto" ? "In Porto" : "Online"}
+          </span>{" "}
+          · Porto time
         </span>
         <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
       </div>
