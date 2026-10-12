@@ -4,18 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   CalendarDays,
+  CalendarOff,
   Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  CircleHelp,
   Repeat2,
 } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
-import { ManualLessonForm } from "@/components/teacher/ManualLessonForm";
+import { AddLessonDialog, ManualLessonForm } from "@/components/teacher/ManualLessonForm";
+import { NextLesson } from "@/components/teacher/NextLesson";
+import { TimeOffDialog, datesBetween } from "@/components/teacher/TimeOffDialog";
 import {
   fetchBookings,
   fetchSchedule,
@@ -33,6 +35,7 @@ import {
   bookingSegments,
   dateBlocks,
   dateKey,
+  daysOff,
   dateLabel,
   hoursFromRules,
   hoursProblem,
@@ -81,6 +84,9 @@ export function TeacherSchedule() {
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(
     null,
   );
+  // A free time chosen on the week, for a lesson added there.
+  const [addLesson, setAddLesson] = useState<{ date: string; minute: number } | null>(null);
+  const [timeOffOpen, setTimeOffOpen] = useState(false);
   const [paymentReview, setPaymentReview] = useState<
     { id: string; reference: string }[]
   >([]);
@@ -395,6 +401,28 @@ export function TeacherSchedule() {
     );
   }
 
+  /**
+   * A holiday: every date from one to another becomes a day off (or opens
+   * again), through the same one-at-a-time saving as a single day, and the
+   * week turns to its start so she sees it marked.
+   */
+  function takeTimeOff(from: string, to: string, off: boolean) {
+    const dates = datesBetween(from, to);
+    const offAlready = daysOff(shownExceptions);
+    for (const date of dates) {
+      if (offAlready.has(date) !== off) changeDay(date, { dayOff: off }, "");
+    }
+    const booked = dates.reduce((count, date) => count + lessonsDuring(date), 0);
+    setDayNote({
+      error: false,
+      text: off
+        ? `${dates.length === 1 ? `${shortDate(from)} is a day off` : `${shortDate(from)} to ${shortDate(to)} are days off`}.${stayBooked(booked)}`
+        : `${dates.length === 1 ? `${shortDate(from)} is` : `${shortDate(from)} to ${shortDate(to)} are`} open again.`,
+    });
+    setWeekStart(mondayOf(from));
+    setTimeOffOpen(false);
+  }
+
   const weekEnd = shiftDate(weekStart, 6);
   const weekCount = bookings.filter(
     (booking) =>
@@ -519,6 +547,10 @@ export function TeacherSchedule() {
         </div>
       ) : null}
 
+      {bookingsShown ? (
+        <NextLesson bookings={bookings} now={now} onOpen={setSelectedBooking} />
+      ) : null}
+
       <section className="teacher-week" aria-labelledby="teacher-week-title">
         {/* One bar holds the week, Weekly hours, the hint and the pager, in
             that reading order. Wide, the week and Weekly hours share the top
@@ -536,57 +568,48 @@ export function TeacherSchedule() {
                   ? "Your weekly hours"
                   : `${dateLabel(weekStart, { day: "numeric", month: "short" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}`}
               </h2>
-              {/* How to take time off waits behind a question mark beside the
-                  week, as on a student's calendar (10 October 2026, at Dan's
-                  request). */}
-              {editing ? null : (
-                <span className="teacher-week-help">
-                  <button
-                    aria-describedby="teacher-week-tip"
-                    aria-label="How to take time off"
-                    className="teacher-week-help__button"
-                    type="button"
-                  >
-                    <CircleHelp size={17} aria-hidden="true" />
-                  </button>
-                  <span className="teacher-week-help__tip" id="teacher-week-tip" role="tooltip">
-                    <span className="teacher-hint-mouse">
-                      Click a time to take it off, or drag across several. Click it
-                      again to reopen it.
-                    </span>
-                    <span className="teacher-hint-touch">
-                      Tap a time to take it off, and tap it again to reopen it.
-                    </span>
-                  </span>
-                </span>
-              )}
             </div>
           </div>
-          {editing ? (
-            <button
-              className="button button--outline teacher-mode-button"
-              type="button"
-              onClick={() => setEditing(false)}
-            >
-              <CalendarDays size={16} aria-hidden="true" />
-              Back to calendar
-            </button>
-          ) : (
-            <button
-              className="button button--coral teacher-mode-button"
-              type="button"
-              onClick={() => setEditing(true)}
-            >
-              <Repeat2 size={16} aria-hidden="true" />
-              Weekly hours
-              {hoursDirty ? (
-                <span
-                  className="teacher-unsaved-dot"
-                  aria-label="unsaved changes"
-                />
-              ) : null}
-            </button>
-          )}
+          <div className="teacher-week-actions">
+            {editing ? (
+              <button
+                className="button button--outline teacher-mode-button"
+                type="button"
+                onClick={() => setEditing(false)}
+              >
+                <CalendarDays size={16} aria-hidden="true" />
+                Back to calendar
+              </button>
+            ) : (
+              <>
+                <button
+                  className="button button--coral teacher-mode-button"
+                  type="button"
+                  onClick={() => setEditing(true)}
+                >
+                  <Repeat2 size={16} aria-hidden="true" />
+                  Weekly hours
+                  {hoursDirty ? (
+                    <span
+                      className="teacher-unsaved-dot"
+                      aria-label="unsaved changes"
+                    />
+                  ) : null}
+                </button>
+                {/* A holiday in one go, beside her weekly hours (12 October
+                    2026, at Dan's request). */}
+                <button
+                  className="button button--outline teacher-mode-button"
+                  type="button"
+                  disabled={savingDays}
+                  onClick={() => setTimeOffOpen(true)}
+                >
+                  <CalendarOff size={16} aria-hidden="true" />
+                  Time off
+                </button>
+              </>
+            )}
+          </div>
           {editing ? (
             <p className="teacher-week-hint">Click or drag down a day to mark lesson start times.</p>
           ) : null}
@@ -677,6 +700,7 @@ export function TeacherSchedule() {
             }}
             onDayOff={takeDayOff}
             onBlockTime={blockTime}
+            onAddLesson={(date, minute) => setAddLesson({ date, minute })}
             onSelectBooking={setSelectedBooking}
           />
         )}
@@ -725,6 +749,31 @@ export function TeacherSchedule() {
       </section>
 
       <ManualLessonForm token={token} onCreated={() => void reloadBookings()} />
+      {addLesson ? (
+        <AddLessonDialog
+          key={`${addLesson.date}-${addLesson.minute}`}
+          token={token}
+          date={addLesson.date}
+          minute={addLesson.minute}
+          afterAddFocusRef={calendarTitleRef}
+          onClose={() => setAddLesson(null)}
+          onCreated={(message) => {
+            if (readSession() !== token) return;
+            setAddLesson(null);
+            setStatus(message);
+            void reloadBookings();
+          }}
+        />
+      ) : null}
+      {timeOffOpen ? (
+        <TimeOffDialog
+          today={today}
+          bookings={bookings}
+          isDayOff={(date) => daysOff(shownExceptions).has(date)}
+          onClose={() => setTimeOffOpen(false)}
+          onConfirm={takeTimeOff}
+        />
+      ) : null}
       {selectedBooking ? (
         <LessonDetails
           key={selectedBooking.id}

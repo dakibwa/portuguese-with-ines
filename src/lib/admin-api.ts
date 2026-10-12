@@ -64,6 +64,16 @@ export type AdminBooking = {
   attendance_status: "expected" | "no_show";
 };
 
+/**
+ * A lesson Inês added herself, for a booking arranged elsewhere, rather than
+ * one a student booked on the site. Hers are never charged through the site,
+ * so their payment stays `not_required`; a student's always has a Stripe
+ * payment state while the site takes payments.
+ */
+export function addedByTeacher(booking: Pick<AdminBooking, "payment_status">) {
+  return booking.payment_status === "not_required";
+}
+
 async function adminRequest<T>(
   token: string,
   path: string,

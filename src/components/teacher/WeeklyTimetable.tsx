@@ -2,6 +2,7 @@
 
 import {
   Fragment,
+  useEffect,
   useMemo,
   useLayoutEffect,
   useRef,
@@ -11,8 +12,9 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
-import type { AdminBooking, AvailabilityException } from "@/lib/admin-api";
+import { createPortal } from "react-dom";
+import { CalendarOff, CalendarPlus, Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
+import { addedByTeacher, type AdminBooking, type AvailabilityException } from "@/lib/admin-api";
 import { meetingHref } from "@/components/MeetingLink";
 import { formatSlotTime } from "@/lib/booking-api";
 import {
@@ -50,7 +52,16 @@ type Props = {
   onChange: (day: number, windows: TeachingWindow[]) => void;
   onDayOff: (date: string, off: boolean) => void;
   onBlockTime: (date: string, span: Span, blocked: boolean) => void;
+  /** A free time chosen for a lesson arranged elsewhere: its date and minute in Porto. */
+  onAddLesson?: (date: string, minute: number) => void;
   onSelectBooking: (booking: AdminBooking) => void;
+};
+
+/** The choice a free time offers, beside the time chosen. */
+type SlotMenu = {
+  day: number;
+  minute: number;
+  canTakeOff: boolean;
 };
 
 /** `paint` marks lesson starts while editing, and takes time off on dates. */
@@ -70,6 +81,7 @@ export function WeeklyTimetable({
   onChange,
   onDayOff,
   onBlockTime,
+  onAddLesson,
   onSelectBooking,
 }: Props) {
   const today = dateKey(new Date());
@@ -79,6 +91,11 @@ export function WeeklyTimetable({
   });
   const [exactDay, setExactDay] = useState(1);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [slotMenu, setSlotMenu] = useState<SlotMenu | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // A drag across several times has already taken them off by the time its
+  // click arrives, so that click is spent.
+  const dragHandled = useRef(false);
   const exactRef = useRef<HTMLDetailsElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -242,12 +259,16 @@ export function WeeklyTimetable({
     if (disabled) return;
     if (!editing) {
       setFocus({ day, minute });
-      if (!locked(day, minute))
-        onBlockTime(
-          dateOf(day),
-          { start: minute, end: minute + step },
-          !takenOff(day, minute),
-        );
+      const date = dateOf(day);
+      if (date < today) return;
+      // A time already off reopens at once; a free one offers a choice:
+      // add a lesson there, or take it off (12 October 2026, at Dan's
+      // request: tapping a time used to take it off without saying so).
+      if (!locked(day, minute) && takenOff(day, minute)) {
+        onBlockTime(date, { start: minute, end: minute + step }, false);
+        return;
+      }
+      setSlotMenu({ day, minute, canTakeOff: !locked(day, minute) });
       return;
     }
     if (!canPaintHours(hours[day] ?? [], interval)) return openExact(day);
@@ -270,6 +291,7 @@ export function WeeklyTimetable({
     minute: number,
   ) {
     pointerType.current = event.pointerType;
+    dragHandled.current = false;
     if (event.pointerType !== "mouse" || event.button !== 0 || disabled) return;
     if (
       editing ? !canPaintHours(hours[day] ?? [], interval) : locked(day, minute)
@@ -311,7 +333,12 @@ export function WeeklyTimetable({
           interval,
         ),
       );
-    else
+    else if (drag.from === drag.to) {
+      // One time pressed and released is a click, which offers the choice.
+      setDrag(null);
+      return;
+    } else {
+      dragHandled.current = true;
       onBlockTime(
         dateOf(drag.day),
         {
@@ -320,8 +347,72 @@ export function WeeklyTimetable({
         },
         drag.paint,
       );
+    }
     setDrag(null);
   }
+
+  function closeSlotMenu(refocus: boolean) {
+    if (refocus && slotMenu) {
+      pendingFocus.current = true;
+      setFocus({ day: slotMenu.day, minute: slotMenu.minute });
+    }
+    setSlotMenu(null);
+  }
+
+  /**
+   * The choice sits just below its time (above it near the window's foot),
+   * inside the window, and follows the time if the page or day scrolls.
+   */
+  function placeSlotMenu() {
+    const menu = menuRef.current;
+    const cell = slotMenu
+      ? gridRef.current?.querySelector<HTMLElement>(
+          `[data-slot-day="${slotMenu.day}"][data-slot-minute="${slotMenu.minute}"]`,
+        )
+      : null;
+    if (!menu || !cell) return;
+    const rect = cell.getBoundingClientRect();
+    const width = menu.offsetWidth;
+    const height = menu.offsetHeight;
+    const left = Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8);
+    const below = rect.bottom + 6;
+    const top = below + height > window.innerHeight - 8 ? Math.max(8, rect.top - height - 6) : below;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+
+  // Its first option takes focus as it opens.
+  useLayoutEffect(() => {
+    if (!slotMenu) return;
+    placeSlotMenu();
+    menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slotMenu]);
+
+  // It closes on a press elsewhere, Escape or a new week.
+  useEffect(() => {
+    if (!slotMenu) return;
+    const outside = (event: Event) => {
+      if (!menuRef.current?.contains(event.target as Node)) setSlotMenu(null);
+    };
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeSlotMenu(true);
+    };
+    const follow = () => placeSlotMenu();
+    document.addEventListener("pointerdown", outside, true);
+    document.addEventListener("keydown", escape);
+    window.addEventListener("scroll", follow, { capture: true, passive: true });
+    window.addEventListener("resize", follow);
+    return () => {
+      document.removeEventListener("pointerdown", outside, true);
+      document.removeEventListener("keydown", escape);
+      window.removeEventListener("scroll", follow, { capture: true });
+      window.removeEventListener("resize", follow);
+    };
+  });
+  useEffect(() => setSlotMenu(null), [weekStart, editing]);
 
   function moveFocus(
     event: KeyboardEvent<HTMLButtonElement>,
@@ -574,6 +665,7 @@ export function WeeklyTimetable({
                         Math.max(span.start, start) < cellEnd,
                     );
                     const fixed = past || off || inWeekly;
+                    const blockedHere = !fixed && overlapsSpan(blocks, minute, cellEnd);
                     const reason = past
                       ? "past"
                       : off
@@ -585,19 +677,22 @@ export function WeeklyTimetable({
                         type="button"
                         className={`teacher-time-slot ${usual && !off && !blocked ? "is-available" : ""} ${blocked && !off ? "is-blocked" : ""} ${labelled ? "is-labelled" : ""} ${weeklyClass} ${hourClass}`}
                         aria-pressed={fixed ? undefined : blocked}
-                        aria-disabled={fixed || undefined}
+                        aria-disabled={past || undefined}
+                        aria-haspopup={past || blockedHere ? undefined : "menu"}
                         aria-label={
                           fixed
                             ? `${minuteLabel(minute)}, ${dateLabel(date)}, ${reason}`
-                            : `Take ${minuteLabel(minute)}–${minuteLabel(cellEnd)} off, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}`
+                            : blockedHere
+                              ? `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}, off: reopen`
+                              : `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}: add a lesson or take it off`
                         }
                         {...pointer}
-                        onClick={(event) => {
-                          if (
-                            event.detail === 0 ||
-                            pointerType.current !== "mouse"
-                          )
-                            toggle(day.value, minute);
+                        onClick={() => {
+                          if (dragHandled.current) {
+                            dragHandled.current = false;
+                            return;
+                          }
+                          toggle(day.value, minute);
                         }}
                       >
                         <span>{minuteLabel(minute)}</span>
@@ -634,12 +729,12 @@ export function WeeklyTimetable({
                           <Fragment key={`${booking.id}-${position}`}>
                           <button
                             type="button"
-                            className={`teacher-calendar-lesson ${booking.location === "porto" ? "teacher-calendar-lesson--porto" : ""}${booking.attendance_status === "no_show" ? " teacher-calendar-lesson--no-show" : ""}`}
+                            className={`teacher-calendar-lesson ${booking.location === "porto" ? "teacher-calendar-lesson--porto" : ""}${booking.attendance_status === "no_show" ? " teacher-calendar-lesson--no-show" : ""}${addedByTeacher(booking) ? " teacher-calendar-lesson--added" : ""}`}
                             style={{
                               top,
                               height,
                             }}
-                            aria-label={`${booking.student_name}, ${dateLabel(date)}, ${formatSlotTime(booking.starts_at)} to ${formatSlotTime(booking.ends_at)}, ${booking.location === "porto" ? "in Porto" : "online"}${booking.attendance_status === "no_show" ? ", marked as a no-show" : ""}. View lesson`}
+                            aria-label={`${booking.student_name}, ${dateLabel(date)}, ${formatSlotTime(booking.starts_at)} to ${formatSlotTime(booking.ends_at)}, ${booking.location === "porto" ? "in Porto" : "online"}${booking.attendance_status === "no_show" ? ", marked as a no-show" : ""}${addedByTeacher(booking) ? ", added by you" : ""}. View lesson`}
                             onClick={() => onSelectBooking(booking)}
                           >
                             <span className="teacher-lesson-time">
@@ -647,6 +742,13 @@ export function WeeklyTimetable({
                               {formatSlotTime(booking.ends_at)}
                               {booking.attendance_status === "no_show" ? (
                                 <em className="teacher-lesson-no-show">No-show</em>
+                              ) : null}
+                              {/* A lesson she added herself reads apart from
+                                  the students' own bookings while lessons
+                                  move onto the site (12 October 2026, at
+                                  Dan's request); the key says "Added by you". */}
+                              {addedByTeacher(booking) ? (
+                                <em className="teacher-lesson-added" aria-hidden="true">Added</em>
                               ) : null}
                             </span>
                             <strong>{booking.student_name}</strong>
@@ -707,6 +809,10 @@ export function WeeklyTimetable({
               <span>
                 <i className="teacher-key-booked" />
                 Booked
+              </span>
+              <span>
+                <i className="teacher-key-added" />
+                Added by you
               </span>
               <span>
                 <i className="teacher-key-off" />
@@ -818,6 +924,61 @@ export function WeeklyTimetable({
           </div>
         </details>
       ) : null}
+
+      {slotMenu
+        ? createPortal(
+            <div
+              aria-label={`${dateLabel(dateOf(slotMenu.day), { weekday: "long", day: "numeric", month: "long" })}, ${minuteLabel(slotMenu.minute)}`}
+              className="teacher-slot-menu"
+              ref={menuRef}
+              role="menu"
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+                event.preventDefault();
+                const items = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]") ?? [])];
+                const at = items.indexOf(document.activeElement as HTMLButtonElement);
+                items[(at + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+              }}
+            >
+              <p className="teacher-slot-menu__when" aria-hidden="true">
+                {dateLabel(dateOf(slotMenu.day), { weekday: "short", day: "numeric", month: "short" })} · {minuteLabel(slotMenu.minute)}
+              </p>
+              {onAddLesson ? (
+                <button
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    const { day, minute } = slotMenu;
+                    // The time keeps focus behind the form, which hands it back.
+                    gridRef.current
+                      ?.querySelector<HTMLElement>(`[data-slot-day="${day}"][data-slot-minute="${minute}"]`)
+                      ?.focus({ preventScroll: true });
+                    setSlotMenu(null);
+                    onAddLesson(dateOf(day), minute);
+                  }}
+                >
+                  <CalendarPlus size={17} aria-hidden="true" />
+                  Add a lesson here
+                </button>
+              ) : null}
+              {slotMenu.canTakeOff ? (
+                <button
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    const { day, minute } = slotMenu;
+                    closeSlotMenu(true);
+                    onBlockTime(dateOf(day), { start: minute, end: minute + step }, true);
+                  }}
+                >
+                  <CalendarOff size={17} aria-hidden="true" />
+                  Take this time off
+                </button>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

@@ -3156,6 +3156,7 @@ textarea,
 }
 
 .booking-bar .segmented label {
+  gap: 0.35rem;
   white-space: nowrap;
 }
 

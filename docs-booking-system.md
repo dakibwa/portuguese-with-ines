@@ -38,6 +38,9 @@ Inês on /schedule                     (her own account, role=teacher)
   → POST /admin/exceptions/day                       one date's day off and blocked hours
   → GET  /admin/bookings, /admin/students
   → POST /admin/bookings                             add a lesson for someone
+                                                     (never charged through the site: its
+                                                     payment stays `not_required`, which is how
+                                                     her schedule marks it `Added by you`)
   → POST /admin/bookings/:id/reschedule | /cancel
 Stripe → POST /stripe/webhook                        signature-verified
 ```
@@ -95,9 +98,13 @@ heading while the timetable reloads; a failed read retains that position and
 offers its existing reload action. Reloading never moves focus from a control
 Inês selects while it is pending.
 
-The week itself is where Inês takes time off. Clicking, tapping or dragging
-across times on a date blocks them for that date only, and doing so again
-reopens them; the `Day off` switch above each date blocks the whole day. Each
+The week itself is where Inês takes time off. Choosing a free time offers
+`Add a lesson here` or `Take this time off`; dragging across times on a date
+blocks them all for that date only, and choosing a blocked time reopens it.
+The `Day off` switch above each date blocks the whole day, and `Time off`
+beside `Weekly hours` sends a day off for every date from one to another
+through the same queue (at most 92 days at a time), naming any lessons
+already booked in that time. Each
 change saves as she makes it, one request at a time, so quick clicks coalesce
 into the date's latest choice. A failed older save keeps a newer choice queued;
 failure of the latest choice puts that date back as saved and says so.
