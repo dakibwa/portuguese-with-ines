@@ -83,6 +83,7 @@ async function fixture(width, options = {}) {
     dayGate: null,
     nextId: 1000,
     failMove: 0,
+    failCancel: 0,
     failBookings: false,
   };
   page.on("pageerror", (error) => state.errors.push(error.message));
@@ -223,7 +224,10 @@ async function fixture(width, options = {}) {
           starts_at: data.startAt,
           ends_at: new Date(Date.parse(data.startAt) + duration).toISOString(),
         });
-      } else if (match[2] === "cancel") booking.status = "cancelled";
+      } else if (match[2] === "cancel") {
+        if (state.failCancel-- > 0) return fail("The booking system is busy. Please try again.");
+        booking.status = "cancelled";
+      }
       else booking.attendance_status = data.noShow ? "no_show" : "expected";
       return route.fulfill({ json: { booking } });
     }
@@ -657,12 +661,27 @@ try {
     state.bookings.find((entry) => entry.id.startsWith("manual")).status,
     "confirmed",
   );
+  const cancellationMessage = "Olá Robin, I’m sorry, I’m unwell today.\nPlease reply and we can find another time.";
+  const messageField = page.getByLabel("Message to student (optional)");
+  await expect(messageField).toHaveAttribute("maxlength", "1000");
+  await messageField.fill(cancellationMessage);
+  await page.getByRole("button", { name: "Back to lesson" }).click();
+  await page.getByRole("button", { name: "Cancel lesson", exact: true }).click();
+  await expect(messageField).toHaveValue(cancellationMessage);
+  const dialogBounds = await page.getByRole("dialog").boundingBox();
+  assert.ok(dialogBounds.y >= 0 && dialogBounds.y + dialogBounds.height <= page.viewportSize().height + 1,
+    "the cancellation stays inside the viewport after the calendar has scrolled");
+  state.failCancel = 1;
+  await page.getByRole("button", { name: "Yes, cancel lesson" }).click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("Please try again");
+  await expect(messageField).toHaveValue(cancellationMessage);
   await page.getByRole("button", { name: "Yes, cancel lesson" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   assert.equal(
     state.bookings.find((entry) => entry.id.startsWith("manual")).status,
     "cancelled",
   );
+  assert.equal(state.writes.filter(entry => entry.path.endsWith("/cancel")).at(-1).data.message, cancellationMessage);
 
   // Her next lesson leads the page with its call: Alex's is happening now.
   const nextLesson = page.locator(".teacher-next");
@@ -841,6 +860,26 @@ try {
     await mobile.page.setViewportSize({ width, height: 900 });
     await noOverflow(mobile.page);
   }
+  await mobile.page.setViewportSize({ width: 390, height: 844 });
+  await showLessons(mobile.page);
+  await mobile.page.getByRole("button", { name: "Tuesday 8 September, show lessons" }).tap();
+  await mobile.page.getByRole("button", { name: /^Sam,.*View lesson$/ }).tap();
+  await mobile.page.getByRole("button", { name: "Cancel lesson", exact: true }).tap();
+  const phoneMessage = mobile.page.getByLabel("Message to student (optional)");
+  const longMessage = "Obrigada! ".repeat(100);
+  await phoneMessage.fill(longMessage);
+  for (const width of [390, 320, 827]) {
+    await mobile.page.setViewportSize({ width, height: 844 });
+    const confirm = mobile.page.getByRole("button", { name: "Yes, cancel lesson" });
+    await confirm.scrollIntoViewIfNeeded();
+    const bounds = await mobile.page.getByRole("dialog").boundingBox();
+    assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 845);
+    assert.ok(await confirm.evaluate(node => node.scrollWidth <= node.clientWidth + 1), "the full cancellation label fits");
+    await expect(phoneMessage).toHaveValue(longMessage);
+  }
+  await mobile.page.getByRole("button", { name: "Yes, cancel lesson" }).click();
+  await expect(mobile.page.getByRole("dialog")).toHaveCount(0);
+  assert.equal(mobile.state.writes.filter(entry => entry.path.endsWith("/cancel")).at(-1).data.message, longMessage);
   assert.deepEqual(mobile.state.errors, []);
   await mobile.page.close();
 

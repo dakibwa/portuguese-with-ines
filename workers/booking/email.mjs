@@ -101,7 +101,7 @@ function base64(text) {
  * - A preheader controls the grey preview line in the inbox list. Without one,
  *   clients scrape the first visible text, which is usually the greeting.
  */
-function layout({ heading, preheader, intro, hero, heroNote, rows, callout, steps, action, footer }) {
+function layout({ heading, preheader, intro, hero, heroNote, rows, callout, message, steps, action, footer }) {
   // Each fact is a line beside one of the confirm step's dabs, its label small
   // above it: a list to glance down rather than a ruled table.
   const rowsHtml = rows.length
@@ -155,6 +155,16 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, step
         )}</h1>
         <p style="margin:12px 0 0;font:400 15px/1.65 ${SANS};color:${BRAND.ink}">${escapeRich(intro)}</p>
       </td></tr>
+
+      ${message?.body?.trim()
+        ? `<tr><td style="padding:22px 32px 0">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+          <tr><td style="border-left:4px solid ${BRAND.lavender};padding:2px 0 2px 18px;overflow-wrap:anywhere;word-break:break-word">
+            <p style="margin:0;font:600 11px/1.5 ${SANS};letter-spacing:.07em;text-transform:uppercase;color:${BRAND.blue}">${escapeHtml(message.label)}</p>
+            <p style="margin:8px 0 0;font:400 15px/1.65 ${SANS};color:${BRAND.ink}">${escapeRich(message.body)}</p>
+          </td></tr>
+        </table>
+      </td></tr>` : ""}
 
       ${
         when
@@ -271,9 +281,10 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, step
  * deleted anything a student had written between angle brackets, including part
  * of an address, from the text part while the HTML part showed it correctly.
  */
-function plainText({ heading, intro, hero, heroNote, rows, callout, steps, action, footer }) {
+function plainText({ heading, intro, hero, heroNote, rows, callout, message, steps, action, footer }) {
   const clean = (value) => String(value ?? "").trim();
   const lines = [heading, "", clean(intro)];
+  if (message?.body?.trim()) lines.push("", clean(message.label), clean(message.body));
   // heroNote already reads "… — the student's time", so a bracket here nests badly.
   if (hero) {
     const { date, time } = splitWhen(hero);

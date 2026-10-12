@@ -149,6 +149,16 @@ heading while the timetable reloads; a failed read retains that position and
 offers its existing reload action. Reloading never moves focus from a control
 Inês selects while it is pending.
 
+When Inês cancels a lesson she can include an optional **Message to student**,
+up to 1,000 characters. It appears as **Message from Inês** in the student's
+cancellation email and in her own copy, with line breaks preserved and markup
+treated as text. An empty message leaves the existing email unchanged. The
+message is stored separately from lesson notes, atomically with cancellation
+or the refund claim, so refund reconciliation and email retries retain it.
+Migration `0024-cancellation-message.sql` adds that nullable booking field and
+must be applied to each database before deploying this Worker. Her existing
+no-fee cancellation and automatic refund rules remain the same.
+
 The week itself is where Inês takes time off. Choosing a free time offers
 `Add a lesson here` or `Take this time off`; dragging across times on a date
 blocks them all for that date only, and choosing a blocked time reopens it.

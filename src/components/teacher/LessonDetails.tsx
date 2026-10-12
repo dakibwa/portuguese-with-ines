@@ -44,6 +44,7 @@ export function LessonDetails({
   );
   const [date, setDate] = useState(dateKey(new Date(booking.starts_at)));
   const [time, setTime] = useState(formatSlotTime(booking.starts_at));
+  const [cancelMessage, setCancelMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const noShowCloses = new Date(new Date(booking.ends_at).getTime() + NO_SHOW_WINDOW_HOURS_AFTER * 3_600_000);
@@ -109,7 +110,7 @@ export function LessonDetails({
         changed.current = true;
         onChanged("Lesson moved. The student has been emailed the new time.");
       } else if (action === "cancel") {
-        await cancelBookingAs(token, booking.id);
+        await cancelBookingAs(token, booking.id, cancelMessage);
         changed.current = true;
         onChanged("Lesson cancelled. The student has been emailed.");
       } else if (action === "no-show") {
@@ -355,6 +356,26 @@ export function LessonDetails({
                     ? "The lesson price will be charged as normal."
                     : `Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the lesson price.`}
               </p>
+              {action === "cancel" ? (
+                <div className="teacher-form teacher-cancel-message">
+                  <label htmlFor="teacher-cancel-message">
+                    <span>Message to student <span className="teacher-field-optional">(optional)</span></span>
+                    <textarea
+                      id="teacher-cancel-message"
+                      aria-describedby="teacher-cancel-message-hint"
+                      rows={4}
+                      maxLength={1000}
+                      disabled={busy}
+                      value={cancelMessage}
+                      onChange={(event) => setCancelMessage(event.target.value)}
+                    />
+                  </label>
+                  <div className="teacher-cancel-message__hint">
+                    <p id="teacher-cancel-message-hint">Included in their cancellation email.</p>
+                    <span aria-hidden="true">{cancelMessage.length}/1,000</span>
+                  </div>
+                </div>
+              ) : null}
               <div className="teacher-dialog-actions">
                 <button
                   className={`button ${action === "no-show" && noShow ? "button--blue" : "button--coral"}`}
