@@ -1297,7 +1297,7 @@ async function confirmStudentCard(env, session) {
         heading: `${student.name} added a card`,
         preheader: "Their lessons with you are now paid after each one.",
         intro: onCard?.length
-          ? `These lessons you added are now charged to their card after each one. If they already paid you for any by hand, mark it “Paid by hand” on your schedule before it ends.`
+          ? `These lessons you added are now charged to their card after each one. If they already paid you for one by hand, open it on your schedule and choose “Take it off their card”.`
           : "Lessons you add for them from now on are charged to their card after each one.",
         callout: "",
         rows: onCard?.length
