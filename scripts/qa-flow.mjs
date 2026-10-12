@@ -9,7 +9,8 @@ const routes = [
   { id: "approach", path: "/approach", heading: "No class." },
   { id: "lessons", path: "/lessons", heading: "Lessons, and" },
   { id: "faq", path: "/faq", heading: "Questions" },
-  { id: "booking", path: "/book", heading: "Your Lessons" }
+  // A visitor without an account is here to book; a student sees Your Lessons.
+  { id: "booking", path: "/book", heading: "Book a Lesson" }
 ];
 
 await mkdir(outDir, { recursive: true });
@@ -2513,6 +2514,10 @@ await changeLessonTime.click();
 // Signed in, booking is headed by the account's name and its menu, at every
 // width: booking is not one of the account's places, so they stay folded.
 await accountPage.locator(".booking-bar__head--account").waitFor({ state: "visible" });
+{
+  const bannerTitle = (await accountPage.locator("#booking-title").innerText()).replace(/\s+/g, " ").trim();
+  if (bannerTitle !== "Your Lessons") throw new Error(`Signed in, the booking banner should read Your Lessons; it read ${bannerTitle}.`);
+}
 const bookingBarMenu = accountPage.locator(".booking-bar__head #account-menu-button");
 await bookingBarMenu.waitFor({ state: "visible" });
 if (await accountPage.locator(".booking-bar__head .account-menu__places button").first().isVisible()) {

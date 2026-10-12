@@ -42,10 +42,21 @@ export function BookingFlow({ initialView = "book" }: { initialView?: BookingVie
       <main className="book-page" id="main-content">
         <section className="booking-composition" aria-labelledby="booking-title">
           <aside className="booking-intro">
+            {/* A visitor without an account is here to book; a student, or a
+                lesson's own link, is here for their lessons (12 October 2026,
+                at Dan's request). The page's script picks one before it
+                paints, from the stored session and the link. */}
             <h1 id="booking-title">
-              Your{" "}
-              <br />
-              <span className="display-second-line">Lessons</span>
+              <span className="booking-title booking-title--book">
+                Book a{" "}
+                <br />
+                <span className="display-second-line">Lesson</span>
+              </span>
+              <span className="booking-title booking-title--account">
+                Your{" "}
+                <br />
+                <span className="display-second-line">Lessons</span>
+              </span>
             </h1>
             <div className="editorial-rule" aria-hidden="true" />
             <AssetMark

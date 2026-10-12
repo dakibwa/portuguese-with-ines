@@ -45,6 +45,17 @@ const primeBooking = BOOKING_API_BASE_URL
     `})(${JSON.stringify(BOOKING_API_BASE_URL)},${JSON.stringify(BOOKING_TIME_ZONE)})}catch(e){}`
   : "";
 
+/**
+ * Whose banner this is, settled before the page paints: a stored session, or a
+ * link to a lesson or to Your lessons, makes it the student's (`Your Lessons`);
+ * anyone else is here to book (`Book a Lesson`). Without JavaScript the page
+ * reads as booking.
+ */
+const markAccount =
+  `try{var q=new URLSearchParams(location.search);` +
+  `if(localStorage.getItem("ines-student-session")||q.get("view")==="lessons"||["manage","token","emailToken","card"].some(function(k){return q.has(k)}))` +
+  `document.documentElement.setAttribute("data-booking-account","")}catch(e){}`;
+
 export default function BookPage() {
   // The API is a different origin, so the handshake is otherwise paid for
   // inside the request above rather than alongside the document.
@@ -52,6 +63,7 @@ export default function BookPage() {
 
   return (
     <>
+      <script dangerouslySetInnerHTML={{ __html: markAccount }} />
       {primeBooking ? <script dangerouslySetInnerHTML={{ __html: primeBooking }} /> : null}
       <BookingFlow />
     </>

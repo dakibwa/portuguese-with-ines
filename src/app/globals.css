@@ -2493,6 +2493,20 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   margin-top: 0;
 }
 
+/* One title shows: Book a Lesson, or Your Lessons for a student (BookingFlow). */
+.booking-title {
+  display: contents;
+}
+
+.booking-title--account,
+:root[data-booking-account] .booking-title--book {
+  display: none;
+}
+
+:root[data-booking-account] .booking-title--account {
+  display: contents;
+}
+
 .booking-intro > .editorial-rule {
   display: none;
 }

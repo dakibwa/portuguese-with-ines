@@ -960,6 +960,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [studentZone, setStudentZone] = useState(BOOKING_TIME_ZONE);
   const [student, setStudent] = useState<Student | null>(null);
+  // Signed in on the page, the banner becomes the student's (BookingFlow).
+  useEffect(() => {
+    if (student) document.documentElement.setAttribute("data-booking-account", "");
+  }, [student]);
   const isTeacher = student?.role === "teacher";
 
   useEffect(() => {
@@ -3132,6 +3136,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   function signOut() {
     transitionBooking(() => {
       clearSession();
+      document.documentElement.removeAttribute("data-booking-account");
       managedRequest.current += 1;
       setManageLoading(false);
       setStudent(null);

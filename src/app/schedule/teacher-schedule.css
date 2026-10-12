@@ -269,9 +269,17 @@
   background: var(--paper);
   border-bottom: 1px solid var(--rule);
 }
+/* The hours stay put above the days sliding beneath them as the week turns. */
+.teacher-axis-heading,
+.teacher-time-axis {
+  z-index: 1;
+}
 .teacher-axis-heading {
-  align-self: center;
-  justify-self: center;
+  position: relative;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
   color: var(--lavender-ink);
   font: 700 0.58rem var(--ui);
   letter-spacing: 0.06em;
@@ -1313,6 +1321,8 @@
   .teacher-timetable-scroll {
     max-height: 504px;
     overflow: auto;
+    /* A turning week slides its day sideways without a scrollbar flashing. */
+    overflow-x: hidden;
   }
   .teacher-timetable--editing .teacher-time-slot > span {
     opacity: 1;
