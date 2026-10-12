@@ -275,6 +275,11 @@ export function openCardPage(token: string) {
   });
 }
 
+/** Takes back the card's standing agreement; lessons Inês added go back to being paid by hand. */
+export function removeStudentCard(token: string) {
+  return post<{ student: Student }>("/me/card/remove", {}, token).then(validateStudentReply);
+}
+
 export function resetPassword(token: string, password: string) {
   return post<{ student: Student; session: string }>("/auth/reset", { token, password }).then(validateSignInReply);
 }

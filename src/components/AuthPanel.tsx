@@ -141,7 +141,7 @@ export function AuthPanel({
         await requestSignInLink(form.email.trim());
         if (request !== authRequest.current || readSession() !== session) return;
         setNoticeFrom("link");
-        setNotice("If you have an account, a link is on its way. Open it on this device.");
+        setNotice("If you have an account, a link is on its way.");
         return;
       }
 

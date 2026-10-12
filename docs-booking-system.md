@@ -88,7 +88,8 @@ the nightly top-up keeps doing so. A week that cannot be booked is left out and
 named in both emails.
 
 **Paying for the lessons she adds** (migration 0023, 12 October 2026, Dan).
-A lesson Inês adds records its price and `added_by_teacher = 1`. It is paid to
+A lesson Inês adds records its price and `added_by_teacher = 1`. One she
+records after it has happened is never charged. It is paid to
 her as before (`payment_status = 'not_required'`) until the student saves a card
 from their own account (`POST /me/card`, Stripe's hosted setup page,
 `client_reference_id = student:<id>`, `metadata.purpose = student_card`). That
@@ -102,8 +103,19 @@ as a lesson the student books), her weekly slots for them turn on
 `automatic_payment`, and anything she adds afterwards is `scheduled` from the
 start. A lesson already had, or one the student booked themselves, is never
 changed. A card saved at one booking's checkout agreed to that booking only and
-does not count. `Your lessons` asks once, above the calendar, while a lesson
-she added is still unpaid; `Your details` has a `Card` row.
+does not count, and only a proven address (see *Accounts*) can save one: a card
+someone registered first never pays for the owner's lessons, and taking an
+unproven account back clears its agreement. `Your lessons` asks once, above
+the calendar, while a lesson she added is still unpaid; `Your details` has a
+`Card` row with `Remove card` (`POST /me/card/remove`), which puts her lessons
+still to come back to being paid by hand and stops her weekly slots charging.
+
+Inês is emailed which of her lessons a newly saved card now pays for. One the
+student already paid her for by hand comes off the card from its dialog
+(`Already paid you by hand? Take it off their card`,
+`POST /admin/bookings/:id/paid-by-hand`) before it is charged, and is marked so
+that no later card takes it back. A lesson she records after it has happened is
+never put on a card.
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
@@ -241,13 +253,14 @@ depending on them having kept the right confirmation email.
   links in emails Inês causes last 14 days. A link is signed like a reset under
   its own prefix, and its `sign_in_links` row is the record that it is unspent:
   `POST /auth/email-link/confirm` deletes the row first, so of two clicks one
-  signs in, and only while the account still has the address the link was sent
+  signs in (the page calls it only when the student presses `Sign in`, so a
+  mail scanner opening the link spends nothing), and only while the account still has the address the link was sent
   to. A link proves the address. On an account that was registered with a
   password and never proven, it makes a Google first link's transition: the
   password, other sessions and any pending reset or address change go. Teacher
-  accounts are never sent one. `/book/?signin=` spends the link from the address
-  bar before anything else and opens `Your lessons`; a spent or expired link
-  opens the panel on asking for a new one.
+  accounts are never sent one. `/book/?signin=` takes the link out of the
+  address bar at once and shows `Sign in`; pressing it opens `Your lessons`,
+  and a spent or expired link opens the panel on asking for a new one.
 - **An address counts as proven once it has received mail.**
   `students.email_verified_at` (migration 0020) is set by any Google sign-in,
   a completed password reset or a confirmed email change; registering with a

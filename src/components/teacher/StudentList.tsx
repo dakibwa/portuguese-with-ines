@@ -3,22 +3,25 @@
 import { useState } from "react";
 import { CalendarPlus, CheckCircle2, Repeat, Send, Users } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
-import { fetchStudents, sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
+import { sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
 import { formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 
-/** Someone she still needs to bring in comes first: never signed in, or lessons not yet on a card. */
-function needsHer(student: AdminStudent) {
-  return !student.signedIn || Boolean(student.unpaidUpcoming && !student.cardForAllLessons);
+/**
+ * Someone she still needs to bring in comes first: never signed in, or (where
+ * the site takes cards) lessons she added that no card pays for yet.
+ */
+function needsHer(student: AdminStudent, cards: boolean) {
+  return !student.signedIn || Boolean(cards && student.unpaidUpcoming && !student.cardForAllLessons);
 }
 
 /** Where they are, in one plain line. */
-function statusOf(student: AdminStudent) {
-  const owed = student.unpaidUpcoming && !student.cardForAllLessons
-    ? `${student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} to collect`
+function statusOf(student: AdminStudent, cards: boolean) {
+  const byHand = cards && student.unpaidUpcoming && !student.cardForAllLessons
+    ? `${student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} paid by hand`
     : "";
-  if (!student.signedIn) return ["Not signed in yet", owed].filter(Boolean).join(" · ");
-  if (owed) return `No card yet · ${owed}`;
+  if (!student.signedIn) return ["Not signed in yet", byHand].filter(Boolean).join(" · ");
+  if (byHand) return `No card yet · ${byHand}`;
   return student.cardForAllLessons ? "All set: signed in, card saved" : "Signed in";
 }
 
@@ -29,36 +32,42 @@ function nextLesson(at: string) {
 /**
  * Her students at a glance, for the move onto the site (12 October 2026,
  * Dan): who has signed in, whose lessons a card pays for, and what comes
- * next. Anyone can be sent a fresh one-click way in. Read each time it opens,
- * so it is never older than the last look.
+ * next, one small card each. The schedule reads the list with the page and
+ * after every lesson she adds, so the count of those still to bring in shows
+ * before she opens it and an open list is never stale.
  */
-export function StudentList({ token, onAddLesson }: { token: string; onAddLesson?: (student: AdminStudent) => void }) {
-  const [students, setStudents] = useState<AdminStudent[] | null>(null);
-  const [error, setError] = useState("");
+export function StudentList({
+  token,
+  students,
+  cards,
+  error,
+  onAddLesson,
+}: {
+  token: string;
+  students: AdminStudent[] | null;
+  /** Whether the site takes cards just now; without them nobody is asked for one. */
+  cards: boolean;
+  error: string;
+  onAddLesson: (student: AdminStudent) => void;
+}) {
   const [query, setQuery] = useState("");
   const [sending, setSending] = useState("");
-  const [sent, setSent] = useState<Record<string, string>>({});
-
-  async function load() {
-    setError("");
-    try {
-      setStudents((await fetchStudents(token)).students);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Your students couldn’t be loaded.");
-    }
-  }
+  // Each answer stays on its own student's card, where she pressed.
+  const [sent, setSent] = useState<Record<string, { ok: boolean; message: string }>>({});
 
   async function welcome(student: AdminStudent) {
     setSending(student.id);
-    setError("");
     try {
       const result = await sendStudentWelcome(token, student.id);
       setSent((current) => ({
         ...current,
-        [student.id]: result.card ? "Sent: a link to sign in and add a card" : "Sent: a link to sign in",
+        [student.id]: { ok: true, message: result.card ? "Sent: a link to sign in and add a card" : "Sent: a link to sign in" },
       }));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The link couldn’t be sent.");
+      setSent((current) => ({
+        ...current,
+        [student.id]: { ok: false, message: caught instanceof Error ? caught.message : "The link couldn’t be sent." },
+      }));
     } finally {
       setSending("");
     }
@@ -67,22 +76,18 @@ export function StudentList({ token, onAddLesson }: { token: string; onAddLesson
   const term = query.trim().toLowerCase();
   const shown = (students ?? [])
     .filter((student) => !term || student.name.toLowerCase().includes(term) || student.email.toLowerCase().includes(term))
-    .sort((a, b) => Number(needsHer(b)) - Number(needsHer(a)) || a.name.localeCompare(b.name));
-  const waiting = (students ?? []).filter(needsHer).length;
+    .sort((a, b) => Number(needsHer(b, cards)) - Number(needsHer(a, cards)) || a.name.localeCompare(b.name));
+  const waiting = (students ?? []).filter((student) => needsHer(student, cards)).length;
 
   return (
-    <details
-      className="teacher-students"
-      onToggle={(event) => {
-        if (event.currentTarget.open) void load();
-      }}
-    >
+    <details className="teacher-students">
       <summary>
         <span>
           <span className="teacher-eyebrow">Who&rsquo;s on the site</span>
           <span className="teacher-manual-title">
             Your students
             {students ? <span className="teacher-students__count"> · {students.length}</span> : null}
+            {waiting ? <span className="teacher-students__waiting"> · {waiting} to bring in</span> : null}
           </span>
         </span>
         <Users size={22} aria-hidden="true" />
@@ -99,11 +104,6 @@ export function StudentList({ token, onAddLesson }: { token: string; onAddLesson
             />
           </label>
         ) : null}
-        {students && waiting ? (
-          <p className="teacher-students__lead">
-            {waiting === 1 ? "1 student still needs" : `${waiting} students still need`} to sign in or add a card.
-          </p>
-        ) : null}
         {error ? (
           <p className="teacher-inline-error" role="alert">
             {error}
@@ -115,20 +115,21 @@ export function StudentList({ token, onAddLesson }: { token: string; onAddLesson
         ) : null}
         <ul className="teacher-students__list">
           {shown.map((student) => {
-            const waiting = needsHer(student);
+            const waitingOn = needsHer(student, cards);
+            const answer = sent[student.id];
             return (
-              <li className={`teacher-student${waiting ? " needs-her" : " is-ready"}`} key={student.id}>
+              <li className={`teacher-student${waitingOn ? " needs-her" : " is-ready"}`} key={student.id}>
                 <AccountAvatar className="teacher-student__avatar" mark={student.mark} name={student.name} />
                 <div className="teacher-student__main">
                   <strong className="teacher-student__name">{student.name}</strong>
                   <span className="teacher-student__email">{student.email}</span>
                   <p className="teacher-student__status">
-                    {waiting ? (
+                    {waitingOn ? (
                       <span aria-hidden="true" className="teacher-student__dot" />
                     ) : (
                       <CheckCircle2 size={15} aria-hidden="true" />
                     )}
-                    {statusOf(student)}
+                    {statusOf(student, cards)}
                   </p>
                   <p className="teacher-student__next">
                     {student.nextLessonAt ? `Next lesson ${nextLesson(student.nextLessonAt)}` : "No lessons booked"}
@@ -141,29 +142,28 @@ export function StudentList({ token, onAddLesson }: { token: string; onAddLesson
                   </p>
                 </div>
                 <div className="teacher-student__action">
-                  <button className="teacher-student__button" onClick={() => onAddLesson?.(student)} type="button">
+                  <button className="teacher-student__button" onClick={() => onAddLesson(student)} type="button">
                     <CalendarPlus size={15} aria-hidden="true" />
                     Add lesson
                     <span className="visually-hidden"> for {student.name}</span>
                   </button>
                   {/* Only someone still to bring in needs a way in sent. */}
-                  {waiting ? (
-                    sent[student.id] ? (
-                      <span className="teacher-student__sent" role="status">
-                        {sent[student.id]}
-                      </span>
-                    ) : (
-                      <button
-                        className="teacher-student__button teacher-student__button--send"
-                        disabled={sending === student.id}
-                        onClick={() => void welcome(student)}
-                        type="button"
-                      >
-                        <Send size={15} aria-hidden="true" />
-                        {sending === student.id ? "Sending…" : "Send sign-in link"}
-                        <span className="visually-hidden"> to {student.name}</span>
-                      </button>
-                    )
+                  {waitingOn && !answer?.ok ? (
+                    <button
+                      className="teacher-student__button teacher-student__button--send"
+                      disabled={sending === student.id}
+                      onClick={() => void welcome(student)}
+                      type="button"
+                    >
+                      <Send size={15} aria-hidden="true" />
+                      {sending === student.id ? "Sending…" : "Send sign-in link"}
+                      <span className="visually-hidden"> to {student.name}</span>
+                    </button>
+                  ) : null}
+                  {answer ? (
+                    <span className={answer.ok ? "teacher-student__sent" : "teacher-student__failed"} role={answer.ok ? "status" : "alert"}>
+                      {answer.message}
+                    </span>
                   ) : null}
                 </div>
               </li>

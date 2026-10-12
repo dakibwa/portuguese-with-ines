@@ -83,12 +83,9 @@ export type AdminBooking = {
  * A lesson Inês added herself, for a booking arranged elsewhere, rather than
  * one a student booked on the site. The booking system records it outright
  * (migration 0023), so it stays hers once the student's card pays for it.
- * Before that record existed, hers were the lessons with no site payment.
  */
-export function addedByTeacher(booking: Pick<AdminBooking, "payment_status" | "added_by_teacher">) {
-  return booking.added_by_teacher === undefined
-    ? booking.payment_status === "not_required"
-    : Boolean(booking.added_by_teacher);
+export function addedByTeacher(booking: Pick<AdminBooking, "added_by_teacher">) {
+  return Boolean(booking.added_by_teacher);
 }
 
 async function adminRequest<T>(
@@ -214,7 +211,7 @@ function validateBookingAcknowledgment<T extends { booking: { reference: string 
 }
 
 export function fetchStudents(token: string) {
-  return adminRequest<{ students: AdminStudent[] }>(token, "/admin/students");
+  return adminRequest<{ students: AdminStudent[]; cardsAccepted?: boolean }>(token, "/admin/students");
 }
 
 /** Emails a student a fresh one-click way into their account. */
@@ -276,6 +273,22 @@ export function cancelBookingAs(token: string, bookingId: string) {
       body: "{}",
     },
   ).then(validateBookingAcknowledgment);
+}
+
+/**
+ * A lesson she added that the student already paid her for by hand comes off
+ * their card before it is charged.
+ */
+export function markPaidByHand(token: string, bookingId: string) {
+  return adminRequest<{ booking: AdminBooking }>(token, `/admin/bookings/${bookingId}/paid-by-hand`, {
+    method: "POST",
+    body: "{}",
+  }).then((data) => {
+    if (!isApiRecord(data.booking) || data.booking.id !== bookingId || data.booking.payment_status !== "not_required") {
+      throw new Error(BOOKING_REPLY_ERROR);
+    }
+    return data;
+  });
 }
 
 export function setNoShow(token: string, bookingId: string, noShow: boolean) {

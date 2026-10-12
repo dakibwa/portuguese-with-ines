@@ -53,6 +53,7 @@ async function fixture(width, reply, signed = true) {
         : path === "/availability" ? { slotsByDate: { "2026-10-06": [{ startAt: "2026-10-06T09:00:00Z", endAt: "2026-10-06T10:00:00Z" }] }, horizonDays: 84, timeZone: "Europe/Lisbon" }
         : path === "/bookings/fixture" ? { booking: lesson, isPast: false, sameDayFeeApplies: false }
         : path === "/admin/availability" ? { rules: [], exceptions: [] }
+        : path === "/admin/students" ? { students: [], cardsAccepted: false }
         : path === "/admin/google-calendar" ? { configured: false, connected: false, needsReconnect: false, pending: 0 }
         : null;
       if (json) return route.fulfill({ headers: cors, json });

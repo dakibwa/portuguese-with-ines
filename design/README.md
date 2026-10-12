@@ -699,18 +699,24 @@ Preserve these desktop and mobile states:
   (`Save name`, `Send confirmation link`, `Save NIF`) and `Cancel`, and closes
   once saved; only an open email carries a short note, the NIF's purpose being
   in its label. A `Card` row follows the email where the site takes cards
-  (12 October 2026, Dan): `Saved`, `Only for lessons you book`, or `Not
+  (12 October 2026, Dan): `Saved`, `Only for lessons you book` or `Not
   added`, with `Change` or `Add card`; opening it shows the confirm step's
-  dabbed terms in place (`Paid after each lesson`, `Stripe keeps your card
-  safe`, the two €5 fees) and `Agree & add card`, which goes to Stripe's
-  page. While a lesson Inês added is still paid to her by hand, Your lessons
-  carries one quiet sheet card above the calendar: a card icon in a lilac
-  disc, `Pay by card`, `Add your card once. Each lesson is paid after it
-  ends.` and `Add card`, nothing more; back from Stripe it becomes `Card
-  saved. Each lesson is now paid after it ends.` Its words are as short and
+  dabbed terms in place (the two €5 fees among them) and `Agree & add
+  card`, which goes to Stripe's page. While a lesson Inês added is still
+  paid to her by hand, Your lessons carries one quiet sheet card above the
+  calendar: a card icon in a lilac disc, `Pay by card`, `Add your card once
+  and you’re set.` and `Add card`, nothing more; back from Stripe it becomes
+  `Card saved. You’re all set.` Its words are as short and
   plain as they can be (12 October 2026, Dan: "the language here can be
   even more simple"), and so are the emails that bring students in.
-  The sign-in panel's quiet links read `Email me a sign-in link` and
+  A sign-in link from an email opens on `Welcome`, `Sign in to see your
+  lessons. No password needed.` and one coral `Sign in`, spent only when
+  pressed, since mail scanners open links on their own; a spent link says so
+  there and offers `Email me a new link`. The card terms add `Your upcoming
+  lessons with Inês are charged to it, each after it ends` and `Already paid
+  Inês for some? Tell her and she’ll take them off`; an open Card row also
+  offers `Remove card`. In Inês's lesson dialog a lesson she added that a card
+  now pays for offers `Already paid you by hand? Take it off their card`. The sign-in panel's quiet links read `Email me a sign-in link` and
   `I’ve forgotten my password` side by side; asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.
   Text fields are 44 px tall, the usual touch height. In the
@@ -1109,8 +1115,8 @@ as a form:
   `8 weeks` or `Until stopped`, as the student's own choice does. `Your
   students` sits beneath the form as small sheet cards, two across where
   there is room: the student's splat (or initial), name and address, one
-  plain status line (a coral dot and `Not signed in yet · 1 lesson to
-  collect`, or a check and `All set: signed in, card saved`), the next
+  plain status line (a coral dot and `Not signed in yet · 1 lesson paid by
+  hand`, or a check and `All set: signed in, card saved`), the next
   lesson with a `Weekly` pill, and beneath a rule `Add lesson` (her form
   opens with them in it, on the date) and, only for someone still to bring
   in, a coral `Send sign-in link`. Those come first, their card edged in

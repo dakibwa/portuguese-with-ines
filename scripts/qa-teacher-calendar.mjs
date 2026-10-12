@@ -200,6 +200,7 @@ async function fixture(width, options = {}) {
     if (path === "/admin/students") {
       return route.fulfill({
         json: {
+          cardsAccepted: true,
           students: [
             { id: "sam", name: "Sam Known", email: "sam@example.invalid", phone: "", signedIn: false, hasCard: false, cardForAllLessons: false, nextLessonAt: "2026-09-10T16:00:00.000Z", upcoming: 1, unpaidUpcoming: 1, weekly: 0 },
             { id: "alex", name: "Alex", email: "alex@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 1 },
@@ -719,7 +720,7 @@ try {
   await students.locator("summary").click();
   await expect(students.locator(".teacher-student").first()).toContainText("Sam Known");
   await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet");
-  await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet · 1 lesson to collect");
+  await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet · 1 lesson paid by hand");
   await expect(students.locator(".teacher-student").nth(1)).toContainText("All set: signed in, card saved");
   await expect(students.getByRole("button", { name: "Send sign-in link to Alex" })).toHaveCount(0);
   await students.getByRole("button", { name: "Send sign-in link to Sam Known" }).click();

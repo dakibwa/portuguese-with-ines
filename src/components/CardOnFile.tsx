@@ -30,13 +30,14 @@ export function CardTerms({ change = false, onCancel }: { change?: boolean; onCa
   return (
     <div className="card-terms">
       <ul className="booking-payment-facts" id="card-terms-summary">
-        <li>Paid after each lesson</li>
+        <li>Your upcoming lessons with Inês are charged to it, each after it ends</li>
+        <li>Already paid Inês for some? Tell her and she&rsquo;ll take them off</li>
         <li>Stripe keeps your card safe</li>
         <li>
           <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> to move or cancel less than {NOTICE_HOURS} hours before
         </li>
         <li>
-          <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> if you miss a lesson
+          <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> if you don’t show up to a lesson
         </li>
         <li>
           The full rules are in{" "}
@@ -80,7 +81,7 @@ export function CardPrompt() {
       </span>
       <div className="card-prompt__body">
         <h3 id="card-prompt-heading">Pay by card</h3>
-        <p>Add your card once. Each lesson is paid after it ends.</p>
+        <p>Add your card once and you&rsquo;re set.</p>
         {open ? (
           <CardTerms onCancel={() => setOpen(false)} />
         ) : (

@@ -158,20 +158,30 @@ export async function sessionHash(token) {
   return base64Url(await crypto.subtle.digest("SHA-256", encoder.encode(token)));
 }
 
-/** Single-use, short-lived token for a password reset link. */
-export async function createResetToken(studentId, secret, minutes = 60) {
+/** A single-use link token, signed under its own prefix so no kind can pass as another. */
+async function createNonceToken(prefix, studentId, secret, minutes, bytes) {
   const expiry = Date.now() + minutes * 60000;
-  const nonce = base64Url(crypto.getRandomValues(new Uint8Array(9)));
+  const nonce = base64Url(crypto.getRandomValues(new Uint8Array(bytes)));
   const payload = `${studentId}.${expiry}.${nonce}`;
-  return `${payload}.${await sign(`reset:${payload}`, secret)}`;
+  return { token: `${payload}.${await sign(`${prefix}:${payload}`, secret)}`, nonce, expiresAt: new Date(expiry).toISOString() };
 }
 
-export async function readResetToken(token, secret) {
+/** Single-use, short-lived token for a password reset link. */
+export async function createResetToken(studentId, secret, minutes = 60) {
+  return (await createNonceToken("reset", studentId, secret, minutes, 9)).token;
+}
+
+export function readResetToken(token, secret) {
+  return readNonceToken("reset", token, secret);
+}
+
+/** A single-use link token: `id.expiry.nonce.signature`, signed under its own prefix. */
+async function readNonceToken(prefix, token, secret) {
   const parts = String(token ?? "").split(".");
   if (parts.length !== 4) return null;
 
   const [studentId, expiry, nonce, signature] = parts;
-  const expected = await sign(`reset:${studentId}.${expiry}.${nonce}`, secret);
+  const expected = await sign(`${prefix}:${studentId}.${expiry}.${nonce}`, secret);
   if (signature.length !== expected.length) return null;
 
   let mismatch = 0;
@@ -189,27 +199,10 @@ export async function readResetToken(token, secret) {
  * neither kind of link can ever be spent as the other. Single use is enforced
  * by the `sign_in_links` row, as with resets.
  */
-export async function createSignInToken(studentId, secret, minutes = 30) {
-  const expiry = Date.now() + minutes * 60000;
-  const nonce = base64Url(crypto.getRandomValues(new Uint8Array(12)));
-  const payload = `${studentId}.${expiry}.${nonce}`;
-  return { token: `${payload}.${await sign(`signin:${payload}`, secret)}`, nonce, expiresAt: new Date(expiry).toISOString() };
+export function createSignInToken(studentId, secret, minutes = 30) {
+  return createNonceToken("signin", studentId, secret, minutes, 12);
 }
 
-export async function readSignInToken(token, secret) {
-  const parts = String(token ?? "").split(".");
-  if (parts.length !== 4) return null;
-
-  const [studentId, expiry, nonce, signature] = parts;
-  const expected = await sign(`signin:${studentId}.${expiry}.${nonce}`, secret);
-  if (signature.length !== expected.length) return null;
-
-  let mismatch = 0;
-  for (let index = 0; index < expected.length; index += 1) {
-    mismatch |= signature.charCodeAt(index) ^ expected.charCodeAt(index);
-  }
-  if (mismatch !== 0) return null;
-  if (!Number(expiry) || Number(expiry) < Date.now()) return null;
-
-  return { studentId, nonce };
+export function readSignInToken(token, secret) {
+  return readNonceToken("signin", token, secret);
 }

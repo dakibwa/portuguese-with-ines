@@ -10,6 +10,7 @@ import {
   confirmEmailChange,
   fetchMe,
   readSession,
+  removeStudentCard,
   requestEmailChange,
   updateProfile,
   type LessonSeries,
@@ -720,19 +721,37 @@ export function MyLessons({
 
           {/* Only where the booking system can take a card, and only once it
               says which kind is saved (12 October 2026, Dan). */}
-          {cardsAccepted && student.role !== "teacher" && student.cardForAllLessons !== undefined ? (
+          {cardsAccepted && student.role !== "teacher" ? (
             <div className="my-lessons__fact" data-field="card">
               <span className="my-lessons__fact-label">Card</span>
               {openField === "card" ? (
-                <CardTerms change={student.cardForAllLessons} onCancel={() => setOpenField(null)} />
+                <div className="card-row-open">
+                  <CardTerms change={student.cardForAllLessons} onCancel={() => setOpenField(null)} />
+                  {student.cardForAllLessons ? (
+                    <button
+                      className="text-action"
+                      onClick={async () => {
+                        setError("");
+                        try {
+                          const result = await removeStudentCard(readSession());
+                          profileVersion.current += 1;
+                          setStudent((current) => current && { ...current, ...result.student });
+                          setOpenField(null);
+                          setDetailsNote("Card removed. Lessons Inês adds are paid to her by hand again.");
+                        } catch (caught) {
+                          setError(caught instanceof Error ? caught.message : "Your card couldn’t be removed.");
+                        }
+                      }}
+                      type="button"
+                    >
+                      Remove card
+                    </button>
+                  ) : null}
+                </div>
               ) : (
                 <>
                   <span className={`my-lessons__fact-value${student.cardForAllLessons ? "" : " my-lessons__fact-value--empty"}`}>
-                    {student.cardForAllLessons
-                      ? "Saved"
-                      : student.hasCard
-                        ? "Only for lessons you book"
-                        : "Not added"}
+                    {student.cardForAllLessons ? "Saved" : student.hasCard ? "Only for lessons you book" : "Not added"}
                   </span>
                   <button className="my-lessons__change" onClick={() => openDetail("card")} type="button">
                     {student.cardForAllLessons ? <>Change<span className="visually-hidden"> card</span></> : "Add card"}
@@ -856,7 +875,7 @@ export function MyLessons({
   const cardNote = cardAdded ? (
     <div className="booking-outcome card-added" role="status">
       <CheckCircle2 size={20} aria-hidden="true" />
-      <p>Card saved. Each lesson is now paid after it ends.</p>
+      <p>Card saved. You&rsquo;re all set.</p>
     </div>
   ) : null;
   const askForCard = !cardAdded && cardsAccepted && student.role !== "teacher" &&

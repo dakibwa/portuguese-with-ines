@@ -39,6 +39,7 @@ async function fixture(width, connection, { callback = "", failStatus = false, c
     const path = new URL(request.url()).pathname;
     if (path === "/me") return route.fulfill({ json: { student: teacher, bookings: [], series: [] } });
     if (path === "/admin/availability") return route.fulfill({ json: { rules: [], exceptions: [] } });
+    if (path === "/admin/students") return route.fulfill({ json: { students: [], cardsAccepted: false } });
     if (path === "/admin/bookings") return route.fulfill({ json: { bookings: [] } });
     if (path === "/admin/google-calendar") {
       assert.equal(request.headers().authorization, "Bearer isolated-meet-teacher");

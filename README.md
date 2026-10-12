@@ -425,6 +425,16 @@ a silent skip is indistinguishable from a completed release:
 - `CLOUDFLARE_ACCOUNT_ID` — from the Cloudflare dashboard URL, or
   `npx wrangler whoami`.
 
+**The booking Worker can deploy first, in the same release.** With the
+repository variable `DEPLOY_WORKER` set to `true` (Settings → Secrets and
+variables → Actions → Variables), the workflow's `worker` job runs
+`npm run test:booking` and `wrangler deploy` for `ines-booking` before the site
+is built, so the site never goes live ahead of the Worker it calls. The same
+`CLOUDFLARE_API_TOKEN` then also needs **Workers Scripts: Edit**. Unset, the
+job only notes that the Worker was not deployed, and `npm run worker:deploy`
+stays a manual step done first. D1 migrations are always applied by hand (see
+`docs-booking-system.md`).
+
 To publish by hand — a local check, or CI being unavailable:
 
 ```bash

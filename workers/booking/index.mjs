@@ -323,9 +323,10 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
     : isOnCard
       ? `${formatEuros(lessonType.price_cents)} · charged to your saved card after the lesson`
       : welcome?.card
-        // A student Inês brought pays her as before until they add a card.
-        ? `${formatEuros(lessonType.price_cents)} · pay Inês as usual until you add your card`
-        : `${formatEuros(lessonType.price_cents)} · pay on the day, in person`;
+        ? `${formatEuros(lessonType.price_cents)} · ${PAID_BY_HAND}`
+        : byTeacher
+          ? `${formatEuros(lessonType.price_cents)} · pay Inês as usual`
+          : `${formatEuros(lessonType.price_cents)} · pay on the day, in person`;
   const studentRows =
     event === "cancelled"
       ? baseRows
@@ -382,12 +383,12 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
           // Written for someone who did not book it: Inês did.
           subject: `Inês has booked your Portuguese lesson — ${studentShortWhen}`,
           heading: "Inês has booked your lesson",
-          intro: welcome
+          intro: welcome?.neverIn
             ? `Olá ${row.student_name.split(" ")[0]}, here is your next lesson. From now on you can see and change your lessons on Inês's website.`
             : `Olá ${row.student_name.split(" ")[0]}, Inês has booked this lesson for you. A calendar invitation is attached.`,
           callout: "",
           footer: welcome
-            ? WELCOME_FOOTER
+            ? `It's free to change until ${notice} before the lesson; after that it costs ${fee}. ${WELCOME_FOOTER}`
             : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
         }
       : {
@@ -452,9 +453,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
     booked: byTeacher ? {
       subject: `You added a lesson — ${row.student_name}, ${shortWhen}`,
       heading: "You added a lesson",
-      intro: `You added a lesson for ${row.student_name}. They have been emailed the details${
-        welcome?.card ? ", with a link to sign in and add their card" : welcome ? ", with a link to sign in" : ""
-      }.`,
+      intro: `You added a lesson for ${row.student_name}. They have been emailed the details${welcomeNote(welcome)}.`,
       callout: ""
     } : {
       subject: `New booking — ${row.student_name}, ${shortWhen}`,
@@ -675,17 +674,22 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     : "";
 
   // Each copy lists the dates on its reader's clock.
-  const rowsOn = (zone) => [
+  const rowsOn = (zone, forTeacher = false) => [
     { label: "Lesson", value: lessonLine(lessonType) },
     { label: "Where", value: locationLabel(first) },
-    { label: series.oneOff ? "Booking" : "Repeats", value: cadence },
+    { label: series.oneOff ? "Booking" : "Repeats", value: forTeacher && !series.occurrences ? "Every week, until stopped" : cadence },
     ...(rows.some(row => meetingUrl(row))
       ? rows.map(row => ({ label: formatShort(new Date(row.starts_at), zone),
-          value: meetingUrl(row) ? "Join Google Meet" : (row.location === "online" ? "Online link will appear in your booking" : locationLabel(row)), url: meetingUrl(row) }))
+          value: meetingUrl(row)
+            ? "Join Google Meet"
+            : row.location === "online"
+              ? (forTeacher ? "Meet link not ready yet" : "Online link will appear in your booking")
+              : locationLabel(row),
+          url: meetingUrl(row) }))
       : [{ label: "Dates", value: rows.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n") }])
   ];
   const studentRowsOn = rowsOn(studentClock);
-  const teacherRows = rowsOn(PORTO);
+  const teacherRows = rowsOn(PORTO, true);
 
   // Price on the student's copy only, per lesson — Inês doesn't need her own
   // prices repeated to her. Current runs charge each lesson separately after
@@ -698,8 +702,10 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
       value: seriesOnCard
         ? `${formatEuros(lessonType.price_cents)} a lesson · charged to your saved card after each lesson`
         : welcome?.card
-          ? `${formatEuros(lessonType.price_cents)} a lesson · pay Inês as usual until you add your card`
-          : `${formatEuros(lessonType.price_cents)} a lesson · pay on the day, in person`
+          ? `${formatEuros(lessonType.price_cents)} a lesson · ${PAID_BY_HAND}`
+          : byTeacher
+            ? `${formatEuros(lessonType.price_cents)} a lesson · pay Inês as usual`
+            : `${formatEuros(lessonType.price_cents)} a lesson · pay on the day, in person`
     },
     ...studentRowsOn.slice(2)
   ];
@@ -750,7 +756,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
           intro: plainSlot
             ? `Olá ${first.student_name.split(" ")[0]}, Inês has kept ${slotWeekday}s at ${slotTime} for you. ${
                 series.occurrences ? "Every lesson is in your calendar attachment." : "New weeks appear on their own until the slot is stopped."
-              }`
+              }${welcome?.neverIn ? " You can see and change them on Inês's website." : ""}`
             : moved
             ? `Olá ${first.student_name.split(" ")[0]}, your upcoming weekly lessons now use this new time. The updated dates are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`
             : series.oneOff
@@ -802,9 +808,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
               : moved
                 ? `${first.student_name}'s upcoming weekly lessons have moved. The updated events will appear in your calendar.`
               : byTeacher
-                ? `You added a weekly slot for ${first.student_name}. They have been emailed the dates${
-                    welcome?.card ? ", with a link to sign in and add their card" : welcome ? ", with a link to sign in" : ""
-                  }, and every lesson will appear in your calendar.`
+                ? `You added a weekly slot for ${first.student_name}. They have been emailed the details${welcomeNote(welcome)}, and every lesson will appear in your calendar.`
               : `${first.student_name} booked ${series.oneOff ? "these individual lessons" : multipleWeeklyTimes ? "two times each week" : "the same slot each week"}. Every lesson will appear in your calendar.`,
           callout:
             skippedNote,
@@ -1009,11 +1013,24 @@ function publicStudent(row) {
     // A card at Stripe, and whether it pays for every lesson (saved from the
     // account) or only the bookings it was saved at (migration 0023).
     hasCard: Boolean(row.stripe_customer_id && row.stripe_payment_method),
-    ...("card_consent_at" in row ? { cardForAllLessons: Boolean(row.card_consent_at && row.stripe_payment_method) } : {})
+    cardForAllLessons: Boolean(row.card_consent_at && row.stripe_payment_method)
   };
 }
 
 // --- Bringing her students in (12 October 2026, Dan) ----------------------
+
+/**
+ * Every way back into an account that was not proven: its pending reset,
+ * address change and sign-in links. One list, so the places that retire an
+ * unproven account's access never drift apart.
+ */
+function forgetPendingAccess(env, studentId) {
+  return [
+    env.DB.prepare("DELETE FROM password_resets WHERE student_id = ?").bind(studentId),
+    env.DB.prepare("DELETE FROM email_changes WHERE student_id = ?").bind(studentId),
+    env.DB.prepare("DELETE FROM sign_in_links WHERE student_id = ?").bind(studentId)
+  ];
+}
 
 /** How long the link in a lesson Inês adds, or one she sends, keeps working. */
 const WELCOME_LINK_MINUTES = 14 * 24 * 60;
@@ -1027,7 +1044,7 @@ function cardsTaken(env, settings) {
 /** A lesson Inês adds is charged after it ends only on the student's standing agreement. */
 function cardPaysFor(env, settings, student) {
   return cardsTaken(env, settings) && Boolean(
-    student.card_consent_at && student.stripe_customer_id && student.stripe_payment_method
+    student.email_verified_at && student.card_consent_at && student.stripe_customer_id && student.stripe_payment_method
   );
 }
 
@@ -1052,25 +1069,35 @@ async function issueWelcome(env, settings, student, { always = false } = {}) {
   const card = cardsTaken(env, settings) && !student.card_consent_at;
   const neverIn = !student.password_hash && !student.google_sub && !student.last_login_at;
   if (!always && !card && !neverIn) return null;
-  return { ...await issueSignInLink(env, student, WELCOME_LINK_MINUTES), card };
+  return { ...await issueSignInLink(env, student, WELCOME_LINK_MINUTES), card, neverIn };
 }
 
-/** The way in, as numbered steps right above the button that takes it. */
+/**
+ * The way in, as numbered steps right above the button that takes it. With
+ * no card to add there is one step, and the button says it on its own.
+ */
 function welcomeSteps(welcome) {
-  return {
-    title: welcome.card ? "Two quick steps" : "One quick step",
-    items: [
-      "Sign in with the button below. No password needed.",
-      ...(welcome.card ? ["Add your card. Each lesson is then paid after it ends."] : [])
-    ]
-  };
+  return welcome.card
+    ? { title: "Two quick steps", items: ["Press the button below to sign in.", "Add your card. That’s it."] }
+    : null;
+}
+
+/** Marks a lesson she added that was paid to her by hand; no card takes it over. */
+const PAID_BY_HAND_MARK = "paid-by-hand";
+
+/** What a lesson Inês added costs until the student's card pays for it. */
+const PAID_BY_HAND = "pay Inês as usual until you add your card";
+
+/** How her own email says the student was brought in. */
+function welcomeNote(welcome) {
+  return welcome?.card ? ", with a link to sign in and add their card" : welcome ? ", with a link to sign in" : "";
 }
 
 function welcomeAction(welcome) {
-  return { label: welcome.card ? "Sign in and add card" : "See your lessons", url: welcome.url };
+  return { label: welcome.card ? "Sign in and add card" : "Sign in, no password needed", url: welcome.url };
 }
 
-const WELCOME_FOOTER = "The button works once, for 14 days. After that, choose “Email me a sign-in link” when you sign in.";
+const WELCOME_FOOTER = "The button lasts 14 days. Later, press Sign in on the website, then “Email me a sign-in link”.";
 
 /** The link on its own, when she sends it from her list of students. */
 async function sendWelcome(env, { student, settings, welcome }) {
@@ -1097,39 +1124,28 @@ async function sendWelcome(env, { student, settings, welcome }) {
 /** Her students at a glance: who is in, who has a card, what comes next. */
 async function teacherStudentList(env) {
   const now = new Date().toISOString();
-  const query = (consent) => env.DB.prepare(
+  const { results } = await env.DB.prepare(
     `SELECT s.id, s.name, s.email, s.phone, s.created_at, COALESCE(s.mark, '') AS mark,
        (COALESCE(s.stripe_payment_method, '') != '') AS has_card,
-       ${consent ? "s.card_consent_at" : "NULL"} AS card_consent_at,
+       s.card_consent_at,
        (s.password_hash != '' OR s.google_sub IS NOT NULL OR s.last_login_at IS NOT NULL) AS signed_in,
        (SELECT MIN(b.starts_at) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?) AS next_lesson_at,
-       (SELECT COUNT(*) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?) AS upcoming,
        (SELECT COUNT(*) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?
-          AND b.payment_status = 'not_required') AS unpaid_upcoming,
+          AND b.added_by_teacher = 1 AND b.payment_status = 'not_required') AS unpaid_upcoming,
        (SELECT COUNT(*) FROM booking_series bs WHERE bs.student_id = s.id AND bs.status = 'active') AS weekly
      FROM students s WHERE s.role = 'student' ORDER BY s.name COLLATE NOCASE`
   )
-    .bind(now, now, now)
+    .bind(now, now)
     .all();
-  let results;
-  try {
-    ({ results } = await query(true));
-  } catch {
-    // Before migration 0023 nobody has agreed to card-on-file charging.
-    ({ results } = await query(false));
-  }
   return (results ?? []).map((row) => ({
     id: row.id,
     name: row.name,
     email: row.email,
     phone: row.phone,
     mark: row.mark ?? "",
-    createdAt: row.created_at,
     signedIn: Boolean(row.signed_in),
-    hasCard: Boolean(row.has_card),
     cardForAllLessons: Boolean(row.has_card && row.card_consent_at),
     nextLessonAt: row.next_lesson_at ?? null,
-    upcoming: Number(row.upcoming ?? 0),
     unpaidUpcoming: Number(row.unpaid_upcoming ?? 0),
     weekly: Number(row.weekly ?? 0)
   }));
@@ -1144,6 +1160,11 @@ async function handleStudentCard(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in to add a card.", 401, request, env);
   if (student.role === "teacher") return fail("Cards are for student accounts.", 403, request, env);
+  // Registering proves nothing about an address; a card that pays for the
+  // lessons Inês adds belongs to whoever receives her emails.
+  if (!student.email_verified_at) {
+    return fail("To add a card, first sign in with a link from your email: sign out, then choose “Email me a sign-in link”.", 403, request, env);
+  }
   const settings = await loadSettings(env);
   if (!cardsTaken(env, settings)) return fail("Cards can't be added just now. Please try again later.", 503, request, env);
   const body = await readJson(request);
@@ -1163,6 +1184,32 @@ async function handleStudentCard(request, env) {
     console.error("stripe-student-card", String(error?.message ?? error));
     return fail("We couldn't open the card form just now. Please try again in a moment.", 502, request, env);
   }
+}
+
+/**
+ * Taking the agreement back: the card stops paying for lessons Inês adds,
+ * and those still to come that have not started charging go back to being
+ * paid to her by hand. Stripe keeps the card for bookings the student made
+ * themselves, under the agreement each of those had.
+ */
+async function handleRemoveStudentCard(request, env) {
+  const student = await currentStudent(request, env);
+  if (!student) return fail("Please sign in.", 401, request, env);
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE students SET card_consent_at = NULL WHERE id = ?").bind(student.id),
+    env.DB.prepare(
+      `UPDATE bookings SET payment_status = 'not_required', payment_consent_at = NULL, payment_consent_version = NULL, updated_at = ?
+       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled'
+         AND payment_consent_version = ?`
+    ).bind(now, student.id, STUDENT_CARD_CONSENT_VERSION),
+    env.DB.prepare(
+      `UPDATE booking_series SET automatic_payment = 0, payment_consent_at = NULL, payment_consent_version = NULL, updated_at = ?
+       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active'`
+    ).bind(now, student.id)
+  ]);
+  const updated = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(student.id).first();
+  return json({ student: publicStudent(updated) }, 200, request, env);
 }
 
 /**
@@ -1214,14 +1261,53 @@ async function confirmStudentCard(env, session) {
          amount_cents = COALESCE(amount_cents, (SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)),
          payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
        WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'not_required' AND starts_at > ?
-         AND ${current}`
+         AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}' AND ${current}`
     ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, now, student.id, consentedAt),
     env.DB.prepare(
       `UPDATE booking_series SET automatic_payment = 1, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
        WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active' AND automatic_payment = 0 AND ${current}`
     ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, student.id, consentedAt)
   ]);
-  if (!(saved?.meta?.changes > 0)) console.warn("stripe-student-card-superseded", student.id);
+  if (!(saved?.meta?.changes > 0)) {
+    console.warn("stripe-student-card-superseded", student.id);
+    return new Response("ok", { status: 200 });
+  }
+
+  /*
+   * Inês is told which of her lessons the card now pays for, so one a
+   * student already paid her for by hand can be cancelled from the card
+   * before it ends (12 October 2026: never charge twice).
+   */
+  const { results: onCard } = await env.DB.prepare(
+    `SELECT starts_at FROM bookings WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed'
+       AND payment_status = 'scheduled' AND payment_consent_at = ? AND starts_at > ? ORDER BY starts_at LIMIT 30`
+  )
+    .bind(student.id, consentedAt, now)
+    .all();
+  const settings = await loadSettings(env);
+  const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
+  if (teacherNotificationsEnabled(env) && teacherEmail) {
+    await deliver(env, {
+      to: teacherEmail,
+      subject: `${student.name} added a card`,
+      kind: "teacher_student_card",
+      dedupeKey: `teacher:student-card:${student.id}:${consentedAt}`,
+      replyTo: student.email,
+      content: {
+        heading: `${student.name} added a card`,
+        preheader: "Their lessons with you are now paid after each one.",
+        intro: onCard?.length
+          ? `These lessons you added are now charged to their card after each one. If they already paid you for any by hand, mark it “Paid by hand” on your schedule before it ends.`
+          : "Lessons you add for them from now on are charged to their card after each one.",
+        callout: "",
+        rows: onCard?.length
+          ? [{ label: "Now on their card", value: onCard.map((row) => formatInZone(new Date(row.starts_at), PORTO)).join("\n") }]
+          : [],
+        action: { label: "Open your schedule", url: siteUrl(env, "/schedule/") },
+        footer: "Sent automatically by the booking system on portuguesewithines.com."
+      }
+    });
+  }
   return new Response("ok", { status: 200 });
 }
 
@@ -1236,11 +1322,13 @@ async function handleEmailLink(request, env, ctx) {
     ? await env.DB.prepare("SELECT * FROM students WHERE email = ? AND role = 'student'").bind(email).first()
     : null;
 
-  if (student && await takeRateLimit(env, `signin:${student.id}`, 3, 3600)) {
+  // The work happens after the reply, so its timing says nothing about
+  // whether the address has an account.
+  if (student) ctx.waitUntil((async () => {
+    if (!await takeRateLimit(env, `signin:${student.id}`, 3, 3600)) return;
     const link = await issueSignInLink(env, student, SIGN_IN_LINK_MINUTES);
     const settings = await loadSettings(env);
-    ctx.waitUntil(
-      deliver(env, {
+    await deliver(env, {
         to: student.email,
         subject: "Your sign-in link — Português com a Inês",
         kind: "sign_in_link",
@@ -1255,9 +1343,8 @@ async function handleEmailLink(request, env, ctx) {
           action: { label: "Sign in", url: link.url },
           footer: "If you didn't ask for this, you can ignore it."
         }
-      })
-    );
-  }
+      });
+  })());
 
   return json({ ok: true }, 200, request, env);
 }
@@ -1265,7 +1352,7 @@ async function handleEmailLink(request, env, ctx) {
 async function handleEmailLinkConfirm(request, env) {
   const body = await readJson(request);
   const parsed = await readSignInToken(body.token, env.BOOKING_TOKEN_SECRET);
-  if (!parsed) return fail("That sign-in link has expired. Ask for a new one below.", 400, request, env);
+  if (!parsed) return fail("That sign-in link has expired. Enter your email for a new one.", 400, request, env);
 
   // Spent before anything else: of two clicks racing, one signs in. Only
   // while the account still has the address the link was sent to.
@@ -1277,7 +1364,7 @@ async function handleEmailLinkConfirm(request, env) {
     .bind(parsed.nonce, parsed.studentId, now, parsed.studentId)
     .run();
   if (!(spent?.meta?.changes > 0)) {
-    return fail("That sign-in link has already been used. Ask for a new one below.", 400, request, env);
+    return fail("That sign-in link has already been used. Enter your email for a new one.", 400, request, env);
   }
 
   /*
@@ -1290,16 +1377,18 @@ async function handleEmailLinkConfirm(request, env) {
   const before = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(parsed.studentId).first();
   if (!before.email_verified_at && before.password_hash) {
     await env.DB.batch([
-      env.DB.prepare(`UPDATE students SET password_hash = '', session_version = session_version + 1,
+      env.DB.prepare(`UPDATE students SET password_hash = '', session_version = session_version + 1, card_consent_at = NULL,
         email_verified_at = COALESCE(email_verified_at, ?), last_login_at = ? WHERE id = ? AND email_verified_at IS NULL`)
         .bind(now, now, before.id),
-      env.DB.prepare("DELETE FROM password_resets WHERE student_id = ?").bind(before.id),
-      env.DB.prepare("DELETE FROM email_changes WHERE student_id = ?").bind(before.id)
+      ...forgetPendingAccess(env, before.id)
     ]);
   } else {
-    await env.DB.prepare("UPDATE students SET email_verified_at = COALESCE(email_verified_at, ?), last_login_at = ? WHERE id = ?")
-      .bind(now, now, before.id)
-      .run();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE students SET email_verified_at = COALESCE(email_verified_at, ?), last_login_at = ? WHERE id = ?")
+        .bind(now, now, before.id),
+      // One link used retires the others still waiting in old emails.
+      env.DB.prepare("DELETE FROM sign_in_links WHERE student_id = ?").bind(before.id)
+    ]);
   }
   const student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(before.id).first();
   return json(
@@ -1408,6 +1497,7 @@ const worker = {
       if (request.method === "POST" && path === "/me/email") return await handleRequestEmailChange(request, env, ctx);
       if (request.method === "POST" && path === "/me/email/confirm") return await handleConfirmEmailChange(request, env);
       if (request.method === "POST" && path === "/me/card") return await handleStudentCard(request, env);
+      if (request.method === "POST" && path === "/me/card/remove") return await handleRemoveStudentCard(request, env);
 
       // Preview before commit: a student is told which weeks are free, and
       // which are not, before anything is booked in their name.
@@ -2013,7 +2103,10 @@ async function resendFailedEmails(env) {
         row,
         lessonType,
         settings,
-        manageUrl: studentManageUrl(env, token)
+        manageUrl: studentManageUrl(env, token),
+        // A lesson she added still reads as hers. A fresh sign-in link is not
+        // sent again here; her list can send one.
+        byTeacher: event === "booked" && Boolean(row.added_by_teacher)
       });
     } catch (error) {
       console.error("email-resend", entry.dedupe_key, String(error?.message ?? error));
@@ -2705,7 +2798,7 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
       "id", "reference", "lesson_type_id", "student_id", "student_name", "student_email", "student_phone",
       "student_timezone", "location", "notes", "starts_at", "ends_at", "status", "sequence", "created_at",
       "updated_at", "payment_status", "amount_cents", "hold_expires_at", "series_id", "payment_consent_at",
-      "payment_consent_version", ...(teacher ? ["added_by_teacher"] : [])
+      "payment_consent_version", "added_by_teacher"
     ],
     values: [
       id,
@@ -2730,7 +2823,7 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
       series.id,
       paymentConsentAt,
       paymentConsentVersion,
-      ...(teacher ? [1] : [])
+      teacher ? 1 : 0
     ],
     startAt: startsAt,
     endAt: endsAt,
@@ -4094,10 +4187,10 @@ async function handleGoogleSignIn(request, env) {
       // concurrent Google callbacks; subsequent Google logins change neither.
       await env.DB.batch([
         env.DB.prepare(`UPDATE students SET google_sub = ?, password_hash = '', session_version = session_version + 1, last_login_at = ?,
-          email_verified_at = COALESCE(email_verified_at, ?)
+          email_verified_at = COALESCE(email_verified_at, ?),
+          card_consent_at = CASE WHEN email_verified_at IS NULL THEN NULL ELSE card_consent_at END
           WHERE id = ? AND google_sub IS NULL`).bind(profile.sub, now, now, student.id),
-        env.DB.prepare("DELETE FROM password_resets WHERE student_id = ?").bind(student.id),
-        env.DB.prepare("DELETE FROM email_changes WHERE student_id = ?").bind(student.id)
+        ...forgetPendingAccess(env, student.id)
       ]);
     } else {
       // Each sign-in is Google vouching for the address again, which also marks
@@ -4186,6 +4279,7 @@ async function handleReset(request, env) {
       parsed.nonce
     ),
     env.DB.prepare("DELETE FROM password_resets WHERE student_id = ?").bind(parsed.studentId),
+    env.DB.prepare("DELETE FROM sign_in_links WHERE student_id = ?").bind(parsed.studentId),
     env.DB.prepare("DELETE FROM login_attempts WHERE email = (SELECT email FROM students WHERE id = ?)").bind(
       parsed.studentId
     )
@@ -4711,7 +4805,8 @@ async function handleAdmin(request, env, ctx, url, path) {
   // --- Bookings on a student's behalf --------------------------------------
 
   if (request.method === "GET" && path === "/admin/students") {
-    return json({ students: await teacherStudentList(env) }, 200, request, env);
+    const settings = await loadSettings(env);
+    return json({ students: await teacherStudentList(env), cardsAccepted: cardsTaken(env, settings) }, 200, request, env);
   }
 
   // A fresh one-click link for a student, from her list: for someone who lost
@@ -4797,11 +4892,10 @@ async function handleAdmin(request, env, ctx, url, path) {
     let reclaimed = false;
     if (student.role !== "teacher" && !student.email_verified_at && student.password_hash) {
       const [cleared] = await env.DB.batch([
-        env.DB.prepare(`UPDATE students SET password_hash = '', session_version = session_version + 1
+        // A card someone else saved here never pays for the owner's lessons.
+        env.DB.prepare(`UPDATE students SET password_hash = '', session_version = session_version + 1, card_consent_at = NULL
           WHERE id = ? AND role != 'teacher' AND email_verified_at IS NULL AND password_hash != ''`).bind(student.id),
-        env.DB.prepare("DELETE FROM password_resets WHERE student_id = ?").bind(student.id),
-        env.DB.prepare("DELETE FROM email_changes WHERE student_id = ?").bind(student.id),
-        env.DB.prepare("DELETE FROM sign_in_links WHERE student_id = ?").bind(student.id)
+        ...forgetPendingAccess(env, student.id)
       ]);
       reclaimed = (cleared?.meta?.changes ?? 0) > 0;
       if (reclaimed) student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(student.id).first();
@@ -4815,7 +4909,10 @@ async function handleAdmin(request, env, ctx, url, path) {
      * agreed to that booking alone. Without it the lesson is paid as it always
      * was, and becomes automatic from the moment they add one.
      */
-    const onCard = cardPaysFor(env, settings, student);
+    const cardPays = cardPaysFor(env, settings, student);
+    // A lesson already had is never charged: she is recording it, and was
+    // most likely paid for it by hand.
+    const onCard = cardPays && start > new Date();
     const location = body.location === "porto" ? "porto" : "online";
     const notes = cleanText(body.notes, 1000);
 
@@ -4867,8 +4964,8 @@ async function handleAdmin(request, env, ctx, url, path) {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, 1, ?, ?)`
       )
         .bind(seriesId, student.id, lessonType.id, location, notes, slot.weekday, slot.minuteOfDay, repeatWeeks,
-          slot.dateKey, onCard ? 1 : 0, onCard ? student.card_consent_at : null,
-          onCard ? STUDENT_CARD_CONSENT_VERSION : null, now, now)
+          slot.dateKey, cardPays ? 1 : 0, cardPays ? student.card_consent_at : null,
+          cardPays ? STUDENT_CARD_CONSENT_VERSION : null, now, now)
         .run();
       await env.DB.prepare("UPDATE bookings SET series_id = ? WHERE id = ?").bind(seriesId, id).run();
       const series = await env.DB.prepare("SELECT * FROM booking_series WHERE id = ?").bind(seriesId).first();
@@ -4879,7 +4976,7 @@ async function handleAdmin(request, env, ctx, url, path) {
             fromKey: addDaysToKey(slot.dateKey, 7),
             count: remaining,
             now: new Date(),
-            paymentState: onCard ? "scheduled" : "none"
+            paymentState: cardPays ? "scheduled" : "none"
           })
         : { rows: [], skipped: [] };
       const first = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
@@ -5038,6 +5135,26 @@ async function handleAdmin(request, env, ctx, url, path) {
     }
 
     const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
+    return json({ booking: updated }, 200, request, env);
+  }
+
+  /*
+   * A lesson she added that the student already paid her for by hand comes
+   * off the card before it is charged, and stays off if the student later
+   * changes card (12 October 2026: never charge twice).
+   */
+  const adminPaidByHand = path.match(/^\/admin\/bookings\/([^/]+)\/paid-by-hand$/);
+  if (adminPaidByHand && request.method === "POST") {
+    const changed = await env.DB.prepare(
+      `UPDATE bookings SET payment_status = 'not_required', payment_consent_at = NULL, payment_consent_version = ?, updated_at = ?
+       WHERE id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled'`
+    )
+      .bind(PAID_BY_HAND_MARK, new Date().toISOString(), adminPaidByHand[1])
+      .run();
+    if ((changed?.meta?.changes ?? 0) === 0) {
+      return fail("Only a lesson you added that is waiting to be charged can be marked paid by hand.", 409, request, env);
+    }
+    const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(adminPaidByHand[1]).first();
     return json({ booking: updated }, 200, request, env);
   }
 

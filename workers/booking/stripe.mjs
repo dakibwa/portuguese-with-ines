@@ -214,7 +214,10 @@ export function studentCardSessionProblem(session, student) {
   if (session?.metadata?.student_id !== student?.id) return "session does not match";
   if (!session?.setup_intent || typeof session.setup_intent !== "string") return "setup intent is missing";
   if (!session?.customer || typeof session.customer !== "string") return "customer is missing";
-  if (student.stripe_customer_id && session.customer !== student.stripe_customer_id) return "customer does not match";
+  // A student who opened the page twice before Stripe knew them can end up
+  // with a second customer. The session is still theirs (reference and
+  // metadata name them), so the newer card and its customer are saved
+  // together rather than refused for ever.
   return "";
 }
 

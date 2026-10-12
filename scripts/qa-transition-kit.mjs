@@ -61,8 +61,9 @@ async function chooseFromMenu(page, name) {
 
 try {
   for (const width of [1280, 390]) {
-    // The link in Inês's email signs the student in, leaves the address bar,
-    // and opens Your lessons with one quiet ask for a card.
+    // The link in Inês's email leaves the address bar and waits for the
+    // student's own press (a mail scanner opening it spends nothing), then
+    // opens Your lessons with one quiet ask for a card.
     const linked = await open(width, "/book/?signin=qa-good-link", {
       reply: (endpoint) => {
         if (endpoint === "/auth/email-link/confirm") return { json: { student, session: "qa-link-session" } };
@@ -70,10 +71,14 @@ try {
         return null;
       },
     });
+    await expect(linked.page.getByRole("heading", { name: "Welcome" })).toBeVisible({ timeout: 15000 });
+    assert.ok(!linked.page.url().includes("signin="), "the link leaves the address bar at once");
+    assert.equal(linked.posts.filter((post) => post.endpoint === "/auth/email-link/confirm").length, 0, "nothing is spent on arrival");
+    await linked.page.screenshot({ path: `tmp/qa/transition-kit/link-${width}.png`, fullPage: false });
+    await linked.page.getByRole("button", { name: "Sign in", exact: true }).click();
     const prompt = linked.page.locator(".card-prompt");
     await expect(prompt.getByRole("heading", { name: "Pay by card" })).toBeVisible({ timeout: 15000 });
-    await expect(prompt).toContainText("Add your card once. Each lesson is paid after it ends.");
-    assert.ok(!linked.page.url().includes("signin="), "the link is spent from the address bar");
+    await expect(prompt).toContainText("Add your card once and you’re set.");
     assert.equal(await linked.page.evaluate(() => localStorage.getItem("ines-student-session")), "qa-link-session");
     assert.deepEqual(linked.posts.filter((post) => post.endpoint === "/auth/email-link/confirm").map((post) => post.body), [{ token: "qa-good-link" }]);
     await expect(linked.page.getByRole("heading", { name: "Your account" })).toHaveCount(0);
@@ -81,7 +86,7 @@ try {
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/prompt-${width}.png`, fullPage: false });
 
     await prompt.getByRole("button", { name: "Add card" }).click();
-    await expect(prompt.locator(".booking-payment-facts")).toContainText("Paid after each lesson");
+    await expect(prompt.locator(".booking-payment-facts")).toContainText("Your upcoming lessons with Inês are charged to it, each after it ends");
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/terms-${width}.png`, fullPage: false });
     await prompt.getByRole("button", { name: "Agree & add card" }).click();
     await linked.page.waitForURL(/checkout\.stripe\.com/);
@@ -93,13 +98,17 @@ try {
     const spent = await open(width, "/book/?signin=qa-spent-link", {
       reply: (endpoint) => {
         if (endpoint === "/auth/email-link/confirm") {
-          return { status: 400, json: { error: "That sign-in link has already been used. Ask for a new one below." } };
+          return { status: 400, json: { error: "That sign-in link has already been used. Enter your email for a new one." } };
         }
         if (endpoint === "/auth/email-link") return { json: { ok: true } };
         return null;
       },
     });
-    await expect(spent.page.locator(".auth-panel [role=alert]")).toContainText("already been used", { timeout: 15000 });
+    await spent.page.getByRole("button", { name: "Sign in", exact: true }).click({ timeout: 15000 });
+    // The landing says why and offers the way on, never a dead end.
+    await expect(spent.page.locator(".sign-in-link [role=alert]")).toContainText("already been used");
+    await spent.page.getByRole("button", { name: "Email me a new link", exact: true }).click();
+    await expect(spent.page.locator(".auth-panel [role=alert]")).toContainText("already been used");
     await expect(spent.page.getByRole("heading", { name: "Sign in by email" })).toBeVisible();
     await spent.page.locator(".auth-panel__form").getByLabel("Email").fill("rita@example.invalid");
     await spent.page.getByRole("button", { name: "Email me a sign-in link" }).click();

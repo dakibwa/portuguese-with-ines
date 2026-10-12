@@ -871,6 +871,13 @@
 }
 .teacher-manual-choice .segmented--four label {
   font-size: 0.78rem;
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .teacher-manual-choice .segmented--four label {
+    font-size: 0.66rem;
+    letter-spacing: 0.02em;
+  }
 }
 .teacher-manual-submit {
   grid-column: 1/-1;
@@ -1765,6 +1772,13 @@
   font-size: 0.78rem;
   line-height: 1.5;
 }
+.teacher-lesson-added-note p {
+  margin: 0;
+}
+.teacher-lesson-added-note .text-action {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+}
 .teacher-lesson-place {
   display: inline-flex;
   align-items: center;
@@ -1844,8 +1858,9 @@
 /* Her students (12 October 2026, Dan): one row each, who first, then what
    is done and what isn't, and a way in to send. Done reads lilac; anything
    still to do stays plain so it isn't alarming. */
-.teacher-students.teacher-students {
-  margin-top: 1.5rem;
+.teacher-students__waiting {
+  color: var(--coral-action);
+  font-weight: 600;
 }
 .teacher-students__count {
   color: var(--lavender-ink);
@@ -1862,9 +1877,9 @@
   min-height: 40px;
   margin-bottom: 0.75rem;
   border: 1px solid var(--rule);
-  border-radius: 10px;
+  border-radius: var(--squiggle-field, 12px);
   padding: 0 0.75rem;
-  background: #fff;
+  background: var(--sheet);
   font: inherit;
   font-size: 0.86rem;
 }
@@ -1953,7 +1968,7 @@
   grid-column: 1 / -1;
   gap: 0.5rem;
   align-items: center;
-  border-top: 1px solid var(--rule-soft, var(--rule));
+  border-top: 1px solid var(--rule-soft);
   padding-top: 0.75rem;
 }
 .teacher-student__button {
@@ -1991,6 +2006,10 @@
 }
 .teacher-student__sent {
   color: var(--lavender-ink);
+  font-size: 0.78rem;
+}
+.teacher-student__failed {
+  color: var(--coral-action);
   font-size: 0.78rem;
 }
 /* A student she already has: said quietly beneath their name. */

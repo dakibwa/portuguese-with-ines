@@ -121,9 +121,6 @@ CREATE TABLE IF NOT EXISTS password_resets (
   created_at TEXT NOT NULL
 );
 
--- A requested address change, held here until the new address proves itself.
--- Deliberately not on `students`: an unconfirmed address must never sit in the
--- row that sign-in matches against. See migrations/0008-email-changes.sql.
 -- One-click sign-in links (migration 0023). A row is the record that a link
 -- is unspent; the address it was sent to must still be the account's.
 CREATE TABLE IF NOT EXISTS sign_in_links (
@@ -136,6 +133,9 @@ CREATE TABLE IF NOT EXISTS sign_in_links (
 
 CREATE INDEX IF NOT EXISTS sign_in_links_student ON sign_in_links (student_id);
 
+-- A requested address change, held here until the new address proves itself.
+-- Deliberately not on `students`: an unconfirmed address must never sit in the
+-- row that sign-in matches against. See migrations/0008-email-changes.sql.
 CREATE TABLE IF NOT EXISTS email_changes (
   nonce      TEXT PRIMARY KEY,
   student_id TEXT NOT NULL REFERENCES students (id),

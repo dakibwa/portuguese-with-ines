@@ -1557,10 +1557,13 @@ await test("Inês booking an address someone registered first shuts that registr
     assert.equal((await call("/auth/login", { user: null, headers: ip, body: { email, password: "the-owners-password" } })).status, 200);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_changes WHERE student_id=?").get(id).n, 1, "the owner's own request stays");
     assert.ok(bookedEmailFor(next.reference), "the owner is told about the next lesson too");
-    // The first email's link was never spent: it still signs the owner in, once.
-    const signedIn = await call("/auth/email-link/confirm", { user: null, headers: ip, body: { token: welcomeLink } });
+    // Choosing a new password retired the sign-in link in the first email.
+    assert.equal((await call("/auth/email-link/confirm", { user: null, headers: ip, body: { token: welcomeLink } })).status, 400);
+    // A fresh one signs the owner in, once, and leaves their password alone.
+    const fresh = signInLinkIn(bookedEmailFor(next.reference));
+    const signedIn = await call("/auth/email-link/confirm", { user: null, headers: ip, body: { token: fresh } });
     assert.equal(signedIn.status, 200, await signedIn.clone().text());
-    assert.equal((await call("/auth/email-link/confirm", { user: null, headers: ip, body: { token: welcomeLink } })).status, 400, "only once");
+    assert.equal((await call("/auth/email-link/confirm", { user: null, headers: ip, body: { token: fresh } })).status, 400, "only once");
     assert.equal((await call("/auth/login", { user: null, headers: ip, body: { email, password: "the-owners-password" } })).status, 200,
       "a proven account keeps its password when a link signs it in");
   } finally {
@@ -1949,6 +1952,27 @@ await test("Inês's weekly slot books outside her hours, skips her days off, and
     forgetStudent(email);
   }
 });
+await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours", async () => {
+  const email = "topped-up@example.invalid";
+  try {
+    const added = await call("/admin/bookings", { user: "teacher", body: { email, name: "Tomás Top", lessonType: "single", startAt: "2026-09-08T03:00:00.000Z", repeat: "open" } });
+    assert.equal(added.status, 201, await added.clone().text());
+    const { id } = db.prepare("SELECT id FROM students WHERE email=?").get(email);
+    const { series_id: seriesId } = db.prepare("SELECT series_id FROM bookings WHERE student_id=? LIMIT 1").get(id);
+    // Take the last week back, as if the run had only reached the week before.
+    const last = db.prepare("SELECT id, starts_at FROM bookings WHERE series_id=? ORDER BY starts_at DESC LIMIT 1").get(seriesId);
+    db.prepare("DELETE FROM bookings WHERE id=?").run(last.id);
+    const filledTo = db.prepare("SELECT filled_to FROM booking_series WHERE id=?").get(seriesId).filled_to;
+    const previous = new Date(Date.parse(`${filledTo}T00:00:00Z`) - 7 * 86400000).toISOString().slice(0, 10);
+    db.prepare("UPDATE booking_series SET filled_to=? WHERE id=?").run(previous, seriesId);
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.parse("2026-09-06T03:10:00.000Z") }, env, ctx);
+    await drain();
+    const regrown = db.prepare("SELECT added_by_teacher, payment_status FROM bookings WHERE series_id=? AND starts_at=?").get(seriesId, last.starts_at);
+    assert.deepEqual({ ...regrown }, { added_by_teacher: 1, payment_status: "not_required" }, "the week comes back as hers, at 04:00 Porto time");
+  } finally {
+    forgetStudent(email);
+  }
+});
 await test("a card saved from the account pays for the lessons Inês added from then on, and only those", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const email = "card-later@example.invalid";
@@ -1962,6 +1986,9 @@ await test("a card saved from the account pays for the lessons Inês added from 
     const token = await createSession(id, env.BOOKING_TOKEN_SECRET);
     const statusOf = (startAt) => db.prepare("SELECT payment_status FROM bookings WHERE student_id=? AND starts_at=?").get(id, startAt).payment_status;
 
+    assert.equal((await call("/me/card", { token, body: { consent: true } })).status, 403, "an unproven address can't take on her lessons");
+    // Signing in with the link from her email proves it.
+    db.prepare("UPDATE students SET email_verified_at=? WHERE id=?").run(new Date().toISOString(), id);
     assert.equal((await call("/me/card", { token, body: {} })).status, 400, "the terms must be agreed");
     assert.equal((await call("/me/card", { user: null, body: { consent: true } })).status, 401);
     const opened = await call("/me/card", { token, body: { consent: true } });
@@ -2008,6 +2035,28 @@ await test("a card saved from the account pays for the lessons Inês added from 
     const later = await add("2026-10-09T02:00:00.000Z");
     assert.equal(later.status, 201);
     assert.equal(statusOf("2026-10-09T02:00:00.000Z"), "scheduled", "a lesson she adds now is on the card from the start");
+    assert.equal((await add("2026-09-02T09:00:00.000Z")).status, 201);
+    assert.equal(statusOf("2026-09-02T09:00:00.000Z"), "not_required", "a lesson she records after it happened is never charged");
+
+    // One the student already paid her for comes off the card, and stays off.
+    const handPaid = db.prepare("SELECT id FROM bookings WHERE student_id=? AND starts_at='2026-10-09T02:00:00.000Z'").get(id).id;
+    assert.equal((await call(`/admin/bookings/${handPaid}/paid-by-hand`, { user: "alice" })).status, 401, "students can't");
+    assert.equal((await call(`/admin/bookings/${handPaid}/paid-by-hand`, { user: "teacher" })).status, 200);
+    assert.equal(statusOf("2026-10-09T02:00:00.000Z"), "not_required");
+    assert.equal((await call(`/admin/bookings/${handPaid}/paid-by-hand`, { user: "teacher" })).status, 409, "only once");
+    setupIntents.set("seti_card_again", { status: "succeeded", customer: "cus_card_later", payment_method: "pm_card_again" });
+    assert.equal((await webhook({ ...event, id: "evt_card_again", data: { object: { ...session, id: "cs_again", setup_intent: "seti_card_again", created: Math.floor(Date.now() / 1000) + 600 } } })).status, 200);
+    assert.equal(statusOf("2026-10-09T02:00:00.000Z"), "not_required", "a new card doesn't take it back");
+
+    // Taking the card back: her lessons still to come go back to being paid by hand.
+    const removed = await call("/me/card/remove", { token, body: {} });
+    assert.equal(removed.status, 200);
+    assert.equal((await removed.json()).student.cardForAllLessons, false);
+    assert.equal(statusOf("2026-10-03T02:00:00.000Z"), "not_required");
+    assert.equal(db.prepare("SELECT automatic_payment FROM booking_series WHERE student_id=?").get(id).automatic_payment, 0);
+    // Saved again, so the charge below runs as it would for a card on file.
+    setupIntents.set("seti_card_back", { status: "succeeded", customer: "cus_card_later", payment_method: "pm_card_back" });
+    assert.equal((await webhook({ ...event, id: "evt_card_back", data: { object: { ...session, id: "cs_back", setup_intent: "seti_card_back", created: Math.floor(Date.now() / 1000) + 900 } } })).status, 200);
 
     // And it is charged after it ends, like any lesson on a card.
     const single = db.prepare("SELECT id FROM bookings WHERE student_id=? AND starts_at='2026-10-02T02:00:00.000Z'").get(id).id;
@@ -2016,6 +2065,7 @@ await test("a card saved from the account pays for the lessons Inês added from 
     const charge = charges.find((entry) => entry.key === `ines:charge:${single}:lesson`);
     assert.equal(charge?.amount, 2500);
     assert.match(charge.body, /customer=cus_card_later/);
+    assert.match(charge.body, /payment_method=pm_card_back/);
     assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(single).payment_status, "paid");
   } finally {
     db.prepare("DELETE FROM bookings WHERE id='card-later-own'").run();
@@ -2078,10 +2128,11 @@ await test("her student list says who is in and who has a card, and she can send
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const listed = await call("/admin/students", { method: "GET", user: "teacher" });
   assert.equal(listed.status, 200);
-  const { students } = await listed.json();
+  const { students, cardsAccepted } = await listed.json();
   assert.ok(!students.some((row) => row.id === "teacher"), "her own account is not a student");
   const alice = students.find((row) => row.id === "alice");
-  assert.deepEqual([alice.hasCard, alice.cardForAllLessons, typeof alice.upcoming], [true, false, "number"]);
+  assert.deepEqual([alice.cardForAllLessons, typeof alice.unpaidUpcoming], [false, "number"]);
+  assert.equal(cardsAccepted, true);
   assert.equal((await call("/admin/students", { method: "GET", user: "alice" })).status, 401);
 
   captureEmail();

@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { CheckCircle2, Globe, Plus, UserRound, X } from "lucide-react";
-import { createBookingFor, fetchStudents, type AdminStudent } from "@/lib/admin-api";
+import { createBookingFor, type AdminStudent } from "@/lib/admin-api";
 import { portoTimeToUtc } from "@/lib/booking-api";
 import { SITE_BASE_PATH } from "@/lib/paths";
 import { dateLabel, minuteLabel } from "@/lib/teacher-calendar";
@@ -38,28 +38,14 @@ function addedMessage(series?: { booked: number; skipped: { key: string }[] }) {
 /**
  * A lesson arranged elsewhere: the student, the lesson, where, and when. The
  * same form serves the section beneath the week and the dialog a free time
- * opens with its date and time already in place.
+ * opens with its date and time already in place. Her students (`known`, read
+ * once by the schedule) are suggested as she types either their email or
+ * their name, and choosing one fills in the other (12 October 2026, Dan: as
+ * easy as possible for her).
  */
-/**
- * Her students, read once per form, so the email field can suggest them as
- * she types and a chosen one brings their name (12 October 2026, Dan: as
- * easy as possible for her). Without the list the field is an ordinary one.
- */
-function useKnownStudents(token: string, wanted: boolean) {
-  const [students, setStudents] = useState<AdminStudent[]>([]);
-  useEffect(() => {
-    if (!wanted) return;
-    let active = true;
-    fetchStudents(token)
-      .then((data) => { if (active) setStudents(data.students); })
-      .catch(() => { /* Suggestions are a convenience; typing still works. */ });
-    return () => { active = false; };
-  }, [token, wanted]);
-  return students;
-}
-
 function LessonForm({
   token,
+  known,
   date = "",
   time = "17:00",
   student,
@@ -68,6 +54,7 @@ function LessonForm({
   onBusy,
 }: {
   token: string;
+  known: AdminStudent[];
   date?: string;
   time?: string;
   /** Chosen from her list of students, so only the lesson is left to fill in. */
@@ -76,12 +63,10 @@ function LessonForm({
   onCreated: (message: string) => void;
   onBusy?: (busy: boolean) => void;
 }) {
-  const initial = { ...empty, date, time, ...(student ? { email: student.email, name: student.name } : {}) };
-  const [lesson, setLesson] = useState(initial);
-  // Asked for when she first reaches the email field, not with the page.
-  const [wantStudents, setWantStudents] = useState(false);
-  const known = useKnownStudents(token, wantStudents);
+  const [lesson, setLesson] = useState({ ...empty, date, time, ...(student ? { email: student.email, name: student.name } : {}) });
   const knownStudent = known.find((entry) => entry.email.toLowerCase() === lesson.email.trim().toLowerCase());
+  // A trial is one first lesson, and choosing it puts How often back to once.
+  const weekly = lesson.repeat !== "once";
   const [busy, setBusyState] = useState(false);
   const [error, setError] = useState("");
   const setBusy = (value: boolean) => {
@@ -98,21 +83,18 @@ function LessonForm({
           setBusy(true);
           setError("");
           try {
-            const weekly = lesson.repeat !== "once" && lesson.lessonType !== "trial";
             const result = await createBookingFor(token, {
               email: lesson.email.trim(),
-              name: lesson.name.trim(),
+              name: knownStudent?.name ?? lesson.name.trim(),
               lessonType: lesson.lessonType,
               startAt: portoTimeToUtc(lesson.date, lesson.time),
               location: lesson.location,
               notes: "",
-              ...(weekly && lesson.repeat !== "once" ? { repeat: lesson.repeat } : {}),
+              ...(weekly ? { repeat: lesson.repeat as Exclude<Repeat, "once"> } : {}),
             });
-            setLesson(initial);
-            // A booking system from before weekly slots books only the first.
-            onCreated(weekly && !result.series
-              ? "Only the first lesson was added: weekly slots aren’t switched on yet. The student has been emailed the details."
-              : addedMessage(result.series));
+            // Ready for the next student, never the one just added.
+            setLesson({ ...empty, date, time });
+            onCreated(addedMessage(result.series));
           } catch (caught) {
             setError(
               caught instanceof Error
@@ -131,16 +113,12 @@ function LessonForm({
             required
             autoComplete="off"
             disabled={busy}
-            list={known.length ? `${idPrefix}-students` : undefined}
-            onFocus={() => setWantStudents(true)}
+            list={known.length ? `${idPrefix}-emails` : undefined}
             value={lesson.email}
-            onChange={(e) => {
-              const match = known.find((entry) => entry.email.toLowerCase() === e.target.value.trim().toLowerCase());
-              setLesson({ ...lesson, email: e.target.value, ...(match ? { name: match.name } : {}) });
-            }}
+            onChange={(e) => setLesson({ ...lesson, email: e.target.value })}
           />
           {known.length ? (
-            <datalist id={`${idPrefix}-students`}>
+            <datalist id={`${idPrefix}-emails`}>
               {known.map((entry) => (
                 <option key={entry.id} value={entry.email}>{entry.name}</option>
               ))}
@@ -151,11 +129,27 @@ function LessonForm({
           <span>Student&rsquo;s name</span>
           <input
             type="text"
-            disabled={busy || Boolean(knownStudent)}
+            disabled={busy}
+            readOnly={Boolean(knownStudent)}
+            aria-describedby={knownStudent ? `${idPrefix}-known` : undefined}
+            list={known.length && !knownStudent ? `${idPrefix}-names` : undefined}
             value={knownStudent ? knownStudent.name : lesson.name}
-            onChange={(e) => setLesson({ ...lesson, name: e.target.value })}
+            onChange={(e) => {
+              // Choosing a name she already has brings their address with it.
+              const match = known.find((entry) => entry.name.toLowerCase() === e.target.value.trim().toLowerCase());
+              setLesson({ ...lesson, name: e.target.value, ...(match && !lesson.email.trim() ? { email: match.email } : {}) });
+            }}
           />
-          {knownStudent ? <small className="teacher-manual-known">Already one of your students</small> : null}
+          {known.length ? (
+            <datalist id={`${idPrefix}-names`}>
+              {known.map((entry) => (
+                <option key={entry.id} value={entry.name} />
+              ))}
+            </datalist>
+          ) : null}
+          {knownStudent ? (
+            <small className="teacher-manual-known" id={`${idPrefix}-known`}>Already one of your students</small>
+          ) : null}
         </label>
         {/* Length and place as the booking's sliders, rather than menus to
             open (10 October 2026, at Dan's request). */}
@@ -233,7 +227,7 @@ function LessonForm({
             </div>
           </fieldset>
         ) : null}
-        {lesson.lessonType !== "trial" && lesson.repeat !== "once" ? (
+        {weekly ? (
           <fieldset className="teacher-manual-choice teacher-manual-choice--wide">
             <legend>For</legend>
             <div
@@ -257,7 +251,7 @@ function LessonForm({
           </fieldset>
         ) : null}
         <label>
-          <span>{lesson.repeat !== "once" && lesson.lessonType !== "trial" ? "First date" : "Date"}</span>
+          <span>{weekly ? "First date" : "Date"}</span>
           <input
             type="date"
             required
@@ -284,7 +278,7 @@ function LessonForm({
           >
             {busy
               ? "Adding…"
-              : lesson.repeat !== "once" && lesson.lessonType !== "trial"
+              : weekly
                 ? "Add weekly lessons and email student"
                 : "Add lesson and email student"}
           </button>
@@ -301,10 +295,12 @@ function LessonForm({
 
 export function ManualLessonForm({
   token,
+  known,
   student,
   onCreated,
 }: {
   token: string;
+  known: AdminStudent[];
   /** From `Add lesson` on her list of students: opens the form with them in it. */
   student?: { email: string; name: string; key: number };
   onCreated: () => void;
@@ -313,6 +309,8 @@ export function ManualLessonForm({
   const detailsRef = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     if (!student || !detailsRef.current) return;
+    // A message about the last student never sits under the next one.
+    setStatus("");
     detailsRef.current.open = true;
     detailsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     detailsRef.current.querySelector<HTMLInputElement>('input[type="date"]')?.focus({ preventScroll: true });
@@ -340,6 +338,7 @@ export function ManualLessonForm({
         <LessonForm
           key={student?.key ?? 0}
           idPrefix="teacher-manual"
+          known={known}
           student={student}
           token={token}
           onCreated={(message) => {
@@ -365,6 +364,7 @@ export function ManualLessonForm({
  */
 export function AddLessonDialog({
   token,
+  known,
   date,
   minute,
   afterAddFocusRef,
@@ -372,6 +372,7 @@ export function AddLessonDialog({
   onCreated,
 }: {
   token: string;
+  known: AdminStudent[];
   date: string;
   minute: number;
   afterAddFocusRef: RefObject<HTMLElement | null>;
@@ -429,6 +430,7 @@ export function AddLessonDialog({
       </p>
       <LessonForm
         idPrefix="teacher-add"
+        known={known}
         token={token}
         date={date}
         time={minuteLabel(minute)}
