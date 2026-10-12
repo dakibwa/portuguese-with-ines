@@ -38,7 +38,7 @@ const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/c
 const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons));
 if (typeof window !== "undefined" && readSession()) void loadAccountControls();
 import { LessonMark } from "@/components/LessonMarks";
-import { clearSession, fetchMe, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
+import { clearSession, confirmSignInLink, fetchMe, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { SITE_BASE_PATH } from "@/lib/paths";
@@ -935,6 +935,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // once it has started. Ticks once a minute.
   const [clock, setClock] = useState(() => Date.now());
   const [accountLoadError, setAccountLoadError] = useState("");
+  // A one-click sign-in link that could not be used: the sign-in panel then
+  // opens on asking for a new one, saying why.
+  const [signInLinkError, setSignInLinkError] = useState("");
+  // A link from an email waits for a press: mail scanners open links on
+  // their own, and spending a one-time link on arrival let them use it up.
+  const [pendingSignIn, setPendingSignIn] = useState("");
+  const [usingSignInLink, setUsingSignInLink] = useState(false);
   // Back from saving a card with Stripe: the booking confirms by webhook, so
   // say what is happening until it shows up.
   const [cardReturn, setCardReturn] = useState<{ token: string; state: "confirming" | "confirmed" | "slow" } | null>(null);
@@ -1221,6 +1228,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     const params = new URLSearchParams(window.location.search);
     const key = portoDateKey(new Date());
     setTodayKey(key);
+    /*
+     * A sign-in link from an email (12 October 2026, Dan): taken out of the
+     * address bar at once, so a reload or a shared screenshot cannot reuse
+     * it, and held for the student's own press of Sign in.
+     */
+    const signInToken = params.get("signin") ?? "";
+    if (signInToken) {
+      params.delete("signin");
+      params.set("view", "lessons");
+      window.history.replaceState({}, "", `/book/?${params}`);
+      setPendingSignIn(signInToken);
+    }
     setHasStoredSession(Boolean(readSession()));
     setStudentZone(browserTimeZone());
     const returningFromCard = params.get("card") === "saved";
@@ -1233,7 +1252,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     if (initialLessonsView || returningFromCard || params.get("view") === "lessons") {
       setIntent("lessons");
       setUpcomingRequestKey((current) => current + 1);
-      if (!readSession()) setShowAccountSignIn(true);
+      if (!readSession() && !signInToken) setShowAccountSignIn(true);
     } else if (params.get("view") === "book" || params.get("lesson")) {
       setIntent("book");
       if (params.get("lesson") === "single" || params.get("lesson") === "long") {
@@ -1783,6 +1802,17 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // An expired bearer is only discovered after the account read. An explicit
   // lessons destination still needs sign-in when that read clears the token;
   // an interrupted read with a retained bearer keeps its retry/error state.
+  // Signed in from the lessons panel or a link from an email: Your lessons.
+  const enterLessons = (signedIn: Student) => {
+    setSignInLinkError("");
+    transitionBooking(() => {
+      setStudent(signedIn);
+      setShowAccountSignIn(false);
+      setAccountView("upcoming");
+      setUpcomingRequestKey((current) => current + 1);
+    });
+    refreshStudentInBackground();
+  };
   const needsLessonsSignIn = intent === "lessons" && !student && (
     showAccountSignIn || !checkingSession && !readSession()
   );
@@ -1791,6 +1821,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const lessonsLoading = checkingSession && hasStoredSession && !managed && Boolean(todayKey) &&
     (intent === "choose" || intent === "lessons");
   const showWorkflowCalendar =
+    !pendingSignIn &&
     !lessonsLoading &&
     !isConfirmingBooking &&
     !needsLessonsSignIn &&
@@ -3573,9 +3604,62 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
         {!manageDialogOpen && accountRefreshNotice}
 
-        {lessonsLoading ? <LessonsLoading todayKey={viewTodayKey || todayKey} /> : null}
+        {lessonsLoading && !pendingSignIn ? <LessonsLoading todayKey={viewTodayKey || todayKey} /> : null}
 
-        {needsLessonsSignIn ? (
+        {pendingSignIn ? (
+          <section className="booking-workflow-sign-in" id="booking-lessons-sign-in" tabIndex={-1}>
+            <div className="auth-panel sign-in-link">
+              <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="auth-panel__mark" />
+              <h2>Welcome</h2>
+              <p className="auth-panel__intro">
+                Sign in to see your lessons. No password needed.
+                {/* Someone else's account open on this device: say what the press does. */}
+                {student ? ` You’re signed in as ${student.name}; this switches to the account the email was sent to.` : null}
+              </p>
+              {signInLinkError ? (
+                <div className="booking-alert booking-alert--error" role="alert">
+                  <AlertCircle size={18} aria-hidden="true" />
+                  <p>{signInLinkError}</p>
+                </div>
+              ) : null}
+              {signInLinkError ? (
+                <button
+                  className="button button--coral booking-confirm-button"
+                  onClick={() => {
+                    setPendingSignIn("");
+                    // Signed out, the panel opens on asking for a new link.
+                    if (student) setSignInLinkError("");
+                    else setShowAccountSignIn(true);
+                  }}
+                  type="button"
+                >
+                  {student ? "Back to your lessons" : "Email me a new link"}
+                </button>
+              ) : (
+                <button
+                  className="button button--coral booking-confirm-button"
+                  disabled={usingSignInLink}
+                  onClick={async () => {
+                    setUsingSignInLink(true);
+                    try {
+                      const result = await confirmSignInLink(pendingSignIn);
+                      storeSession(result.session);
+                      setPendingSignIn("");
+                      enterLessons(result.student);
+                    } catch (caught) {
+                      setSignInLinkError(caught instanceof Error ? caught.message : "That sign-in link couldn’t be used. Enter your email for a new one.");
+                    } finally {
+                      setUsingSignInLink(false);
+                    }
+                  }}
+                  type="button"
+                >
+                  {usingSignInLink ? "Signing in…" : "Sign in"}
+                </button>
+              )}
+            </div>
+          </section>
+        ) : needsLessonsSignIn ? (
           <section className="booking-workflow-sign-in" id="booking-lessons-sign-in" tabIndex={-1}>
             <button className="booking-back booking-back--tertiary" onClick={returnToJourneyStart} type="button">
               <ArrowLeft size={16} aria-hidden="true" /> Back
@@ -3583,16 +3667,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             <AuthPanel
               heading="Your account"
               headingLevel={2}
-              initialMode="signin"
-              onSignedIn={(signedIn) => {
-                transitionBooking(() => {
-                  setStudent(signedIn);
-                  setShowAccountSignIn(false);
-                  setAccountView("upcoming");
-                  setUpcomingRequestKey((current) => current + 1);
-                });
-                refreshStudentInBackground();
-              }}
+              initialError={signInLinkError}
+              initialMode={signInLinkError ? "link" : "signin"}
+              onSignedIn={enterLessons}
             />
           </section>
         ) : null}

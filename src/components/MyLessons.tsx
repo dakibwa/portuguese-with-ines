@@ -4,11 +4,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AlertCircle, CheckCircle2, CircleX } from "lucide-react";
 import { AccountAvatar, AccountMenu, AccountSignature, type AccountSection } from "@/components/AccountMenu";
 import { AuthPanel } from "@/components/AuthPanel";
+import { CardPrompt, CardTerms } from "@/components/CardOnFile";
 import { LessonMark } from "@/components/LessonMarks";
 import {
   confirmEmailChange,
   fetchMe,
   readSession,
+  removeStudentCard,
   requestEmailChange,
   updateProfile,
   type LessonSeries,
@@ -88,7 +90,7 @@ export function MyLessons({
   section = "upcoming"
 }: {
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
-  initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[] } | null;
+  initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; cardsAccepted?: boolean } | null;
   /** The account's saved weekly rates, as last read or changed here, so booking prices with them. */
   onRatesChange?: (rates: Record<number, number>) => void;
   onSelectSection?: (section: AccountSection) => void;
@@ -99,6 +101,9 @@ export function MyLessons({
   const [student, setStudent] = useState<Student | null>(initialAccount?.student ?? null);
   const [bookings, setBookings] = useState<MyBooking[]>(initialAccount?.bookings ?? []);
   const [series, setSeries] = useState<LessonSeries[]>(initialAccount?.series ?? []);
+  const [cardsAccepted, setCardsAccepted] = useState(Boolean(initialAccount?.cardsAccepted));
+  // Back from Stripe with a card saved; the account may take a moment to say so.
+  const [cardAdded, setCardAdded] = useState(false);
   const editing = section === "profile";
   const [details, setDetails] = useState(() => accountDetails(initialAccount?.student));
   // What each open row holds now, read when a save returns: a row closes only
@@ -108,7 +113,7 @@ export function MyLessons({
   const [savingName, setSavingName] = useState(false);
   const [savingNif, setSavingNif] = useState(false);
   // Your details shows each value with its own Change; one opens at a time.
-  const [openField, setOpenField] = useState<"name" | "email" | "nif" | "mark" | null>(null);
+  const [openField, setOpenField] = useState<"name" | "email" | "nif" | "mark" | "card" | null>(null);
   const [savingMark, setSavingMark] = useState<string | null>(null);
   // Just chosen: the new splat lands in its row (11 October 2026, at Dan's
   // request: choosing one felt abrupt).
@@ -148,6 +153,7 @@ export function MyLessons({
     accountRequest.current += 1;
     setBookings(initialAccount.bookings);
     setSeries(initialAccount.series ?? []);
+    setCardsAccepted(Boolean(initialAccount.cardsAccepted));
     setLoading(false);
     setLoadError("");
   }, [initialAccount, student?.id]);
@@ -199,7 +205,7 @@ export function MyLessons({
   // Focus a field as it opens, before a student can select anything else: a
   // queued frame could otherwise steal their focus or subsequent typing.
   useLayoutEffect(() => {
-    if (openField && openField !== "mark") {
+    if (openField && openField !== "mark" && openField !== "card") {
       detailsRef.current?.querySelector<HTMLInputElement>(`[data-field="${openField}"] input`)?.focus({ preventScroll: true });
     }
   }, [openField]);
@@ -253,6 +259,7 @@ export function MyLessons({
       }
       setBookings(data.bookings);
       setSeries(data.series ?? []);
+      setCardsAccepted(Boolean(data.cardsAccepted));
     } catch (caught) {
       if (request !== accountRequest.current || readSession() !== session) return;
       setLoadError(caught instanceof Error ? caught.message : "We couldn’t load your lessons.");
@@ -315,6 +322,21 @@ export function MyLessons({
       });
     return () => { active = false; };
   }, []);
+
+  /*
+   * Back from Stripe with a card saved from the account. Stripe tells the
+   * booking system a moment later, so the account is read again shortly
+   * rather than at once.
+   */
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("card") !== "added") return;
+    url.searchParams.delete("card");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    setCardAdded(true);
+    const timers = [2500, 8000].map((delay) => window.setTimeout(() => void load(), delay));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [load]);
 
   async function saveName() {
     const session = readSession();
@@ -497,7 +519,7 @@ export function MyLessons({
 
   // Opening a detail starts from what is saved, so a draft abandoned with
   // Cancel never comes back.
-  const openDetail = (field: "name" | "email" | "nif" | "mark") => {
+  const openDetail = (field: "name" | "email" | "nif" | "mark" | "card") => {
     setError("");
     setDetailsNote("");
     if (field === "name") setDetails((current) => ({ ...current, name: student.name }));
@@ -697,6 +719,48 @@ export function MyLessons({
             )}
           </div>
 
+          {/* Only where the booking system can take a card, and only once it
+              says which kind is saved (12 October 2026, Dan). */}
+          {cardsAccepted && student.role !== "teacher" ? (
+            <div className="my-lessons__fact" data-field="card">
+              <span className="my-lessons__fact-label">Card</span>
+              {openField === "card" ? (
+                <div className="card-row-open">
+                  <CardTerms change={student.cardForAllLessons} onCancel={() => setOpenField(null)} />
+                  {student.cardForAllLessons ? (
+                    <button
+                      className="text-action"
+                      onClick={async () => {
+                        setError("");
+                        try {
+                          const result = await removeStudentCard(readSession());
+                          profileVersion.current += 1;
+                          setStudent((current) => current && { ...current, ...result.student });
+                          setOpenField(null);
+                          setDetailsNote("Card removed. Lessons Inês adds are paid to her by hand again.");
+                        } catch (caught) {
+                          setError(caught instanceof Error ? caught.message : "Your card couldn’t be removed.");
+                        }
+                      }}
+                      type="button"
+                    >
+                      Remove card
+                    </button>
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <span className={`my-lessons__fact-value${student.cardForAllLessons ? "" : " my-lessons__fact-value--empty"}`}>
+                    {student.cardForAllLessons ? "Saved" : student.hasCard ? "Only for lessons you book" : "Not added"}
+                  </span>
+                  <button className="my-lessons__change" onClick={() => openDetail("card")} type="button">
+                    {student.cardForAllLessons ? <>Change<span className="visually-hidden"> card</span></> : "Add card"}
+                  </button>
+                </>
+              )}
+            </div>
+          ) : null}
+
           <div className="my-lessons__fact" data-field="nif">
             {openField === "nif" ? (
               <form
@@ -804,6 +868,23 @@ export function MyLessons({
   }
 
   // On Your lessons the calendar card carries the account; only a failure to
-  // read it needs saying here.
-  return alert;
+  // read it, or lessons Inês added that no card covers yet, need saying here.
+  const unpaidAdded = bookings.filter((booking) =>
+    !booking.isPast && booking.status === "confirmed" && booking.addedByTeacher && booking.paymentStatus === "not_required"
+  ).length;
+  const cardNote = cardAdded ? (
+    <div className="booking-outcome card-added" role="status">
+      <CheckCircle2 size={20} aria-hidden="true" />
+      <p>Card saved. You&rsquo;re all set.</p>
+    </div>
+  ) : null;
+  const askForCard = !cardAdded && cardsAccepted && student.role !== "teacher" &&
+    student.cardForAllLessons === false && unpaidAdded > 0;
+  return (
+    <>
+      {cardNote}
+      {askForCard ? <CardPrompt /> : null}
+      {alert}
+    </>
+  );
 }

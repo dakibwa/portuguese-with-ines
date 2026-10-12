@@ -54,6 +54,8 @@ async function fixture(width, reply = async () => null, signed = true) {
       if (path === "/availability") return route.fulfill({ headers: cors, json: { slotsByDate: {}, horizonDays: 84, timeZone: "Europe/Lisbon" } });
       if (path === "/bookings/fixture") return route.fulfill({ headers: cors, json: { booking: lesson, isPast: false, sameDayFeeApplies: false } });
       if (path === "/admin/availability") return route.fulfill({ headers: cors, json: { rules: [], exceptions: [] } });
+      // Her add-a-lesson form asks for her students when she reaches the email.
+      if (path === "/admin/students") return route.fulfill({ headers: cors, json: { students: [], cardsAccepted: false } });
       if (path === "/admin/bookings") return route.fulfill({ headers: cors, json: { bookings: [] } });
       if (path === "/admin/google-calendar") return route.fulfill({ headers: cors, json: { configured: false, connected: false, needsReconnect: false, pending: 0 } });
     }
@@ -107,6 +109,7 @@ const adminLesson = { id: "lesson", reference: "PT-ACDEFG", status: "confirmed",
 function teacherDefaults(path) {
   if (path === "/me") return { json: { student: teacher, bookings: [], series: [] } };
   if (path === "/admin/availability") return { json: { rules, exceptions: [], settings: { slotIntervalMinutes: 30 } } };
+  if (path === "/admin/students") return { json: { students: [], cardsAccepted: false } };
   return null;
 }
 const slot = (page, day, minute) => page.locator(`[data-slot-day="${day}"][data-slot-minute="${minute}"]`);

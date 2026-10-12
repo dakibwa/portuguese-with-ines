@@ -101,7 +101,7 @@ function base64(text) {
  * - A preheader controls the grey preview line in the inbox list. Without one,
  *   clients scrape the first visible text, which is usually the greeting.
  */
-function layout({ heading, preheader, intro, hero, heroNote, rows, callout, action, footer }) {
+function layout({ heading, preheader, intro, hero, heroNote, rows, callout, steps, action, footer }) {
   // Each fact is a line beside one of the confirm step's dabs, its label small
   // above it: a list to glance down rather than a ruled table.
   const rowsHtml = rows.length
@@ -198,6 +198,39 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, acti
       ${rowsHtml ? `<tr><td style="padding:22px 32px 0">${rowsHtml}</td></tr>` : ""}
 
       ${
+        // What to do next, numbered, right above the one button that does it
+        // (12 October 2026, Dan: the first email a student Inês brings gets
+        // should be beautiful and simple to understand).
+        steps?.items?.length
+          ? `<tr><td style="padding:24px 32px 0">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${
+          BRAND.lavenderWash
+        };border-radius:18px 12px 16px 14px">
+          <tr><td style="padding:18px 22px 6px">
+            <p style="margin:0;font:600 16px/1.4 ${SANS};color:${BRAND.blue}">${escapeHtml(steps.title)}</p>
+          </td></tr>
+          ${steps.items
+            .map(
+              (item, index) => `<tr><td style="padding:10px 22px ${index === steps.items.length - 1 ? 18 : 0}px">
+            <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>
+              <td width="26" valign="top" style="width:26px;padding-top:1px">
+                <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate"><tr>
+                  <td width="22" height="22" align="center" bgcolor="${BRAND.blue}" style="width:22px;height:22px;background:${
+                    BRAND.blue
+                  };border-radius:11px;font:700 12px/22px ${SANS};color:#ffffff">${index + 1}</td>
+                </tr></table>
+              </td>
+              <td valign="top" style="padding-left:10px;font:400 15px/1.55 ${SANS};color:${BRAND.ink}">${escapeRich(item)}</td>
+            </tr></table>
+          </td></tr>`
+            )
+            .join("")}
+        </table>
+      </td></tr>`
+          : ""
+      }
+
+      ${
         action
           ? `<tr><td align="center" style="padding:26px 32px 0">
         <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate">
@@ -238,7 +271,7 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, acti
  * deleted anything a student had written between angle brackets, including part
  * of an address, from the text part while the HTML part showed it correctly.
  */
-function plainText({ heading, intro, hero, heroNote, rows, callout, action, footer }) {
+function plainText({ heading, intro, hero, heroNote, rows, callout, steps, action, footer }) {
   const clean = (value) => String(value ?? "").trim();
   const lines = [heading, "", clean(intro)];
   // heroNote already reads "… — the student's time", so a bracket here nests badly.
@@ -251,6 +284,7 @@ function plainText({ heading, intro, hero, heroNote, rows, callout, action, foot
     lines.push("");
     for (const { label, value, url } of rows) lines.push(`${label}: ${clean(value)}${safeMeetingLink(url) ? ` — ${url}` : ""}`);
   }
+  if (steps?.items?.length) lines.push("", steps.title, ...steps.items.map((item, index) => `${index + 1}. ${clean(item)}`));
   if (action) lines.push("", `${action.label}: ${action.url}`);
   lines.push("", clean(footer), "portuguesewithines.com");
   return lines.join("\n");

@@ -15,7 +15,9 @@ export type LessonProduct = {
  * Approved editorial product copy for the lessons page.
  *
  * One entry per bookable lesson, matching the booking Worker's `lesson_types`
- * table — ids included. Single lessons used to be one entry carrying two
+ * table — ids included. Lessons are named by their length, never "single",
+ * which read as "only one" beside a weekly slot (12 October 2026, Dan).
+ * Single lessons used to be one entry carrying two
  * prices, which made the two columns impossible to compare and did not line up
  * with what a student actually picks on /book. Keep the two in step: this copy
  * is what a visitor reads, that table is what they can book.
@@ -35,21 +37,21 @@ export const lessonProducts: LessonProduct[] = [
     id: "single",
     durationMinutes: 60,
     priceCents: 2500,
-    title: "Single lesson",
+    title: "60-minute lesson",
     price: "\u20ac25",
     duration: "60 mins",
     description: "Book one at a time, or keep the same time each week.",
-    bookingLabel: "Book a single lesson"
+    bookingLabel: "Book a 60-minute lesson"
   },
   {
     id: "long",
     durationMinutes: 90,
     priceCents: 3500,
-    title: "Longer lesson",
+    title: "90-minute lesson",
     price: "\u20ac35",
     duration: "90 mins",
     description: "An hour and a half, if you want more time to talk.",
-    bookingLabel: "Book a longer lesson"
+    bookingLabel: "Book a 90-minute lesson"
   }
 ];
 

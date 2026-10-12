@@ -781,7 +781,7 @@ await test("an automatic charge is idempotent and only returns a succeeded Payme
         customer: "cus_test",
         paymentMethod: "pm_test",
         amountCents: 2500,
-        description: "Single lesson · PT-ABC234"
+        description: "60-minute lesson · PT-ABC234"
       }
     );
     assert.equal(intent.status, "succeeded");
@@ -814,7 +814,7 @@ await test("an automatic charge that still requires customer action is not treat
           customer: "cus_test",
           paymentMethod: "pm_test",
           amountCents: 2500,
-          description: "Single lesson · PT-ABC234"
+          description: "60-minute lesson · PT-ABC234"
         }
       ),
       /did not succeed \(requires_action\)/

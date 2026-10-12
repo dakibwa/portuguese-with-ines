@@ -37,6 +37,8 @@ async function fixture(width, { rules = [], interval = 15, current = booking, re
     if (request.method() === "GET") {
       if (path === "/me") return route.fulfill({ headers: cors, json: { student, bookings: [], series: [], sameDayFeeCents: 500 } });
       if (path === "/admin/availability") return route.fulfill({ headers: cors, json: { rules, exceptions: [], settings: { slotIntervalMinutes: interval } } });
+      // Her add-a-lesson form asks for her students when she reaches the email.
+      if (path === "/admin/students") return route.fulfill({ headers: cors, json: { students: [], cardsAccepted: false } });
       if (path === "/admin/bookings") return route.fulfill({ headers: cors, json: { bookings: current ? [current] : [] } });
       if (path === "/admin/google-calendar") return route.fulfill({ headers: cors, json: { configured: false, connected: false, needsReconnect: false, pending: 0 } });
     }

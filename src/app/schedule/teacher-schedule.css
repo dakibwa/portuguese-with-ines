@@ -781,12 +781,14 @@
   align-items: end;
   width: 100%;
 }
-.teacher-manual {
+.teacher-manual,
+.teacher-students {
   margin-top: 3rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--rule);
 }
-.teacher-manual summary {
+.teacher-manual summary,
+.teacher-students summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -795,10 +797,12 @@
   cursor: pointer;
   list-style: none;
 }
-.teacher-manual summary::-webkit-details-marker {
+.teacher-manual summary::-webkit-details-marker,
+.teacher-students summary::-webkit-details-marker {
   display: none;
 }
-.teacher-manual summary > svg {
+.teacher-manual summary > svg,
+.teacher-students summary > svg {
   flex: none;
   transition: transform 160ms;
 }
@@ -860,6 +864,20 @@
   padding: 0;
   border: 0;
   opacity: 0;
+}
+/* How long a weekly slot runs takes the form's whole width: four choices. */
+.teacher-manual-choice--wide {
+  grid-column: 1/-1;
+}
+.teacher-manual-choice .segmented--four label {
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .teacher-manual-choice .segmented--four label {
+    font-size: 0.66rem;
+    letter-spacing: 0.02em;
+  }
 }
 .teacher-manual-submit {
   grid-column: 1/-1;
@@ -1331,7 +1349,8 @@
   .teacher-exact-windows {
     width: 100%;
   }
-  .teacher-manual {
+  .teacher-manual,
+  .teacher-students {
     margin-top: 2rem;
   }
   .teacher-manual-title {
@@ -1753,6 +1772,20 @@
   font-size: 0.78rem;
   line-height: 1.5;
 }
+.teacher-lesson-added-note p {
+  margin: 0;
+}
+/* A quiet way out for a lesson already paid by hand, not a call to action. */
+.teacher-lesson-added-note .text-action {
+  margin-top: 0.15rem;
+  padding: 0;
+  color: var(--blue-deep);
+  font: 600 0.78rem/1.5 var(--ui);
+  letter-spacing: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-transform: none;
+}
 .teacher-lesson-place {
   display: inline-flex;
   align-items: center;
@@ -1827,4 +1860,169 @@
 .teacher-timeoff-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+/* Her students (12 October 2026, Dan): one row each, who first, then what
+   is done and what isn't, and a way in to send. Done reads lilac; anything
+   still to do stays plain so it isn't alarming. */
+.teacher-students__waiting {
+  color: var(--coral-action);
+  font-weight: 600;
+}
+.teacher-students__count {
+  color: var(--lavender-ink);
+  font-weight: 500;
+}
+.teacher-students__lead {
+  margin: 0 0 0.75rem;
+  color: var(--lavender-ink);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+.teacher-students__search input {
+  width: min(100%, 20rem);
+  min-height: 40px;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-field, 12px);
+  padding: 0 0.75rem;
+  background: var(--sheet);
+  font: inherit;
+  font-size: 0.86rem;
+}
+.teacher-students__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* One small sheet card each: their splat or initial, who they are, where
+   they are in one line, and only the buttons that help. */
+.teacher-student {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.85rem 0.85rem;
+  align-items: start;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: 1rem 1.1rem;
+  background: var(--sheet);
+}
+.teacher-student.needs-her {
+  border-color: rgba(239, 93, 60, 0.35);
+}
+.teacher-student__avatar.account-avatar {
+  width: 2.6rem;
+  height: 2.6rem;
+  font-size: 1rem;
+}
+.teacher-student__main {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+.teacher-student__name {
+  font: 600 0.95rem/1.35 var(--ui);
+}
+.teacher-student__email {
+  overflow: hidden;
+  color: var(--lavender-ink);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teacher-student__status {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0.45rem 0 0;
+  font: 600 0.8rem/1.4 var(--ui);
+}
+.teacher-student.is-ready .teacher-student__status {
+  color: var(--blue-deep);
+}
+.teacher-student__dot {
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--coral);
+}
+.teacher-student__next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.6rem;
+  align-items: center;
+  margin: 0.1rem 0 0;
+  color: var(--lavender-ink);
+  font-size: 0.78rem;
+}
+.teacher-student__weekly {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+  border-radius: var(--squiggle-pill);
+  padding: 0 0.45rem;
+  background: var(--lavender-soft);
+  color: var(--ink);
+  font: 600 0.7rem/1.6 var(--ui);
+}
+.teacher-student__action {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 0.5rem;
+  align-items: center;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 0.75rem;
+}
+.teacher-student__button {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid var(--blue-deep);
+  border-radius: var(--squiggle-pill);
+  padding: 0 0.85rem;
+  background: transparent;
+  color: var(--blue-deep);
+  cursor: pointer;
+  font: 600 0.76rem/1 var(--ui);
+  transition: background 200ms, color 200ms;
+}
+.teacher-student__button:hover,
+.teacher-student__button:focus-visible {
+  background: var(--blue-deep);
+  color: #fff;
+}
+.teacher-student__button--send {
+  border-color: var(--coral-action);
+  background: var(--coral-action);
+  color: #fff;
+}
+.teacher-student__button--send:hover,
+.teacher-student__button--send:focus-visible {
+  background: var(--blue-deep);
+  border-color: var(--blue-deep);
+}
+.teacher-student__button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.teacher-student__sent {
+  color: var(--lavender-ink);
+  font-size: 0.78rem;
+}
+.teacher-student__failed {
+  color: var(--coral-action);
+  font-size: 0.78rem;
+}
+/* A student she already has: said quietly beneath their name. */
+.teacher-manual-known {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--lavender-ink);
+  font: 500 0.72rem/1.4 var(--ui);
 }

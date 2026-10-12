@@ -36,6 +36,7 @@ async function open(width, path, { session = "", me = student, reply = () => nul
     if (endpoint === "/availability") return route.fulfill({ json: { slotsByDate: {}, horizonDays: 56 } });
     if (endpoint === "/admin/google-calendar") return route.fulfill({ json: { configured: false, connected: false, email: null, needsReconnect: false, pending: 0 } });
     if (endpoint === "/admin/availability") return route.fulfill({ json: { rules: [], exceptions: [], settings: { slotIntervalMinutes: 30 } } });
+    if (endpoint === "/admin/students") return route.fulfill({ json: { students: [], cardsAccepted: false } });
     errors.push(`Unexpected fixture request: ${request.method()} ${endpoint}`);
     return route.abort();
   });

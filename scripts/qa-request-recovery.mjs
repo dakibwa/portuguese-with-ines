@@ -82,6 +82,7 @@ async function fixture(width, reply = async () => null) {
     if (pathname === "/availability") return route.fulfill({ headers: cors, json: { slotsByDate: {}, timeZone: "Europe/Lisbon", horizonDays: 84 } });
     if (pathname === "/bookings/next") return route.fulfill({ headers: cors, json: { booking: nextLesson, isPast: false, sameDayFeeApplies: false } });
     if (pathname === "/admin/availability") return route.fulfill({ headers: cors, json: { rules: [], exceptions: [] } });
+    if (pathname === "/admin/students") return route.fulfill({ headers: cors, json: { students: [], cardsAccepted: false } });
     if (pathname === "/admin/bookings") return route.fulfill({ headers: cors, json: { bookings: [] } });
     if (pathname === "/admin/google-calendar") return route.fulfill({ headers: cors, json: { configured: false, connected: false, needsReconnect: false, pending: 0 } });
     errors.push(`Unexpected request: ${request.method()} ${pathname}`);

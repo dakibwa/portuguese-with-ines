@@ -79,7 +79,7 @@ export function occurrenceInstants({ fromKey, minuteOfDay, count }) {
  * booking the other eleven. The skipped dates are returned so the student is
  * told before they commit, never after.
  */
-export async function planOccurrences(env, { fromKey, minuteOfDay, count, lessonType, now, ignoreBookingId = null, ignoreHoldsOf = null }) {
+export async function planOccurrences(env, { fromKey, minuteOfDay, count, lessonType, now, ignoreBookingId = null, ignoreHoldsOf = null, teacher = false }) {
   const wanted = occurrenceInstants({ fromKey, minuteOfDay, count: Math.min(count, MAX_OCCURRENCES_PER_RUN) });
 
   const bookable = [];
@@ -88,6 +88,15 @@ export async function planOccurrences(env, { fromKey, minuteOfDay, count, lesson
     const actual = slotOf(occurrence.startAt);
     if (actual.dateKey !== occurrence.key || actual.minuteOfDay !== minuteOfDay) {
       skipped.push({ key: occurrence.key, startAt: occurrence.startAt.toISOString(), reason: "That weekly time does not exist because the clocks change." });
+      continue;
+    }
+    if (teacher) {
+      // Inês's own weekly slot: like a single lesson she adds, only her days
+      // off and her other lessons stand in its way. The slot claim refuses a
+      // clash atomically, so only the day off is checked here.
+      const problem = await teacherWeekProblem(env, occurrence, now);
+      if (problem) skipped.push({ key: occurrence.key, startAt: occurrence.startAt.toISOString(), reason: problem });
+      else bookable.push({ ...occurrence, endAt: new Date(occurrence.startAt.getTime() + lessonType.duration_minutes * 60000) });
       continue;
     }
     const check = await isSlotBookable(env, {
@@ -106,6 +115,17 @@ export async function planOccurrences(env, { fromKey, minuteOfDay, count, lesson
   }
 
   return { bookable, skipped };
+}
+
+async function teacherWeekProblem(env, occurrence, now) {
+  if (occurrence.startAt <= now) return "That time has already passed.";
+  const dayOff = await env.DB.prepare(
+    `SELECT 1 FROM availability_exceptions WHERE date = ? AND weekday IS NULL AND kind = 'blocked'
+       AND (start_minute IS NULL OR start_minute <= 0) AND (end_minute IS NULL OR end_minute >= 1440) LIMIT 1`
+  )
+    .bind(occurrence.key)
+    .first();
+  return dayOff ? "You have that day off." : "";
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   addedByTeacher,
   cancelBookingAs,
   rescheduleBookingAs,
+  markPaidByHand,
   setNoShow,
   type AdminBooking,
 } from "@/lib/admin-api";
@@ -159,10 +160,37 @@ export function LessonDetails({
         {booking.status === "cancelled" ? "Cancelled" : addedByTeacher(booking) ? "Added by you" : "Booked"}
       </p>
       {addedByTeacher(booking) && booking.status !== "cancelled" ? (
-        <p className="teacher-lesson-added-note">
-          You added this lesson for a booking arranged elsewhere, so it isn&rsquo;t
-          charged through the site.
-        </p>
+        booking.payment_status === "scheduled" ? (
+          // On the student's card since they saved it. One they already paid
+          // for by hand comes off before it is charged (12 October 2026).
+          <div className="teacher-lesson-added-note">
+            <p>You added this lesson. It&rsquo;s charged to the student&rsquo;s card after it ends.</p>
+            <button
+              className="text-action"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                try {
+                  await markPaidByHand(token, booking.id);
+                  changed.current = true;
+                  onChanged("Taken off their card. This lesson stays paid to you by hand.");
+                } catch (caught) {
+                  setError(caught instanceof Error ? caught.message : "This lesson couldn’t be updated.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              type="button"
+            >
+              Already paid you by hand? Take it off their card
+            </button>
+          </div>
+        ) : (
+          <p className="teacher-lesson-added-note">
+            You added this lesson. It&rsquo;s paid to you by hand, not through the site.
+          </p>
+        )
       ) : null}
       <div className="teacher-dialog-top">
         {/* The student's own splat when they have chosen one, so Inês knows
