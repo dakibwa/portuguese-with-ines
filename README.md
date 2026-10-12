@@ -273,8 +273,7 @@ gives the page being left an exit and the arriving page an enter, which
 the new one focuses in over about 420 ms, drifting into place over 620 ms on
 desktop and 520 ms on phones. The header, the portfolio banner and an open phone
 menu carry their own `view-transition-name`s, so the header holds still and the
-menu recedes with its page; the nav's current line, `.site-nav__current`, is a
-named element of its own and glides. `PageTurn` sets `data-page-turn`
+menu recedes with its page. `PageTurn` sets `data-page-turn`
 (`forward`, `back` or `settle`) on the root while the new page commits, from the
 pages' order along the nav. React commits a back or forward navigation
 synchronously, so it has no view transition, and `PageTurn` gives those pages

@@ -88,6 +88,11 @@ export function TeacherSchedule() {
   const [scheduleError, setScheduleError] = useState("");
   const [scheduleAttempt, setScheduleAttempt] = useState(0);
   const [bookingsLoading, setBookingsLoading] = useState(true);
+  // Once a week has shown, turning to another keeps the timetable in place
+  // while that week's lessons arrive, rather than blanking it to a loading
+  // note between weeks (12 October 2026: the arrows' slide had nothing to
+  // slide).
+  const [bookingsShown, setBookingsShown] = useState(false);
   const [bookingsError, setBookingsError] = useState("");
   const [savingHours, setSavingHours] = useState(false);
   const [error, setError] = useState("");
@@ -222,6 +227,7 @@ export function TeacherSchedule() {
       setBookings(
         result.bookings.filter((booking) => booking.status === "confirmed"),
       );
+      setBookingsShown(true);
       setPaymentReview(result.manualPaymentReconciliation ?? []);
     } catch (caught) {
       if (request === bookingRequest.current)
@@ -617,7 +623,7 @@ export function TeacherSchedule() {
             </div>
           )}
         </div>
-        {!editing && bookingsLoading ? (
+        {!editing && bookingsLoading && !bookingsShown ? (
           <p className="teacher-calendar-loading" role="status">
             Loading this week&rsquo;s lessons…
           </p>

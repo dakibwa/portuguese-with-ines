@@ -243,7 +243,8 @@ Dan's 22 September review tightened the public pages:
   the right edge halfway down the heading rather than trailing beneath it, and
   the booking banner keeps
   its splat at the right in a band of about 124 px, without an editorial rule,
-  its two-line `Your Lessons` set close as one handwritten block;
+  its two-line `Book a Lesson` or `Your Lessons` set close as one handwritten
+  block;
 - the three Lessons cards each have their own squiggle outline, and their own
   splat comes in large from the card's top-right corner, cropped by its edge;
   once landed it moves only to turn a little while its card is pointed at. The
@@ -388,7 +389,13 @@ usual lesson starts and days off; avoid a wall of administration forms.
 
 ## Wording and confirmation — 13 September 2026
 
-Use `Portuguese Lessons` on the home page and `Your Lessons` in booking.
+Use `Portuguese Lessons` on the home page. Booking's banner reads `Book a
+Lesson` to a visitor without an account and `Your Lessons` to a student, or to
+anyone arriving by a lesson's own link or a link to Your lessons (12 October
+2026, at Dan's request). The banner names the page, so the booking card
+carries no second `Book a lesson` title of its own (its title is kept for
+screen readers): a first-time visitor's card opens on the lesson's choices,
+and a returning one's on `Already booked? Sign in`.
 Marketing copy describes Portuguese lessons without repeated European/Portugal
 positioning. The one statement of it is on Approach: Inês teaches European
 Portuguese, and any variety a student already knows is welcome. Retain actual
@@ -443,8 +450,9 @@ the booking celebration followed, kept in style and tasteful). What lands or
 travels moves on a soft spring that gives a few per cent and settles; controls
 answer on a firm one; everything else decelerates long.
 
-Pages turn into one another. The header stays exactly where it is and the
-nav's coral line glides along to the new destination. The page being left
+Pages turn into one another. The header stays exactly where it is, and the
+nav's coral moves to the new destination's name; the nav draws no line beneath
+it (12 October 2026, at Dan's request). The page being left
 drops out of focus and away almost at once, and the new one pulls into focus as
 it settles, so two pages never print over each other and for a breath the
 paper shows between them. On wider screens the pages sit in a row along the
@@ -1061,7 +1069,10 @@ as a form:
   as the student's calendar does, a globe or a person in its top right
   corner, explained in the key, with a small `Meet` pill at the foot of an
   online lesson whose call is ready,
-  and `Weekly hours` a coral button in the middle of the week's row. A lesson opens in the student's own dialog: status, the student,
+  and `Weekly hours` a coral button in the middle of the week's row. Her
+  arrows turn the week as the student's turn theirs: the days slide in from
+  the side the week was reached from while the hours stay put (12 October
+  2026, at Dan's request). A lesson opens in the student's own dialog: status, the student,
   the time in bold with its length and place beneath, then `Move lesson` in
   coral beside `Cancel lesson`, with `Mark no-show` a quiet link below;
 - emails read as the site does: Montserrat (falling back to Arial) rather
