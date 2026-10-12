@@ -110,6 +110,12 @@ function teacherDefaults(path) {
   return null;
 }
 const slot = (page, day, minute) => page.locator(`[data-slot-day="${day}"][data-slot-minute="${minute}"]`);
+// A free time offers a choice; time off is one of its options. A time
+// already off reopens straight away.
+async function takeOff(page, cell) {
+  await cell.click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "Take this time off", exact: true }).click();
+}
 async function monday(page) {
   await page.goto(`${base}/schedule/`);
   await page.getByRole("button", { name: "Next week", exact: true }).click();
@@ -224,8 +230,8 @@ try {
       try {
         const { page } = state;
         await monday(page);
-        await slot(page, 1, 600).click(); await started.promise;
-        await slot(page, 1, 630).click();
+        await takeOff(page, slot(page, 1, 600)); await started.promise;
+        await takeOff(page, slot(page, 1, 630));
         if (failure === "malformed") {
           await page.getByRole("switch", { name: "Day off, Monday 5 October", exact: true }).click();
           await page.getByRole("switch", { name: "Day off, Monday 5 October", exact: true }).click();
@@ -250,12 +256,12 @@ try {
       });
       try {
         const { page } = state;
-        await monday(page); await slot(page, 1, 600).click();
+        await monday(page); await takeOff(page, slot(page, 1, 600));
         await expect(page.locator(".teacher-save-state")).toContainText(unreadable);
         await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "false");
         await check(state);
         if (width !== 390 && Object.keys(answer).length === 0) await page.screenshot({ path: `${output}/time-off-error-${width}.png`, fullPage: true });
-        await slot(page, 1, 600).click();
+        await takeOff(page, slot(page, 1, 600));
         await expect(page.locator(".teacher-save-state")).not.toHaveClass(/is-error/);
         await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "true");
         await check(state); assert.equal(writes, 2); cases += 1;
@@ -297,8 +303,8 @@ try {
       });
       try {
         const { page } = state;
-        await monday(page); await slot(page, 1, 600).click(); await started.promise;
-        await slot(page, 1, 630).click();
+        await monday(page); await takeOff(page, slot(page, 1, 600)); await started.promise;
+        await takeOff(page, slot(page, 1, 630));
         await leaveForFaq(page);
         await page.evaluate(value => {
           if (value) localStorage.setItem("ines-student-session", value); else localStorage.removeItem("ines-student-session");
