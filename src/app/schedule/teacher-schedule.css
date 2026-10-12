@@ -1775,9 +1775,16 @@
 .teacher-lesson-added-note p {
   margin: 0;
 }
+/* A quiet way out for a lesson already paid by hand, not a call to action. */
 .teacher-lesson-added-note .text-action {
-  margin-top: 0.2rem;
-  font-size: 0.78rem;
+  margin-top: 0.15rem;
+  padding: 0;
+  color: var(--blue-deep);
+  font: 600 0.78rem/1.5 var(--ui);
+  letter-spacing: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-transform: none;
 }
 .teacher-lesson-place {
   display: inline-flex;
