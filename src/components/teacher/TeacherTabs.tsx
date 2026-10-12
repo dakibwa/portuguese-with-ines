@@ -33,10 +33,10 @@ export function TeacherTabs({ current, hoursDirty, meetAttention, onSelect }: {
       // Keep the active tab in view after a resize as well as a tab change.
       // Scroll only the strip, never the page or a form she is editing.
       if (scroller) {
-        const left = selected.offsetLeft;
-        const right = left + selected.offsetWidth;
-        if (left < scroller.scrollLeft) scroller.scrollLeft = left;
-        else if (right > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = right - scroller.clientWidth;
+        const tab = selected.getBoundingClientRect();
+        const strip = scroller.getBoundingClientRect();
+        if (tab.left < strip.left + 3) scroller.scrollLeft += tab.left - strip.left - 3;
+        else if (tab.right > strip.right - 3) scroller.scrollLeft += tab.right - strip.right + 3;
       }
     };
     measure();
