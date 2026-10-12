@@ -109,7 +109,10 @@ function LessonForm({
               ...(weekly && lesson.repeat !== "once" ? { repeat: lesson.repeat } : {}),
             });
             setLesson(initial);
-            onCreated(addedMessage(result.series));
+            // A booking system from before weekly slots books only the first.
+            onCreated(weekly && !result.series
+              ? "Only the first lesson was added: weekly slots aren’t switched on yet. The student has been emailed the details."
+              : addedMessage(result.series));
           } catch (caught) {
             setError(
               caught instanceof Error
