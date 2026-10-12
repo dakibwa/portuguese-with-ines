@@ -36,11 +36,14 @@ Legacy /my-lessons and /booking links resolve into /book without losing state
 Inês on /schedule                     (her own account, role=teacher)
   → GET/POST /admin/availability, /admin/exceptions
   → POST /admin/exceptions/day                       one date's day off and blocked hours
-  → GET  /admin/bookings, /admin/students
-  → POST /admin/bookings                             add a lesson for someone
-                                                     (never charged through the site: its
-                                                     payment stays `not_required`, which is how
-                                                     her schedule marks it `Added by you`)
+  → GET  /admin/bookings, /admin/students            her lessons; her students and how far
+                                                     each is onto the site
+  → POST /admin/bookings                             add a lesson, or a weekly slot, for someone
+                                                     (marked `added_by_teacher`, shown as
+                                                     `Added by you`; charged to a card only
+                                                     once the student saved one from their
+                                                     account)
+  → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
   → POST /admin/bookings/:id/reschedule | /cancel
 Stripe → POST /stripe/webhook                        signature-verified
 ```
@@ -69,9 +72,42 @@ one deciding, and fitting a lesson in outside them is a normal thing for her to
 do. A double booking is never intended, so that is still refused.
 
 Adding a lesson for someone who booked another way creates their account if it
-does not exist, with no password — they set one through "forgot password" when
-they first want to manage the lesson themselves. They receive the same
-confirmation, calendar invitation and manage link as if they had booked it.
+does not exist, with no password. Their confirmation says Inês booked it and
+carries the calendar invitation. While they have never been in, or have not yet
+saved a card from their account, its button is a one-click sign-in link (good
+for 14 days, once) instead of the manage link, and it says how adding a card
+works; the invitation still carries the manage link. Her own copy says
+`You added a lesson`.
+
+`How often` adds a weekly slot instead (4, 6 or 8 weeks, or until stopped),
+one email for the run. Like a single lesson she adds, its weeks are checked
+only against her days off and her other lessons, not her published hours or
+the notice window, and the run is marked `booking_series.added_by_teacher` so
+the nightly top-up keeps doing so. A week that cannot be booked is left out and
+named in both emails.
+
+**Paying for the lessons she adds** (migration 0023, 12 October 2026, Dan).
+A lesson Inês adds records its price and `added_by_teacher = 1`. It is paid to
+her as before (`payment_status = 'not_required'`) until the student saves a card
+from their own account (`POST /me/card`, Stripe's hosted setup page,
+`client_reference_id = student:<id>`, `metadata.purpose = student_card`). That
+agreement is stored as `students.card_consent_at` with
+`STUDENT_CARD_CONSENT_VERSION`. When Stripe's signed webhook confirms the
+SetupIntent, the card is saved, every lesson she added that has not yet started
+becomes `scheduled` (charged after it ends, on the same change and no-show terms
+as a lesson the student books), her weekly slots for them turn on
+`automatic_payment`, and anything she adds afterwards is `scheduled` from the
+start. A lesson already had, or one the student booked themselves, is never
+changed. A card saved at one booking's checkout agreed to that booking only and
+does not count. `Your lessons` asks once, above the calendar, while a lesson
+she added is still unpaid; `Your details` has a `Card` row.
+
+`GET /admin/students` lists each student with whether they have signed in, a
+card and the standing agreement, their next lesson, how many lessons to come are
+still paid by hand, and any weekly slot. `Your students` on `/schedule` puts
+those who still need to sign in or add a card first, each with
+`Send sign-in link` (`POST /admin/students/:id/welcome`, three an hour per
+student).
 
 Registering proves nothing about an address, so an existing account may belong
 to whoever registered the address first rather than to the student Inês means.
@@ -79,10 +115,10 @@ When the account's address has never been proven (see *Accounts*) and it has a
 password, adding the lesson first applies the transition a first Google link
 makes: the password, every session and any pending reset or address change are
 cleared, before the lesson exists, so no earlier session can read it or its
-manage link. The mailbox's owner gets back in with Google or by choosing a new
-password through "I’ve forgotten my password", and only that booking's
-confirmation adds one sentence saying so. A proven address, a teacher account
-and the password-less accounts created here are never touched.
+manage link. The mailbox's owner gets back in with the one-click sign-in link
+that booking's confirmation always carries, with Google, or by choosing a new
+password. A proven address, a teacher account and the password-less accounts
+created here are never touched.
 
 ## Teacher calendar
 
@@ -132,7 +168,11 @@ are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
 Manual lesson entry is a collapsed backup at the bottom, with online/in-Porto
-location. All teacher actions still use the authenticated admin endpoints and
+location and `How often` (once, or weekly for 4, 6 or 8 weeks or until
+stopped). Its email field suggests her existing students (read from
+`GET /admin/students` when she first reaches it) and a chosen one fills in
+their name. `Your students` sits beneath it, read each time it opens; each
+row's `Add lesson` opens the form with that student in it. All teacher actions still use the authenticated admin endpoints and
 their existing booking, payment and email safeguards.
 
 ## Accounts
@@ -191,6 +231,20 @@ depending on them having kept the right confirmation email.
   how fast addresses can be tested.
 - Reset links are single-use and last an hour. A Google-only account has no
   password; using "forgot password" is how such a student sets one.
+- **Sign-in links** (migration 0023). `Email me a sign-in link` on the sign-in
+  panel (`POST /auth/email-link`) emails an existing student account a link
+  that signs it in once, within 30 minutes; the answer is the same whether or
+  not the address has an account, and each account gets three an hour. The
+  links in emails Inês causes last 14 days. A link is signed like a reset under
+  its own prefix, and its `sign_in_links` row is the record that it is unspent:
+  `POST /auth/email-link/confirm` deletes the row first, so of two clicks one
+  signs in, and only while the account still has the address the link was sent
+  to. A link proves the address. On an account that was registered with a
+  password and never proven, it makes a Google first link's transition: the
+  password, other sessions and any pending reset or address change go. Teacher
+  accounts are never sent one. `/book/?signin=` spends the link from the address
+  bar before anything else and opens `Your lessons`; a spent or expired link
+  opens the panel on asking for a new one.
 - **An address counts as proven once it has received mail.**
   `students.email_verified_at` (migration 0020) is set by any Google sign-in,
   a completed password reset or a confirmed email change; registering with a
@@ -1263,6 +1317,10 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
   and Options.md` for the full position, including the unresolved IVA exemption
   code.
 - **Reminders** before a lesson.
+- **Migration 0023** (`workers/booking/migrations/0023-transition-kit.sql`) must
+  be applied to staging and production D1 before the Worker that reads it is
+  deployed: adding a lesson writes `added_by_teacher` and sign-in links need
+  their table.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
 ## Google Calendar and Meet setup

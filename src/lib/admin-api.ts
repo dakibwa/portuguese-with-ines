@@ -7,6 +7,17 @@ export type AdminStudent = {
   name: string;
   email: string;
   phone: string;
+  /** Has ever signed in, or set a password or Google sign-in. */
+  signedIn?: boolean;
+  hasCard?: boolean;
+  /** A card saved from their account, which pays for the lessons she adds. */
+  cardForAllLessons?: boolean;
+  nextLessonAt?: string | null;
+  upcoming?: number;
+  /** Lessons to come that are still paid to her by hand. */
+  unpaidUpcoming?: number;
+  /** Active weekly slots. */
+  weekly?: number;
 };
 
 export type AvailabilityRule = {
@@ -62,16 +73,20 @@ export type AdminBooking = {
     | "payment_due"
     | "refunded";
   attendance_status: "expected" | "no_show";
+  /** 1 when Inês added it herself (migration 0023). */
+  added_by_teacher?: number;
 };
 
 /**
  * A lesson Inês added herself, for a booking arranged elsewhere, rather than
- * one a student booked on the site. Hers are never charged through the site,
- * so their payment stays `not_required`; a student's always has a Stripe
- * payment state while the site takes payments.
+ * one a student booked on the site. The booking system records it outright
+ * (migration 0023), so it stays hers once the student's card pays for it.
+ * Before that record existed, hers were the lessons with no site payment.
  */
-export function addedByTeacher(booking: Pick<AdminBooking, "payment_status">) {
-  return booking.payment_status === "not_required";
+export function addedByTeacher(booking: Pick<AdminBooking, "payment_status" | "added_by_teacher">) {
+  return booking.added_by_teacher === undefined
+    ? booking.payment_status === "not_required"
+    : Boolean(booking.added_by_teacher);
 }
 
 async function adminRequest<T>(
@@ -200,6 +215,14 @@ export function fetchStudents(token: string) {
   return adminRequest<{ students: AdminStudent[] }>(token, "/admin/students");
 }
 
+/** Emails a student a fresh one-click way into their account. */
+export function sendStudentWelcome(token: string, studentId: string) {
+  return adminRequest<{ ok: true; card?: boolean }>(token, `/admin/students/${encodeURIComponent(studentId)}/welcome`, {
+    method: "POST",
+    body: "{}",
+  });
+}
+
 /** Creates the student's account too, if this is their first lesson. */
 export function createBookingFor(
   token: string,
@@ -210,9 +233,14 @@ export function createBookingFor(
     startAt: string;
     location: "online" | "porto";
     notes: string;
+    /** Weekly: 4, 6 or 8 weeks, or "open" until stopped. Left out, one lesson. */
+    repeat?: 4 | 6 | 8 | "open";
   },
 ) {
-  return adminRequest<{ booking: { reference: string } }>(
+  return adminRequest<{
+    booking: { reference: string };
+    series?: { booked: number; skipped: { key: string; startAt: string; reason: string }[] };
+  }>(
     token,
     "/admin/bookings",
     {

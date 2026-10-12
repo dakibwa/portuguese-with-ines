@@ -16,6 +16,7 @@ import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
 import { AddLessonDialog, ManualLessonForm } from "@/components/teacher/ManualLessonForm";
+import { StudentList } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
 import { TimeOffDialog, datesBetween } from "@/components/teacher/TimeOffDialog";
 import {
@@ -86,6 +87,8 @@ export function TeacherSchedule() {
   );
   // A free time chosen on the week, for a lesson added there.
   const [addLesson, setAddLesson] = useState<{ date: string; minute: number } | null>(null);
+  // A student chosen from her list, put straight into the add-a-lesson form.
+  const [formStudent, setFormStudent] = useState<{ email: string; name: string; key: number }>();
   const [timeOffOpen, setTimeOffOpen] = useState(false);
   const [paymentReview, setPaymentReview] = useState<
     { id: string; reference: string }[]
@@ -748,7 +751,11 @@ export function TeacherSchedule() {
         ) : null}
       </section>
 
-      <ManualLessonForm token={token} onCreated={() => void reloadBookings()} />
+      <ManualLessonForm token={token} student={formStudent} onCreated={() => void reloadBookings()} />
+      <StudentList
+        token={token}
+        onAddLesson={(student) => setFormStudent((current) => ({ email: student.email, name: student.name, key: (current?.key ?? 0) + 1 }))}
+      />
       {addLesson ? (
         <AddLessonDialog
           key={`${addLesson.date}-${addLesson.minute}`}

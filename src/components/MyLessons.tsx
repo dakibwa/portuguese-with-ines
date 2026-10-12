@@ -729,9 +729,9 @@ export function MyLessons({
                 <>
                   <span className={`my-lessons__fact-value${student.cardForAllLessons ? "" : " my-lessons__fact-value--empty"}`}>
                     {student.cardForAllLessons
-                      ? "Saved, charged after each lesson"
+                      ? "Saved"
                       : student.hasCard
-                        ? "Saved for lessons you book"
+                        ? "Only for lessons you book"
                         : "Not added"}
                   </span>
                   <button className="my-lessons__change" onClick={() => openDetail("card")} type="button">
@@ -856,7 +856,7 @@ export function MyLessons({
   const cardNote = cardAdded ? (
     <div className="booking-outcome card-added" role="status">
       <CheckCircle2 size={20} aria-hidden="true" />
-      <p>Your card is saved. From now on, each lesson is paid automatically after it ends.</p>
+      <p>Card saved. Each lesson is now paid after it ends.</p>
     </div>
   ) : null;
   const askForCard = !cardAdded && cardsAccepted && student.role !== "teacher" &&
@@ -864,7 +864,7 @@ export function MyLessons({
   return (
     <>
       {cardNote}
-      {askForCard ? <CardPrompt lessons={unpaidAdded} /> : null}
+      {askForCard ? <CardPrompt /> : null}
       {alert}
     </>
   );

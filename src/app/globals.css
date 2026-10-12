@@ -8548,3 +8548,70 @@ dialog[open]::backdrop {
     transform: rotate(360deg) scale(0.86);
   }
 }
+
+/* A card for the lessons Inês adds (12 October 2026, Dan): one calm card
+   above Your lessons while some are still paid to her by hand, and the same
+   short terms a booking shows, opened in place. */
+.card-prompt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+  margin-bottom: 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: clamp(0.9rem, 2vw, 1.25rem);
+  background: var(--sheet);
+}
+
+.card-prompt__icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--lavender-soft);
+  color: var(--blue-deep);
+}
+
+.card-prompt__body {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+}
+
+.card-prompt h3 {
+  margin: 0;
+  font: 600 1rem/1.4 var(--ui);
+}
+
+.card-prompt p {
+  margin: 0;
+  color: var(--lavender-ink);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.card-terms {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.card-terms .booking-payment-facts {
+  margin: 0;
+}
+
+.card-added {
+  margin-bottom: 1rem;
+}
+
+.my-lessons__fact[data-field="card"] .card-terms {
+  grid-column: 2 / -1;
+}
+
+@media (max-width: 640px) {
+  .my-lessons__fact[data-field="card"] .card-terms {
+    grid-column: 1 / -1;
+  }
+}

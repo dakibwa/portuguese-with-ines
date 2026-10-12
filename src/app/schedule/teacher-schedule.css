@@ -781,12 +781,14 @@
   align-items: end;
   width: 100%;
 }
-.teacher-manual {
+.teacher-manual,
+.teacher-students {
   margin-top: 3rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--rule);
 }
-.teacher-manual summary {
+.teacher-manual summary,
+.teacher-students summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -795,10 +797,12 @@
   cursor: pointer;
   list-style: none;
 }
-.teacher-manual summary::-webkit-details-marker {
+.teacher-manual summary::-webkit-details-marker,
+.teacher-students summary::-webkit-details-marker {
   display: none;
 }
-.teacher-manual summary > svg {
+.teacher-manual summary > svg,
+.teacher-students summary > svg {
   flex: none;
   transition: transform 160ms;
 }
@@ -860,6 +864,13 @@
   padding: 0;
   border: 0;
   opacity: 0;
+}
+/* How long a weekly slot runs takes the form's whole width: four choices. */
+.teacher-manual-choice--wide {
+  grid-column: 1/-1;
+}
+.teacher-manual-choice .segmented--four label {
+  font-size: 0.78rem;
 }
 .teacher-manual-submit {
   grid-column: 1/-1;
@@ -1331,7 +1342,8 @@
   .teacher-exact-windows {
     width: 100%;
   }
-  .teacher-manual {
+  .teacher-manual,
+  .teacher-students {
     margin-top: 2rem;
   }
   .teacher-manual-title {
@@ -1827,4 +1839,133 @@
 .teacher-timeoff-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+/* Her students (12 October 2026, Dan): one row each, who first, then what
+   is done and what isn't, and a way in to send. Done reads lilac; anything
+   still to do stays plain so it isn't alarming. */
+.teacher-students.teacher-students {
+  margin-top: 1.5rem;
+}
+.teacher-students__count {
+  color: var(--lavender-ink);
+  font-weight: 500;
+}
+.teacher-students__lead {
+  margin: 0 0 0.75rem;
+  color: var(--lavender-ink);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+.teacher-students__search input {
+  width: min(100%, 20rem);
+  min-height: 40px;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 0 0.75rem;
+  background: #fff;
+  font: inherit;
+  font-size: 0.86rem;
+}
+.teacher-students__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.teacher-student {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1.1fr) minmax(0, 2fr) auto;
+  gap: 0.4rem 1.25rem;
+  align-items: center;
+  border-top: 1px solid var(--rule);
+  padding: 0.75rem 0;
+}
+.teacher-student__who {
+  display: grid;
+  min-width: 0;
+}
+.teacher-student__who strong {
+  font: 600 0.92rem/1.4 var(--ui);
+}
+.teacher-student__who span {
+  overflow: hidden;
+  color: var(--lavender-ink);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teacher-student__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+}
+.teacher-student__fact {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-pill);
+  padding: 0.1rem 0.55rem;
+  font: 600 0.7rem/1.5 var(--ui);
+}
+.teacher-student__fact.is-done {
+  border-color: transparent;
+  background: var(--lavender-soft);
+}
+.teacher-student__next {
+  color: var(--lavender-ink);
+  font-size: 0.76rem;
+}
+.teacher-student__send {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid var(--blue-deep);
+  border-radius: var(--squiggle-pill);
+  padding: 0 0.85rem;
+  background: transparent;
+  color: var(--blue-deep);
+  cursor: pointer;
+  font: 600 0.74rem/1 var(--ui);
+  transition: background 200ms, color 200ms;
+}
+.teacher-student__send:hover,
+.teacher-student__send:focus-visible {
+  background: var(--blue-deep);
+  color: #fff;
+}
+.teacher-student__send:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.teacher-student__sent {
+  color: var(--lavender-ink);
+  font-size: 0.76rem;
+}
+@media (max-width: 760px) {
+  .teacher-student {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.teacher-student__action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+@media (max-width: 760px) {
+  .teacher-student__action {
+    justify-content: flex-start;
+  }
+}
+/* A student she already has: said quietly beneath their name. */
+.teacher-manual-known {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--lavender-ink);
+  font: 500 0.72rem/1.4 var(--ui);
 }

@@ -1941,7 +1941,7 @@ await test("Inês's weekly slot books outside her hours, skips her days off, and
     const sent = sentEmails.filter((mail) => mail.to[0] === email);
     assert.equal(sent.length, 1, "one email for the whole run");
     assert.match(sent[0].subject, /^Inês has booked your weekly Portuguese lessons/);
-    assert.match(sent[0].text, /add a card once/);
+    assert.match(sent[0].text, /add your card/);
     assert.ok(signInLinkIn(sent[0]), "with a way in");
   } finally {
     releaseEmail();
@@ -2083,7 +2083,7 @@ await test("her student list says who is in and who has a card, and she can send
     assert.equal(sent.status, 200, await sent.clone().text());
     assert.equal((await sent.json()).card, true);
     const [mail] = sentEmails.filter((entry) => entry.to[0] === "alice@example.invalid");
-    assert.equal(mail.subject, "Add your card for your lessons with Inês");
+    assert.equal(mail.subject, "Your lessons with Inês: add your card");
     assert.ok(signInLinkIn(mail));
     assert.equal((await call("/admin/students/alice/welcome", { user: "teacher" })).status, 200);
     assert.equal((await call("/admin/students/alice/welcome", { user: "teacher" })).status, 200);

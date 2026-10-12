@@ -183,13 +183,31 @@ async function fixture(width, options = {}) {
         if (state.failBookings) return fail("Lessons could not be loaded.");
         return route.fulfill({ json: { bookings: state.bookings } });
       }
-      // Her own lessons are never charged through the site.
+      // Hers are marked as hers, and wait for the student's card.
       state.bookings.push({
-        ...lesson(`manual-${state.bookings.length}`, data.name, data.startAt, data.location),
+        ...lesson(`manual-${state.bookings.length}`, data.name || "Sam Known", data.startAt, data.location),
         payment_status: "not_required",
+        added_by_teacher: 1,
       });
-      return route.fulfill({ json: { booking: { reference: "TEST-manual" } } });
+      return route.fulfill({
+        json: {
+          booking: { reference: "TEST-manual" },
+          ...(data.repeat ? { series: { booked: 3, skipped: [{ key: "2026-10-01", startAt: "2026-10-01T16:00:00.000Z", reason: "Day off" }] } } : {}),
+        },
+      });
     }
+    // Her students, for suggestions in the form and her list beneath it.
+    if (path === "/admin/students") {
+      return route.fulfill({
+        json: {
+          students: [
+            { id: "sam", name: "Sam Known", email: "sam@example.invalid", phone: "", signedIn: false, hasCard: false, cardForAllLessons: false, nextLessonAt: "2026-09-10T16:00:00.000Z", upcoming: 1, unpaidUpcoming: 1, weekly: 0 },
+            { id: "alex", name: "Alex", email: "alex@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 1 },
+          ],
+        },
+      });
+    }
+    if (path === "/admin/students/sam/welcome") return route.fulfill({ json: { ok: true, card: true } });
     const match = path.match(
       /^\/admin\/bookings\/([^/]+)\/(reschedule|cancel|no-show)$/,
     );
@@ -677,6 +695,39 @@ try {
   await expect(
     page.getByRole("button", { name: /^Kai,.*added by you\. View lesson$/ }),
   ).toHaveClass(/teacher-calendar-lesson--added/);
+
+  // A student she already has: choosing their address brings their name. A
+  // weekly slot says what was booked and which week was left out.
+  await slot(page, 2, 1080).click();
+  await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
+  const weeklyDialog = page.getByRole("dialog", { name: "Add a lesson" });
+  await weeklyDialog.getByLabel("Student’s email").fill("sam@example.invalid");
+  await expect(weeklyDialog.getByLabel("Student’s name")).toHaveValue("Sam Known");
+  await expect(weeklyDialog).toContainText("Already one of your students");
+  await weeklyDialog.getByRole("radio", { name: "Weekly", exact: true }).check();
+  await expect(weeklyDialog.getByRole("radio", { name: "Until stopped", exact: true })).toBeChecked();
+  await weeklyDialog.getByRole("radio", { name: "4 weeks", exact: true }).check();
+  await weeklyDialog.getByRole("button", { name: "Add weekly lessons and email student" }).click();
+  await expect(weeklyDialog).toHaveCount(0);
+  await expect(page.locator(".teacher-workspace > .teacher-inline-success")).toContainText("Weekly lessons added: 3 booked. One week was left out (1 Oct).");
+  const weekly = state.writes.filter((entry) => entry.path === "/admin/bookings").at(-1).data;
+  assert.deepEqual([weekly.email, weekly.name, weekly.repeat], ["sam@example.invalid", "Sam Known", 4]);
+
+  // Her students: who still needs to come in leads, and each can be sent a
+  // way in or given a lesson straight from the list.
+  const students = page.locator(".teacher-students");
+  await students.locator("summary").click();
+  await expect(students.locator(".teacher-student").first()).toContainText("Sam Known");
+  await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet");
+  await expect(students.locator(".teacher-student").first()).toContainText("No card: 1 lesson to collect");
+  await expect(students.locator(".teacher-student").nth(1)).toContainText("Card pays for every lesson");
+  await students.getByRole("button", { name: "Send sign-in link to Sam Known" }).click();
+  await expect(students.locator(".teacher-student").first()).toContainText("Sent: a link to sign in and add a card");
+  await students.getByRole("button", { name: "Add lesson for Alex" }).click();
+  await expect(manual).toHaveAttribute("open", "");
+  await expect(manual.getByLabel("Student’s email")).toHaveValue("alex@example.invalid");
+  await expect(manual.getByLabel("Date", { exact: true })).toBeFocused();
+  await manual.locator("summary").click();
 
   // A holiday is taken in one go, every day from one date to another, and
   // the week turns to show it.

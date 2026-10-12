@@ -30,13 +30,13 @@ export function CardTerms({ change = false, onCancel }: { change?: boolean; onCa
   return (
     <div className="card-terms">
       <ul className="booking-payment-facts" id="card-terms-summary">
-        <li>Stripe keeps your card. Inês never sees it</li>
-        <li>Each lesson is charged after it ends, including the ones Inês adds for you</li>
+        <li>Paid after each lesson</li>
+        <li>Stripe keeps your card safe</li>
         <li>
           <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> to move or cancel less than {NOTICE_HOURS} hours before
         </li>
         <li>
-          <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> if you don’t show up to a lesson
+          <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> if you miss a lesson
         </li>
         <li>
           The full rules are in{" "}
@@ -71,7 +71,7 @@ export function CardTerms({ change = false, onCancel }: { change?: boolean; onCa
  * On Your lessons, only while lessons Inês added are still paid to her by
  * hand: one quiet card above the calendar asking once, in her words.
  */
-export function CardPrompt({ lessons }: { lessons: number }) {
+export function CardPrompt() {
   const [open, setOpen] = useState(false);
   return (
     <section aria-labelledby="card-prompt-heading" className="card-prompt">
@@ -79,16 +79,13 @@ export function CardPrompt({ lessons }: { lessons: number }) {
         <CreditCard size={20} />
       </span>
       <div className="card-prompt__body">
-        <h3 id="card-prompt-heading">Add a card for your lessons</h3>
-        <p>
-          Inês has added {lessons === 1 ? "a lesson" : `${lessons} lessons`} for you. Add a card once and
-          each one is paid automatically after it ends.
-        </p>
+        <h3 id="card-prompt-heading">Pay by card</h3>
+        <p>Add your card once. Each lesson is paid after it ends.</p>
         {open ? (
           <CardTerms onCancel={() => setOpen(false)} />
         ) : (
           <button className="button button--blue button--compact" onClick={() => setOpen(true)} type="button">
-            Add your card
+            Add card
           </button>
         )}
       </div>

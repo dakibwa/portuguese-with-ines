@@ -698,7 +698,22 @@ Preserve these desktop and mobile states:
   where there is none. Changing one opens its field in place with its action
   (`Save name`, `Send confirmation link`, `Save NIF`) and `Cancel`, and closes
   once saved; only an open email carries a short note, the NIF's purpose being
-  in its label. Text fields are 44 px tall, the usual touch height. In the
+  in its label. A `Card` row follows the email where the site takes cards
+  (12 October 2026, Dan): `Saved`, `Only for lessons you book`, or `Not
+  added`, with `Change` or `Add card`; opening it shows the confirm step's
+  dabbed terms in place (`Paid after each lesson`, `Stripe keeps your card
+  safe`, the two €5 fees) and `Agree & add card`, which goes to Stripe's
+  page. While a lesson Inês added is still paid to her by hand, Your lessons
+  carries one quiet sheet card above the calendar: a card icon in a lilac
+  disc, `Pay by card`, `Add your card once. Each lesson is paid after it
+  ends.` and `Add card`, nothing more; back from Stripe it becomes `Card
+  saved. Each lesson is now paid after it ends.` Its words are as short and
+  plain as they can be (12 October 2026, Dan: "the language here can be
+  even more simple"), and so are the emails that bring students in.
+  The sign-in panel's quiet links read `Email me a sign-in link` and
+  `I’ve forgotten my password` side by side; asking for a link is its own
+  small form, like a forgotten password, without the tabs or Google.
+  Text fields are 44 px tall, the usual touch height. In the
   change dialog, whose cream matches a track's, the sliders' tracks take a
   lilac wash so they read as sliders. The splat
   opens as a row of the site's own marks, all but the FAQ's question, with the
@@ -1086,8 +1101,18 @@ as a form:
   students' own while lessons move onto the site: lilac with a dashed edge
   and `Added` beside its time on the week, `Added by you` in the key, the
   strip and its dialog, which says it isn't charged through the site. The
-  site tells hers apart by payment: her lessons are never charged through
-  it, so theirs stay `not_required`. A lesson opens in the student's own dialog: status, the student,
+  booking system records which lessons she added, so they stay hers once a
+  student's card pays for them. Her add-a-lesson form asks `How often`:
+  `Once` or `Weekly`, and a weekly slot then runs for `4 weeks`, `6 weeks`,
+  `8 weeks` or `Until stopped`, as the student's own choice does. `Your
+  students` sits beneath the form, one row each: the name and address, then
+  lilac pills for what is done (`Signed in`, `Card pays for every lesson`)
+  and plain ones for what isn't, the next lesson, `Add lesson` (which opens
+  her form with them already in it, on the date) and `Send sign-in link`;
+  those still to bring in come first (12 October 2026, Dan). Her form's
+  email field suggests the students she already has, and choosing one fills
+  in their name (`Already one of your students`): everything she does here
+  should take as few steps as it can. A lesson opens in the student's own dialog: status, the student,
   the time in bold with its length and place beneath, then `Move lesson` in
   coral beside `Cancel lesson`, with `Mark no-show` a quiet link below;
 - emails read as the site does: Montserrat (falling back to Arial) rather

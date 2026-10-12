@@ -103,7 +103,7 @@ export function AuthPanel({
     mode === "forgot"
       ? `Give us the email you booked with and we’ll send you a link to choose a new password. ${RESET_LINK_LIFETIME}`
       : mode === "link"
-        ? `Give us the email you booked with and we’ll send you a link that signs you in, no password needed. ${SIGN_IN_LINK_LIFETIME}`
+        ? `We’ll email you a link. Open it to sign in, no password needed. ${SIGN_IN_LINK_LIFETIME}`
       : mode === "register" && !keepCopy
         ? "Keeps all your lessons in one place, so you can change them yourself."
         : intro;
@@ -141,7 +141,7 @@ export function AuthPanel({
         await requestSignInLink(form.email.trim());
         if (request !== authRequest.current || readSession() !== session) return;
         setNoticeFrom("link");
-        setNotice("If that email has an account, a sign-in link is on its way. Open it on this device.");
+        setNotice("If you have an account, a link is on its way. Open it on this device.");
         return;
       }
 

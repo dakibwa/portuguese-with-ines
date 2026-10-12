@@ -310,7 +310,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       ? `${formatEuros(lessonType.price_cents)} · charged to your saved card after the lesson`
       : welcome?.card
         // A student Inês brought pays her as before until they add a card.
-        ? `${formatEuros(lessonType.price_cents)} · pay Inês as usual, or add a card to pay automatically`
+        ? `${formatEuros(lessonType.price_cents)} · pay Inês as usual until you add your card`
         : `${formatEuros(lessonType.price_cents)} · pay on the day, in person`;
   const studentRows =
     event === "cancelled"
@@ -368,8 +368,10 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
           // Written for someone who did not book it: Inês did.
           subject: `Inês has booked your Portuguese lesson — ${studentShortWhen}`,
           heading: "Inês has booked your lesson",
-          intro: `Olá ${row.student_name.split(" ")[0]}, Inês has booked this lesson for you. A calendar invitation is attached.`,
-          callout: welcome ? welcomeCallout(welcome) : "",
+          intro: welcome
+            ? `Olá ${row.student_name.split(" ")[0]}, here is your next lesson. From now on you can see and change your lessons on Inês's website.`
+            : `Olá ${row.student_name.split(" ")[0]}, Inês has booked this lesson for you. A calendar invitation is attached.`,
+          callout: "",
           footer: welcome
             ? WELCOME_FOOTER
             : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
@@ -511,8 +513,11 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         callout: student.callout,
         hero: studentWhen,
         heroNote: "",
-        preheader: `${lessonType.name} · ${studentWhen}`,
+        preheader: event === "booked" && welcome
+          ? "Inês has booked your lesson. Sign in with one click to see it."
+          : `${lessonType.name} · ${studentWhen}`,
         rows: studentRows,
+        steps: event === "booked" && welcome ? welcomeSteps(welcome) : null,
         action: event === "booked" && welcome
           ? welcomeAction(welcome)
           : manageUrl && event !== "cancelled" ? { label: "Change or cancel this lesson", url: manageUrl } : null,
@@ -679,11 +684,24 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
       value: seriesOnCard
         ? `${formatEuros(lessonType.price_cents)} a lesson · charged to your saved card after each lesson`
         : welcome?.card
-          ? `${formatEuros(lessonType.price_cents)} a lesson · pay Inês as usual, or add a card to pay automatically`
+          ? `${formatEuros(lessonType.price_cents)} a lesson · pay Inês as usual until you add your card`
           : `${formatEuros(lessonType.price_cents)} a lesson · pay on the day, in person`
     },
     ...studentRowsOn.slice(2)
   ];
+  // A slot Inês set up reads as one line, its day and time, rather than a
+  // long list of dates: they are in the attachment and on the website
+  // (12 October 2026, Dan: simple to understand).
+  const slotWeekday = new Intl.DateTimeFormat("en-GB", { timeZone: studentClock, weekday: "long" }).format(new Date(first.starts_at));
+  const slotTime = new Intl.DateTimeFormat("en-GB", { timeZone: studentClock, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .format(new Date(first.starts_at));
+  const plainSlot = byTeacher && reason === "booked" && !series.oneOff;
+  if (plainSlot) {
+    studentSeriesRows.splice(3, studentSeriesRows.length, {
+      label: "When",
+      value: `Every ${slotWeekday}, ${slotTime}${series.occurrences ? ` · ${rows.length} lessons` : ""}`
+    });
+  }
   const seriesFee = formatEuros(settings.sameDayChangeFeeCents);
   const seriesFooter = seriesOnCard
     ? `Move or cancel any single lesson free until ${settings.minimumNoticeHours} hours before it. After that, moving or cancelling costs ${seriesFee}. A no-show costs ${seriesFee} instead of the lesson price.`
@@ -715,9 +733,9 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
         calendar: { body: invite({ name: first.student_name, email: first.student_email }, true), method: "REQUEST" },
         content: {
           heading: moved ? "Your weekly lessons have moved" : series.oneOff ? "Your lessons are booked" : multipleWeeklyTimes ? "Your weekly times are booked" : "Your weekly slot is booked",
-          intro: byTeacher && !moved
-            ? `Olá ${first.student_name.split(" ")[0]}, Inês has booked the same time for you each week. ${
-                series.occurrences ? "Every lesson is in the calendar attachment." : "Your next lessons are in the calendar attachment, and new weeks appear on their own until the slot is stopped."
+          intro: plainSlot
+            ? `Olá ${first.student_name.split(" ")[0]}, Inês has kept ${slotWeekday}s at ${slotTime} for you. ${
+                series.occurrences ? "Every lesson is in your calendar attachment." : "New weeks appear on their own until the slot is stopped."
               }`
             : moved
             ? `Olá ${first.student_name.split(" ")[0]}, your upcoming weekly lessons now use this new time. The updated dates are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`
@@ -726,11 +744,12 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
               : series.occurrences
                 ? `Olá ${first.student_name.split(" ")[0]}, ${weeklyTimeCopy} now held for you each week. Every lesson is in the calendar attachment, and you can move or cancel any one of them on your lesson calendar.`
                 : `Olá ${first.student_name.split(" ")[0]}, ${weeklyTimeCopy} now held for you each week. Your current lessons are in the calendar attachment, and new weeks will appear automatically on your lesson calendar without extra confirmation emails.`,
-          callout: [welcome ? welcomeCallout(welcome) : "", skippedNote].filter(Boolean).join("\n\n"),
+          callout: skippedNote,
           hero: lessonWhen(new Date(first.starts_at), studentClock),
           heroNote: "",
           preheader: `${lessonType.name} · ${cadence}`,
           rows: studentSeriesRows,
+          steps: welcome && !moved ? welcomeSteps(welcome) : null,
           action: welcome ? welcomeAction(welcome) : { label: "See all your lessons", url: siteUrl(env, "/book/?view=lessons") },
           footer: welcome ? `${seriesFooter} ${WELCOME_FOOTER}` : seriesFooter
         }
@@ -1022,33 +1041,39 @@ async function issueWelcome(env, settings, student, { always = false } = {}) {
   return { ...await issueSignInLink(env, student, WELCOME_LINK_MINUTES), card };
 }
 
-function welcomeCallout(welcome) {
-  return welcome.card
-    ? "Your lessons with Inês are on her booking site now. Sign in with the button below, no password needed, and add a card once: each lesson is then paid automatically after it ends."
-    : "Your lessons with Inês are on her booking site now. Sign in with the button below, no password needed, to see and change them.";
+/** The way in, as numbered steps right above the button that takes it. */
+function welcomeSteps(welcome) {
+  return {
+    title: welcome.card ? "Two quick steps" : "One quick step",
+    items: [
+      "Sign in with the button below. No password needed.",
+      ...(welcome.card ? ["Add your card. Each lesson is then paid after it ends."] : [])
+    ]
+  };
 }
 
 function welcomeAction(welcome) {
-  return { label: welcome.card ? "Sign in and add your card" : "See your lessons", url: welcome.url };
+  return { label: welcome.card ? "Sign in and add card" : "See your lessons", url: welcome.url };
 }
 
-const WELCOME_FOOTER = "The sign-in button works once, for 14 days. After that, choose “Email me a sign-in link” on the sign-in page.";
+const WELCOME_FOOTER = "The button works once, for 14 days. After that, choose “Email me a sign-in link” when you sign in.";
 
 /** The link on its own, when she sends it from her list of students. */
 async function sendWelcome(env, { student, settings, welcome }) {
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
   return deliver(env, {
     to: student.email,
-    subject: welcome.card ? "Add your card for your lessons with Inês" : "Your lessons with Inês, in one place",
+    subject: welcome.card ? "Your lessons with Inês: add your card" : "Your lessons with Inês, in one place",
     kind: "student_welcome",
     dedupeKey: `welcome:${welcome.nonce}`,
     replyTo: settings.replyToEmail || teacherEmail || undefined,
     content: {
       heading: "Your lessons, in one place",
       preheader: "Sign in with one click, no password needed.",
-      intro: `Olá ${student.name.split(" ")[0]}, ${welcomeCallout(welcome).replace(/^Your/, "your")}`,
+      intro: `Olá ${student.name.split(" ")[0]}, your lessons with Inês are now on her website, where you can see and change them.`,
       callout: "",
       rows: [],
+      steps: welcomeSteps(welcome),
       action: welcomeAction(welcome),
       footer: WELCOME_FOOTER
     }
