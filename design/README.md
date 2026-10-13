@@ -344,8 +344,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   as she clicks; the line under the calendar says what changed or what failed.
   Weekly blocks such as lunch are shown but not toggled per date. Keyboard and
   touch input must work without dragging.
-- A sliding tab bar groups `Week`, `Weekly hours`, `Time off`, `Students`
-  and `Google Meet`. Open on `Week`; keep the week pager beside its date heading.
+- A sliding tab bar groups `Timetable` (her week; renamed from `Week`, 13
+  October 2026, Dan), `Weekly hours`, `Time off`, `Students`, `Receipts`
+  and `Google Meet`. Open on `Timetable`; keep the week pager beside its
+  date heading.
   On narrow screens only the tab strip scrolls horizontally. Arrow keys, Home
   and End move between tabs. Unsaved hours and selected dates survive tab changes;
   an unsaved-hours dot stays visible on its tab, and `Students` carries a dot
@@ -1212,7 +1214,7 @@ as a form:
 - signed in, booking is headed by the account's own bar, as Your lessons is:
   the name's menu, or the places open on a wide card, holding the way back;
 - Inês's schedule reads as the same place: the booking page's blue band,
-  one sliding bar for `Week`, `Weekly hours`, `Time off`, `Students`
+  one sliding bar for `Timetable`, `Weekly hours`, `Time off`, `Students`
   and `Google Meet`, beside a small `Sign out`; sliders for a
   lesson's length and place in her lesson form, with the
   timetable's globe and person beside Online and In Porto, her sign-in with no `Create an account`, and each student's chosen

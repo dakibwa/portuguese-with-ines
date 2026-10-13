@@ -196,7 +196,7 @@ try {
     await expect(schedule.page.locator('[data-receipt-id="without-nif:lesson"]')).toContainText("Consumidor final");
     await expect(schedule.page.locator(".teacher-receipts")).toContainText("2 receipts to issue · €50");
     assert.ok(await noOverflow(schedule.page), "Receipts fit the phone");
-    await schedule.page.getByRole("tab", { name: "Week", exact: true }).click();
+    await schedule.page.getByRole("tab", { name: "Timetable", exact: true }).click();
     await schedule.page.getByRole("button", { name: /^Carla, .*View lesson$/ }).click();
     await schedule.page.getByRole("button", { name: "Move lesson", exact: true }).click();
     const newDate = schedule.page.getByLabel("New date");

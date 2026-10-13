@@ -271,7 +271,7 @@ const slot = (page, day, minute) =>
 const showHours = (page) =>
   page.getByRole("tab", { name: /^Weekly hours/ }).click();
 const showLessons = (page) =>
-  page.getByRole("tab", { name: "Week", exact: true }).click();
+  page.getByRole("tab", { name: "Timetable", exact: true }).click();
 const dayWrites = (state, date) =>
   state.writes
     .filter((entry) => entry.path === "/admin/exceptions/day")
@@ -1119,8 +1119,8 @@ try {
     const timeOff = page.locator(".teacher-timeoff");
     const initialBookings = structuredClone(state.bookings);
     await expect(page.getByRole("tablist", { name: "Teacher tools" }).getByRole("tab")).toHaveCount(6);
-    await expect(page.getByRole("tab", { name: "Week", exact: true })).toHaveAttribute("aria-selected", "true");
-    await page.getByRole("tab", { name: "Week", exact: true }).focus();
+    await expect(page.getByRole("tab", { name: "Timetable", exact: true })).toHaveAttribute("aria-selected", "true");
+    await page.getByRole("tab", { name: "Timetable", exact: true }).focus();
     await page.keyboard.press("ArrowRight");
     await expect(page.getByRole("tab", { name: /^Weekly hours/ })).toBeFocused();
     await slot(page, 1, 600).click();
@@ -1185,7 +1185,7 @@ try {
       await page.setViewportSize({ width, height: 900 });
     }
     await page.keyboard.press("Home");
-    await expect(page.getByRole("tab", { name: "Week", exact: true })).toBeFocused();
+    await expect(page.getByRole("tab", { name: "Timetable", exact: true })).toBeFocused();
     state.failBookings = true;
     await page.getByRole("button", { name: "Next week", exact: true }).click();
     await expect(page.locator(".teacher-week").getByRole("alert")).toContainText("Lessons could not be loaded");
