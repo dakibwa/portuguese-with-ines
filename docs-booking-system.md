@@ -398,7 +398,7 @@ depending on them having kept the right confirmation email.
   on its own, with `Back` above it.
   Every booked lesson is marked there, weekly lessons in lilac and one-off
   lessons in coral. Choosing a date with one lesson opens that lesson; a date
-  with several lists them in `Your lessons`; a free future date opens booking
+  with several lists them in a dialog titled by that date; a free future date opens booking
   on that day with its times. It never creates a second selected-day panel.
   While booking, a chosen free day's times sit beside the calendar on wide
   screens and take its place on a phone, headed by a short date with `Change`
@@ -777,7 +777,11 @@ different students were confirmed into the same lesson in testing.
 - Customer emails use short introductions and one action button. HTML keeps
   the complete action link in that button; the plain-text alternative includes
   the URL. The price row carries payment timing and the footer keeps the
-  applicable cancellation/no-show rules without repeating payment timing.
+  applicable cancellation/no-show rules without repeating payment timing, or
+  a fee or refund the note above it already states (a late move on a saved
+  card ends `This fee applies once per lesson.`). A cancellation names its
+  place rather than linking its call, and an automatic notice ends `Sent
+  automatically by the booking system.` above the site's link.
   Amounts are written as the site writes them: whole euros bare (€25), anything
   else with its cents (€22.50), never rounded.
 - `email/receipt-kit/README.md` and `scripts/build-receipt-email-kit.mjs` provide
@@ -933,7 +937,7 @@ the next usable week; closed weeks later in the booking window remain visible.
 Selecting a free day while booking keeps the four weeks beside its times on
 wide screens; on a phone the times replace the calendar and the date's `Change`
 returns to the four weeks that held it. In the lesson view a booked date opens
-its lesson, or lists several in `Your lessons` with `Book another lesson`; other
+its lesson, or lists several in a dialog titled by that date, with `Book another lesson`; other
 future dates highlight on hover/focus and open booking on that day directly,
 with no separate Book labels on the tiles and no question first. Availability
 is always checked for the chosen length.

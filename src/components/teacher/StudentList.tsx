@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarPlus, ChevronRight, Send, UserPlus } from "lucide-react";
+import { CalendarPlus, CheckCircle2, ChevronRight, Send, UserPlus } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
 import { formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
@@ -38,11 +38,14 @@ function nextLesson(at: string) {
  * after every lesson she adds, so the count of those still to bring in shows
  * before she opens it and an open list is never stale.
  */
-/** Her own price for them, when she has set one: "Their price €20 · 60 mins". */
+/**
+ * Her own price for them, when she has set one, read as every length choice
+ * reads: "Their price: 60 mins · €20".
+ */
 function theirPrice(student: AdminStudent) {
   const own = ([60, 90] as const).filter((minutes) => student.prices?.[minutes] !== undefined);
   if (!own.length) return "";
-  return `Their price ${own.map((minutes) => `${formatMoneyCents(student.prices![minutes]!)} · ${minutes} mins`).join(", ")}`;
+  return `Their price: ${own.map((minutes) => `${minutes} mins · ${formatMoneyCents(student.prices![minutes]!)}`).join(", ")}`;
 }
 
 export function StudentList({
@@ -167,6 +170,7 @@ export function StudentList({
                   ) : null}
                   {answer ? (
                     <span className={answer.ok ? "teacher-student__sent" : "teacher-student__failed"} role={answer.ok ? "status" : "alert"}>
+                      {answer.ok ? <CheckCircle2 size={15} aria-hidden="true" /> : null}
                       {answer.message}
                     </span>
                   ) : null}

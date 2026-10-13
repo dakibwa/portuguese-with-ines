@@ -777,8 +777,8 @@ try {
   assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/students").at(-1).data,
     { email: "ana@example.invalid", name: "Ana Costa", phone: "+351 912 345 678", nif: "123456789", mark: "bloom", prices: { 60: 2000 } });
   await expect(addStudent.getByRole("heading", { name: "Ana Costa" })).toBeVisible();
-  await expect(addStudent.getByRole("radio", { name: "60 mins · €20" })).toBeVisible();
-  await expect(addStudent.getByRole("radio", { name: "90 mins · €35" })).toBeVisible();
+  await expect(addStudent.getByRole("radio", { name: "60 mins, €20" })).toBeVisible();
+  await expect(addStudent.getByRole("radio", { name: "90 mins, €35" })).toBeVisible();
   await expect(addStudent.getByRole("button", { name: "Send welcome email", exact: true })).toHaveCount(0);
   await addStudent.getByRole("button", { name: "Done, send later", exact: true }).click();
   const ana = students.locator(".teacher-student").filter({ hasText: "Ana Costa" });
@@ -1141,7 +1141,8 @@ try {
     await page.getByRole("tab", { name: "Time off", exact: true }).click();
     await expect(timeOff.getByRole("heading", { name: "3 days chosen" })).toBeVisible();
     const before = state.writes.length;
-    await timeOff.getByRole("button", { name: "Take 3 days off", exact: true }).click();
+    // 21 September is already off, so only the other two are taken.
+    await timeOff.getByRole("button", { name: "Take 2 days off", exact: true }).click();
     await expect(timeOff.locator(".teacher-save-state")).toContainText("3 selected days are off");
     assert.deepEqual(state.writes.slice(before).map(write => write.data), [
       { date: "2026-09-08", dayOff: true }, { date: "2026-10-01", dayOff: true },

@@ -483,22 +483,24 @@ export function MyLessons({
       <div className="my-lessons">
         <div className="booking-alert" role="alert">
           <AlertCircle size={18} aria-hidden="true" />
-          <p>{loadError || error}</p>
+          <div className="booking-alert__body">
+            <p>{loadError || error}</p>
+            <div className="booking-alert__actions">
+              <button
+                className="button button--outline button--compact"
+                onClick={() => {
+                  setError("");
+                  setLoadError("");
+                  setLoading(true);
+                  load();
+                }}
+                type="button"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
         </div>
-        <p className="booking-state-note">
-          <button
-            className="text-action"
-            onClick={() => {
-              setError("");
-              setLoadError("");
-              setLoading(true);
-              load();
-            }}
-            type="button"
-          >
-            Try again
-          </button>
-        </p>
       </div>
     );
   }

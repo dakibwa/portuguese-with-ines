@@ -1693,7 +1693,11 @@ if ((await desktopBookingTimes.count()) !== 2) {
 // A day with more than one lesson asks which to open, and can still book another.
 await qaStartDay.scrollIntoViewIfNeeded();
 await qaStartDay.click();
-const dayLessonsPrompt = accountPage.getByRole("dialog", { name: "Your lessons", exact: true });
+// The day's lessons are titled by the day itself, as the page writes it.
+const qaStartLongDate = await accountPage.evaluate((key) => new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/Lisbon", weekday: "long", day: "numeric", month: "long", year: "numeric"
+}).format(new Date(`${key}T12:00:00Z`)), qaStartDate);
+const dayLessonsPrompt = accountPage.getByRole("dialog", { name: qaStartLongDate, exact: true });
 await dayLessonsPrompt.waitFor();
 const promptLessons = dayLessonsPrompt.locator(".calendar-booking-prompt__lesson");
 const promptLessonDetails = await promptLessons.evaluateAll((buttons) =>

@@ -9,7 +9,7 @@ import {
   slotOf
 } from "./series.mjs";
 import { buildCalendarInvite, buildCalendarSeriesInvite, calendarUid } from "./ics.mjs";
-import { deliver as sendEmail } from "./email.mjs";
+import { deliver as sendEmail, splitWhen } from "./email.mjs";
 import {
   chargeSavedCard,
   checkoutSessionProblem,
@@ -245,6 +245,11 @@ function locationLabel(row) {
   return row.location === "porto" ? "In person, Porto" : "Online";
 }
 
+/** An email row's place, in the site's words; the calendar file keeps `locationLabel`. */
+function placeLabel(row) {
+  return row.location === "porto" ? "In Porto" : "Online";
+}
+
 /**
  * The clock a student reads a lesson on, as the site shows it: their own for
  * an online lesson, Porto's for one in Porto, where it happens.
@@ -340,13 +345,19 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   // lifted out of the detail table into its own panel rather than being the
   // second row of five.
   const hero = portoTime;
-  const teacherHeroNote = studentTime ? `${studentTime} — the student's time` : "";
+  // "Jessica’s time: Tue 13 Oct, 01:00 · Los Angeles time", named and short.
+  const teacherHeroNote = studentTime
+    ? `${row.student_name.split(" ")[0]}’s time: ${formatShort(start, studentZone)} · ${zoneName(studentZone, start)}`
+    : "";
   const cancellationMessage = event === "cancelled" && byTeacher
     ? row.cancellation_message?.trim() : "";
 
+  // A cancelled lesson has no call to join, so its place is named, not linked.
   const baseRows = [
     { label: "Lesson", value: lessonLine(lessonType) },
-    { label: "Where", value: meetingUrl(row) ? "Join Google Meet" : locationLabel(row), url: meetingUrl(row) },
+    event === "cancelled"
+      ? { label: "Where", value: placeLabel(row) }
+      : { label: "Where", value: meetingUrl(row) ? "Join Google Meet" : placeLabel(row), url: meetingUrl(row) },
     { label: "Reference", value: row.reference }
   ];
 
@@ -415,8 +426,11 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const savedCardChangeFooter = `Move or cancel free until ${notice} before the lesson. After that, moving or cancelling costs ${fee}. A no-show costs ${fee} instead of the lesson price.`;
   const unpaidChangeFooter = `Need to change it? Use the link above. It's free until ${notice} before the lesson; after that it costs ${fee}.`;
   const refundNote = wasRefunded
-    ? `Your ${formatEuros(row.amount_cents ?? lessonType.price_cents)} is on its way back to your card — refunds usually show within a few days.`
+    ? `Refunded in full: your ${formatEuros(row.amount_cents ?? lessonType.price_cents)} is on its way back to your card and usually shows within a few days.`
     : "";
+  // A late move on a saved card already states its fee in the note above, so
+  // the footer adds only what the note doesn't say.
+  const lateOnCardFooter = row.same_day_change && isOnCard ? "This fee applies once per lesson." : "";
 
   const student = {
     booked: byTeacher
@@ -458,14 +472,14 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
             heading: "Your lesson has changed",
             intro: `Olá ${row.student_name.split(" ")[0]}, your lesson is now ${lessonType.duration_minutes} minutes at the time below. An updated calendar invitation is attached.`,
             callout: sameDayNotice,
-            footer: isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : "You can change or cancel it again from the same link."
+            footer: lateOnCardFooter || (isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : "You can change or cancel it again from the same link.")
           }
         : {
           subject: `Your lesson has moved — ${studentShortWhen}`,
           heading: "Your lesson has moved",
           intro: `Olá ${row.student_name.split(" ")[0]}, your new lesson time is below. An updated calendar invitation is attached.`,
           callout: sameDayNotice,
-          footer: isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : "You can move or cancel it again from the same link."
+          footer: lateOnCardFooter || (isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : "You can move or cancel it again from the same link.")
         },
     cancelled: byTeacher
       ? {
@@ -475,7 +489,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
             ? `Olá ${row.student_name.split(" ")[0]}, Inês has left you a message below. A cancellation update for your calendar is attached.`
             : `Olá ${row.student_name.split(" ")[0]}, Inês has cancelled this lesson. Sorry about that — reply to arrange another time. A cancellation update for your calendar is attached.`,
           callout: refundNote,
-          footer: wasRefunded ? "Refunded in full — a cancellation she makes never costs you anything." : "No charge for a cancellation she makes."
+          footer: "A cancellation Inês makes never costs you anything."
         }
       : {
           subject: `Your lesson on ${studentShortWhen} is cancelled`,
@@ -615,7 +629,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
             ...(row.notes ? [{ label: "Notes", value: row.notes }] : [])
           ],
           action: null,
-          footer: "Sent automatically by the booking system on portuguesewithines.com."
+          footer: "Sent automatically by the booking system."
         }
       })
     );
@@ -724,7 +738,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   // Each copy lists the dates on its reader's clock.
   const rowsOn = (zone, forTeacher = false) => [
     { label: "Lesson", value: lessonLine(lessonType) },
-    { label: "Where", value: locationLabel(first) },
+    { label: "Where", value: placeLabel(first) },
     { label: series.oneOff ? "Booking" : "Repeats", value: forTeacher && !series.occurrences ? "Every week, until stopped" : cadence },
     ...(rows.some(row => meetingUrl(row))
       ? rows.map(row => ({ label: formatShort(new Date(row.starts_at), zone),
@@ -732,7 +746,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
             ? "Join Google Meet"
             : row.location === "online"
               ? (forTeacher ? "Meet link not ready yet" : "Online link will appear in your booking")
-              : locationLabel(row),
+              : placeLabel(row),
           url: meetingUrl(row) }))
       : [{ label: "Dates", value: rows.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n") }])
   ];
@@ -870,7 +884,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
             ...(first.notes ? [{ label: "Notes", value: first.notes }] : [])
           ],
           action: null,
-          footer: "Sent automatically by the booking system on portuguesewithines.com."
+          footer: "Sent automatically by the booking system."
         }
       })
     );
@@ -1020,7 +1034,7 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
             { label: "Cancelled", value: datesOn(PORTO) }
           ],
           action: null,
-          footer: "Sent automatically by the booking system on portuguesewithines.com."
+          footer: "Sent automatically by the booking system."
         }
       })
     );
@@ -1156,10 +1170,15 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
   const first = student.name.split(" ")[0];
   const shown = lessons.slice(0, 12);
-  const rows = shown.map((lesson) => ({
-    label: lesson.location === "porto" ? "Lesson · In Porto" : "Lesson · Online",
-    value: lessonWhen(new Date(lesson.starts_at), lessonZone(lesson))
-  }));
+  // "Thursday 15 October 2026, 17:00 · Porto time": the date box's date and
+  // time on one line, its clock after the time rather than a second clause.
+  const rows = shown.map((lesson) => {
+    const when = splitWhen(lessonWhen(new Date(lesson.starts_at), lessonZone(lesson)));
+    return {
+      label: `Lesson · ${placeLabel(lesson)}`,
+      value: when.time ? `${when.date}, ${when.time}` : when.date
+    };
+  });
   if (lessons.length > shown.length) rows.push({ label: "And more", value: "The rest are on the website" });
   // Already on the price Inês agreed with them, with no code to type
   // (13 October 2026, Dan).
@@ -1382,7 +1401,7 @@ async function confirmStudentCard(env, session) {
           ? [{ label: "Now on their card", value: onCard.map((row) => formatInZone(new Date(row.starts_at), PORTO)).join("\n") }]
           : [],
         action: { label: "Open your schedule", url: siteUrl(env, "/schedule/") },
-        footer: "Sent automatically by the booking system on portuguesewithines.com."
+        footer: "Sent automatically by the booking system."
       }
     });
   }
@@ -1900,7 +1919,7 @@ async function notifyLessonCharged(env, { row, lessonType, amountCents, noShow =
           ...(nif ? [{ label: "NIF", value: `${nif} · on your receipt from Inês` }] : [])
         ],
         action: null,
-        footer: "Sent automatically by the booking system on portuguesewithines.com."
+        footer: "Sent automatically by the booking system."
       }
     })
   ];
@@ -1926,7 +1945,7 @@ async function notifyLessonCharged(env, { row, lessonType, amountCents, noShow =
             nifRow
           ],
           action: null,
-          footer: "Sent automatically by the booking system on portuguesewithines.com."
+          footer: "Sent automatically by the booking system."
         }
       })
     );
@@ -1959,7 +1978,7 @@ async function notifySameDayFeeCharged(env, { row, lessonType, amountCents }) {
           ...(nif ? [{ label: "NIF", value: `${nif} · on your receipt from Inês` }] : [])
         ],
         action: null,
-        footer: "Sent automatically by the booking system on portuguesewithines.com."
+        footer: "Sent automatically by the booking system."
       }
     })
   ];
@@ -1988,7 +2007,7 @@ async function notifySameDayFeeCharged(env, { row, lessonType, amountCents }) {
             receiptNifRow(nif)
           ],
           action: null,
-          footer: "Sent automatically by the booking system on portuguesewithines.com."
+          footer: "Sent automatically by the booking system."
         }
       })
     );
@@ -2086,7 +2105,7 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
         { label: "Reference", value: row.reference }
       ],
       action: payUrl ? { label: `Pay ${amount}`, url: payUrl } : null,
-      footer: "Sent automatically by the booking system on portuguesewithines.com."
+      footer: "Sent automatically by the booking system."
     }
   });
 
@@ -2110,7 +2129,7 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
           { label: "Reference", value: row.reference }
         ],
         action: null,
-        footer: "Sent automatically by the booking system on portuguesewithines.com."
+        footer: "Sent automatically by the booking system."
       }
     });
   }
@@ -4580,7 +4599,7 @@ async function handleRequestEmailChange(request, env, ctx) {
           callout: "If this wasn't you, change your password now and tell Inês.",
           rows: [],
           action: null,
-          footer: "Sent automatically by the booking system on portuguesewithines.com."
+          footer: "Sent automatically by the booking system."
         }
       })
     );

@@ -322,7 +322,9 @@ function RepeatAvailability({
 const LESSON_MARKS = [
   "/visuals/v2-splats/booking-availability-splat-v2.svg",
   "/visuals/v2-splats/relaxed-practical-blob.webp",
-  "/visuals/v2-splats/at-your-pace-blob.webp",
+  // A transparent SVG: a generated mark on a white ground showed as a white
+  // square once the summary column became sticky (13 October 2026).
+  "/visuals/v2-splats/in-porto-or-online-splat-v2.svg",
   "/visuals/v2-splats/one-to-one-splat-v2.svg",
   "/visuals/v2-splats/real-life-splat-v2.svg",
   "/visuals/v2-splats/european-portuguese-splat-v2.svg",
@@ -968,10 +970,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [studentZone, setStudentZone] = useState(BOOKING_TIME_ZONE);
   const [student, setStudent] = useState<Student | null>(null);
-  // Signed in on the page, the banner becomes the student's (BookingFlow).
+  // Signed in on the page, the banner becomes the student's (BookingFlow) once
+  // Your lessons opens: signing in halfway through a booking keeps `Book a
+  // Lesson` above the booking being finished.
   useEffect(() => {
-    if (student) document.documentElement.setAttribute("data-booking-account", "");
-  }, [student]);
+    if (student && intent === "lessons") document.documentElement.setAttribute("data-booking-account", "");
+  }, [student, intent]);
   const isTeacher = student?.role === "teacher";
 
   useEffect(() => {
@@ -1742,7 +1746,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const rawDaySlots = selectedDate ? selectableSlots(selectedDate) : [];
   // Until a day is chosen the times panel waits out of sight, so a window with
   // nothing free says so on the calendar itself.
-  const noFreeTimes = intent === "book" && !managed && !selectedDate && !loadingSlots && Boolean(lessonType) &&
+  // A failed lookup says nothing about the weeks: its own alert shows instead.
+  const noFreeTimes = intent === "book" && !managed && !selectedDate && !loadingSlots && !availabilityError && Boolean(lessonType) &&
     !(restrictedWeek ? displayedCalendarWeeks : rangeWeeks).some((week) => week.cells.some((cell) => selectableSlots(cell.key).length));
   const managedDate = managed ? dateKeyIn(new Date(managed.booking.startAt), viewZone) : "";
   const shouldShowCurrentManagedSlot = Boolean(
@@ -2169,11 +2174,17 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     } catch (error) {
       if (!current()) return;
       const message = error instanceof Error ? error.message : "The booking couldn’t be created.";
-      setSubmitError(message);
       if (/taken|available/i.test(message)) {
         loadAvailability();
-        if (bookingChoices.length === 1) goTo("time");
+        // One lesson goes back to its day's times, which say why. goTo clears
+        // a submit error, so the times' own notice carries the message there.
+        if (bookingChoices.length === 1) {
+          goTo("time");
+          setSlotNotice(message);
+          return;
+        }
       }
+      setSubmitError(message);
     } finally {
       if (request === bookingRequest.current) setSubmitting(false);
     }
@@ -2642,6 +2653,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     }, last ? BOOKING_CALENDAR : undefined);
   }
 
+  /** Each chosen lesson's row; the clock is named once, on the first. */
   function selectedLessonsList(choices: Slot[], editable: boolean) {
     return (
       <ol className="booking-chosen-lessons" aria-label={bookingKind === "recurring" ? "Starting times" : "Selected lessons"}>
@@ -2651,7 +2663,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               actionLabel={editable && !payment ? `Change lesson ${index + 1}` : undefined}
               actionText="Change"
               ariaLabel={`Lesson ${index + 1}`}
-              detail={viewZoneName}
+              detail={index === 0 ? viewZoneName : undefined}
               disabled={submitting}
               mark={LESSON_MARKS[index % LESSON_MARKS.length]}
               onAction={() => changeSelectedLesson(index)}
@@ -2754,7 +2766,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         <div className="lesson-manage-dialog__lesson">
           <strong className="lesson-when"><span>{formatLongDate(preview.startAt, zoneOf(preview))}</span><span className="visually-hidden">, </span><span className="lesson-when__time">{lessonTime(preview.startAt, zoneOf(preview))}</span></strong>
           <span>{formatBookedLessonLabel(preview.lessonType)} · {preview.location === "porto" ? "In Porto" : "Online"}</span>
-          <MeetingLink meetingUrl={preview.meetingUrl} location={preview.location} status={preview.status} />
+          {manageMode === "view" ? <MeetingLink meetingUrl={preview.meetingUrl} location={preview.location} status={preview.status} /> : null}
         </div>
         {preview.changeLocked && preview.status === "confirmed" ? (
           <p className="lesson-calendar__notice">
@@ -2762,10 +2774,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </p>
         ) : preview.sameDayFeeApplies && preview.status === "confirmed" ? (
           <p className="lesson-calendar__notice">
-            This lesson is less than {NOTICE_HOURS} hours away, so changing or cancelling it now costs{" "}
-            {formatMoneyCents(feeCents)}.
+            Changing or cancelling now costs {formatMoneyCents(feeCents)}, as it&rsquo;s less than {NOTICE_HOURS} hours away.
             {preview.sameDayFeeAutomatic ? " Your saved card is charged when you confirm." : ""}
-            {" "}This fee applies once per lesson.
           </p>
         ) : null}
         {changeable ? (
@@ -2805,10 +2815,18 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         </div>
         {selectedLessonsList(savedChoices, false)}
         {activeChange ? (
-          <p className="booking-bar__note">
-            Changing {formatLongDate(activeChange.startAt, viewZone)}, {lessonTime(activeChange.startAt, viewZone)}.{" "}
-            <button className="text-action" type="button" onClick={removeChangingLesson}>Remove this lesson</button>
-          </p>
+          <div className="booking-bar__note">
+            <p>
+              Changing{" "}
+              <strong>
+                <WhenText
+                  long={`${formatLongDate(activeChange.startAt, viewZone)}, ${lessonTime(activeChange.startAt, viewZone)}`}
+                  short={shortWhen(activeChange.startAt, viewZone)}
+                />
+              </strong>
+            </p>
+            <button className="button button--outline button--compact" type="button" onClick={removeChangingLesson}>Remove this lesson</button>
+          </div>
         ) : null}
       </div>
     );
@@ -2984,22 +3002,24 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const accountRefreshNotice = accountLoadError ? (
     <div className="booking-alert booking-alert--account" role="alert">
       <AlertCircle size={18} aria-hidden="true" />
-      <p>
-        {accountLoadError}{" "}
-        <button
-          className="text-action"
-          onClick={() => {
-            setAccountLoadError("");
-            setCheckingSession(true);
-            refreshStudent()
-              .catch(() => setAccountLoadError("We still couldn’t reach your account. Please try again in a moment."))
-              .finally(() => setCheckingSession(false));
-          }}
-          type="button"
-        >
-          Try again
-        </button>
-      </p>
+      <div className="booking-alert__body">
+        <p>{accountLoadError}</p>
+        <div className="booking-alert__actions">
+          <button
+            className="button button--outline button--compact"
+            onClick={() => {
+              setAccountLoadError("");
+              setCheckingSession(true);
+              refreshStudent()
+                .catch(() => setAccountLoadError("We still couldn’t reach your account. Please try again in a moment."))
+                .finally(() => setCheckingSession(false));
+            }}
+            type="button"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
     </div>
   ) : null;
 
@@ -3146,11 +3166,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               <dt>Your reference</dt>
               <dd>{confirmation.reference}</dd>
             </dl>
-            <p className="booking-success__note">
-              {several ? "These lessons are" : "This lesson is"} now on your calendar. Changing or cancelling{" "}
-              {several ? "one" : "it"} is free up to {NOTICE_HOURS} hours before; after that it costs{" "}
-              {formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}.
-            </p>
+            {/* The fee rule as the confirm step's dabs, said once. */}
+            <ul className="booking-payment-facts booking-success__note">
+              <li>Free to change or cancel until {NOTICE_HOURS} hours before</li>
+              <li><strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> after that</li>
+            </ul>
           </div>
         </section>
       </section>
@@ -3246,20 +3266,21 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       {loadError ? (
         <div className="booking-alert" role="status">
           <AlertCircle size={18} aria-hidden="true" />
-          <p>
-            {loadError}{" "}
-            {availabilityError && !lessonTypesError ? (
-              <>
-                <button className="text-action" disabled={loadingSlots} onClick={() => loadAvailability()} type="button">
+          {/* Every alert alike: what happened, then its ways on as small
+              outline buttons side by side. */}
+          <div className="booking-alert__body">
+            <p>{loadError}</p>
+            <div className="booking-alert__actions">
+              {availabilityError && !lessonTypesError ? (
+                <button className="button button--outline button--compact" disabled={loadingSlots} onClick={() => loadAvailability()} type="button">
                   Try again
-                </button>{" "}
-              </>
-            ) : null}
-            <a href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-              Message Inês instead
-            </a>
-            .
-          </p>
+                </button>
+              ) : null}
+              <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
+                Message Inês
+              </a>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -3375,7 +3396,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   <div className="lesson-manage-dialog__lesson">
                     <strong className="lesson-when"><span>{formatLongDate(managed.booking.startAt, zoneOf(managed.booking))}</span><span className="visually-hidden">, </span><span className="lesson-when__time">{lessonTime(managed.booking.startAt, zoneOf(managed.booking))}</span></strong>
                     <span>{formatBookedLessonLabel(managed.booking.lessonType)} · {managed.booking.location === "porto" ? "In Porto" : "Online"}</span>
-                    <MeetingLink meetingUrl={managed.booking.meetingUrl} location={managed.booking.location} status={managed.booking.status} />
+                    {/* Joining belongs to the lesson itself, not to a decision about it. */}
+                    {manageMode === "view" ? (
+                      <MeetingLink meetingUrl={managed.booking.meetingUrl} location={managed.booking.location} status={managed.booking.status} />
+                    ) : null}
                   </div>
 
                   {accountRefreshNotice}
@@ -3419,10 +3443,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         </p>
                       ) : managed.sameDayFeeApplies && managed.booking.status === "confirmed" ? (
                         <p className="lesson-calendar__notice">
-                          This lesson is less than {NOTICE_HOURS} hours away, so changing or cancelling it now costs{" "}
-                          {formatMoneyCents(managed.booking.sameDayFeeCents)}.
+                          Changing or cancelling now costs {formatMoneyCents(managed.booking.sameDayFeeCents)}, as it&rsquo;s less than {NOTICE_HOURS} hours away.
                           {managed.sameDayFeeAutomatic ? " Your saved card is charged when you confirm." : ""}
-                          {" "}This fee applies once per lesson.
                         </p>
                       ) : null}
 
@@ -3478,7 +3500,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             : ""}
                           {managed.sameDayFeeApplies
                             ? managed.sameDayFeeAutomatic
-                              ? ` Your saved card is charged the ${formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee when you confirm the cancellation. This fee applies once per lesson. There’s no lesson charge.`
+                              ? ` Your saved card is charged the ${formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee, and nothing for the lesson.`
                               : ` The ${formatMoneyCents(managed.booking.sameDayFeeCents)} late change fee applies once per lesson.`
                             : ""}
                         </p>
@@ -4062,7 +4084,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               {isLessonsCalendarOverview && calendarBookings.some((booking) => booking.location === "porto") ? (
                 <span><UserRound aria-hidden="true" size={12} strokeWidth={2.4} /> In Porto</span>
               ) : null}
-              {intent === "book" || isManagedReschedule ? (
+              {/* Only while there are free days to explain. */}
+              {(intent === "book" || isManagedReschedule) && !noFreeTimes && !availabilityError && !loadingSlots ? (
                 <span><i className="is-free" aria-hidden="true" /> Free to book</span>
               ) : null}
             </div>
@@ -4204,11 +4227,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 ) : null}
                 {manageMode === "reschedule" && managed.sameDayFeeApplies ? (
                   <p className="lesson-calendar__notice" id="managed-change-fee">
-                    Changing this lesson with less than {NOTICE_HOURS} hours&rsquo; notice costs{" "}
-                    {formatMoneyCents(managed.booking.sameDayFeeCents)}.
-                    {managed.sameDayFeeAutomatic ? " Your saved card is charged when you confirm the change." : ""}
-                    {" "}This fee applies once per lesson.
-                    {managed.sameDayFeeAutomatic ? " The lesson price is charged after the lesson." : ""}
+                    Changing now costs {formatMoneyCents(managed.booking.sameDayFeeCents)}
+                    {managed.sameDayFeeAutomatic ? ", charged to your saved card when you confirm" : ""}. It applies once per lesson
+                    {managed.sameDayFeeAutomatic ? "; the lesson itself is charged after it" : ""}.
                   </p>
                 ) : null}
                 <div className="manage-booking__actions">
@@ -4251,8 +4272,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     {selectedDate && bookingDateChosen ? (
                       <>
                         <span className="unified-calendar__date-long">{formatLongDate(`${selectedDate}T12:00:00Z`)}</span>
+                        {/* On a phone the times replace the calendar and its
+                            clock label, so a student on another clock reads it
+                            here, in the year's place. */}
                         <span aria-hidden="true" className="unified-calendar__date-short">
-                          {formatShortDay(`${selectedDate}T12:00:00Z`)} {selectedDate.slice(0, 4)}
+                          {formatShortDay(`${selectedDate}T12:00:00Z`)}{" "}
+                          {studentClockDiffers
+                            ? `· ${viewZone === BOOKING_TIME_ZONE ? "Porto time" : viewZoneName}`
+                            : selectedDate.slice(0, 4)}
                         </span>
                       </>
                     ) : selectedDate
@@ -4385,23 +4412,26 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               <div className="booking-final">
                 {payment ? (
                   <div className="booking-payment">
-                    <p className="booking-payment__summary">
-                      {lessonType ? `${formatLessonDuration(lessonType.duration_minutes)} lesson` : "Your lesson"}
-                      {lessonType ? ` · ${formatMoneyCents(lessonType.price_cents)}` : ""}
-                      {form.repeat !== "once" || bookingChoices.length > 1 ? " each" : ""}. {bookingChoices.length > 1 ? "Your selected times are" : "Your time is"} held while you save a card. Nothing is charged now.
-                    </p>
+                    {/* The length and price stay in the bar above; here only
+                        what saving a card does, as the confirm step's dabs. */}
+                    <ul className="booking-payment-facts">
+                      <li>{bookingChoices.length > 1 ? "Your times are" : "Your time is"} held while you save a card</li>
+                      <li>Nothing is charged now</li>
+                    </ul>
                     {paymentError ? (
                       <div className="booking-alert" role="alert">
                         <AlertCircle size={18} aria-hidden="true" />
-                        <p>
-                          {paymentError}{" "}
-                          <button className="text-action" type="button" onClick={() => {
-                            setPaymentError("");
-                            setPaymentAttempt((attempt) => attempt + 1);
-                          }}>
-                            Try again
-                          </button>
-                        </p>
+                        <div className="booking-alert__body">
+                          <p>{paymentError}</p>
+                          <div className="booking-alert__actions">
+                            <button className="button button--outline button--compact" type="button" onClick={() => {
+                              setPaymentError("");
+                              setPaymentAttempt((attempt) => attempt + 1);
+                            }}>
+                              Try again
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ) : null}
                     <div className="booking-payment__mount" ref={paymentMountRef} />
@@ -4423,11 +4453,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   />
                 ) : (
                   <form className="student-details-form" onSubmit={submit}>
-                    {form.repeat !== "once" && lessonType?.id !== "trial" ? (
-                      <div className="booking-recurring-rate">
-                        <p><strong>{lessonType ? formatMoneyCents(lessonType.price_cents) : ""} per lesson</strong></p>
-                      </div>
-                    ) : null}
+                    {/* The price is in the length choice above ("60 mins · €25"). */}
                     {ratesError ? <p className="booking-state-note" role="status">{ratesError}</p> : null}
 
                     <div className="booking-confirmation-columns">

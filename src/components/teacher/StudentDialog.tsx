@@ -85,6 +85,10 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
     setDetails((current) => ({ ...current, [field]: event.target.value }));
   const title = step === "details" ? "Add a student" : step === "pick" ? "Add a lesson" : student?.name ?? "";
   const sorted = [...known].sort((a, b) => a.name.localeCompare(b.name));
+  // From a free time, the lesson there is the thing to do first; their
+  // welcome waits until it is added (13 October 2026, review).
+  const lessonFirst = Boolean(slot) && !added.length;
+  const welcomeNext = !lessonFirst && Boolean(student?.awaitingWelcome && (added.length || student.nextLessonAt));
 
   return (
     <dialog className="teacher-lesson-dialog teacher-student-dialog" ref={dialogRef} {...backdrop} aria-labelledby="teacher-student-dialog-title" onKeyDown={keepDialogFocus} onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}>
@@ -101,7 +105,9 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
       ) : (
         <h2 id="teacher-student-dialog-title">{title}</h2>
       )}
-      {slot ? (
+      {/* The free time leads only while she picks whose it is; the lesson
+          form then holds the same date and time in its fields. */}
+      {slot && step === "pick" ? (
         <p className="teacher-student-dialog__when lesson-when">
           <span>{dateLabel(slot.date, { weekday: "long", day: "numeric", month: "long" })}</span>
           <span className="visually-hidden">, </span>
@@ -233,7 +239,7 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
             time={slot?.time}
             // Coral always marks what is still to do for them: their first
             // lesson, then their welcome (13 October 2026, Dan).
-            tone={student.awaitingWelcome && (added.length || student.nextLessonAt) ? "blue" : "coral"}
+            tone={welcomeNext ? "blue" : "coral"}
             onBusy={setBusy}
             onCreated={(message) => {
               setAdded((current) => [...current, message]);
@@ -243,7 +249,7 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
           <div className="teacher-student-dialog__finish">
             {welcomed ? (
               <p className="teacher-inline-success" role="status"><CheckCircle2 size={18} aria-hidden="true" />Welcome sent</p>
-            ) : student.awaitingWelcome && (added.length || student.nextLessonAt) ? (
+            ) : welcomeNext ? (
               <button className="button button--coral" disabled={busy} onClick={() => void sendWelcome()} type="button">
                 Send welcome email
               </button>

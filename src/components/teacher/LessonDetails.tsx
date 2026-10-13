@@ -298,45 +298,51 @@ export function LessonDetails({
       ) : (
         <div className="teacher-dialog-confirmation">
           {action === "move" ? (
-            <form
-              className="teacher-form teacher-move-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void perform();
-              }}
-            >
-              <label>
-                <span>New date</span>
-                <input
-                  type="date"
-                  required
-                  disabled={busy}
-                  value={date}
-                  onChange={(event) => setDate(event.target.value)}
-                />
-              </label>
-              <label>
-                <span>Time in Porto</span>
-                <input
-                  type="time"
-                  required
-                  disabled={busy}
-                  value={time}
-                  onChange={(event) => setTime(event.target.value)}
-                />
-              </label>
-              <p>{awaiting ? `${firstName} isn’t emailed until you send their welcome.` : "The student will be emailed the new time."}</p>
-              <div className="teacher-dialog-actions">
-                <button
-                  className="button button--coral"
-                  type="submit"
-                  disabled={busy}
-                >
-                  {busy ? "Moving…" : "Save new time"}
-                </button>
-                {backToLesson}
-              </div>
-            </form>
+            <>
+              {/* Headed as Cancel this lesson? is, with what happens as a dab. */}
+              <h3>Move this lesson</h3>
+              <form
+                className="teacher-form teacher-move-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void perform();
+                }}
+              >
+                <label>
+                  <span>New date</span>
+                  <input
+                    type="date"
+                    required
+                    disabled={busy}
+                    value={date}
+                    onChange={(event) => setDate(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Time in Porto</span>
+                  <input
+                    type="time"
+                    required
+                    disabled={busy}
+                    value={time}
+                    onChange={(event) => setTime(event.target.value)}
+                  />
+                </label>
+                <ul className="booking-payment-facts teacher-confirm-facts">
+                  <li>{awaiting ? `${firstName} isn’t emailed until you send their welcome` : `${firstName} gets an email with the new time`}</li>
+                </ul>
+                <div className="teacher-dialog-actions">
+                  <button
+                    className="button button--coral"
+                    type="submit"
+                    disabled={busy}
+                  >
+                    {busy ? "Moving…" : "Save new time"}
+                  </button>
+                  {backToLesson}
+                </div>
+              </form>
+            </>
           ) : (
             <>
               <h3>

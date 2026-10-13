@@ -486,7 +486,7 @@ try {
         for (const radio of await radios.all()) await expect(radio).toBeDisabled();
         await expect(page.getByRole("button", { name: "Change date or time", exact: true })).toHaveCount(0);
         await expect(page.getByRole("button", { name: weekly ? "Add a second weekly time" : "Add another lesson", exact: true })).toHaveCount(0);
-        await expect(page.locator(".booking-payment__summary")).toContainText("60-minute lesson · €25");
+        await expect(page.locator(".booking-payment .booking-payment-facts")).toContainText("Your time is held while you save a card");
         assert.equal(posts.length, 1);
         assert.equal(posts[0].lessonType, "single"); assert.equal(posts[0].location, "online");
         assert.equal(posts[0].expectedPriceCents, 2500); assert.equal(posts[0].repeat, weekly ? 4 : undefined);

@@ -442,12 +442,11 @@ export function TeacherSchedule() {
     for (const date of dates) {
       if (offAlready.has(date) !== off) changeDay(date, { dayOff: off }, "");
     }
-    const booked = bookings.filter(booking => dates.some(date =>
-      dateKey(new Date(booking.starts_at)) <= date && dateKey(new Date(Date.parse(booking.ends_at) - 1)) >= date)).length;
+    // The card above already shows any lessons on them as Already booked.
     setDayNote({
       error: false,
       text: off
-        ? `${dates.length === 1 ? `${shortDate(dates[0])} is a day off` : `${dates.length} selected days are off`}.${stayBooked(booked)}`
+        ? `${dates.length === 1 ? `${shortDate(dates[0])} is a day off` : `${dates.length} selected days are off`}.`
         : `${dates.length === 1 ? `${shortDate(dates[0])} is` : `${dates.length} selected days are`} open again, following your weekly hours.`,
     });
   }
@@ -725,7 +724,8 @@ export function TeacherSchedule() {
         {editing ? (
           <div className="teacher-hours-save">
             <div className="teacher-save-row">
-              <span className="teacher-save-note" aria-live="polite">
+              {/* Said to a screen reader; the coral Save already shows it. */}
+              <span className="teacher-save-note visually-hidden" aria-live="polite">
                 {hoursDirty ? "Not saved yet" : ""}
               </span>
               {hoursDirty ? (
@@ -769,7 +769,11 @@ export function TeacherSchedule() {
           bookingsError={bookingsError}
           onReloadBookings={() => void reloadBookings()}
           busy={savingDays}
-          status={<p className={`teacher-save-state ${dayNote?.error ? "is-error" : ""}`} role={dayNote?.error ? "alert" : "status"}>{savingDays ? "Saving…" : dayNote?.text}</p>}
+          status={
+            <p className={`teacher-save-state ${dayNote?.error ? "is-error" : ""}`} role={dayNote?.error ? "alert" : "status"}>
+              {savingDays ? "Saving…" : dayNote ? <>{dayNote.error ? null : <Check size={15} aria-hidden="true" />}{dayNote.text}</> : null}
+            </p>
+          }
           onChange={takeTimeOff}
           onSaveDay={saveTimeOffDay}
           onOpenBooking={setSelectedBooking}

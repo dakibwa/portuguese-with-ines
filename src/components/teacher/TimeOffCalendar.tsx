@@ -64,6 +64,8 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
   const booked = bookings.filter(booking => booking.status === "confirmed" && chosen.some(date => lessonsOn([booking], date).length))
     .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
   const hoursOff = one && !off.has(one) ? dateBlocks(exceptions, one) : [];
+  // Days already off aren't taken again, so the button counts only the rest.
+  const toTake = chosen.filter(date => !off.has(date)).length;
   const firstFocus = dates.includes(focused) && focused >= today ? focused : dates.find(date => date >= today && date.startsWith(month.slice(0, 7)));
   const unchecked = bookingsLoading || Boolean(bookingsError);
 
@@ -158,7 +160,7 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
             <div className="teacher-timeoff-lessons">
               <p className="teacher-eyebrow">Already booked</p>
               <ul className="teacher-lesson-cards">
-                {booked.map(booking => <BookedLessonCard booking={booking} disabled={busy} key={booking.id} onOpen={onOpenBooking} />)}
+                {booked.map(booking => <BookedLessonCard booking={booking} disabled={busy} key={booking.id} onOpen={onOpenBooking} showDay={!one} />)}
               </ul>
             </div>
           ) : null}
@@ -170,10 +172,10 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
           ) : null}
           {chosen.length ? (
             <div className="teacher-timeoff-selection-actions">
-              {chosen.some(date => !off.has(date)) ? (
+              {toTake ? (
                 <button className="button button--coral" disabled={busy || unchecked} onClick={() => onChange(chosen, true)} type="button">
                   <CalendarOff size={16} aria-hidden="true" />
-                  {one ? "Take the day off" : `Take ${chosen.length} days off`}
+                  {one ? "Take the day off" : `Take ${toTake} ${toTake === 1 ? "day" : "days"} off`}
                 </button>
               ) : null}
               {one ? (

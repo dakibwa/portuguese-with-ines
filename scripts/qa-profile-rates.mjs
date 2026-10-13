@@ -184,11 +184,13 @@ try {
     if (await part.count()) await part.check();
     await page.getByRole("button", { name: "10:00", exact: true }).click();
     await page.locator("#booking-confirmation-stage").waitFor();
-    await expect(page.getByText("€15 per lesson", { exact: true })).toBeVisible();
+    // The saved rate is the price in the length choice itself, said once.
+    const confirmStage = page.locator("#booking-confirmation-stage");
+    await expect(confirmStage.getByRole("radio", { name: "60-minute lesson · €15", exact: true })).toBeChecked();
     await expect(page.getByLabel(/your code/i)).toHaveCount(0);
     await expect(page.getByText(/Have a code|Apply and save rate/)).toHaveCount(0);
     await page.getByRole("radio", { name: /^90-minute lesson/ }).check();
-    await expect(page.getByText("€27 per lesson", { exact: true })).toBeVisible();
+    await expect(confirmStage.getByRole("radio", { name: "90-minute lesson · €27", exact: true })).toBeChecked();
     await expect(page.getByLabel(/your code/i)).toHaveCount(0);
     await page.locator("#booking-confirmation-stage").screenshot({ path: `${out}/booking-${width}.png` });
     assert.ok(await noOverflow(page), `Confirmation fits at ${width}px`);
