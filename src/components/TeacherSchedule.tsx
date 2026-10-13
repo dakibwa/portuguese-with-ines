@@ -12,7 +12,7 @@ import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
-import { AddLessonDialog, ManualLessonForm } from "@/components/teacher/ManualLessonForm";
+import { StudentDialog, type StudentDialogStart } from "@/components/teacher/StudentDialog";
 import { StudentList, needsHer } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
@@ -90,13 +90,14 @@ export function TeacherSchedule() {
     null,
   );
   // A free time chosen on the week, for a lesson added there.
-  const [addLesson, setAddLesson] = useState<{ date: string; minute: number } | null>(null);
+  // Adding a student, their lessons, or a lesson at a free time: one dialog.
+  const [studentDialog, setStudentDialog] = useState<(StudentDialogStart & { key: number }) | null>(null);
+  const openStudentDialog = (start: StudentDialogStart) => setStudentDialog({ ...start, key: Date.now() });
   // Her students, read once with the page and again after each lesson she
   // adds: the form suggests them and Your students lists them.
   const [students, setStudents] = useState<{ list: AdminStudent[]; cardsAccepted: boolean } | null>(null);
   const [studentsError, setStudentsError] = useState("");
   // A student chosen from her list, put straight into the add-a-lesson form.
-  const [formStudent, setFormStudent] = useState<{ email: string; name: string; key: number }>();
   const [paymentReview, setPaymentReview] = useState<
     { id: string; reference: string }[]
   >([]);
@@ -716,7 +717,7 @@ export function TeacherSchedule() {
             }}
             onDayOff={takeDayOff}
             onBlockTime={blockTime}
-            onAddLesson={(date, minute) => setAddLesson({ date, minute })}
+            onAddLesson={(date, minute) => openStudentDialog({ step: "pick", date, minute })}
             onSelectBooking={setSelectedBooking}
           />
         )}
@@ -779,41 +780,28 @@ export function TeacherSchedule() {
         students={students?.list ?? null}
         cards={Boolean(students?.cardsAccepted)}
         error={studentsError}
-        onAddLesson={(student) => setFormStudent((current) => ({ email: student.email, name: student.name, key: (current?.key ?? 0) + 1 }))}
+        onAddStudent={() => openStudentDialog({ step: "new" })}
+        onAddLesson={(student) => openStudentDialog({ step: "lessons", student })}
         onStudentsChanged={() => void reloadStudents()}
       />
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "meet"}>
         <TeacherMeetConnection token={token} onAttentionChange={setMeetAttention} />
       </div>
-      <div className="teacher-tab-view" hidden={activeTab !== "week" && activeTab !== "students"}>
-        <ManualLessonForm
+      </div>
+      {studentDialog ? (
+        <StudentDialog
+          key={studentDialog.key}
           token={token}
           known={students?.list ?? []}
-          student={formStudent}
-          onCreated={() => {
-            void reloadStudents();
-            void reloadBookings();
-          }}
-        />
-      </div>
-      </div>
-      {addLesson ? (
-        <AddLessonDialog
-          key={`${addLesson.date}-${addLesson.minute}`}
-          token={token}
-          known={students?.list ?? []}
-          date={addLesson.date}
-          minute={addLesson.minute}
-          afterAddFocusRef={calendarTitleRef}
-          onClose={() => setAddLesson(null)}
-          onCreated={(message) => {
+          start={studentDialog}
+          afterCloseFocusRef={studentDialog.step === "pick" ? calendarTitleRef : undefined}
+          onChanged={() => {
             if (readSession() !== token) return;
-            setAddLesson(null);
-            setStatus(message);
             void reloadStudents();
             void reloadBookings();
           }}
+          onClose={() => setStudentDialog(null)}
         />
       ) : null}
       {selectedBooking ? (

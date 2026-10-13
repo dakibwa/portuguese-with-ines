@@ -231,13 +231,14 @@ The sliding tools bar groups `Week`, `Weekly hours`, `Time off`,
 The Google Meet tab exposes the existing connection controls and its tab
 marks connection problems; Google callbacks open it directly.
 
-Manual lesson entry is a collapsed backup in Week and Students,
-with online/in-Porto location and `How often` (once, or weekly for 4, 6 or 8 weeks or until
-stopped). Its email field suggests her existing students (read from
-`GET /admin/students` when she first reaches it) and a chosen one fills in
-their name. `Students` contains the student cards; each
-row's `Add lesson` opens the form with that student in it. Form drafts survive
-tab changes. All teacher actions still use the authenticated admin endpoints and
+Lessons only belong to students (13 October 2026, Dan: no loose lessons).
+`POST /admin/bookings` refuses an email that isn't on the site ("Add them as a
+student first.", 404); students come from `POST /admin/students`. The page's
+one student dialog adds a student, then their lessons (online or in Porto,
+once or weekly for 4, 6 or 8 weeks or until stopped), then their welcome; a
+student card's `Add lesson` and a free time's `Add a lesson here` open the same
+dialog, the latter asking whose lesson first. All teacher actions still use the
+authenticated admin endpoints and
 their existing booking, payment and email safeguards.
 
 Onboarding (13 October 2026, Dan) lets Inês set a student up before they hear

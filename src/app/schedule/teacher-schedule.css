@@ -128,14 +128,23 @@
 }
 /* Set as the booking workspace's buttons are (0.7 rem, 700, 0.12 em, the
    hand-drawn button cut), at the denser 44 px a schedule needs. */
+/* Her buttons are the site's buttons (13 October 2026, Dan: they looked
+   different): the same weight, spacing, fill and lift, only a little denser
+   for a schedule. */
 .teacher-workspace .button,
 .teacher-lesson-dialog .button {
-  min-height: 44px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  padding: 0.8rem 1.25rem;
-  border-radius: var(--squiggle-button);
+  min-height: 46px;
+  padding: 0.8rem 1.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+}
+.teacher-workspace .button--compact,
+.teacher-lesson-dialog .button--compact {
+  min-height: 40px;
+  padding: 0.6rem 1rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  gap: 0.4rem;
 }
 .teacher-workspace .button:disabled {
   opacity: 0.48;
@@ -827,46 +836,8 @@
   align-items: end;
   width: 100%;
 }
-.teacher-manual {
-  margin-top: 1.6rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--rule);
-}
-.teacher-manual summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 48px;
-  cursor: pointer;
-  list-style: none;
-}
-.teacher-manual summary::-webkit-details-marker {
-  display: none;
-}
-.teacher-manual summary > svg {
-  flex: none;
-  transition: transform 160ms;
-}
-.teacher-manual[open] summary > svg {
-  transform: rotate(45deg);
-}
-.teacher-manual-title {
-  display: block;
-  margin-top: 0.4rem;
-  font: 600 1rem/1.5 var(--ui);
-}
 .teacher-manual-body {
   padding-top: 1rem;
-}
-.teacher-manual-body > p {
-  max-width: 70ch;
-  font-size: 0.83rem;
-  line-height: 1.6;
-}
-.teacher-manual-body a {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
 }
 .teacher-manual-form {
   display: grid;
@@ -1076,21 +1047,14 @@
 .teacher-lesson-when .meeting-link {
   margin-top: 0.5rem;
 }
-/* Who to reach, quietly, without a panel around it. */
+/* Who they are and how it is paid, as the confirm step's dabs. */
 .teacher-lesson-facts {
-  display: grid;
-  gap: 0.3rem;
-  color: var(--lavender-ink);
-  font-size: 0.78rem;
+  margin: 0.9rem 0 0;
+  color: var(--ink);
+  font-size: 0.8rem;
 }
-.teacher-lesson-facts > * {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.teacher-lesson-facts li {
   overflow-wrap: anywhere;
-}
-.teacher-lesson-facts svg {
-  flex: none;
 }
 .teacher-lesson-facts a {
   color: inherit;
@@ -1174,26 +1138,31 @@
   font: 500 0.72rem/1.4 var(--ui);
   text-align: center;
 }
-/* Join Google Meet is a button too, in the lesson's blue. */
+/* Join Google Meet is the lesson's own call to action: a solid blue button
+   as the site's, never an outline (13 October 2026, Dan). */
 .teacher-lesson-dialog .meeting-link {
   display: flex;
   width: 100%;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
-  min-height: 44px;
-  border: 1.5px solid var(--blue);
-  border-radius: var(--squiggle-pill);
-  padding: 0.7rem 1.25rem;
-  color: var(--blue);
-  font: 700 0.69rem/1.2 var(--ui);
-  letter-spacing: 0.14em;
+  gap: 0.5rem;
+  min-height: 48px;
+  border-radius: var(--squiggle-button);
+  padding: 0.75rem 1.25rem;
+  background: var(--blue-deep);
+  color: var(--paper-light);
+  font: 600 0.72rem/1.15 var(--ui);
+  letter-spacing: 0.16em;
   text-decoration: none;
   text-transform: uppercase;
+  transition: background 200ms ease, box-shadow 320ms var(--motion-ease-out), transform 420ms var(--motion-spring-firm);
 }
 .teacher-lesson-dialog .meeting-link:hover,
 .teacher-lesson-dialog .meeting-link:focus-visible {
-  background: rgba(44, 84, 170, 0.08);
+  background: var(--ink);
+  color: var(--paper-light);
+  box-shadow: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
+  transform: translateY(-2px);
 }
 /* The question sits under a quiet rule, apart from who and when. */
 .teacher-dialog-confirmation {
@@ -1421,13 +1390,7 @@
   .teacher-exact-windows {
     width: 100%;
   }
-  .teacher-manual {
-    margin-top: 1.5rem;
-  }
-  .teacher-manual-title {
-    font-size: 0.92rem;
-  }
-  .teacher-manual-form {
+      .teacher-manual-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .teacher-manual-form > label:first-child,
@@ -1781,17 +1744,8 @@
   background: var(--lavender-soft);
   color: var(--ink);
 }
-.teacher-lesson-added-note {
-  margin: 0;
-  color: var(--lavender-ink);
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
-.teacher-lesson-added-note p {
-  margin: 0;
-}
 /* A quiet way out for a lesson already paid by hand, not a call to action. */
-.teacher-lesson-added-note .text-action {
+.teacher-lesson-paid.text-action {
   margin-top: 0.15rem;
   padding: 0;
   color: var(--blue-deep);
@@ -1814,40 +1768,7 @@
   gap: 0.35rem;
 }
 
-/* Her add-a-lesson dialog, set as her lesson dialog. */
-.teacher-add-dialog h2 {
-  margin-right: 2.8rem;
-}
-.teacher-add-when {
-  display: grid;
-  margin: 0;
-  gap: 0.15rem;
-}
-.teacher-add-when strong {
-  font: 700 0.95rem/1.35 var(--ui);
-}
-.teacher-add-when span {
-  margin: 0;
-  color: var(--lavender-ink);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-.teacher-add-dialog {
-  width: min(520px, calc(100vw - 2rem));
-}
-/* In the dialog the form is two columns, its sliders across both. */
-.teacher-add-dialog .teacher-manual-form {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 0;
-}
-.teacher-add-dialog .teacher-manual-choice {
-  grid-column: 1 / -1;
-}
-@media (max-width: 480px) {
-  .teacher-add-dialog .teacher-manual-form {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+
 /* What the chosen days hold, as the confirm step's dab list; a lesson that
    stays booked takes the coral dab. */
 .teacher-timeoff-facts li.teacher-timeoff-booked::before {
@@ -2172,8 +2093,8 @@
 .teacher-student__profile {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   gap: 0.85rem;
   width: 100%;
   min-width: 0;
@@ -2185,23 +2106,35 @@
   text-align: left;
   cursor: pointer;
 }
+.teacher-student__open {
+  color: var(--blue);
+  transition: transform 200ms var(--motion-ease-out);
+}
+.teacher-student__profile:hover .teacher-student__open {
+  transform: translateX(3px);
+}
+.teacher-student__profile:hover .teacher-student__name {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+/* Where they are, as the confirm step's dabs; the first dab turns coral
+   while she still has something to do for them. */
+.teacher-student__facts {
+  grid-column: 1 / -1;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+.teacher-student__facts.needs-her li:first-child::before {
+  background: var(--coral);
+}
+.teacher-student__status {
+  font-weight: 600;
+}
 .teacher-student__profile:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 6px;
 }
-.teacher-student__history-link {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  margin-top: 0.55rem;
-  color: var(--blue);
-  font: 600 0.74rem/1.4 var(--ui);
-}
-.teacher-student__profile:hover .teacher-student__history-link {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-.teacher-history-dialog { width: min(620px, calc(100vw - 2rem)); }
+.teacher-student__profile:hover .teacher-history-dialog { width: min(620px, calc(100vw - 2rem)); }
 .teacher-history-heading {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
@@ -2221,8 +2154,8 @@
 .teacher-history-status { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); padding: 0.2rem 0.5rem; font: 600 0.65rem/1.4 var(--ui); }
 .teacher-history-status.is-muted { background: var(--lavender-soft); color: var(--ink); }
 .teacher-history-lesson__top strong span { font-weight: 500; }
-.teacher-history-lesson__facts { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin: 0.4rem 0 0; font: 500 0.7rem/1.5 var(--ui); color: var(--lavender-ink); }
-.teacher-history-lesson__facts > span { display: inline-flex; align-items: center; gap: 0.25rem; }
+/* The lesson's facts as a row of dabs. */
+.teacher-history-lesson__facts.booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.3rem 1.1rem; margin: 0.5rem 0 0; font-size: 0.74rem; }
 /* Her message and their note read as the emails show a message: a lilac
    edge, a small label above. */
 .teacher-history-lesson__note { margin: 0.65rem 0 0; padding-left: 0.75rem; border-left: 3px solid var(--lavender); white-space: pre-wrap; overflow-wrap: anywhere; font: 400 0.75rem/1.5 var(--ui); }
@@ -2238,43 +2171,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.teacher-student__status {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-  margin: 0.45rem 0 0;
-  font: 600 0.8rem/1.4 var(--ui);
-}
-.teacher-student.is-ready .teacher-student__status {
-  color: var(--blue-deep);
-}
-.teacher-student__dot {
-  flex: none;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: var(--coral);
-}
-.teacher-student__next {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem 0.6rem;
-  align-items: center;
-  margin: 0.1rem 0 0;
-  color: var(--lavender-ink);
-  font-size: 0.78rem;
-}
-.teacher-student__weekly {
-  display: inline-flex;
-  gap: 0.25rem;
-  align-items: center;
-  border-radius: var(--squiggle-pill);
-  padding: 0 0.45rem;
-  background: var(--lavender-soft);
-  color: var(--ink);
-  font: 600 0.7rem/1.6 var(--ui);
-}
-.teacher-student__action {
+.teacher-student.is-ready .teacher-student__action {
   display: flex;
   flex-wrap: wrap;
   grid-column: 1 / -1;
@@ -2282,39 +2179,6 @@
   align-items: center;
   border-top: 1px solid var(--rule-soft);
   padding-top: 0.75rem;
-}
-.teacher-student__button {
-  display: inline-flex;
-  gap: 0.4rem;
-  align-items: center;
-  min-height: 36px;
-  border: 1px solid var(--blue-deep);
-  border-radius: var(--squiggle-pill);
-  padding: 0 0.85rem;
-  background: transparent;
-  color: var(--blue-deep);
-  cursor: pointer;
-  font: 600 0.76rem/1 var(--ui);
-  transition: background 200ms, color 200ms;
-}
-.teacher-student__button:hover,
-.teacher-student__button:focus-visible {
-  background: var(--blue-deep);
-  color: #fff;
-}
-.teacher-student__button--send {
-  border-color: var(--coral-action);
-  background: var(--coral-action);
-  color: #fff;
-}
-.teacher-student__button--send:hover,
-.teacher-student__button--send:focus-visible {
-  background: var(--blue-deep);
-  border-color: var(--blue-deep);
-}
-.teacher-student__button:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 .teacher-student__sent {
   color: var(--lavender-ink);
@@ -2348,35 +2212,130 @@
 .teacher-students__bar .teacher-inline-success {
   margin: 0;
 }
-.teacher-add-student {
-  width: min(560px, calc(100vw - 2rem));
+/* One dialog for a student and their lessons: details, then lessons, then
+   their welcome; or, from a free time, whose lesson it is first. */
+.teacher-student-dialog {
+  width: min(580px, calc(100vw - 2rem));
 }
-.teacher-add-student h2 {
+.teacher-student-dialog h2 {
   margin-right: 2.5rem;
 }
-.teacher-add-student__facts {
-  margin: 0.6rem 0 1.1rem;
+.teacher-student-dialog__who {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding-right: 2.5rem;
 }
-.teacher-add-student__form {
+.teacher-student-dialog__who .account-avatar {
+  width: 44px;
+  height: 44px;
+}
+.teacher-student-dialog__who p {
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
+  color: var(--lavender-ink);
+  font-size: 0.78rem;
+}
+.teacher-student-dialog__when {
+  margin: 0.35rem 0 0;
+  font: 700 0.95rem/1.35 var(--ui);
+}
+.teacher-student-dialog__facts,
+.teacher-student-dialog__added {
+  margin: 0.8rem 0 1.1rem;
+}
+.teacher-student-dialog__added {
+  font-weight: 600;
+}
+.teacher-student-dialog__pick {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+.teacher-student-dialog__pick .teacher-eyebrow {
+  margin: 0;
+}
+.teacher-student-dialog__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  gap: 0.5rem;
+  max-height: 18rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.teacher-student-dialog__choices button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-field);
+  padding: 0.45rem 0.7rem;
+  background: var(--paper-light);
+  color: var(--ink);
+  font: 600 0.85rem/1.3 var(--ui);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 200ms, background 200ms;
+}
+.teacher-student-dialog__choices button:hover,
+.teacher-student-dialog__choices button:focus-visible {
+  border-color: var(--blue);
+  background: var(--lavender-soft);
+}
+.teacher-student-dialog__choices .account-avatar {
+  width: 34px;
+  height: 34px;
+  flex: none;
+}
+.teacher-student-dialog__new.button {
+  gap: 0.5rem;
+}
+.teacher-student-dialog__form,
+.teacher-student-dialog .teacher-manual-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
+  margin: 0;
 }
-.teacher-add-student__splat,
-.teacher-add-student__form > .teacher-inline-error,
-.teacher-add-student__form > .teacher-dialog-actions {
+.teacher-student-dialog .teacher-manual-choice,
+.teacher-student-dialog .teacher-manual-submit,
+.teacher-student-dialog__splat,
+.teacher-student-dialog__form > .teacher-dialog-actions {
   grid-column: 1 / -1;
 }
-.teacher-add-student__splat {
+.teacher-student-dialog__splat {
   display: grid;
   gap: 0.35rem;
   min-width: 0;
 }
-.teacher-add-student__splat > span {
+.teacher-student-dialog__splat > span {
   font: 600 0.68rem/1.5 var(--ui);
 }
+.teacher-student-dialog__finish {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 1.1rem;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 1rem;
+}
+.teacher-student-dialog__finish .button {
+  flex: 1 1 12rem;
+  width: auto;
+}
+.teacher-student-dialog__finish .teacher-inline-success {
+  flex: 1 1 12rem;
+  margin: 0;
+}
 @media (max-width: 480px) {
-  .teacher-add-student__form {
+  .teacher-student-dialog__form,
+  .teacher-student-dialog .teacher-manual-form {
     grid-template-columns: minmax(0, 1fr);
   }
 }

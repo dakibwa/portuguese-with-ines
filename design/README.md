@@ -410,18 +410,27 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - Every booked lesson shows its time, student and explicit `Online` or `In Porto`
   label in both layouts, including 60-minute blocks. Keep the location icons and
   coral marker for Porto lessons.
-- Onboarding is three steps, each its own button (13 October 2026, Dan):
-  `Add a student` (coral, leading the Students tab) opens a dialog of full
-  name, email, phone, NIF (for receipts) and their splat in the student's own
-  picker, with two dabs saying nothing is emailed yet; then `Add lesson` on
-  their card; then `Send welcome email`, which sends their lessons so far and
-  the one-click way in. Until then their card reads `Set up, not emailed yet`,
-  lesson forms say `Add lesson` without `and email student`, and moving or
+- A student and their lessons live in one dialog, and there are no loose
+  lessons: every lesson belongs to a student she has set up (13 October 2026,
+  Dan: "so it all feels integrated"). `Add a student` (coral, leading the
+  Students tab) opens it on their details: full name, email, phone, NIF (for
+  receipts) and their splat in the student's own picker, under two dabs (their
+  details now, their lessons next; nothing is emailed until their welcome).
+  `Next: their lessons` keeps the same dialog, now headed with their splat and
+  name, on the lesson form; each lesson added becomes a dab line (`Thu 10
+  Sept, 10:00 · weekly, 8 lessons`), and the foot offers `Send welcome email`
+  (blue, once there is a lesson) and `Done, send later`. `Add lesson` on a
+  student's card opens it at their lessons. A free time on her week opens it
+  as `Add a lesson` with the date and time, asking `Whose lesson?` over her
+  students' splats and names, with `Add a new student` beneath, and keeps
+  that time through to the lesson. Until their welcome a card reads `Set up,
+  not emailed yet`, lesson buttons drop `and email student`, and moving or
   cancelling says they aren't emailed. Everything for Inês still happens: her
   calendar, the blocked time and the lesson's NIF.
 - Keep `Sign out` beside the tools bar. `Students` holds the student
-  cards and their actions, with the add-a-lesson form also available there,
-  and no sentence above them. Selecting a student's card opens their lesson
+  cards, each a profile (splat, name, address and an arrow into their history)
+  over dabs for where they are and their next lesson, then the site's own
+  outline `Add lesson` and coral `Send welcome email`; no sentence above them. Selecting a student's card opens their lesson
   history: upcoming lessons first, then past and cancelled, one card each with
   the date and time on one line (the year only when it isn't this one), a pill
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
@@ -440,9 +449,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   Closing without a change returns keyboard focus to its opener. Completing
   an action returns focus to the stable week heading while the timetable
   reloads, with a single blue outline; it never steals a later focus choice.
-- Put manual lesson entry last, collapsed under `Add a lesson for a student`.
-  It is a backup for a lesson arranged elsewhere; the ordinary student booking
-  service remains the primary route. Include online/in-Porto location.
+- Her buttons are the site's buttons: the same fill, weight, spacing and lift,
+  a little denser, and `Join Google Meet` in a lesson is a solid blue button,
+  never an outline. A lesson's details read as dabs (their address, NIF, how
+  it is paid, whether they have been emailed) rather than sentences.
 
 ## Wording and confirmation — 13 September 2026
 
@@ -1139,7 +1149,7 @@ as a form:
 - Inês's schedule reads as the same place: the booking page's blue band,
   one sliding bar for `Week`, `Weekly hours`, `Time off`, `Students`
   and `Google Meet`, beside a small `Sign out`; sliders for a
-  lesson's length and place in `Add a lesson for a student`, with the
+  lesson's length and place in her lesson form, with the
   timetable's globe and person beside Online and In Porto, her sign-in with no `Create an account`, and each student's chosen
   splat beside their name when she opens a lesson. Her week is set as the
   student's calendar: a hand-cut card, quiet capital weekdays with `Today`
@@ -1156,8 +1166,8 @@ as a form:
   October 2026, at Dan's request): her next lesson, or the one happening now,
   leads the page in a blue strip with its `Join Meet` one press away (`Meet
   link on its way` until the call exists, and nothing for a lesson in
-  Porto); choosing a free time offers `Add a lesson here` (her add-a-lesson
-  form in a dialog, its date and time already in place) or `Take this time
+  Porto); choosing a free time offers `Add a lesson here` (the student
+  dialog asking whose lesson, its date and time already in place) or `Take this time
   off`, while a time already off reopens at once and dragging across several
   still takes them off together. The `Time off` month takes taps on one day
   or several, and its card offers the whole day, some hours, or making them

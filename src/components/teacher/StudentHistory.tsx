@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Globe, UserRound, X } from "lucide-react";
+import { X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { addedByTeacher, fetchBookings, type AdminBooking, type AdminStudent } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
@@ -110,10 +110,10 @@ export function StudentHistory({ student, token, onClose }: {
           </strong>
           {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
         </div>
-        <p className="teacher-history-lesson__facts">
-          <span>{booking.location === "porto" ? <UserRound size={13} aria-hidden="true" /> : <Globe size={13} aria-hidden="true" />}{booking.location === "porto" ? "In Porto" : "Online"}</span>
-          {facts.map(fact => <span key={fact}>{fact}</span>)}
-        </p>
+        <ul className="booking-payment-facts teacher-history-lesson__facts">
+          <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
+          {facts.map(fact => <li key={fact}>{fact}</li>)}
+        </ul>
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
         {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
       </li>

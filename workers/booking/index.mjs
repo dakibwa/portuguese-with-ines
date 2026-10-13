@@ -4973,19 +4973,9 @@ async function handleAdmin(request, env, ctx, url, path) {
     let student = await env.DB.prepare("SELECT * FROM students WHERE email = ?").bind(email).first();
     const now = new Date().toISOString();
 
-    if (!student) {
-      // No password: the student signs in with the link in their first email,
-      // with Google, or by asking for a link on the sign-in page.
-      const id = crypto.randomUUID();
-      // Someone she sets up hears nothing until she sends their welcome.
-      await env.DB.prepare(
-        `INSERT INTO students (id, email, name, phone, timezone, password_hash, created_at, awaiting_welcome)
-         VALUES (?, ?, ?, '', ?, '', ?, 1)`
-      )
-        .bind(id, email, name || email.split("@")[0], PORTO, now)
-        .run();
-      student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(id).first();
-    }
+    // Every lesson belongs to a student she has set up (13 October 2026, Dan:
+    // no loose lessons). Add a student creates them; this never does.
+    if (!student) return fail("Add them as a student first.", 404, request, env);
 
     /*
      * Registering proves nothing about an address, so whoever registered this

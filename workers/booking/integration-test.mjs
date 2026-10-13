@@ -1743,7 +1743,9 @@ await test("Inês's bookings never alter a password-less account she created, or
   const email = "no-password@example.invalid";
   captureEmail();
   try {
-    assert.equal((await call("/admin/bookings", { user: "teacher", body: { email, name: "Nadia Nopass", lessonType: "single", startAt: "2026-12-09T10:00:00.000Z" } })).status, 201);
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { email, name: "Nadia Nopass", lessonType: "single", startAt: "2026-12-09T10:00:00.000Z" } })).status, 404, "no loose lessons");
+    assert.equal((await call("/admin/students", { user: "teacher", body: { email, name: "Nadia Nopass" } })).status, 201);
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { email, lessonType: "single", startAt: "2026-12-09T10:00:00.000Z" } })).status, 201);
     const created = db.prepare("SELECT * FROM students WHERE email=?").get(email);
     assert.equal(created.password_hash, "");
     assert.equal(created.email_verified_at, null);
@@ -2076,6 +2078,7 @@ await test("Inês's weekly slot books outside her hours, skips her days off, and
 await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours", async () => {
   const email = "topped-up@example.invalid";
   try {
+    await call("/admin/students", { user: "teacher", body: { email, name: "Tomás Top" } });
     const added = await call("/admin/bookings", { user: "teacher", body: { email, name: "Tomás Top", lessonType: "single", startAt: "2026-09-08T03:00:00.000Z", repeat: "open" } });
     assert.equal(added.status, 201, await added.clone().text());
     const { id } = db.prepare("SELECT id FROM students WHERE email=?").get(email);
@@ -2098,6 +2101,8 @@ await test("a card saved from the account pays for the lessons Inês added from 
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const email = "card-later@example.invalid";
   const add = (startAt, extra = {}) => call("/admin/bookings", { user: "teacher", body: { email, name: "Carla Later", lessonType: "single", startAt, ...extra } });
+  // One of her students from before quiet onboarding, already emailed.
+  db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('card-later',?,'Carla Later','',?)").run(email, new Date().toISOString());
   try {
     assert.equal((await add("2026-09-01T09:00:00.000Z")).status, 201, "a lesson already had");
     assert.equal((await add("2026-10-02T02:00:00.000Z")).status, 201);

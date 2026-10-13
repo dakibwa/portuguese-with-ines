@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { X, Mail, ArrowLeft, ReceiptText, CheckCircle2, CircleX, Globe, UserRound } from "lucide-react";
+import { X, ArrowLeft, CheckCircle2, CircleX, Globe, UserRound } from "lucide-react";
 import {
   addedByTeacher,
   cancelBookingAs,
@@ -163,42 +163,6 @@ export function LessonDetails({
         {booking.status === "cancelled" ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
         {booking.status === "cancelled" ? "Cancelled" : addedByTeacher(booking) ? "Added by you" : "Booked"}
       </p>
-      {/* While she confirms a change, the dialog keeps to who, when and the
-          question (13 October 2026, Dan); the lesson's extras return with
-          Back to lesson. */}
-      {action === "view" && addedByTeacher(booking) && booking.status !== "cancelled" ? (
-        booking.payment_status === "scheduled" ? (
-          // On the student's card since they saved it. One they already paid
-          // for by hand comes off before it is charged (12 October 2026).
-          <div className="teacher-lesson-added-note">
-            <p>You added this lesson. It&rsquo;s charged to the student&rsquo;s card after it ends.</p>
-            <button
-              className="text-action"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                setError("");
-                try {
-                  await markPaidByHand(token, booking.id);
-                  changed.current = true;
-                  onChanged("Taken off their card. This lesson stays paid to you by hand.");
-                } catch (caught) {
-                  setError(caught instanceof Error ? caught.message : "This lesson couldn’t be updated.");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-              type="button"
-            >
-              Already paid you by hand? Take it off their card
-            </button>
-          </div>
-        ) : (
-          <p className="teacher-lesson-added-note">
-            You added this lesson. It&rsquo;s paid to you by hand, not through the site.
-          </p>
-        )
-      ) : null}
       <div className="teacher-dialog-top">
         {/* The student's own splat when they have chosen one, so Inês knows
             them at a glance (10 October 2026, at Dan's request). */}
@@ -237,18 +201,44 @@ export function LessonDetails({
           <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
         ) : null}
       </div>
+      {/* Who they are and how it is paid, as the confirm step's dab list
+          rather than sentences (13 October 2026, Dan). While she confirms a
+          change these step aside; Back to lesson brings them back. */}
       {action === "view" ? (
-      <div className="teacher-lesson-facts">
-        <a href={`mailto:${booking.student_email}`}>
-          <Mail size={15} aria-hidden="true" />
-          {booking.student_email}
-        </a>
-        {/* Her receipt automation reads this, so absence is stated too. */}
-        <span>
-          <ReceiptText size={15} aria-hidden="true" />
-          {booking.student_nif ? `NIF ${booking.student_nif}` : "NIF not given (consumidor final)"}
-        </span>
-      </div>
+        <>
+          <ul className="booking-payment-facts teacher-lesson-facts">
+            <li><a href={`mailto:${booking.student_email}`}>{booking.student_email}</a></li>
+            {/* Her receipt automation reads this, so absence is stated too. */}
+            <li>{booking.student_nif ? `NIF ${booking.student_nif}` : "NIF not given (consumidor final)"}</li>
+            {addedByTeacher(booking) && booking.status !== "cancelled" ? (
+              <li>{booking.payment_status === "scheduled" ? "Charged to their card after the lesson" : "Paid to you by hand"}</li>
+            ) : null}
+            {awaiting ? <li>Not emailed yet: send their welcome from Students</li> : null}
+          </ul>
+          {addedByTeacher(booking) && booking.status !== "cancelled" && booking.payment_status === "scheduled" ? (
+            // One they already paid for by hand comes off before it is charged.
+            <button
+              className="text-action teacher-lesson-paid"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                try {
+                  await markPaidByHand(token, booking.id);
+                  changed.current = true;
+                  onChanged("Taken off their card. This lesson stays paid to you by hand.");
+                } catch (caught) {
+                  setError(caught instanceof Error ? caught.message : "This lesson couldn’t be updated.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              type="button"
+            >
+              Already paid you by hand? Take it off their card
+            </button>
+          ) : null}
+        </>
       ) : null}
       {action === "view" && booking.notes ? (
         <p className="teacher-lesson-note">{booking.notes}</p>

@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarPlus, CheckCircle2, ChevronRight, Repeat, Send, UserPlus } from "lucide-react";
+import { CalendarPlus, ChevronRight, Send, UserPlus } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
 import { formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { StudentHistory } from "@/components/teacher/StudentHistory";
-import { AddStudentDialog } from "@/components/teacher/AddStudentDialog";
 
 /**
  * Someone she still needs to bring in comes first: never signed in, or (where
@@ -44,6 +43,7 @@ export function StudentList({
   students,
   cards,
   error,
+  onAddStudent,
   onAddLesson,
   onStudentsChanged,
 }: {
@@ -52,12 +52,11 @@ export function StudentList({
   /** Whether the site takes cards just now; without them nobody is asked for one. */
   cards: boolean;
   error: string;
+  onAddStudent: () => void;
   onAddLesson: (student: AdminStudent) => void;
   /** After a student is added or welcomed, so her list reads afresh. */
   onStudentsChanged: () => void;
 }) {
-  const [adding, setAdding] = useState(false);
-  const [added, setAdded] = useState("");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<AdminStudent | null>(null);
   const [sending, setSending] = useState("");
@@ -93,11 +92,10 @@ export function StudentList({
     <section className="teacher-students" aria-labelledby="teacher-students-title">
       <h2 className="visually-hidden" id="teacher-students-title">Students</h2>
       <div className="teacher-students__bar">
-        <button className="button button--coral" onClick={() => setAdding(true)} type="button">
+        <button className="button button--coral" onClick={onAddStudent} type="button">
           <UserPlus size={16} aria-hidden="true" />
           Add a student
         </button>
-        {added ? <p className="teacher-inline-success" role="status">{added}</p> : null}
       </div>
       <div className="teacher-manual-body">
         {students && students.length > 8 ? (
@@ -127,32 +125,21 @@ export function StudentList({
             return (
               <li className={`teacher-student${waitingOn ? " needs-her" : " is-ready"}`} key={student.id}>
                 <button className="teacher-student__profile" aria-label={`View lesson history for ${student.name}`} onClick={() => setSelected(student)} type="button">
-                <AccountAvatar className="teacher-student__avatar" mark={student.mark} name={student.name} />
-                <span className="teacher-student__main">
-                  <strong className="teacher-student__name">{student.name}</strong>
-                  <span className="teacher-student__email">{student.email}</span>
-                  <span className="teacher-student__status">
-                    {waitingOn ? (
-                      <span aria-hidden="true" className="teacher-student__dot" />
-                    ) : (
-                      <CheckCircle2 size={15} aria-hidden="true" />
-                    )}
-                    {statusOf(student, cards)}
+                  <AccountAvatar className="teacher-student__avatar" mark={student.mark} name={student.name} />
+                  <span className="teacher-student__main">
+                    <strong className="teacher-student__name">{student.name}</strong>
+                    <span className="teacher-student__email">{student.email}</span>
                   </span>
-                  <span className="teacher-student__next">
-                    {student.nextLessonAt ? `Next lesson ${nextLesson(student.nextLessonAt)}` : "No lessons booked"}
-                    {student.weekly ? (
-                      <span className="teacher-student__weekly">
-                        <Repeat size={13} aria-hidden="true" />
-                        Weekly
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="teacher-student__history-link">Lesson history <ChevronRight size={14} aria-hidden="true" /></span>
-                </span>
+                  <ChevronRight className="teacher-student__open" size={18} aria-hidden="true" />
                 </button>
+                {/* Where they are, as dabs rather than lines of text (13 October 2026, Dan). */}
+                <ul className={`booking-payment-facts teacher-student__facts${waitingOn ? " needs-her" : ""}`}>
+                  <li className="teacher-student__status">{statusOf(student, cards)}</li>
+                  <li>{student.nextLessonAt ? `Next lesson ${nextLesson(student.nextLessonAt)}` : "No lessons yet"}</li>
+                  {student.weekly ? <li>Weekly lessons</li> : null}
+                </ul>
                 <div className="teacher-student__action">
-                  <button className="teacher-student__button" onClick={() => onAddLesson(student)} type="button">
+                  <button className="button button--outline button--compact" onClick={() => onAddLesson(student)} type="button">
                     <CalendarPlus size={15} aria-hidden="true" />
                     Add lesson
                     <span className="visually-hidden"> for {student.name}</span>
@@ -160,7 +147,7 @@ export function StudentList({
                   {/* Only someone still to bring in needs a way in sent. */}
                   {waitingOn && !answer?.ok ? (
                     <button
-                      className="teacher-student__button teacher-student__button--send"
+                      className="button button--coral button--compact"
                       disabled={sending === student.id}
                       onClick={() => void welcome(student)}
                       type="button"
@@ -181,17 +168,6 @@ export function StudentList({
           })}
         </ul>
       </div>
-      {adding ? (
-        <AddStudentDialog
-          token={token}
-          onAdded={(student) => {
-            setAdding(false);
-            setAdded(`${student.name} added. Add their lessons, then send their welcome when you’re ready.`);
-            onStudentsChanged();
-          }}
-          onClose={() => setAdding(false)}
-        />
-      ) : null}
       {selected ? <StudentHistory key={`${token}:${selected.id}`} student={selected} token={token} onClose={() => setSelected(null)} /> : null}
     </section>
   );

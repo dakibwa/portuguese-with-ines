@@ -198,13 +198,15 @@ async function fixture(width, options = {}) {
       }
       // Hers are marked as hers, and wait for the student's card.
       state.bookings.push({
-        ...lesson(`manual-${state.bookings.length}`, data.name || "Sam Known", data.startAt, data.location),
+        ...lesson(`manual-${state.bookings.length}`, state.added && data.email === state.added.email ? state.added.name : data.name || "Sam Known", data.startAt, data.location),
         payment_status: "not_required",
         added_by_teacher: 1,
       });
       return route.fulfill({
         json: {
           booking: { reference: "TEST-manual" },
+          // A student she has just set up isn't emailed until their welcome.
+          emailed: !(state.added && data.email === state.added.email),
           ...(data.repeat ? { series: { booked: 3, skipped: [{ key: "2026-10-01", startAt: "2026-10-01T16:00:00.000Z", reason: "Day off" }] } } : {}),
         },
       });
@@ -648,29 +650,21 @@ try {
   );
   await page.getByRole("button", { name: "This week" }).click();
 
-  const manual = page.locator(".teacher-manual");
-  assert.equal(await manual.getAttribute("open"), null);
-  assert.equal(
-    await manual.evaluate((node) => Boolean(
-      node.compareDocumentPosition(document.querySelector(".teacher-week")) & Node.DOCUMENT_POSITION_PRECEDING,
-    )),
-    true,
-  );
-  await manual.locator("summary").click();
-  await manual.getByLabel("Student’s email").fill("manual@example.invalid");
-  await manual.getByLabel("Student’s full name").fill("Robin");
-  await manual.getByRole("radio", { name: "In Porto", exact: true }).check();
-  await manual.getByLabel("Date", { exact: true }).fill("2026-09-11");
-  await manual
-    .getByRole("button", { name: /^Add lesson( and email student)?$/ })
-    .click();
-  await manual.getByRole("status").waitFor();
-  assert.equal(
-    state.writes.find((entry) => entry.path === "/admin/bookings").data
-      .location,
-    "porto",
-  );
-  await page.getByRole("button", { name: /^Robin,.*View lesson$/ }).click();
+  // No loose lessons: a free time asks whose lesson it is, and the lesson
+  // form belongs to that student.
+  await expect(page.locator(".teacher-manual")).toHaveCount(0);
+  await slot(page, 5, 1020).click();
+  await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
+  const forSam = page.getByRole("dialog");
+  await forSam.getByRole("button", { name: "Sam Known", exact: true }).click();
+  await forSam.getByRole("radio", { name: "In Porto", exact: true }).check();
+  await expect(forSam.getByLabel("Date", { exact: true })).toHaveValue("2026-09-11");
+  await forSam.getByRole("button", { name: "Add lesson and email student", exact: true }).click();
+  await expect(forSam.locator(".teacher-student-dialog__added")).toContainText("emailed");
+  assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.location, "porto");
+  await forSam.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: /^Sam Known, .*11 September.*View lesson$/ }).click();
   await page
     .getByRole("button", { name: "Cancel lesson", exact: true })
     .click();
@@ -681,7 +675,7 @@ try {
     state.bookings.find((entry) => entry.id.startsWith("manual")).status,
     "confirmed",
   );
-  const cancellationMessage = "Olá Robin, I’m sorry, I’m unwell today.\nPlease reply and we can find another time.";
+  const cancellationMessage = "Olá Sam, I’m sorry, I’m unwell today.\nPlease reply and we can find another time.";
   const messageField = page.getByLabel(/^Add a message to the email \(optional\)/);
   await expect(messageField).toHaveAttribute("maxlength", "1000");
   await messageField.fill(cancellationMessage);
@@ -719,14 +713,21 @@ try {
   // the lesson reads as hers rather than a student's booking.
   await slot(page, 4, 1080).click();
   await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
-  const addDialog = page.getByRole("dialog", { name: "Add a lesson" });
+  const addDialog = page.getByRole("dialog");
+  await expect(addDialog).toContainText(/Thursday,? 10 September, 18:00/);
+  // Someone new is set up first, then the lesson keeps the time she chose.
+  await addDialog.getByRole("button", { name: "Add a new student", exact: true }).click();
+  await addDialog.getByLabel("Full name").fill("Kai");
+  await addDialog.getByLabel("Email").fill("kai@example.invalid");
+  await addDialog.getByRole("button", { name: "Next: their lessons", exact: true }).click();
+  await expect(addDialog.getByRole("heading", { name: "Kai" })).toBeVisible();
   await expect(addDialog.getByLabel("Date", { exact: true })).toHaveValue("2026-09-10");
   await expect(addDialog.getByLabel("Time in Porto")).toHaveValue("18:00");
-  await addDialog.getByLabel("Student’s email").fill("slot@example.invalid");
-  await addDialog.getByLabel("Student’s full name").fill("Kai");
-  await addDialog.getByRole("button", { name: /^Add lesson( and email student)?$/ }).click();
+  await addDialog.getByRole("button", { name: "Add lesson", exact: true }).click();
+  await expect(addDialog.locator(".teacher-student-dialog__added")).toContainText("18:00");
+  await expect(addDialog.locator(".teacher-student-dialog__added")).not.toContainText("emailed");
+  await addDialog.getByRole("button", { name: "Done, send later", exact: true }).click();
   await expect(addDialog).toHaveCount(0);
-  await expect(page.locator(".teacher-workspace > .teacher-inline-success")).toContainText("Lesson added");
   assert.equal(
     state.writes.filter((entry) => entry.path === "/admin/bookings").at(-1).data.startAt,
     "2026-09-10T17:00:00.000Z",
@@ -740,52 +741,50 @@ try {
   // weekly slot says what was booked and which week was left out.
   await slot(page, 2, 1080).click();
   await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
-  const weeklyDialog = page.getByRole("dialog", { name: "Add a lesson" });
-  await weeklyDialog.getByLabel("Student’s email").fill("sam@example.invalid");
-  await expect(weeklyDialog.getByLabel("Student’s full name")).toHaveValue("Sam Known");
-  await expect(weeklyDialog).toContainText("Already one of your students");
+  const weeklyDialog = page.getByRole("dialog");
+  await weeklyDialog.getByRole("button", { name: "Sam Known", exact: true }).click();
   await weeklyDialog.getByRole("radio", { name: "Weekly", exact: true }).check();
   await expect(weeklyDialog.getByRole("radio", { name: "Until stopped", exact: true })).toBeChecked();
   await weeklyDialog.getByRole("radio", { name: "4 weeks", exact: true }).check();
-  await weeklyDialog.getByRole("button", { name: /^Add weekly lessons( and email student)?$/ }).click();
-  await expect(weeklyDialog).toHaveCount(0);
-  await expect(page.locator(".teacher-workspace > .teacher-inline-success")).toContainText("Weekly lessons added: 3 booked. One week was left out (1 Oct).");
+  await weeklyDialog.getByRole("button", { name: "Add weekly lessons and email student", exact: true }).click();
+  await expect(weeklyDialog.locator(".teacher-student-dialog__added")).toContainText("1 Oct left out");
   const weekly = state.writes.filter((entry) => entry.path === "/admin/bookings").at(-1).data;
   assert.deepEqual([weekly.email, weekly.name, weekly.repeat], ["sam@example.invalid", "Sam Known", 4]);
+  await weeklyDialog.getByRole("button", { name: "Done", exact: true }).click();
 
   // Her students: who still needs to come in leads, and each can be sent a
   // way in or given a lesson straight from the list.
   const students = page.locator(".teacher-students");
   await page.getByRole("tab", { name: /^Students/ }).click();
-  await expect(students.locator(".teacher-student").first()).toContainText("Sam Known");
-  await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet");
-  await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet · 1 lesson paid by hand");
-  await expect(students.locator(".teacher-student").nth(1)).toContainText("All set: signed in, card saved");
+  // Kai, just set up, leads; then Sam, still to bring in; then Alex.
+  await expect(students.locator(".teacher-student").first()).toContainText("Set up, not emailed yet");
+  await expect(students.locator(".teacher-student").filter({ hasText: "Sam Known" })).toContainText("Not signed in yet · 1 lesson paid by hand");
+  await expect(students.locator(".teacher-student").filter({ hasText: "Alex" })).toContainText("All set: signed in, card saved");
   await expect(students.getByRole("button", { name: "Send welcome email to Alex" })).toHaveCount(0);
   await students.getByRole("button", { name: "Send welcome email to Sam Known" }).click();
   // Onboarding: set a student up with their details, nothing emailed, then
   // their welcome from their card.
   await students.getByRole("button", { name: "Add a student", exact: true }).click();
-  const addStudent = page.getByRole("dialog", { name: "Add a student" });
+  const addStudent = page.getByRole("dialog");
   await addStudent.getByLabel("Full name").fill("Ana Costa");
   await addStudent.getByLabel("Email").fill("ana@example.invalid");
   await addStudent.getByLabel(/^Phone/).fill("+351 912 345 678");
   await addStudent.getByLabel(/^NIF/).fill("123456789");
   await addStudent.getByRole("button", { name: "Bloom", exact: true }).click();
-  await addStudent.getByRole("button", { name: "Add student", exact: true }).click();
-  await expect(addStudent).toHaveCount(0);
-  assert.deepEqual(state.writes.find((entry) => entry.path === "/admin/students").data,
+  await addStudent.getByRole("button", { name: "Next: their lessons", exact: true }).click();
+  assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/students").at(-1).data,
     { email: "ana@example.invalid", name: "Ana Costa", phone: "+351 912 345 678", nif: "123456789", mark: "bloom" });
+  await expect(addStudent.getByRole("heading", { name: "Ana Costa" })).toBeVisible();
+  await expect(addStudent.getByRole("button", { name: "Send welcome email", exact: true })).toBeDisabled();
+  await addStudent.getByRole("button", { name: "Done, send later", exact: true }).click();
   const ana = students.locator(".teacher-student").filter({ hasText: "Ana Costa" });
   await expect(ana).toContainText("Set up, not emailed yet");
   await ana.getByRole("button", { name: "Send welcome email to Ana Costa" }).click();
   await expect(ana).toContainText("Welcome sent");
   await expect(students.locator(".teacher-student").filter({ hasText: "Sam Known" })).toContainText("Welcome sent");
   await students.getByRole("button", { name: "Add lesson for Alex" }).click();
-  await expect(manual).toHaveAttribute("open", "");
-  await expect(manual.getByLabel("Student’s email")).toHaveValue("alex@example.invalid");
-  await expect(manual.getByLabel("Date", { exact: true })).toBeFocused();
-  await manual.locator("summary").click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Alex" })).toBeVisible();
+  await page.getByRole("dialog").getByRole("button", { name: "Done", exact: true }).click();
 
   // Select a few dates, apply time off, then see those same days in the week.
   await page.getByRole("tab", { name: "Time off", exact: true }).click();
@@ -1135,9 +1134,6 @@ try {
     await timeOff.getByRole("button", { name: "Next month" }).click();
     await chosenDay("2026-10-01").click();
     await page.getByRole("tab", { name: /^Students/ }).click();
-    const manual = page.locator(".teacher-manual");
-    await manual.locator("summary").click();
-    await manual.getByLabel("Student’s email").fill("draft@example.invalid");
     await page.getByRole("tab", { name: "Time off", exact: true }).click();
     await expect(timeOff.getByRole("heading", { name: "3 days chosen" })).toBeVisible();
     const before = state.writes.length;
@@ -1170,7 +1166,6 @@ try {
     await expect(timeOff.locator(".teacher-save-state")).toContainText("is a day off");
     await noOverflow(page);
     await page.getByRole("tab", { name: /^Students/ }).click();
-    await expect(manual.getByLabel("Student’s email")).toHaveValue("draft@example.invalid");
     await page.getByRole("tab", { name: /^Students/ }).focus();
     await page.keyboard.press("End");
     await expect(page.getByRole("tab", { name: /^Google Meet/ })).toBeFocused();
@@ -1208,7 +1203,7 @@ try {
   assert.deepEqual(student.state.writes, []);
   await student.page.close();
   console.log(
-    "Teacher calendar passed: visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, manual fallback, responsive layout and access gate.",
+    "Teacher calendar passed: visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, students and their lessons in one dialog, responsive layout and access gate.",
   );
 } finally {
   await browser.close();
