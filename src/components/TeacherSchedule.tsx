@@ -29,7 +29,7 @@ import {
   type AvailabilityException,
 } from "@/lib/admin-api";
 import { clearSession, fetchMe, readSession, subscribeToSession, type Student } from "@/lib/auth-api";
-import { formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
+import { portoTimeToUtc } from "@/lib/booking-api";
 import { BOOKING_CONFIGURED } from "@/lib/config";
 import { SITE_BASE_PATH } from "@/lib/paths";
 import {

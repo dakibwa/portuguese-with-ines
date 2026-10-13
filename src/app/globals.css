@@ -4116,9 +4116,13 @@ textarea,
   border: 1px solid rgba(170, 164, 230, 0.9);
   border-radius: var(--squiggle-panel);
   padding: clamp(0.65rem, 2vw, 1rem);
+  /* The dialogs' one surface: light paper, a warm corner and the faint lilac
+     wash, as the lesson dialog and Terms have (13 October 2026, Dan noticed
+     this one read warmer than the rest). */
   background-color: var(--paper-light);
   background-image:
-    radial-gradient(circle at 96% 2%, rgba(239, 93, 60, 0.12), transparent 24%),
+    radial-gradient(circle at 94% 4%, rgba(239, 93, 60, 0.12), transparent 28%),
+    linear-gradient(145deg, rgba(170, 164, 230, 0.08), transparent 58%),
     var(--paper-texture);
   box-shadow: 0 28px 80px rgba(17, 31, 72, 0.38);
   outline: 0;

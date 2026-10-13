@@ -42,8 +42,8 @@ for (const [duration, width] of [[60, 390], [90, 1440]]) {
   await editor.getByText("Have a code from Inês?", { exact: true }).click();
   await editor.getByLabel("Your code", { exact: true }).fill(` ${rate.code.toLowerCase()} `);
   await editor.getByRole("button", { name: "Add code", exact: true }).click();
-  await editor.getByRole("status").getByText(`Saved. Your ${duration}-minute weekly lessons are now €${rate.cents / 100} each.`, { exact: true }).waitFor();
-  await editor.getByRole("list", { name: "Your saved weekly rates" }).getByText(`${duration}-minute weekly lessons`, { exact: true }).waitFor();
+  await editor.getByRole("status").getByText(`Saved. Your ${duration}-minute lessons are now €${rate.cents / 100} each.`, { exact: true }).waitFor();
+  await editor.getByRole("list", { name: "Your prices" }).getByText(`${duration}-minute lessons`, { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: `tmp/qa/recurring-rate-${duration}-${width}.png`, fullPage: true });
 }

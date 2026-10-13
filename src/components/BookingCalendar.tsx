@@ -1061,10 +1061,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const lessonType = useMemo(() => {
     const type = lessonTypes.find((item) => item.id === lessonTypeId);
     if (!type) return null;
-    return form.repeat !== "once" && type.id !== "trial"
+    // The student's own price, from a code or set by Inês, prices every
+    // lesson of theirs at that length; the trial keeps its own (13 October 2026).
+    return type.id !== "trial"
       ? { ...type, price_cents: recurringRates[type.duration_minutes] ?? type.price_cents }
       : type;
-  }, [lessonTypes, lessonTypeId, form.repeat, recurringRates]);
+  }, [lessonTypes, lessonTypeId, recurringRates]);
 
   const rateStudentId = student?.id;
   useEffect(() => {
@@ -1077,7 +1079,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       fetchRecurringRates(readSession()).then((data) => {
         if (active && version === recurringRatesVersion.current) { setRecurringRates(data.rates); setRatesReady(true); }
       }).catch(() => {
-        if (active && version === recurringRatesVersion.current) setRatesError("We couldn’t check your saved weekly rate. Please reload before booking weekly lessons.");
+        if (active && version === recurringRatesVersion.current) setRatesError("We couldn’t check your price. Please reload before booking.");
       });
     }
     return () => { active = false; };
@@ -1093,11 +1095,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         );
   const managedPaymentStatus = managed?.booking.paymentStatus ?? "not_required";
   const selectedManagedType = lessonTypes.find((type) => type.id === managedLessonTypeId);
-  const managedPrice = managed && selectedManagedType
-    ? selectedManagedType.id === managed.booking.lessonType.id
+  // A lesson keeping its length keeps its price; another length costs the
+  // student's own price for it, or the standard one.
+  const managedPriceOf = (type: LessonType) => managed
+    ? type.id === managed.booking.lessonType.id
       ? managed.booking.amountCents ?? managed.booking.lessonType.priceCents
-      : managed.durationPrices?.[selectedManagedType.duration_minutes] ?? selectedManagedType.price_cents
-    : undefined;
+      : managed.durationPrices?.[type.duration_minutes] ?? type.price_cents
+    : type.price_cents;
+  const managedPrice = managed && selectedManagedType ? managedPriceOf(selectedManagedType) : undefined;
   const isManagedReschedule = manageMode === "reschedule" || manageMode === "reschedule-sequence";
 
   /*
@@ -1893,7 +1898,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const canSubmit =
     Boolean(chosen && lessonType && student) &&
     !submitting &&
-    (form.repeat === "once" || ratesReady) &&
+    (lessonType?.id === "trial" || ratesReady) &&
     !previewing &&
     !loadingSlots &&
     !paymentConfigurationError &&
@@ -2928,9 +2933,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               <div className={`segmented segmented--position-${lengthIndex}`}>
                 <span aria-hidden="true" className="segmented__thumb" />
                 {regularLessonTypes.map((type) => {
-                  // Weekly lessons cost the account's saved rate for that
-                  // length, so each choice shows the price the student agrees to.
-                  const price = form.repeat !== "once" ? recurringRates[type.duration_minutes] ?? type.price_cents : type.price_cents;
+                  // Each choice shows the price the student agrees to: their
+                  // own for that length, or the standard one.
+                  const price = recurringRates[type.duration_minutes] ?? type.price_cents;
                   return (
                     <label className={lessonTypeId === type.id ? "is-active" : ""} key={type.id}>
                       <input
@@ -4105,7 +4110,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           key={type.id}
                         >
                           <input
-                            aria-label={`${type.duration_minutes} minutes`}
+                            aria-label={`${type.duration_minutes} minutes · ${formatMoneyCents(managedPriceOf(type))}`}
                             checked={managedLessonTypeId === type.id}
                             disabled={manageWorking}
                             name="managed-lesson-duration"
@@ -4123,7 +4128,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             type="radio"
                             value={type.id}
                           />
-                          {type.duration_minutes} mins
+                          {/* The price rides in the choice rather than on a
+                              line of its own (13 October 2026, Dan). */}
+                          {type.duration_minutes} mins · {formatMoneyCents(managedPriceOf(type))}
                         </label>
                       ))}
                     </div>
@@ -4134,11 +4141,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     cancel and rebook to change its length.
                   </p>
                 ) : null}
-                {managedPrice !== undefined ? <p className="booking-state-note">{manageMode === "reschedule-sequence"
-                  ? managedLessonTypeId === managed.booking.lessonType.id
-                    ? "Lessons that keep their length keep their current prices."
-                    : `Changed-length lessons: ${formatMoneyCents(managedPrice)} each. Lessons already this length keep their current prices.`
-                  : `${formatMoneyCents(managedPrice)} per lesson${managed.recurring ? " · weekly rate" : ""}`}</p> : null}
+                {manageMode === "reschedule-sequence" && managedPrice !== undefined && managedLessonTypeId !== managed.booking.lessonType.id ? (
+                  <p className="booking-state-note">Lessons already this length keep their prices.</p>
+                ) : null}
                 <fieldset className="managed-lesson__duration">
                   <legend>Where</legend>
                   <div className={`segmented segmented--${managedLocation}`}>
@@ -4164,9 +4169,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     <p>{manageError}</p>
                   </div>
                 ) : null}
-                <p className="booking-state-note">
-                  {selectedDate ? `${formatShortDay(`${selectedDate}T12:00:00Z`)} · ${viewZoneName}` : "Choose a free day on the calendar."}
-                </p>
+                {/* The calendar already shows the chosen day; only the clock
+                    the times are on needs saying, and only when it isn't theirs. */}
+                {!selectedDate ? (
+                  <p className="booking-state-note">Choose a free day on the calendar.</p>
+                ) : studentClockDiffers ? (
+                  <p className="booking-state-note">Times in {viewZone === BOOKING_TIME_ZONE ? "Porto time" : viewZoneName}</p>
+                ) : null}
                 {accountRefreshNotice}
                 {loadingSlots ? (
                   <p className="booking-state-note">Checking what&rsquo;s free…</p>
@@ -4418,9 +4427,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     {form.repeat !== "once" && lessonType?.id !== "trial" ? (
                       <div className="booking-recurring-rate">
                         <p><strong>{lessonType ? formatMoneyCents(lessonType.price_cents) : ""} per lesson</strong></p>
-                        {ratesError ? <p role="status">{ratesError}</p> : null}
                       </div>
                     ) : null}
+                    {ratesError ? <p className="booking-state-note" role="status">{ratesError}</p> : null}
 
                     <div className="booking-confirmation-columns">
                       <label className="booking-confirmation-notes">

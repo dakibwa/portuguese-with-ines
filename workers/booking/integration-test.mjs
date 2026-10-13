@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import worker, { chargeDueLessons, chargeDueSameDayFees, notifySeries, resendFailedEmails, retryPaymentRecovery, retryRefunds } from "./index.mjs";
 import { createSession, createResetToken, hashPassword, sessionVersion } from "./auth.mjs";
 import { createManageToken, readManageToken } from "./tokens.mjs";
-import { findRecurringCode, recurringLessonType, priceForMove } from "./rates.mjs";
+import { findRecurringCode, studentLessonType, priceForMove } from "./rates.mjs";
 import { bookingSelection, portoWeekOf } from "./selection.mjs";
 import { computeAvailability } from "./availability.mjs";
 
@@ -260,9 +260,9 @@ await test("parallel guesses bounded to eight requests per account window", asyn
 });
 await test("saved rate survives catalogue removal, trial and other duration keep public price", async () => {
   const local = { ...env, PRIVATE_RECURRING_CODES: "[]" };
-  assert.equal((await recurringLessonType(local, "alice", { id: "single", duration_minutes: 60, price_cents: 2500 })).price_cents, 1500);
-  assert.equal((await recurringLessonType(local, "alice", { id: "trial", duration_minutes: 60, price_cents: 2000 })).price_cents, 2000);
-  assert.equal((await recurringLessonType(local, "bob", { id: "long", duration_minutes: 90, price_cents: 3500 })).price_cents, 3500);
+  assert.equal((await studentLessonType(local, "alice", { id: "single", duration_minutes: 60, price_cents: 2500 })).price_cents, 1500);
+  assert.equal((await studentLessonType(local, "alice", { id: "trial", duration_minutes: 60, price_cents: 2000 })).price_cents, 2000);
+  assert.equal((await studentLessonType(local, "bob", { id: "long", duration_minutes: 90, price_cents: 3500 })).price_cents, 3500);
   assert.equal(await priceForMove(local, { lesson_type_id: "single", amount_cents: 1800, series_id: "series", student_id: "alice" }, { id: "single", duration_minutes: 60, price_cents: 2500 }), 1800);
   assert.equal(await priceForMove(local, { lesson_type_id: "single", amount_cents: 1800, series_id: "series", student_id: "alice" }, { id: "long", duration_minutes: 90, price_cents: 3500 }), 2700);
 });
@@ -273,9 +273,16 @@ await test("a code names its own length, so a 60 and a 90 minute code save side 
   const ninety = await call("/me/recurring-rates", { user: "carol", body: { code: " demo27 " } });
   assert.equal(ninety.status, 200);
   assert.deepEqual(await ninety.json(), { rates: { 90: 2700 }, saved: { durationMinutes: 90, cents: 2700 } });
+  // A lesson they already have at that length is on the code's price at once;
+  // one already paid is not.
+  booking("carol-booked", { owner: "carol", payment: "not_required", start: "2026-11-02T10:00:00.000Z", end: "2026-11-02T11:00:00.000Z" });
+  booking("carol-paid", { owner: "carol", payment: "paid", start: "2026-11-09T10:00:00.000Z", end: "2026-11-09T11:00:00.000Z" });
+  db.prepare("UPDATE bookings SET amount_cents = 2500 WHERE id IN ('carol-booked', 'carol-paid')").run();
   const sixty = await call("/me/recurring-rates", { user: "carol", body: { code: "TEST15" } });
   assert.equal(sixty.status, 200);
   assert.deepEqual(await sixty.json(), { rates: { 60: 1500, 90: 2700 }, saved: { durationMinutes: 60, cents: 1500 } });
+  assert.deepEqual(db.prepare("SELECT amount_cents FROM bookings WHERE id IN ('carol-booked', 'carol-paid') ORDER BY starts_at").all().map((row) => row.amount_cents), [1500, 2500]);
+  db.prepare("DELETE FROM bookings WHERE id IN ('carol-booked', 'carol-paid')").run();
   // Adding the same code again changes nothing and is not an error.
   const again = await call("/me/recurring-rates", { user: "carol", body: { code: "test15" } });
   assert.equal(again.status, 200);
@@ -342,7 +349,7 @@ await test("student cannot use teacher routes and forged manage links disclose n
   assert.equal((await call("/admin/bookings", { method: "GET" })).status, 401);
   assert.equal((await call("/bookings/forged", { method: "GET" })).status, 404);
 });
-await test("recurring booking creation snapshots rate for every occurrence; one-off and tampering cannot use it", async () => {
+await test("the student's own price snapshots onto every occurrence and a one-off; tampering is refused", async () => {
   const payload = { lessonType: "single", startAt: "2026-09-08T09:00:00.000Z", repeat: 4, expectedPriceCents: 1500 };
   const result = await call("/bookings", { body: payload });
   assert.equal(result.status, 201, await result.clone().text());
@@ -350,9 +357,11 @@ await test("recurring booking creation snapshots rate for every occurrence; one-
   assert.equal(rows.length, 4);
   assert.ok(rows.every((row) => row.amount_cents === 1500));
   assert.equal((await call("/bookings", { body: { ...payload, startAt: "2026-09-08T12:00:00.000Z", expectedPriceCents: 100 } })).status, 409);
-  const one = await call("/bookings", { body: { lessonType: "single", startAt: "2026-09-08T12:00:00.000Z", expectedPriceCents: 2500 } });
+  // Their price is theirs for one-off lessons too (13 October 2026, Dan).
+  assert.equal((await call("/bookings", { body: { lessonType: "single", startAt: "2026-09-08T12:00:00.000Z", expectedPriceCents: 2500 } })).status, 409);
+  const one = await call("/bookings", { body: { lessonType: "single", startAt: "2026-09-08T12:00:00.000Z", expectedPriceCents: 1500 } });
   assert.equal(one.status, 201);
-  assert.equal((await one.json()).booking.amountCents, 2500);
+  assert.equal((await one.json()).booking.amountCents, 1500);
 });
 await test("a cancellation inside 14 hours records and charges just one separate fee under concurrent retries", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
@@ -2032,6 +2041,7 @@ function forgetStudent(email) {
   db.prepare("DELETE FROM bookings WHERE student_id=?").run(row.id);
   db.prepare("DELETE FROM booking_series WHERE student_id=?").run(row.id);
   db.prepare("DELETE FROM sign_in_links WHERE student_id=?").run(row.id);
+  db.prepare("DELETE FROM student_recurring_rates WHERE student_id=?").run(row.id);
   db.prepare("DELETE FROM students WHERE id=?").run(row.id);
 }
 await test("Inês's weekly slot books outside her hours, skips her days off, and waits for the student's card", async () => {
@@ -2295,6 +2305,59 @@ await test("she sets a student up and adds their lessons without emailing them, 
   } finally {
     releaseEmail();
     forgetStudent("quiet@example.invalid");
+  }
+});
+await test("her price for a student prices their lessons, and only lessons nothing is settled on follow a change", async () => {
+  try {
+    const add = (body) => call("/admin/students", { user: "teacher", body });
+    assert.equal((await add({ email: "priced@example.invalid", name: "Rita", prices: { 60: 50 } })).status, 400);
+    const created = await add({ email: "priced@example.invalid", name: "Rita", prices: { 60: 2000 } });
+    assert.equal(created.status, 201, await created.clone().text());
+    const { student } = await created.json();
+    assert.deepEqual(student.prices, { 60: 2000 });
+    const book = (body) => call("/admin/bookings", { user: "teacher", body: { email: "priced@example.invalid", ...body } });
+    assert.equal((await book({ lessonType: "single", startAt: "2026-10-26T10:00:00.000Z" })).status, 201);
+    assert.equal((await book({ lessonType: "single", startAt: "2026-10-27T10:00:00.000Z", repeat: 4 })).status, 201);
+    assert.equal((await book({ lessonType: "long", startAt: "2026-10-28T10:00:00.000Z" })).status, 201);
+    await drain();
+    const amounts = () => db.prepare("SELECT amount_cents FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id WHERE student_id=? AND l.duration_minutes=60 ORDER BY starts_at").all(student.id).map((row) => row.amount_cents);
+    const long = () => db.prepare("SELECT amount_cents FROM bookings WHERE student_id=? AND lesson_type_id='long'").get(student.id).amount_cents;
+    const count = amounts().length;
+    assert.ok(count >= 4);
+    assert.deepEqual(amounts(), Array(count).fill(2000), "one-off or weekly, her price is theirs");
+    const rest = (cents) => Array(count - 3).fill(cents);
+    assert.equal(long(), 3500, "a length she gave no price keeps the standard one");
+    captureEmail();
+    try {
+      assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 200);
+      await drain();
+      const welcome = sentEmails.find((sent) => sent.to[0] === "priced@example.invalid");
+      assert.ok(welcome.text.includes("€20 a lesson"), "their welcome says they are on her price");
+    } finally {
+      releaseEmail();
+    }
+
+    // One agreed at checkout, one paid, one she marked paid by hand.
+    const ids = db.prepare("SELECT id FROM bookings WHERE student_id=? AND lesson_type_id='single' ORDER BY starts_at").all(student.id).map((row) => row.id);
+    db.prepare("UPDATE bookings SET payment_status='scheduled', payment_consent_version='2026-09-21-fourteen-hours-v1' WHERE id=?").run(ids[0]);
+    db.prepare("UPDATE bookings SET payment_status='paid' WHERE id=?").run(ids[1]);
+    db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(ids[2]);
+    const price = (prices) => call(`/admin/students/${student.id}/prices`, { user: "teacher", body: { prices } });
+    assert.equal((await call(`/admin/students/${student.id}/prices`, { user: "alice", body: { prices: { 60: 100 } } })).status, 401);
+    assert.equal((await call("/admin/students/nobody/prices", { user: "teacher", body: { prices: { 60: 2400 } } })).status, 404);
+
+    const raised = await price({ 60: 2400 });
+    assert.equal(raised.status, 200, await raised.clone().text());
+    assert.equal((await raised.json()).updated, count - 3);
+    assert.deepEqual(amounts(), [2000, 2000, 2000, ...rest(2400)], "a higher price never reaches what they agreed at checkout");
+    await price({ 60: 1800 });
+    assert.deepEqual(amounts(), [1800, 2000, 2000, ...rest(1800)], "a lower one does");
+    const reset = await price({ 60: null });
+    assert.deepEqual((await reset.json()).student.prices, {});
+    assert.deepEqual(amounts(), [1800, 2000, 2000, ...rest(2500)]);
+    assert.equal(long(), 3500);
+  } finally {
+    forgetStudent("priced@example.invalid");
   }
 });
 await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {

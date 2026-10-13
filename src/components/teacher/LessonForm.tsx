@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Globe, UserRound } from "lucide-react";
 import { createBookingFor, type AdminStudent } from "@/lib/admin-api";
-import { portoTimeToUtc } from "@/lib/booking-api";
+import { formatMoneyCents, portoTimeToUtc } from "@/lib/booking-api";
+import { lessonProducts } from "@/lib/lesson-products";
+import { priceFor } from "@/components/teacher/StudentPrice";
 import { dateLabel } from "@/lib/teacher-calendar";
 
 type Repeat = "once" | 4 | 6 | 8 | "open";
@@ -16,6 +18,7 @@ const empty = {
   repeat: "once" as Repeat,
 };
 
+const trialPrice = lessonProducts.find((product) => product.id === "trial")?.priceCents ?? 0;
 const RUN_LENGTHS: [Repeat, string][] = [[4, "4 weeks"], [6, "6 weeks"], [8, "8 weeks"], ["open", "Until stopped"]];
 
 /**
@@ -114,7 +117,8 @@ export function LessonForm({
             className={`segmented segmented--three segmented--position-${["trial", "single", "long"].indexOf(lesson.lessonType)}`}
           >
             <span aria-hidden="true" className="segmented__thumb" />
-            {([["trial", "Trial"], ["single", "60 mins"], ["long", "90 mins"]] as const).map(([value, label]) => (
+            {/* Each length carries what this student pays for it (13 October 2026, Dan). */}
+            {([["trial", "Trial", trialPrice], ["single", "60 mins", priceFor(student, 60)], ["long", "90 mins", priceFor(student, 90)]] as const).map(([value, label, cents]) => (
               <label className={lesson.lessonType === value ? "is-active" : ""} key={value}>
                 <input
                   checked={lesson.lessonType === value}
@@ -124,7 +128,7 @@ export function LessonForm({
                   type="radio"
                   value={value}
                 />
-                {label}
+                {label} · {formatMoneyCents(cents)}
               </label>
             ))}
           </div>

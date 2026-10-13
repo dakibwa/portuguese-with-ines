@@ -28,7 +28,7 @@ Student on /book                                     (browse without an account)
   → POST /auth/register | /auth/login | /auth/google → session token
   → POST /bookings                    (Bearer)       → D1 row, emails, ICS invite
   → GET  /me                          (Bearer)       → their calendar and series
-  → GET/POST /me/recurring-rates      (Bearer)       → saved weekly rates; POST saves a code
+  → GET/POST /me/recurring-rates      (Bearer)       → their own prices; POST saves a code
   → GET  /bookings/:token                            one lesson; HMAC-signed token
   → POST /bookings/:token/reschedule | /cancel       → optional lessonType, sequence++, updated ICS
   → POST /series/:id/reschedule | /stop (Bearer)     → move or end an owned weekly sequence
@@ -43,6 +43,8 @@ Inês on /schedule                     (her own account, role=teacher)
                                                      `Added by you`; charged to a card only
                                                      once the student saved one from their
                                                      account)
+  → POST /admin/students                             set a student up (details, optional prices); nothing emailed
+  → POST /admin/students/:id/prices                  her price for a student per length; null is standard
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
   → POST /admin/bookings/:id/reschedule | /cancel
 Stripe → POST /stripe/webhook                        signature-verified
@@ -1196,7 +1198,28 @@ names; they now mean "inside the window".
   retained and no new card charge is invented. Emails say the fee applies (to
   Inês, that it is due) rather than that a card is charged.
 
-### Private recurring rates and security
+### A student's own price, private codes and security
+
+**One price per student per length (13 October 2026, Dan).** A student's own
+price for a length, whether from a code they added or set by Inês, prices every
+lesson of theirs at that length, one-off or weekly. The trial keeps its own
+price and €5 fees never change. Inês sets it when she adds a student or later
+from their profile (`POST /admin/students/:id/prices`, `{ prices: { 60: cents
+| null, 90: cents | null } }`, €1–€100, null for the standard price again), and
+can change it at any time: her price replaces a code's. Their welcome email
+lists their price, so they are on it with no code to type.
+
+When a price is set or a code is added, their lessons still to come at that
+length follow it, provided nothing is settled on them: status `confirmed`,
+`payment_status` `scheduled` or `not_required`, no charge started, and not
+marked paid by hand. Paid, processing, due, refunded and pending-checkout
+lessons keep their amount. A lesson the student agreed to at checkout
+(`PAYMENT_CONSENT_VERSION`) follows only a lower price, since that agreement
+was to the amount it showed; a card saved from their account
+(`STUDENT_CARD_CONSENT_VERSION`) agreed to every lesson's price, so those
+follow either way. The reply says how many lessons moved.
+
+
 
 `PRIVATE_RECURRING_CODES` is a private Worker binding containing the exact
 approved code, duration and cents triples. The canonical owner list is outside
@@ -1222,25 +1245,26 @@ accounts and removing a code does not revoke prior grants. Each length has its
 own grant, so one account can hold a 60 minute rate and a 90 minute rate at
 once, from two codes. A second code for a length that already has a different
 rate is refused (409) naming the length and pointing to Inês; the same rate
-again changes nothing. Recurring creation
-and top-ups snapshot the saved rate in `bookings.amount_cents`, including when
-payment is off. Existing rows keep their price when moved at the same duration;
-a new duration uses its own saved rate or public price. Single/trial bookings
-and €5 fees never use these rates. No booked row is repriced merely by redeeming.
+again changes nothing. Booking, weekly top-ups and Inês's own lessons snapshot
+the student's price in `bookings.amount_cents`, including when payment is off.
+Existing rows keep their price when moved at the same duration; a new duration
+uses the student's price for it or the public price. Trials and €5 fees never
+use these prices. Booked rows follow a new price as described above.
 
 **Where a student adds a code.** Only under *Edit details*, behind a small `Have a
-code from Inês?` disclosure. Weekly booking and lesson-length changes use the
-account's saved rates automatically and offer no code field. The profile lists
-the saved weekly rates only once there is one, so a student without a code sees
+code from Inês?` disclosure. Booking and lesson-length changes use the
+account's prices automatically and offer no code field; each length choice
+carries its price (`60 mins · €20`). The profile lists the student's prices
+only once there is one, so a student without a code sees
 one quiet link and no "standard price" rows. It is
 one field for every code: after a 60 minute code is added the disclosure stays
 open for the 90 minute one. A reply clears only its submitted code; a newer
-code typed while waiting stays ready to add. The note names future weekly
-lessons of the matching length, since single/trial prices are unaffected.
+code typed while waiting stays ready to add. The note says the code sets their
+price for lessons of that length, including ones already booked.
 Old rates lookups cannot overwrite a saved code's prices or show a stale
 lookup error, in either the editor or the booking workspace.
 Saving there tells the booking workspace at once,
-so the next weekly booking is priced from it without a reload or the code being
+so the next booking is priced from it without a reload or the code being
 typed again. **Sign-up deliberately has no code field** (decided 28 September
 2026): only some students have a code, and a field there would suggest most new
 students should have one.

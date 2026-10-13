@@ -10,6 +10,7 @@ import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
+import { StudentPrice } from "@/components/teacher/StudentPrice";
 
 function paymentLabel(booking: AdminBooking) {
   switch (booking.payment_status) {
@@ -25,9 +26,11 @@ function paymentLabel(booking: AdminBooking) {
 }
 
 /** Reads the existing teacher records, including dates before the visible week. */
-export function StudentHistory({ student, token, onClose }: {
+export function StudentHistory({ student, token, onChanged, onClose }: {
   student: AdminStudent;
   token: string;
+  /** After she changes their price. */
+  onChanged: (student: AdminStudent) => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -127,6 +130,7 @@ export function StudentHistory({ student, token, onClose }: {
         <AccountAvatar mark={student.mark} name={student.name} />
         <div><p id="teacher-history-label">Lesson history</p><h2 id="teacher-history-name">{student.name}</h2><p className="teacher-history-email">{student.email}</p></div>
       </header>
+      <StudentPrice token={token} student={student} onChanged={onChanged} />
       {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={() => { setError(""); setBookings(null); setAttempt(value => value + 1); }} type="button">Try again</button></div>
         : bookings === null ? <p role="status">Loading lesson history…</p>
           : bookings.length === 0 ? <p className="teacher-history-empty">No lessons recorded yet.</p>

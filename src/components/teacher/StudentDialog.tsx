@@ -10,6 +10,7 @@ import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { STUDENT_MARKS } from "@/lib/student-marks";
 import { dateLabel, minuteLabel } from "@/lib/teacher-calendar";
+import { PriceFields, pricesFromDraft, type PriceDraft } from "@/components/teacher/StudentPrice";
 
 /** Where the dialog opens: a new student, one of hers, or a free time on her week. */
 export type StudentDialogStart =
@@ -38,6 +39,7 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
   const [student, setStudent] = useState<AdminStudent | null>(start.step === "lessons" ? start.student : null);
   const slot = start.step === "pick" ? { date: start.date, time: minuteLabel(start.minute) } : null;
   const [details, setDetails] = useState({ email: "", name: "", phone: "", nif: "", mark: "" });
+  const [prices, setPrices] = useState<PriceDraft>({ 60: "", 90: "" });
   const [added, setAdded] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -136,6 +138,11 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
             onSubmit={async (event) => {
               event.preventDefault();
               if (busy) return;
+              const agreed = pricesFromDraft(prices, { keepEmpty: false });
+              if (!agreed) {
+                setError("Each price needs to be between €1 and €100.");
+                return;
+              }
               setBusy(true);
               setError("");
               try {
@@ -145,6 +152,7 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
                   phone: details.phone.trim(),
                   nif: details.nif.trim(),
                   mark: details.mark,
+                  prices: agreed,
                 });
                 setStudent(result.student);
                 setStep("lessons");
@@ -172,6 +180,12 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
               <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
               <input autoComplete="off" disabled={busy} inputMode="numeric" onChange={set("nif")} type="text" value={details.nif} />
             </label>
+            {/* Their price from the start, so their welcome finds them on it
+                with no code to type (13 October 2026, Dan). */}
+            <fieldset className="teacher-student-dialog__price">
+              <legend>Their price <span className="teacher-field-optional">(optional, per lesson)</span></legend>
+              <PriceFields draft={prices} disabled={busy} idPrefix="teacher-student-price" onChange={setPrices} />
+            </fieldset>
             <div className="teacher-student-dialog__splat">
               <span id="teacher-student-splat">Their splat <span className="teacher-field-optional">(optional)</span></span>
               <div aria-labelledby="teacher-student-splat" className="my-lessons__marks" role="group">

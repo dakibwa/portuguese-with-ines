@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CalendarPlus, ChevronRight, Send, UserPlus } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
-import { formatSlotTime } from "@/lib/booking-api";
+import { formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { StudentHistory } from "@/components/teacher/StudentHistory";
 
@@ -38,6 +38,13 @@ function nextLesson(at: string) {
  * after every lesson she adds, so the count of those still to bring in shows
  * before she opens it and an open list is never stale.
  */
+/** Her own price for them, when she has set one: "Their price €20 · 60 mins". */
+function theirPrice(student: AdminStudent) {
+  const own = ([60, 90] as const).filter((minutes) => student.prices?.[minutes] !== undefined);
+  if (!own.length) return "";
+  return `Their price ${own.map((minutes) => `${formatMoneyCents(student.prices![minutes]!)} · ${minutes} mins`).join(", ")}`;
+}
+
 export function StudentList({
   token,
   students,
@@ -137,6 +144,7 @@ export function StudentList({
                   <li className="teacher-student__status">{statusOf(student, cards)}</li>
                   <li>{student.nextLessonAt ? `Next lesson ${nextLesson(student.nextLessonAt)}` : "No lessons yet"}</li>
                   {student.weekly ? <li>Weekly lessons</li> : null}
+                  {theirPrice(student) ? <li>{theirPrice(student)}</li> : null}
                 </ul>
                 <div className="teacher-student__action">
                   <button className="button button--blue button--compact" onClick={() => onAddLesson(student)} type="button">
@@ -168,7 +176,15 @@ export function StudentList({
           })}
         </ul>
       </div>
-      {selected ? <StudentHistory key={`${token}:${selected.id}`} student={selected} token={token} onClose={() => setSelected(null)} /> : null}
+      {selected ? (
+        <StudentHistory
+          key={`${token}:${selected.id}`}
+          student={selected}
+          token={token}
+          onChanged={(updated) => { setSelected(updated); onStudentsChanged(); }}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
     </section>
   );
 }

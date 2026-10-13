@@ -140,19 +140,19 @@ try {
     if (width >= 700) assert.ok(actionLeft >= fieldRight - 1, `Add code sits beside its field at ${width}px`);
     else assert.ok(actionTop >= fieldBottom - 1, `Add code sits under its field at ${width}px`);
     await add.click();
-    await expect(editor.getByRole("status")).toHaveText("Saved. Your 60-minute weekly lessons are now €15 each.");
+    await expect(editor.getByRole("status")).toHaveText("Saved. Your 60-minute lessons are now €15 each.");
     const rows = editor.locator(".my-lessons__rates-list li");
     await expect(rows).toHaveCount(1);
-    await expect(rows.first()).toContainText("60-minute weekly lessons");
+    await expect(rows.first()).toContainText("60-minute lessons");
     await expect(rows.first()).toContainText("€15 each");
     await expect(code).toHaveValue("");
     await expect(code).toBeFocused();
     await expect(disclosure).toHaveAttribute("open", "");
     await code.fill("DEMO27");
     await code.press("Enter");
-    await expect(editor.getByRole("status")).toHaveText("Saved. Your 90-minute weekly lessons are now €27 each.");
+    await expect(editor.getByRole("status")).toHaveText("Saved. Your 90-minute lessons are now €27 each.");
     await expect(rows).toHaveCount(2);
-    await expect(rows.nth(1)).toContainText("90-minute weekly lessons");
+    await expect(rows.nth(1)).toContainText("90-minute lessons");
     await expect(rows.nth(1)).toContainText("€27 each");
     assert.ok(await noOverflow(page), `Saved rates fit at ${width}px`);
     await editor.screenshot({ path: `${out}/saved-${width}.png` });
@@ -212,9 +212,9 @@ try {
     await page.goto(`${base}/book/?manage=profile-rate-lesson`, { waitUntil: "domcontentloaded" });
     await page.getByRole("dialog", { name: "Manage this lesson", exact: true }).getByRole("button", { name: "Change", exact: true }).click();
     const change = page.getByRole("dialog", { name: "Choose a new date and time", exact: true });
-    await expect(change.getByText("€18 per lesson · weekly rate", { exact: true })).toBeVisible();
-    await change.getByRole("radio", { name: "90 minutes", exact: true }).check();
-    await expect(change.getByText("€27 per lesson · weekly rate", { exact: true })).toBeVisible();
+    // Each length carries its price: the lesson's own, then their price for 90.
+    await expect(change.getByRole("radio", { name: "60 minutes · €18", exact: true })).toBeChecked();
+    await change.getByRole("radio", { name: "90 minutes · €27", exact: true }).check();
     await expect(change.getByLabel(/your code/i)).toHaveCount(0);
     await expect(change.getByText(/Have a code|Apply and save rate/)).toHaveCount(0);
     await change.screenshot({ path: `${out}/change-length-${width}.png` });
@@ -226,13 +226,13 @@ try {
   const failing = await open(1280, { ratesReadFails: true });
   await chooseFromMenu(failing.page, "Edit details");
   const failingEditor = failing.page.locator(".my-lessons__details");
-  await expect(failingEditor).toContainText("We couldn’t check your saved weekly rates just now.");
+  await expect(failingEditor).toContainText("We couldn’t check your prices just now.");
   await failingEditor.locator("details.my-lessons__code summary").click();
   await failingEditor.getByLabel("Your code").fill("TEST15");
   await failingEditor.getByRole("button", { name: "Add code", exact: true }).click();
-  await expect(failingEditor.getByRole("status")).toHaveText("Saved. Your 60-minute weekly lessons are now €15 each.");
+  await expect(failingEditor.getByRole("status")).toHaveText("Saved. Your 60-minute lessons are now €15 each.");
   await expect(failingEditor.locator(".my-lessons__rates-list li")).toHaveCount(1);
-  await expect(failingEditor).not.toContainText("We couldn’t check your saved weekly rates just now.");
+  await expect(failingEditor).not.toContainText("We couldn’t check your prices just now.");
   assert.deepEqual(failing.errors, []);
   await failing.context.close();
 

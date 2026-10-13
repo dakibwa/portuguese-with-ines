@@ -64,7 +64,7 @@ import {
   zoneName
 } from "./time.mjs";
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
-import { findRecurringCode, recurringRates, recurringLessonType, priceForMove, rateLimitAddress, takeRateLimit } from "./rates.mjs";
+import { findRecurringCode, studentRates, studentLessonType, priceForMove, teacherRate, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
 import { formatEuros } from "./money.mjs";
 import { bookingSelection, claimSelection } from "./selection.mjs";
@@ -1159,6 +1159,13 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
     value: lessonWhen(new Date(lesson.starts_at), lessonZone(lesson))
   }));
   if (lessons.length > shown.length) rows.push({ label: "And more", value: "The rest are on the website" });
+  // Already on the price Inês agreed with them, with no code to type
+  // (13 October 2026, Dan).
+  const prices = await studentRates(env, student.id).catch(() => ({}));
+  rows.unshift(...[60, 90].filter((minutes) => prices[minutes]).map((minutes) => ({
+    label: `Your price · ${minutes} minutes`,
+    value: `${formatEuros(prices[minutes])} a lesson`
+  })));
   return deliver(env, {
     to: student.email,
     subject: welcome.card ? "Your lessons with Inês: add your card" : "Your lessons with Inês, in one place",
@@ -1200,6 +1207,9 @@ async function teacherStudentList(env) {
   )
     .bind(now, now)
     .all();
+  const { results: rates } = await env.DB.prepare("SELECT student_id, duration_minutes, amount_cents FROM student_recurring_rates").all();
+  const prices = {};
+  for (const rate of rates ?? []) (prices[rate.student_id] ??= {})[rate.duration_minutes] = rate.amount_cents;
   return (results ?? []).map((row) => ({
     id: row.id,
     name: row.name,
@@ -1211,7 +1221,8 @@ async function teacherStudentList(env) {
     cardForAllLessons: Boolean(row.has_card && row.card_consent_at),
     nextLessonAt: row.next_lesson_at ?? null,
     unpaidUpcoming: Number(row.unpaid_upcoming ?? 0),
-    weekly: Number(row.weekly ?? 0)
+    weekly: Number(row.weekly ?? 0),
+    prices: prices[row.id] ?? {}
   }));
 }
 
@@ -2395,7 +2406,7 @@ async function handleCreate(request, env, ctx) {
   const selection = bookingSelection(body, { recurring: wantsRepeat, durationMinutes: lessonType.duration_minutes, trial: lessonType.id === "trial" });
   if (selection.error) return fail(selection.error, 400, request, env);
   body.startAt = selection.starts[0];
-  if (wantsRepeat) lessonType = await recurringLessonType(env, student.id, lessonType);
+  lessonType = await studentLessonType(env, student.id, lessonType);
   if (body.expectedPriceCents !== undefined && body.expectedPriceCents !== lessonType.price_cents) {
     return fail("Your lesson price has changed. Please review it before confirming.", 409, request, env);
   }
@@ -2914,7 +2925,7 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
  * stall on it forever.
  */
 async function fillSeries(env, { series, student, lessonType, fromKey, count, now, paymentState = "none", holdExpiresAt = null }) {
-  lessonType = await recurringLessonType(env, student.id, lessonType);
+  lessonType = await studentLessonType(env, student.id, lessonType);
   const teacher = Boolean(series.added_by_teacher);
   const { lessonBufferMinutes } = await loadSettings(env);
   const { bookable, skipped } = await planOccurrences(env, {
@@ -3399,7 +3410,7 @@ async function handleGetBooking(request, env, token) {
       changeLocked: policy.locked,
       refundOnCancel: policy.refundOnCancel,
       recurring: Boolean(row.series_id),
-      durationPrices: row.series_id && row.student_id ? await recurringRates(env, row.student_id) : {},
+      durationPrices: row.student_id ? await studentRates(env, row.student_id) : {},
       paymentsDue: {
         lesson: row.payment_status === "payment_due" ? row.charged_cents ?? row.amount_cents : null,
         sameDayFee: row.same_day_fee_status === "payment_due" ? row.same_day_fee_cents : null
@@ -4389,7 +4400,7 @@ async function handleRecurringRates(request, env) {
       `INSERT INTO student_recurring_rates (student_id, duration_minutes, amount_cents, redeemed_at)
        VALUES (?, ?, ?, ?) ON CONFLICT(student_id, duration_minutes) DO NOTHING`
     ).bind(student.id, rate.duration, rate.cents, new Date().toISOString()).run();
-    const rates = await recurringRates(env, student.id);
+    const rates = await studentRates(env, student.id);
     if (rates[rate.duration] !== rate.cents) {
       return fail(
         `You already have an agreed rate for ${rate.duration}-minute lessons. Ask Inês if it needs to change.`,
@@ -4398,9 +4409,12 @@ async function handleRecurringRates(request, env) {
         env
       );
     }
+    // Their lessons already booked at that length are on it at once, as any
+    // price of theirs is (13 October 2026, Dan).
+    await repriceLessons(env, student.id, rate.duration, rate.cents, new Date().toISOString()).run();
     return json({ rates, saved: { durationMinutes: rate.duration, cents: rate.cents } }, 200, request, env);
   }
-  return json({ rates: await recurringRates(env, student.id) }, 200, request, env);
+  return json({ rates: await studentRates(env, student.id) }, 200, request, env);
 }
 
 async function handleMe(request, env) {
@@ -4658,6 +4672,63 @@ function studentDetails(body) {
   return { phone: cleanText(body.phone, 40), nif, mark };
 }
 
+/**
+ * Inês's prices for one student, as sent: a length mapped to cents, or to
+ * null for the standard price again. Lengths left out are not touched.
+ */
+function studentPrices(value) {
+  if (value === undefined) return { prices: {} };
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { problem: "Those prices couldn't be read." };
+  const prices = {};
+  for (const minutes of [60, 90]) {
+    if (!(String(minutes) in value)) continue;
+    const cents = teacherRate(value[minutes]);
+    if (cents === undefined) return { problem: "Each price needs to be between €1 and €100." };
+    prices[minutes] = cents;
+  }
+  return { prices };
+}
+
+/**
+ * Her price for a student prices every lesson of theirs at that length
+ * (13 October 2026, Dan), and their lessons still to come follow it unless
+ * something has already been charged, paid or settled by hand. A lesson they
+ * agreed to at checkout follows only a lower price: that agreement was to the
+ * amount it showed. A card saved from their account agreed to every lesson's
+ * price, so those follow either way. Returns how many lessons changed.
+ */
+async function setStudentPrices(env, studentId, prices) {
+  const now = new Date().toISOString();
+  const statements = [];
+  for (const [minutes, cents] of Object.entries(prices)) {
+    statements.push(cents === null
+      ? env.DB.prepare("DELETE FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = ?").bind(studentId, Number(minutes))
+      : env.DB.prepare(
+        `INSERT INTO student_recurring_rates (student_id, duration_minutes, amount_cents, redeemed_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(student_id, duration_minutes) DO UPDATE SET amount_cents = excluded.amount_cents, redeemed_at = excluded.redeemed_at`
+      ).bind(studentId, Number(minutes), cents, now));
+    statements.push(repriceLessons(env, studentId, Number(minutes), cents, now));
+  }
+  if (!statements.length) return 0;
+  const results = await env.DB.batch(statements);
+  return results.filter((_, index) => index % 2 === 1).reduce((total, result) => total + (result?.meta?.changes ?? 0), 0);
+}
+
+/** Their lessons still to come at one length, moved to a price (null: the standard one). */
+function repriceLessons(env, studentId, minutes, cents, now) {
+  const standard = "(SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)";
+  return env.DB.prepare(
+    `UPDATE bookings SET amount_cents = COALESCE(?, ${standard}), updated_at = ?
+     WHERE student_id = ? AND status = 'confirmed' AND starts_at > ? AND charge_started_at IS NULL
+       AND lesson_type_id IN (SELECT id FROM lesson_types WHERE duration_minutes = ? AND id != 'trial')
+       AND payment_status IN ('scheduled', 'not_required')
+       AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
+       AND COALESCE(amount_cents, -1) != COALESCE(?, ${standard})
+       AND (payment_consent_version IS NULL OR payment_consent_version = ?
+         OR COALESCE(?, ${standard}) < COALESCE(amount_cents, ${standard}))`
+  ).bind(cents, now, studentId, now, minutes, cents, STUDENT_CARD_CONSENT_VERSION, cents);
+}
+
 async function handleUpdateMe(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
@@ -4896,6 +4967,8 @@ async function handleAdmin(request, env, ctx, url, path) {
     if (!name) return fail("Please give the student's name.", 400, request, env);
     const details = studentDetails(body);
     if (details.problem) return fail(details.problem, 400, request, env);
+    const priced = studentPrices(body.prices);
+    if (priced.problem) return fail(priced.problem, 400, request, env);
     const id = crypto.randomUUID();
     const added = await env.DB.prepare(
       `INSERT INTO students (id, email, name, phone, nif, mark, timezone, password_hash, created_at, awaiting_welcome)
@@ -4904,8 +4977,21 @@ async function handleAdmin(request, env, ctx, url, path) {
       .bind(id, email, name, details.phone, details.nif, details.mark, PORTO, new Date().toISOString())
       .run();
     if (!(added?.meta?.changes > 0)) return fail("Someone with that email is already on the site.", 409, request, env);
+    await setStudentPrices(env, id, priced.prices);
     const list = await teacherStudentList(env);
     return json({ student: list.find((entry) => entry.id === id) }, 201, request, env);
+  }
+
+  // Her price for a student, per length; null is the standard price again.
+  const pricedStudent = path.match(/^\/admin\/students\/([^/]+)\/prices$/);
+  if (pricedStudent && request.method === "POST") {
+    const student = await env.DB.prepare("SELECT id FROM students WHERE id = ? AND role = 'student'").bind(pricedStudent[1]).first();
+    if (!student) return fail("That student could not be found.", 404, request, env);
+    const priced = studentPrices((await readJson(request)).prices);
+    if (priced.problem) return fail(priced.problem, 400, request, env);
+    const updated = await setStudentPrices(env, student.id, priced.prices);
+    const list = await teacherStudentList(env);
+    return json({ student: list.find((entry) => entry.id === student.id), updated }, 200, request, env);
   }
 
   // Her welcome for a student: their one-click way in and the lessons she has
@@ -4936,7 +5022,6 @@ async function handleAdmin(request, env, ctx, url, path) {
   if (request.method === "POST" && path === "/admin/bookings") {
     const body = await readJson(request);
     const email = normaliseEmail(body.email);
-    const name = cleanText(body.name, 120);
     if (!isEmail(email)) return fail("Please give the student's email address.", 400, request, env);
 
     let lessonType = await loadLessonType(env, cleanText(body.lessonType, 40) || "single");
@@ -4998,7 +5083,7 @@ async function handleAdmin(request, env, ctx, url, path) {
       if (reclaimed) student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(student.id).first();
     }
 
-    if (wantsRepeat) lessonType = await recurringLessonType(env, student.id, lessonType);
+    lessonType = await studentLessonType(env, student.id, lessonType);
     const settings = await loadSettings(env);
     /*
      * Charged to a card only with the student's standing agreement, given when

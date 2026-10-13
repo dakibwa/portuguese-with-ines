@@ -214,7 +214,7 @@ async function fixture(width, options = {}) {
     // Her students, for suggestions in the form and her list beneath it.
     if (path === "/admin/students" && data) {
       // Set up quietly: nothing is emailed until her welcome.
-      const student = { id: "ana", name: data.name, email: data.email, phone: data.phone, mark: data.mark, signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0 };
+      const student = { id: "ana", name: data.name, email: data.email, phone: data.phone, mark: data.mark, prices: data.prices, signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0 };
       state.added = student;
       return route.fulfill({ status: 201, json: { student } });
     }
@@ -771,10 +771,14 @@ try {
   await addStudent.getByLabel(/^Phone/).fill("+351 912 345 678");
   await addStudent.getByLabel(/^NIF/).fill("123456789");
   await addStudent.getByRole("button", { name: "Bloom", exact: true }).click();
+  // Her price for them from the start; the other length stays standard.
+  await addStudent.getByLabel("Price for 60 minutes, in euros").fill("20");
   await addStudent.getByRole("button", { name: "Next: their lessons", exact: true }).click();
   assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/students").at(-1).data,
-    { email: "ana@example.invalid", name: "Ana Costa", phone: "+351 912 345 678", nif: "123456789", mark: "bloom" });
+    { email: "ana@example.invalid", name: "Ana Costa", phone: "+351 912 345 678", nif: "123456789", mark: "bloom", prices: { 60: 2000 } });
   await expect(addStudent.getByRole("heading", { name: "Ana Costa" })).toBeVisible();
+  await expect(addStudent.getByRole("radio", { name: "60 mins · €20" })).toBeVisible();
+  await expect(addStudent.getByRole("radio", { name: "90 mins · €35" })).toBeVisible();
   await expect(addStudent.getByRole("button", { name: "Send welcome email", exact: true })).toHaveCount(0);
   await addStudent.getByRole("button", { name: "Done, send later", exact: true }).click();
   const ana = students.locator(".teacher-student").filter({ hasText: "Ana Costa" });

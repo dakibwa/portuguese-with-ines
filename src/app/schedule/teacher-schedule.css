@@ -1105,11 +1105,20 @@
 }
 /* Buttons, as everywhere else on the site: blue for the lesson's choices,
    coral only where something is lost. */
+/* Two actions share a row while both labels fit whole, and stack when they
+   don't, so no label is ever clipped. */
 .teacher-dialog-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.65rem;
   margin-top: 0.25rem;
+}
+.teacher-dialog-actions > .button {
+  flex: 1 1 0;
+  min-width: max-content;
+}
+.teacher-dialog-actions > :not(.button) {
+  flex: 1 1 100%;
 }
 .teacher-lesson-dialog .button {
   width: 100%;
@@ -1530,13 +1539,6 @@
 }
 .teacher-meet .teacher-meet-note p {
   margin-top: 0.4rem;
-}
-/* Two actions share a row on phones too; only the long cancel
-   confirmation stacks, so its label stays whole. */
-@media (max-width: 480px) {
-  .teacher-dialog-confirmation .teacher-dialog-actions {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 
@@ -2359,6 +2361,79 @@
 }
 .teacher-student-dialog__splat > span {
   font: 600 0.68rem/1.5 var(--ui);
+}
+/* Their price: the two lengths side by side, a euro sign inside each field
+   and the standard price showing until she types her own. */
+.teacher-student-dialog__price {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.teacher-student-dialog__price legend {
+  margin-bottom: 0.35rem;
+  padding: 0;
+  font: 600 0.68rem/1.5 var(--ui);
+}
+.teacher-price-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.teacher-price-input {
+  position: relative;
+  display: block;
+}
+.teacher-price-input > span {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  transform: translateY(-50%);
+  color: var(--lavender-ink);
+  font: 600 0.84rem/1 var(--ui);
+  pointer-events: none;
+}
+.teacher-form .teacher-price-input input {
+  padding-left: 1.6rem;
+}
+.teacher-price {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--squiggle-field);
+  padding: 0.85rem;
+  background: var(--sheet);
+}
+.teacher-history-dialog .teacher-price h3 {
+  margin: 0;
+}
+.teacher-price__view {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.teacher-price__facts {
+  margin: 0;
+}
+.teacher-price__view .button {
+  width: auto;
+}
+.teacher-price .teacher-form {
+  display: grid;
+  gap: 0.6rem;
+}
+.teacher-price__hint {
+  margin: 0;
+  color: var(--lavender-ink);
+  font-size: 0.72rem;
+}
+.teacher-price .teacher-inline-success,
+.teacher-price .teacher-inline-error {
+  margin: 0;
 }
 .teacher-student-dialog__finish {
   display: flex;

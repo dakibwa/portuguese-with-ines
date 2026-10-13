@@ -22,7 +22,12 @@ export type AdminStudent = {
   unpaidUpcoming?: number;
   /** Active weekly slots. */
   weekly?: number;
+  /** Their own price per lesson length, in cents; a missing length is the standard price. */
+  prices?: Partial<Record<60 | 90, number>>;
 };
+
+/** A length mapped to cents, or to null for the standard price again. */
+export type StudentPrices = Partial<Record<60 | 90, number | null>>;
 
 export type AvailabilityRule = {
   id: number;
@@ -224,11 +229,22 @@ export function fetchStudents(token: string) {
 /** Sets a student up with their details; nothing is emailed (13 October 2026, Dan). */
 export function addStudent(
   token: string,
-  input: { email: string; name: string; phone: string; nif: string; mark: string },
+  input: { email: string; name: string; phone: string; nif: string; mark: string; prices?: StudentPrices },
 ) {
   return adminRequest<{ student: AdminStudent }>(token, "/admin/students", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+/**
+ * Her price for a student. It prices every lesson of theirs at that length, and
+ * their lessons to come that nothing is settled on follow it; `updated` counts them.
+ */
+export function setStudentPrices(token: string, studentId: string, prices: StudentPrices) {
+  return adminRequest<{ student: AdminStudent; updated: number }>(token, `/admin/students/${encodeURIComponent(studentId)}/prices`, {
+    method: "POST",
+    body: JSON.stringify({ prices }),
   });
 }
 

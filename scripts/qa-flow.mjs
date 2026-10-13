@@ -1761,8 +1761,8 @@ await desktopManageDialog.getByRole("button", { name: "Change", exact: true }).c
 const desktopChangeDialog = accountPage.getByRole("dialog", { name: "Choose a new date and time", exact: true });
 await desktopChangeDialog.waitFor({ state: "visible" });
 await desktopChangeDialog.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
-await desktopManagePanel.getByRole("radio", { name: "60 minutes", exact: true }).waitFor();
-const ninetyMinuteChoice = desktopManagePanel.getByRole("radio", { name: "90 minutes", exact: true });
+await desktopManagePanel.getByRole("radio", { name: /^60 minutes/ }).waitFor();
+const ninetyMinuteChoice = desktopManagePanel.getByRole("radio", { name: /^90 minutes/ });
 await ninetyMinuteChoice.waitFor();
 await desktopManagePanel.getByRole("radio", { name: "Online", exact: true }).waitFor();
 const currentManagedTime = desktopManagePanel.locator(".slot-grid button.is-selected");
@@ -2158,8 +2158,8 @@ await mobileManageDialog.getByRole("button", { name: "Change", exact: true }).cl
 const mobileChangeDialog = accountPage.getByRole("dialog", { name: "Choose a new date and time", exact: true });
 await mobileChangeDialog.waitFor({ state: "visible" });
 await mobileChangeDialog.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
-await mobileManagePanel.getByRole("radio", { name: "60 minutes", exact: true }).waitFor();
-await mobileManagePanel.getByRole("radio", { name: "90 minutes", exact: true }).waitFor();
+await mobileManagePanel.getByRole("radio", { name: /^60 minutes/ }).waitFor();
+await mobileManagePanel.getByRole("radio", { name: /^90 minutes/ }).waitFor();
 await waitForOrientation(accountPage);
 const mobileChangeLayout = await accountPage.evaluate(() => {
   const workspace = document.querySelector("#lesson-calendar")?.getBoundingClientRect();

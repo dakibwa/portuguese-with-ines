@@ -62,12 +62,16 @@ Use these names in review so recurring problems are easy to recognise:
 
 ## Contrast and accessibility
 
-Recurring checkout shows the final per-lesson price before confirmation and
-uses the account's saved rate automatically. Code entry belongs only under
-Edit details, behind the small “Have a code from Inês?” disclosure; booking and
-lesson-length changes have no code field. The student applies a rate for each
-length, so a 60-minute code and a 90-minute code can both be saved.
-The disclosure note describes future weekly lessons of the matching length.
+A student's own price (from a code, or set by Inês) prices every lesson of
+theirs at that length, one-off or weekly; the trial keeps its own (13 October
+2026, Dan). Each length choice carries its price (`60 mins · €20`), in booking,
+in a lesson's change and in Inês's lesson form, rather than on a line of its
+own. Recurring checkout shows the final per-lesson price before confirmation.
+Code entry belongs only under Edit details, behind the small “Have a code from
+Inês?” disclosure; booking and lesson-length changes have no code field. The
+student applies a price for each length, so a 60-minute code and a 90-minute
+code can both be saved. The disclosure note says the code sets their price for
+lessons of that length, including ones already booked.
 Students can continue editing while a save is pending; a reply preserves newer
 drafts, and independent name/NIF saves cannot undo one another.
 They get an accessible status message and see that saved price on return.
@@ -414,7 +418,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   lessons: every lesson belongs to a student she has set up (13 October 2026,
   Dan: "so it all feels integrated"). `Add a student` (coral, leading the
   Students tab) opens it on their details: full name, email, phone, NIF (for
-  receipts) and their splat in the student's own picker, under two dabs (their
+  receipts), their price for 60 and 90 minute lessons (two € fields side by
+  side, the standard price showing until she types her own) and their splat in
+  the student's own picker, under two dabs (their
   details now, their lessons next; nothing is emailed until their welcome).
   `Next: their lessons` keeps the same dialog, now headed with their splat and
   name, on the lesson form; each lesson added becomes a dab line (`Thu 10
@@ -429,8 +435,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
   calendar, the blocked time and the lesson's NIF.
 - Keep `Sign out` beside the tools bar. `Students` holds the student
   cards, each a profile (splat, name, address and an arrow into their history)
-  over dabs for where they are and their next lesson, then the site's own
+  over dabs for where they are, their next lesson and their own price when
+  she has set one, then the site's own
   blue `Add lesson` and coral `Send welcome email`; no sentence above them. Selecting a student's card opens their lesson
+  profile: `Their price` first (each length as a dab, `· standard` where she
+  hasn't set one, and a lilac `Change price` that opens the two fields in
+  place and says how many lessons to come moved to it), then their lesson
   history: upcoming lessons first, then past and cancelled, one card each with
   the date and time on one line (the year only when it isn't this one), a pill
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
