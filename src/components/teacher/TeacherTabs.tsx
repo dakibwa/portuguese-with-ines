@@ -9,6 +9,7 @@ const tabs = [
   { id: "time-off", label: "Time off" },
   { id: "students", label: "Students" },
   { id: "receipts", label: "Receipts" },
+  { id: "expressions", label: "Expressions" },
   { id: "meet", label: "Google Meet" },
 ] as const;
 

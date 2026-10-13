@@ -345,7 +345,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   Weekly blocks such as lunch are shown but not toggled per date. Keyboard and
   touch input must work without dragging.
 - A sliding tab bar groups `Week`, `Weekly hours`, `Time off`, `Students`
-  and `Google Meet`. Open on `Week`; keep the week pager beside its date heading.
+  `Receipts`, `Expressions` and `Google Meet`. Open on `Week`; keep the week pager beside its date heading.
   On narrow screens only the tab strip scrolls horizontally. Arrow keys, Home
   and End move between tabs. Unsaved hours and selected dates survive tab changes;
   an unsaved-hours dot stays visible on its tab, and `Students` carries a dot
@@ -452,7 +452,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   `Payment due`, `Being charged`, `Refunded`). On a phone each row is a small
   cream card. Rows carry their id and figures as data attributes, so her
   automation can read the table, the CSV or the Worker's JSON alike. On a
-  phone the six tabs sit as two even rows of three.
+  phone the tools wrap into three-column rows, with Google Meet across the final row.
 - Keep `Sign out` beside the tools bar. `Students` holds the student
   cards, each a profile (splat, name, address and an arrow into their history)
   over dabs for where they are, their next lesson and their own price when
@@ -496,6 +496,48 @@ usual lesson starts and days off; avoid a wall of administration forms.
   (`Cancel`, `Back`, `Done`) stays an outline. On a phone every tab
   is in view at once, as a grid. Booked is the calendar's navy everywhere. A lesson's details read as dabs (their address, NIF, how
   it is paid, whether they have been emailed) rather than sentences.
+
+### Expressions in her portal — 13 October 2026
+
+Stage 1 is an `Expressions` tab immediately after `Receipts`. Only a teacher
+can load its collection. No student card, public page or main-menu item is
+part of this stage. `Published` marks editorial readiness; the collection
+remains private until a later, separately reviewed stage.
+
+- Use the same lilac sheet as Receipts, cream reading cards, Beth Ellen
+  expression titles and Montserrat labels and content. Keep the latest bundle
+  introduction exactly: `expressão idiomática`, `nome feminino`, and
+  `Conjunto de palavras com um significado próprio, diferente do seu sentido literal.`
+- The coral `Add an expression` leads. Search matches accents flexibly across
+  expressions, meanings, examples and notes. The theme filter includes entries
+  with no theme. Do not display the original collection's count.
+- Each card shows a small `Draft` or `Published` pill, its Portuguese meaning,
+  English meaning/equivalent and optional literal translation as dab facts,
+  then one or two example dabs when supplied. Notes/origin and reference links
+  open in a quiet disclosure. Optional themes use the existing lilac pill fill.
+- Reuse blue for Edit, soft lilac for Preview and publication changes, coral
+  for saving, and outline for Cancel/Done. Up/down buttons reorder the whole
+  collection; clear filters first. Every phone action is at least 44px.
+- The editor and preview use the shared flat lilac dialog, cream fields,
+  the same close button, backdrop dismissal, scroll lock and focus return.
+  Failed writes retain the draft. Discarding edits and deleting an expression
+  each require an explicit confirmation. Stale versions never overwrite an edit.
+- `Preview as students see it` renders the same reading-card component, without
+  teacher actions or publication pills. The surrounding private-preview note
+  is for Inês only. It does not create student access.
+- Two reading columns fit a wide desktop; use one on phones. All seven tabs
+  remain reachable without horizontal page overflow, including at 320px.
+  Long expressions, notes and examples wrap within the card. Fields and actions
+  also fit a 320px dialog.
+- All imported entries are drafts. The reference bundle has no usage examples
+  or themes; leave those blank instead of inventing them. Publishing needs both
+  meanings and at least one example. Preserve Inês's punctuation and accents.
+- The original strip photographs are reference material, with text too small
+  for a reading card. The packaging photos and business card do not illustrate
+  individual meanings. None is copied into `public/visuals/` in Stage 1.
+
+The full source inventory and later-stage feature map are in
+[Expressions: source and scope](../docs/expressions-stage-1.md).
 
 ## Wording and confirmation — 13 September 2026
 

@@ -2452,6 +2452,80 @@ await test("her receipts list each amount paid or due for a month's lessons, wit
     db.prepare("DELETE FROM bookings WHERE student_id = 'receipts'").run();
   }
 });
+await test("only a teacher can manage expressions; drafts, exact text, publication and order survive safely", async () => {
+  const migration = readFileSync(new URL("./migrations/0026-expressions.sql", import.meta.url), "utf8");
+  db.exec(migration);
+  const input = {
+    expression: "Não é «bicho-de-sete-cabeças»!",
+    meaningPt: "É possível — com calma.\nMantém-se a pontuação de Inês.",
+    meaningEn: "It is not that difficult.", literalEn: "It is not a seven-headed beast.",
+    examples: [], notes: "Uma nota com ‘aspas’ e «guillemets».",
+    sourceUrl: "https://example.com/expression", tags: ["Aprendizagem"], imageUrl: "", imageAlt: "",
+  };
+  const adminCall = (path = "", options = {}) => call(`/admin/expressions${path}`, { user: "teacher", ...options });
+  const list = async (options = {}) => {
+    const response = await adminCall("", { method: "GET", ...options });
+    assert.equal(response.status, 200, await response.clone().text());
+    return (await response.json()).expressions;
+  };
+  try {
+    const seed = await list();
+    assert.equal(seed.length, 52);
+    assert.ok(seed.every((row) => row.published === 0 && row.examples.length === 0 && row.tags.length === 0));
+    assert.equal(seed[0].expression, "Partir o coco a rir");
+    assert.equal((await list({ token: env.ADMIN_TOKEN })).length, 52, "the shared admin fallback remains authorised");
+    const ip = { "CF-Connecting-IP": "198.51.100.26" };
+    for (const [path, method, body] of [["", "GET", {}], ["", "POST", input], ["/original-1", "POST", input],
+      ["/original-1/publish", "POST", { published: 1 }], ["/original-1/delete", "POST", {}], ["/reorder", "POST", { ids: ["original-1"] }]]) {
+      assert.equal((await adminCall(path, { user: "outsider", method, body, headers: ip })).status, 401);
+    }
+    assert.equal((await adminCall("", { user: null, method: "GET", headers: ip })).status, 401);
+    for (const invalid of [{ published: 1 }, { meaningPt: null }, { examples: ["one", "two", "three"] },
+      { tags: [3] }, { imageUrl: "https://example.com/a.webp", imageAlt: "An image" },
+      { imageUrl: "/visuals/expressions/example.webp" }, { sourceUrl: "https://user:password@example.com/reference" }, { sourceUrl: "javascript:alert(1)" }]) {
+      assert.equal((await adminCall("", { body: { ...input, ...invalid } })).status, 400);
+    }
+    const created = await adminCall("", { body: input });
+    assert.equal(created.status, 201, await created.clone().text());
+    let item = (await created.json()).expression;
+    for (const key of Object.keys(input)) assert.deepEqual(item[key], input[key], `preserves ${key}`);
+    assert.equal(item.published, 0);
+    assert.equal((await adminCall(`/${item.id}/publish`, { body: { published: 1, updatedAt: item.updatedAt } })).status, 400, "a seed-like draft needs an example before publication");
+    const firstVersion = item.updatedAt;
+    const editedInput = { ...input, meaningPt: "Não é tão difícil como parece.", examples: ["«Vais ver: não é bicho-de-sete-cabeças!»"], imageUrl: "/visuals/expressions/example.webp", imageAlt: "Uma ilustração" };
+    const edited = await adminCall(`/${item.id}`, { body: { ...editedInput, updatedAt: firstVersion } });
+    assert.equal(edited.status, 200, await edited.clone().text());
+    item = (await edited.json()).expression;
+    assert.deepEqual(item.examples, editedInput.examples);
+    assert.equal(item.meaningPt, editedInput.meaningPt);
+    assert.equal((await adminCall(`/${item.id}`, { body: { ...input, updatedAt: firstVersion } })).status, 409, "a stale editor cannot overwrite her work");
+    const published = await adminCall(`/${item.id}/publish`, { body: { published: 1, updatedAt: item.updatedAt } });
+    assert.equal(published.status, 200);
+    item = (await published.json()).expression;
+    assert.equal(item.published, 1);
+    assert.equal((await adminCall(`/${item.id}`, { body: { ...editedInput, examples: [], updatedAt: item.updatedAt } })).status, 400, "published content remains complete");
+    assert.equal((await call("/expressions", { method: "GET", user: "alice" })).status, 404, "no student or public endpoint ships in stage 1");
+    const order = (await list()).map((row) => row.id);
+    const desired = [item.id, ...order.filter((id) => id !== item.id)];
+    const reordered = await adminCall("/reorder", { body: { ids: desired, expectedOrder: order } });
+    assert.equal(reordered.status, 200, await reordered.clone().text());
+    const afterOrder = (await reordered.json()).expressions;
+    assert.deepEqual(afterOrder.map((row) => row.id), desired);
+    assert.deepEqual(afterOrder[0].examples, editedInput.examples);
+    assert.equal((await adminCall("/reorder", { body: { ids: desired, expectedOrder: order } })).status, 409);
+    item = afterOrder[0];
+    const unpublished = await adminCall(`/${item.id}/publish`, { body: { published: 0, updatedAt: item.updatedAt } });
+    assert.equal(unpublished.status, 200);
+    item = (await unpublished.json()).expression;
+    assert.equal(item.published, 0);
+    assert.equal((await adminCall(`/${item.id}/delete`, { body: { updatedAt: item.updatedAt } })).status, 200);
+    assert.ok(!(await list()).some((row) => row.id === item.id));
+    db.prepare("UPDATE expressions SET meaning_pt = 'Reviewed by teacher' WHERE id = 'original-1'").run();
+    db.exec(migration);
+    assert.equal(db.prepare("SELECT meaning_pt FROM expressions WHERE id = 'original-1'").get().meaning_pt, "Reviewed by teacher", "repeating the import preserves review edits");
+  } finally { db.exec("DELETE FROM expressions"); }
+});
+
 await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('launch-check','launch-check-0000@example.invalid','Launch Verification','x','2026-09-05T08:56:55.286Z')").run();

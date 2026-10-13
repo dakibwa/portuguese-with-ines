@@ -330,3 +330,25 @@ CREATE TABLE IF NOT EXISTS google_calendar_oauth_states (
   verifier_encrypted TEXT NOT NULL,
   expires_at TEXT NOT NULL
 );
+
+-- Stage 1: teacher-only expressions. Apply only as part of Dan's approved release.
+CREATE TABLE IF NOT EXISTS expressions (
+  id TEXT PRIMARY KEY,
+  expression TEXT NOT NULL,
+  normalized TEXT NOT NULL UNIQUE,
+  meaning_pt TEXT NOT NULL DEFAULT '',
+  meaning_en TEXT NOT NULL DEFAULT '',
+  literal_en TEXT NOT NULL DEFAULT '',
+  examples TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(examples) AND json_type(examples) = 'array' AND json_array_length(examples) <= 2),
+  notes TEXT NOT NULL DEFAULT '',
+  source_url TEXT NOT NULL DEFAULT '',
+  tags TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(tags) AND json_type(tags) = 'array' AND json_array_length(tags) <= 8),
+  image_url TEXT NOT NULL DEFAULT '',
+  image_alt TEXT NOT NULL DEFAULT '',
+  published INTEGER NOT NULL DEFAULT 0 CHECK (published IN (0, 1)),
+  sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (published = 0 OR (length(trim(meaning_pt)) > 0 AND length(trim(meaning_en)) > 0 AND json_array_length(examples) BETWEEN 1 AND 2))
+);
+CREATE INDEX IF NOT EXISTS expressions_order ON expressions(sort_order, id);
