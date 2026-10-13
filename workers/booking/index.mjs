@@ -1139,7 +1139,11 @@ async function teacherStudentList(env) {
        (SELECT COUNT(*) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?
           AND b.added_by_teacher = 1 AND b.payment_status = 'not_required') AS unpaid_upcoming,
        (SELECT COUNT(*) FROM booking_series bs WHERE bs.student_id = s.id AND bs.status = 'active') AS weekly
-     FROM students s WHERE s.role = 'student' ORDER BY s.name COLLATE NOCASE`
+     FROM students s WHERE s.role = 'student'
+       -- The opt-in live check's throwaway accounts (scripts/qa-recurring-rates)
+       -- can never be a student of hers.
+       AND s.email NOT LIKE 'launch-check-%@example.invalid'
+     ORDER BY s.name COLLATE NOCASE`
   )
     .bind(now, now)
     .all();

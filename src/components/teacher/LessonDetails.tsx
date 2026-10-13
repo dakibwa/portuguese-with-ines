@@ -45,6 +45,7 @@ export function LessonDetails({
   const [date, setDate] = useState(dateKey(new Date(booking.starts_at)));
   const [time, setTime] = useState(formatSlotTime(booking.starts_at));
   const [cancelMessage, setCancelMessage] = useState("");
+  const firstName = booking.student_name.split(" ")[0];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const noShowCloses = new Date(new Date(booking.ends_at).getTime() + NO_SHOW_WINDOW_HOURS_AFTER * 3_600_000);
@@ -160,7 +161,10 @@ export function LessonDetails({
         {booking.status === "cancelled" ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
         {booking.status === "cancelled" ? "Cancelled" : addedByTeacher(booking) ? "Added by you" : "Booked"}
       </p>
-      {addedByTeacher(booking) && booking.status !== "cancelled" ? (
+      {/* While she confirms a change, the dialog keeps to who, when and the
+          question (13 October 2026, Dan); the lesson's extras return with
+          Back to lesson. */}
+      {action === "view" && addedByTeacher(booking) && booking.status !== "cancelled" ? (
         booking.payment_status === "scheduled" ? (
           // On the student's card since they saved it. One they already paid
           // for by hand comes off before it is charged (12 October 2026).
@@ -227,8 +231,11 @@ export function LessonDetails({
           </span>{" "}
           · Porto time
         </span>
-        <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
+        {action === "view" ? (
+          <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
+        ) : null}
       </div>
+      {action === "view" ? (
       <div className="teacher-lesson-facts">
         <a href={`mailto:${booking.student_email}`}>
           <Mail size={15} aria-hidden="true" />
@@ -240,7 +247,8 @@ export function LessonDetails({
           {booking.student_nif ? `NIF ${booking.student_nif}` : "NIF not given (consumidor final)"}
         </span>
       </div>
-      {booking.notes ? (
+      ) : null}
+      {action === "view" && booking.notes ? (
         <p className="teacher-lesson-note">{booking.notes}</p>
       ) : null}
       {noShow ? (
@@ -349,31 +357,41 @@ export function LessonDetails({
                     ? "Remove the no-show?"
                     : "Mark as a no-show?"}
               </h3>
-              <p>
-                {action === "cancel"
-                  ? "The lesson will be removed from the calendar and the student will be emailed."
-                  : noShow
-                    ? "The lesson price will be charged as normal."
-                    : `Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the lesson price.`}
-              </p>
+              <ul className="booking-payment-facts teacher-confirm-facts">
+                {action === "cancel" ? (
+                  <>
+                    <li>{firstName} gets an email saying you’ve cancelled, with an update for their calendar</li>
+                    {booking.payment_status === "paid" ? (
+                      <li>{firstName} is refunded in full, automatically</li>
+                    ) : booking.payment_status === "scheduled" ? (
+                      <li>Nothing is charged to {firstName}’s card</li>
+                    ) : null}
+                    <li>The lesson comes off your calendar</li>
+                  </>
+                ) : noShow ? (
+                  <li>{firstName} is charged the lesson price as normal</li>
+                ) : (
+                  <li>{firstName} is charged only {SAME_DAY_FEE_LABEL}, instead of the lesson price</li>
+                )}
+              </ul>
               {action === "cancel" ? (
                 <div className="teacher-form teacher-cancel-message">
                   <label htmlFor="teacher-cancel-message">
-                    <span>Message to student <span className="teacher-field-optional">(optional)</span></span>
+                    <span>Add a message to the email <span className="teacher-field-optional">(optional)</span></span>
                     <textarea
                       id="teacher-cancel-message"
-                      aria-describedby="teacher-cancel-message-hint"
-                      rows={4}
+                      rows={3}
                       maxLength={1000}
+                      placeholder="Sorry, I can’t make it. Shall we find another time?"
                       disabled={busy}
                       value={cancelMessage}
                       onChange={(event) => setCancelMessage(event.target.value)}
                     />
                   </label>
-                  <div className="teacher-cancel-message__hint">
-                    <p id="teacher-cancel-message-hint">Included in their cancellation email.</p>
-                    <span aria-hidden="true">{cancelMessage.length}/1,000</span>
-                  </div>
+                  {/* The limit shows only as she nears it. */}
+                  {cancelMessage.length > 850 ? (
+                    <p className="teacher-cancel-message__hint">{cancelMessage.length}/1,000</p>
+                  ) : null}
                 </div>
               ) : null}
               <div className="teacher-dialog-actions">

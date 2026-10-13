@@ -325,7 +325,6 @@ export function ManualLessonForm({
         <Plus size={22} aria-hidden="true" />
       </summary>
       <div className="teacher-manual-body">
-        <ul className="teacher-help"><li>For a lesson arranged directly.</li></ul>
         <LessonForm
           key={student?.key ?? 0}
           idPrefix="teacher-manual"

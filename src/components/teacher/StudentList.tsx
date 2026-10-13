@@ -12,7 +12,7 @@ import { StudentHistory } from "@/components/teacher/StudentHistory";
  * Someone she still needs to bring in comes first: never signed in, or (where
  * the site takes cards) lessons she added that no card pays for yet.
  */
-function needsHer(student: AdminStudent, cards: boolean) {
+export function needsHer(student: AdminStudent, cards: boolean) {
   return !student.signedIn || Boolean(cards && student.unpaidUpcoming && !student.cardForAllLessons);
 }
 
@@ -79,14 +79,10 @@ export function StudentList({
   const shown = (students ?? [])
     .filter((student) => !term || student.name.toLowerCase().includes(term) || student.email.toLowerCase().includes(term))
     .sort((a, b) => Number(needsHer(b, cards)) - Number(needsHer(a, cards)) || a.name.localeCompare(b.name));
-  const waiting = (students ?? []).filter((student) => needsHer(student, cards)).length;
 
   return (
     <section className="teacher-students" aria-labelledby="teacher-students-title">
-      <header className="teacher-tool-heading">
-        <h2 className="visually-hidden" id="teacher-students-title">Manage students</h2>
-        <ul className="teacher-help"><li>Choose a student to see their lessons.</li>{waiting ? <li>{waiting} {waiting === 1 ? "student needs" : "students need"} help getting started.</li> : null}</ul>
-      </header>
+      <h2 className="visually-hidden" id="teacher-students-title">Students</h2>
       <div className="teacher-manual-body">
         {students && students.length > 8 ? (
           <label className="teacher-students__search">

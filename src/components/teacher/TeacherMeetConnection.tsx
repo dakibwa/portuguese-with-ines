@@ -102,37 +102,53 @@ export function TeacherMeetConnection({ token, onAttentionChange }: { token: str
 
   return (
     <section className="teacher-meet" aria-labelledby="teacher-meet-title">
-      <header className="teacher-tool-heading">
-        <h2 className="visually-hidden" id="teacher-meet-title">Google Meet</h2>
-        {attention ? <p className="teacher-meet-attention">{attention}</p> : healthy ? <p className="teacher-meet-connected"><GoogleMeetLogo /><Check size={16} aria-hidden="true" />Connected{connection?.email ? ` as ${connection.email}` : ""}</p> : null}
-      </header>
+      <div className="teacher-meet-head">
+        <GoogleMeetLogo />
+        <div>
+          <h2 id="teacher-meet-title">Google Meet</h2>
+          {attention ? (
+            <p className="teacher-meet-attention">{attention}</p>
+          ) : healthy ? (
+            <p className="teacher-meet-connected"><Check size={15} strokeWidth={2.6} aria-hidden="true" />Connected{connection?.email ? ` as ${connection.email}` : ""}</p>
+          ) : null}
+        </div>
+      </div>
       {!connection && !error ? <p role="status">Checking Google Meet…</p> : null}
       {feedback ? <p role="status">{feedback}</p> : null}
       {error ? <div className="teacher-meet-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={() => setAttempt(value => value + 1)} type="button">Try again</button></div> : null}
       {connection?.configured ? (
-        <div className="teacher-meet-settings">
-          <ul className="teacher-help"><li>
-            {healthy
-              ? "Lessons and Meet links sync automatically."
-              : connection.needsReconnect
-                ? "Reconnect to sync lessons and Meet links."
-                : "Connect to add lessons and Meet links to Google Calendar."}
-          </li>{connection.connected ? <li>Move or cancel lessons here.</li> : null}</ul>
-          {connection.pending > 0 ? (
-            <p>{connection.pending} {connection.pending === 1 ? "lesson is" : "lessons are"} waiting to sync.</p>
-          ) : null}
-          <div className="teacher-meet-actions">
-            <button className={`button ${healthy ? "button--quiet" : "button--coral"}`} disabled={busy} onClick={() => void connect()} type="button">
-              {busy ? "Opening Google…" : connection.connected || connection.needsReconnect ? "Reconnect Google Meet" : "Connect Google Meet"}
-            </button>
-            {connection.connected ? (
-              <a className="teacher-text-button" href="https://calendar.google.com/" target="_blank" rel="noopener noreferrer">Open Google Calendar</a>
+        <>
+          <ul className="booking-payment-facts">
+            {healthy ? (
+              <>
+                <li>Every lesson goes to your Google Calendar with its Meet link</li>
+                <li>Move or cancel lessons here, not in Google</li>
+              </>
+            ) : (
+              <li>{connection.needsReconnect ? "Reconnect" : "Connect once"} so every lesson goes to your Google Calendar with a Meet link</li>
+            )}
+            {connection.pending > 0 ? (
+              <li>{connection.pending} {connection.pending === 1 ? "lesson is" : "lessons are"} waiting to sync</li>
             ) : null}
+          </ul>
+          <div className="teacher-meet-actions">
+            {healthy ? (
+              <>
+                <a className="button button--outline" href="https://calendar.google.com/" target="_blank" rel="noopener noreferrer">Open Google Calendar</a>
+                <button className="teacher-text-button" disabled={busy} onClick={() => void connect()} type="button">
+                  {busy ? "Opening Google…" : "Reconnect Google Meet"}
+                </button>
+              </>
+            ) : (
+              <button className="button button--coral" disabled={busy} onClick={() => void connect()} type="button">
+                {busy ? "Opening Google…" : connection.connected || connection.needsReconnect ? "Reconnect Google Meet" : "Connect Google Meet"}
+              </button>
+            )}
           </div>
           {connection.connected ? (
             <details className="teacher-meet-note"><summary>Share your calendar</summary><p>In Google Calendar, open “Português com a Inês — lessons” → Settings and sharing → Add people.</p></details>
           ) : null}
-        </div>
+        </>
       ) : null}
     </section>
   );

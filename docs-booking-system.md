@@ -119,10 +119,13 @@ never put on a card.
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
-still paid by hand, and any weekly slot. `Manage students` on `/schedule` puts
+still paid by hand, and any weekly slot. `Students` on `/schedule` puts
 those who still need to sign in or add a card first, each with
 `Send sign-in link` (`POST /admin/students/:id/welcome`, three an hour per
-student).
+student). Accounts the opt-in live check registers
+(`launch-check-…@example.invalid`, from `scripts/qa-recurring-rates.mjs`) are
+left out of the list; the four made on 5 September 2026 were deleted from
+production on 13 October 2026 at Dan's request.
 
 Selecting a student opens their lesson history. The teacher UI reads
 `GET /admin/bookings?from=1970-01-01T00:00:00.000Z` through the existing teacher
@@ -158,7 +161,8 @@ heading while the timetable reloads; a failed read retains that position and
 offers its existing reload action. Reloading never moves focus from a control
 Inês selects while it is pending.
 
-When Inês cancels a lesson she can include an optional **Message to student**,
+When Inês cancels a lesson she can include an optional **Message for {first
+name}**,
 up to 1,000 characters. It appears as **Message from Inês** in the student's
 cancellation email and in her own copy, with line breaks preserved and markup
 treated as text. An empty message leaves the existing email unchanged. The
@@ -172,17 +176,19 @@ The week itself is where Inês takes time off. Choosing a free time offers
 `Add a lesson here` or `Take this time off`; dragging across times on a date
 blocks them all for that date only, and choosing a blocked time reopens it.
 The `Day off` switch above each date blocks the whole day. The `Time off`
-tab shows a month calendar. Each date opens a popup for `Full day off` or
-`Specific times`, including multiple timed breaks. In the time picker, `00:00` means the end
-of that day (stored as minute 1440).
-This draft saves explicitly through the same `/admin/exceptions/day` endpoint.
-Switching to timed breaks removes that date's whole-day block; removing time
-off clears its whole-day and partial blocks. Weekly blocks and extra hours stay.
-The month marks whole days off and booked lessons, without displaying weekly
-unavailability or partial blocks from the week.
-`Select several days` enables bulk changes across months; selected dates survive
-tab changes. Booked lessons are shown before applying changes, and unavailable
-booking data must be retried first. Each bulk-selected date uses the same queue;
+tab shows a month calendar beside one card. Tapping dates chooses them, one or
+several, across months; chosen dates survive tab changes. The card offers
+`Take the day off` / `Take N days off`, `Take some hours off` for a single
+date, and `Make available` when a chosen date is off. Some hours opens a draft
+of one or more timed breaks; in the time picker, `00:00` means the end of that
+day (stored as minute 1440). That draft saves explicitly through the same
+`/admin/exceptions/day` endpoint; saving breaks removes that date's whole-day
+block, and `Remove hours off` clears its breaks. Weekly blocks and extra hours
+stay. The month marks whole days off and booked lessons, without displaying
+weekly unavailability or partial blocks from the week.
+Booked lessons on the chosen dates are listed as cards whose `Change` opens
+that lesson's own move/cancel dialog, and unavailable booking data must be
+retried before applying changes. Each bulk-selected date uses the same queue;
 already-matching days require no write. Reopening a day removes only its
 whole-day block, retaining partial time off and weekly hours. Each change
 saves one request at a time, so quick clicks coalesce
@@ -192,8 +198,8 @@ failure of the latest choice puts that date back as saved and says so.
 Weekly-hours drafts warn when changed lesson start times overlap an existing
 confirmed lesson in Porto time, including ongoing and future lessons. Saving
 waits for booked lessons to load; the warning and save confirmation both state
-that existing lessons stay booked. Each clash is a lesson card with a
-`Change lesson` button opening the existing move/cancel dialog. Opening or
+that existing lessons stay booked. Each clash is the same lesson card, its
+`Change` button opening the existing move/cancel dialog. Opening or
 changing a lesson preserves the weekly-hours draft; a completed change refreshes
 the clash cards. More than four affected lessons expand from `more lessons`.
 Hours edits never move or cancel lessons themselves.
@@ -221,15 +227,15 @@ are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
 The sliding tools bar groups `Week`, `Weekly hours`, `Time off`,
-`Manage students` and `Google Meet`, with the current week as the default.
+`Students` and `Google Meet`, with the current week as the default.
 The Google Meet tab exposes the existing connection controls and its tab
 marks connection problems; Google callbacks open it directly.
 
-Manual lesson entry is a collapsed backup in Week and Manage students,
+Manual lesson entry is a collapsed backup in Week and Students,
 with online/in-Porto location and `How often` (once, or weekly for 4, 6 or 8 weeks or until
 stopped). Its email field suggests her existing students (read from
 `GET /admin/students` when she first reaches it) and a chosen one fills in
-their name. `Manage students` contains the student cards; each
+their name. `Students` contains the student cards; each
 row's `Add lesson` opens the form with that student in it. Form drafts survive
 tab changes. All teacher actions still use the authenticated admin endpoints and
 their existing booking, payment and email safeguards.

@@ -2245,10 +2245,13 @@ await test("a sign-in link signs an existing student in once, while the address 
 });
 await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('launch-check','launch-check-0000@example.invalid','Launch Verification','x','2026-09-05T08:56:55.286Z')").run();
   const listed = await call("/admin/students", { method: "GET", user: "teacher" });
   assert.equal(listed.status, 200);
   const { students, cardsAccepted } = await listed.json();
+  db.prepare("DELETE FROM students WHERE id='launch-check'").run();
   assert.ok(!students.some((row) => row.id === "teacher"), "her own account is not a student");
+  assert.ok(!students.some((row) => row.id === "launch-check"), "a live check's throwaway account is not a student");
   const alice = students.find((row) => row.id === "alice");
   assert.deepEqual([alice.cardForAllLessons, typeof alice.unpaidUpcoming], [false, "number"]);
   assert.equal(cardsAccepted, true);

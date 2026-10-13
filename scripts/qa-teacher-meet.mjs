@@ -76,7 +76,7 @@ try {
     await expect(ready.panel).toContainText("Not connected");
     await readableMeetFeedback(ready.panel, ".teacher-meet-attention");
     await expect(ready.page.getByRole("tab", { name: /^Google Meet/ }).locator(".teacher-tab-dot")).toHaveAttribute("aria-label", "needs attention");
-    await expect(ready.panel).toContainText("2 lessons are waiting to sync.");
+    await expect(ready.panel).toContainText("2 lessons are waiting to sync");
     await expect(ready.panel.getByRole("button", { name: "Connect Google Meet", exact: true })).toBeVisible();
     assert.deepEqual(ready.calls, [], "OAuth never starts without a click");
     assert.ok(await ready.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));

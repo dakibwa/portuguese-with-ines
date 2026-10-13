@@ -7,16 +7,18 @@ const tabs = [
   { id: "week", label: "Week" },
   { id: "hours", label: "Weekly hours" },
   { id: "time-off", label: "Time off" },
-  { id: "students", label: "Manage students" },
+  { id: "students", label: "Students" },
   { id: "meet", label: "Google Meet" },
 ] as const;
 
 export type TeacherTab = (typeof tabs)[number]["id"];
 
 /** One sliding control, with the same keyboard behaviour at every width. */
-export function TeacherTabs({ current, hoursDirty, meetAttention, onSelect }: {
+export function TeacherTabs({ current, hoursDirty, studentsWaiting, meetAttention, onSelect }: {
   current: TeacherTab;
   hoursDirty: boolean;
+  /** Students she still needs to bring onto the site. */
+  studentsWaiting: number;
   meetAttention: boolean;
   onSelect: (tab: TeacherTab) => void;
 }) {
@@ -46,7 +48,7 @@ export function TeacherTabs({ current, hoursDirty, meetAttention, onSelect }: {
     observer.observe(selected);
     if (scroller) observer.observe(scroller);
     return () => observer.disconnect();
-  }, [current, hoursDirty, meetAttention]);
+  }, [current, hoursDirty, studentsWaiting, meetAttention]);
 
   return (
     <div className="teacher-tabs-scroll">
@@ -81,6 +83,7 @@ export function TeacherTabs({ current, hoursDirty, meetAttention, onSelect }: {
           >
             {tab.id === "meet" ? <><GoogleMeetLogo /><span className="visually-hidden">Google Meet</span></> : tab.label}
             {tab.id === "hours" && hoursDirty ? <span className="teacher-tab-dot" aria-label="unsaved changes" /> : null}
+            {tab.id === "students" && studentsWaiting ? <span className="teacher-tab-dot" aria-label={`${studentsWaiting} to bring in`} /> : null}
             {tab.id === "meet" && meetAttention ? <span className="teacher-tab-dot" aria-label="needs attention" /> : null}
           </button>
         ))}
