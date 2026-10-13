@@ -2330,8 +2330,9 @@ await accountPage.waitForFunction(
 if (await accountPage.locator("#lesson-calendar .unified-calendar__grid").isVisible()) {
   throw new Error("On a phone, a chosen day's times should take the calendar's place.");
 }
-// A day with times either side of 14:00 shows one part at a time; each part is
-// a small timetable, one row per hour, each start minute in its own column.
+// A day with times either side of 14:00 shows one part at a time; when the
+// day mixes start minutes each part is a small timetable, one row per hour,
+// each start minute in its own column, and otherwise its times sit side by side.
 const timePicker = accountPage.locator("#lesson-calendar .unified-calendar__availability .time-picker");
 const partInputs = timePicker.locator(".time-picker__parts input");
 const partCount = await partInputs.count();
@@ -2345,9 +2346,15 @@ for (let index = 0; index < Math.max(partCount, 1); index++) {
       return { part, hour: time.slice(0, 2), minute: time.slice(3, 5), top: Math.round(box.top), left: Math.round(box.left), height: box.height };
     }), index));
 }
-const timesShareHourRows = shownTimes.every((a) => shownTimes.every((b) =>
+const mixedMinutes = new Set(shownTimes.map((time) => time.minute)).size > 1;
+const timesShareHourRows = !mixedMinutes || shownTimes.every((a) => shownTimes.every((b) =>
   a.part !== b.part || (a.hour === b.hour) === (Math.abs(a.top - b.top) <= 1)));
-const timesShareMinuteColumns = shownTimes.every((a) => shownTimes.every((b) => a.minute !== b.minute || Math.abs(a.left - b.left) <= 1));
+const timesShareMinuteColumns = !mixedMinutes || shownTimes.every((a) => shownTimes.every((b) => a.minute !== b.minute || Math.abs(a.left - b.left) <= 1));
+// Times on one minute never stand one per line: the first two of a part share a row.
+const timesSideBySide = mixedMinutes || [0, 1].every((part) => {
+  const inPart = shownTimes.filter((time) => time.part === part);
+  return inPart.length < 2 || Math.abs(inPart[0].top - inPart[1].top) <= 1;
+});
 const headingCount = await timePicker.evaluate((picker) => picker.parentElement?.querySelectorAll("h3, h4").length ?? -1);
 if (
   shownTimes.length !== 5 ||
@@ -2355,7 +2362,8 @@ if (
   headingCount !== 0 ||
   shownTimes.some((time) => time.height < 44 || time.height > 54) ||
   !timesShareHourRows ||
-  !timesShareMinuteColumns
+  !timesShareMinuteColumns ||
+  !timesSideBySide
 ) {
   throw new Error(`A free day's times should split at 14:00, each part a small timetable: ${JSON.stringify({ partCount, shownTimes })}.`);
 }

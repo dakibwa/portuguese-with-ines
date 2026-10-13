@@ -887,9 +887,12 @@ Preserve these desktop and mobile states:
   divide where 14:00 in Porto falls on the student's clock, in their own
   times, or at noon when Inês's day crosses their midnight. A half with nothing free that day
   says so; the half holding a chosen time, or else the first with times, opens
-  first. Never a wall of every quarter hour. Each half is a small timetable without subheadings: one row per hour, one column
-  per start minute the day offers (four for quarter hours), so a gap reads as a
-  gap and buttons keep an accessible touch target on a phone. The date's
+  first. Never a wall of every quarter hour. When a day mixes start minutes,
+  each half is a small timetable without subheadings: one row per hour, one
+  column per start minute the day offers (four for quarter hours), so a gap
+  reads as a gap and buttons keep an accessible touch target on a phone. When
+  every time starts on the same minute (all on the hour), they simply sit side
+  by side, three to a row, never one per line (13 October 2026, Dan). The date's
   `Change` returns to the four weeks that held the date. Opening any
   lesson keeps the calendar in place and adds a compact overlay asking
   whether to change or cancel it. `Change` keeps the page dimmed and lifts that

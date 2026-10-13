@@ -129,20 +129,16 @@ function calendarMonths(weeks: BookingWeek[]) {
 }
 
 /**
- * Times read as a small timetable: one row per hour, one column per start
- * minute the day offers (four for quarter hours, two for half hours), so a
- * gap reads as a gap and a long day stays short. Finer grids fall back to
- * wrapping.
- */
-/**
  * A day's free times in two fixed halves, divided where Inês's day divides
  * (14:00 in Porto) and named by the same span every day (from her earliest
  * start to the divide, and from it to her latest), so a full day of quarter
  * hours is never one wall of buttons and the choice never shifts under the
  * student. It reads the clock the calendar shows (`zone`). A half with nothing
- * free that day says so. Each half is a small timetable: one row per hour,
- * each start minute in its own column. It opens on the half holding the time
- * already chosen, or the first with free times.
+ * free that day says so. When the day mixes start minutes each half is a
+ * small timetable, one row per hour and each start minute in its own column,
+ * so a gap reads as a gap; when every time starts on the same minute they
+ * sit side by side. It opens on the half holding the time already chosen, or
+ * the first with free times.
  */
 function TimePicker({ halves, renderTime, selected = "", slots, zone }: {
   /** Where the day divides and the span its halves are named by; null keeps one list. */
@@ -175,7 +171,10 @@ function TimePicker({ halves, renderTime, selected = "", slots, zone }: {
     : { id: "all", label: "", slots };
   const minutes = [...new Set(slots.map((slot) => clock(slot.startAt).slice(3, 5)))].sort();
   const hours = [...new Set(current.slots.map((slot) => clock(slot.startAt).slice(0, 2)))];
-  const timetable = minutes.length <= 4;
+  // A timetable only helps when the day mixes start minutes (:00, :15, :30);
+  // times that all start on the same minute simply sit side by side, three
+  // to a row, rather than one per line (13 October 2026, Dan).
+  const timetable = minutes.length > 1 && minutes.length <= 4;
   return (
     <div className="time-picker">
       {halves ? (
