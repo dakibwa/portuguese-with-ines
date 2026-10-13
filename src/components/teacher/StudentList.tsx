@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarPlus, CheckCircle2, Repeat, Send } from "lucide-react";
+import { CalendarPlus, CheckCircle2, ChevronRight, Repeat, Send } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
 import { formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
+import { StudentHistory } from "@/components/teacher/StudentHistory";
 
 /**
  * Someone she still needs to bring in comes first: never signed in, or (where
@@ -51,6 +52,7 @@ export function StudentList({
   onAddLesson: (student: AdminStudent) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<AdminStudent | null>(null);
   const [sending, setSending] = useState("");
   // Each answer stays on its own student's card, where she pressed.
   const [sent, setSent] = useState<Record<string, { ok: boolean; message: string }>>({});
@@ -82,9 +84,8 @@ export function StudentList({
   return (
     <section className="teacher-students" aria-labelledby="teacher-students-title">
       <header className="teacher-tool-heading">
-        <span className="teacher-eyebrow">Your students</span>
-        <h2 id="teacher-students-title">Manage students{students ? <span className="teacher-students__count"> · {students.length}</span> : null}</h2>
-        <p>{waiting ? `${waiting} ${waiting === 1 ? "student needs" : "students need"} a hand getting started. ` : ""}Add a lesson or send a link to help someone sign in.</p>
+        <h2 className="visually-hidden" id="teacher-students-title">Manage students</h2>
+        <ul className="teacher-help"><li>Choose a student to see their lessons.</li>{waiting ? <li>{waiting} {waiting === 1 ? "student needs" : "students need"} help getting started.</li> : null}</ul>
       </header>
       <div className="teacher-manual-body">
         {students && students.length > 8 ? (
@@ -113,19 +114,20 @@ export function StudentList({
             const answer = sent[student.id];
             return (
               <li className={`teacher-student${waitingOn ? " needs-her" : " is-ready"}`} key={student.id}>
+                <button className="teacher-student__profile" aria-label={`View lesson history for ${student.name}`} onClick={() => setSelected(student)} type="button">
                 <AccountAvatar className="teacher-student__avatar" mark={student.mark} name={student.name} />
-                <div className="teacher-student__main">
+                <span className="teacher-student__main">
                   <strong className="teacher-student__name">{student.name}</strong>
                   <span className="teacher-student__email">{student.email}</span>
-                  <p className="teacher-student__status">
+                  <span className="teacher-student__status">
                     {waitingOn ? (
                       <span aria-hidden="true" className="teacher-student__dot" />
                     ) : (
                       <CheckCircle2 size={15} aria-hidden="true" />
                     )}
                     {statusOf(student, cards)}
-                  </p>
-                  <p className="teacher-student__next">
+                  </span>
+                  <span className="teacher-student__next">
                     {student.nextLessonAt ? `Next lesson ${nextLesson(student.nextLessonAt)}` : "No lessons booked"}
                     {student.weekly ? (
                       <span className="teacher-student__weekly">
@@ -133,8 +135,10 @@ export function StudentList({
                         Weekly
                       </span>
                     ) : null}
-                  </p>
-                </div>
+                  </span>
+                  <span className="teacher-student__history-link">Lesson history <ChevronRight size={14} aria-hidden="true" /></span>
+                </span>
+                </button>
                 <div className="teacher-student__action">
                   <button className="teacher-student__button" onClick={() => onAddLesson(student)} type="button">
                     <CalendarPlus size={15} aria-hidden="true" />
@@ -165,6 +169,7 @@ export function StudentList({
           })}
         </ul>
       </div>
+      {selected ? <StudentHistory key={`${token}:${selected.id}`} student={selected} token={token} onClose={() => setSelected(null)} /> : null}
     </section>
   );
 }

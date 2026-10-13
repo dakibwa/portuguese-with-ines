@@ -4,7 +4,6 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "re
 import { CheckCircle2, Globe, Plus, UserRound, X } from "lucide-react";
 import { createBookingFor, type AdminStudent } from "@/lib/admin-api";
 import { portoTimeToUtc } from "@/lib/booking-api";
-import { SITE_BASE_PATH } from "@/lib/paths";
 import { dateLabel, minuteLabel } from "@/lib/teacher-calendar";
 import { restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
@@ -319,9 +318,6 @@ export function ManualLessonForm({
     <details className="teacher-manual" ref={detailsRef}>
       <summary>
         <span>
-          <span className="teacher-eyebrow">
-            For a booking arranged elsewhere
-          </span>
           <span className="teacher-manual-title">
             Add a lesson for a student
           </span>
@@ -329,12 +325,7 @@ export function ManualLessonForm({
         <Plus size={22} aria-hidden="true" />
       </summary>
       <div className="teacher-manual-body">
-        <p>
-          Students can book through{" "}
-          <a href={`${SITE_BASE_PATH}/book/?view=book`}>the booking page</a>.
-          Use this if you&rsquo;ve already arranged a lesson another way. You
-          can also choose a free time on your week.
-        </p>
+        <ul className="teacher-help"><li>For a lesson arranged directly.</li></ul>
         <LessonForm
           key={student?.key ?? 0}
           idPrefix="teacher-manual"

@@ -41,6 +41,7 @@ export type AvailabilityException = {
 };
 export type AdminBooking = {
   id: string;
+  student_id?: string | null;
   reference: string;
   /** The lesson type, so a trial can keep its name where others show their length. */
   lesson_type_id?: string;
@@ -58,6 +59,8 @@ export type AdminBooking = {
   location: "online" | "porto";
   meeting_url?: string | null;
   notes: string;
+  cancelled_by?: string | null;
+  cancellation_message?: string | null;
   same_day_change: number;
   same_day_fee_status:
     | "not_required"
