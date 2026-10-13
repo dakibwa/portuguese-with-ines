@@ -1177,7 +1177,8 @@ as a form:
   hand`, or a check and `All set: signed in, card saved`), the next
   lesson with a `Weekly` pill, and beneath a rule `Add lesson` (her form
   opens with them in it, on the date) and, only for someone still to bring
-  in, a coral `Send sign-in link`. Those come first, their card edged in
+  in, a coral `Send welcome email` (one email for everyone: their lessons and the
+  way in). Those come first, their card edged in
   coral (12 October 2026, Dan: "can this be more beautiful"). Her form's
   email field suggests the students she already has, and choosing one fills
   in their name (`Already one of your students`): everything she does here

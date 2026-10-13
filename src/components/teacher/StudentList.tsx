@@ -67,21 +67,17 @@ export function StudentList({
   async function welcome(student: AdminStudent) {
     setSending(student.id);
     try {
-      const result = await sendStudentWelcome(token, student.id);
+      await sendStudentWelcome(token, student.id);
       setSent((current) => ({
         ...current,
-        [student.id]: {
-          ok: true,
-          message: student.awaitingWelcome
-            ? "Welcome sent, with their lessons"
-            : result.card ? "Sent: a link to sign in and add a card" : "Sent: a link to sign in",
-        },
+        // One email for everyone: their lessons and the way in (13 October 2026, Dan).
+        [student.id]: { ok: true, message: "Welcome sent" },
       }));
       if (student.awaitingWelcome) onStudentsChanged();
     } catch (caught) {
       setSent((current) => ({
         ...current,
-        [student.id]: { ok: false, message: caught instanceof Error ? caught.message : "The link couldn’t be sent." },
+        [student.id]: { ok: false, message: caught instanceof Error ? caught.message : "The welcome couldn’t be sent." },
       }));
     } finally {
       setSending("");
@@ -170,7 +166,7 @@ export function StudentList({
                       type="button"
                     >
                       <Send size={15} aria-hidden="true" />
-                      {sending === student.id ? "Sending…" : student.awaitingWelcome ? "Send welcome email" : "Send sign-in link"}
+                      {sending === student.id ? "Sending…" : "Send welcome email"}
                       <span className="visually-hidden"> to {student.name}</span>
                     </button>
                   ) : null}

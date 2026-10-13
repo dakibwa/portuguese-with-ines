@@ -761,8 +761,8 @@ try {
   await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet");
   await expect(students.locator(".teacher-student").first()).toContainText("Not signed in yet · 1 lesson paid by hand");
   await expect(students.locator(".teacher-student").nth(1)).toContainText("All set: signed in, card saved");
-  await expect(students.getByRole("button", { name: "Send sign-in link to Alex" })).toHaveCount(0);
-  await students.getByRole("button", { name: "Send sign-in link to Sam Known" }).click();
+  await expect(students.getByRole("button", { name: "Send welcome email to Alex" })).toHaveCount(0);
+  await students.getByRole("button", { name: "Send welcome email to Sam Known" }).click();
   // Onboarding: set a student up with their details, nothing emailed, then
   // their welcome from their card.
   await students.getByRole("button", { name: "Add a student", exact: true }).click();
@@ -779,8 +779,8 @@ try {
   const ana = students.locator(".teacher-student").filter({ hasText: "Ana Costa" });
   await expect(ana).toContainText("Set up, not emailed yet");
   await ana.getByRole("button", { name: "Send welcome email to Ana Costa" }).click();
-  await expect(ana).toContainText("Welcome sent, with their lessons");
-  await expect(students.locator(".teacher-student").filter({ hasText: "Sam Known" })).toContainText("Sent: a link to sign in and add a card");
+  await expect(ana).toContainText("Welcome sent");
+  await expect(students.locator(".teacher-student").filter({ hasText: "Sam Known" })).toContainText("Welcome sent");
   await students.getByRole("button", { name: "Add lesson for Alex" }).click();
   await expect(manual).toHaveAttribute("open", "");
   await expect(manual.getByLabel("Student’s email")).toHaveValue("alex@example.invalid");

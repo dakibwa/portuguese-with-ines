@@ -121,7 +121,7 @@ never put on a card.
 card and the standing agreement, their next lesson, how many lessons to come are
 still paid by hand, and any weekly slot. `Students` on `/schedule` puts
 those who still need to sign in or add a card first, each with
-`Send sign-in link` (`POST /admin/students/:id/welcome`, three an hour per
+`Send welcome email` (`POST /admin/students/:id/welcome`, three an hour per
 student). Accounts the opt-in live check registers
 (`launch-check-…@example.invalid`, from `scripts/qa-recurring-rates.mjs`) are
 left out of the list; the four made on 5 September 2026 were deleted from
