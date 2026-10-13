@@ -2753,7 +2753,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         </p>
         <h2 id="lesson-manage-heading">Manage this lesson</h2>
         <div className="lesson-manage-dialog__lesson">
-          <strong>{formatLongDate(preview.startAt, zoneOf(preview))}, {lessonTime(preview.startAt, zoneOf(preview))}</strong>
+          <strong className="lesson-when"><span>{formatLongDate(preview.startAt, zoneOf(preview))}</span><span className="visually-hidden">, </span><span className="lesson-when__time">{lessonTime(preview.startAt, zoneOf(preview))}</span></strong>
           <span>{formatBookedLessonLabel(preview.lessonType)} · {preview.location === "porto" ? "In Porto" : "Online"}</span>
           <MeetingLink meetingUrl={preview.meetingUrl} location={preview.location} status={preview.status} />
         </div>
@@ -3374,7 +3374,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   ) : null}
 
                   <div className="lesson-manage-dialog__lesson">
-                    <strong>{formatLongDate(managed.booking.startAt, zoneOf(managed.booking))}, {lessonTime(managed.booking.startAt, zoneOf(managed.booking))}</strong>
+                    <strong className="lesson-when"><span>{formatLongDate(managed.booking.startAt, zoneOf(managed.booking))}</span><span className="visually-hidden">, </span><span className="lesson-when__time">{lessonTime(managed.booking.startAt, zoneOf(managed.booking))}</span></strong>
                     <span>{formatBookedLessonLabel(managed.booking.lessonType)} · {managed.booking.location === "porto" ? "In Porto" : "Online"}</span>
                     <MeetingLink meetingUrl={managed.booking.meetingUrl} location={managed.booking.location} status={managed.booking.status} />
                   </div>

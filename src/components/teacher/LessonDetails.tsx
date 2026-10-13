@@ -173,9 +173,12 @@ export function LessonDetails({
         <h2 id="teacher-lesson-title">{booking.student_name}</h2>
       </div>
       <div className="teacher-lesson-when">
-        <strong>
-          {dateLabel(dateKey(new Date(booking.starts_at)), { weekday: "long", day: "numeric", month: "long" })},{" "}
-          {formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}
+        {/* The date, then the time on a line of its own, rather than the
+            time breaking across two (13 October 2026, Dan). */}
+        <strong className="lesson-when">
+          <span>{dateLabel(dateKey(new Date(booking.starts_at)), { weekday: "long", day: "numeric", month: "long" })}</span>
+          <span className="visually-hidden">, </span>
+          <span className="lesson-when__time">{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
         </strong>
         <span>
           {formatBookedLessonLabel({

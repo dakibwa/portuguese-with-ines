@@ -102,7 +102,11 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
         <h2 id="teacher-student-dialog-title">{title}</h2>
       )}
       {slot ? (
-        <p className="teacher-student-dialog__when">{dateLabel(slot.date, { weekday: "long", day: "numeric", month: "long" })}, {slot.time}</p>
+        <p className="teacher-student-dialog__when lesson-when">
+          <span>{dateLabel(slot.date, { weekday: "long", day: "numeric", month: "long" })}</span>
+          <span className="visually-hidden">, </span>
+          <span className="lesson-when__time">{slot.time}</span>
+        </p>
       ) : null}
 
       {step === "pick" ? (

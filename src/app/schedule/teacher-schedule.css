@@ -969,7 +969,7 @@
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-panel);
   padding: clamp(1.25rem, 4vw, 1.7rem);
-  background: var(--paper-light);
+  background: var(--dialog-surface);
   color: var(--ink);
   box-shadow: 0 24px 65px rgba(26, 49, 105, 0.26);
   overflow-y: auto;
@@ -980,17 +980,6 @@
 }
 .teacher-lesson-dialog[open] {
   isolation: isolate;
-}
-/* The student dialog's own warm corner. */
-.teacher-lesson-dialog::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(circle at 94% 4%, rgba(239, 93, 60, 0.14), transparent 28%),
-    linear-gradient(145deg, rgba(170, 164, 230, 0.08), transparent 58%);
-  content: "";
-  pointer-events: none;
 }
 .teacher-lesson-dialog::backdrop {
   background: rgba(15, 35, 70, 0.5);
@@ -2178,7 +2167,7 @@
 .teacher-history-dialog h3 { margin: 0.8rem 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
 .teacher-history-dialog h3 span { color: var(--lavender-ink); font-weight: 500; }
 .teacher-history-list { display: grid; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
-.teacher-history-lesson { padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--sheet); }
+.teacher-history-lesson { padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
 .teacher-history-lesson.is-cancelled { background: var(--lavender-pale, #f1eef7); }
 .teacher-history-lesson__top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.45rem; font-size: 0.8rem; }
 .teacher-history-status { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); padding: 0.2rem 0.5rem; font: 600 0.65rem/1.4 var(--ui); }
@@ -2404,7 +2393,7 @@
   border: 1px solid var(--rule-soft);
   border-radius: var(--squiggle-field);
   padding: 0.85rem;
-  background: var(--sheet);
+  background: var(--raised);
 }
 .teacher-history-dialog .teacher-price h3 {
   margin: 0;

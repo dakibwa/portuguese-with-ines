@@ -112,6 +112,14 @@ html {
 }
 
 body {
+  /*
+   * Every dialog is a booking card lifted off the page: the same sheet over
+   * the same paper, with no gradient of its own (13 October 2026, Dan: "make
+   * it consistent with the original site"). What sits in it to be pressed or
+   * typed in is raised in cream, as it is on the page. Set here because the
+   * paper's grain is given to body.
+   */
+  --dialog-surface: linear-gradient(var(--sheet), var(--sheet)), var(--paper-texture), var(--paper);
   margin: 0;
   min-width: 320px;
   background-color: var(--paper);
@@ -4116,14 +4124,7 @@ textarea,
   border: 1px solid rgba(170, 164, 230, 0.9);
   border-radius: var(--squiggle-panel);
   padding: clamp(0.65rem, 2vw, 1rem);
-  /* The dialogs' one surface: light paper, a warm corner and the faint lilac
-     wash, as the lesson dialog and Terms have (13 October 2026, Dan noticed
-     this one read warmer than the rest). */
-  background-color: var(--paper-light);
-  background-image:
-    radial-gradient(circle at 94% 4%, rgba(239, 93, 60, 0.12), transparent 28%),
-    linear-gradient(145deg, rgba(170, 164, 230, 0.08), transparent 58%),
-    var(--paper-texture);
+  background: var(--dialog-surface);
   box-shadow: 0 28px 80px rgba(17, 31, 72, 0.38);
   outline: 0;
   transform: translate(-50%, -50%);
@@ -4176,7 +4177,7 @@ textarea,
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-panel);
   padding: clamp(1.25rem, 4vw, 1.7rem);
-  background: var(--paper-light);
+  background: var(--dialog-surface);
   box-shadow: 0 24px 65px rgba(26, 49, 105, 0.26);
   outline: 0;
   gap: 0.75rem;
@@ -4189,15 +4190,6 @@ textarea,
   animation: lesson-manage-content-in 160ms var(--motion-ease) both;
 }
 
-.lesson-manage-dialog::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(circle at 94% 4%, rgba(239, 93, 60, 0.14), transparent 28%),
-    linear-gradient(145deg, rgba(170, 164, 230, 0.08), transparent 58%);
-  content: "";
-}
 
 .lesson-manage-dialog__close {
   position: absolute;
@@ -4261,6 +4253,15 @@ textarea,
   font-family: var(--ui);
   font-size: 0.9rem;
   line-height: 1.35;
+}
+
+/* A lesson's date, then its time on a line of its own (13 October 2026, Dan:
+   "move the time onto the next line so it's easier to read"). The comma
+   between them is kept for screen readers. */
+strong.lesson-when > span,
+p.lesson-when > span {
+  display: block;
+  font: inherit;
 }
 
 .lesson-manage-dialog__lesson span,
@@ -4994,13 +4995,6 @@ textarea,
 
 .slot-grid button:hover {
   transform: translateY(-1px);
-}
-
-/* In a dialog the times sit on the dialog's own cream, so each is drawn on
-   the sheet with a rule, to read as something to press. */
-dialog .slot-grid button:not(.is-selected) {
-  border-color: var(--rule);
-  background: var(--sheet);
 }
 
 .slot-grid button:hover,
@@ -7562,8 +7556,8 @@ dialog[open]::backdrop {
   color: var(--ink);
 }
 
-/* One family with the lesson dialog: the same hand-cut panel, the same light
-   paper with its warm corner, over the same lightly dimmed page. */
+/* One family with the lesson dialog: the same hand-cut panel on the same
+   card surface, over the same lightly dimmed page. */
 .policy-dialog {
   width: min(760px, calc(100% - 2rem));
   max-width: none;
@@ -7572,11 +7566,7 @@ dialog[open]::backdrop {
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-panel);
   padding: 0;
-  background-color: var(--paper-light);
-  background-image:
-    radial-gradient(circle at 94% 4%, rgba(239, 93, 60, 0.12), transparent 28%),
-    linear-gradient(145deg, rgba(170, 164, 230, 0.08), transparent 58%),
-    var(--paper-texture);
+  background: var(--dialog-surface);
   box-shadow: 0 24px 65px rgba(26, 49, 105, 0.26);
   color: var(--ink);
   overflow: hidden;

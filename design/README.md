@@ -1029,8 +1029,12 @@ calmer, without new content:
   phone; and just past the stacked layout the chosen day's times take close
   to half the row, so a quarter-hour timetable never squeezes;
 - `Terms & privacy` and a day's list of lessons are one family with the lesson
-  dialog: the same hand-cut panel on light paper with its warm corner, over the
-  same lightly dimmed page. The day's list needs no ruled header, and each of
+  dialog: the same hand-cut panel, over the same lightly dimmed page. Every
+  dialog, Inês's included, is a booking card lifted off the page: the same
+  lilac sheet over paper, with no gradient or warm corner of its own (13
+  October 2026, Dan: "make it consistent with the original site"), and what
+  sits in it to press or type in (times, fields, lesson cards) is raised in
+  cream, as on the page. The day's list needs no ruled header, and each of
   its rows wears the lesson's own mark, as on the calendar. Terms keeps the
   rule under its title, where a long text scrolls beneath it;
 - a lesson that repeats is `weekly` wherever a student reads about it, never
