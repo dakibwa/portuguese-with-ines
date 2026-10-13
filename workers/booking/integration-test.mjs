@@ -2319,7 +2319,7 @@ await test("she can set a student up from a name alone and give their email late
     const created = await add({ name: "Bea", nif: "123456789", prices: { 60: 2000 } });
     assert.equal(created.status, 201, await created.clone().text());
     const { student } = await created.json();
-    assert.deepEqual([student.email, student.awaitingWelcome, student.prices], ["", true, { 60: 2000 }]);
+    assert.deepEqual([student.email, student.awaitingWelcome, student.ownPrices, student.prices], ["", true, { 60: 2000 }, { 60: 2000, 90: 3000 }]);
     assert.equal((await add({ name: "Bea's sister" })).status, 201, "any number of them can wait for an email");
     assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 400, "no welcome without an email");
 
@@ -2341,11 +2341,16 @@ await test("she can set a student up from a name alone and give their email late
     assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 200);
     await drain();
     assert.equal(to("bea@example.invalid").length, 1);
+    // Corrected again before they use it, the welcome sent to the old address no longer opens their account.
+    const links = () => db.prepare("SELECT COUNT(*) AS n FROM sign_in_links WHERE student_id=?").get(student.id).n;
+    assert.ok(links() > 0);
+    assert.equal((await details({ name: "Bea Lopes", email: "beatriz@example.invalid", nif: "123456789" })).status, 200);
+    assert.equal(links(), 0, "links sent to the old address are revoked");
 
     // Once they have signed in, the address is theirs to change.
     db.prepare("UPDATE students SET last_login_at=? WHERE id=?").run(new Date().toISOString(), student.id);
     assert.equal((await details({ name: "Bea Lopes", email: "other@example.invalid" })).status, 409);
-    assert.equal((await details({ name: "Bea Lopes", email: "bea@example.invalid", nif: "" })).status, 200, "her other details stay hers to correct");
+    assert.equal((await details({ name: "Bea Lopes", email: "beatriz@example.invalid", nif: "" })).status, 200, "her other details stay hers to correct");
   } finally {
     releaseEmail();
     forgetStudent("bea@example.invalid");

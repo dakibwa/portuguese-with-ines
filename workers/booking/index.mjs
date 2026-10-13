@@ -5074,14 +5074,30 @@ async function handleAdmin(request, env, ctx, url, path) {
     }
     if (moving && !email) return fail("Please give the student's email address.", 400, request, env);
     const stored = email || student.email;
+    // The address only moves while they have still never signed in, checked
+    // in the same write so a sign-in landing meanwhile keeps their address.
     const updated = await env.DB.prepare(
       `UPDATE students SET name = ?, email = ?, phone = ?, nif = ?, mark = ?,
-         email_verified_at = CASE WHEN email = ? THEN email_verified_at ELSE NULL END
-       WHERE id = ? AND NOT EXISTS (SELECT 1 FROM students other WHERE other.email = ? AND other.id != ?)`
-    ).bind(name, stored, details.phone, details.nif, details.mark, stored, student.id, stored, student.id).run();
-    if (!(updated?.meta?.changes > 0)) return fail("Someone with that email is already on the site.", 409, request, env);
-    // Lessons she already added for them follow them to the new address.
-    if (moving) await env.DB.prepare("UPDATE bookings SET student_email = ? WHERE student_id = ?").bind(email, student.id).run();
+         email_verified_at = CASE WHEN email = ? THEN email_verified_at ELSE NULL END,
+         session_version = session_version + CASE WHEN email = ? THEN 0 ELSE 1 END
+       WHERE id = ? AND NOT EXISTS (SELECT 1 FROM students other WHERE other.email = ? AND other.id != ?)
+         AND (? = 0 OR (password_hash = '' AND google_sub IS NULL AND last_login_at IS NULL))`
+    ).bind(name, stored, details.phone, details.nif, details.mark, stored, stored, student.id, stored, student.id, moving ? 1 : 0).run();
+    if (!(updated?.meta?.changes > 0)) {
+      const now = await env.DB.prepare("SELECT password_hash, google_sub, last_login_at FROM students WHERE id = ?").bind(student.id).first();
+      return now && (now.password_hash || now.google_sub || now.last_login_at)
+        ? fail("They sign in with that email, so they can change it from their account.", 409, request, env)
+        : fail("Someone with that email is already on the site.", 409, request, env);
+    }
+    if (moving) {
+      // A welcome or sign-in link sent to the old address, a mistyped one
+      // perhaps, must not open their account now; and lessons she already
+      // added follow them to the new address.
+      await env.DB.batch([
+        ...forgetPendingAccess(env, student.id),
+        env.DB.prepare("UPDATE bookings SET student_email = ? WHERE student_id = ?").bind(email, student.id)
+      ]);
+    }
     const list = await teacherStudentList(env);
     return json({ student: list.find((entry) => entry.id === student.id) }, 200, request, env);
   }
