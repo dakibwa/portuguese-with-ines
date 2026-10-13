@@ -118,49 +118,11 @@ jobs:
       - name: Run release check
         run: npm run check:release
 
-      # The journey test only ever ran locally, so its selectors rotted through
-      # several commits while CI stayed green — the booking page had been
-      # renamed and nothing noticed. It runs against the built export here, so
-      # a broken customer journey blocks the release rather than shipping.
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Check Akibwa portfolio entry
         run: npm run test:portfolio-banner
-
-      - name: Check customer journeys against the built site
-        run: |
-          # localhost, not 127.0.0.1: the browser sends the host it was given as
-          # the Origin, and the Worker's allow-list carries localhost:3000. Using
-          # the raw IP meant every API call was refused by CORS, so the booking
-          # page rendered with no lesson types.
-          python3 -m http.server 3000 --bind 127.0.0.1 --directory out &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID' EXIT
-          for _ in $(seq 1 20); do
-            curl -sf http://localhost:3000/ > /dev/null && break
-            sleep 1
-          done
-          QA_BASE_URL=http://localhost:3000 npm run test:flow
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-workspace-navigation.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-booking-selection.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-payment-recovery.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-teacher-calendar.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-transition-kit.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-meet-links.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-teacher-meet.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-student-nif.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-profile-rates.mjs
-          QA_BASE_URL=http://localhost:3000 npm run test:request-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:auth-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:html-fallbacks
-          QA_BASE_URL=http://localhost:3000 npm run test:state-continuity
-          QA_BASE_URL=http://localhost:3000 npm run test:account-booking-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:management-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:selection-calendar-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:release-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:teacher-boundaries
-          QA_BASE_URL=http://localhost:3000 npm run test:dialog-interactions
 
       # The plain directory the Cloudflare deploy needs. Hidden files are kept
       # because the export carries dotfiles the deploy would otherwise lose;
@@ -174,10 +136,77 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
+  # The customer journeys, against the built export the release will publish.
+  # They only ever ran locally once, and their selectors rotted through several
+  # commits while CI stayed green, so a broken journey blocks the release.
+  #
+  # Run one after another they took about 15 minutes. Since 13 October 2026
+  # (Dan: "they don't need these long winded 20 mins test") they are split
+  # across four runners started together, balanced by how long each takes, so
+  # the release waits about five minutes. Every check still runs.
+  journeys:
+    name: Customer journeys (${{ matrix.group }})
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - group: booking calendar
+            checks: qa-selection-calendar-recovery qa-flow qa-payment-recovery
+          - group: accounts
+            checks: qa-state-continuity qa-teacher-boundaries qa-auth-recovery
+          - group: recovery
+            checks: qa-request-recovery qa-management-recovery qa-account-booking-recovery qa-workspace-navigation
+          - group: teacher and the rest
+            checks: qa-release-recovery qa-teacher-calendar qa-dialog-interactions qa-student-nif qa-booking-selection qa-meet-links qa-transition-kit qa-profile-rates qa-html-fallbacks qa-teacher-meet
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: out
+
+      - name: Check customer journeys against the built site
+        env:
+          CHECKS: ${{ matrix.checks }}
+        run: |
+          # localhost, not 127.0.0.1: the browser sends the host it was given as
+          # the Origin, and the Worker's allow-list carries localhost:3000. Using
+          # the raw IP meant every API call was refused by CORS, so the booking
+          # page rendered with no lesson types.
+          python3 -m http.server 3000 --bind 127.0.0.1 --directory out &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID' EXIT
+          for _ in $(seq 1 20); do
+            curl -sf http://localhost:3000/ > /dev/null && break
+            sleep 1
+          done
+          for check in $CHECKS; do
+            echo "::group::$check"
+            QA_BASE_URL=http://localhost:3000 node "scripts/$check.mjs"
+            echo "::endgroup::"
+          done
+
   publish-cloudflare:
     name: Publish to Cloudflare Pages (live)
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, journeys]
     steps:
       - name: Check Cloudflare credentials are configured
         env:
