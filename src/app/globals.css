@@ -3529,6 +3529,13 @@ textarea,
   display: none;
 }
 
+/* With nothing booked the lessons card's key is empty, but it keeps its one
+   line, so the splat in the corner sits level with it, not on the last Sunday. */
+.calendar-panel:has(> .account-signature) > .unified-calendar__legend:empty {
+  display: flex;
+  min-height: 1lh;
+}
+
 /* "Checking what's free" and "No free times" sit under the key at one gap. */
 .unified-calendar__legend ~ .booking-state-note {
   margin: 0.9rem 0 0;
@@ -4412,6 +4419,20 @@ p.lesson-when > span {
   font-size: 0.68rem;
 }
 
+/* On a 320px phone the longest labels, "Cancel all booked lessons" and
+   "Manage weekly lessons", broke onto a second line. The weekly choices give
+   up some side padding (each has the row to itself there), and the weekly
+   time's button starts under the repeat mark rather than beside it. */
+@media (max-width: 360px) {
+  .lesson-manage-dialog__actions--sequence .button {
+    padding-inline: 0.5rem;
+  }
+
+  .lesson-manage-dialog__series .button {
+    grid-column: 1 / -1;
+  }
+}
+
 .lesson-manage-dialog__decision {
   display: grid;
   gap: 0.8rem;
@@ -4475,8 +4496,10 @@ p.lesson-when > span {
 .managed-lesson__head {
   grid-area: head;
   min-width: 0;
-  /* Level with the calendar's own content, and clear of the close button. */
-  padding: 0.2rem 3.75rem 0 var(--pad-card);
+  /* Level with the calendar's own content, and clear of the close button.
+     Its top takes the card's inset too, so the title starts as far down as
+     every dialog's first line does. */
+  padding: var(--pad-card) 3.75rem 0 var(--pad-card);
 }
 
 /* Beneath the head the calendar and the form start together, close under it. */
@@ -4589,7 +4612,9 @@ p.lesson-when > span {
   font-family: var(--ui);
   font-size: 0.64rem;
   letter-spacing: 0.05em;
-  opacity: 0.56;
+  /* Quiet by its size, at the meta line's strength: it is what a student
+     quotes to Inês, so it has to clear AA. */
+  opacity: 0.76;
 }
 
 .upcoming-lesson-group__summary {
@@ -4958,6 +4983,9 @@ p.lesson-when > span {
   min-height: 62px;
   place-items: center;
   border: 0;
+  /* No browser padding: on a narrow phone it pushed a booked day's number
+     and time off its tile. */
+  padding: 0;
   border-radius: var(--squiggle-chip);
   background: transparent;
   color: inherit;
@@ -5036,8 +5064,23 @@ p.lesson-when > span {
     line-height: 0.7;
   }
 
+  /* The tiles close up a little, so a booked time fits inside its own. */
+  .calendar-weekdays,
+  .calendar-week {
+    gap: 4px;
+  }
+
   .calendar-weekdays span {
     letter-spacing: 0;
+  }
+
+  /* The month stays on one line beside its arrows, its question mark with it. */
+  .unified-calendar__toolbar {
+    gap: 0.5rem;
+  }
+
+  .unified-calendar__month {
+    font-size: 0.92rem;
   }
 }
 
@@ -6663,10 +6706,12 @@ button.text-action {
   white-space: nowrap;
 }
 
-/* Cancel beside Save speaks at Save's size, so the pair reads as one. */
+/* Cancel beside Save speaks at Save's size, so the pair reads as one. In
+   the booking column Save is a booking control, smaller than the site's
+   button, so Cancel takes the control's size too. */
 .my-lessons__edit-actions > .my-lessons__change {
-  font-size: 0.78rem;
-  letter-spacing: 0.19em;
+  font-size: var(--booking-control-font-size);
+  letter-spacing: var(--booking-control-tracking);
 }
 
 .my-lessons__edit > .my-lessons__details-note {
@@ -8769,12 +8814,21 @@ dialog[open]::backdrop {
   margin-bottom: 1rem;
 }
 
-.my-lessons__fact[data-field="card"] .card-terms {
+/* Open, the card's terms fill the value and action columns, as the splat
+   picker does, with Card level with their first line. On a phone they drop
+   below Card, full width. The wrapper is the row's child, so it is the one
+   placed, and the column decides, as for every other row: a viewport query
+   left Card written over the terms. */
+.my-lessons__fact[data-field="card"]:has(> .card-row-open) {
+  align-items: start;
+}
+
+.my-lessons__fact[data-field="card"] > .card-row-open {
   grid-column: 2 / -1;
 }
 
-@media (max-width: 640px) {
-  .my-lessons__fact[data-field="card"] .card-terms {
+@container booking (max-width: 519.98px) {
+  .my-lessons__fact[data-field="card"] > .card-row-open {
     grid-column: 1 / -1;
   }
 }
