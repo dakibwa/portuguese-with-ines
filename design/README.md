@@ -900,9 +900,9 @@ Preserve these desktop and mobile states:
   now pays for offers `Already paid you by hand? Take it off their card`. The sign-in panel's quiet links read `Email me a sign-in link` and
   `I’ve forgotten my password` side by side; asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.
-  Text fields are 44 px tall, the usual touch height. In the
-  change dialog, whose cream matches a track's, the sliders' tracks take a
-  lilac wash so they read as sliders. The splat
+  Text fields are 44 px tall, the usual touch height. The change dialog is
+  the same flat lilac as every dialog, so its sliders' tracks and free days
+  are raised cream there exactly as on the booking sheet. The splat
   opens as a row of the site's own marks, all but the FAQ's question, with the
   initial first; choosing one saves it, and it shows wherever the name's menu
   does. A small `Sign out` waits at the card's foot, on the right. `Done

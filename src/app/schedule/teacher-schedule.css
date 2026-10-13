@@ -2138,7 +2138,12 @@
 @media (max-width: 480px) {
   .teacher-tools-header { flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
   .teacher-tabs-scroll { flex: 1 1 100%; overflow: visible; }
-  .teacher-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  /* Seven tools in two rows: her week's three, then the rest with Meet's
+     logo in the small last place, so nothing sits alone on a third row. */
+  .teacher-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
+  .teacher-tabs button { grid-column: span 2; }
+  .teacher-tabs #teacher-tab-hours { grid-column: span 3; }
+  .teacher-tabs #teacher-tab-meet { grid-column: span 1; }
   .teacher-tabs .teacher-tabs__thumb { display: none; }
   .teacher-tabs button { min-height: 44px; padding-inline: 0.4rem; }
   /* Every tap on a phone is at least 44 px. */
@@ -2634,7 +2639,6 @@
   .teacher-expressions__intro > .button { width: 100%; }
   .teacher-expression__actions .button { width: auto; flex: 1 1 auto; }
   .teacher-expression__order { margin-left: 0; }
-  .teacher-tabs .teacher-tab--meet { grid-column: 1 / -1; }
 }
 .teacher-receipts .teacher-month-heading {
   margin: 0;

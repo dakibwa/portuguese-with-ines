@@ -34,6 +34,22 @@ for (const width of [390, 1440]) {
   await page.screenshot({ path: `tmp/qa/payment-recovery-${width}.png`, fullPage: true });
   assert.deepEqual(errors, []);
   await page.close();
+  // The emailed link is the key to its lesson: Change opens the times, never
+  // a sign-in, for a student who is not signed in on this device.
+  const signedOut = await browser.newPage({ viewport: { width, height: 1000 } });
+  await signedOut.route("**/bookings/manage-upcoming", (route) => route.fulfill({ json: {
+    booking: { reference: "UI-UPCOMING", status: "confirmed", startAt: "2099-09-10T16:00:00.000Z", endAt: "2099-09-10T17:00:00.000Z",
+      location: "online", studentName: "Isolated Test", studentEmail: "ui@example.invalid", studentTimezone: "Europe/Lisbon", notes: "", rescheduleCount: 0,
+      sameDayFeeCents: 500, paymentStatus: "scheduled", lessonType: { id: "single", name: "Single lesson", durationMinutes: 60, priceCents: 2500 } },
+    isPast: false, sameDayFeeApplies: false, changeLocked: false
+  } }));
+  await signedOut.route("**/lesson-types", (route) => route.fulfill({ json: { lessonTypes: [{ id: "single", name: "Single lesson", duration_minutes: 60, price_cents: 2500 }], postpay: true } }));
+  await signedOut.route("**/availability?**", (route) => route.fulfill({ json: { slotsByDate: {}, horizonDays: 56 } }));
+  await signedOut.goto(`${base}/book/?manage=manage-upcoming`, { waitUntil: "domcontentloaded" });
+  await signedOut.getByRole("button", { name: /^Change/ }).first().click();
+  await signedOut.getByRole("heading", { name: "Choose a new date and time" }).waitFor();
+  assert.equal(await signedOut.locator("#booking-lessons-sign-in").count(), 0, "A manage link must not ask for an account to change its lesson");
+  await signedOut.close();
   const diary = await browser.newPage({ viewport: { width, height: 1000 } });
   await diary.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-teacher-fixture"));
   await diary.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));

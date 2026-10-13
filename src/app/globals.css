@@ -2933,7 +2933,7 @@ textarea,
   align-items: center;
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-field);
-  padding: 0.7rem 0.9rem;
+  padding: 0.7rem var(--pad-card);
   background: var(--sheet);
   gap: 0.75rem;
 }
@@ -4175,7 +4175,9 @@ textarea,
   overscroll-behavior: contain;
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-panel);
-  padding: clamp(0.65rem, 2vw, 1rem);
+  /* Its calendar and form carry the cards' own inset inside, so together
+     they start where every dialog's content does. */
+  padding: calc(var(--pad-dialog) - var(--pad-card));
   background: var(--dialog-surface);
   box-shadow: 0 24px 65px rgba(26, 49, 105, 0.26);
   outline: 0;
@@ -4437,15 +4439,6 @@ p.lesson-when > span {
 
 .managed-lesson__duration .segmented {
   margin-bottom: 0;
-}
-
-/* The change dialog is the track's own cream, so there its tracks and free
-   days take a lilac wash and read as sliders and days to choose, as they do
-   on the booking sheet, rather than a blue tile beside loose words (10
-   October 2026, at Dan's request). */
-.unified-calendar--managed-overlay .segmented,
-.unified-calendar--managed-overlay .calendar-week button.has-availability:not(.is-selected):not(.has-booking) {
-  background: rgba(170, 164, 230, 0.2);
 }
 
 .managed-lesson__duration-note {
@@ -6481,7 +6474,7 @@ button.text-action {
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-field);
   padding: 0 0.85rem;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--raised);
   font: inherit;
 }
 
@@ -6668,6 +6661,12 @@ button.text-action {
   padding-right: 1.1rem;
   padding-left: 1.1rem;
   white-space: nowrap;
+}
+
+/* Cancel beside Save speaks at Save's size, so the pair reads as one. */
+.my-lessons__edit-actions > .my-lessons__change {
+  font-size: 0.78rem;
+  letter-spacing: 0.19em;
 }
 
 .my-lessons__edit > .my-lessons__details-note {
@@ -7590,14 +7589,16 @@ button.text-action {
   gap: 0.6rem;
 }
 
-.booking-alert__action {
-  margin-top: 0.65rem;
-}
-
-.booking-alert__actions .button,
-.booking-alert__action {
+.booking-alert__actions .button {
   width: auto;
   min-height: 44px;
+}
+
+/* On a phone they share the row between them rather than huddling left. */
+@media (max-width: 560px) {
+  .booking-alert__actions > .button {
+    flex: 1 1 auto;
+  }
 }
 
 /* An alert at the top of the booking steps keeps clear of the card below. */

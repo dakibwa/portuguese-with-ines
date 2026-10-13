@@ -1825,7 +1825,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     });
     refreshStudentInBackground();
   };
-  const needsLessonsSignIn = intent === "lessons" && !student && (
+  // A lesson opened from its emailed link carries its own key: changing it
+  // never asks for an account.
+  const needsLessonsSignIn = intent === "lessons" && !student && !managedToken && (
     showAccountSignIn || !checkingSession && !readSession()
   );
   // A signed-in student's first visit draws Your lessons straight away, its
