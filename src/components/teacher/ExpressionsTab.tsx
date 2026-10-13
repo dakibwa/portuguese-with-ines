@@ -89,7 +89,10 @@ export function ExpressionsTab({ token }: { token: string }) {
           <dd>Conjunto de palavras com um significado próprio, diferente do seu sentido literal.</dd>
         </dl>
         <button className="button button--coral" ref={addButton} type="button" disabled={!expressions || busy}
-          onClick={() => setDialog({ expression: null, preview: false })}><Plus size={17} aria-hidden="true" />Add an expression</button>
+          onClick={() => setDialog({ expression: null, preview: false })}>
+          <Plus size={17} aria-hidden="true" />
+          Add an expression
+        </button>
       </div>
       <ul className="booking-payment-facts teacher-expressions__help">
         <li>Your students can pick published expressions from Your lessons.</li>
