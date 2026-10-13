@@ -32,13 +32,18 @@ export type ExpressionPaintingHandle = {
 /**
  * The painted sheet of "Pinta e descobre". Decorative throughout: the section
  * names the expression in words. The painter draws into it imperatively, so
- * React renders it once and never per frame; a painting that fails to draw
- * leaves the cream sheet and the reading beside it.
+ * React renders it once and never per frame. If it cannot draw at all,
+ * `onUnavailable` lets the reading show the expression as its title instead.
  */
-export function ExpressionPainting({ start, ref }: { start: PaintingStart; ref?: Ref<ExpressionPaintingHandle> }) {
+export function ExpressionPainting({ start, onUnavailable, ref }: { start: PaintingStart; onUnavailable?: () => void; ref?: Ref<ExpressionPaintingHandle> }) {
   const root = useRef<HTMLDivElement>(null);
   const painter = useRef<Painter | null>(null);
   const initial = useRef(start);
+  const unavailable = useRef(onUnavailable);
+
+  useEffect(() => {
+    unavailable.current = onUnavailable;
+  });
 
   useEffect(() => {
     const element = root.current;
@@ -47,6 +52,7 @@ export function ExpressionPainting({ start, ref }: { start: PaintingStart; ref?:
     try {
       current = new Painter(element);
     } catch {
+      unavailable.current?.();
       return;
     }
     painter.current = current;
@@ -56,6 +62,10 @@ export function ExpressionPainting({ start, ref }: { start: PaintingStart; ref?:
       else current.rest(first.paint, first.wax);
     } catch {
       // The reading carries the expression without its painting.
+      current.destroy();
+      painter.current = null;
+      unavailable.current?.();
+      return;
     }
     // Unmounting mid-stroke cancels everything and lets anything awaited carry on.
     return () => {

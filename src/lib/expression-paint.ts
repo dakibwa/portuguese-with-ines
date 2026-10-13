@@ -23,6 +23,8 @@ export type Paint = {
   /** The near-miss: the thin wash it is brushed in, and the strike that crosses it out. */
   decoy: string;
   strike: string;
+  /** The strike's weight, as a share of the near-miss's band: a light paint strikes broader. */
+  strikeWeight: number;
 };
 
 const CREAM = "#FBF4E5";
@@ -30,12 +32,19 @@ const INK = "#1A3169";
 const LAVENDER_WASH = "#908ACC";
 
 export const PAINTS: Record<PaintKey, Paint> = {
-  deep: { paint: "#203E82", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#EF5D3C", decoy: LAVENDER_WASH, strike: "#203E82" },
-  blue: { paint: "#2C54AA", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#203E82", decoy: LAVENDER_WASH, strike: "#2C54AA" },
-  coral: { paint: "#B43A26", letters: CREAM, shade: "#000000", streaks: 1, companion: "#EF5D3C", accent: "#AAA4E6", decoy: LAVENDER_WASH, strike: "#B43A26" },
-  "lavender-ink": { paint: "#554F91", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#EF5D3C", decoy: "#E2735A", strike: "#554F91" },
-  lavender: { paint: "#AAA4E6", letters: INK, shade: "#554F91", streaks: 0.55, companion: "#554F91", accent: "#EF5D3C", decoy: "#4A66AE", strike: "#AAA4E6" },
+  deep: { paint: "#203E82", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#EF5D3C", decoy: LAVENDER_WASH, strike: "#203E82", strikeWeight: 0.17 },
+  blue: { paint: "#2C54AA", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#203E82", decoy: LAVENDER_WASH, strike: "#2C54AA", strikeWeight: 0.17 },
+  coral: { paint: "#B43A26", letters: CREAM, shade: "#000000", streaks: 1, companion: "#EF5D3C", accent: "#AAA4E6", decoy: LAVENDER_WASH, strike: "#B43A26", strikeWeight: 0.17 },
+  "lavender-ink": { paint: "#554F91", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#EF5D3C", decoy: "#E2735A", strike: "#554F91", strikeWeight: 0.19 },
+  // Light lavender strikes broadly across a deep blue wash, so the crossing-out reads as boldly as the others.
+  lavender: { paint: "#AAA4E6", letters: INK, shade: "#554F91", streaks: 0.55, companion: "#554F91", accent: "#EF5D3C", decoy: "#203E82", strike: "#AAA4E6", strikeWeight: 0.25 },
 };
+
+/**
+ * Paints too alike to follow one another: the two blues and the two
+ * lavenders differ, but the next painting would not read as a new colour.
+ */
+const FAMILY: Record<PaintKey, "blue" | "coral" | "lavender"> = { deep: "blue", blue: "blue", coral: "coral", "lavender-ink": "lavender", lavender: "lavender" };
 
 const STORE = "ines-expression-paint";
 /** Enough to remember every recent painting without the entry growing for ever. */
@@ -85,11 +94,16 @@ export function paintFor(id: string): PaintKey {
   return read().byId[id] ?? PAINT_KEYS[hash(id) % PAINT_KEYS.length];
 }
 
-/** The paint for the next painting: never the last one used on this device, nor any colour in `avoid`. */
+/**
+ * The paint for the next painting: never the last one used on this device,
+ * nor any colour in `avoid`, nor one of the same family as either.
+ */
 export function nextPaint(avoid: (PaintKey | null | undefined)[] = []): PaintKey {
-  const skip = new Set([read().last, ...avoid]);
-  const choices = PAINT_KEYS.filter((paint) => !skip.has(paint));
-  const from = choices.length ? choices : PAINT_KEYS.filter((paint) => paint !== read().last);
+  const last = read().last;
+  const skip = [last, ...avoid].filter((paint): paint is PaintKey => Boolean(paint));
+  const families = new Set(skip.map((paint) => FAMILY[paint]));
+  const choices = PAINT_KEYS.filter((paint) => !families.has(FAMILY[paint]));
+  const from = choices.length ? choices : PAINT_KEYS.filter((paint) => !skip.includes(paint));
   return from[Math.floor(Math.random() * from.length)];
 }
 

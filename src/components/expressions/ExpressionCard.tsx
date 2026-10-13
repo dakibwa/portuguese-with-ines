@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { ExpressionInput } from "@/lib/expressions";
 import { publicAssetPath } from "@/lib/paths";
 
@@ -72,13 +73,17 @@ export function ExpressionExamples({ item }: { item: ExpressionInput }) {
   );
 }
 
-/** Its themes, Inês's notes and source, and an optional picture. */
-export function ExpressionExtras({ item, image = false }: { item: ExpressionInput; image?: boolean }) {
+/**
+ * Its themes, Inês's notes and source, and an optional picture. A student's
+ * card ends with its themes and `action` in one row, the action at its end.
+ */
+export function ExpressionExtras({ item, image = false, action }: { item: ExpressionInput; image?: boolean; action?: ReactNode }) {
   const picture = image && item.imageUrl;
-  if (!item.tags.length && !item.notes && !item.sourceUrl && !picture) return null;
+  if (!action && !item.tags.length && !item.notes && !item.sourceUrl && !picture) return null;
+  const tags = item.tags.length ? <ul className="expression-card__tags" aria-label="Temas">{item.tags.map((tag) => <li key={tag}>{tag}</li>)}</ul> : null;
   return (
     <div className="expression-card__extras">
-      {item.tags.length ? <ul className="expression-card__tags" aria-label="Temas">{item.tags.map((tag) => <li key={tag}>{tag}</li>)}</ul> : null}
+      {action ? null : tags}
       {item.notes || item.sourceUrl ? (
         <details className="expression-card__notes">
           <summary>Notas e origem</summary>
@@ -87,6 +92,7 @@ export function ExpressionExtras({ item, image = false }: { item: ExpressionInpu
         </details>
       ) : null}
       {picture ? <ExpressionImage item={item} /> : null}
+      {action ? <div className="expression-card__foot">{tags}{action}</div> : null}
     </div>
   );
 }

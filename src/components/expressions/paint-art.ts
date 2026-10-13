@@ -349,9 +349,11 @@ export type PhraseLine = { text: string; w: number; asc: number; desc: number };
 
 /**
  * Lays the phrase out once, when it is known: the largest type that fits in
- * few enough lines, balanced so the strokes are of a similar length. Each
- * line carries how far its letters reach above and below the baseline, so
- * the paint can be sized round them.
+ * few enough lines, balanced so the strokes are of a similar length. A short
+ * phrase stays on one line if a slightly smaller size holds it. Each line
+ * carries how far its letters reach above and below the baseline, so the
+ * paint can be sized round them. Nothing is ever cut: a phrase too long for
+ * every size takes as many lines as it needs (the sheet grows to hold them).
  */
 export function layoutPhrase(text: string, m: PhraseMetrics, family: string): { fs: number; lines: PhraseLine[] } {
   const probe = document.createElement("canvas").getContext("2d");
@@ -362,32 +364,37 @@ export function layoutPhrase(text: string, m: PhraseMetrics, family: string): { 
     const metrics = probe.measureText(line);
     return { text: line, w: metrics.width, asc: metrics.actualBoundingBoxAscent || size, desc: metrics.actualBoundingBoxDescent || 0 };
   };
-  for (const [fs, maxLines] of m.sizes) {
-    const available = m.room(fs);
-    probe.font = `${fs}px ${family}`;
-    const space = probe.measureText(" ").width;
-    const widths = words.map((word) => probe.measureText(word).width);
-    if (Math.max(...widths) > available) continue;
+  const width = (size: number, value: string) => {
+    probe.font = `${size}px ${family}`;
+    return probe.measureText(value).width;
+  };
+  const result = (size: number, lines: string[]) => ({ fs: size, lines: lines.map((line) => measured(size, line)) });
+  // Balanced lines of `pieces` at `size`, each within the room; null if more than `maxLines`.
+  const wrap = (size: number, pieces: string[], maxLines = Infinity) => {
+    const available = m.room(size);
+    const space = width(size, " ");
+    const widths = pieces.map((piece) => width(size, piece));
+    if (Math.max(...widths) > available) return null;
     const greedy = (limit: number) => {
       const lines: number[][] = [];
       let current: number[] = [];
-      let width = 0;
-      widths.forEach((wordWidth, index) => {
-        const add = current.length ? space + wordWidth : wordWidth;
-        if (current.length && width + add > limit) {
+      let used = 0;
+      widths.forEach((pieceWidth, index) => {
+        const add = current.length ? space + pieceWidth : pieceWidth;
+        if (current.length && used + add > limit) {
           lines.push(current);
           current = [index];
-          width = wordWidth;
+          used = pieceWidth;
         } else {
           current.push(index);
-          width += add;
+          used += add;
         }
       });
       if (current.length) lines.push(current);
       return lines;
     };
     let lines = greedy(available);
-    if (lines.length > maxLines) continue;
+    if (lines.length > maxLines) return null;
     if (lines.length > 1) {
       let low = available / lines.length;
       let high = available;
@@ -398,24 +405,40 @@ export function layoutPhrase(text: string, m: PhraseMetrics, family: string): { 
       }
       lines = greedy(high);
     }
-    let size = fs;
+    return lines.map((indices) => indices.map((index) => pieces[index]).join(" "));
+  };
+  const whole = words.join(" ");
+  for (const [fs, maxLines] of m.sizes) {
+    const lines = wrap(fs, words, maxLines);
+    if (!lines) continue;
     if (lines.length === 1) {
       // A short phrase grows a little, as long as it still fits at the larger size.
-      const total = widths.reduce((sum, width) => sum + width + space, -space);
-      size = fs;
-      for (let next = fs * 1.14; next > fs; next -= fs * 0.02) {
-        if (total * (next / fs) <= m.room(next)) {
-          size = next;
-          break;
-        }
-      }
+      for (let next = fs * 1.14; next > fs; next -= fs * 0.02) if (width(next, whole) <= m.room(next)) return result(next, lines);
+      return result(fs, lines);
     }
-    return { fs: size, lines: lines.map((indices) => measured(size, indices.map((index) => words[index]).join(" "))) };
+    // A phrase of a few words keeps to one line if up to 15% smaller type holds it.
+    if (lines.length === 2 && words.length <= 3) {
+      for (let next = fs * 0.98; next >= fs * 0.85; next -= fs * 0.02) if (width(next, whole) <= m.room(next)) return result(next, [whole]);
+    }
+    return result(fs, lines);
   }
-  // A single word too long for any size: the smallest type, one line, cut to fit.
-  const fs = m.sizes[m.sizes.length - 1][0] * 0.9;
-  const line = measured(fs, text);
-  return { fs, lines: [{ ...line, w: Math.min(m.room(fs), line.w) }] };
+  // Longer than every size allows in few lines: the smallest type, in as many
+  // lines as it takes. Smaller only for a word too wide for a line, and a word
+  // too wide even then is broken between its letters.
+  const floor = m.sizes[m.sizes.length - 1][0];
+  let fs = floor;
+  while (fs > floor * 0.7 && Math.max(...words.map((word) => width(fs, word))) > m.room(fs)) fs -= 1;
+  const room = m.room(fs);
+  const pieces = words.flatMap((word) => {
+    if (width(fs, word) <= room) return [word];
+    const parts = [""];
+    for (const character of word) {
+      if (parts[parts.length - 1] && width(fs, parts[parts.length - 1] + character) > room) parts.push("");
+      parts[parts.length - 1] += character;
+    }
+    return parts;
+  });
+  return result(fs, wrap(fs, pieces) ?? pieces);
 }
 
 /** The phrases that fit the sheet, up to three, each at the largest size that fits. */
