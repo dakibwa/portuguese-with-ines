@@ -5,8 +5,10 @@ expression with gouache strokes that are drawn in code for now, in
 `src/components/expressions/paint-art.ts`. Each stand-in below can be replaced
 by a painting without changing how the reveal works: the code already paints
 every piece once and then only moves, wipes and fades it. The lettering stays
-live type (Beth Ellen, in the paper's cream), because it must be the real
-phrase.
+live type (Beth Ellen, in the paper's cream or, on lavender, in ink), because
+it must be the real phrase. The code sizes each stroke round the phrase's own
+letters and keeps the stretch under them solid, so a painted stroke must be
+solid across its body: streaks of bare paper belong only in its dry-brush end.
 
 ## For every painting
 
@@ -16,15 +18,18 @@ phrase.
   sizes below are in image pixels, twice the size each piece appears on the page.
 - One set per paint, in these exact colours (the body colour, before texture):
 
-  | Name | Colour | Cream lettering contrast |
-  | --- | --- | --- |
-  | `deep` | `#203E82` | 9.3:1 |
-  | `blue` | `#2C54AA` | 6.5:1 |
-  | `coral` | `#B43A26` | 5.4:1 |
-  | `lavender` | `#554F91` | 6.6:1 |
+  | Name | Colour | Lettering | Contrast |
+  | --- | --- | --- | --- |
+  | `deep` | `#203E82` | cream `#FBF4E5` | 9.3:1 |
+  | `blue` | `#2C54AA` | cream `#FBF4E5` | 6.5:1 |
+  | `coral` | `#B43A26` | cream `#FBF4E5` | 5.4:1 |
+  | `lavender-ink` | `#554F91` | cream `#FBF4E5` | 6.6:1 |
+  | `lavender` | `#AAA4E6` | ink `#1A3169` | 5.4:1 |
 
-  Keep the texture light enough that `#FBF4E5` lettering on the darkest
-  streaks still clears 4.5:1.
+  Keep the texture light enough that the lettering still clears 4.5:1 on every
+  streak: cream on the darkest streaks of the four dark paints, ink on the
+  darkest streaks of lavender (its streaks darken towards lavender ink, not
+  black, and only faintly).
 - Put the files in `public/visuals/expression-paint/` only when the site uses
   them (the design contract keeps `public/visuals/` to assets in use).
 
@@ -37,7 +42,7 @@ phrase.
 | `pool-{paint}-{1,2}.webp` | 300 × 300 | `blob` (resting pool) | The flat pool waiting by the margin, seen from above, with one small satellite drop. Two variants per paint. |
 | `dab-{paint}.webp` | 330 × 330 | `blob` (the press) | The dab that lands in the pool on the press, a little larger and looser than the pool. |
 | `drop-{1..6}.webp` | 24 to 64 square | `blob` (spatter) | Six small drops of different sizes and shapes, painted in white on transparent: the code tints them in the paint and its companion colours. |
-| `dry-lavender.webp` | 1200 × 120 | `paintStroke(…, { dry: true })` | The near-miss: a thin, half-empty lavender wash in `#908ACC`, its middle mostly whole (wax letters show through it), with a long, broken bristle tail. |
+| `dry-{lavender,coral,blue}.webp` | 1200 × 120 | `paintStroke(…, { dry: true })` | The near-miss: a thin, half-empty wash, its middle mostly whole (wax letters show through it), with a long, broken bristle tail. Lavender `#908ACC` behind the blues and coral, coral `#E2735A` behind lavender ink, blue `#4A66AE` behind lavender, so the strike in the real paint always stands out. |
 | `strike-{paint}.webp` | 900 × 64 | the strike in `nearMiss` | A quick, thin crossing-out stroke, rising slightly to the right, ending in a small flick. |
 
 ## Not to commission

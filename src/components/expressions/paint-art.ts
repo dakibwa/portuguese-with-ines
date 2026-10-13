@@ -7,7 +7,6 @@
  */
 
 export const PAPER = "#FBF4E5";
-export const LAVENDER = "#AAA4E6";
 
 export type Rand = () => number;
 
@@ -81,20 +80,45 @@ export function blob(g: CanvasRenderingContext2D, cx: number, cy: number, r: num
 }
 
 /**
+ * Where a stroke must be solid paint: from x `from` to `to`, and between y
+ * `top` and `bottom` on its canvas. Its edges never come inside, and no paper
+ * shows through there, so the words painted over it always sit in paint.
+ */
+export type Solid = { from: number; to: number; top: number; bottom: number };
+
+type StrokeOptions = { flick?: number; dry?: boolean; shade?: string; streaks?: number; solid?: Solid };
+
+/** `limit` pushed out of the way of `value` softly, so an edge kept clear still wobbles. */
+function soft(value: number, limit: number, k = 2.5) {
+  const z = (limit - value) / k;
+  return limit - k * (z > 30 ? z : Math.log1p(Math.exp(z)));
+}
+
+/**
  * A gouache stroke in its forward direction: a loaded, blunt start at x=0, a
  * body with bristle streaks and darker dried edges, and a dry-brush end that
  * breaks into separate bristles from x=Lb to x=L. `dry` paints a thin,
  * half-empty brush: paper shows through in streaks along its whole length.
+ * `solid` keeps the stretch under the words whole (see Solid).
  */
-export function paintStroke(L: number, T: number, B: number, Lb: number, colour: string, R: Rand, dpr: number, { flick = 0, dry = false } = {}) {
+export function paintStroke(L: number, T: number, B: number, Lb: number, colour: string, R: Rand, dpr: number, { flick = 0, dry = false, shade = "#000000", streaks: streakStrength = 1, solid }: StrokeOptions = {}) {
   const [canvas, g] = makeCanvas(L, T, dpr);
   const cy = T / 2;
   const hw0 = B / 2;
   const tl = L - Lb;
   const phase = Array.from({ length: 8 }, () => R() * Math.PI * 2);
-  const arc = (R() * 2 - 1) * B * 0.05;
+  const arc = (R() * 2 - 1) * B * 0.035;
   const mid = (x: number) => cy + arc * Math.sin(Math.PI * x / L) + 0.8 * Math.sin(x / 57 + phase[6]);
-  const notches = Array.from({ length: 6 }, () => [R() * Lb, 6 + R() * 18, (R() * 0.05 + 0.02) * B, R() < 0.5 ? 0 : 1] as const);
+  const notches = Array.from({ length: 6 }, () => [R() * Lb, 6 + R() * 18, (R() * 0.03 + 0.015) * B, R() < 0.5 ? 0 : 1] as const);
+  // How much of the solid stretch applies at x: all of it under the words, easing off either side.
+  const ramp = Math.max(8, B * 0.12);
+  const guard = (x: number) => {
+    if (!solid) return 0;
+    const outside = Math.max(solid.from - x, x - solid.to, 0);
+    if (outside >= ramp) return 0;
+    const u = outside / ramp;
+    return 1 - u * u * (3 - 2 * u);
+  };
   const edge = (x: number, side: number) => {
     let e = B * (0.045 * Math.sin(x / 43 + phase[side]) + 0.025 * Math.sin(x / 13 + phase[side + 2]) + 0.014 * Math.sin(x / 4.3 + phase[side + 4]));
     for (const [nx, nw, nd, s] of notches) if (s === side && Math.abs(x - nx) < nw) e += (side ? -1 : 1) * nd * (1 + Math.cos(Math.PI * (x - nx) / nw)) / 2;
@@ -149,8 +173,15 @@ export function paintStroke(L: number, T: number, B: number, Lb: number, colour:
   const bottom: [number, number][] = [];
   for (let x = startDepth; x <= Lb + 0.01; x += step) {
     const xx = Math.min(x, Lb);
-    top.push([xx, mid(xx) - hw(xx) + edge(xx, 0)]);
-    bottom.push([xx, mid(xx) + hw(xx) + edge(xx, 1)]);
+    let y0 = mid(xx) - hw(xx) + edge(xx, 0);
+    let y1 = mid(xx) + hw(xx) + edge(xx, 1);
+    const weight = guard(xx);
+    if (solid && weight) {
+      y0 += (soft(y0, solid.top) - y0) * weight;
+      y1 += (-soft(-y1, -solid.bottom) - y1) * weight;
+    }
+    top.push([xx, y0]);
+    bottom.push([xx, y1]);
   }
   const path = new Path2D();
   path.moveTo(top[0][0], top[0][1]);
@@ -185,8 +216,8 @@ export function paintStroke(L: number, T: number, B: number, Lb: number, colour:
     const end = Math.min(Lb, x0 + length * (light ? 1.4 : 1));
     while (x < end) {
       const run = 10 + R() * 50;
-      const alpha = (light ? 0.03 + R() * 0.06 : 0.16 + R() * 0.22) * (dry ? 0.45 : 1);
-      g.strokeStyle = light ? mix(colour, PAPER, 0.18, alpha) : mix(colour, "#000000", 0.3, alpha);
+      const alpha = (light ? 0.03 + R() * 0.06 : (0.16 + R() * 0.22) * streakStrength) * (dry ? 0.45 : 1);
+      g.strokeStyle = light ? mix(colour, PAPER, 0.18, alpha) : mix(colour, shade, 0.3, alpha);
       g.beginPath();
       for (let xx = x; xx < Math.min(end, x + run); xx += 5) {
         const y = mid(xx) + u * hw(xx) + 0.4 * Math.sin(xx / 9 + i);
@@ -202,9 +233,11 @@ export function paintStroke(L: number, T: number, B: number, Lb: number, colour:
   // A dry brush keeps its middle, where the wax letters are, mostly whole.
   const skips = dry ? Math.round(B * 0.5) : 3 + Math.round(R() * 4);
   for (let i = 0; i < skips; i++) {
-    const x0 = dry ? R() * Lb * 0.8 : Lb - 6 - R() * Math.min(70, Lb * 0.3);
+    // Never where the words are: only past the end of the longest line.
+    const x0 = dry ? R() * Lb * 0.8 : Math.max(solid ? solid.to + ramp : 0, Lb - 6 - R() * Math.min(70, Lb * 0.3));
     const u = (R() < 0.5 ? -1 : 1) * (dry ? 0.5 + R() * 0.5 : 0.55 + R() * 0.4);
     const length = dry ? 18 + R() * Lb * 0.5 : 10 + R() * 40;
+    if (x0 >= Lb - 2) continue;
     g.strokeStyle = `rgba(0,0,0,${dry ? 0.55 + R() * 0.45 : 0.45 + R() * 0.45})`;
     g.lineWidth = dry ? 0.6 + R() * 1.6 : 0.5 + R() * 1.1;
     g.beginPath();
@@ -216,14 +249,14 @@ export function paintStroke(L: number, T: number, B: number, Lb: number, colour:
   g.restore();
 
   // Darker dried edges, as gouache settles at the rim, and a few stray hairs.
-  g.strokeStyle = mix(colour, "#000000", 0.3, dry ? 0.12 : 0.42);
+  g.strokeStyle = mix(colour, shade, 0.3, dry ? 0.12 : 0.42);
   g.lineWidth = 1;
   for (const line of [top, bottom]) {
     g.beginPath();
     line.forEach((point, index) => (index ? g.lineTo(point[0], point[1]) : g.moveTo(point[0], point[1])));
     g.stroke();
   }
-  g.strokeStyle = mix(colour, "#000000", 0.05, 0.75);
+  g.strokeStyle = mix(colour, shade, 0.05, 0.75);
   for (let i = 0; i < (dry ? 0 : 5); i++) {
     const x0 = cap + R() * (Lb - cap) * 0.9;
     const side = R() < 0.5 ? -1 : 1;
@@ -241,7 +274,7 @@ export function paintStroke(L: number, T: number, B: number, Lb: number, colour:
 }
 
 /** The wet front of a stroke: a rounded bead of paint whose back half melts into the stroke. Matte. */
-export function paintBead(B: number, colour: string, R: Rand, dir: number, dpr: number) {
+export function paintBead(B: number, colour: string, R: Rand, dir: number, dpr: number, shade = "#000000") {
   const bw = B * 0.66;
   const bh = B * 1.1;
   const [canvas, g] = makeCanvas(bw, bh, dpr);
@@ -266,7 +299,7 @@ export function paintBead(B: number, colour: string, R: Rand, dir: number, dpr: 
   path.closePath();
   g.fillStyle = colour;
   g.fill(path);
-  g.strokeStyle = mix(colour, "#000000", 0.32, 0.5);
+  g.strokeStyle = mix(colour, shade, 0.32, 0.5);
   g.lineWidth = 1.2;
   g.beginPath();
   g.ellipse(cx, cy, rx * 0.98, ry * 0.98, 0, -1.25, 1.25);
@@ -281,8 +314,12 @@ export function paintBead(B: number, colour: string, R: Rand, dir: number, dpr: 
   return { canvas, bw, bh };
 }
 
-/** One line of the phrase in cream wax, with a few specks of the paint beading on it. */
-export function paintLetters(text: string, family: string, fs: number, T: number, colour: string, R: Rand, dpr: number) {
+/**
+ * One line of the phrase in `ink` (the paper's cream, or ink on a light
+ * paint), with a few specks of the paint beading on it. `baseline` is where it
+ * sits on the line; by default its letters are centred on it.
+ */
+export function paintLetters(text: string, family: string, fs: number, T: number, colour: string, R: Rand, dpr: number, ink = PAPER, baseline?: number) {
   const probe = document.createElement("canvas").getContext("2d");
   if (!probe) throw new Error("No 2D canvas");
   probe.font = `${fs}px ${family}`;
@@ -292,9 +329,9 @@ export function paintLetters(text: string, family: string, fs: number, T: number
   const w = Math.ceil(inkRight - inkLeft);
   const [canvas, g] = makeCanvas(w, T, dpr);
   g.font = `${fs}px ${family}`;
-  g.fillStyle = PAPER;
+  g.fillStyle = ink;
   g.textBaseline = "alphabetic";
-  g.fillText(text, -inkLeft, T / 2 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2);
+  g.fillText(text, -inkLeft, baseline ?? T / 2 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2);
   g.globalCompositeOperation = "source-atop";
   const specks = Math.round((w * fs) / 70);
   for (let i = 0; i < specks; i++) {
@@ -306,18 +343,27 @@ export function paintLetters(text: string, family: string, fs: number, T: number
   return { canvas, offset: inkLeft, w };
 }
 
-export type PhraseMetrics = { w: number; padL: number; padR: number; tailRoom: number; sizes: [number, number][] };
+/** `room(fs)`: how wide a line of type at `fs` may be, leaving the paint its margins. */
+export type PhraseMetrics = { room: (fs: number) => number; sizes: [number, number][] };
+export type PhraseLine = { text: string; w: number; asc: number; desc: number };
 
 /**
  * Lays the phrase out once, when it is known: the largest type that fits in
- * few enough lines, balanced so the strokes are of a similar length.
+ * few enough lines, balanced so the strokes are of a similar length. Each
+ * line carries how far its letters reach above and below the baseline, so
+ * the paint can be sized round them.
  */
-export function layoutPhrase(text: string, m: PhraseMetrics, family: string) {
+export function layoutPhrase(text: string, m: PhraseMetrics, family: string): { fs: number; lines: PhraseLine[] } {
   const probe = document.createElement("canvas").getContext("2d");
   if (!probe) throw new Error("No 2D canvas");
   const words = text.trim().split(/\s+/);
-  const available = m.w - m.padL - m.padR - m.tailRoom;
+  const measured = (size: number, line: string): PhraseLine => {
+    probe.font = `${size}px ${family}`;
+    const metrics = probe.measureText(line);
+    return { text: line, w: metrics.width, asc: metrics.actualBoundingBoxAscent || size, desc: metrics.actualBoundingBoxDescent || 0 };
+  };
   for (const [fs, maxLines] of m.sizes) {
+    const available = m.room(fs);
     probe.font = `${fs}px ${family}`;
     const space = probe.measureText(" ").width;
     const widths = words.map((word) => probe.measureText(word).width);
@@ -353,36 +399,32 @@ export function layoutPhrase(text: string, m: PhraseMetrics, family: string) {
       lines = greedy(high);
     }
     let size = fs;
-    if (lines.length === 1) size = Math.min(fs * 1.14, fs * (available / widths.reduce((sum, width) => sum + width + space, -space)));
-    probe.font = `${size}px ${family}`;
-    return {
-      fs: size,
-      lines: lines.map((indices) => {
-        const line = indices.map((index) => words[index]).join(" ");
-        return { text: line, w: probe.measureText(line).width };
-      }),
-    };
+    if (lines.length === 1) {
+      // A short phrase grows a little, as long as it still fits at the larger size.
+      const total = widths.reduce((sum, width) => sum + width + space, -space);
+      size = fs;
+      for (let next = fs * 1.14; next > fs; next -= fs * 0.02) {
+        if (total * (next / fs) <= m.room(next)) {
+          size = next;
+          break;
+        }
+      }
+    }
+    return { fs: size, lines: lines.map((indices) => measured(size, indices.map((index) => words[index]).join(" "))) };
   }
   // A single word too long for any size: the smallest type, one line, cut to fit.
   const fs = m.sizes[m.sizes.length - 1][0] * 0.9;
-  probe.font = `${fs}px ${family}`;
-  return { fs, lines: [{ text, w: Math.min(available, probe.measureText(text).width) }] };
+  const line = measured(fs, text);
+  return { fs, lines: [{ ...line, w: Math.min(m.room(fs), line.w) }] };
 }
 
-/**
- * The resting sheet: real phrases from her collection written faintly in wax,
- * the paper's own cream with the faintest raised edge, just readable if you
- * look. With no phrases to show, joined-up loops in her slant instead.
- */
-export function paintWax(g: CanvasRenderingContext2D, w: number, h: number, m: { padL: number; padR: number; wide: boolean }, phrases: string[], family: string, R: Rand) {
-  const fs = m.wide ? 29 : 21;
+/** The phrases that fit the sheet, up to three, each at the largest size that fits. */
+export function waxRows(g: CanvasRenderingContext2D, w: number, m: WaxMetrics, phrases: string[], family: string) {
   const available = w - m.padL - m.padR - 6;
-  const pitch = fs * 1.95;
-  g.textBaseline = "alphabetic";
   const rows: { text: string; size: number }[] = [];
   for (const phrase of phrases) {
     if (rows.length === 3) break;
-    for (const size of [fs, fs * 0.86, fs * 0.74]) {
+    for (const size of [m.waxFs, m.waxFs * 0.86, m.waxFs * 0.74]) {
       g.font = `${size}px ${family}`;
       if (g.measureText(phrase).width <= available) {
         rows.push({ text: phrase, size });
@@ -390,8 +432,30 @@ export function paintWax(g: CanvasRenderingContext2D, w: number, h: number, m: {
       }
     }
   }
+  return rows;
+}
+
+export type WaxMetrics = { padL: number; padR: number; wide: boolean; waxFs: number };
+
+/** How tall the wax writing stands: rows of phrases, or three lines of loops. */
+export function waxHeight(rows: number, m: WaxMetrics) {
+  return rows ? (rows - 1) * m.waxFs * 1.95 + m.waxFs * 1.5 : 2 * (m.wide ? 40 : 27) * 1.55 + (m.wide ? 40 : 27);
+}
+
+/**
+ * The resting sheet: real phrases from her collection written faintly in wax,
+ * the paper's own cream with the faintest raised edge, just readable if you
+ * look. With no phrases to show, joined-up loops in her slant instead.
+ * Centred between `top` and `bottom`.
+ */
+export function paintWax(g: CanvasRenderingContext2D, w: number, top: number, bottom: number, m: WaxMetrics, phrases: string[], family: string, R: Rand) {
+  const fs = m.waxFs;
+  const pitch = fs * 1.95;
+  const centre = (top + bottom) / 2;
+  g.textBaseline = "alphabetic";
+  const rows = waxRows(g, w, m, phrases, family);
   if (rows.length) {
-    const y0 = h / 2 - ((rows.length - 1) * pitch) / 2 + fs * 0.32;
+    const y0 = centre - ((rows.length - 1) * pitch) / 2 + fs * 0.32;
     rows.forEach((row, index) => {
       g.font = `${row.size}px ${family}`;
       const x = m.padL + (index % 2 ? fs * 0.5 : 0) + R() * fs * 0.3;
@@ -407,14 +471,14 @@ export function paintWax(g: CanvasRenderingContext2D, w: number, h: number, m: {
   const lines = 3;
   const size = m.wide ? 40 : 27;
   const linePitch = size * 1.55;
-  const top = h / 2 - ((lines - 1) * linePitch) / 2 + size * 0.2;
+  const first = centre - ((lines - 1) * linePitch) / 2 + size * 0.2;
   const xHeight = size * 0.32;
   g.lineCap = "round";
   g.lineJoin = "round";
   for (let row = 0; row < lines; row++) {
     const span = (w - m.padL - m.padR - 24) * (row === lines - 1 ? 0.5 + R() * 0.2 : 0.78 + R() * 0.2);
     let x = m.padL;
-    const base = top + row * linePitch;
+    const base = first + row * linePitch;
     while (x < m.padL + span - size * 0.8) {
       const letters = 2 + Math.floor(R() * 6);
       const points: [number, number][] = [];

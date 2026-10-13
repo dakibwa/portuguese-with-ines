@@ -541,39 +541,60 @@ there is no anonymous page or main-menu item.
   for a reading card. The packaging photos and business card do not illustrate
   individual meanings. None is copied into `public/visuals/` for this integration.
 
-The student card, `Uma expressão para ti`, sits on the same lilac sheet below
-the lessons calendar. Its centre is `Pinta e descobre` (13 October 2026, at
-Dan's choice; it replaced a spinning wheel he rejected): Inês has written the
-expression in wax on a cream sheet, and a gouache brush sweeps across it line
-by line so the phrase shows through the paint in cream Beth Ellen, in reading
-order. The painted phrase is the reading's title; the facts follow it.
+The student card sits on the same lilac sheet below the lessons calendar. Its
+centre is `Pinta e descobre` (13 October 2026, at Dan's choice; it replaced a
+spinning wheel he rejected): Inês has written the expression in wax on a cream
+sheet, and a gouache brush sweeps across it line by line so the phrase shows
+through the paint in Beth Ellen, in reading order. The painted phrase is the
+reading's title; the facts follow it.
 
-- Colour: each painting is in one of four paints, every one clear of AA for
-  the cream lettering: deep blue `#203E82`, blue `#2C54AA`, coral `#B43A26` and
-  lavender ink `#554F91`. A new painting is never the colour of the last one
-  painted on this device. A returning student sees their expression in the
-  colour it was painted in, remembered on the device, or else in a colour that
-  expression always gets. The reading's labels, dabs, marked words and the
-  drops thrown off the brush all follow the paint and its companion colours.
-- Composition: on a phone the sheet fills the cream card, the reading opens
-  beneath it, and `Paint it` (then `Paint another`) follows, full width. Where
-  the section is wide, the facts sit beside the painting, the example sits
-  under it, themes and notes under the facts, and the button moves up beside
-  the heading; no column is left empty. Nothing above the section moves; the
-  card grows and shrinks smoothly below.
-- At rest the sheet invites: a few real, unseen phrases are written faintly in
-  wax, just readable if you look, and a flat pool of the next paint waits by
-  the margin. On a wide card the facts still to come wait in wax beside it.
-  Gouache is matte: nothing glossy.
+- No visible heading and no helper text (Dan: "do we even need the top
+  stuff"). The section keeps `Uma expressão para ti` as a visually hidden
+  heading, so it is still named. At rest the sheet itself invites: the same
+  words as a small uppercase label at its top, in the waiting paint's
+  lettering colour, and `Paint it`. Once painted, the card is the whole
+  section, with the compact `Paint another` kept with it: in the card's top
+  right corner beside the painting where the facts sit alongside, at the card's
+  foot on a phone. It stays a 44px target and never becomes a full-width slab.
+- Colour: each painting is in one of five paints, every one with lettering
+  clear of AA: deep blue `#203E82`, blue `#2C54AA`, coral `#B43A26` and
+  lavender ink `#554F91` carry cream `#FBF4E5` lettering; lavender `#AAA4E6`
+  carries ink `#1A3169` (5.4:1; cream on it would be 2.1:1). A new painting is
+  never the colour of the last one painted on this device. A returning student
+  sees their expression in the colour it was painted in, remembered on the
+  device, or else in a colour that expression always gets. The reading's
+  labels, dabs, marked words and the drops thrown off the brush all follow the
+  paint and its companion colours; on lavender the labels are in lavender ink
+  and the marked words take a stronger lavender wash, so both still read.
+- Room around the words (Dan: "give it space so the words fit comfortably
+  inside so it's not ambiguous"): every letter sits in solid paint. The band is
+  sized round the phrase's own letters, with generous paint above the first
+  line's tallest letter and below the last line's deepest, a clear inset from
+  the blunt start, and the dry brush beginning only after the longest line ends
+  and a margin of paint after it. The strokes of a longer phrase overlap, so no
+  paper shows between its lines, and no streak of paper crosses a word.
+- Composition: on a phone the sheet fills the cream card and the reading opens
+  beneath it. From a landscape phone up, the facts sit beside the painting and
+  the example under it, themes and notes under the facts; on a very wide card
+  the example moves up into a third column. No column is left empty. The
+  painted sheet closes round its phrase as the reading opens, so a one-line
+  phrase never sits in a tall empty sheet; nothing above the section moves, and
+  the card grows and shrinks smoothly below.
+- At rest a few real, unseen phrases are written faintly in wax, just readable
+  if you look, and a flat pool of the next paint waits by the margin. Beside
+  the painting, the facts still to come wait in wax. Gouache is matte: nothing
+  glossy.
 - The press starts the painting at once while the Worker picks and saves the
   expression: a dab lands in the pool and spreads. On about one press in three
-  the wait becomes a near-miss: a thin lavender dry brush starts the first word
-  or two of an unseen phrase near the top, and a quick stroke of the real paint
-  crosses it out, before the real phrase is painted. The near-miss never sits
-  under the real phrase and dries away as the reading opens. The whole reveal,
-  press to reading, takes no more than about 3.2 seconds, even after a slow
-  reply. `Paint another` fades the last reading, folds it away under the sheet
-  and paints afresh.
+  the wait becomes a near-miss: a thin dry brush starts the first word or two
+  of an unseen phrase near the top, and a quick stroke of the real paint
+  crosses it out, before the real phrase is painted. The near-miss is brushed
+  in a wash the real paint stands out against (lavender behind the blues and
+  coral, coral behind lavender ink, blue behind lavender), so the strike always
+  reads. It never sits under the real phrase and dries away as the reading
+  opens. The whole reveal, press to reading, takes no more than about 3.2
+  seconds, even after a slow reply. `Paint another` fades the last reading,
+  folds it away under the sheet and paints afresh.
 - Only the button paints: no swipe or drag on the sheet, and no loose chapéu at
   the card's corner.
 - The painting is decorative: the pick is the Worker's and the brush paints only
@@ -590,7 +611,8 @@ the waiting sheet) back, and `Try again` repeats the same request without
 spending another pick. If the collection cannot be read at all, the section
 stays away rather than raising an alarm beside the lessons. Returning students see their last
 available result, and every student has an independent history. Once their
-published pool is exhausted, show a quiet note and wait for new expressions.
+published pool is exhausted, a quiet note takes the button's place and the
+card waits for new expressions.
 Do not reset their history or imply another student has taken an expression.
 
 The full source inventory and later-stage feature map are in

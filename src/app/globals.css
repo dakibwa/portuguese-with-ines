@@ -9135,11 +9135,12 @@ dialog[open]::backdrop {
    own painting (13 October 2026): what the words say, what they mean and the
    English for it, each under a small label in the paint's colour after a dab
    of it; then the expression in use, its own words marked in the paint. A
-   student's card sets the paint (--paint and its two companions); elsewhere
-   the site's deep blue, lavender and coral stand in. */
+   student's card sets the paint (--paint, the colour its labels are written
+   in, its two companions and its mark); elsewhere the site's deep blue,
+   lavender and coral stand in. */
 .expression-card { min-width: 0; color: var(--ink); background: var(--raised); overflow-wrap: anywhere; }
 .expression-card .expression-card__title { margin: 0 0 1rem; font: 400 clamp(1.05rem, 1.6vw, 1.25rem)/2 var(--display); color: var(--blue-deep); }
-.expression-card__label { display: block; margin: 0; color: var(--paint, var(--blue-deep)); font: 700 0.66rem/1.5 var(--ui); letter-spacing: 0.15em; text-transform: uppercase; }
+.expression-card__label { display: block; margin: 0; color: var(--paint-ink, var(--blue-deep)); font: 700 0.66rem/1.5 var(--ui); letter-spacing: 0.15em; text-transform: uppercase; }
 .expression-card__meanings { display: grid; gap: 0.95rem; margin: 0; }
 .expression-card__fact, .expression-card__examples, .expression-reading__waiting p { position: relative; padding-left: 1.75rem; }
 .expression-card__fact::before, .expression-card__examples::before, .expression-reading__waiting p::before {
@@ -9166,16 +9167,16 @@ dialog[open]::backdrop {
 .expression-card__phrase {
   padding-inline: 0.08em;
   border-radius: 0.25em 0.1em 0.3em 0.12em;
-  background: linear-gradient(transparent 52%, color-mix(in srgb, color-mix(in srgb, var(--paint, var(--blue-deep)) 50%, var(--paint-2, var(--lavender))) 30%, transparent) 52% 96%, transparent 96%);
+  background: linear-gradient(transparent 52%, var(--paint-mark, color-mix(in srgb, color-mix(in srgb, var(--blue-deep) 50%, var(--lavender)) 30%, transparent)) 52% 96%, transparent 96%);
   color: inherit;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 .expression-card__extras { display: grid; justify-items: start; gap: 0.3rem; margin-top: 0.9rem; padding-left: 1.75rem; }
 .expression-card__tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.25rem 0 0; padding: 0; list-style: none; }
-.expression-card__tags li { border-radius: var(--squiggle-pill); padding: 0.2rem 0.7rem; background: color-mix(in srgb, var(--paint-2, var(--lavender)) 30%, var(--raised)); font-size: 0.74rem; }
+.expression-card__tags li { border-radius: var(--squiggle-pill); padding: 0.2rem 0.7rem; background: color-mix(in srgb, var(--paint-tag, var(--paint-2, var(--lavender))) 30%, var(--raised)); font-size: 0.74rem; }
 .expression-card__notes { font-size: 0.85rem; line-height: 1.65; }
-.expression-card__notes summary { display: inline-flex; align-items: center; gap: 0.55rem; min-height: 44px; color: var(--paint, var(--blue-deep)); cursor: pointer; font: 700 0.66rem/1.5 var(--ui); letter-spacing: 0.15em; list-style: none; text-transform: uppercase; }
+.expression-card__notes summary { display: inline-flex; align-items: center; gap: 0.55rem; min-height: 44px; color: var(--paint-ink, var(--blue-deep)); cursor: pointer; font: 700 0.66rem/1.5 var(--ui); letter-spacing: 0.15em; list-style: none; text-transform: uppercase; }
 .expression-card__notes summary::-webkit-details-marker { display: none; }
 .expression-card__notes summary::after { width: 0.4rem; height: 0.4rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; content: ""; rotate: 45deg; translate: 0 -0.12rem; transition: rotate var(--motion-surface) var(--motion-ease), translate var(--motion-surface) var(--motion-ease); }
 .expression-card__notes[open] summary::after { rotate: 225deg; translate: 0 0.1rem; }
@@ -9187,29 +9188,30 @@ dialog[open]::backdrop {
 /* A student's expression: "Pinta e descobre" (13 October 2026, at Dan's
    request). Inês has written it in wax on a cream sheet; the press sweeps a
    gouache brush across it and the phrase shows through the paint, which is
-   then the reading's title. On a phone the reading opens beneath the sheet,
-   with the button after it. On a wide card the facts sit beside the painting,
-   the example under it, and the button moves up beside the heading. */
+   then the reading's title. The section's heading is for assistive
+   technology only: at rest the sheet itself invites, with a small label and
+   the button, and once painted the card is the whole section, with
+   "Paint another" kept beside it. On a phone the reading opens beneath the
+   sheet and the button sits at the card's foot. On a wide card the facts sit
+   beside the painting, the example under it, and the button in the top
+   corner above the facts. */
 .student-expressions { position: relative; container: expressions / inline-size; width: 100%; min-width: 0; margin-top: 1.5rem; padding: var(--pad-card); border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet); }
-.student-expressions__layout { display: grid; grid-template-areas: "heading" "reading" "actions"; grid-template-columns: minmax(0, 1fr); gap: 0.95rem; }
-.student-expressions__heading { grid-area: heading; min-width: 0; }
-.student-expressions__heading h2 { margin: 0; font: 400 clamp(1.15rem, 2.1vw, 1.5rem)/2 var(--display); color: var(--blue-deep); overflow-wrap: anywhere; }
-.student-expressions__heading p { margin: 0.1rem 0 0; font-size: 0.85rem; line-height: 1.6; }
-.student-expressions__actions { display: grid; grid-area: actions; justify-items: center; gap: 0.6rem; min-width: 0; text-align: center; }
-.student-expressions__actions .button { width: 100%; }
-.student-expressions__actions .booking-alert { margin: 0; }
-.student-expressions__note { margin: 0; font-size: 0.8rem; line-height: 1.6; text-wrap: balance; }
+.expression-reading__note { margin: 0; font-size: 0.8rem; line-height: 1.6; text-wrap: balance; }
+.student-expressions > .expression-reading__note { text-align: center; }
 
-/* The paint sets the card's colours: the painting, its labels, dabs and marks. */
+/* The paint sets the card's colours: the painting, its labels, dabs and marks.
+   Lavender is too light to write on in its own colour: its labels are in
+   lavender ink, and its mark is a stronger wash of itself. */
 .expression-reading {
   --paint: var(--blue-deep);
+  --paint-ink: var(--paint);
   --paint-2: var(--lavender);
   --paint-3: var(--coral);
+  --paint-mark: color-mix(in srgb, color-mix(in srgb, var(--paint) 50%, var(--paint-2)) 30%, transparent);
   /* Where the painted lettering starts; the reading lines up with it. */
-  --paint-text-x: 40px;
+  --paint-text-x: 44px;
   position: relative;
   display: grid;
-  grid-area: reading;
   grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   overflow: clip;
@@ -9219,18 +9221,42 @@ dialog[open]::backdrop {
 }
 .expression-reading[data-paint="blue"] { --paint: var(--blue); --paint-3: var(--blue-deep); }
 .expression-reading[data-paint="coral"] { --paint: var(--coral-action); --paint-2: var(--coral); --paint-3: var(--lavender); }
-.expression-reading[data-paint="lavender"] { --paint: var(--lavender-ink); }
+.expression-reading[data-paint="lavender-ink"] { --paint: var(--lavender-ink); }
+.expression-reading[data-paint="lavender"] { --paint: var(--lavender); --paint-ink: var(--lavender-ink); --paint-2: var(--lavender-ink); --paint-tag: var(--lavender); --paint-mark: color-mix(in srgb, var(--lavender) 58%, transparent); }
 /* The paper's grain lies over the paint as well as the card. */
 .expression-reading::after { position: absolute; z-index: 1; inset: 0; background: var(--paper-texture); content: ""; pointer-events: none; }
-.expression-reading__text, .expression-reading__waiting { position: relative; z-index: 2; transition: opacity 220ms var(--motion-ease); }
+.expression-reading > .paint-sheet { grid-row: 1; grid-column: 1; }
+.expression-reading__text, .expression-reading__waiting { position: relative; z-index: 2; grid-row: 2; transition: opacity 220ms var(--motion-ease); }
 .expression-reading[data-busy] :is(.expression-reading__text, .expression-reading__waiting) { opacity: 0; }
 .expression-reading[data-folded] .expression-reading__text { display: none; }
-.expression-reading__text { padding: 0 1.25rem 1.6rem var(--paint-text-x); background: none; outline: none; }
+.expression-reading__text { padding: 0.15rem 1.25rem 0.35rem var(--paint-text-x); background: none; outline: none; }
 .expression-reading__text :is(.expression-card__fact, .expression-card__examples, .expression-card__extras) { padding-left: 0; }
 .expression-reading__text :is(.expression-card__fact, .expression-card__examples)::before { left: -1.6rem; }
-.expression-reading__waiting { display: none; }
+.expression-reading__waiting, .expression-reading__waiting p:nth-child(4) { display: none; }
 .expression-reading__waiting p { margin: 0; padding-left: 0; }
 .expression-reading__waiting p::before { left: -1.6rem; }
+/* The waiting sheet's label, over its top; it fades as the paint lands. */
+.expression-reading__label {
+  position: relative;
+  z-index: 2;
+  grid-row: 1;
+  grid-column: 1;
+  align-self: start;
+  margin: 1rem 1rem 0 var(--paint-text-x);
+  color: var(--paint-ink);
+  font: 700 0.66rem/1.5 var(--ui);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: opacity 240ms var(--motion-ease);
+}
+.expression-reading[data-busy] .expression-reading__label { opacity: 0; }
+/* The button stays with the card: at its foot on a phone, in its top corner when wide. */
+.expression-reading__actions { position: relative; z-index: 3; grid-row: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem 1rem; min-width: 0; padding: 0.35rem 1rem 1rem; }
+/* Compact at every width (phones otherwise stretch every button full width), and still a 44px target. */
+.expression-reading__actions .button { width: auto; min-width: 9.5rem; min-height: 48px; padding-inline: 1.6rem; }
+.expression-reading__actions .booking-alert { flex-basis: 100%; margin: 0; }
+.expression-reading__actions .expression-reading__note { max-width: 19rem; text-align: right; }
 /* Each fact still to come, written in wax: a shade brighter than the paper, the faintest raised edge. */
 .expression-reading__wax {
   display: block;
@@ -9253,8 +9279,10 @@ dialog[open]::backdrop {
   from { opacity: 0; transform: translateY(8px); }
 }
 
-/* The sheet. Its layers are built and moved by the painter (painter.ts). */
-.paint-sheet { position: relative; height: 220px; overflow: hidden; font-family: var(--display); }
+/* The sheet. Its layers are built and moved by the painter (painter.ts),
+   which keeps --paint-label-room clear for the label at the top of the
+   resting sheet. */
+.paint-sheet { --paint-label-room: 42px; position: relative; height: 180px; overflow: hidden; font-family: var(--display); }
 .paint-sheet canvas { display: block; }
 .paint-sheet__wax { position: absolute; top: 0; left: 0; transition: opacity 280ms var(--motion-ease); }
 .paint-sheet__wax[data-gone] { opacity: 0; }
@@ -9270,31 +9298,56 @@ dialog[open]::backdrop {
 .paint-sheet__drop { position: absolute; top: 0; left: 0; opacity: 0; }
 
 @container expressions (max-width: 300px) {
-  .expression-reading { --paint-text-x: 32px; }
+  .expression-reading { --paint-text-x: 40px; }
   .expression-reading__text { padding-right: 1rem; }
+  .expression-reading__actions { padding-inline: 0.75rem; }
+}
+
+/* From a landscape phone up, the facts sit beside the painting: stacked, a
+   one-line phrase would leave a half-empty card twice the viewport's height. */
+@container expressions (min-width: 34rem) {
+  .paint-sheet { --paint-label-room: 48px; }
+  /* In line with the button across the card's top. */
+  .expression-reading__label { margin-top: 0.9rem; line-height: 48px; }
+  .expression-reading { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-rows: auto auto auto; column-gap: 1.5rem; }
+  .expression-reading > .paint-sheet { grid-column: 1; grid-row: 1 / 3; align-self: center; }
+  .expression-reading__actions { grid-column: 2; grid-row: 1; align-self: start; padding: 0.9rem 0.9rem 0 0; }
+  .expression-reading__text { display: grid; grid-column: 1 / -1; grid-row: 1 / -1; grid-template-columns: subgrid; grid-template-rows: subgrid; padding: 0; }
+  .expression-reading__text > .expression-card__meanings { grid-column: 2; grid-row: 2; align-self: center; padding: 0.9rem 1.25rem 1.5rem 0.4rem; }
+  .expression-reading__text > .expression-card__examples { grid-column: 1; grid-row: 3; margin: 0 0 0 var(--paint-text-x); padding: 0 0.5rem 1.6rem 0; }
+  .expression-reading__text > .expression-card__extras { grid-column: 2; grid-row: 3; align-self: start; margin: 0; padding: 0 1.25rem 1.6rem 0.4rem; }
+  .expression-reading__waiting { display: grid; grid-column: 2; grid-row: 2; align-self: center; gap: 1.2rem; padding: 0.9rem 1.25rem 1.6rem 0.4rem; }
 }
 
 @container expressions (min-width: 44rem) {
-  .student-expressions__layout { grid-template-areas: "heading actions" "reading reading"; grid-template-columns: minmax(0, 1fr) auto; gap: 1.1rem 2rem; align-items: center; }
-  .student-expressions__actions { justify-items: end; text-align: right; }
-  .student-expressions__actions .button { width: auto; min-width: 13.5rem; }
-  .student-expressions__note { max-width: 22rem; }
-  .paint-sheet { height: 236px; }
-  .expression-reading { --paint-text-x: 60px; grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 2.5rem; }
-  .expression-reading > .paint-sheet { grid-column: 1; grid-row: 1; }
-  .expression-reading__text { display: grid; grid-column: 1 / -1; grid-row: 1 / -1; grid-template-columns: subgrid; grid-template-rows: subgrid; padding: 0; }
-  .expression-reading__text > .expression-card__meanings { grid-column: 2; grid-row: 1; align-self: center; padding: 1.6rem 2.25rem 1.4rem 0.4rem; }
-  .expression-reading__text > .expression-card__examples { grid-column: 1; grid-row: 2; margin: 0 0 0 var(--paint-text-x); padding: 0 1rem 1.9rem 0; }
-  .expression-reading__text > .expression-card__extras { grid-column: 2; grid-row: 2; align-self: start; margin: 0; padding: 0 2.25rem 1.9rem 0.4rem; }
+  .expression-reading { --paint-text-x: 64px; grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr); column-gap: 2.5rem; }
+  .expression-reading__text > .expression-card__meanings { padding-right: 2.25rem; }
+  .expression-reading__text > .expression-card__examples { padding: 0 1rem 1.9rem 0; }
+  .expression-reading__text > .expression-card__extras { padding: 0 2.25rem 1.9rem 0.4rem; }
   .expression-reading__text .expression-card__fact dd, .expression-reading__text .expression-card__examples li { font-size: 0.97rem; }
   .expression-reading__text .expression-card__fact[data-fact="meaning"] dd { font-size: 1.1rem; }
-  .expression-reading__waiting { display: grid; grid-column: 2; grid-row: 1; align-self: center; gap: 1.2rem; padding: 1.5rem 2.25rem 1.5rem 0.4rem; }
+  .expression-reading__waiting { padding-right: 2.25rem; }
+}
+
+/* On a very wide card a short phrase would leave the middle empty: the
+   example moves up into a third column, under the button. */
+@container expressions (min-width: 90rem) {
+  .expression-reading { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); }
+  .expression-reading > .paint-sheet { grid-row: 1 / -1; }
+  .expression-reading__actions { grid-column: 3; }
+  .expression-reading__text > .expression-card__meanings { grid-column: 2; grid-row: 1 / -1; padding: 1.6rem 0 1.6rem 0.4rem; }
+  .expression-reading__text > .expression-card__examples { grid-column: 3; grid-row: 2; align-self: start; margin: 0.4rem 0 0; padding: 0 2.25rem 0 0.4rem; }
+  .expression-reading__text > .expression-card__extras { grid-column: 3; grid-row: 3; padding-top: 0.9rem; }
+  .expression-reading__waiting { grid-column: 2 / 4; grid-row: 1 / -1; grid-template-columns: subgrid; grid-template-rows: repeat(3, auto); align-content: center; column-gap: 2.5rem; padding-right: 0; }
+  .expression-reading__waiting p { grid-column: 1; }
+  .expression-reading__waiting p:nth-child(4) { display: block; grid-column: 2; grid-row: 2; padding-right: 2.25rem; }
+  .expression-reading__waiting p:nth-child(4)::before { rotate: 330deg; background: var(--paint); }
 }
 
 /* Without subgrid, the wide reading keeps to the column beside the painting. */
 @supports not (grid-template-rows: subgrid) {
-  @container expressions (min-width: 44rem) {
-    .expression-reading__text { display: block; grid-column: 2; grid-row: 1 / -1; padding: 1.6rem 2.25rem 1.9rem 0.4rem; }
+  @container expressions (min-width: 34rem) {
+    .expression-reading__text { display: block; grid-column: 2; grid-row: 2 / -1; padding: 0.9rem 1.25rem 1.9rem 0.4rem; }
     .expression-reading__text > :is(.expression-card__meanings, .expression-card__examples, .expression-card__extras) { padding: 0; }
     .expression-reading__text > .expression-card__examples { margin-top: 1.15rem; }
     .expression-reading__text > .expression-card__extras { margin-top: 0.9rem; }

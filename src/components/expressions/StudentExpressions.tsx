@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ExpressionExamples, ExpressionExtras, ExpressionMeanings } from "@/components/expressions/ExpressionCard";
 import { ExpressionPainting, type ExpressionPaintingHandle, type PaintingStart } from "@/components/expressions/ExpressionPainting";
-import { FACTS_OPEN } from "@/components/expressions/painter";
+import { FACTS_OPEN, OPEN_EASE } from "@/components/expressions/painter";
 import { AuthApiError, readSession } from "@/lib/auth-api";
 import { chooseDecoy, nextPaint, paintFor, rememberPaint, type PaintKey } from "@/lib/expression-paint";
 import { fetchStudentExpressions, type StudentExpressions as Collection } from "@/lib/student-expressions-api";
@@ -11,8 +11,10 @@ import { fetchStudentExpressions, type StudentExpressions as Collection } from "
 /** The colour the shown expression was painted in, and the one waiting for the next. */
 type Paints = { shown: PaintKey | null; next: PaintKey };
 
-const WAITING = ["Ao pé da letra", "Quer dizer", "Em inglês"];
-const OPEN_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+const TITLE = "Uma expressão para ti";
+const EXHAUSTED = "You’ve explored every expression. Come back when Inês adds more.";
+/** The facts still to come, in wax; Exemplo waits only where it will open beside them. */
+const WAITING = ["Ao pé da letra", "Quer dizer", "Em inglês", "Exemplo"];
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -39,6 +41,8 @@ export function StudentExpressions({ token }: { token: string }) {
   const result = useRef<HTMLElement>(null);
   /** The card's height just before its reading folded away, came back or was replaced. */
   const before = useRef<number | null>(null);
+  /** A new painting has landed: the sheet closes round it as its reading opens. */
+  const settling = useRef(false);
   const settle = useRef(0);
   const fold = useRef(0);
   const canUpdate = () => active.current && readSession() === token;
@@ -63,13 +67,20 @@ export function StudentExpressions({ token }: { token: string }) {
   }, [token]);
 
   // The card grows or shrinks from its last height, never jumping: the reading
-  // folding away, coming back after a failed reply, or opening new.
+  // folding away, coming back after a failed reply, or opening new, as the
+  // painted sheet closes round a new phrase in the same motion.
   useLayoutEffect(() => {
     const from = before.current;
     before.current = null;
     const element = card.current;
-    if (from === null || !element || reducedMotion()) return;
+    const closeSheet = settling.current ? painting.current?.settle() : undefined;
+    settling.current = false;
+    if (from === null || !element || reducedMotion()) {
+      closeSheet?.();
+      return;
+    }
     const to = element.getBoundingClientRect().height;
+    closeSheet?.();
     if (Math.abs(to - from) >= 1) element.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: folded ? 380 : FACTS_OPEN, easing: OPEN_EASE });
   }, [folded, revealed]);
 
@@ -132,6 +143,7 @@ export function StudentExpressions({ token }: { token: string }) {
         rememberPaint(picked.id, paint);
         request.current = null;
         unfold();
+        settling.current = true;
         setPaints({ shown: paint, next: nextPaint([paint]) });
         setCollection(next);
         setRevealed((count) => count + 1);
@@ -169,47 +181,44 @@ export function StudentExpressions({ token }: { token: string }) {
     : { kind: "rest", paint: paints.next, wax: collection.shuffleLabels };
   return (
     <section className="student-expressions" aria-labelledby="student-expressions-title">
-      <div className="student-expressions__layout">
-        <div className="student-expressions__heading">
-          <h2 id="student-expressions-title">Uma expressão para ti</h2>
-          <p>A Portuguese expression, picked just for you.</p>
-        </div>
-        <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
-        {collection.canPick || expression ? (
-          <div
-            className="expression-reading"
-            data-busy={busy ? "" : undefined}
-            data-folded={folded ? "" : undefined}
-            data-paint={expression ? (paints.shown ?? paints.next) : paints.next}
-            data-state={expression ? "read" : "waiting"}
-            ref={card}
-          >
-            <ExpressionPainting ref={painting} start={start} />
-            {expression ? (
-              <article className="expression-card expression-reading__text" key={expression.id} lang="pt-PT" ref={result} tabIndex={-1}>
-                <h3 className="visually-hidden">{expression.expression}</h3>
-                <ExpressionMeanings item={expression} />
-                <ExpressionExamples item={expression} />
-                <ExpressionExtras image item={expression} />
-              </article>
-            ) : (
+      <h2 className="visually-hidden" id="student-expressions-title">{TITLE}</h2>
+      <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
+      {collection.canPick || expression ? (
+        <div
+          className="expression-reading"
+          data-busy={busy ? "" : undefined}
+          data-folded={folded ? "" : undefined}
+          data-paint={expression ? (paints.shown ?? paints.next) : paints.next}
+          data-state={expression ? "read" : "waiting"}
+          ref={card}
+        >
+          <ExpressionPainting ref={painting} start={start} />
+          {expression ? (
+            <article className="expression-card expression-reading__text" key={expression.id} lang="pt-PT" ref={result} tabIndex={-1}>
+              <h3 className="visually-hidden">{expression.expression}</h3>
+              <ExpressionMeanings item={expression} />
+              <ExpressionExamples item={expression} />
+              <ExpressionExtras image item={expression} />
+            </article>
+          ) : (
+            <>
+              {/* At rest the sheet invites; the hidden heading says the same to assistive technology. */}
+              <p aria-hidden="true" className="expression-reading__label">{TITLE}</p>
               <div aria-hidden="true" className="expression-reading__waiting">
                 {WAITING.map((label) => <p key={label}><span className="expression-card__label">{label}</span><span className="expression-reading__wax" /></p>)}
               </div>
-            )}
-          </div>
-        ) : null}
-        <div className="student-expressions__actions">
-          {collection.canPick ? (
-            <button className="button button--coral" disabled={busy} type="button" onClick={() => void pick()}>
-              {busy ? "Painting…" : error ? "Try again" : expression ? "Paint another" : "Paint it"}
-            </button>
-          ) : null}
-          {error ? <p className="booking-alert" role="alert">{error}</p> : (
-            <p className="student-expressions__note">{collection.canPick ? "No repeats. Your picks are saved to your account." : "You’ve explored every expression. Come back when Inês adds more."}</p>
+            </>
           )}
+          <div className="expression-reading__actions">
+            {collection.canPick ? (
+              <button className="button button--coral button--compact" disabled={busy} type="button" onClick={() => void pick()}>
+                {busy ? "Painting…" : error ? "Try again" : expression ? "Paint another" : "Paint it"}
+              </button>
+            ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
+            {error ? <p className="booking-alert" role="alert">{error}</p> : null}
+          </div>
         </div>
-      </div>
+      ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
     </section>
   );
 }

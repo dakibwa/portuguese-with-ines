@@ -1,18 +1,40 @@
 /**
  * The paints a student's expression can be painted in (13 October 2026, at
- * Dan's request that each painting be a different colour on top). Each one
- * carries the cream lettering at AA or better: deep blue 9.3:1, blue 6.5:1,
- * coral 5.4:1 and lavender ink 6.6:1 against #FBF4E5.
+ * Dan's request that each painting be a different colour on top; lavender
+ * joined them the same day). The four dark paints carry cream lettering, and
+ * lavender carries ink, each at AA or better: deep blue 9.3:1, blue 6.5:1,
+ * coral 5.4:1 and lavender ink 6.6:1 with #FBF4E5, lavender 5.4:1 with #1A3169
+ * (cream on lavender would be 2.1:1).
  */
-export const PAINT_KEYS = ["deep", "blue", "coral", "lavender"] as const;
+export const PAINT_KEYS = ["deep", "blue", "coral", "lavender-ink", "lavender"] as const;
 export type PaintKey = (typeof PAINT_KEYS)[number];
 
-/** The paint, then the two colours its drops, dabs and accents are mixed with. */
-export const PAINTS: Record<PaintKey, { paint: string; companion: string; accent: string }> = {
-  deep: { paint: "#203E82", companion: "#AAA4E6", accent: "#EF5D3C" },
-  blue: { paint: "#2C54AA", companion: "#AAA4E6", accent: "#203E82" },
-  coral: { paint: "#B43A26", companion: "#EF5D3C", accent: "#AAA4E6" },
-  lavender: { paint: "#554F91", companion: "#AAA4E6", accent: "#EF5D3C" },
+export type Paint = {
+  paint: string;
+  /** The lettering the phrase shows in through the paint. */
+  letters: string;
+  /** What the paint's streaks and dried edges darken towards. */
+  shade: string;
+  /** How strongly its streaks darken: a light paint shows them more. */
+  streaks: number;
+  /** The two colours its drops, dabs and accents are mixed with. */
+  companion: string;
+  accent: string;
+  /** The near-miss: the thin wash it is brushed in, and the strike that crosses it out. */
+  decoy: string;
+  strike: string;
+};
+
+const CREAM = "#FBF4E5";
+const INK = "#1A3169";
+const LAVENDER_WASH = "#908ACC";
+
+export const PAINTS: Record<PaintKey, Paint> = {
+  deep: { paint: "#203E82", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#EF5D3C", decoy: LAVENDER_WASH, strike: "#203E82" },
+  blue: { paint: "#2C54AA", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#203E82", decoy: LAVENDER_WASH, strike: "#2C54AA" },
+  coral: { paint: "#B43A26", letters: CREAM, shade: "#000000", streaks: 1, companion: "#EF5D3C", accent: "#AAA4E6", decoy: LAVENDER_WASH, strike: "#B43A26" },
+  "lavender-ink": { paint: "#554F91", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#EF5D3C", decoy: "#E2735A", strike: "#554F91" },
+  lavender: { paint: "#AAA4E6", letters: INK, shade: "#554F91", streaks: 0.55, companion: "#554F91", accent: "#EF5D3C", decoy: "#4A66AE", strike: "#AAA4E6" },
 };
 
 const STORE = "ines-expression-paint";

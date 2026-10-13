@@ -21,6 +21,12 @@ export type ExpressionPaintingHandle = {
   rest(paint: PaintKey, wax: string[], fade?: boolean): void;
   /** The crossed-out near-miss dries away once the reading is open. */
   fadeDecoy(): void;
+  /**
+   * The landed painting closes round its phrase as the reading opens: sets
+   * its final size at once, so the card can measure it, and returns what
+   * starts the motion there.
+   */
+  settle(): () => void;
 };
 
 /**
@@ -75,6 +81,7 @@ export function ExpressionPainting({ start, ref }: { start: PaintingStart; ref?:
       show: (phrase, id, paint, fade) => safely((current) => current.show(phrase, id, paint, fade), undefined),
       rest: (paint, wax, fade) => safely((current) => current.rest(paint, wax, fade), undefined),
       fadeDecoy: () => safely((current) => current.fadeDecoy(), undefined),
+      settle: () => safely((current) => current.settle(), () => {}),
     };
   }, []);
 
