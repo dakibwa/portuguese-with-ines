@@ -33,7 +33,17 @@ export async function studentRates(env, studentId) {
   const { results } = await env.DB.prepare(
     "SELECT duration_minutes, amount_cents FROM student_recurring_rates WHERE student_id = ?"
   ).bind(studentId).all();
-  return Object.fromEntries((results ?? []).map((row) => [row.duration_minutes, row.amount_cents]));
+  return withDerived(Object.fromEntries((results ?? []).map((row) => [row.duration_minutes, row.amount_cents])));
+}
+
+/**
+ * By definition a student's 90-minute lesson is 1.5 times their own
+ * 60-minute price (13 October 2026, Dan), unless a 90-minute price of its
+ * own was set or redeemed, which always wins.
+ */
+export function withDerived(rates) {
+  if (rates[60] === undefined || rates[90] !== undefined) return rates;
+  return { ...rates, 90: Math.round(rates[60] * 1.5) };
 }
 
 export async function studentLessonType(env, studentId, lessonType) {

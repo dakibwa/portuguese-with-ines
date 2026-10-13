@@ -24,8 +24,10 @@ export type AdminStudent = {
   unpaidUpcoming?: number;
   /** Active weekly slots. */
   weekly?: number;
-  /** Their own price per lesson length, in cents; a missing length is the standard price. */
+  /** What they pay per lesson length, in cents, a 90-minute price derived from their 60 included; a missing length is the standard price. */
   prices?: Partial<Record<60 | 90, number>>;
+  /** The prices set for them (by her or a code), which is what she edits. */
+  ownPrices?: Partial<Record<60 | 90, number>>;
 };
 
 /** A length mapped to cents, or to null for the standard price again. */

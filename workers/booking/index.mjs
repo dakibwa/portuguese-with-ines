@@ -66,7 +66,7 @@ import {
 } from "./time.mjs";
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
-import { findRecurringCode, studentRates, studentLessonType, priceForMove, teacherRate, rateLimitAddress, takeRateLimit } from "./rates.mjs";
+import { findRecurringCode, studentRates, studentLessonType, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
 import { formatEuros } from "./money.mjs";
 import { bookingSelection, claimSelection } from "./selection.mjs";
@@ -1229,8 +1229,8 @@ async function teacherStudentList(env) {
     .bind(now, now)
     .all();
   const { results: rates } = await env.DB.prepare("SELECT student_id, duration_minutes, amount_cents FROM student_recurring_rates").all();
-  const prices = {};
-  for (const rate of rates ?? []) (prices[rate.student_id] ??= {})[rate.duration_minutes] = rate.amount_cents;
+  const own = {};
+  for (const rate of rates ?? []) (own[rate.student_id] ??= {})[rate.duration_minutes] = rate.amount_cents;
   return (results ?? []).map((row) => ({
     id: row.id,
     name: row.name,
@@ -1244,7 +1244,10 @@ async function teacherStudentList(env) {
     nextLessonAt: row.next_lesson_at ?? null,
     unpaidUpcoming: Number(row.unpaid_upcoming ?? 0),
     weekly: Number(row.weekly ?? 0),
-    prices: prices[row.id] ?? {}
+    // What they pay, a 90-minute price derived from a 60-minute one included,
+    // and the prices set for them, which is what she edits.
+    prices: withDerived(own[row.id] ?? {}),
+    ownPrices: own[row.id] ?? {}
   }));
 }
 
@@ -4433,7 +4436,7 @@ async function handleRecurringRates(request, env) {
     }
     // Their lessons already booked at that length are on it at once, as any
     // price of theirs is (13 October 2026, Dan).
-    await repriceLessons(env, student.id, rate.duration, rate.cents, new Date().toISOString()).run();
+    await repriceStudent(env, student.id);
     return json({ rates, saved: { durationMinutes: rate.duration, cents: rate.cents } }, 200, request, env);
   }
   return json({ rates: await studentRates(env, student.id) }, 200, request, env);
@@ -4721,19 +4724,26 @@ function studentPrices(value) {
  */
 async function setStudentPrices(env, studentId, prices) {
   const now = new Date().toISOString();
-  const statements = [];
-  for (const [minutes, cents] of Object.entries(prices)) {
-    statements.push(cents === null
-      ? env.DB.prepare("DELETE FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = ?").bind(studentId, Number(minutes))
-      : env.DB.prepare(
-        `INSERT INTO student_recurring_rates (student_id, duration_minutes, amount_cents, redeemed_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT(student_id, duration_minutes) DO UPDATE SET amount_cents = excluded.amount_cents, redeemed_at = excluded.redeemed_at`
-      ).bind(studentId, Number(minutes), cents, now));
-    statements.push(repriceLessons(env, studentId, Number(minutes), cents, now));
-  }
+  const statements = Object.entries(prices).map(([minutes, cents]) => cents === null
+    ? env.DB.prepare("DELETE FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = ?").bind(studentId, Number(minutes))
+    : env.DB.prepare(
+      `INSERT INTO student_recurring_rates (student_id, duration_minutes, amount_cents, redeemed_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(student_id, duration_minutes) DO UPDATE SET amount_cents = excluded.amount_cents, redeemed_at = excluded.redeemed_at`
+    ).bind(studentId, Number(minutes), cents, now));
   if (!statements.length) return 0;
-  const results = await env.DB.batch(statements);
-  return results.filter((_, index) => index % 2 === 1).reduce((total, result) => total + (result?.meta?.changes ?? 0), 0);
+  await env.DB.batch(statements);
+  return repriceStudent(env, studentId, now);
+}
+
+/**
+ * Their lessons to come at both lengths, moved to their prices now: a
+ * 90-minute price follows a new 60-minute one when it is derived from it.
+ * Returns how many lessons changed.
+ */
+async function repriceStudent(env, studentId, now = new Date().toISOString()) {
+  const rates = await studentRates(env, studentId);
+  const results = await env.DB.batch([60, 90].map((minutes) => repriceLessons(env, studentId, minutes, rates[minutes] ?? null, now)));
+  return results.reduce((total, result) => total + (result?.meta?.changes ?? 0), 0);
 }
 
 /** Their lessons still to come at one length, moved to a price (null: the standard one). */

@@ -258,11 +258,13 @@ await test("parallel guesses bounded to eight requests per account window", asyn
   const responses = await Promise.all(Array.from({ length: 12 }, () => call("/me/recurring-rates", { user: "outsider", body: { code: "NOPE15", durationMinutes: 60 } })));
   assert.equal(responses.filter((res) => res.status === 429).length, 4);
 });
-await test("saved rate survives catalogue removal, trial and other duration keep public price", async () => {
+await test("saved rate survives catalogue removal; the trial keeps its price; 90 minutes is 1.5x their 60 unless set", async () => {
   const local = { ...env, PRIVATE_RECURRING_CODES: "[]" };
   assert.equal((await studentLessonType(local, "alice", { id: "single", duration_minutes: 60, price_cents: 2500 })).price_cents, 1500);
   assert.equal((await studentLessonType(local, "alice", { id: "trial", duration_minutes: 60, price_cents: 2000 })).price_cents, 2000);
-  assert.equal((await studentLessonType(local, "bob", { id: "long", duration_minutes: 90, price_cents: 3500 })).price_cents, 3500);
+  // Bob has only a 60-minute price, so his 90 minutes is 1.5 times it; Alice's own 90-minute price wins (below).
+  assert.equal((await studentLessonType(local, "bob", { id: "long", duration_minutes: 90, price_cents: 3500 })).price_cents, 2250);
+  assert.equal((await studentLessonType(local, "outsider", { id: "long", duration_minutes: 90, price_cents: 3500 })).price_cents, 3500, "no price of their own: the public one");
   assert.equal(await priceForMove(local, { lesson_type_id: "single", amount_cents: 1800, series_id: "series", student_id: "alice" }, { id: "single", duration_minutes: 60, price_cents: 2500 }), 1800);
   assert.equal(await priceForMove(local, { lesson_type_id: "single", amount_cents: 1800, series_id: "series", student_id: "alice" }, { id: "long", duration_minutes: 90, price_cents: 3500 }), 2700);
 });
@@ -295,8 +297,9 @@ await test("a second code for a length that already has a rate is refused and na
   const refused = await call("/me/recurring-rates", { user: "dora", body: { code: "MOCK19" } });
   assert.equal(refused.status, 409);
   assert.equal((await refused.json()).error, "You already have an agreed rate for 60-minute lessons. Ask Inês if it needs to change.");
-  assert.deepEqual(await savedRates("dora"), { 60: 1500 });
-  // The other length is still open to her.
+  // Until a 90-minute code, her 90 minutes is 1.5 times her 60.
+  assert.deepEqual(await savedRates("dora"), { 60: 1500, 90: 2250 });
+  // The other length is still open to her, and its own code wins.
   assert.equal((await call("/me/recurring-rates", { user: "dora", body: { code: "DEMO27" } })).status, 200);
   assert.deepEqual(await savedRates("dora"), { 60: 1500, 90: 2700 });
 });
@@ -304,7 +307,7 @@ await test("two different prices for one length racing without a named length sa
   await enrol("erin");
   const responses = await Promise.all(["TEST15", "MOCK19"].map((code) => call("/me/recurring-rates", { user: "erin", body: { code } })));
   assert.deepEqual(responses.map((res) => res.status).sort(), [200, 409]);
-  assert.deepEqual(Object.keys(await savedRates("erin")), ["60"]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM student_recurring_rates WHERE student_id = 'erin'").get().n, 1);
 });
 await test("an unknown code is refused without naming a length, and a named length still has to match", async () => {
   await enrol("finn");
@@ -2314,7 +2317,7 @@ await test("her price for a student prices their lessons, and only lessons nothi
     const created = await add({ email: "priced@example.invalid", name: "Rita", prices: { 60: 2000 } });
     assert.equal(created.status, 201, await created.clone().text());
     const { student } = await created.json();
-    assert.deepEqual(student.prices, { 60: 2000 });
+    assert.deepEqual([student.prices, student.ownPrices], [{ 60: 2000, 90: 3000 }, { 60: 2000 }], "90 minutes is 1.5 times her 60-minute price");
     const book = (body) => call("/admin/bookings", { user: "teacher", body: { email: "priced@example.invalid", ...body } });
     assert.equal((await book({ lessonType: "single", startAt: "2026-10-26T10:00:00.000Z" })).status, 201);
     assert.equal((await book({ lessonType: "single", startAt: "2026-10-27T10:00:00.000Z", repeat: 4 })).status, 201);
@@ -2326,7 +2329,7 @@ await test("her price for a student prices their lessons, and only lessons nothi
     assert.ok(count >= 4);
     assert.deepEqual(amounts(), Array(count).fill(2000), "one-off or weekly, her price is theirs");
     const rest = (cents) => Array(count - 3).fill(cents);
-    assert.equal(long(), 3500, "a length she gave no price keeps the standard one");
+    assert.equal(long(), 3000, "their 90-minute lesson is 1.5 times their 60-minute price");
     captureEmail();
     try {
       assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 200);
@@ -2348,11 +2351,16 @@ await test("her price for a student prices their lessons, and only lessons nothi
 
     const raised = await price({ 60: 2400 });
     assert.equal(raised.status, 200, await raised.clone().text());
-    assert.equal((await raised.json()).updated, count - 3);
+    assert.equal((await raised.json()).updated, count - 3 + 1, "and the 90-minute lesson follows its derived price");
     assert.deepEqual(amounts(), [2000, 2000, 2000, ...rest(2400)], "a higher price never reaches what they agreed at checkout");
+    assert.equal(long(), 3600);
     await price({ 60: 1800 });
     assert.deepEqual(amounts(), [1800, 2000, 2000, ...rest(1800)], "a lower one does");
-    const reset = await price({ 60: null });
+    assert.equal(long(), 2700);
+    // A 90-minute price of its own wins over the derived one.
+    await price({ 90: 2500 });
+    assert.equal(long(), 2500);
+    const reset = await price({ 60: null, 90: null });
     assert.deepEqual((await reset.json()).student.prices, {});
     assert.deepEqual(amounts(), [1800, 2000, 2000, ...rest(2500)]);
     assert.equal(long(), 3500);

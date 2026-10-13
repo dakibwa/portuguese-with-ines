@@ -1222,7 +1222,11 @@ names; they now mean "inside the window".
 
 **One price per student per length (13 October 2026, Dan).** A student's own
 price for a length, whether from a code they added or set by Inês, prices every
-lesson of theirs at that length, one-off or weekly. The trial keeps its own
+lesson of theirs at that length, one-off or weekly. By definition their
+90-minute price is 1.5 times their own 60-minute price unless a 90-minute
+price of its own was set or redeemed, which always wins (`withDerived` in
+`rates.mjs`; the derived price is never stored, so a later 90-minute price
+simply takes over). The trial keeps its own
 price and €5 fees never change. Inês sets it when she adds a student or later
 from their profile (`POST /admin/students/:id/prices`, `{ prices: { 60: cents
 | null, 90: cents | null } }`, €1–€100, null for the standard price again), and

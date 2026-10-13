@@ -20,9 +20,9 @@ export function priceFor(student: Pick<AdminStudent, "prices"> | null | undefine
   return student?.prices?.[minutes] ?? standardPrice(minutes);
 }
 
-export function priceDraft(student?: Pick<AdminStudent, "prices"> | null): PriceDraft {
+export function priceDraft(student?: Pick<AdminStudent, "prices" | "ownPrices"> | null): PriceDraft {
   const euros = (minutes: Length) => {
-    const cents = student?.prices?.[minutes];
+    const cents = (student?.ownPrices ?? student?.prices)?.[minutes];
     return cents === undefined ? "" : (cents / 100).toFixed(cents % 100 ? 2 : 0);
   };
   return { 60: euros(60), 90: euros(90) };
@@ -48,7 +48,19 @@ export function pricesFromDraft(draft: PriceDraft, { keepEmpty }: { keepEmpty: b
   return prices;
 }
 
-/** Two fields side by side, the standard price showing until she types her own. */
+/** What a typed price reads as in cents, or null. */
+function typedCents(text: string) {
+  const value = text.trim().replace(",", ".").replace(/^€\s*/, "");
+  return /^\d{1,3}(\.\d{1,2})?$/.test(value) ? Math.round(Number(value) * 100) : null;
+}
+
+const euroText = (cents: number) => (cents / 100).toFixed(cents % 100 ? 2 : 0);
+
+/**
+ * Two fields side by side, the standard price showing until she types her
+ * own; once she types a 60-minute price the 90-minute field shows 1.5 times
+ * it, which is what an empty 90 means (13 October 2026, Dan).
+ */
 export function PriceFields({ draft, disabled, idPrefix, onChange }: {
   draft: PriceDraft;
   disabled?: boolean;
@@ -69,7 +81,7 @@ export function PriceFields({ draft, disabled, idPrefix, onChange }: {
               id={`${idPrefix}-${minutes}`}
               inputMode="decimal"
               onChange={(event) => onChange({ ...draft, [minutes]: event.target.value })}
-              placeholder={String(standardPrice(minutes) / 100)}
+              placeholder={minutes === 90 && typedCents(draft[60]) ? euroText(Math.round(typedCents(draft[60])! * 1.5)) : euroText(standardPrice(minutes))}
               type="text"
               value={draft[minutes]}
             />
@@ -124,7 +136,7 @@ export function StudentPrice({ token, student, onChanged }: {
       {editing ? (
         <form className="teacher-form" noValidate onSubmit={(event) => { event.preventDefault(); void save(); }}>
           <PriceFields draft={draft} disabled={busy} idPrefix="teacher-price" onChange={setDraft} />
-          <p className="teacher-price__hint">Leave one empty for the standard price.</p>
+          <p className="teacher-price__hint">Leave 90 mins empty for 1.5× their 60, or both for the standard price.</p>
           <div className="teacher-dialog-actions">
             <button className="button button--coral button--compact" disabled={busy} type="submit">{busy ? "Saving…" : "Save price"}</button>
             <button className="button button--outline button--compact" disabled={busy} onClick={() => { setEditing(false); setDraft(priceDraft(student)); setError(""); }} type="button">Cancel</button>
@@ -136,7 +148,9 @@ export function StudentPrice({ token, student, onChanged }: {
             {LENGTHS.map((minutes) => (
               <li key={minutes}>
                 {minutes} mins · <strong>{formatMoneyCents(priceFor(student, minutes))}</strong>
-                {student.prices?.[minutes] === undefined ? " · standard" : ""}
+                {student.prices?.[minutes] === undefined
+                  ? " · standard"
+                  : minutes === 90 && student.ownPrices && student.ownPrices[90] === undefined ? " · 1.5× their 60" : ""}
               </li>
             ))}
           </ul>

@@ -64,7 +64,9 @@ Use these names in review so recurring problems are easy to recognise:
 
 A student's own price (from a code, or set by Inês) prices every lesson of
 theirs at that length, one-off or weekly; the trial keeps its own (13 October
-2026, Dan). Each length choice carries its price (`60 mins · €20`), in booking,
+2026, Dan). Their 90-minute price is 1.5 times their 60 unless one was set for
+90 minutes; her price fields show it as the 90-minute placeholder once she
+types a 60, and their profile marks it `1.5× their 60`. Each length choice carries its price (`60 mins · €20`), in booking,
 in a lesson's change and in Inês's lesson form, rather than on a line of its
 own. Recurring checkout shows the final per-lesson price before confirmation.
 Code entry belongs only under Edit details, behind the small “Have a code from
