@@ -1892,14 +1892,21 @@
 }
 .teacher-hours-warning:not(:empty) {
   margin: 0 0 0.8rem;
-  padding: 0.65rem 0.85rem;
-  border-left: 3px solid var(--coral);
-  border-radius: 0 10px 12px 0;
-  background: rgba(239, 93, 60, 0.08);
   font: 400 0.8rem/1.5 var(--ui);
 }
 .teacher-hours-warning p { margin: 0; }
-.teacher-hours-warning ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+.teacher-hours-clashes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: 0.65rem; margin: 0; padding: 0; list-style: none; }
+.teacher-hours-clash { min-width: 0; padding: 0.75rem 0.85rem; border: 1px solid rgba(239, 93, 60, 0.25); border-left: 3px solid var(--coral); border-radius: var(--squiggle-field); background: rgba(239, 93, 60, 0.06); }
+.teacher-hours-clash__heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.3rem 0.6rem; }
+.teacher-hours-clash__heading > strong { overflow-wrap: anywhere; }
+.teacher-hours-clash__flag { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--coral-action); font: 600 0.7rem/1.4 var(--ui); white-space: nowrap; }
+.teacher-hours-warning .teacher-hours-clash__when { display: flex; flex-wrap: wrap; gap: 0.1rem 0.6rem; margin: 0.3rem 0 0.6rem; font-size: 0.75rem; }
+.teacher-hours-clash__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.35rem 0.6rem; }
+.teacher-hours-clash__actions > span { color: var(--lavender-ink); font-size: 0.7rem; }
+.teacher-hours-clash__actions .button { min-height: 36px; padding: 0.35rem 0.65rem; font-size: 0.7rem; gap: 0.2rem; }
+.teacher-hours-clashes-more { margin-top: 0.55rem; }
+.teacher-hours-clashes-more > summary { width: fit-content; padding: 0.35rem 0; cursor: pointer; font-weight: 600; }
+.teacher-hours-clashes-more[open] > summary { margin-bottom: 0.35rem; }
 .teacher-timeoff > .teacher-tool-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
 .teacher-timeoff-dialog h2 { margin-right: 2.5rem; }
 .teacher-timeoff-dialog form { display: grid; gap: 1rem; }

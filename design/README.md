@@ -1131,7 +1131,10 @@ as a form:
   still takes them off together. The `Time off` month opens each date in a popup
   for a whole day off or specific hours. `Select several days` keeps bulk changes
   available across months and tabs. Booked lessons are named and stay until she
-  moves or cancels them. A lesson she
+  moves or cancels them. A weekly-hours clash is a compact lesson card: student,
+  date and time, `Hours clash`, `Stays booked`, and `Change lesson`. Its button
+  opens the lesson's existing actions without losing the hours draft; further
+  cards expand when more than four lessons clash. A lesson she
   added herself, for a booking arranged elsewhere, reads apart from the
   students' own while lessons move onto the site: lilac with a dashed edge
   and `Added` within its card on the week, `Added by you` in the key, the

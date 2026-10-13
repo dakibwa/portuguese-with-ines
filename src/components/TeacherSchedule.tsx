@@ -60,6 +60,40 @@ function shortDate(date: string) {
   return dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
 }
 
+function HoursClashCard({ booking, disabled, onOpen }: {
+  booking: AdminBooking;
+  disabled: boolean;
+  onOpen: (booking: AdminBooking) => void;
+}) {
+  const day = shortDate(dateKey(new Date(booking.starts_at)));
+  return (
+    <li className="teacher-hours-clash">
+      <div className="teacher-hours-clash__heading">
+        <strong>{booking.student_name}</strong>
+        <span className="teacher-hours-clash__flag">
+          <AlertCircle size={13} aria-hidden="true" /> Hours clash
+        </span>
+      </div>
+      <p className="teacher-hours-clash__when">
+        <span>{day}</span>
+        <strong>{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</strong>
+      </p>
+      <div className="teacher-hours-clash__actions">
+        <span>Stays booked</span>
+        <button
+          className="button button--outline button--compact"
+          type="button"
+          disabled={disabled}
+          aria-label={`Change lesson for ${booking.student_name} on ${day}`}
+          onClick={() => onOpen(booking)}
+        >
+          Change lesson <ChevronRight size={14} aria-hidden="true" />
+        </button>
+      </div>
+    </li>
+  );
+}
+
 export function TeacherSchedule() {
   const [token, setToken] = useState("");
   const [me, setMe] = useState<Student | null>(null);
@@ -640,9 +674,17 @@ export function TeacherSchedule() {
         {editing && hoursDirty ? (
           <div className="teacher-hours-warning" aria-live="polite">
             {bookingsLoading ? <p>Checking booked lessons…</p> : bookingsError ? <div role="alert"><p>Booked lessons could not be checked.</p><button className="teacher-text-button" onClick={() => void reloadBookings()} type="button">Try again</button></div> : affectedLessons.length ? <>
-              <p><strong>{affectedLessons.length === 1 ? "1 booked lesson falls" : `${affectedLessons.length} booked lessons fall`} in the hours you’re changing.</strong> {affectedLessons.length === 1 ? "It stays" : "They stay"} booked.</p>
-              <ul>{affectedLessons.slice(0, 4).map(booking => <li key={booking.id}>{booking.student_name} · {shortDate(dateKey(new Date(booking.starts_at)))} · {formatSlotTime(booking.starts_at)}</li>)}</ul>
-              {affectedLessons.length > 4 ? <p>And {affectedLessons.length - 4} more.</p> : null}
+              <ul className="teacher-hours-clashes" aria-label="Lessons that clash with your hours">
+                {affectedLessons.slice(0, 4).map(booking => <HoursClashCard key={booking.id} booking={booking} disabled={savingHours} onOpen={setSelectedBooking} />)}
+              </ul>
+              {affectedLessons.length > 4 ? (
+                <details className="teacher-hours-clashes-more">
+                  <summary>{affectedLessons.length - 4} more {affectedLessons.length === 5 ? "lesson" : "lessons"}</summary>
+                  <ul className="teacher-hours-clashes" aria-label="More lessons that clash with your hours">
+                    {affectedLessons.slice(4).map(booking => <HoursClashCard key={booking.id} booking={booking} disabled={savingHours} onOpen={setSelectedBooking} />)}
+                  </ul>
+                </details>
+              ) : null}
             </> : null}
           </div>
         ) : null}

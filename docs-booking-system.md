@@ -192,7 +192,11 @@ failure of the latest choice puts that date back as saved and says so.
 Weekly-hours drafts warn when changed lesson start times overlap an existing
 confirmed lesson in Porto time, including ongoing and future lessons. Saving
 waits for booked lessons to load; the warning and save confirmation both state
-that existing lessons stay booked. Hours edits never move or cancel them.
+that existing lessons stay booked. Each clash is a lesson card with a
+`Change lesson` button opening the existing move/cancel dialog. Opening or
+changing a lesson preserves the weekly-hours draft; a completed change refreshes
+the clash cards. More than four affected lessons expand from `more lessons`.
+Hours edits never move or cancel lessons themselves.
 Leaving the teacher page releases its queue: an already submitted write may
 finish, but no later queued write starts. Unreadable time-off or weekly-hours
 acknowledgments show an error instead of claiming success. Past dates and
