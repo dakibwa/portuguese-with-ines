@@ -2243,6 +2243,31 @@ await test("a sign-in link signs an existing student in once, while the address 
     forgetStudent("linked-squat@example.invalid");
   }
 });
+await test("a student she adds can start with her phone, NIF and splat, and an existing one keeps their own", async () => {
+  captureEmail();
+  try {
+    const add = (body) => call("/admin/bookings", { user: "teacher", body: { lessonType: "single", ...body } });
+    const refused = await add({ email: "newcomer@example.invalid", name: "Nova Pessoa", nif: "123456788", startAt: "2026-10-20T10:00:00.000Z" });
+    assert.equal(refused.status, 400);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM students WHERE email='newcomer@example.invalid'").get().n, 0, "a refused NIF creates nothing");
+    assert.equal((await add({ email: "newcomer@example.invalid", mark: "sparkle", startAt: "2026-10-20T10:00:00.000Z" })).status, 400);
+    const added = await add({ email: "newcomer@example.invalid", name: "Nova Pessoa", phone: "+351 912 345 678", nif: "PT 123 456 789", mark: "bloom", startAt: "2026-10-20T10:00:00.000Z" });
+    assert.equal(added.status, 201, await added.clone().text());
+    await drain();
+    const created = db.prepare("SELECT name, phone, nif, mark FROM students WHERE email='newcomer@example.invalid'").get();
+    assert.deepEqual({ ...created }, { name: "Nova Pessoa", phone: "+351 912 345 678", nif: "123456789", mark: "bloom" });
+    // Her details only fill what the student hasn't set themselves.
+    db.prepare("UPDATE students SET phone='+44 7700 900000', nif='', mark='duo' WHERE email='newcomer@example.invalid'").run();
+    const again = await add({ email: "newcomer@example.invalid", phone: "+351 900 000 000", nif: "123456789", mark: "pool", startAt: "2026-10-21T10:00:00.000Z" });
+    assert.equal(again.status, 201, await again.clone().text());
+    await drain();
+    const kept = db.prepare("SELECT phone, nif, mark FROM students WHERE email='newcomer@example.invalid'").get();
+    assert.deepEqual({ ...kept }, { phone: "+44 7700 900000", nif: "123456789", mark: "duo" });
+  } finally {
+    releaseEmail();
+    forgetStudent("newcomer@example.invalid");
+  }
+});
 await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('launch-check','launch-check-0000@example.invalid','Launch Verification','x','2026-09-05T08:56:55.286Z')").run();

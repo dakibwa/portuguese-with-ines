@@ -2,7 +2,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { CheckCircle2, Globe, Plus, UserRound, X } from "lucide-react";
+import { AccountAvatar } from "@/components/AccountMenu";
 import { createBookingFor, type AdminStudent } from "@/lib/admin-api";
+import { STUDENT_MARKS } from "@/lib/student-marks";
 import { portoTimeToUtc } from "@/lib/booking-api";
 import { dateLabel, minuteLabel } from "@/lib/teacher-calendar";
 import { restoreDialogFocus } from "@/lib/dialog-focus";
@@ -14,6 +16,9 @@ type Repeat = "once" | 4 | 6 | 8 | "open";
 const empty = {
   email: "",
   name: "",
+  phone: "",
+  nif: "",
+  mark: "",
   lessonType: "single",
   date: "",
   time: "17:00",
@@ -64,6 +69,9 @@ function LessonForm({
 }) {
   const [lesson, setLesson] = useState({ ...empty, date, time, ...(student ? { email: student.email, name: student.name } : {}) });
   const knownStudent = known.find((entry) => entry.email.toLowerCase() === lesson.email.trim().toLowerCase());
+  // Someone new gets their details set up here, so their account is ready
+  // when they first sign in (13 October 2026, Dan).
+  const newStudent = !knownStudent && /^\S+@\S+\.\S+$/.test(lesson.email.trim());
   // A trial is one first lesson, and choosing it puts How often back to once.
   const weekly = lesson.repeat !== "once";
   const [busy, setBusyState] = useState(false);
@@ -89,6 +97,7 @@ function LessonForm({
               startAt: portoTimeToUtc(lesson.date, lesson.time),
               location: lesson.location,
               notes: "",
+              ...(newStudent ? { phone: lesson.phone.trim(), nif: lesson.nif.trim(), mark: lesson.mark } : {}),
               ...(weekly ? { repeat: lesson.repeat as Exclude<Repeat, "once"> } : {}),
             });
             // Ready for the next student, never the one just added.
@@ -125,7 +134,7 @@ function LessonForm({
           ) : null}
         </label>
         <label>
-          <span>Student&rsquo;s name</span>
+          <span>Student&rsquo;s full name</span>
           <input
             type="text"
             disabled={busy}
@@ -150,6 +159,49 @@ function LessonForm({
             <small className="teacher-manual-known" id={`${idPrefix}-known`}>Already one of your students</small>
           ) : null}
         </label>
+        {newStudent ? (
+          <>
+            <label>
+              <span>Phone <span className="teacher-field-optional">(optional)</span></span>
+              <input
+                type="tel"
+                autoComplete="off"
+                disabled={busy}
+                value={lesson.phone}
+                onChange={(e) => setLesson({ ...lesson, phone: e.target.value })}
+              />
+            </label>
+            <label>
+              <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={busy}
+                value={lesson.nif}
+                onChange={(e) => setLesson({ ...lesson, nif: e.target.value })}
+              />
+            </label>
+            <div className="teacher-manual-splat">
+              <span id={`${idPrefix}-splat`}>Their splat <span className="teacher-field-optional">(optional)</span></span>
+              <div aria-labelledby={`${idPrefix}-splat`} className="my-lessons__marks" role="group">
+                {[{ id: "", label: "Their initial" }, ...STUDENT_MARKS].map((choice) => (
+                  <button
+                    aria-label={choice.label}
+                    aria-pressed={lesson.mark === choice.id}
+                    className="my-lessons__mark"
+                    disabled={busy}
+                    key={choice.id || "initial"}
+                    onClick={() => setLesson({ ...lesson, mark: choice.id })}
+                    type="button"
+                  >
+                    <AccountAvatar mark={choice.id} name={lesson.name.trim() || lesson.email.trim() || "?"} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : null}
         {/* Length and place as the booking's sliders, rather than menus to
             open (10 October 2026, at Dan's request). */}
         <fieldset className="teacher-manual-choice">

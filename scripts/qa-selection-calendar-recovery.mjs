@@ -537,7 +537,7 @@ try {
         await page.getByText("Add a lesson for a student", { exact: true }).click();
         const form = page.locator(".teacher-manual-form");
         await form.getByLabel("Student’s email", { exact: true }).fill("other@example.invalid");
-        await form.getByLabel("Student’s name", { exact: true }).fill("New student");
+        await form.getByLabel("Student’s full name", { exact: true }).fill("New student");
         await form.getByLabel("Date", { exact: true }).fill("2026-10-06");
         await form.getByLabel("Time in Porto", { exact: true }).fill("10:00");
         await form.getByRole("button", { name: "Add lesson and email student", exact: true }).click();

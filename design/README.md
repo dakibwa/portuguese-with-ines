@@ -1171,7 +1171,10 @@ as a form:
   in, a coral `Send sign-in link`. Those come first, their card edged in
   coral (12 October 2026, Dan: "can this be more beautiful"). Her form's
   email field suggests the students she already has, and choosing one fills
-  in their name (`Already one of your students`): everything she does here
+  in their name (`Already one of your students`). For someone new she can
+  also give `Phone`, `NIF` (for receipts) and `Their splat`, the student's own
+  picker, all optional, so their account is ready when they first sign in
+  (13 October 2026, Dan): everything she does here
   should take as few steps as it can. A lesson opens in the student's own dialog: status, the student,
   the time in bold with its length and place beneath, then `Move lesson` in
   coral beside `Cancel lesson`, with `Mark no-show` a quiet link below.

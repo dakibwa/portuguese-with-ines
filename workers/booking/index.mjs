@@ -4842,6 +4842,14 @@ async function handleAdmin(request, env, ctx, url, path) {
     const email = normaliseEmail(body.email);
     const name = cleanText(body.name, 120);
     if (!isEmail(email)) return fail("Please give the student's email address.", 400, request, env);
+    // Details she can give for someone new (13 October 2026, Dan), so their
+    // account is ready when they first sign in. Each is optional.
+    const phone = cleanText(body.phone, 40);
+    const nif = normaliseNif(body.nif);
+    const nifTrouble = nifProblem(nif);
+    if (nifTrouble) return fail(nifTrouble, 400, request, env);
+    const mark = typeof body.mark === "string" ? body.mark : "";
+    if (!STUDENT_MARKS.has(mark)) return fail("Choose one of the splats.", 400, request, env);
 
     let lessonType = await loadLessonType(env, cleanText(body.lessonType, 40) || "single");
     if (!lessonType) return fail("That lesson type is not available.", 400, request, env);
@@ -4882,12 +4890,25 @@ async function handleAdmin(request, env, ctx, url, path) {
       // with Google, or by asking for a link on the sign-in page.
       const id = crypto.randomUUID();
       await env.DB.prepare(
-        `INSERT INTO students (id, email, name, phone, timezone, password_hash, created_at)
-         VALUES (?, ?, ?, '', ?, '', ?)`
+        `INSERT INTO students (id, email, name, phone, nif, mark, timezone, password_hash, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, '', ?)`
       )
-        .bind(id, email, name || email.split("@")[0], PORTO, now)
+        .bind(id, email, name || email.split("@")[0], phone, nif, mark, PORTO, now)
         .run();
       student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(id).first();
+    } else if (student.role === "student" && (phone || nif || mark)) {
+      // Someone she already has keeps what they set themselves: her details
+      // only fill gaps, never overwrite.
+      await env.DB.prepare(
+        `UPDATE students SET
+           phone = CASE WHEN COALESCE(phone, '') = '' THEN ? ELSE phone END,
+           nif = CASE WHEN COALESCE(nif, '') = '' THEN ? ELSE nif END,
+           mark = CASE WHEN COALESCE(mark, '') = '' THEN ? ELSE mark END
+         WHERE id = ?`
+      )
+        .bind(phone, nif, mark, student.id)
+        .run();
+      student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(student.id).first();
     }
 
     /*

@@ -240,6 +240,11 @@ row's `Add lesson` opens the form with that student in it. Form drafts survive
 tab changes. All teacher actions still use the authenticated admin endpoints and
 their existing booking, payment and email safeguards.
 
+For a new student the form also takes an optional phone, NIF and splat;
+`POST /admin/bookings` accepts them as `phone`, `nif` and `mark`, checks the NIF
+as `/me` does and refuses an unknown splat before creating anything. An
+existing student keeps their own details: hers only fill fields still empty.
+
 ## Accounts
 
 Booking requires an account, so a student's lessons persist together rather than

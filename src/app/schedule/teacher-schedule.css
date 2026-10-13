@@ -874,6 +874,16 @@
   gap: 1rem;
   margin-top: 1.5rem;
 }
+/* A new student's splat, as they would choose it themselves. */
+.teacher-manual-splat {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.teacher-manual-splat > span {
+  font: 600 0.68rem/1.5 var(--ui);
+}
 /* Lesson length and place as the booking's sliders. */
 .teacher-manual-choice {
   min-width: 0;

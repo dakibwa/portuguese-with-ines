@@ -235,6 +235,10 @@ export function createBookingFor(
     startAt: string;
     location: "online" | "porto";
     notes: string;
+    /** For someone new: filled in on their account; an existing one keeps their own. */
+    phone?: string;
+    nif?: string;
+    mark?: string;
     /** Weekly: 4, 6 or 8 weeks, or "open" until stopped. Left out, one lesson. */
     repeat?: 4 | 6 | 8 | "open";
   },

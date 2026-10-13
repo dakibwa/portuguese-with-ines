@@ -650,7 +650,11 @@ try {
   );
   await manual.locator("summary").click();
   await manual.getByLabel("Student’s email").fill("manual@example.invalid");
-  await manual.getByLabel("Student’s name").fill("Robin");
+  await manual.getByLabel("Student’s full name").fill("Robin");
+  // Someone new can start with their details and a splat.
+  await manual.getByLabel(/^Phone/).fill("+351 912 345 678");
+  await manual.getByLabel(/^NIF/).fill("123456789");
+  await manual.getByRole("button", { name: "Bloom", exact: true }).click();
   await manual.getByRole("radio", { name: "In Porto", exact: true }).check();
   await manual.getByLabel("Date", { exact: true }).fill("2026-09-11");
   await manual
@@ -662,6 +666,8 @@ try {
       .location,
     "porto",
   );
+  const robin = state.writes.find((entry) => entry.path === "/admin/bookings").data;
+  assert.deepEqual([robin.phone, robin.nif, robin.mark], ["+351 912 345 678", "123456789", "bloom"]);
   await page.getByRole("button", { name: /^Robin,.*View lesson$/ }).click();
   await page
     .getByRole("button", { name: "Cancel lesson", exact: true })
@@ -715,7 +721,7 @@ try {
   await expect(addDialog.getByLabel("Date", { exact: true })).toHaveValue("2026-09-10");
   await expect(addDialog.getByLabel("Time in Porto")).toHaveValue("18:00");
   await addDialog.getByLabel("Student’s email").fill("slot@example.invalid");
-  await addDialog.getByLabel("Student’s name").fill("Kai");
+  await addDialog.getByLabel("Student’s full name").fill("Kai");
   await addDialog.getByRole("button", { name: "Add lesson and email student" }).click();
   await expect(addDialog).toHaveCount(0);
   await expect(page.locator(".teacher-workspace > .teacher-inline-success")).toContainText("Lesson added");
@@ -734,7 +740,7 @@ try {
   await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
   const weeklyDialog = page.getByRole("dialog", { name: "Add a lesson" });
   await weeklyDialog.getByLabel("Student’s email").fill("sam@example.invalid");
-  await expect(weeklyDialog.getByLabel("Student’s name")).toHaveValue("Sam Known");
+  await expect(weeklyDialog.getByLabel("Student’s full name")).toHaveValue("Sam Known");
   await expect(weeklyDialog).toContainText("Already one of your students");
   await weeklyDialog.getByRole("radio", { name: "Weekly", exact: true }).check();
   await expect(weeklyDialog.getByRole("radio", { name: "Until stopped", exact: true })).toBeChecked();

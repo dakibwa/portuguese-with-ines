@@ -108,7 +108,7 @@ async function formFor(page, action, current = booking) {
     await page.getByText("Add a lesson for a student", { exact: true }).click();
     const form = page.locator(".teacher-manual-form");
     await form.getByLabel("Student’s email", { exact: true }).fill("ana@example.invalid");
-    await form.getByLabel("Student’s name", { exact: true }).fill("Ana Martins");
+    await form.getByLabel("Student’s full name", { exact: true }).fill("Ana Martins");
     return { form, date: form.getByLabel("Date", { exact: true }), time: form.getByLabel("Time in Porto", { exact: true }), submit: form.getByRole("button", { name: "Add lesson and email student", exact: true }) };
   }
   const fold = current.starts_at.startsWith("2026-10-25");
