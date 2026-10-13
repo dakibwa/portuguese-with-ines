@@ -5,12 +5,17 @@ import { BOOKING_REPLY_ERROR, isApiInstant, isApiRecord } from "@/lib/api-respon
 export type AdminStudent = {
   id: string;
   name: string;
+  /** Empty when she set them up from a name alone and has not given one yet. */
   email: string;
   phone: string;
+  /** Nine digits for their receipts; empty for consumidor final. */
+  nif?: string;
   /** The splat they chose for their account; empty for their initial. */
   mark?: string;
   /** Has ever signed in, or set a password or Google sign-in. */
   signedIn?: boolean;
+  /** Set up by her and not emailed yet: the site sends them nothing until she sends their welcome. */
+  awaitingWelcome?: boolean;
   hasCard?: boolean;
   /** A card saved from their account, which pays for the lessons she adds. */
   cardForAllLessons?: boolean;
@@ -20,7 +25,14 @@ export type AdminStudent = {
   unpaidUpcoming?: number;
   /** Active weekly slots. */
   weekly?: number;
+  /** What they pay per lesson length, in cents, a 90-minute price derived from their 60 included; a missing length is the standard price. */
+  prices?: Partial<Record<60 | 90, number>>;
+  /** The prices set for them (by her or a code), which is what she edits. */
+  ownPrices?: Partial<Record<60 | 90, number>>;
 };
+
+/** A length mapped to cents, or to null for the standard price again. */
+export type StudentPrices = Partial<Record<60 | 90, number | null>>;
 
 export type AvailabilityRule = {
   id: number;
@@ -53,6 +65,8 @@ export type AdminBooking = {
   student_nif?: string;
   /** The splat the student chose to wear beside their name; empty for none. */
   student_mark?: string;
+  /** Their student is set up but not welcomed yet, so no email reaches them. */
+  student_awaiting_welcome?: number;
   starts_at: string;
   ends_at: string;
   status: "confirmed" | "cancelled";
@@ -80,6 +94,8 @@ export type AdminBooking = {
   attendance_status: "expected" | "no_show";
   /** 1 when Inês added it herself (migration 0023). */
   added_by_teacher?: number;
+  /** The lesson's own price, as booked. */
+  amount_cents?: number | null;
 };
 
 /**
@@ -217,7 +233,70 @@ export function fetchStudents(token: string) {
   return adminRequest<{ students: AdminStudent[]; cardsAccepted?: boolean }>(token, "/admin/students");
 }
 
-/** Emails a student a fresh one-click way into their account. */
+/**
+ * One amount Inês owes a fatura-recibo for: a lesson's price (or the no-show
+ * amount) or a late change fee. `id` is stable, so her automation can remember
+ * what it has issued; `ready` is true once the money is in.
+ */
+export type ReceiptLine = {
+  id: string;
+  bookingId: string;
+  reference: string;
+  kind: "lesson" | "no-show" | "late-change-fee";
+  label: string;
+  lessonStartsAt: string;
+  studentName: string;
+  studentEmail: string;
+  /** Nine digits, or empty for consumidor final. */
+  nif: string;
+  amountCents: number | null;
+  method: "card" | "by hand";
+  state: "paid" | "refunded" | "due" | "charging";
+  ready: boolean;
+  stripePaymentIntent: string;
+};
+
+/** A Porto month's receipts ("2026-10"), as her automation reads them too. */
+export function fetchReceipts(token: string, month: string) {
+  return adminRequest<{ month: string; receipts: ReceiptLine[]; totals: { ready: number; readyCents: number } }>(
+    token,
+    `/admin/receipts?month=${encodeURIComponent(month)}`,
+  );
+}
+
+export type StudentDetailsInput = { email: string; name: string; phone: string; nif: string; mark: string };
+
+/**
+ * Sets a student up with their details; nothing is emailed (13 October 2026,
+ * Dan). Only the name is needed: an empty email shows as "" until she gives one.
+ */
+export function addStudent(token: string, input: StudentDetailsInput & { prices?: StudentPrices }) {
+  return adminRequest<{ student: AdminStudent }>(token, "/admin/students", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Their details, all at once. Their email can change only until they first sign in. */
+export function updateStudentDetails(token: string, studentId: string, input: StudentDetailsInput) {
+  return adminRequest<{ student: AdminStudent }>(token, `/admin/students/${encodeURIComponent(studentId)}/details`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * Her price for a student. It prices every lesson of theirs at that length, and
+ * their lessons to come that nothing is settled on follow it; `updated` counts them.
+ */
+export function setStudentPrices(token: string, studentId: string, prices: StudentPrices) {
+  return adminRequest<{ student: AdminStudent; updated: number }>(token, `/admin/students/${encodeURIComponent(studentId)}/prices`, {
+    method: "POST",
+    body: JSON.stringify({ prices }),
+  });
+}
+
+/** Emails a student their lessons so far and a one-click way into their account. */
 export function sendStudentWelcome(token: string, studentId: string) {
   return adminRequest<{ ok: true; card?: boolean }>(token, `/admin/students/${encodeURIComponent(studentId)}/welcome`, {
     method: "POST",
@@ -241,6 +320,8 @@ export function createBookingFor(
 ) {
   return adminRequest<{
     booking: { reference: string };
+    /** False while the student awaits their welcome: nothing was sent to them. */
+    emailed?: boolean;
     series?: { booked: number; skipped: { key: string; startAt: string; reason: string }[] };
   }>(
     token,
@@ -257,7 +338,7 @@ export function rescheduleBookingAs(
   bookingId: string,
   startAt: string,
 ) {
-  return adminRequest<{ booking: { reference: string } }>(
+  return adminRequest<{ booking: { reference: string }; emailed?: boolean }>(
     token,
     `/admin/bookings/${bookingId}/reschedule`,
     {
@@ -268,7 +349,7 @@ export function rescheduleBookingAs(
 }
 
 export function cancelBookingAs(token: string, bookingId: string, message?: string) {
-  return adminRequest<{ booking: { reference: string } }>(
+  return adminRequest<{ booking: { reference: string }; emailed?: boolean }>(
     token,
     `/admin/bookings/${bookingId}/cancel`,
     {

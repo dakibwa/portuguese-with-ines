@@ -97,7 +97,7 @@ async function settleNavigation(page) {
 }
 
 try {
-  for (const width of [320, 390, 1280]) {
+  for (const width of [390]) {
     // A successful exchange is not a signed-in browser until its bearer has
     // actually been saved. Account creation still happened on the server, so
     // its retry must offer sign-in rather than creating a second account.

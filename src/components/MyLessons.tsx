@@ -91,7 +91,7 @@ export function MyLessons({
 }: {
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
   initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; cardsAccepted?: boolean } | null;
-  /** The account's saved weekly rates, as last read or changed here, so booking prices with them. */
+  /** The account's own prices, as last read or changed here, so booking prices with them. */
   onRatesChange?: (rates: Record<number, number>) => void;
   onSelectSection?: (section: AccountSection) => void;
   onSignOut?: () => void;
@@ -121,7 +121,7 @@ export function MyLessons({
   const [emailPending, setEmailPending] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
   const [detailsNote, setDetailsNote] = useState("");
-  // The weekly rates saved on the account, read each time the details open.
+  // The prices saved on the account, read each time the details open.
   // `null` until they arrive, so a slow answer never reads as "none saved".
   const [rates, setRates] = useState<Record<number, number> | null>(null);
   const [ratesFailed, setRatesFailed] = useState(false);
@@ -424,7 +424,7 @@ export function MyLessons({
       setRateCode((current) => current === submittedCode ? "" : current);
       setDetailsNote(
         result.saved
-          ? `Saved. Your ${result.saved.durationMinutes}-minute weekly lessons are now ${formatMoneyCents(result.saved.cents)} each.`
+          ? `Saved. Your ${result.saved.durationMinutes}-minute lessons are now ${formatMoneyCents(result.saved.cents)} each.`
           : "Saved."
       );
     } catch (caught) {
@@ -483,22 +483,24 @@ export function MyLessons({
       <div className="my-lessons">
         <div className="booking-alert" role="alert">
           <AlertCircle size={18} aria-hidden="true" />
-          <p>{loadError || error}</p>
+          <div className="booking-alert__body">
+            <p>{loadError || error}</p>
+            <div className="booking-alert__actions">
+              <button
+                className="button button--outline button--compact"
+                onClick={() => {
+                  setError("");
+                  setLoadError("");
+                  setLoading(true);
+                  load();
+                }}
+                type="button"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
         </div>
-        <p className="booking-state-note">
-          <button
-            className="text-action"
-            onClick={() => {
-              setError("");
-              setLoadError("");
-              setLoading(true);
-              load();
-            }}
-            type="button"
-          >
-            Try again
-          </button>
-        </p>
       </div>
     );
   }
@@ -812,17 +814,17 @@ export function MyLessons({
             small disclosure, as it does when booking. */}
         <div className="my-lessons__rates">
           {rates && RATE_LENGTHS.some((minutes) => rates[minutes] !== undefined) ? (
-            <ul aria-label="Your saved weekly rates" className="my-lessons__rates-list">
+            <ul aria-label="Your prices" className="my-lessons__rates-list">
               {RATE_LENGTHS.filter((minutes) => rates[minutes] !== undefined).map((minutes) => (
                 <li key={minutes}>
-                  <span>{minutes}-minute weekly lessons</span>
+                  <span>{minutes}-minute lessons</span>
                   <strong>{formatMoneyCents(rates[minutes])} each</strong>
                 </li>
               ))}
             </ul>
           ) : null}
           {ratesFailed ? (
-            <p className="my-lessons__details-note">We couldn&rsquo;t check your saved weekly rates just now.</p>
+            <p className="my-lessons__details-note">We couldn&rsquo;t check your prices just now.</p>
           ) : null}
           <details className="my-lessons__code">
             <summary>Have a code from Inês?</summary>
@@ -851,7 +853,7 @@ export function MyLessons({
               </button>
             </form>
             <p className="my-lessons__details-note">
-              Your code sets the rate for future weekly lessons of the matching length.
+              Your code sets your price for lessons of that length, including ones already booked.
             </p>
           </details>
         </div>

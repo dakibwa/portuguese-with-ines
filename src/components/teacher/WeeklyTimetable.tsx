@@ -798,39 +798,39 @@ export function WeeklyTimetable({
         </div>
       </div>
 
-      <div className="teacher-grid-footnote">
-        <div className="teacher-calendar-key" aria-label="Timetable key">
-          <span>
-            <i className="teacher-key-starts" />
-            {editing ? "Lesson starts" : "Weekly hours"}
-          </span>
-          {!editing ? (
-            <>
-              <span>
-                <i className="teacher-key-booked" />
-                Booked
-              </span>
-              <span>
-                <i className="teacher-key-added" />
-                Added by you
-              </span>
-              <span>
-                <i className="teacher-key-off" />
-                Time off
-              </span>
-              <span>
-                <Globe size={12} strokeWidth={2.4} aria-hidden="true" />
-                Online
-              </span>
-              <span>
-                <UserRound size={12} strokeWidth={2.4} aria-hidden="true" />
-                In Porto
-              </span>
-            </>
-          ) : null}
+      {/* The key reads the week; while she edits her hours, the marked
+          starts and their two dabs above say it all. */}
+      {!editing ? (
+        <div className="teacher-grid-footnote">
+          <div className="teacher-calendar-key" aria-label="Timetable key">
+            <span>
+              <i className="teacher-key-starts" />
+              Weekly hours
+            </span>
+            <span>
+              <i className="teacher-key-booked" />
+              Booked
+            </span>
+            <span>
+              <i className="teacher-key-added" />
+              Added by you
+            </span>
+            <span>
+              <i className="teacher-key-off" />
+              Time off
+            </span>
+            <span>
+              <Globe size={12} strokeWidth={2.4} aria-hidden="true" />
+              Online
+            </span>
+            <span>
+              <UserRound size={12} strokeWidth={2.4} aria-hidden="true" />
+              In Porto
+            </span>
+          </div>
+          {status}
         </div>
-        {status}
-      </div>
+      ) : null}
 
       {editing ? (
         <details className="teacher-exact-hours" ref={exactRef}>

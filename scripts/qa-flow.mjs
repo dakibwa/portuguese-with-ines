@@ -1693,7 +1693,11 @@ if ((await desktopBookingTimes.count()) !== 2) {
 // A day with more than one lesson asks which to open, and can still book another.
 await qaStartDay.scrollIntoViewIfNeeded();
 await qaStartDay.click();
-const dayLessonsPrompt = accountPage.getByRole("dialog", { name: "Your lessons", exact: true });
+// The day's lessons are titled by the day itself, as the page writes it.
+const qaStartLongDate = await accountPage.evaluate((key) => new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/Lisbon", weekday: "long", day: "numeric", month: "long", year: "numeric"
+}).format(new Date(`${key}T12:00:00Z`)), qaStartDate);
+const dayLessonsPrompt = accountPage.getByRole("dialog", { name: qaStartLongDate, exact: true });
 await dayLessonsPrompt.waitFor();
 const promptLessons = dayLessonsPrompt.locator(".calendar-booking-prompt__lesson");
 const promptLessonDetails = await promptLessons.evaluateAll((buttons) =>
@@ -1761,8 +1765,8 @@ await desktopManageDialog.getByRole("button", { name: "Change", exact: true }).c
 const desktopChangeDialog = accountPage.getByRole("dialog", { name: "Choose a new date and time", exact: true });
 await desktopChangeDialog.waitFor({ state: "visible" });
 await desktopChangeDialog.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
-await desktopManagePanel.getByRole("radio", { name: "60 minutes", exact: true }).waitFor();
-const ninetyMinuteChoice = desktopManagePanel.getByRole("radio", { name: "90 minutes", exact: true });
+await desktopManagePanel.getByRole("radio", { name: /^60 minutes/ }).waitFor();
+const ninetyMinuteChoice = desktopManagePanel.getByRole("radio", { name: /^90 minutes/ });
 await ninetyMinuteChoice.waitFor();
 await desktopManagePanel.getByRole("radio", { name: "Online", exact: true }).waitFor();
 const currentManagedTime = desktopManagePanel.locator(".slot-grid button.is-selected");
@@ -2158,8 +2162,8 @@ await mobileManageDialog.getByRole("button", { name: "Change", exact: true }).cl
 const mobileChangeDialog = accountPage.getByRole("dialog", { name: "Choose a new date and time", exact: true });
 await mobileChangeDialog.waitFor({ state: "visible" });
 await mobileChangeDialog.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
-await mobileManagePanel.getByRole("radio", { name: "60 minutes", exact: true }).waitFor();
-await mobileManagePanel.getByRole("radio", { name: "90 minutes", exact: true }).waitFor();
+await mobileManagePanel.getByRole("radio", { name: /^60 minutes/ }).waitFor();
+await mobileManagePanel.getByRole("radio", { name: /^90 minutes/ }).waitFor();
 await waitForOrientation(accountPage);
 const mobileChangeLayout = await accountPage.evaluate(() => {
   const workspace = document.querySelector("#lesson-calendar")?.getBoundingClientRect();
@@ -2330,8 +2334,9 @@ await accountPage.waitForFunction(
 if (await accountPage.locator("#lesson-calendar .unified-calendar__grid").isVisible()) {
   throw new Error("On a phone, a chosen day's times should take the calendar's place.");
 }
-// A day with times either side of 14:00 shows one part at a time; each part is
-// a small timetable, one row per hour, each start minute in its own column.
+// A day with times either side of 14:00 shows one part at a time; when the
+// day mixes start minutes each part is a small timetable, one row per hour,
+// each start minute in its own column, and otherwise its times sit side by side.
 const timePicker = accountPage.locator("#lesson-calendar .unified-calendar__availability .time-picker");
 const partInputs = timePicker.locator(".time-picker__parts input");
 const partCount = await partInputs.count();
@@ -2345,9 +2350,15 @@ for (let index = 0; index < Math.max(partCount, 1); index++) {
       return { part, hour: time.slice(0, 2), minute: time.slice(3, 5), top: Math.round(box.top), left: Math.round(box.left), height: box.height };
     }), index));
 }
-const timesShareHourRows = shownTimes.every((a) => shownTimes.every((b) =>
+const mixedMinutes = new Set(shownTimes.map((time) => time.minute)).size > 1;
+const timesShareHourRows = !mixedMinutes || shownTimes.every((a) => shownTimes.every((b) =>
   a.part !== b.part || (a.hour === b.hour) === (Math.abs(a.top - b.top) <= 1)));
-const timesShareMinuteColumns = shownTimes.every((a) => shownTimes.every((b) => a.minute !== b.minute || Math.abs(a.left - b.left) <= 1));
+const timesShareMinuteColumns = !mixedMinutes || shownTimes.every((a) => shownTimes.every((b) => a.minute !== b.minute || Math.abs(a.left - b.left) <= 1));
+// Times on one minute never stand one per line: the first two of a part share a row.
+const timesSideBySide = mixedMinutes || [0, 1].every((part) => {
+  const inPart = shownTimes.filter((time) => time.part === part);
+  return inPart.length < 2 || Math.abs(inPart[0].top - inPart[1].top) <= 1;
+});
 const headingCount = await timePicker.evaluate((picker) => picker.parentElement?.querySelectorAll("h3, h4").length ?? -1);
 if (
   shownTimes.length !== 5 ||
@@ -2355,7 +2366,8 @@ if (
   headingCount !== 0 ||
   shownTimes.some((time) => time.height < 44 || time.height > 54) ||
   !timesShareHourRows ||
-  !timesShareMinuteColumns
+  !timesShareMinuteColumns ||
+  !timesSideBySide
 ) {
   throw new Error(`A free day's times should split at 14:00, each part a small timetable: ${JSON.stringify({ partCount, shownTimes })}.`);
 }
@@ -2650,7 +2662,7 @@ const submitBooking = accountPage.getByRole("button", { name: "Book lesson & agr
 await agreement.waitFor();
 await accountPage.locator(".student-details-form textarea").fill("Keep this note while I read the terms.");
 const choicesBeforeTerms = JSON.stringify(await accountPage.locator(".booking-selection-stack strong").allTextContents());
-for (const width of [390, 1440, 320]) {
+for (const width of [390, 1440]) {
   await accountPage.setViewportSize({ width, height: 844 });
   if (await agreement.getAttribute("aria-pressed") !== "false" || await submitBooking.isEnabled()) {
     throw new Error("A new booking must require an explicit agreement before it can be submitted.");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { X, Mail, ArrowLeft, ReceiptText, CheckCircle2, CircleX, Globe, UserRound } from "lucide-react";
+import { X, ArrowLeft, CheckCircle2, CircleX } from "lucide-react";
 import {
   addedByTeacher,
   cancelBookingAs,
@@ -10,7 +10,7 @@ import {
   setNoShow,
   type AdminBooking,
 } from "@/lib/admin-api";
-import { formatBookedLessonLabel, formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
+import { formatBookedLessonLabel, formatMoneyCents, formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
 import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { AssetMark } from "@/components/BrandMarks";
@@ -45,6 +45,9 @@ export function LessonDetails({
   const [date, setDate] = useState(dateKey(new Date(booking.starts_at)));
   const [time, setTime] = useState(formatSlotTime(booking.starts_at));
   const [cancelMessage, setCancelMessage] = useState("");
+  const firstName = booking.student_name.split(" ")[0];
+  // Set up by her and not welcomed yet: the site emails them nothing.
+  const awaiting = Boolean(booking.student_awaiting_welcome);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const noShowCloses = new Date(new Date(booking.ends_at).getTime() + NO_SHOW_WINDOW_HOURS_AFTER * 3_600_000);
@@ -62,6 +65,21 @@ export function LessonDetails({
   const locked =
     booking.payment_status === "processing" ||
     booking.same_day_fee_status === "processing";
+  const minutes = Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60_000);
+  // Its price and how it is paid, one dab: "€25 · paid to you by hand". A
+  // cancelled lesson's money matters only if some moved.
+  const paid = {
+    paid: "paid",
+    refunded: "refunded",
+    payment_due: "payment due",
+    processing: "payment processing",
+    scheduled: "charged to their card after the lesson",
+    pending: "waiting for their card",
+    not_required: "paid to you by hand",
+  }[booking.payment_status];
+  const money = booking.status === "cancelled" && !["paid", "refunded"].includes(booking.payment_status)
+    ? ""
+    : booking.amount_cents ? `${formatMoneyCents(booking.amount_cents)} · ${paid}` : paid.charAt(0).toUpperCase() + paid.slice(1);
   const backdropHandlers = useDialogBackdrop(() => { if (!busy) onClose(); });
 
   useLayoutEffect(() => {
@@ -102,17 +120,17 @@ export function LessonDetails({
     setError("");
     try {
       if (action === "move") {
-        await rescheduleBookingAs(
+        const moved = await rescheduleBookingAs(
           token,
           booking.id,
           portoTimeToUtc(date, time, booking.starts_at),
         );
         changed.current = true;
-        onChanged("Lesson moved. The student has been emailed the new time.");
+        onChanged(moved.emailed === false ? "Lesson moved." : "Lesson moved. The student has been emailed the new time.");
       } else if (action === "cancel") {
-        await cancelBookingAs(token, booking.id, cancelMessage);
+        const cancelled = await cancelBookingAs(token, booking.id, awaiting ? "" : cancelMessage);
         changed.current = true;
-        onChanged("Lesson cancelled. The student has been emailed.");
+        onChanged(cancelled.emailed === false ? "Lesson cancelled." : "Lesson cancelled. The student has been emailed.");
       } else if (action === "no-show") {
         await setNoShow(token, booking.id, !noShow);
         changed.current = true;
@@ -160,14 +178,44 @@ export function LessonDetails({
         {booking.status === "cancelled" ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
         {booking.status === "cancelled" ? "Cancelled" : addedByTeacher(booking) ? "Added by you" : "Booked"}
       </p>
-      {addedByTeacher(booking) && booking.status !== "cancelled" ? (
-        booking.payment_status === "scheduled" ? (
-          // On the student's card since they saved it. One they already paid
-          // for by hand comes off before it is charged (12 October 2026).
-          <div className="teacher-lesson-added-note">
-            <p>You added this lesson. It&rsquo;s charged to the student&rsquo;s card after it ends.</p>
+      <div className="teacher-dialog-top">
+        {/* The student's own splat when they have chosen one, so Inês knows
+            them at a glance (10 October 2026, at Dan's request). */}
+        <AssetMark
+          asset={studentMark(booking.student_mark)?.src ?? "/visuals/v2-splats/one-to-one-splat-v2.svg"}
+          className="teacher-lesson-mark"
+        />
+        <h2 id="teacher-lesson-title">{booking.student_name}</h2>
+      </div>
+      <div className="teacher-lesson-when">
+        {/* The date, then the time on a line of its own, rather than the
+            time breaking across two (13 October 2026, Dan). */}
+        <strong className="lesson-when">
+          <span>{dateLabel(dateKey(new Date(booking.starts_at)), { weekday: "long", day: "numeric", month: "long" })}</span>
+          <span className="visually-hidden">, </span>
+          <span className="lesson-when__time">{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
+        </strong>
+        {action === "view" ? (
+          <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
+        ) : null}
+      </div>
+      {/* The lesson, not the student (13 October 2026, Dan: "this page is
+          more about the lesson"): its place, length, price and how it is
+          paid as dabs, as her history shows a lesson. Who they are lives in
+          Students. While she confirms a change these step aside. */}
+      {action === "view" ? (
+        <>
+          <ul className="booking-payment-facts teacher-lesson-facts">
+            <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
+            <li>{formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: minutes })}</li>
+            {money ? <li>{money}</li> : null}
+            {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
+            {awaiting ? <li>Not emailed yet: send their welcome from Students</li> : null}
+          </ul>
+          {addedByTeacher(booking) && booking.status !== "cancelled" && booking.payment_status === "scheduled" ? (
+            // One they already paid for by hand comes off before it is charged.
             <button
-              className="text-action"
+              className="text-action teacher-lesson-paid"
               disabled={busy}
               onClick={async () => {
                 setBusy(true);
@@ -186,62 +234,11 @@ export function LessonDetails({
             >
               Already paid you by hand? Take it off their card
             </button>
-          </div>
-        ) : (
-          <p className="teacher-lesson-added-note">
-            You added this lesson. It&rsquo;s paid to you by hand, not through the site.
-          </p>
-        )
+          ) : null}
+        </>
       ) : null}
-      <div className="teacher-dialog-top">
-        {/* The student's own splat when they have chosen one, so Inês knows
-            them at a glance (10 October 2026, at Dan's request). */}
-        <AssetMark
-          asset={studentMark(booking.student_mark)?.src ?? "/visuals/v2-splats/one-to-one-splat-v2.svg"}
-          className="teacher-lesson-mark"
-        />
-        <h2 id="teacher-lesson-title">{booking.student_name}</h2>
-      </div>
-      <div className="teacher-lesson-when">
-        <strong>
-          {dateLabel(dateKey(new Date(booking.starts_at)), { weekday: "long", day: "numeric", month: "long" })},{" "}
-          {formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}
-        </strong>
-        <span>
-          {formatBookedLessonLabel({
-            id: booking.lesson_type_id ?? "",
-            name: booking.lesson_name,
-            durationMinutes: Math.round(
-              (Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) /
-                60_000,
-            ),
-          })}{" "}
-          ·{" "}
-          <span className="teacher-lesson-place">
-            {booking.location === "porto" ? (
-              <UserRound size={13} strokeWidth={2.4} aria-hidden="true" />
-            ) : (
-              <Globe size={13} strokeWidth={2.4} aria-hidden="true" />
-            )}
-            {booking.location === "porto" ? "In Porto" : "Online"}
-          </span>{" "}
-          · Porto time
-        </span>
-        <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
-      </div>
-      <div className="teacher-lesson-facts">
-        <a href={`mailto:${booking.student_email}`}>
-          <Mail size={15} aria-hidden="true" />
-          {booking.student_email}
-        </a>
-        {/* Her receipt automation reads this, so absence is stated too. */}
-        <span>
-          <ReceiptText size={15} aria-hidden="true" />
-          {booking.student_nif ? `NIF ${booking.student_nif}` : "NIF not given (consumidor final)"}
-        </span>
-      </div>
-      {booking.notes ? (
-        <p className="teacher-lesson-note">{booking.notes}</p>
+      {action === "view" && booking.notes ? (
+        <p className="teacher-history-lesson__note teacher-lesson-note"><span>Their note</span>{booking.notes}</p>
       ) : null}
       {noShow ? (
         <p className="teacher-inline-notice">No-show · {SAME_DAY_FEE_LABEL} after this lesson</p>
@@ -301,45 +298,51 @@ export function LessonDetails({
       ) : (
         <div className="teacher-dialog-confirmation">
           {action === "move" ? (
-            <form
-              className="teacher-form teacher-move-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void perform();
-              }}
-            >
-              <label>
-                <span>New date</span>
-                <input
-                  type="date"
-                  required
-                  disabled={busy}
-                  value={date}
-                  onChange={(event) => setDate(event.target.value)}
-                />
-              </label>
-              <label>
-                <span>Time in Porto</span>
-                <input
-                  type="time"
-                  required
-                  disabled={busy}
-                  value={time}
-                  onChange={(event) => setTime(event.target.value)}
-                />
-              </label>
-              <p>The student will be emailed the new time.</p>
-              <div className="teacher-dialog-actions">
-                <button
-                  className="button button--coral"
-                  type="submit"
-                  disabled={busy}
-                >
-                  {busy ? "Moving…" : "Save new time"}
-                </button>
-                {backToLesson}
-              </div>
-            </form>
+            <>
+              {/* Headed as Cancel this lesson? is, with what happens as a dab. */}
+              <h3>Move this lesson</h3>
+              <form
+                className="teacher-form teacher-move-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void perform();
+                }}
+              >
+                <label>
+                  <span>New date</span>
+                  <input
+                    type="date"
+                    required
+                    disabled={busy}
+                    value={date}
+                    onChange={(event) => setDate(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Time in Porto</span>
+                  <input
+                    type="time"
+                    required
+                    disabled={busy}
+                    value={time}
+                    onChange={(event) => setTime(event.target.value)}
+                  />
+                </label>
+                <ul className="booking-payment-facts teacher-confirm-facts">
+                  <li>{awaiting ? `${firstName} isn’t emailed until you send their welcome` : `${firstName} gets an email with the new time`}</li>
+                </ul>
+                <div className="teacher-dialog-actions">
+                  <button
+                    className="button button--coral"
+                    type="submit"
+                    disabled={busy}
+                  >
+                    {busy ? "Moving…" : "Save new time"}
+                  </button>
+                  {backToLesson}
+                </div>
+              </form>
+            </>
           ) : (
             <>
               <h3>
@@ -349,31 +352,45 @@ export function LessonDetails({
                     ? "Remove the no-show?"
                     : "Mark as a no-show?"}
               </h3>
-              <p>
-                {action === "cancel"
-                  ? "The lesson will be removed from the calendar and the student will be emailed."
-                  : noShow
-                    ? "The lesson price will be charged as normal."
-                    : `Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the lesson price.`}
-              </p>
-              {action === "cancel" ? (
+              <ul className="booking-payment-facts teacher-confirm-facts">
+                {action === "cancel" ? (
+                  <>
+                    <li>
+                      {awaiting
+                        ? `${firstName} isn’t emailed: they haven’t had their welcome yet`
+                        : `${firstName} gets an email saying you’ve cancelled, with an update for their calendar`}
+                    </li>
+                    {booking.payment_status === "paid" ? (
+                      <li>{firstName} is refunded in full, automatically</li>
+                    ) : booking.payment_status === "scheduled" ? (
+                      <li>Nothing is charged to {firstName}’s card</li>
+                    ) : null}
+                    <li>The lesson comes off your calendar</li>
+                  </>
+                ) : noShow ? (
+                  <li>{firstName} is charged the lesson price as normal</li>
+                ) : (
+                  <li>{firstName} is charged only {SAME_DAY_FEE_LABEL}, instead of the lesson price</li>
+                )}
+              </ul>
+              {action === "cancel" && !awaiting ? (
                 <div className="teacher-form teacher-cancel-message">
                   <label htmlFor="teacher-cancel-message">
-                    <span>Message to student <span className="teacher-field-optional">(optional)</span></span>
+                    <span>Add a message to the email <span className="teacher-field-optional">(optional)</span></span>
                     <textarea
                       id="teacher-cancel-message"
-                      aria-describedby="teacher-cancel-message-hint"
-                      rows={4}
+                      rows={3}
                       maxLength={1000}
+                      placeholder="Sorry, I can’t make it. Shall we find another time?"
                       disabled={busy}
                       value={cancelMessage}
                       onChange={(event) => setCancelMessage(event.target.value)}
                     />
                   </label>
-                  <div className="teacher-cancel-message__hint">
-                    <p id="teacher-cancel-message-hint">Included in their cancellation email.</p>
-                    <span aria-hidden="true">{cancelMessage.length}/1,000</span>
-                  </div>
+                  {/* The limit shows only as she nears it. */}
+                  {cancelMessage.length > 850 ? (
+                    <p className="teacher-cancel-message__hint">{cancelMessage.length}/1,000</p>
+                  ) : null}
                 </div>
               ) : null}
               <div className="teacher-dialog-actions">

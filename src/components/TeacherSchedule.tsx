@@ -12,11 +12,13 @@ import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
-import { AddLessonDialog, ManualLessonForm } from "@/components/teacher/ManualLessonForm";
-import { StudentList } from "@/components/teacher/StudentList";
+import { StudentDialog, type StudentDialogStart } from "@/components/teacher/StudentDialog";
+import { StudentList, needsHer } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
+import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
+import { ReceiptsTab } from "@/components/teacher/ReceiptsTab";
 import {
   fetchBookings,
   fetchSchedule,
@@ -28,7 +30,7 @@ import {
   type AvailabilityException,
 } from "@/lib/admin-api";
 import { clearSession, fetchMe, readSession, subscribeToSession, type Student } from "@/lib/auth-api";
-import { formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
+import { portoTimeToUtc } from "@/lib/booking-api";
 import { BOOKING_CONFIGURED } from "@/lib/config";
 import { SITE_BASE_PATH } from "@/lib/paths";
 import {
@@ -60,40 +62,6 @@ function shortDate(date: string) {
   return dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
 }
 
-function HoursClashCard({ booking, disabled, onOpen }: {
-  booking: AdminBooking;
-  disabled: boolean;
-  onOpen: (booking: AdminBooking) => void;
-}) {
-  const day = shortDate(dateKey(new Date(booking.starts_at)));
-  return (
-    <li className="teacher-hours-clash">
-      <div className="teacher-hours-clash__heading">
-        <strong>{booking.student_name}</strong>
-        <span className="teacher-hours-clash__flag">
-          <AlertCircle size={13} aria-hidden="true" /> Hours clash
-        </span>
-      </div>
-      <p className="teacher-hours-clash__when">
-        <span>{day}</span>
-        <strong>{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</strong>
-      </p>
-      <div className="teacher-hours-clash__actions">
-        <span>Stays booked</span>
-        <button
-          className="button button--outline button--compact"
-          type="button"
-          disabled={disabled}
-          aria-label={`Change lesson for ${booking.student_name} on ${day}`}
-          onClick={() => onOpen(booking)}
-        >
-          Change lesson <ChevronRight size={14} aria-hidden="true" />
-        </button>
-      </div>
-    </li>
-  );
-}
-
 export function TeacherSchedule() {
   const [token, setToken] = useState("");
   const [me, setMe] = useState<Student | null>(null);
@@ -123,13 +91,14 @@ export function TeacherSchedule() {
     null,
   );
   // A free time chosen on the week, for a lesson added there.
-  const [addLesson, setAddLesson] = useState<{ date: string; minute: number } | null>(null);
+  // Adding a student, their lessons, or a lesson at a free time: one dialog.
+  const [studentDialog, setStudentDialog] = useState<(StudentDialogStart & { key: number }) | null>(null);
+  const openStudentDialog = (start: StudentDialogStart) => setStudentDialog({ ...start, key: Date.now() });
   // Her students, read once with the page and again after each lesson she
   // adds: the form suggests them and Your students lists them.
   const [students, setStudents] = useState<{ list: AdminStudent[]; cardsAccepted: boolean } | null>(null);
   const [studentsError, setStudentsError] = useState("");
   // A student chosen from her list, put straight into the add-a-lesson form.
-  const [formStudent, setFormStudent] = useState<{ email: string; name: string; key: number }>();
   const [paymentReview, setPaymentReview] = useState<
     { id: string; reference: string }[]
   >([]);
@@ -473,12 +442,11 @@ export function TeacherSchedule() {
     for (const date of dates) {
       if (offAlready.has(date) !== off) changeDay(date, { dayOff: off }, "");
     }
-    const booked = bookings.filter(booking => dates.some(date =>
-      dateKey(new Date(booking.starts_at)) <= date && dateKey(new Date(Date.parse(booking.ends_at) - 1)) >= date)).length;
+    // The card above already shows any lessons on them as Already booked.
     setDayNote({
       error: false,
       text: off
-        ? `${dates.length === 1 ? `${shortDate(dates[0])} is a day off` : `${dates.length} selected days are off`}.${stayBooked(booked)}`
+        ? `${dates.length === 1 ? `${shortDate(dates[0])} is a day off` : `${dates.length} selected days are off`}.`
         : `${dates.length === 1 ? `${shortDate(dates[0])} is` : `${dates.length} selected days are`} open again, following your weekly hours.`,
     });
   }
@@ -587,7 +555,7 @@ export function TeacherSchedule() {
   return (
     <div className="teacher-workspace">
       <div className="teacher-tools-header">
-        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} meetAttention={meetAttention} onSelect={setActiveTab} />
+        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} studentsWaiting={(students?.list ?? []).filter(student => needsHer(student, Boolean(students?.cardsAccepted))).length} meetAttention={meetAttention} onSelect={setActiveTab} />
         <button
           className="teacher-sign-out"
           disabled={savingDays || savingHours}
@@ -635,13 +603,16 @@ export function TeacherSchedule() {
             <div className="teacher-week-heading">
               <h2 id="teacher-week-title" ref={calendarTitleRef} tabIndex={-1}>
                 {editing
-                  ? "Repeats every week"
+                  ? "Your weekly hours"
                   : `${dateLabel(weekStart, { day: "numeric", month: "short" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}`}
               </h2>
             </div>
           </div>
           {editing ? (
-            <ul className="teacher-help teacher-week-hint"><li>Tap or drag to set lesson start times.</li></ul>
+            <ul className="booking-payment-facts teacher-week-hint">
+              <li>Tap or drag to mark when a lesson can <strong>start</strong></li>
+              <li>Repeats every week</li>
+            </ul>
           ) : null}
           {!editing ? (
             <div className="teacher-week-navigation">
@@ -674,14 +645,18 @@ export function TeacherSchedule() {
         {editing && hoursDirty ? (
           <div className="teacher-hours-warning" aria-live="polite">
             {bookingsLoading ? <p>Checking booked lessons…</p> : bookingsError ? <div role="alert"><p>Booked lessons could not be checked.</p><button className="teacher-text-button" onClick={() => void reloadBookings()} type="button">Try again</button></div> : affectedLessons.length ? <>
-              <ul className="teacher-hours-clashes" aria-label="Lessons that clash with your hours">
-                {affectedLessons.slice(0, 4).map(booking => <HoursClashCard key={booking.id} booking={booking} disabled={savingHours} onOpen={setSelectedBooking} />)}
+              <p className="teacher-hours-warning__lead">
+                <AlertCircle size={16} aria-hidden="true" />
+                {affectedLessons.length === 1 ? "This lesson is" : `These ${affectedLessons.length} lessons are`} outside your new hours. {affectedLessons.length === 1 ? "It stays" : "They stay"} booked.
+              </p>
+              <ul className="teacher-lesson-cards" aria-label="Lessons that clash with your hours">
+                {affectedLessons.slice(0, 4).map(booking => <BookedLessonCard key={booking.id} booking={booking} disabled={savingHours} onOpen={setSelectedBooking} />)}
               </ul>
               {affectedLessons.length > 4 ? (
                 <details className="teacher-hours-clashes-more">
                   <summary>{affectedLessons.length - 4} more {affectedLessons.length === 5 ? "lesson" : "lessons"}</summary>
-                  <ul className="teacher-hours-clashes" aria-label="More lessons that clash with your hours">
-                    {affectedLessons.slice(4).map(booking => <HoursClashCard key={booking.id} booking={booking} disabled={savingHours} onOpen={setSelectedBooking} />)}
+                  <ul className="teacher-lesson-cards" aria-label="More lessons that clash with your hours">
+                    {affectedLessons.slice(4).map(booking => <BookedLessonCard key={booking.id} booking={booking} disabled={savingHours} onOpen={setSelectedBooking} />)}
                   </ul>
                 </details>
               ) : null}
@@ -742,20 +717,16 @@ export function TeacherSchedule() {
             }}
             onDayOff={takeDayOff}
             onBlockTime={blockTime}
-            onAddLesson={(date, minute) => setAddLesson({ date, minute })}
+            onAddLesson={(date, minute) => openStudentDialog({ step: "pick", date, minute })}
             onSelectBooking={setSelectedBooking}
           />
         )}
         {editing ? (
           <div className="teacher-hours-save">
-            <p className="teacher-secondary-copy">
-              Marked times are lesson <strong>starts</strong>, not finishing times.
-            </p>
             <div className="teacher-save-row">
-              <span className="teacher-save-note" aria-live="polite">
-                {hoursDirty
-                  ? "You have unsaved hours."
-                  : "Your saved weekly hours."}
+              {/* Said to a screen reader; the coral Save already shows it. */}
+              <span className="teacher-save-note visually-hidden" aria-live="polite">
+                {hoursDirty ? "Not saved yet" : ""}
               </span>
               {hoursDirty ? (
                 <button
@@ -798,9 +769,14 @@ export function TeacherSchedule() {
           bookingsError={bookingsError}
           onReloadBookings={() => void reloadBookings()}
           busy={savingDays}
-          status={<p className={`teacher-save-state ${dayNote?.error ? "is-error" : ""}`} role={dayNote?.error ? "alert" : "status"}>{savingDays ? "Saving…" : dayNote?.text}</p>}
+          status={
+            <p className={`teacher-save-state ${dayNote?.error ? "is-error" : ""}`} role={dayNote?.error ? "alert" : "status"}>
+              {savingDays ? "Saving…" : dayNote ? <>{dayNote.error ? null : <Check size={15} aria-hidden="true" />}{dayNote.text}</> : null}
+            </p>
+          }
           onChange={takeTimeOff}
           onSaveDay={saveTimeOffDay}
+          onOpenBooking={setSelectedBooking}
         />
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "students"}>
@@ -809,40 +785,31 @@ export function TeacherSchedule() {
         students={students?.list ?? null}
         cards={Boolean(students?.cardsAccepted)}
         error={studentsError}
-        onAddLesson={(student) => setFormStudent((current) => ({ email: student.email, name: student.name, key: (current?.key ?? 0) + 1 }))}
+        onAddStudent={() => openStudentDialog({ step: "new" })}
+        onAddLesson={(student) => openStudentDialog({ step: "lessons", student })}
+        onStudentsChanged={() => void reloadStudents()}
       />
+      </div>
+      <div className="teacher-tab-view" hidden={activeTab !== "receipts"}>
+        {activeTab === "receipts" ? <ReceiptsTab token={token} today={today} /> : null}
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "meet"}>
         <TeacherMeetConnection token={token} onAttentionChange={setMeetAttention} />
       </div>
-      <div className="teacher-tab-view" hidden={activeTab !== "week" && activeTab !== "students"}>
-        <ManualLessonForm
+      </div>
+      {studentDialog ? (
+        <StudentDialog
+          key={studentDialog.key}
           token={token}
           known={students?.list ?? []}
-          student={formStudent}
-          onCreated={() => {
-            void reloadStudents();
-            void reloadBookings();
-          }}
-        />
-      </div>
-      </div>
-      {addLesson ? (
-        <AddLessonDialog
-          key={`${addLesson.date}-${addLesson.minute}`}
-          token={token}
-          known={students?.list ?? []}
-          date={addLesson.date}
-          minute={addLesson.minute}
-          afterAddFocusRef={calendarTitleRef}
-          onClose={() => setAddLesson(null)}
-          onCreated={(message) => {
+          start={studentDialog}
+          afterCloseFocusRef={studentDialog.step === "pick" ? calendarTitleRef : undefined}
+          onChanged={() => {
             if (readSession() !== token) return;
-            setAddLesson(null);
-            setStatus(message);
             void reloadStudents();
             void reloadBookings();
           }}
+          onClose={() => setStudentDialog(null)}
         />
       ) : null}
       {selectedBooking ? (

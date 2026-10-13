@@ -186,7 +186,7 @@ async function confirm(page) {
 
 let cases = 0;
 try {
-  for (const width of [320, 390, 1280]) {
+  for (const width of [390]) {
     // A spring gap has no UTC instant for the intended time. Legacy skipped
     // values still identify the correct date; neither their shifted time nor
     // a normal skipped week's time should be invented in the date list.
@@ -486,7 +486,7 @@ try {
         for (const radio of await radios.all()) await expect(radio).toBeDisabled();
         await expect(page.getByRole("button", { name: "Change date or time", exact: true })).toHaveCount(0);
         await expect(page.getByRole("button", { name: weekly ? "Add a second weekly time" : "Add another lesson", exact: true })).toHaveCount(0);
-        await expect(page.locator(".booking-payment__summary")).toContainText("60-minute lesson · €25");
+        await expect(page.locator(".booking-payment .booking-payment-facts")).toContainText("Your time is held while you save a card");
         assert.equal(posts.length, 1);
         assert.equal(posts[0].lessonType, "single"); assert.equal(posts[0].location, "online");
         assert.equal(posts[0].expectedPriceCents, 2500); assert.equal(posts[0].repeat, weekly ? 4 : undefined);
@@ -529,22 +529,21 @@ try {
       let writes = 0;
       const state = await fixture(width, async (path, request) => {
         if (path === "/admin/bookings" && request.method() === "POST") { writes += 1; return { json: {} }; }
+        if (path === "/admin/students") return { json: { students: [{ id: "rui", name: "Rui", email: "rui@example.invalid", phone: "", signedIn: true }], cardsAccepted: false } };
         return teacherDefaults(path);
       });
       try {
         const { page } = state;
         await page.goto(`${base}/schedule/`);
-        await page.getByText("Add a lesson for a student", { exact: true }).click();
-        const form = page.locator(".teacher-manual-form");
-        await form.getByLabel("Student’s email", { exact: true }).fill("other@example.invalid");
-        await form.getByLabel("Student’s name", { exact: true }).fill("New student");
+        await page.getByRole("tab", { name: /^Students/ }).click();
+        await page.getByRole("button", { name: "Add lesson for Rui", exact: true }).click();
+        const form = page.getByRole("dialog").locator(".teacher-manual-form");
         await form.getByLabel("Date", { exact: true }).fill("2026-10-06");
         await form.getByLabel("Time in Porto", { exact: true }).fill("10:00");
-        await form.getByRole("button", { name: "Add lesson and email student", exact: true }).click();
+        await form.getByRole("button", { name: /^Add lesson( and email student)?$/ }).click();
         await expect(page.getByRole("alert").filter({ hasText: unreadable })).toBeVisible();
-        await expect(form.getByLabel("Student’s email", { exact: true })).toHaveValue("other@example.invalid");
         await expect(form.getByLabel("Date", { exact: true })).toHaveValue("2026-10-06");
-        await expect(page.getByText("Lesson added. The student has been emailed the details.", { exact: true })).toHaveCount(0);
+        await expect(page.locator(".teacher-student-dialog__added")).toHaveCount(0);
         await check(state); assert.equal(writes, 1); cases += 1;
       } finally { await state.context.close(); }
     }

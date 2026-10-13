@@ -112,7 +112,7 @@ async function currentSession(page) {
 }
 
 try {
-  for (const width of [320, 390, 1280]) {
+  for (const width of [390]) {
     // Dismiss a loading lesson, then deliver both a success and a failure.
     // Neither reply may reopen it or leave the page's scroll lock behind.
     for (const status of [200, 503]) {

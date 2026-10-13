@@ -1,10 +1,11 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CalendarOff, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarCheck, CalendarOff, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import type { AdminBooking, AvailabilityException } from "@/lib/admin-api";
-import { dateKey, dateLabel, daysOff, mondayOf, shiftDate, WEEKDAYS, type Span } from "@/lib/teacher-calendar";
+import { dateBlocks, dateKey, dateLabel, daysOff, mondayOf, shiftDate, spanLabel, WEEKDAYS, type Span } from "@/lib/teacher-calendar";
 import { TimeOffDayDialog } from "@/components/teacher/TimeOffDayDialog";
+import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 
 function monthStart(date: string) { return `${date.slice(0, 7)}-01`; }
 function shiftMonth(month: string, amount: number) {
@@ -12,9 +13,21 @@ function shiftMonth(month: string, amount: number) {
   date.setUTCMonth(date.getUTCMonth() + amount);
   return date.toISOString().slice(0, 10);
 }
+const shortDay = (date: string) => dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
 
-/** Select dates first; applying time off never moves or cancels a booked lesson. */
-export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, bookingsError, onReloadBookings, busy, status, onChange, onSaveDay }: {
+/** A booked lesson on a date, counting one that runs past midnight on both. */
+function lessonsOn(bookings: AdminBooking[], date: string) {
+  return bookings.filter(booking => booking.status === "confirmed" &&
+    dateKey(new Date(booking.starts_at)) <= date && dateKey(new Date(Date.parse(booking.ends_at) - 1)) >= date);
+}
+
+/**
+ * Time off as one month (13 October 2026, Dan): she taps the days she means,
+ * one or several, and the card beside the month says what she can do with
+ * them. One way to choose, no modes. Booked lessons are never moved or
+ * cancelled from here; the card names any that stay.
+ */
+export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, bookingsError, onReloadBookings, busy, status, onChange, onSaveDay, onOpenBooking }: {
   today: string;
   exceptions: AvailabilityException[];
   bookings: AdminBooking[];
@@ -25,19 +38,21 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
   status: ReactNode;
   onChange: (dates: string[], off: boolean) => void;
   onSaveDay: (date: string, change: { dayOff: boolean; blocks?: Span[] }) => Promise<void>;
+  /** Opens a booked lesson so she can move or cancel it. */
+  onOpenBooking: (booking: AdminBooking) => void;
 }) {
   const [month, setMonth] = useState(() => monthStart(today));
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [focused, setFocused] = useState(today);
-  const [multiple, setMultiple] = useState(false);
-  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [hoursFor, setHoursFor] = useState<string | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
-  const returnToDate = useRef<string | null>(null);
+  const hoursButtonRef = useRef<HTMLButtonElement>(null);
+  const reopenedHours = useRef(false);
   useLayoutEffect(() => {
-    if (editingDate || busy || !returnToDate.current) return;
-    calendarRef.current?.querySelector<HTMLButtonElement>(`[data-timeoff-date="${returnToDate.current}"]`)?.focus({ preventScroll: true });
-    returnToDate.current = null;
-  }, [editingDate, busy]);
+    if (hoursFor || !reopenedHours.current) return;
+    reopenedHours.current = false;
+    hoursButtonRef.current?.focus({ preventScroll: true });
+  }, [hoursFor]);
   const off = useMemo(() => daysOff(exceptions), [exceptions]);
   const start = mondayOf(month);
   const last = shiftDate(shiftMonth(month, 1), -1);
@@ -45,9 +60,14 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
   const dates: string[] = [];
   for (let date = start; date <= end; date = shiftDate(date, 1)) dates.push(date);
   const chosen = [...selected].filter(date => date >= today).sort();
-  const booked = bookings.filter(booking => booking.status === "confirmed" && chosen.some(date =>
-    dateKey(new Date(booking.starts_at)) <= date && dateKey(new Date(Date.parse(booking.ends_at) - 1)) >= date));
+  const one = chosen.length === 1 ? chosen[0] : null;
+  const booked = bookings.filter(booking => booking.status === "confirmed" && chosen.some(date => lessonsOn([booking], date).length))
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const hoursOff = one && !off.has(one) ? dateBlocks(exceptions, one) : [];
+  // Days already off aren't taken again, so the button counts only the rest.
+  const toTake = chosen.filter(date => !off.has(date)).length;
   const firstFocus = dates.includes(focused) && focused >= today ? focused : dates.find(date => date >= today && date.startsWith(month.slice(0, 7)));
+  const unchecked = bookingsLoading || Boolean(bookingsError);
 
   function moveMonth(amount: number) {
     const next = shiftMonth(month, amount);
@@ -55,7 +75,7 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
     setFocused(next < today ? today : next);
   }
 
-  function selectDate(date: string) {
+  function toggle(date: string) {
     setFocused(date);
     setSelected(current => {
       const next = new Set(current);
@@ -66,12 +86,8 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
 
   return (
     <section className="teacher-timeoff" aria-labelledby="teacher-timeoff-title">
-      <header className="teacher-tool-heading">
-        <h2 className="visually-hidden" id="teacher-timeoff-title">Time off</h2>
-        <ul className="teacher-help"><li>{multiple ? "Select days, then mark them off." : "Choose a day for a full day off or a timed break."}</li></ul>
-        <button className="teacher-text-button" disabled={busy} onClick={() => setMultiple(value => !value)} type="button">{multiple ? "Edit one day" : "Select several days"}</button>
-      </header>
-      <div className={`teacher-timeoff-layout${multiple ? "" : " is-single"}`}>
+      <h2 className="visually-hidden" id="teacher-timeoff-title">Time off</h2>
+      <div className="teacher-timeoff-layout">
         <div className="teacher-month">
           <div className="teacher-month-heading">
             <h3 id="teacher-timeoff-month" aria-live="polite">{dateLabel(month, { month: "long", year: "numeric" })}</h3>
@@ -85,18 +101,17 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
             {WEEKDAYS.map(day => <span aria-hidden="true" className="teacher-month-weekday" key={day.value}>{day.short}</span>)}
             {dates.map(date => {
               const dayOff = off.has(date);
-              const lessons = bookings.filter(booking => booking.status === "confirmed" && dateKey(new Date(booking.starts_at)) <= date && dateKey(new Date(Date.parse(booking.ends_at) - 1)) >= date).length;
+              const lessons = lessonsOn(bookings, date).length;
               return (
                 <button
                   aria-label={`${dateLabel(date)}${dayOff ? ", day off" : ""}${lessons ? `, ${lessons} ${lessons === 1 ? "lesson" : "lessons"} booked` : ""}`}
-                  aria-pressed={multiple ? selected.has(date) : undefined}
-                  aria-haspopup={multiple ? undefined : "dialog"}
+                  aria-pressed={selected.has(date)}
                   aria-current={date === today ? "date" : undefined}
                   className={`teacher-month-day${dayOff ? " is-off" : ""}${!date.startsWith(month.slice(0, 7)) ? " is-outside" : ""}`}
                   data-timeoff-date={date}
                   disabled={date < today || busy}
                   key={date}
-                  onClick={() => { if (multiple) selectDate(date); else { setFocused(date); returnToDate.current = date; setEditingDate(date); } }}
+                  onClick={() => toggle(date)}
                   onKeyDown={event => {
                     const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : event.key === "ArrowDown" ? 7 : event.key === "ArrowUp" ? -7 : null;
                     if (step === null) return;
@@ -118,27 +133,78 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
             })}
           </div>
           <div className="teacher-month-key" aria-label="Calendar key">
-            {multiple ? <span><i className="is-selected" /> Selected</span> : null}
+            <span><i className="is-selected" /> Chosen</span>
             <span><i className="is-off" /> Day off</span>
             <span><i className="is-booked" /> Lesson booked</span>
           </div>
         </div>
-        {multiple ? <div className="teacher-timeoff-selection">
+
+        <div className={`teacher-timeoff-selection${chosen.length ? " has-days" : ""}`}>
           <div className="teacher-timeoff-selection-heading">
-            <h3 aria-live="polite">{chosen.length ? `${chosen.length} ${chosen.length === 1 ? "day" : "days"} selected` : "Choose your days"}</h3>
+            <h3 aria-live="polite">{one ? shortDay(one) : chosen.length ? `${chosen.length} days chosen` : "Tap the days you want off"}</h3>
             {chosen.length ? <button className="teacher-text-button" disabled={busy} onClick={() => setSelected(new Set())} type="button">Clear</button> : null}
           </div>
-          {chosen.length ? <ul className="teacher-selected-days">{chosen.map(date => <li key={date}><button aria-label={`Remove ${dateLabel(date)} from selection`} disabled={busy} onClick={() => selectDate(date)} type="button">{dateLabel(date, { day: "numeric", month: "short" })}<span aria-hidden="true">×</span></button></li>)}</ul> : <p>You can select across months.</p>}
-          {bookingsLoading ? <p role="status">Checking booked lessons…</p> : bookingsError ? <div className="teacher-inline-error" role="alert"><p>Booked lessons could not be checked. Please try again before changing your days.</p><button className="teacher-text-button" onClick={onReloadBookings} type="button">Try again</button></div> : booked.length ? <div className="teacher-timeoff-booked" role="status"><p>{booked.length === 1 ? "1 lesson is" : `${booked.length} lessons are`} already booked. {booked.length === 1 ? "It stays" : "They stay"} booked until you move or cancel {booked.length === 1 ? "it" : "them"}.</p><ul>{booked.map(booking => <li key={booking.id}>{booking.student_name}, {dateLabel(dateKey(new Date(booking.starts_at)), { day: "numeric", month: "short" })}</li>)}</ul></div> : null}
-          <div className="teacher-timeoff-selection-actions">
-            <button className="button button--coral" disabled={busy || bookingsLoading || Boolean(bookingsError) || !chosen.some(date => !off.has(date))} onClick={() => onChange(chosen, true)} type="button"><CalendarOff size={16} aria-hidden="true" />Mark {chosen.length === 1 ? "day" : "days"} off</button>
-            <button className="button button--outline" disabled={busy || bookingsLoading || Boolean(bookingsError) || !chosen.some(date => off.has(date))} onClick={() => onChange(chosen, false)} type="button"><Check size={16} aria-hidden="true" />Make available</button>
-          </div>
+          {chosen.length > 1 ? (
+            <ul className="teacher-selected-days">
+              {chosen.map(date => <li key={date}><button aria-label={`Remove ${dateLabel(date)}`} disabled={busy} onClick={() => toggle(date)} type="button">{dateLabel(date, { day: "numeric", month: "short" })}<span aria-hidden="true">×</span></button></li>)}
+            </ul>
+          ) : null}
+          {(one && off.has(one)) || hoursOff.length || (chosen.length && bookingsLoading) ? (
+            <ul className="booking-payment-facts teacher-timeoff-facts">
+              {one && off.has(one) ? <li>A day off</li> : null}
+              {hoursOff.length ? <li>Off {hoursOff.map(spanLabel).join(", ")}</li> : null}
+              {chosen.length && bookingsLoading ? <li role="status">Checking booked lessons…</li> : null}
+            </ul>
+          ) : null}
+          {!bookingsLoading && !bookingsError && booked.length ? (
+            <div className="teacher-timeoff-lessons">
+              <p className="teacher-eyebrow">Already booked</p>
+              <ul className="teacher-lesson-cards">
+                {booked.map(booking => <BookedLessonCard booking={booking} disabled={busy} key={booking.id} onOpen={onOpenBooking} showDay={!one} />)}
+              </ul>
+            </div>
+          ) : null}
+          {bookingsError && chosen.length ? (
+            <div className="teacher-inline-error" role="alert">
+              <p>Booked lessons couldn’t be checked.</p>
+              <button className="teacher-text-button" onClick={onReloadBookings} type="button">Try again</button>
+            </div>
+          ) : null}
+          {chosen.length ? (
+            <div className="teacher-timeoff-selection-actions">
+              {toTake ? (
+                <button className="button button--coral" disabled={busy || unchecked} onClick={() => onChange(chosen, true)} type="button">
+                  <CalendarOff size={16} aria-hidden="true" />
+                  {one ? "Take the day off" : `Take ${toTake} ${toTake === 1 ? "day" : "days"} off`}
+                </button>
+              ) : null}
+              {one ? (
+                <button className="button button--lilac" disabled={busy || unchecked} onClick={() => setHoursFor(one)} ref={hoursButtonRef} type="button">
+                  <Clock size={16} aria-hidden="true" />
+                  {hoursOff.length ? "Change hours off" : "Take some hours off"}
+                </button>
+              ) : null}
+              {chosen.some(date => off.has(date)) ? (
+                <button className="button button--lilac" disabled={busy || unchecked} onClick={() => onChange(chosen, false)} type="button">
+                  <CalendarCheck size={16} aria-hidden="true" />
+                  Make available
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {status}
-        </div> : null}
+        </div>
       </div>
-      {!multiple ? status : null}
-      {editingDate ? <TimeOffDayDialog key={editingDate} date={editingDate} exceptions={exceptions} bookings={bookings} bookingsLoading={bookingsLoading} bookingsError={bookingsError} onReloadBookings={onReloadBookings} onSave={onSaveDay} onClose={() => setEditingDate(null)} /> : null}
+      {hoursFor ? (
+        <TimeOffDayDialog
+          key={hoursFor}
+          date={hoursFor}
+          exceptions={exceptions}
+          bookings={bookings}
+          onSave={onSaveDay}
+          onClose={() => { reopenedHours.current = true; setHoursFor(null); }}
+        />
+      ) : null}
     </section>
   );
 }

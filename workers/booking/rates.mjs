@@ -23,24 +23,45 @@ export function findRecurringCode(catalogue, input, duration) {
   return { duration: match.duration, cents: match.cents };
 }
 
-export async function recurringRates(env, studentId) {
+/**
+ * A student's own price for each lesson length, from a code they added or set
+ * by Inês (13 October 2026, Dan: "Inês should be able to set students custom
+ * prices"). It prices every lesson of theirs at that length, one-off or
+ * weekly; the trial keeps its own price.
+ */
+export async function studentRates(env, studentId) {
   const { results } = await env.DB.prepare(
     "SELECT duration_minutes, amount_cents FROM student_recurring_rates WHERE student_id = ?"
   ).bind(studentId).all();
-  return Object.fromEntries((results ?? []).map((row) => [row.duration_minutes, row.amount_cents]));
+  return withDerived(Object.fromEntries((results ?? []).map((row) => [row.duration_minutes, row.amount_cents])));
 }
 
-export async function recurringLessonType(env, studentId, lessonType) {
+/**
+ * By definition a student's 90-minute lesson is 1.5 times their own
+ * 60-minute price (13 October 2026, Dan), unless a 90-minute price of its
+ * own was set or redeemed, which always wins.
+ */
+export function withDerived(rates) {
+  if (rates[60] === undefined || rates[90] !== undefined) return rates;
+  return { ...rates, 90: Math.round(rates[60] * 1.5) };
+}
+
+export async function studentLessonType(env, studentId, lessonType) {
   if (lessonType.id === "trial" || !studentId) return lessonType;
-  const rates = await recurringRates(env, studentId);
+  const rates = await studentRates(env, studentId);
   return { ...lessonType, price_cents: rates[lessonType.duration_minutes] ?? lessonType.price_cents };
 }
 
 /** A move of the same duration preserves the price already agreed for that row. */
 export async function priceForMove(env, row, lessonType) {
   if (row.lesson_type_id === lessonType.id) return row.amount_cents ?? lessonType.price_cents;
-  const priced = row.series_id ? await recurringLessonType(env, row.student_id, lessonType) : lessonType;
-  return priced.price_cents;
+  return (await studentLessonType(env, row.student_id, lessonType)).price_cents;
+}
+
+/** Inês's price for one length: whole euro cents in the same bounds as a code's. */
+export function teacherRate(value) {
+  if (value === null || value === "") return null;
+  return Number.isInteger(value) && value >= 100 && value <= 10000 ? value : undefined;
 }
 
 /**

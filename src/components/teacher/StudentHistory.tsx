@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Globe, UserRound, X } from "lucide-react";
+import { X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { addedByTeacher, fetchBookings, type AdminBooking, type AdminStudent } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
@@ -10,6 +10,8 @@ import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
+import { StudentPrice } from "@/components/teacher/StudentPrice";
+import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
 
 function paymentLabel(booking: AdminBooking) {
   switch (booking.payment_status) {
@@ -25,15 +27,18 @@ function paymentLabel(booking: AdminBooking) {
 }
 
 /** Reads the existing teacher records, including dates before the visible week. */
-export function StudentHistory({ student, token, onClose }: {
+export function StudentHistory({ student, token, onChanged, onClose }: {
   student: AdminStudent;
   token: string;
+  /** After she changes their price or details. */
+  onChanged: (student: AdminStudent) => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [bookings, setBookings] = useState<AdminBooking[] | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [editing, setEditing] = useState(false);
   const [now] = useState(() => Date.now());
   const backdrop = useDialogBackdrop(onClose);
 
@@ -59,7 +64,7 @@ export function StudentHistory({ student, token, onClose }: {
         (booking.status === "confirmed" || booking.status === "cancelled") &&
         (booking.student_id
           ? booking.student_id === student.id
-          : booking.student_email.trim().toLowerCase() === student.email.trim().toLowerCase())
+          : Boolean(student.email) && booking.student_email.trim().toLowerCase() === student.email.trim().toLowerCase())
       ));
     }).catch(caught => {
       if (active && readSession() === token)
@@ -73,31 +78,49 @@ export function StudentHistory({ student, token, onClose }: {
   const past = (bookings ?? []).filter(booking => booking.status === "cancelled" || Date.parse(booking.ends_at) <= now)
     .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
 
+  const thisYear = new Date(now).getFullYear();
+
+  /**
+   * One card per lesson: when, then a few quiet facts. A pill only for what
+   * breaks the pattern (cancelled, no-show, happening now), since the section
+   * already says upcoming or past.
+   */
   function lessonRow(booking: AdminBooking) {
     const cancelled = booking.status === "cancelled";
     const noShow = booking.attendance_status === "no_show";
-    const status = cancelled ? "Cancelled" : noShow ? "No-show" : Date.parse(booking.ends_at) <= now ? "Past lesson" : Date.parse(booking.starts_at) <= now ? "Happening now" : "Booked";
+    const starts = new Date(booking.starts_at);
+    const live = !cancelled && Date.parse(booking.starts_at) <= now && Date.parse(booking.ends_at) > now;
+    const pill = cancelled
+      ? booking.cancelled_by === "teacher" ? "Cancelled by you" : booking.cancelled_by === "student" ? "Cancelled by student" : "Cancelled"
+      : noShow ? "No-show" : live ? "Happening now" : "";
     const changeFee = booking.same_day_fee_status === "paid" ? "Change fee paid"
       : booking.same_day_fee_status === "payment_due" ? "Change fee due"
         : booking.same_day_fee_status === "scheduled" ? "Change fee scheduled"
           : booking.same_day_fee_status === "processing" ? "Change fee processing" : "";
+    // A cancelled lesson's money only matters if some moved.
+    const payment = cancelled && !["paid", "refunded"].includes(booking.payment_status) ? "" : paymentLabel(booking);
+    const facts = [
+      formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000) }),
+      payment,
+      addedByTeacher(booking) ? "Added by you" : "",
+      booking.reschedule_count > 0 ? `Moved ${booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}` : "",
+      changeFee,
+    ].filter(Boolean);
     return (
-      <li className={`teacher-history-lesson${cancelled ? " is-cancelled" : ""}`} key={booking.id}>
+      <li className={`teacher-history-lesson${cancelled || noShow ? " is-cancelled" : ""}`} key={booking.id}>
         <div className="teacher-history-lesson__top">
-          <strong>{dateLabel(dateKey(new Date(booking.starts_at)), { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</strong>
-          <span className={`teacher-history-status${cancelled || noShow ? " is-muted" : ""}`}>{status}</span>
+          <strong>
+            {dateLabel(dateKey(starts), { weekday: "short", day: "numeric", month: "short", ...(starts.getFullYear() === thisYear ? {} : { year: "numeric" }) })}
+            <span> · {formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
+          </strong>
+          {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
         </div>
-        <p className="teacher-history-lesson__time">{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}<span> · {formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000) })}</span></p>
-        <p className="teacher-history-lesson__facts">
-          <span>{booking.location === "porto" ? <UserRound size={13} aria-hidden="true" /> : <Globe size={13} aria-hidden="true" />}{booking.location === "porto" ? "In Porto" : "Online"}</span>
-          <span>{paymentLabel(booking)}</span>
-          {addedByTeacher(booking) ? <span>Added by you</span> : null}
-          {booking.reschedule_count > 0 ? <span>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</span> : null}
-          {changeFee ? <span>{changeFee}</span> : null}
-        </p>
-        {cancelled && ["teacher", "student"].includes(booking.cancelled_by ?? "") ? <p className="teacher-history-lesson__note">Cancelled {booking.cancelled_by === "teacher" ? "by you" : "by the student"}.</p> : null}
-        {booking.cancellation_message ? <p className="teacher-history-lesson__note">Message: {booking.cancellation_message}</p> : null}
-        {booking.notes ? <p className="teacher-history-lesson__note">{booking.notes}</p> : null}
+        <ul className="booking-payment-facts teacher-history-lesson__facts">
+          <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
+          {facts.map(fact => <li key={fact}>{fact}</li>)}
+        </ul>
+        {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
+        {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
       </li>
     );
   }
@@ -107,9 +130,24 @@ export function StudentHistory({ student, token, onClose }: {
       <button className="teacher-dialog-close" aria-label="Close student history" onClick={onClose} type="button"><X size={20} aria-hidden="true" /></button>
       <header className="teacher-history-heading">
         <AccountAvatar mark={student.mark} name={student.name} />
-        <div><p id="teacher-history-label">Lesson history</p><h2 id="teacher-history-name">{student.name}</h2><p className="teacher-history-email">{student.email}</p></div>
+        <div>
+          <p id="teacher-history-label">Lesson history</p>
+          <h2 id="teacher-history-name">{student.name}</h2>
+          <p className="teacher-history-email">{student.email || "No email yet"}</p>
+          {student.phone ? <p className="teacher-history-email">{student.phone}</p> : null}
+          <p className="teacher-history-email">{student.nif ? `NIF ${student.nif}` : "No NIF (consumidor final)"}</p>
+          {editing ? null : <button className="teacher-text-button" onClick={() => setEditing(true)} type="button">Edit details</button>}
+        </div>
       </header>
-      <p className="teacher-history-clock">Porto time</p>
+      {editing ? (
+        <StudentDetailsForm
+          token={token}
+          student={student}
+          onCancel={() => setEditing(false)}
+          onSaved={(updated) => { setEditing(false); onChanged(updated); }}
+        />
+      ) : null}
+      <StudentPrice token={token} student={student} onChanged={onChanged} />
       {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={() => { setError(""); setBookings(null); setAttempt(value => value + 1); }} type="button">Try again</button></div>
         : bookings === null ? <p role="status">Loading lesson history…</p>
           : bookings.length === 0 ? <p className="teacher-history-empty">No lessons recorded yet.</p>

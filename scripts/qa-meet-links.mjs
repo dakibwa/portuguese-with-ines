@@ -26,7 +26,7 @@ const bookings = cases.map((entry, index) => ({
 }));
 await mkdir("tmp/qa/meet", { recursive: true });
 try {
-  for (const width of [1280, 390]) {
+  for (const width of [390]) {
     const page = await browser.newPage({ viewport: { width, height: 1000 } });
     const errors = [];
     let lateReady = false;

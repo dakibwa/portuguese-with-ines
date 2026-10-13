@@ -22,6 +22,7 @@ export function CalendarBookingPrompt({ date, lessons = [], onBook, onClose }: {
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const backdropHandlers = useDialogBackdrop(onClose);
+  const longDate = formatLongDate(`${date}T12:00:00Z`);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -38,7 +39,7 @@ export function CalendarBookingPrompt({ date, lessons = [], onBook, onClose }: {
   return (
     <dialog
       aria-labelledby="calendar-booking-title"
-      aria-describedby="calendar-booking-date"
+      aria-describedby={lessons.length ? undefined : "calendar-booking-date"}
       className="policy-dialog calendar-booking-prompt"
       ref={dialogRef}
       {...backdropHandlers}
@@ -46,13 +47,15 @@ export function CalendarBookingPrompt({ date, lessons = [], onBook, onClose }: {
       onCancel={(event) => { event.preventDefault(); onClose(); }}
     >
       <div className="policy-dialog__heading">
-        <h2 id="calendar-booking-title">{lessons.length ? "Your lessons" : "Do you want to book?"}</h2>
+        {/* A day's lessons are titled by the day: "Your lessons" only
+            repeated the card behind the dialog. */}
+        <h2 id="calendar-booking-title">{lessons.length ? longDate : "Do you want to book?"}</h2>
         <button aria-label={lessons.length ? "Close" : "Close booking question"} onClick={onClose} type="button">
           <X size={22} aria-hidden="true" />
         </button>
       </div>
       <div className="calendar-booking-prompt__content">
-        <p id="calendar-booking-date">{formatLongDate(`${date}T12:00:00Z`)}</p>
+        {lessons.length ? null : <p id="calendar-booking-date">{longDate}</p>}
         {lessons.length ? (
           <ul className="calendar-booking-prompt__lessons">
             {lessons.map((lesson) => (

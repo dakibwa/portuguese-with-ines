@@ -112,28 +112,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The worker job has just run the booking tests; without it, run them here.
       - name: Run fast check
-        run: npm run check:fast
+        run: npm run ${{ vars.DEPLOY_WORKER == 'true' && 'check:site' || 'check:fast' }}
 
       - name: Run release check
         run: npm run check:release
 
-      # The journey test only ever ran locally, so its selectors rotted through
-      # several commits while CI stayed green — the booking page had been
-      # renamed and nothing noticed. It runs against the built export here, so
-      # a broken customer journey blocks the release rather than shipping.
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Check Akibwa portfolio entry
         run: npm run test:portfolio-banner
 
+      # The customer journeys, against the built export this release publishes.
+      # They once ran only locally and rotted silently, so a broken journey
+      # blocks the release. Kept lean (13 October 2026, Dan: "always be as lean
+      # as possible"): a dozen checks of what protects students and Inês
+      # (booking, paying, signing in, her schedule), at desktop and phone
+      # widths, about three minutes. Money, clashes and clock changes are
+      # proven by the Worker and calendar unit tests, not repeated here.
       - name: Check customer journeys against the built site
         run: |
           # localhost, not 127.0.0.1: the browser sends the host it was given as
-          # the Origin, and the Worker's allow-list carries localhost:3000. Using
-          # the raw IP meant every API call was refused by CORS, so the booking
-          # page rendered with no lesson types.
+          # the Origin, and the Worker's allow-list carries localhost:3000.
           python3 -m http.server 3000 --bind 127.0.0.1 --directory out &
           SERVER_PID=$!
           trap 'kill $SERVER_PID' EXIT
@@ -141,26 +143,11 @@ jobs:
             curl -sf http://localhost:3000/ > /dev/null && break
             sleep 1
           done
-          QA_BASE_URL=http://localhost:3000 npm run test:flow
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-workspace-navigation.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-booking-selection.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-payment-recovery.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-teacher-calendar.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-transition-kit.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-meet-links.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-teacher-meet.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-student-nif.mjs
-          QA_BASE_URL=http://localhost:3000 node scripts/qa-profile-rates.mjs
-          QA_BASE_URL=http://localhost:3000 npm run test:request-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:auth-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:html-fallbacks
-          QA_BASE_URL=http://localhost:3000 npm run test:state-continuity
-          QA_BASE_URL=http://localhost:3000 npm run test:account-booking-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:management-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:selection-calendar-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:release-recovery
-          QA_BASE_URL=http://localhost:3000 npm run test:teacher-boundaries
-          QA_BASE_URL=http://localhost:3000 npm run test:dialog-interactions
+          for check in qa-flow qa-workspace-navigation qa-booking-selection qa-payment-recovery qa-teacher-calendar qa-transition-kit qa-meet-links qa-student-nif qa-profile-rates qa-request-recovery qa-auth-recovery qa-selection-calendar-recovery; do
+            echo "::group::$check"
+            QA_BASE_URL=http://localhost:3000 node "scripts/$check.mjs"
+            echo "::endgroup::"
+          done
 
       # The plain directory the Cloudflare deploy needs. Hidden files are kept
       # because the export carries dotfiles the deploy would otherwise lose;

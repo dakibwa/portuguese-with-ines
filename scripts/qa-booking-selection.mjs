@@ -15,7 +15,7 @@ const types = [
 ];
 const addWeeks = (start, index) => new Date(Date.parse(start) + index * 7 * 86400000).toISOString();
 try {
-  for (const width of [320, 390, 1280]) {
+  for (const width of [390, 1280]) {
     // A student on Porto's clock: elsewhere every time shows on the browser's
     // own, so exact time labels would depend on the machine running the check.
     const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce", timezoneId: "Europe/Lisbon" });
@@ -157,7 +157,7 @@ try {
     await page.getByRole("button", { name: "Book 3 lessons & agree to pay", exact: true }).click();
     await page.getByRole("heading", { name: "You’re booked in.", exact: true }).waitFor();
     assert.deepEqual(requests.at(-1).startAts.map(start => start.slice(0, 10)).sort(), ["2026-09-16", "2026-09-17", "2026-09-30"]);
-    assert.equal(requests.at(-1).expectedPriceCents, 2500);
+    assert.equal(requests.at(-1).expectedPriceCents, 1500, "The student's own price applies to one-off lessons too");
     assert.equal(requests.at(-1).paymentConsent, true, "The short control preserves the server's payment authorisation");
     assert.equal("repeat" in requests.at(-1), false);
     bookings = []; series = [];
@@ -179,7 +179,7 @@ try {
     await page.getByRole("heading", { name: "You’re booked in.", exact: true }).waitFor();
     assert.equal(requests.at(-1).startAts.length, 2);
     assert.equal(requests.at(-1).repeat, 4);
-    assert.equal(requests.at(-1).expectedPriceCents, 1500, "The recurring private rate applies to both weekly times");
+    assert.equal(requests.at(-1).expectedPriceCents, 1500, "Their own price applies to both weekly times");
     await page.getByRole("button", { name: "Back to your lessons", exact: true }).click();
     await page.locator("#upcoming-lessons-heading").waitFor();
     // Both weekly times are on the calendar as weekly lessons; each opens into

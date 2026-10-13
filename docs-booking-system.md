@@ -28,7 +28,7 @@ Student on /book                                     (browse without an account)
   → POST /auth/register | /auth/login | /auth/google → session token
   → POST /bookings                    (Bearer)       → D1 row, emails, ICS invite
   → GET  /me                          (Bearer)       → their calendar and series
-  → GET/POST /me/recurring-rates      (Bearer)       → saved weekly rates; POST saves a code
+  → GET/POST /me/recurring-rates      (Bearer)       → their own prices; POST saves a code
   → GET  /bookings/:token                            one lesson; HMAC-signed token
   → POST /bookings/:token/reschedule | /cancel       → optional lessonType, sequence++, updated ICS
   → POST /series/:id/reschedule | /stop (Bearer)     → move or end an owned weekly sequence
@@ -43,6 +43,12 @@ Inês on /schedule                     (her own account, role=teacher)
                                                      `Added by you`; charged to a card only
                                                      once the student saved one from their
                                                      account)
+  → POST /admin/students                             set a student up (details, optional prices); nothing emailed
+  → POST /admin/students/:id/details                 their name, email, phone, NIF and splat; email only
+                                                     until they first sign in
+  → POST /admin/students/:id/prices                  her price for a student per length; null is standard
+  → GET  /admin/receipts?month=YYYY-MM               every amount paid or due for a Porto month's lessons,
+                                                     with the NIF to issue to (her Receipts tab and automation)
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
   → POST /admin/bookings/:id/reschedule | /cancel
 Stripe → POST /stripe/webhook                        signature-verified
@@ -119,10 +125,13 @@ never put on a card.
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
-still paid by hand, and any weekly slot. `Manage students` on `/schedule` puts
+still paid by hand, and any weekly slot. `Students` on `/schedule` puts
 those who still need to sign in or add a card first, each with
-`Send sign-in link` (`POST /admin/students/:id/welcome`, three an hour per
-student).
+`Send welcome email` (`POST /admin/students/:id/welcome`, three an hour per
+student). Accounts the opt-in live check registers
+(`launch-check-…@example.invalid`, from `scripts/qa-recurring-rates.mjs`) are
+left out of the list; the four made on 5 September 2026 were deleted from
+production on 13 October 2026 at Dan's request.
 
 Selecting a student opens their lesson history. The teacher UI reads
 `GET /admin/bookings?from=1970-01-01T00:00:00.000Z` through the existing teacher
@@ -158,7 +167,8 @@ heading while the timetable reloads; a failed read retains that position and
 offers its existing reload action. Reloading never moves focus from a control
 Inês selects while it is pending.
 
-When Inês cancels a lesson she can include an optional **Message to student**,
+When Inês cancels a lesson she can include an optional **Message for {first
+name}**,
 up to 1,000 characters. It appears as **Message from Inês** in the student's
 cancellation email and in her own copy, with line breaks preserved and markup
 treated as text. An empty message leaves the existing email unchanged. The
@@ -172,17 +182,19 @@ The week itself is where Inês takes time off. Choosing a free time offers
 `Add a lesson here` or `Take this time off`; dragging across times on a date
 blocks them all for that date only, and choosing a blocked time reopens it.
 The `Day off` switch above each date blocks the whole day. The `Time off`
-tab shows a month calendar. Each date opens a popup for `Full day off` or
-`Specific times`, including multiple timed breaks. In the time picker, `00:00` means the end
-of that day (stored as minute 1440).
-This draft saves explicitly through the same `/admin/exceptions/day` endpoint.
-Switching to timed breaks removes that date's whole-day block; removing time
-off clears its whole-day and partial blocks. Weekly blocks and extra hours stay.
-The month marks whole days off and booked lessons, without displaying weekly
-unavailability or partial blocks from the week.
-`Select several days` enables bulk changes across months; selected dates survive
-tab changes. Booked lessons are shown before applying changes, and unavailable
-booking data must be retried first. Each bulk-selected date uses the same queue;
+tab shows a month calendar beside one card. Tapping dates chooses them, one or
+several, across months; chosen dates survive tab changes. The card offers
+`Take the day off` / `Take N days off`, `Take some hours off` for a single
+date, and `Make available` when a chosen date is off. Some hours opens a draft
+of one or more timed breaks; in the time picker, `00:00` means the end of that
+day (stored as minute 1440). That draft saves explicitly through the same
+`/admin/exceptions/day` endpoint; saving breaks removes that date's whole-day
+block, and `Remove hours off` clears its breaks. Weekly blocks and extra hours
+stay. The month marks whole days off and booked lessons, without displaying
+weekly unavailability or partial blocks from the week.
+Booked lessons on the chosen dates are listed as cards whose `Change` opens
+that lesson's own move/cancel dialog, and unavailable booking data must be
+retried before applying changes. Each bulk-selected date uses the same queue;
 already-matching days require no write. Reopening a day removes only its
 whole-day block, retaining partial time off and weekly hours. Each change
 saves one request at a time, so quick clicks coalesce
@@ -192,8 +204,8 @@ failure of the latest choice puts that date back as saved and says so.
 Weekly-hours drafts warn when changed lesson start times overlap an existing
 confirmed lesson in Porto time, including ongoing and future lessons. Saving
 waits for booked lessons to load; the warning and save confirmation both state
-that existing lessons stay booked. Each clash is a lesson card with a
-`Change lesson` button opening the existing move/cancel dialog. Opening or
+that existing lessons stay booked. Each clash is the same lesson card, its
+`Change` button opening the existing move/cancel dialog. Opening or
 changing a lesson preserves the weekly-hours draft; a completed change refreshes
 the clash cards. More than four affected lessons expand from `more lessons`.
 Hours edits never move or cancel lessons themselves.
@@ -221,18 +233,49 @@ are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
 The sliding tools bar groups `Week`, `Weekly hours`, `Time off`,
-`Manage students` and `Google Meet`, with the current week as the default.
+`Students` and `Google Meet`, with the current week as the default.
 The Google Meet tab exposes the existing connection controls and its tab
 marks connection problems; Google callbacks open it directly.
 
-Manual lesson entry is a collapsed backup in Week and Manage students,
-with online/in-Porto location and `How often` (once, or weekly for 4, 6 or 8 weeks or until
-stopped). Its email field suggests her existing students (read from
-`GET /admin/students` when she first reaches it) and a chosen one fills in
-their name. `Manage students` contains the student cards; each
-row's `Add lesson` opens the form with that student in it. Form drafts survive
-tab changes. All teacher actions still use the authenticated admin endpoints and
+Lessons only belong to students (13 October 2026, Dan: no loose lessons).
+`POST /admin/bookings` refuses an email that isn't on the site ("Add them as a
+student first.", 404); students come from `POST /admin/students`. The page's
+one student dialog adds a student, then their lessons (online or in Porto,
+once or weekly for 4, 6 or 8 weeks or until stopped), then their welcome; a
+student card's `Add lesson` and a free time's `Add a lesson here` open the same
+dialog, the latter asking whose lesson first. All teacher actions still use the
+authenticated admin endpoints and
 their existing booking, payment and email safeguards.
+
+Onboarding (13 October 2026, Dan) lets Inês set a student up before they hear
+anything. `POST /admin/students` takes `email`, `name` and optional `phone`,
+`nif` (checked as `/me` checks it) and `mark`, creates the account with no
+password and `awaiting_welcome = 1` (migration `0025-awaiting-welcome.sql`,
+applied to staging and production on 13 October 2026), and sends nothing; an
+address already on the site is refused. A student she creates from the lesson
+form is set up the same way. While a student is awaiting their welcome and has
+never signed in, every `student_*` email about them is held at the one sending
+point (lessons added, moved or cancelled, the Meet link, charges); her Google
+Calendar, the blocked time and the lesson's NIF are unaffected, and her own
+copy says they weren't emailed. Lesson, move and cancel replies carry
+`emailed: false` so her page says so. `POST /admin/students/:id/welcome` sends
+their upcoming lessons (up to twelve, each on the lesson's clock) and the
+one-click way in, then clears the flag, after which emails reach them as
+usual. Signing in themselves also ends the hold. Students made before this keep
+`awaiting_welcome = 0`, so nothing about them changes.
+
+A name alone is enough to set a student up (13 October 2026, Dan: she builds
+on it later). `students.email` stays `NOT NULL UNIQUE`, so a student without
+one stores `no-email:<id>`. No address can equal that, and every sign-in,
+registration, reset and email-change path checks for a real address first.
+`GET /admin/students` shows such a student's email as `""`. Their welcome is
+refused (400) and `POST /admin/bookings` cannot reach them, so their lessons
+and welcome wait until she gives an email. `POST /admin/students/:id/details`
+sets name, phone, NIF and splat at any time. It sets or corrects the email only
+while the student has never signed in (no password, Google link or sign-in);
+after that it answers 409 and the student changes it from their account. A
+changed address clears `email_verified_at` and moves their bookings'
+`student_email` with it. An address another student has is refused (409).
 
 ## Accounts
 
@@ -370,7 +413,7 @@ depending on them having kept the right confirmation email.
   on its own, with `Back` above it.
   Every booked lesson is marked there, weekly lessons in lilac and one-off
   lessons in coral. Choosing a date with one lesson opens that lesson; a date
-  with several lists them in `Your lessons`; a free future date opens booking
+  with several lists them in a dialog titled by that date; a free future date opens booking
   on that day with its times. It never creates a second selected-day panel.
   While booking, a chosen free day's times sit beside the calendar on wide
   screens and take its place on a phone, headed by a short date with `Change`
@@ -665,12 +708,26 @@ lessons, so its cancellation set includes every occurrence committed first.
   restore stale values in D1. Account creation handles an email claimed after
   its lookup: password registration offers sign-in; Google resolves the winning
   row through the existing verified identity and first-link rules.
+- **Receipts (13 October 2026, Dan).** `GET /admin/receipts?month=YYYY-MM`
+  (teacher session or `ADMIN_TOKEN`) answers every amount for lessons starting
+  in that Porto month: one line per lesson price (or the no-show amount that
+  replaced it) and one per late change fee, each with a stable `id`
+  (`<booking id>:lesson` / `:fee`), the student's name, email and current NIF
+  (empty for consumidor final), `amountCents`, `method` (`card` / `by hand`),
+  `state` (`paid`, `refunded`, `due`, `charging`), the Stripe PaymentIntent
+  for card payments, and `ready`, true once the money is in. A lesson with
+  nothing on a card counts as paid by hand once it has happened; a cancelled
+  lesson appears only if money moved; a lesson still to come only once paid.
+  Her Receipts tab shows the same lines and downloads them as CSV, so her
+  automation can work from the JSON, the CSV or the table and remember each
+  `id` it has issued. The rules live in `workers/booking/receipts.mjs`.
 - **Where it appears.** Inês's fatura-recibo automation reads her booking
   emails and schedule, so every email she gets about a student's lessons
   (bookings, weekly runs, moves, cancellations, declined cards and payments)
   carries a `NIF` row beside the student, with the number or
-  `Not given (consumidor final)`, read when the email is sent. Her lesson
-  details state it the same way. The student's own payment email shows it,
+  `Not given (consumidor final)`, read when the email is sent. Her Receipts
+  tab and her student profiles state it the same way; her lesson details are
+  about the lesson and no longer carry it. The student's own payment email shows it,
   when given, so they can check it before the receipt is issued; their other
   booking emails do not. It is never sent to Stripe or written to logs, and it
   stays out of the shareable Google Calendar events.
@@ -735,7 +792,11 @@ different students were confirmed into the same lesson in testing.
 - Customer emails use short introductions and one action button. HTML keeps
   the complete action link in that button; the plain-text alternative includes
   the URL. The price row carries payment timing and the footer keeps the
-  applicable cancellation/no-show rules without repeating payment timing.
+  applicable cancellation/no-show rules without repeating payment timing, or
+  a fee or refund the note above it already states (a late move on a saved
+  card ends `This fee applies once per lesson.`). A cancellation names its
+  place rather than linking its call, and an automatic notice ends `Sent
+  automatically by the booking system.` above the site's link.
   Amounts are written as the site writes them: whole euros bare (€25), anything
   else with its cents (€22.50), never rounded.
 - `email/receipt-kit/README.md` and `scripts/build-receipt-email-kit.mjs` provide
@@ -891,7 +952,7 @@ the next usable week; closed weeks later in the booking window remain visible.
 Selecting a free day while booking keeps the four weeks beside its times on
 wide screens; on a phone the times replace the calendar and the date's `Change`
 returns to the four weeks that held it. In the lesson view a booked date opens
-its lesson, or lists several in `Your lessons` with `Book another lesson`; other
+its lesson, or lists several in a dialog titled by that date, with `Book another lesson`; other
 future dates highlight on hover/focus and open booking on that day directly,
 with no separate Book labels on the tiles and no question first. Availability
 is always checked for the chosen length.
@@ -1172,7 +1233,32 @@ names; they now mean "inside the window".
   retained and no new card charge is invented. Emails say the fee applies (to
   Inês, that it is due) rather than that a card is charged.
 
-### Private recurring rates and security
+### A student's own price, private codes and security
+
+**One price per student per length (13 October 2026, Dan).** A student's own
+price for a length, whether from a code they added or set by Inês, prices every
+lesson of theirs at that length, one-off or weekly. By definition their
+90-minute price is 1.5 times their own 60-minute price unless a 90-minute
+price of its own was set or redeemed, which always wins (`withDerived` in
+`rates.mjs`; the derived price is never stored, so a later 90-minute price
+simply takes over). The trial keeps its own
+price and €5 fees never change. Inês sets it when she adds a student or later
+from their profile (`POST /admin/students/:id/prices`, `{ prices: { 60: cents
+| null, 90: cents | null } }`, €1–€100, null for the standard price again), and
+can change it at any time: her price replaces a code's. Their welcome email
+lists their price, so they are on it with no code to type.
+
+When a price is set or a code is added, their lessons still to come at that
+length follow it, provided nothing is settled on them: status `confirmed`,
+`payment_status` `scheduled` or `not_required`, no charge started, and not
+marked paid by hand. Paid, processing, due, refunded and pending-checkout
+lessons keep their amount. A lesson the student agreed to at checkout
+(`PAYMENT_CONSENT_VERSION`) follows only a lower price, since that agreement
+was to the amount it showed; a card saved from their account
+(`STUDENT_CARD_CONSENT_VERSION`) agreed to every lesson's price, so those
+follow either way. The reply says how many lessons moved.
+
+
 
 `PRIVATE_RECURRING_CODES` is a private Worker binding containing the exact
 approved code, duration and cents triples. The canonical owner list is outside
@@ -1198,25 +1284,26 @@ accounts and removing a code does not revoke prior grants. Each length has its
 own grant, so one account can hold a 60 minute rate and a 90 minute rate at
 once, from two codes. A second code for a length that already has a different
 rate is refused (409) naming the length and pointing to Inês; the same rate
-again changes nothing. Recurring creation
-and top-ups snapshot the saved rate in `bookings.amount_cents`, including when
-payment is off. Existing rows keep their price when moved at the same duration;
-a new duration uses its own saved rate or public price. Single/trial bookings
-and €5 fees never use these rates. No booked row is repriced merely by redeeming.
+again changes nothing. Booking, weekly top-ups and Inês's own lessons snapshot
+the student's price in `bookings.amount_cents`, including when payment is off.
+Existing rows keep their price when moved at the same duration; a new duration
+uses the student's price for it or the public price. Trials and €5 fees never
+use these prices. Booked rows follow a new price as described above.
 
 **Where a student adds a code.** Only under *Edit details*, behind a small `Have a
-code from Inês?` disclosure. Weekly booking and lesson-length changes use the
-account's saved rates automatically and offer no code field. The profile lists
-the saved weekly rates only once there is one, so a student without a code sees
+code from Inês?` disclosure. Booking and lesson-length changes use the
+account's prices automatically and offer no code field; each length choice
+carries its price (`60 mins · €20`). The profile lists the student's prices
+only once there is one, so a student without a code sees
 one quiet link and no "standard price" rows. It is
 one field for every code: after a 60 minute code is added the disclosure stays
 open for the 90 minute one. A reply clears only its submitted code; a newer
-code typed while waiting stays ready to add. The note names future weekly
-lessons of the matching length, since single/trial prices are unaffected.
+code typed while waiting stays ready to add. The note says the code sets their
+price for lessons of that length, including ones already booked.
 Old rates lookups cannot overwrite a saved code's prices or show a stale
 lookup error, in either the editor or the booking workspace.
 Saving there tells the booking workspace at once,
-so the next weekly booking is priced from it without a reload or the code being
+so the next booking is priced from it without a reload or the code being
 typed again. **Sign-up deliberately has no code field** (decided 28 September
 2026): only some students have a code, and a field there would suggest most new
 students should have one.

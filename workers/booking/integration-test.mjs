@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import worker, { chargeDueLessons, chargeDueSameDayFees, notifySeries, resendFailedEmails, retryPaymentRecovery, retryRefunds } from "./index.mjs";
 import { createSession, createResetToken, hashPassword, sessionVersion } from "./auth.mjs";
 import { createManageToken, readManageToken } from "./tokens.mjs";
-import { findRecurringCode, recurringLessonType, priceForMove } from "./rates.mjs";
+import { findRecurringCode, studentLessonType, priceForMove } from "./rates.mjs";
 import { bookingSelection, portoWeekOf } from "./selection.mjs";
 import { computeAvailability } from "./availability.mjs";
 
@@ -258,11 +258,13 @@ await test("parallel guesses bounded to eight requests per account window", asyn
   const responses = await Promise.all(Array.from({ length: 12 }, () => call("/me/recurring-rates", { user: "outsider", body: { code: "NOPE15", durationMinutes: 60 } })));
   assert.equal(responses.filter((res) => res.status === 429).length, 4);
 });
-await test("saved rate survives catalogue removal, trial and other duration keep public price", async () => {
+await test("saved rate survives catalogue removal; the trial keeps its price; 90 minutes is 1.5x their 60 unless set", async () => {
   const local = { ...env, PRIVATE_RECURRING_CODES: "[]" };
-  assert.equal((await recurringLessonType(local, "alice", { id: "single", duration_minutes: 60, price_cents: 2500 })).price_cents, 1500);
-  assert.equal((await recurringLessonType(local, "alice", { id: "trial", duration_minutes: 60, price_cents: 2000 })).price_cents, 2000);
-  assert.equal((await recurringLessonType(local, "bob", { id: "long", duration_minutes: 90, price_cents: 3500 })).price_cents, 3500);
+  assert.equal((await studentLessonType(local, "alice", { id: "single", duration_minutes: 60, price_cents: 2500 })).price_cents, 1500);
+  assert.equal((await studentLessonType(local, "alice", { id: "trial", duration_minutes: 60, price_cents: 2000 })).price_cents, 2000);
+  // Bob has only a 60-minute price, so his 90 minutes is 1.5 times it; Alice's own 90-minute price wins (below).
+  assert.equal((await studentLessonType(local, "bob", { id: "long", duration_minutes: 90, price_cents: 3500 })).price_cents, 2250);
+  assert.equal((await studentLessonType(local, "outsider", { id: "long", duration_minutes: 90, price_cents: 3500 })).price_cents, 3500, "no price of their own: the public one");
   assert.equal(await priceForMove(local, { lesson_type_id: "single", amount_cents: 1800, series_id: "series", student_id: "alice" }, { id: "single", duration_minutes: 60, price_cents: 2500 }), 1800);
   assert.equal(await priceForMove(local, { lesson_type_id: "single", amount_cents: 1800, series_id: "series", student_id: "alice" }, { id: "long", duration_minutes: 90, price_cents: 3500 }), 2700);
 });
@@ -273,9 +275,16 @@ await test("a code names its own length, so a 60 and a 90 minute code save side 
   const ninety = await call("/me/recurring-rates", { user: "carol", body: { code: " demo27 " } });
   assert.equal(ninety.status, 200);
   assert.deepEqual(await ninety.json(), { rates: { 90: 2700 }, saved: { durationMinutes: 90, cents: 2700 } });
+  // A lesson they already have at that length is on the code's price at once;
+  // one already paid is not.
+  booking("carol-booked", { owner: "carol", payment: "not_required", start: "2026-11-02T10:00:00.000Z", end: "2026-11-02T11:00:00.000Z" });
+  booking("carol-paid", { owner: "carol", payment: "paid", start: "2026-11-09T10:00:00.000Z", end: "2026-11-09T11:00:00.000Z" });
+  db.prepare("UPDATE bookings SET amount_cents = 2500 WHERE id IN ('carol-booked', 'carol-paid')").run();
   const sixty = await call("/me/recurring-rates", { user: "carol", body: { code: "TEST15" } });
   assert.equal(sixty.status, 200);
   assert.deepEqual(await sixty.json(), { rates: { 60: 1500, 90: 2700 }, saved: { durationMinutes: 60, cents: 1500 } });
+  assert.deepEqual(db.prepare("SELECT amount_cents FROM bookings WHERE id IN ('carol-booked', 'carol-paid') ORDER BY starts_at").all().map((row) => row.amount_cents), [1500, 2500]);
+  db.prepare("DELETE FROM bookings WHERE id IN ('carol-booked', 'carol-paid')").run();
   // Adding the same code again changes nothing and is not an error.
   const again = await call("/me/recurring-rates", { user: "carol", body: { code: "test15" } });
   assert.equal(again.status, 200);
@@ -288,8 +297,9 @@ await test("a second code for a length that already has a rate is refused and na
   const refused = await call("/me/recurring-rates", { user: "dora", body: { code: "MOCK19" } });
   assert.equal(refused.status, 409);
   assert.equal((await refused.json()).error, "You already have an agreed rate for 60-minute lessons. Ask Inês if it needs to change.");
-  assert.deepEqual(await savedRates("dora"), { 60: 1500 });
-  // The other length is still open to her.
+  // Until a 90-minute code, her 90 minutes is 1.5 times her 60.
+  assert.deepEqual(await savedRates("dora"), { 60: 1500, 90: 2250 });
+  // The other length is still open to her, and its own code wins.
   assert.equal((await call("/me/recurring-rates", { user: "dora", body: { code: "DEMO27" } })).status, 200);
   assert.deepEqual(await savedRates("dora"), { 60: 1500, 90: 2700 });
 });
@@ -297,7 +307,7 @@ await test("two different prices for one length racing without a named length sa
   await enrol("erin");
   const responses = await Promise.all(["TEST15", "MOCK19"].map((code) => call("/me/recurring-rates", { user: "erin", body: { code } })));
   assert.deepEqual(responses.map((res) => res.status).sort(), [200, 409]);
-  assert.deepEqual(Object.keys(await savedRates("erin")), ["60"]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM student_recurring_rates WHERE student_id = 'erin'").get().n, 1);
 });
 await test("an unknown code is refused without naming a length, and a named length still has to match", async () => {
   await enrol("finn");
@@ -342,7 +352,7 @@ await test("student cannot use teacher routes and forged manage links disclose n
   assert.equal((await call("/admin/bookings", { method: "GET" })).status, 401);
   assert.equal((await call("/bookings/forged", { method: "GET" })).status, 404);
 });
-await test("recurring booking creation snapshots rate for every occurrence; one-off and tampering cannot use it", async () => {
+await test("the student's own price snapshots onto every occurrence and a one-off; tampering is refused", async () => {
   const payload = { lessonType: "single", startAt: "2026-09-08T09:00:00.000Z", repeat: 4, expectedPriceCents: 1500 };
   const result = await call("/bookings", { body: payload });
   assert.equal(result.status, 201, await result.clone().text());
@@ -350,9 +360,11 @@ await test("recurring booking creation snapshots rate for every occurrence; one-
   assert.equal(rows.length, 4);
   assert.ok(rows.every((row) => row.amount_cents === 1500));
   assert.equal((await call("/bookings", { body: { ...payload, startAt: "2026-09-08T12:00:00.000Z", expectedPriceCents: 100 } })).status, 409);
-  const one = await call("/bookings", { body: { lessonType: "single", startAt: "2026-09-08T12:00:00.000Z", expectedPriceCents: 2500 } });
+  // Their price is theirs for one-off lessons too (13 October 2026, Dan).
+  assert.equal((await call("/bookings", { body: { lessonType: "single", startAt: "2026-09-08T12:00:00.000Z", expectedPriceCents: 2500 } })).status, 409);
+  const one = await call("/bookings", { body: { lessonType: "single", startAt: "2026-09-08T12:00:00.000Z", expectedPriceCents: 1500 } });
   assert.equal(one.status, 201);
-  assert.equal((await one.json()).booking.amountCents, 2500);
+  assert.equal((await one.json()).booking.amountCents, 1500);
 });
 await test("a cancellation inside 14 hours records and charges just one separate fee under concurrent retries", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
@@ -1743,7 +1755,9 @@ await test("Inês's bookings never alter a password-less account she created, or
   const email = "no-password@example.invalid";
   captureEmail();
   try {
-    assert.equal((await call("/admin/bookings", { user: "teacher", body: { email, name: "Nadia Nopass", lessonType: "single", startAt: "2026-12-09T10:00:00.000Z" } })).status, 201);
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { email, name: "Nadia Nopass", lessonType: "single", startAt: "2026-12-09T10:00:00.000Z" } })).status, 404, "no loose lessons");
+    assert.equal((await call("/admin/students", { user: "teacher", body: { email, name: "Nadia Nopass" } })).status, 201);
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { email, lessonType: "single", startAt: "2026-12-09T10:00:00.000Z" } })).status, 201);
     const created = db.prepare("SELECT * FROM students WHERE email=?").get(email);
     assert.equal(created.password_hash, "");
     assert.equal(created.email_verified_at, null);
@@ -1766,9 +1780,9 @@ await test("Inês's bookings never alter a password-less account she created, or
     assert.equal((await call("/admin/students", { method: "GET", user: "teacher" })).status, 200, "her session still works");
     await drain();
     const confirmations = sentEmails.filter((sent) => sent.subject.startsWith("Inês has booked your Portuguese lesson"));
-    assert.equal(confirmations.length, 3);
-    // The password-less account she made is offered a way in; her own never is.
-    assert.ok(confirmations.filter((sent) => sent.to[0] === email).every((sent) => signInLinkIn(sent)));
+    // The account she made hears nothing until she sends their welcome.
+    assert.equal(confirmations.filter((sent) => sent.to[0] === email).length, 0);
+    assert.equal(confirmations.length, 1);
     assert.ok(!confirmations.some((sent) => sent.to[0] === "teacher@example.invalid" && signInLinkIn(sent)), "a teacher is never sent a sign-in link");
   } finally {
     releaseEmail();
@@ -2030,6 +2044,7 @@ function forgetStudent(email) {
   db.prepare("DELETE FROM bookings WHERE student_id=?").run(row.id);
   db.prepare("DELETE FROM booking_series WHERE student_id=?").run(row.id);
   db.prepare("DELETE FROM sign_in_links WHERE student_id=?").run(row.id);
+  db.prepare("DELETE FROM student_recurring_rates WHERE student_id=?").run(row.id);
   db.prepare("DELETE FROM students WHERE id=?").run(row.id);
 }
 await test("Inês's weekly slot books outside her hours, skips her days off, and waits for the student's card", async () => {
@@ -2045,6 +2060,8 @@ await test("Inês's weekly slot books outside her hours, skips her days off, and
     assert.equal((await call("/admin/bookings", { user: "alice", body: { email, lessonType: "single", startAt: at, repeat: 4 } })).status, 401);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_email=?").get(email).n, 0, "nothing is booked by a refusal");
 
+    // Someone she already had before setting students up quietly, so the run is emailed.
+    db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('wendy',?,'Wendy Weekly','',?)").run(email, new Date().toISOString());
     const added = await call("/admin/bookings", { user: "teacher", body: { email, name: "Wendy Weekly", lessonType: "single", startAt: at, repeat: 4, location: "porto" } });
     assert.equal(added.status, 201, await added.clone().text());
     const { series } = await added.json();
@@ -2074,6 +2091,7 @@ await test("Inês's weekly slot books outside her hours, skips her days off, and
 await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours", async () => {
   const email = "topped-up@example.invalid";
   try {
+    await call("/admin/students", { user: "teacher", body: { email, name: "Tomás Top" } });
     const added = await call("/admin/bookings", { user: "teacher", body: { email, name: "Tomás Top", lessonType: "single", startAt: "2026-09-08T03:00:00.000Z", repeat: "open" } });
     assert.equal(added.status, 201, await added.clone().text());
     const { id } = db.prepare("SELECT id FROM students WHERE email=?").get(email);
@@ -2096,6 +2114,8 @@ await test("a card saved from the account pays for the lessons Inês added from 
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const email = "card-later@example.invalid";
   const add = (startAt, extra = {}) => call("/admin/bookings", { user: "teacher", body: { email, name: "Carla Later", lessonType: "single", startAt, ...extra } });
+  // One of her students from before quiet onboarding, already emailed.
+  db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('card-later',?,'Carla Later','',?)").run(email, new Date().toISOString());
   try {
     assert.equal((await add("2026-09-01T09:00:00.000Z")).status, 201, "a lesson already had");
     assert.equal((await add("2026-10-02T02:00:00.000Z")).status, 201);
@@ -2243,12 +2263,204 @@ await test("a sign-in link signs an existing student in once, while the address 
     forgetStudent("linked-squat@example.invalid");
   }
 });
+await test("she sets a student up and adds their lessons without emailing them, then one welcome lists them all", async () => {
+  captureEmail();
+  const to = (email) => sentEmails.filter((sent) => sent.to[0] === email);
+  try {
+    const add = (body) => call("/admin/students", { user: "teacher", body });
+    assert.equal((await add({ email: "quiet@example.invalid", name: "Ana Costa", nif: "123456788" })).status, 400, "a wrong NIF is refused");
+    assert.equal((await add({ email: "quiet@example.invalid", name: "Ana Costa", mark: "sparkle" })).status, 400);
+    assert.equal((await call("/admin/students", { user: "alice", body: { email: "quiet@example.invalid", name: "Ana Costa" } })).status, 401);
+    const created = await add({ email: "quiet@example.invalid", name: "Ana Costa", phone: "+351 912 345 678", nif: "PT 123 456 789", mark: "bloom" });
+    assert.equal(created.status, 201, await created.clone().text());
+    const { student } = await created.json();
+    assert.deepEqual([student.awaitingWelcome, student.signedIn, student.mark], [true, false, "bloom"]);
+    assert.deepEqual({ ...db.prepare("SELECT phone, nif FROM students WHERE id=?").get(student.id) }, { phone: "+351 912 345 678", nif: "123456789" });
+    assert.equal((await add({ email: "quiet@example.invalid", name: "Again" })).status, 409);
+
+    // Lessons, a move and a cancellation: all real for her, nothing to them.
+    const one = await call("/admin/bookings", { user: "teacher", body: { email: "quiet@example.invalid", lessonType: "single", startAt: "2026-10-20T10:00:00.000Z" } });
+    assert.equal(one.status, 201, await one.clone().text());
+    assert.equal((await one.json()).emailed, false);
+    const weekly = await call("/admin/bookings", { user: "teacher", body: { email: "quiet@example.invalid", lessonType: "single", startAt: "2026-10-22T10:00:00.000Z", repeat: 4 } });
+    assert.equal(weekly.status, 201, await weekly.clone().text());
+    await drain();
+    const lessons = db.prepare("SELECT id FROM bookings WHERE student_id=? AND status='confirmed' ORDER BY starts_at").all(student.id);
+    assert.ok(lessons.length >= 5, "the lessons exist and block the time");
+    const moved = await call(`/admin/bookings/${lessons[0].id}/reschedule`, { user: "teacher", body: { startAt: "2026-10-20T14:00:00.000Z" } });
+    assert.equal((await moved.json()).emailed, false);
+    await drain();
+    assert.equal(to("quiet@example.invalid").length, 0, "nothing reaches the student before their welcome");
+
+    const welcomed = await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} });
+    assert.equal(welcomed.status, 200, await welcomed.clone().text());
+    await drain();
+    const [welcome] = to("quiet@example.invalid");
+    assert.ok(welcome.subject.startsWith("Your lessons with Inês"));
+    assert.ok(welcome.text.includes("Inês has set up your lessons"));
+    assert.ok((welcome.text.match(/Lesson · Online/g) ?? []).length >= 5, "every lesson so far is listed");
+    assert.equal(db.prepare("SELECT awaiting_welcome FROM students WHERE id=?").get(student.id).awaiting_welcome, 0);
+
+    // After the welcome, her changes reach them as usual.
+    await call(`/admin/bookings/${lessons[1].id}/cancel`, { user: "teacher", body: {} });
+    await drain();
+    assert.ok(to("quiet@example.invalid").some((sent) => sent.subject.startsWith("Inês has cancelled your lesson")));
+  } finally {
+    releaseEmail();
+    forgetStudent("quiet@example.invalid");
+  }
+});
+await test("she can set a student up from a name alone and give their email later, until they sign in", async () => {
+  captureEmail();
+  const to = (email) => sentEmails.filter((sent) => sent.to[0] === email);
+  try {
+    const add = (body) => call("/admin/students", { user: "teacher", body });
+    assert.equal((await add({ email: "not-an-address", name: "Bea" })).status, 400, "a mistyped email is still refused");
+    const created = await add({ name: "Bea", nif: "123456789", prices: { 60: 2000 } });
+    assert.equal(created.status, 201, await created.clone().text());
+    const { student } = await created.json();
+    assert.deepEqual([student.email, student.awaitingWelcome, student.ownPrices, student.prices], ["", true, { 60: 2000 }, { 60: 2000, 90: 3000 }]);
+    assert.equal((await add({ name: "Bea's sister" })).status, 201, "any number of them can wait for an email");
+    assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 400, "no welcome without an email");
+
+    const details = (body) => call(`/admin/students/${student.id}/details`, { user: "teacher", body });
+    assert.equal((await call(`/admin/students/${student.id}/details`, { user: "alice", body: { name: "Bea" } })).status, 401);
+    assert.equal((await details({ name: "Bea", email: "alice@example.invalid" })).status, 409, "another student's email is refused");
+    const filled = await details({ name: "Bea Lopes", email: "Later@Example.invalid", phone: "+351 911 111 111", nif: "123456789", mark: "pool" });
+    assert.equal(filled.status, 200, await filled.clone().text());
+    const now = (await filled.json()).student;
+    assert.deepEqual([now.name, now.email, now.phone, now.mark], ["Bea Lopes", "later@example.invalid", "+351 911 111 111", "pool"]);
+
+    // With an email, she adds their lessons and sends their welcome as usual.
+    const lesson = await call("/admin/bookings", { user: "teacher", body: { email: "later@example.invalid", lessonType: "single", startAt: "2026-10-21T10:00:00.000Z" } });
+    assert.equal(lesson.status, 201, await lesson.clone().text());
+    await drain();
+    assert.equal(to("later@example.invalid").length, 0);
+    assert.equal((await details({ name: "Bea Lopes", email: "bea@example.invalid", nif: "123456789" })).status, 200, "a typo can be corrected before they sign in");
+    assert.equal(db.prepare("SELECT student_email FROM bookings WHERE student_id=?").get(student.id).student_email, "bea@example.invalid", "her lessons follow the new address");
+    assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 200);
+    await drain();
+    assert.equal(to("bea@example.invalid").length, 1);
+    // Corrected again before they use it, the welcome sent to the old address no longer opens their account.
+    const links = () => db.prepare("SELECT COUNT(*) AS n FROM sign_in_links WHERE student_id=?").get(student.id).n;
+    assert.ok(links() > 0);
+    assert.equal((await details({ name: "Bea Lopes", email: "beatriz@example.invalid", nif: "123456789" })).status, 200);
+    assert.equal(links(), 0, "links sent to the old address are revoked");
+
+    // Once they have signed in, the address is theirs to change.
+    db.prepare("UPDATE students SET last_login_at=? WHERE id=?").run(new Date().toISOString(), student.id);
+    assert.equal((await details({ name: "Bea Lopes", email: "other@example.invalid" })).status, 409);
+    assert.equal((await details({ name: "Bea Lopes", email: "beatriz@example.invalid", nif: "" })).status, 200, "her other details stay hers to correct");
+  } finally {
+    releaseEmail();
+    forgetStudent("bea@example.invalid");
+    db.prepare("DELETE FROM student_recurring_rates WHERE student_id IN (SELECT id FROM students WHERE email LIKE 'no-email:%')").run();
+    db.prepare("DELETE FROM students WHERE email LIKE 'no-email:%'").run();
+  }
+});
+await test("her price for a student prices their lessons, and only lessons nothing is settled on follow a change", async () => {
+  try {
+    const add = (body) => call("/admin/students", { user: "teacher", body });
+    assert.equal((await add({ email: "priced@example.invalid", name: "Rita", prices: { 60: 50 } })).status, 400);
+    const created = await add({ email: "priced@example.invalid", name: "Rita", prices: { 60: 2000 } });
+    assert.equal(created.status, 201, await created.clone().text());
+    const { student } = await created.json();
+    assert.deepEqual([student.prices, student.ownPrices], [{ 60: 2000, 90: 3000 }, { 60: 2000 }], "90 minutes is 1.5 times her 60-minute price");
+    const book = (body) => call("/admin/bookings", { user: "teacher", body: { email: "priced@example.invalid", ...body } });
+    assert.equal((await book({ lessonType: "single", startAt: "2026-10-26T10:00:00.000Z" })).status, 201);
+    assert.equal((await book({ lessonType: "single", startAt: "2026-10-27T10:00:00.000Z", repeat: 4 })).status, 201);
+    assert.equal((await book({ lessonType: "long", startAt: "2026-10-28T10:00:00.000Z" })).status, 201);
+    await drain();
+    const amounts = () => db.prepare("SELECT amount_cents FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id WHERE student_id=? AND l.duration_minutes=60 ORDER BY starts_at").all(student.id).map((row) => row.amount_cents);
+    const long = () => db.prepare("SELECT amount_cents FROM bookings WHERE student_id=? AND lesson_type_id='long'").get(student.id).amount_cents;
+    const count = amounts().length;
+    assert.ok(count >= 4);
+    assert.deepEqual(amounts(), Array(count).fill(2000), "one-off or weekly, her price is theirs");
+    const rest = (cents) => Array(count - 3).fill(cents);
+    assert.equal(long(), 3000, "their 90-minute lesson is 1.5 times their 60-minute price");
+    captureEmail();
+    try {
+      assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 200);
+      await drain();
+      const welcome = sentEmails.find((sent) => sent.to[0] === "priced@example.invalid");
+      assert.ok(welcome.text.includes("€20 a lesson"), "their welcome says they are on her price");
+    } finally {
+      releaseEmail();
+    }
+
+    // One agreed at checkout, one paid, one she marked paid by hand.
+    const ids = db.prepare("SELECT id FROM bookings WHERE student_id=? AND lesson_type_id='single' ORDER BY starts_at").all(student.id).map((row) => row.id);
+    db.prepare("UPDATE bookings SET payment_status='scheduled', payment_consent_version='2026-09-21-fourteen-hours-v1' WHERE id=?").run(ids[0]);
+    db.prepare("UPDATE bookings SET payment_status='paid' WHERE id=?").run(ids[1]);
+    db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(ids[2]);
+    const price = (prices) => call(`/admin/students/${student.id}/prices`, { user: "teacher", body: { prices } });
+    assert.equal((await call(`/admin/students/${student.id}/prices`, { user: "alice", body: { prices: { 60: 100 } } })).status, 401);
+    assert.equal((await call("/admin/students/nobody/prices", { user: "teacher", body: { prices: { 60: 2400 } } })).status, 404);
+
+    const raised = await price({ 60: 2400 });
+    assert.equal(raised.status, 200, await raised.clone().text());
+    assert.equal((await raised.json()).updated, count - 3 + 1, "and the 90-minute lesson follows its derived price");
+    assert.deepEqual(amounts(), [2000, 2000, 2000, ...rest(2400)], "a higher price never reaches what they agreed at checkout");
+    assert.equal(long(), 3600);
+    await price({ 60: 1800 });
+    assert.deepEqual(amounts(), [1800, 2000, 2000, ...rest(1800)], "a lower one does");
+    assert.equal(long(), 2700);
+    // A 90-minute price of its own wins over the derived one.
+    await price({ 90: 2500 });
+    assert.equal(long(), 2500);
+    const reset = await price({ 60: null, 90: null });
+    assert.deepEqual((await reset.json()).student.prices, {});
+    assert.deepEqual(amounts(), [1800, 2000, 2000, ...rest(2500)]);
+    assert.equal(long(), 3500);
+  } finally {
+    forgetStudent("priced@example.invalid");
+  }
+});
+await test("her receipts list each amount paid or due for a month's lessons, with the NIF to issue to", async () => {
+  await enrol("receipts");
+  db.prepare("UPDATE students SET nif = '123456789', name = 'Rita Receipts' WHERE id = 'receipts'").run();
+  const at = (day, hour) => ({ start: `2026-08-${day}T${hour}:00:00.000Z`, end: `2026-08-${day}T${Number(hour) + 1}:00:00.000Z` });
+  booking("r-card", { owner: "receipts", payment: "paid", ...at("03", "09") });
+  db.prepare("UPDATE bookings SET charged_cents = 1500, stripe_payment_intent = 'pi_card' WHERE id = 'r-card'").run();
+  booking("r-hand", { owner: "receipts", payment: "not_required", ...at("04", "09") });
+  booking("r-noshow", { owner: "receipts", payment: "paid", ...at("05", "09") });
+  db.prepare("UPDATE bookings SET attendance_status = 'no_show', charged_cents = 500 WHERE id = 'r-noshow'").run();
+  booking("r-fee", { owner: "receipts", payment: "not_required", ...at("06", "09") });
+  db.prepare("UPDATE bookings SET status = 'cancelled', same_day_fee_status = 'paid', same_day_fee_cents = 500, same_day_fee_payment_intent = 'pi_fee' WHERE id = 'r-fee'").run();
+  booking("r-due", { owner: "receipts", payment: "payment_due", ...at("07", "09") });
+  booking("r-cancelled", { owner: "receipts", payment: "not_required", ...at("10", "09") });
+  db.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = 'r-cancelled'").run();
+  try {
+    assert.equal((await call("/admin/receipts?month=2026-08", { method: "GET", user: "alice" })).status, 401);
+    assert.equal((await call("/admin/receipts?month=2026-13", { method: "GET", user: "teacher" })).status, 400);
+    const reply = await call("/admin/receipts?month=2026-08", { method: "GET", user: "teacher" });
+    assert.equal(reply.status, 200, await reply.clone().text());
+    const { month, receipts } = await reply.json();
+    assert.equal(month, "2026-08");
+    const mine = receipts.filter((line) => line.studentEmail === "receipts@example.invalid");
+    assert.deepEqual(mine.map((line) => [line.id, line.label, line.amountCents, line.method, line.state, line.ready]), [
+      ["r-card:lesson", "60-minute lesson", 1500, "card", "paid", true],
+      ["r-hand:lesson", "60-minute lesson", 1500, "by hand", "paid", true],
+      ["r-noshow:lesson", "No-show", 500, "card", "paid", true],
+      ["r-fee:fee", "Late change fee", 500, "card", "paid", true],
+      ["r-due:lesson", "60-minute lesson", 1500, "card", "due", false]
+    ], "a cancelled lesson with no money moved has no line");
+    assert.ok(mine.every((line) => line.nif === "123456789" && line.studentName === "Test Student"));
+    assert.equal(mine.find((line) => line.id === "r-card:lesson").stripePaymentIntent, "pi_card");
+    assert.equal(mine.find((line) => line.id === "r-fee:fee").stripePaymentIntent, "pi_fee");
+  } finally {
+    db.prepare("DELETE FROM bookings WHERE student_id = 'receipts'").run();
+  }
+});
 await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('launch-check','launch-check-0000@example.invalid','Launch Verification','x','2026-09-05T08:56:55.286Z')").run();
   const listed = await call("/admin/students", { method: "GET", user: "teacher" });
   assert.equal(listed.status, 200);
   const { students, cardsAccepted } = await listed.json();
+  db.prepare("DELETE FROM students WHERE id='launch-check'").run();
   assert.ok(!students.some((row) => row.id === "teacher"), "her own account is not a student");
+  assert.ok(!students.some((row) => row.id === "launch-check"), "a live check's throwaway account is not a student");
   const alice = students.find((row) => row.id === "alice");
   assert.deepEqual([alice.cardForAllLessons, typeof alice.unpaidUpcoming], [false, "number"]);
   assert.equal(cardsAccepted, true);

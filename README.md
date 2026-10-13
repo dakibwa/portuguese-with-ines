@@ -144,110 +144,31 @@ Open `http://localhost:3000`.
 Smallest relevant checks:
 
 ```bash
-npm run test:booking   # focused Worker logic while iterating
-npm run check:fast     # typecheck, lint and Worker tests once before push
-npm run check:release  # live booking health probe and production build once at release
-npm run test:flow
-npm run test:request-recovery
-npm run test:auth-recovery
-npm run test:html-fallbacks
-npm run test:state-continuity
-npm run test:account-booking-recovery
-npm run test:management-recovery
-npm run test:selection-calendar-recovery
-npm run test:release-recovery
+npm run test:booking   # Worker logic: money, bookings, tokens, calendar
+npm run check:fast     # typecheck, lint, Worker and calendar unit tests
+npm run check:release  # live booking health probe and production build
+QA_BASE_URL=http://localhost:3000 node scripts/qa-teacher-calendar.mjs  # one journey
 ```
 
-`test:booking` needs Node 22 or newer but neither a server nor a network. It
-covers timezone/calendar/token logic and real SQLite booking/payment state
-transitions: concurrent changes, late fees, recurring prices, recovery,
-webhooks, permissions and session revocation. Stripe and email are isolated.
+Run the one or two checks for what changed, not everything (13 October 2026,
+Dan: keep tests as lean as possible). `test:booking` needs Node 22 or newer
+but neither a server nor a network: it proves the real SQLite booking and
+payment state (charges, refunds, webhooks, clashes, clock changes, NIF, rates,
+permissions), with Stripe and email isolated. `test:teacher-calendar` proves
+Porto times across the clock changes and how hours and time off are stored.
 
-`test:flow` expects a running static or development server. Set
-`QA_BASE_URL` when it is not `http://localhost:3000`.
-
-The recovery checks use isolated API replies at 320, 390 and 1280 px. They
-cover closing a loading lesson, interrupted account forms and Google exchanges,
-late mutations, keyboard focus, password reset, account replacement, and signing
-out in another tab. A late response must never restore private lesson data or overwrite a
-newer sign-in; the teacher workspace also closes when its session ends.
-Payment recovery responses cannot redirect or reopen management after sign-out,
-account replacement or leaving the page. Cancellation decisions retain dialog
-focus. Unfinished card setups say `Not confirmed`, can return to booking, and
-never appear as completed lessons. Teacher Meet feedback is checked for AA text
-contrast against its rendered panel.
-
-A card-return flag alone cannot confirm a booking: its returned management token
-must identify a confirmed lesson. Checkout returns for weekly runs and selected
-dates carry the first lesson's token too. Older bookings on an account cannot
-confirm a new checkout; without that token the page asks the student to check
-their lessons. Publish the Worker return-link update before the website guard.
-
-Both recovery scripts accept `QA_BROWSER=firefox` or `QA_BROWSER=webkit` after
-installing that Playwright browser. CI runs them in Chromium against the same
-built export it publishes. Google credential checks use an isolated SDK when
-the build has `NEXT_PUBLIC_GOOGLE_CLIENT_ID` configured, and report their count.
-Meet and NIF fixtures match API paths, so they stay
-isolated when the build points at a localhost Worker as well as the live URL.
-
-`test:html-fallbacks` disables JavaScript at 320, 390, 820 and 1440 px and checks
-ordinary navigation, every FAQ category, terms/privacy and the old legal links.
-It also checks the enhanced FAQ and terms modal after hydration. It accepts the
-same `QA_BASE_URL` and `QA_BROWSER` options and runs in the Pages workflow.
-
-`test:account-booking-recovery` uses isolated replies at 320, 390 and 1280 px
-in Chromium, Firefox or WebKit. It covers email confirmation with session
-renewal, newer profile drafts and saved fields, interrupted navigation,
-overlapping bookings from replaced accounts, and retrying an account refresh
-after a confirmed booking. Refresh retries never submit another booking.
-Verified email renewal preserves the current editor; replacing or ending a
-session still clears its private views. Profile focus checks defer browser
-frames and verify that opening the editor never steals later typing from the
-chosen name, email or NIF field. Its 48 cases per browser run against the built
-export in CI.
-
-`test:management-recovery` uses isolated replies at the same three widths and
-accepts the same browser/server options. It checks accepted individual and
-recurring changes when later reads fail, disabled controls while saving,
-account reload retries after moves/cancellations, stale availability replies,
-payment-form retries using the original checkout, checkout returns after a
-session ends, and account counts refreshed without discarding profile drafts.
-Its 57 cases per browser never submit real bookings or contact payment providers.
-CI runs it against the built export.
-
-`test:selection-calendar-recovery` checks whole selections after length changes,
-availability retries while adding/changing lessons, locked choices during
-booking and checkout, newer time-off choices after failed saves, abandoned
-teacher queues, malformed mutation acknowledgments, invalid nested read rows,
-and email replies that must preserve the current session and draft.
-Its 141 isolated cases per browser cover 320, 390 and 1280 px, accept the same
-browser/server options, and run against the release export in CI.
-Weekly skipped-date checks include the spring missing hour and show dates
-without inventing a shifted time.
-
-`test:release-recovery` covers booking destinations and browser history, malformed
-password-reset and recurring-stop acknowledgments, teacher attendance replies,
-booking confirmation fields, payment amounts, late-fee flags and rate-code
-receipts. It verifies usable retries with isolated replies across the same
-three widths and browser engines, and runs against the release export in CI.
-
-`test:teacher-boundaries` covers mixed quarter-hour cells, click/keyboard/drag
-edits, exact off-grid hours, retained form fields after failures, spring's
-missing hour and both occurrences of autumn's repeated hour. Its 78 isolated
-cases per browser run at 320, 390 and 1280 px, accept the same browser/server
-options, and run against the release export in CI. Authentication recovery also
-checks session-storage refusal and retry for password, Google and registration,
-truthful password-reset/email-change success without a saved session, and
-sign-in at an explicit lessons destination after an expired bearer is refused.
-
-`test:state-continuity` uses isolated replies at 320, 390 and 1280 px. It
-checks edits made during a save, overlapping name/NIF saves in both reply
-orders, stale rates lookups after code saves, native modified FAQ clicks,
-stacked terms/lesson dialogs, and recovery
-from unreadable or malformed public, account, sign-in and teacher replies. A save only
-updates its own field and never discards a newer draft. Rate codes apply to
-future weekly lessons of their matching length. This check accepts the same
-browser/server options and runs against the release export in CI.
+The release then runs twelve customer journeys against the built export it
+publishes, at desktop and phone widths, in about three minutes: `qa-flow`
+(public pages and a real booking, move and cancel), `qa-workspace-navigation`,
+`qa-booking-selection`, `qa-payment-recovery`, `qa-teacher-calendar` (Inês's
+schedule), `qa-transition-kit` (sign-in links and saving a card),
+`qa-meet-links`, `qa-student-nif`, `qa-profile-rates`, `qa-request-recovery`
+(paying lands on Stripe; a checkout return stays pending until confirmed),
+`qa-auth-recovery` (password reset) and `qa-selection-calendar-recovery` (the
+price posted and the card form after booking). Each expects a static or
+development server at `QA_BASE_URL` (default `http://localhost:3000`); all but
+`qa-flow`'s booking use isolated API replies. A new check earns its place only
+by protecting a student, Inês or money in a way these don't already.
 
 ## Accessibility
 

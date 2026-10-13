@@ -1,4 +1,4 @@
-import { Video } from "lucide-react";
+import { GoogleMeetLogo } from "@/components/GoogleMeetLogo";
 import type { BookingStatus } from "@/lib/booking-api";
 
 type Props = {
@@ -30,7 +30,8 @@ export function MeetingLink(props: Props) {
 
   return (
     <a className="meeting-link" href={href} target="_blank" rel="noopener noreferrer">
-      <Video size={17} aria-hidden="true" />
+      {/* Meet's own mark rather than a generic camera (13 October 2026, Dan). */}
+      <span className="meeting-link__logo"><GoogleMeetLogo /></span>
       Join Google Meet
     </a>
   );

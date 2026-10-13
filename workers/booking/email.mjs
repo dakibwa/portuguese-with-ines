@@ -16,10 +16,8 @@ const BRAND = {
   paper: "#f5ecd9",
   paperLight: "#fbf4e5",
   lavender: "#aaa4e6",
-  lavenderInk: "#665fa6",
+  lavenderInk: "#554f91",
   lavenderWash: "#eeecf9",
-  coral: "#ef5d3c",
-  coralWash: "#fdeae5",
   coralAction: "#b43a26",
   rule: "#ded8f0"
 };
@@ -41,6 +39,10 @@ const EMAIL_ASSETS = "https://portuguesewithines.com/email";
 const DABS = ["dab-blue", "dab-lavender", "dab-coral", "dab-ink"].map(name => `${EMAIL_ASSETS}/${name}.png`);
 const MEET_MARK = `${EMAIL_ASSETS}/google-meet.png`;
 const SANS = "Montserrat,Arial,Helvetica,sans-serif";
+/** One small label above a fact or a message, as the site labels its fields. */
+const LABEL = `font:700 11px/1.4 ${SANS};letter-spacing:.1em;text-transform:uppercase;color:${BRAND.lavenderInk}`;
+/** The panels (date, note, steps) share the date box's wash and hand-cut corners. */
+const PANEL = `border-collapse:collapse;background:${BRAND.lavenderWash};border-radius:18px 12px 16px 14px`;
 
 /**
  * "Tuesday, 13 October 2026 at 17:00, Porto time" read as two lines, the date
@@ -115,7 +117,7 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
         <tr>
           <td width="28" valign="top" style="width:28px;padding:${index ? 16 : 4}px 0 0;line-height:0"><img src="${DABS[index % DABS.length]}" width="14" height="14" alt="" style="display:block;border:0"></td>
           <td valign="top" style="padding:${index ? 12 : 0}px 0 0">
-            <p style="margin:0;font:700 10.5px/1.4 ${SANS};letter-spacing:.11em;text-transform:uppercase;color:${BRAND.lavenderInk}">${escapeHtml(label)}</p>
+            <p style="margin:0;${LABEL}">${escapeHtml(label)}</p>
             <p style="margin:2px 0 0;font:400 15px/1.5 ${SANS};color:${BRAND.ink}">${content}</p>
           </td>
         </tr>`;
@@ -157,10 +159,10 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
       </td></tr>
 
       ${message?.body?.trim()
-        ? `<tr><td style="padding:22px 32px 0">
+        ? `<tr><td style="padding:24px 32px 0">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
           <tr><td style="border-left:4px solid ${BRAND.lavender};padding:2px 0 2px 18px;overflow-wrap:anywhere;word-break:break-word">
-            <p style="margin:0;font:600 11px/1.5 ${SANS};letter-spacing:.07em;text-transform:uppercase;color:${BRAND.blue}">${escapeHtml(message.label)}</p>
+            <p style="margin:0;${LABEL}">${escapeHtml(message.label)}</p>
             <p style="margin:8px 0 0;font:400 15px/1.65 ${SANS};color:${BRAND.ink}">${escapeRich(message.body)}</p>
           </td></tr>
         </table>
@@ -168,10 +170,8 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
 
       ${
         when
-          ? `<tr><td style="padding:22px 32px 0">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${
-          BRAND.lavenderWash
-        };border-radius:18px 12px 16px 14px">
+          ? `<tr><td style="padding:24px 32px 0">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${PANEL}">
           <tr><td style="padding:18px 22px">
             <p style="margin:0;font:600 19px/1.35 ${SANS};color:${BRAND.blue}">${escapeHtml(when.date)}</p>
             ${when.time ? `<p style="margin:3px 0 0;font:400 16px/1.45 ${SANS};color:${BRAND.ink}">${escapeHtml(when.time)}</p>` : ""}
@@ -190,22 +190,15 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
 
       ${
         callout
-          ? `<tr><td style="padding:20px 32px 0">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${
-          BRAND.coralWash
-        };border-radius:12px">
-          <tr>
-            <td width="4" bgcolor="${BRAND.coral}" style="background:${BRAND.coral};width:4px;line-height:0">&nbsp;</td>
-            <td style="padding:14px 18px;font:400 15px/1.6 ${SANS};color:${
-              BRAND.ink
-            }">${escapeRich(callout)}</td>
-          </tr>
+          ? `<tr><td style="padding:24px 32px 0">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${PANEL}">
+          <tr><td style="padding:16px 22px;font:400 15px/1.6 ${SANS};color:${BRAND.ink}">${escapeRich(callout)}</td></tr>
         </table>
       </td></tr>`
           : ""
       }
 
-      ${rowsHtml ? `<tr><td style="padding:22px 32px 0">${rowsHtml}</td></tr>` : ""}
+      ${rowsHtml ? `<tr><td style="padding:24px 32px 0">${rowsHtml}</td></tr>` : ""}
 
       ${
         // What to do next, numbered, right above the one button that does it
@@ -213,9 +206,7 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
         // should be beautiful and simple to understand).
         steps?.items?.length
           ? `<tr><td style="padding:24px 32px 0">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${
-          BRAND.lavenderWash
-        };border-radius:18px 12px 16px 14px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${PANEL}">
           <tr><td style="padding:18px 22px 6px">
             <p style="margin:0;font:600 16px/1.4 ${SANS};color:${BRAND.blue}">${escapeHtml(steps.title)}</p>
           </td></tr>
@@ -242,7 +233,7 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
 
       ${
         action
-          ? `<tr><td align="center" style="padding:26px 32px 0">
+          ? `<tr><td align="center" style="padding:24px 32px 0">
         <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate">
           <tr><td bgcolor="${BRAND.coralAction}" style="background:${
             BRAND.coralAction
@@ -285,7 +276,7 @@ function plainText({ heading, intro, hero, heroNote, rows, callout, message, ste
   const clean = (value) => String(value ?? "").trim();
   const lines = [heading, "", clean(intro)];
   if (message?.body?.trim()) lines.push("", clean(message.label), clean(message.body));
-  // heroNote already reads "… — the student's time", so a bracket here nests badly.
+  // heroNote already names its clock ("Jessica’s time: …"), so it stands on its own line.
   if (hero) {
     const { date, time } = splitWhen(hero);
     lines.push("", date, ...(time ? [time] : []), ...(heroNote ? [heroNote] : []));

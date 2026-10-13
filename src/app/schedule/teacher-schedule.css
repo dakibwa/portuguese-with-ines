@@ -114,47 +114,6 @@
   outline-offset: 6px;
   border-radius: 12px;
 }
-.teacher-tool-heading {
-  margin-bottom: 0.85rem;
-}
-.teacher-tool-heading h2:not(.visually-hidden) {
-  margin: 0.35rem 0 0;
-  color: var(--ink);
-  font: 600 clamp(1.25rem, 2.4vw, 1.55rem)/1.45 var(--ui);
-  letter-spacing: -0.035em;
-}
-.teacher-tool-heading p {
-  max-width: 68ch;
-  margin: 0.6rem 0 0;
-  font-size: 0.84rem;
-  line-height: 1.6;
-}
-.teacher-help {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1.3rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--lavender-ink);
-  font: 500 0.8rem/1.5 var(--ui);
-}
-.teacher-help li {
-  position: relative;
-  padding-left: 1.1rem;
-}
-.teacher-help li::before {
-  content: "";
-  position: absolute;
-  top: 0.3em;
-  left: 0;
-  width: 0.7rem;
-  height: 0.7rem;
-  background: url("/email/dab-blue.png") center / contain no-repeat;
-}
-.teacher-help li:nth-child(2)::before {
-  background-image: url("/email/dab-coral.png");
-}
 .teacher-week--editing .teacher-week-title h2 {
   font-size: 1rem;
   letter-spacing: 0;
@@ -169,14 +128,23 @@
 }
 /* Set as the booking workspace's buttons are (0.7 rem, 700, 0.12 em, the
    hand-drawn button cut), at the denser 44 px a schedule needs. */
+/* Her buttons are the site's buttons (13 October 2026, Dan: they looked
+   different): the same weight, spacing, fill and lift, only a little denser
+   for a schedule. */
 .teacher-workspace .button,
 .teacher-lesson-dialog .button {
-  min-height: 44px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  padding: 0.8rem 1.25rem;
-  border-radius: var(--squiggle-button);
+  min-height: 46px;
+  padding: 0.8rem 1.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+}
+.teacher-workspace .button--compact,
+.teacher-lesson-dialog .button--compact {
+  min-height: 40px;
+  padding: 0.6rem 1rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  gap: 0.4rem;
 }
 .teacher-workspace .button:disabled {
   opacity: 0.48;
@@ -251,6 +219,7 @@
   margin: 0 0.25rem;
 }
 .teacher-icon-button {
+  position: relative;
   display: inline-grid;
   place-items: center;
   width: 44px;
@@ -261,6 +230,13 @@
   background: transparent;
   color: var(--ink);
   cursor: pointer;
+}
+/* A 36 px round arrow still takes a 44 px tap. */
+.teacher-icon-button::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
 }
 .teacher-icon-button:hover:not(:disabled) {
   background: var(--lavender-soft);
@@ -358,8 +334,14 @@
 .teacher-day-today {
   margin-top: -0.25rem;
   color: var(--ink);
-  font: 700 0.5rem/1 var(--ui);
+  font: 700 0.56rem/1 var(--ui);
   letter-spacing: 0.06em;
+}
+/* Today's booked dot sits just right of TODAY, clear of the day's name. */
+.teacher-day-today ~ .teacher-heading-booked-dot {
+  top: auto;
+  bottom: 8px;
+  left: calc(50% + 1.5rem);
 }
 .teacher-heading-booked-dot {
   position: absolute;
@@ -759,10 +741,6 @@
   background: rgba(239, 93, 60, 0.2);
   border-color: rgba(239, 93, 60, 0.4) !important;
 }
-.teacher-timetable--editing + .teacher-grid-footnote .teacher-key-starts {
-  background: var(--lavender-soft);
-  border-color: var(--lavender) !important;
-}
 .teacher-key-booked {
   background: var(--blue-deep);
 }
@@ -781,11 +759,6 @@
   font-size: 0.8rem;
   color: var(--lavender-ink);
 }
-.teacher-secondary-copy {
-  color: var(--lavender-ink);
-  font-size: 0.78rem;
-  line-height: 1.65;
-}
 .teacher-hours-save {
   border-top: 1px solid var(--rule-soft);
   margin-top: 1rem;
@@ -798,7 +771,7 @@
   gap: 0.7rem 1rem;
 }
 .teacher-hours-save .teacher-save-row {
-  margin-top: 1rem;
+  margin-top: 0;
   justify-content: flex-end;
 }
 .teacher-hours-save .teacher-save-note {
@@ -815,8 +788,13 @@
   gap: 0.35rem;
   min-width: 0;
 }
-.teacher-form label > span {
-  font: 600 0.68rem/1.5 var(--ui);
+/* Field labels as the booking's: small capitals over the field; a legend
+   over a choice is the lilac eyebrow the student side uses. */
+.teacher-form label > span,
+.teacher-student-dialog__splat > span {
+  font: 600 0.72rem/1.5 var(--ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .teacher-form input,
 .teacher-form textarea,
@@ -873,46 +851,8 @@
   align-items: end;
   width: 100%;
 }
-.teacher-manual {
-  margin-top: 1.6rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--rule);
-}
-.teacher-manual summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 48px;
-  cursor: pointer;
-  list-style: none;
-}
-.teacher-manual summary::-webkit-details-marker {
-  display: none;
-}
-.teacher-manual summary > svg {
-  flex: none;
-  transition: transform 160ms;
-}
-.teacher-manual[open] summary > svg {
-  transform: rotate(45deg);
-}
-.teacher-manual-title {
-  display: block;
-  margin-top: 0.4rem;
-  font: 600 1rem/1.5 var(--ui);
-}
 .teacher-manual-body {
   padding-top: 1rem;
-}
-.teacher-manual-body > p {
-  max-width: 70ch;
-  font-size: 0.83rem;
-  line-height: 1.6;
-}
-.teacher-manual-body a {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
 }
 .teacher-manual-form {
   display: grid;
@@ -927,20 +867,26 @@
   border: 0;
   padding: 0;
 }
-.teacher-manual-choice legend {
+.teacher-manual-choice legend,
+.teacher-student-dialog__price legend {
   margin-bottom: 0.35rem;
   padding: 0;
-  font: 600 0.68rem/1.5 var(--ui);
+  color: var(--lavender-ink);
+  font: 700 0.64rem/1.3 var(--ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
+/* Its track is raised in cream, as every slider on a lilac sheet is. */
 .teacher-manual-choice .segmented {
   margin-bottom: 0;
-  background: rgba(170, 164, 230, 0.2);
 }
+/* Online and In Porto carry their marks in her lesson form. */
 .teacher-manual-choice .segmented label {
   display: grid;
+  grid-auto-flow: column;
+  gap: 0.35rem;
   min-height: 36px;
   place-items: center;
-  flex-direction: row;
 }
 /* The form's field styling stops at the sliders' hidden radios. */
 .teacher-manual-choice .segmented input {
@@ -961,10 +907,49 @@
   font-size: 0.78rem;
   white-space: nowrap;
 }
+/* Each length's price follows it on one line wide, and sits under it on a
+   phone. The dot is drawn, not read: the label is "60 mins, €20". */
+.teacher-manual-price::before {
+  content: "· ";
+  content: "· " / "";
+}
+/* On a phone the four runs sit in two rows of two, the pill moving across
+   and down, as the booking bar's do, so Until stopped never spills. */
 @media (max-width: 480px) {
+  .teacher-manual-choice .segmented--four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .teacher-manual-choice .segmented--four .segmented__thumb {
+    bottom: auto;
+    width: calc(50% - 6px);
+    height: calc(50% - 6px);
+  }
+  .teacher-manual-choice .segmented--four.segmented--position-2 .segmented__thumb {
+    transform: translateY(calc(100% + 4px));
+  }
+  .teacher-manual-choice .segmented--four.segmented--position-3 .segmented__thumb {
+    transform: translate(calc(100% + 4px), calc(100% + 4px));
+  }
+  .teacher-manual-choice .segmented--three label {
+    grid-auto-flow: row;
+    gap: 0.05rem;
+    line-height: 1.25;
+  }
+  .teacher-manual-price::before {
+    content: none;
+  }
+}
+/* At 320 px Until stopped keeps inside its pill, and the long submit label
+   wraps rather than running off both edges. */
+@media (max-width: 360px) {
   .teacher-manual-choice .segmented--four label {
-    font-size: 0.66rem;
+    padding-inline: 0.25rem;
+    font-size: 0.7rem;
     letter-spacing: 0.02em;
+  }
+  .teacher-lesson-dialog .teacher-manual-submit .button {
+    white-space: normal;
+    line-height: 1.35;
   }
 }
 .teacher-manual-submit {
@@ -977,7 +962,7 @@
   display: flex;
   align-items: flex-start;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.6rem;
   padding: 0.85rem 1rem;
   margin-bottom: 1.2rem;
   border-radius: var(--squiggle-field);
@@ -992,10 +977,15 @@
   color: var(--ink);
   font-weight: 600;
 }
+/* Good news keeps its tick beside the words, in the site's blue. */
 .teacher-inline-success {
+  flex-wrap: nowrap;
   border: 1px solid var(--rule-soft);
   background: rgba(170, 164, 230, 0.22);
   color: var(--ink);
+}
+.teacher-inline-success > svg {
+  color: var(--blue);
 }
 .teacher-inline-notice {
   background: rgba(220, 216, 245, 0.5);
@@ -1028,9 +1018,9 @@
   font-size: 0.9rem;
   text-align: center;
 }
-/* Set as a student's own lesson dialog is: the same cream card, its lilac
-   close at the top right, the status, then who and when (10 October 2026, at
-   Dan's request). */
+/* Set as a student's own lesson dialog is: the same lilac sheet over paper,
+   its close at the top right, the status, then who and when (10 October
+   2026, at Dan's request). */
 .teacher-lesson-dialog {
   position: fixed;
   inset: 0;
@@ -1040,31 +1030,29 @@
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-panel);
   padding: clamp(1.25rem, 4vw, 1.7rem);
-  background: var(--paper-light);
+  background: var(--dialog-surface);
   color: var(--ink);
   box-shadow: 0 24px 65px rgba(26, 49, 105, 0.26);
   overflow-y: auto;
 }
+/* Its parts stand a steady 1rem apart; the gap owns that space, so nothing
+   inside keeps a margin of its own. */
 .teacher-lesson-dialog[open] {
   display: grid;
-  gap: 0.75rem;
-}
-.teacher-lesson-dialog[open] {
+  gap: 1rem;
   isolation: isolate;
 }
-/* The student dialog's own warm corner. */
-.teacher-lesson-dialog::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(circle at 94% 4%, rgba(239, 93, 60, 0.14), transparent 28%),
-    linear-gradient(145deg, rgba(170, 164, 230, 0.08), transparent 58%);
-  content: "";
-  pointer-events: none;
+.teacher-lesson-dialog > :is(.teacher-lesson-facts, .teacher-lesson-note, .teacher-inline-error, .teacher-inline-notice, .teacher-inline-success) {
+  margin: 0;
 }
+/* Who the lesson is with sits close under its status. */
+.teacher-lesson-dialog > .lesson-calendar__status + * {
+  margin-top: -0.5rem;
+}
+/* The one scrim every dialog shares, the student's included. */
 .teacher-lesson-dialog::backdrop {
-  background: rgba(15, 35, 70, 0.5);
+  background: rgba(26, 49, 105, 0.24);
+  backdrop-filter: blur(3px);
 }
 .teacher-dialog-close {
   position: absolute;
@@ -1090,6 +1078,10 @@
   justify-self: start;
   margin: 0;
 }
+/* Booked is the calendar's navy, as in the key; coral read as a warning. */
+.teacher-lesson-dialog > .lesson-calendar__status:not(.lesson-calendar__status--added):not(.lesson-calendar__status--cancelled) {
+  background: var(--blue-deep);
+}
 .teacher-dialog-top {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
@@ -1106,10 +1098,10 @@
   font: 600 clamp(1.2rem, 3.4vw, 1.45rem)/1.2 var(--ui);
   overflow-wrap: anywhere;
 }
-/* When, bold, with its length and place beneath, as the student reads it. */
+/* When, bold: the date, then the time on its own line. */
 .teacher-lesson-when {
   display: grid;
-  padding: 0.2rem 0 0.1rem;
+  padding: 0;
   gap: 0.18rem;
 }
 .teacher-lesson-when strong {
@@ -1122,69 +1114,75 @@
 .teacher-lesson-when .meeting-link {
   margin-top: 0.5rem;
 }
-/* Who to reach, quietly, without a panel around it. */
-.teacher-lesson-facts {
-  display: grid;
-  gap: 0.3rem;
-  color: var(--lavender-ink);
-  font-size: 0.78rem;
-}
-.teacher-lesson-facts > * {
+/* The lesson as dabs, as her history shows one: place and length side by
+   side, then its price and anything else each on a line of its own. */
+.teacher-lesson-facts.booking-payment-facts {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  overflow-wrap: anywhere;
+  flex-wrap: wrap;
+  gap: 0.45rem 1.2rem;
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.82rem;
 }
-.teacher-lesson-facts svg {
-  flex: none;
+.teacher-lesson-facts li:nth-child(n + 3) {
+  flex-basis: 100%;
 }
-.teacher-lesson-facts a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-.teacher-lesson-note {
-  font-size: 0.85rem;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  margin-bottom: 1.2rem;
+.teacher-lesson-dialog .teacher-lesson-note {
+  margin: 0;
+  font-size: 0.82rem;
 }
 .teacher-cancel-message {
-  margin: 1rem 0;
+  margin: 0 0 1.1rem;
 }
+.teacher-cancel-message label > span {
+  color: var(--ink);
+  font: 600 0.8rem/1.5 var(--ui);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.teacher-cancel-message textarea::placeholder {
+  color: var(--lavender-ink);
+  opacity: 0.75;
+}
+/* An aside in a label stays in plain lower case. */
 .teacher-field-optional {
   font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .teacher-cancel-message textarea {
-  min-height: 124px;
+  min-height: 96px;
   max-height: 240px;
   field-sizing: content;
   resize: vertical;
   line-height: 1.65;
 }
 .teacher-cancel-message__hint {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.75rem;
-  margin-top: 0.45rem;
+  margin: 0.4rem 0 0;
   color: var(--lavender-ink);
   font: 500 0.68rem/1.5 var(--ui);
-}
-.teacher-cancel-message__hint p {
-  margin: 0;
-}
-.teacher-cancel-message__hint > span {
-  flex: none;
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 /* Buttons, as everywhere else on the site: blue for the lesson's choices,
    coral only where something is lost. */
+/* Two actions share a row while both labels fit whole, and stack when they
+   don't, so no label is ever clipped. fit-content keeps a button as wide as
+   its label but never wider than the row, so at 320 px a long label wraps
+   inside its button instead of overflowing (min(100%, max-content) is not
+   valid CSS and would be dropped). */
 .teacher-dialog-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.65rem;
   margin-top: 0.25rem;
+}
+.teacher-dialog-actions > .button {
+  flex: 1 1 0;
+  min-width: fit-content;
+}
+.teacher-dialog-actions > :not(.button) {
+  flex: 1 1 100%;
 }
 .teacher-lesson-dialog .button {
   width: 100%;
@@ -1204,6 +1202,21 @@
   margin-top: 0.15rem;
   gap: 0.15rem;
 }
+/* A quiet link in a dialog is underlined at the word, as the student side's
+   are, rather than ruled beneath its 44 px box. */
+.teacher-lesson-dialog .text-action {
+  border-bottom: 0;
+  text-decoration: underline;
+  text-decoration-color: rgba(26, 49, 105, 0.3);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.3em;
+}
+.teacher-lesson-dialog .text-action::after {
+  display: none;
+}
+.teacher-lesson-dialog .text-action:hover:not(:disabled) {
+  text-decoration-color: currentColor;
+}
 .teacher-no-show .text-action:disabled {
   color: var(--lavender-ink);
   cursor: default;
@@ -1221,52 +1234,66 @@
   font: 500 0.72rem/1.4 var(--ui);
   text-align: center;
 }
-/* Join Google Meet is a button too, in the lesson's blue. */
+/* Join Google Meet is the lesson's own call to action: a solid blue button
+   as the site's, never an outline (13 October 2026, Dan). */
 .teacher-lesson-dialog .meeting-link {
   display: flex;
   width: 100%;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
-  min-height: 44px;
-  border: 1.5px solid var(--blue);
-  border-radius: var(--squiggle-pill);
-  padding: 0.7rem 1.25rem;
-  color: var(--blue);
-  font: 700 0.69rem/1.2 var(--ui);
-  letter-spacing: 0.14em;
+  gap: 0.5rem;
+  min-height: 48px;
+  border-radius: var(--squiggle-button);
+  padding: 0.75rem 1.25rem;
+  background: var(--blue-deep);
+  color: var(--paper-light);
+  font: 600 0.72rem/1.15 var(--ui);
+  letter-spacing: 0.16em;
   text-decoration: none;
   text-transform: uppercase;
+  transition: background 200ms ease, box-shadow 320ms var(--motion-ease-out), transform 420ms var(--motion-spring-firm);
 }
 .teacher-lesson-dialog .meeting-link:hover,
 .teacher-lesson-dialog .meeting-link:focus-visible {
-  background: rgba(44, 84, 170, 0.08);
+  background: var(--ink);
+  color: var(--paper-light);
+  box-shadow: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
+  transform: translateY(-2px);
 }
+/* The question sits under a quiet rule, apart from who and when. */
 .teacher-dialog-confirmation {
-  padding-top: 0.2rem;
+  margin-top: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule-soft);
 }
 .teacher-dialog-confirmation h3 {
   font: 600 1.05rem/1.5 var(--ui);
-  margin: 0.8rem 0 0.5rem;
+  margin: 0 0 0.6rem;
+}
+/* What the change does, as the confirm step's dab list. */
+.teacher-confirm-facts {
+  margin: 0 0 1.1rem;
 }
 .teacher-dialog-confirmation p {
   font-size: 0.82rem;
   line-height: 1.6;
   margin-bottom: 1.2rem;
 }
+/* Under its own heading, as Cancel this lesson? is, with what happens as a
+   dab rather than a sentence. */
 .teacher-move-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
-  margin-top: 0.7rem;
 }
-.teacher-move-form > p,
+.teacher-move-form > ul,
 .teacher-move-form > .teacher-dialog-actions {
   grid-column: 1/-1;
   margin: 0;
 }
+/* Inside a dialog every stack spaces itself with a gap. */
 .teacher-lesson-dialog .teacher-inline-error {
-  margin: 1rem 0 0;
+  margin: 0;
 }
 
 @media (min-width: 741px) {
@@ -1461,13 +1488,7 @@
   .teacher-exact-windows {
     width: 100%;
   }
-  .teacher-manual {
-    margin-top: 1.5rem;
-  }
-  .teacher-manual-title {
-    font-size: 0.92rem;
-  }
-  .teacher-manual-form {
+      .teacher-manual-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .teacher-manual-form > label:first-child,
@@ -1479,10 +1500,6 @@
     width: 100%;
     font-size: 0.63rem;
   }
-  .teacher-lesson-dialog {
-    padding: 1rem 1.1rem 1.15rem;
-  }
-
 }
 
 /* A side panel has room for the working week; phones retain one roomy day. */
@@ -1535,15 +1552,30 @@
   cursor: default;
   opacity: 0.5;
 }
+/* Google Meet as one card on the same lilac sheet as the time-off month
+   (13 October 2026, Dan): logo and state at the head, a short dab list, then
+   the one action that matters for that state. */
 .teacher-meet {
   display: grid;
-  gap: 0.6rem;
-  max-width: 720px;
+  gap: 1rem;
+  max-width: 560px;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: 1.3rem 1.35rem;
+  background: var(--sheet);
 }
-.teacher-meet h2 {
+.teacher-meet-head {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.85rem;
+}
+.teacher-meet-head > .teacher-meet-logo {
+  width: 34px;
+}
+.teacher-meet h2 {
+  margin: 0;
+  color: var(--ink);
+  font: 600 1.05rem/1.35 var(--ui);
 }
 .teacher-meet-logo {
   width: 24px;
@@ -1563,36 +1595,37 @@
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
+.teacher-meet-head p {
+  margin-top: 0.1rem;
+}
+/* The tick stays by the first line when a long address wraps. */
 .teacher-meet-connected {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  align-items: flex-start;
+  gap: 0.35rem;
   color: var(--blue-deep);
 }
-.teacher-meet .teacher-tool-heading p {
-  margin-top: 0.6rem;
-}
-.teacher-meet-settings {
-  display: grid;
-  gap: 0.5rem;
-  padding: 0.75rem 0 0.35rem;
-  border-top: 1px solid var(--rule-soft);
+.teacher-meet-connected svg {
+  flex: none;
+  margin-top: 0.25em;
 }
 .teacher-meet-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem 1.2rem;
+  gap: 0.6rem 1.2rem;
 }
 .teacher-meet .teacher-meet-note {
   color: var(--lavender-ink);
   font-size: 0.75rem;
 }
-/* Keep confirmation labels complete on phones, including the long cancel action. */
-@media (max-width: 480px) {
-  .teacher-dialog-actions {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.teacher-meet .teacher-meet-note summary {
+  width: fit-content;
+  padding-block: 0.85rem;
+  cursor: pointer;
+}
+.teacher-meet .teacher-meet-note p {
+  margin-top: 0.4rem;
 }
 
 
@@ -1754,7 +1787,11 @@
   font: 600 0.86rem/1.2 var(--ui);
   text-align: left;
 }
-.teacher-slot-menu button:hover,
+@media (hover: hover) {
+  .teacher-slot-menu button:hover {
+    background: var(--lavender-soft);
+  }
+}
 .teacher-slot-menu button:focus-visible {
   background: var(--lavender-soft);
   outline: none;
@@ -1809,24 +1846,16 @@
   background: var(--lavender-soft);
   color: var(--ink);
 }
-.teacher-lesson-added-note {
-  margin: 0;
-  color: var(--lavender-ink);
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
-.teacher-lesson-added-note p {
-  margin: 0;
-}
 /* A quiet way out for a lesson already paid by hand, not a call to action. */
-.teacher-lesson-added-note .text-action {
-  margin-top: 0.15rem;
+.teacher-lesson-paid.text-action {
+  justify-self: start;
+  margin-top: -0.25rem;
+  border-bottom: 0;
   padding: 0;
   color: var(--blue-deep);
   font: 600 0.78rem/1.5 var(--ui);
   letter-spacing: 0;
   text-align: left;
-  text-decoration: underline;
   text-transform: none;
 }
 .teacher-lesson-place {
@@ -1836,104 +1865,70 @@
   vertical-align: -0.12em;
 }
 
-/* Online and In Porto carry their marks in her lesson form. */
-.teacher-manual-choice .segmented label {
-  grid-auto-flow: column;
-  gap: 0.35rem;
-}
 
-/* Her add-a-lesson dialog, set as her lesson dialog. */
-.teacher-add-dialog h2 {
-  margin-right: 2.8rem;
+/* What the chosen days hold, as the confirm step's dab list; a lesson that
+   stays booked takes the coral dab. */
+.teacher-timeoff-facts li.teacher-timeoff-booked::before {
+  background: var(--coral);
 }
-.teacher-add-when {
+.teacher-timeoff-lessons {
   display: grid;
-  margin: 0;
-  gap: 0.15rem;
+  gap: 0.45rem;
 }
-.teacher-add-when strong {
-  font: 700 0.95rem/1.35 var(--ui);
-}
-.teacher-add-when span {
-  margin: 0;
-  color: var(--lavender-ink);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-.teacher-add-dialog {
-  width: min(520px, calc(100vw - 2rem));
-}
-/* In the dialog the form is two columns, its sliders across both. */
-.teacher-add-dialog .teacher-manual-form {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.teacher-timeoff-lessons .teacher-eyebrow {
   margin: 0;
 }
-.teacher-add-dialog .teacher-manual-choice {
-  grid-column: 1 / -1;
-}
-@media (max-width: 480px) {
-  .teacher-add-dialog .teacher-manual-form {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-.teacher-timeoff-booked {
-  border-radius: var(--squiggle-field);
-  padding: 0.6rem 0.8rem;
-  background: rgba(239, 93, 60, 0.1);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-.teacher-timeoff-booked p {
-  margin: 0 0 0.3rem;
-}
-.teacher-timeoff-booked ul {
-  margin: 0;
-  padding-left: 1.1rem;
+/* Beside the month the cards stack in one column. */
+.teacher-timeoff-lessons .teacher-lesson-cards {
+  grid-template-columns: minmax(0, 1fr);
 }
 .teacher-hours-warning:not(:empty) {
   margin: 0 0 0.8rem;
   font: 400 0.8rem/1.5 var(--ui);
 }
 .teacher-hours-warning p { margin: 0; }
-.teacher-hours-clashes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: 0.65rem; margin: 0; padding: 0; list-style: none; }
-.teacher-hours-clash { min-width: 0; padding: 0.75rem 0.85rem; border: 1px solid rgba(239, 93, 60, 0.25); border-left: 3px solid var(--coral); border-radius: var(--squiggle-field); background: rgba(239, 93, 60, 0.06); }
-.teacher-hours-clash__heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.3rem 0.6rem; }
-.teacher-hours-clash__heading > strong { overflow-wrap: anywhere; }
-.teacher-hours-clash__flag { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--coral-action); font: 600 0.7rem/1.4 var(--ui); white-space: nowrap; }
-.teacher-hours-warning .teacher-hours-clash__when { display: flex; flex-wrap: wrap; gap: 0.1rem 0.6rem; margin: 0.3rem 0 0.6rem; font-size: 0.75rem; }
-.teacher-hours-clash__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.35rem 0.6rem; }
-.teacher-hours-clash__actions > span { color: var(--lavender-ink); font-size: 0.7rem; }
-.teacher-hours-clash__actions .button { min-height: 36px; padding: 0.35rem 0.65rem; font-size: 0.7rem; gap: 0.2rem; }
+.teacher-lesson-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: 0.65rem; margin: 0; padding: 0; list-style: none; }
+.teacher-hours-warning__lead { display: flex; align-items: flex-start; gap: 0.45rem; margin: 0 0 0.6rem !important; color: var(--coral-action); font-weight: 600; }
+.teacher-hours-warning__lead svg { flex: none; margin-top: 0.15em; }
+/* A booked lesson in her way is a small card: who and when, and Change
+   beside them, opening the lesson itself. */
+.teacher-lesson-card { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; min-width: 0; padding: 0.65rem 0.75rem 0.65rem 0.9rem; border: 1px solid rgba(239, 93, 60, 0.35); border-radius: var(--squiggle-field); background: var(--paper-light); }
+.teacher-lesson-card__who { display: grid; flex: 1 1 auto; min-width: 0; }
+.teacher-lesson-card__who strong { font: 600 0.88rem/1.35 var(--ui); overflow-wrap: anywhere; }
+.teacher-lesson-card__who span { color: var(--lavender-ink); font-size: 0.75rem; }
+.teacher-lesson-card .button { flex: none; width: auto; padding-inline: 0.95rem; }
 .teacher-hours-clashes-more { margin-top: 0.55rem; }
 .teacher-hours-clashes-more > summary { width: fit-content; padding: 0.35rem 0; cursor: pointer; font-weight: 600; }
 .teacher-hours-clashes-more[open] > summary { margin-bottom: 0.35rem; }
-.teacher-timeoff > .teacher-tool-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
 .teacher-timeoff-dialog h2 { margin-right: 2.5rem; }
 .teacher-timeoff-dialog form { display: grid; gap: 1rem; }
-.teacher-timeoff-options { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0; padding: 0; border: 0; }
-.teacher-timeoff-options label { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; min-height: 44px; padding: 0.5rem 0.7rem; border: 1px solid var(--rule); border-radius: var(--squiggle-field); font-size: 0.8rem; cursor: pointer; }
-.teacher-timeoff-options label:has(:checked) { background: var(--lavender-soft); border-color: var(--blue); }
-.teacher-timeoff-options input { width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: var(--blue); }
+.teacher-timeoff-dialog .teacher-eyebrow { margin: 0 2.5rem -0.5rem 0; }
 .teacher-timeoff-times { display: grid; gap: 0.65rem; }
 .teacher-timeoff-times > p { margin: 0; }
 .teacher-timeoff-time { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 0.5rem; align-items: end; }
 .teacher-timeoff-time input { width: 100%; min-width: 0; }
+/* At 320 px both times keep their digits whole. */
+@media (max-width: 360px) {
+  .teacher-timeoff-time { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; gap: 0.35rem; }
+  .teacher-timeoff-time input { padding-inline: 0.55rem; }
+  .teacher-timeoff-time .teacher-icon-button { width: 36px; }
+}
 .teacher-timeoff-dialog .teacher-dialog-actions { margin: 0; }
 
-/* Whole days use the booking calendar's cream sheet and clear date buttons. */
+/* Whole days use the booking calendar's lilac sheet, its dates raised in
+   cream inside it (13 October 2026, Dan: her tool cards are the lilac sheet). */
 .teacher-timeoff-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
   align-items: start;
   gap: 2rem;
 }
-.teacher-timeoff-layout.is-single { display: block; max-width: 44rem; }
 .teacher-month {
   min-width: 0;
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-panel);
   padding: 1.1rem;
-  background: var(--paper-light);
+  background: var(--sheet);
 }
 .teacher-month-heading {
   display: flex;
@@ -1988,7 +1983,7 @@
   border: 1px solid transparent;
   border-radius: var(--squiggle-field);
   padding: 0.35rem 0;
-  background: var(--paper);
+  background: var(--raised);
   color: var(--ink);
   font: 500 1rem/1.2 var(--ui);
   cursor: pointer;
@@ -2065,22 +2060,20 @@
   border-radius: 50%;
   background: var(--blue-deep);
 }
+/* The chosen days' card sits beside the month, the same sheet and edge. */
 .teacher-timeoff-selection {
   display: grid;
-  gap: 1rem;
-  padding: 0.5rem 0;
+  gap: 0.9rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: 1.1rem;
+  background: var(--sheet);
 }
 .teacher-timeoff-selection-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
-}
-.teacher-timeoff-selection > p {
-  margin: 0;
-  color: var(--lavender-ink);
-  font-size: 0.82rem;
-  line-height: 1.6;
 }
 .teacher-selected-days {
   display: flex;
@@ -2110,42 +2103,78 @@
   color: var(--lavender-ink);
   font-size: 1.1rem;
 }
+/* One rule for every row of buttons: they share a row while their labels
+   fit whole, and stack when they don't. */
 .teacher-timeoff-selection-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
 }
-.teacher-timeoff-selection-actions .button {
-  flex: 1 1 auto;
+.teacher-timeoff-selection-actions > .button {
+  flex: 1 1 0;
+  min-width: fit-content;
   gap: 0.5rem;
 }
+/* With nothing chosen it is only a hint, not a card. */
+.teacher-timeoff-selection:not(.has-days) {
+  border-color: transparent;
+  background: transparent;
+}
+/* What changed reads from the left with its tick, as under the week. */
 .teacher-timeoff-selection .teacher-save-state {
+  justify-content: flex-start;
   min-height: 0;
   margin: 0;
+  text-align: left;
+}
+.teacher-timeoff-selection .teacher-save-state:empty {
+  display: none;
 }
 @media (max-width: 820px) {
   .teacher-tools-header { gap: 0.75rem; }
+}
+/* On a phone every tab is in view at once (13 October 2026, Dan): the bar
+   wraps into rows, the chosen tab filled, and Sign out sits beneath. */
+@media (max-width: 480px) {
+  .teacher-tools-header { flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
+  .teacher-tabs-scroll { flex: 1 1 100%; overflow: visible; }
+  .teacher-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  .teacher-tabs .teacher-tabs__thumb { display: none; }
+  .teacher-tabs button { min-height: 44px; padding-inline: 0.4rem; }
+  /* Every tap on a phone is at least 44 px. */
+  .teacher-sign-out,
+  .teacher-workspace .button--compact,
+  .teacher-lesson-dialog .button--compact { min-height: 44px; }
+  /* Six tabs, two even rows of three. */
+  .teacher-tabs button[aria-selected="true"] { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); }
+}
+@media (max-width: 820px) {
   .teacher-tabs button { padding-inline: 0.9rem; font-size: 0.76rem; }
   .teacher-timeoff-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  /* On a phone the card rides at the foot of the screen once a day is
+     chosen, so its buttons are in reach without scrolling past the month. */
+  .teacher-timeoff-selection.has-days {
+    position: sticky;
+    bottom: 0.75rem;
+    z-index: 2;
+    /* The same lilac, made solid, so the month never shows through. */
+    background: var(--dialog-surface);
+    box-shadow: 0 10px 30px rgba(36, 64, 133, 0.18);
+  }
+  .teacher-timeoff-selection.has-days .teacher-selected-days { display: none; }
 }
 @media (max-width: 480px) {
   .teacher-month { padding: 0.8rem; }
   .teacher-month-heading { gap: 0.15rem; }
-  .teacher-month-heading h3 { width: 100%; }
   .teacher-month-navigation { margin-left: auto; }
   .teacher-month-grid { gap: 0.2rem; }
   .teacher-month-day { min-height: 54px; }
   .teacher-month-state { font-size: 0.5rem; }
   .teacher-month-key { column-gap: 0.65rem; font-size: 0.62rem; }
-  .teacher-timeoff-selection-actions { flex-direction: column; }
 }
 /* Her students (12 October 2026, Dan): one row each, who first, then what
    is done and what isn't, and a way in to send. Done reads lilac; anything
    still to do stays plain so it isn't alarming. */
-.teacher-students__count {
-  color: var(--lavender-ink);
-  font-weight: 500;
-}
 .teacher-students__lead {
   margin: 0 0 0.75rem;
   color: var(--lavender-ink);
@@ -2165,17 +2194,20 @@
 }
 .teacher-students__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 26rem), 1fr));
   gap: 0.75rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 /* One small sheet card each: their splat or initial, who they are, where
-   they are in one line, and only the buttons that help. */
+   they are in one line, and only the buttons that help. Two across at a
+   laptop's width, so a card's two buttons share their row, and the buttons
+   sit at the foot, level with the card beside it. */
 .teacher-student {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
   gap: 0.85rem 0.85rem;
   align-items: start;
   border: 1px solid var(--rule);
@@ -2199,8 +2231,8 @@
 .teacher-student__profile {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   gap: 0.85rem;
   width: 100%;
   min-width: 0;
@@ -2212,21 +2244,33 @@
   text-align: left;
   cursor: pointer;
 }
+.teacher-student__open {
+  color: var(--blue);
+  transition: transform 200ms var(--motion-ease-out);
+}
+.teacher-student__profile:hover .teacher-student__open {
+  transform: translateX(3px);
+}
+.teacher-student__profile:hover .teacher-student__name {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+/* Where they are, as the confirm step's dabs; the first dab turns coral
+   while she still has something to do for them. */
+.teacher-student__facts {
+  grid-column: 1 / -1;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+.teacher-student__facts.needs-her li:first-child::before {
+  background: var(--coral);
+}
+.teacher-student__status {
+  font-weight: 600;
+}
 .teacher-student__profile:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 6px;
-}
-.teacher-student__history-link {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  margin-top: 0.55rem;
-  color: var(--blue);
-  font: 600 0.74rem/1.4 var(--ui);
-}
-.teacher-student__profile:hover .teacher-student__history-link {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
 }
 .teacher-history-dialog { width: min(620px, calc(100vw - 2rem)); }
 .teacher-history-heading {
@@ -2238,21 +2282,23 @@
 }
 .teacher-history-heading .account-avatar { width: 42px; height: 42px; }
 .teacher-history-heading p { margin: 0 0 0.2rem; font-size: 0.72rem; color: var(--lavender-ink); }
-.teacher-history-heading .teacher-history-email { margin: 0.35rem 0 0; overflow-wrap: anywhere; }
-.teacher-history-clock { margin: 0; font-size: 0.7rem; color: var(--lavender-ink); }
-.teacher-history-dialog h3 { margin: 0.8rem 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
+/* An address too long for a phone ends in an ellipsis, as on her card. */
+.teacher-history-heading .teacher-history-email { margin: 0.35rem 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.teacher-history-dialog h3 { margin: 0.25rem 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
 .teacher-history-dialog h3 span { color: var(--lavender-ink); font-weight: 500; }
 .teacher-history-list { display: grid; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
-.teacher-history-lesson { padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--sheet); }
+.teacher-history-lesson { padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
 .teacher-history-lesson.is-cancelled { background: var(--lavender-pale, #f1eef7); }
 .teacher-history-lesson__top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.45rem; font-size: 0.8rem; }
 .teacher-history-status { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); padding: 0.2rem 0.5rem; font: 600 0.65rem/1.4 var(--ui); }
 .teacher-history-status.is-muted { background: var(--lavender-soft); color: var(--ink); }
-.teacher-history-lesson__time { margin: 0.4rem 0; font: 600 0.8rem/1.5 var(--ui); }
-.teacher-history-lesson__time span { font-weight: 400; }
-.teacher-history-lesson__facts { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin: 0; font: 500 0.7rem/1.5 var(--ui); color: var(--lavender-ink); }
-.teacher-history-lesson__facts > span { display: inline-flex; align-items: center; gap: 0.25rem; }
-.teacher-history-lesson__note { margin: 0.6rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 0.75rem/1.5 var(--ui); }
+.teacher-history-lesson__top strong span { font-weight: 500; }
+/* The lesson's facts as a row of dabs. */
+.teacher-history-lesson__facts.booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.3rem 1.1rem; margin: 0.5rem 0 0; font-size: 0.74rem; }
+/* Her message and their note read as the emails show a message: a lilac
+   edge, a small label above. */
+.teacher-history-lesson__note { margin: 0.65rem 0 0; padding-left: 0.75rem; border-left: 3px solid var(--lavender); white-space: pre-wrap; overflow-wrap: anywhere; font: 400 0.75rem/1.5 var(--ui); }
+.teacher-history-lesson__note > span { display: block; color: var(--lavender-ink); font: 700 0.6rem/1.5 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; }
 .teacher-history-empty { font-size: 0.85rem; }
 .teacher-student__name {
   font: 600 0.95rem/1.35 var(--ui);
@@ -2264,87 +2310,43 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.teacher-student__status {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-  margin: 0.45rem 0 0;
-  font: 600 0.8rem/1.4 var(--ui);
-}
-.teacher-student.is-ready .teacher-student__status {
-  color: var(--blue-deep);
-}
-.teacher-student__dot {
-  flex: none;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: var(--coral);
-}
-.teacher-student__next {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem 0.6rem;
-  align-items: center;
-  margin: 0.1rem 0 0;
-  color: var(--lavender-ink);
-  font-size: 0.78rem;
-}
-.teacher-student__weekly {
-  display: inline-flex;
-  gap: 0.25rem;
-  align-items: center;
-  border-radius: var(--squiggle-pill);
-  padding: 0 0.45rem;
-  background: var(--lavender-soft);
-  color: var(--ink);
-  font: 600 0.7rem/1.6 var(--ui);
-}
+/* Its actions side by side, sharing the row at every width, rather than
+   stacked full width (13 October 2026, Dan). */
 .teacher-student__action {
   display: flex;
   flex-wrap: wrap;
   grid-column: 1 / -1;
-  gap: 0.5rem;
+  align-self: end;
+  gap: 0.65rem;
   align-items: center;
   border-top: 1px solid var(--rule-soft);
   padding-top: 0.75rem;
 }
-.teacher-student__button {
-  display: inline-flex;
-  gap: 0.4rem;
-  align-items: center;
-  min-height: 36px;
-  border: 1px solid var(--blue-deep);
-  border-radius: var(--squiggle-pill);
-  padding: 0 0.85rem;
-  background: transparent;
-  color: var(--blue-deep);
-  cursor: pointer;
-  font: 600 0.76rem/1 var(--ui);
-  transition: background 200ms, color 200ms;
+.teacher-student__action .button {
+  flex: 1 1 0;
+  width: auto;
+  min-width: fit-content;
 }
-.teacher-student__button:hover,
-.teacher-student__button:focus-visible {
-  background: var(--blue-deep);
-  color: #fff;
-}
-.teacher-student__button--send {
-  border-color: var(--coral-action);
-  background: var(--coral-action);
-  color: #fff;
-}
-.teacher-student__button--send:hover,
-.teacher-student__button--send:focus-visible {
-  background: var(--blue-deep);
-  border-color: var(--blue-deep);
-}
-.teacher-student__button:disabled {
-  opacity: 0.6;
-  cursor: default;
+/* On a phone the icons step aside so both fit on one row. */
+@media (max-width: 480px) {
+  .teacher-student__action .button {
+    padding-inline: 0.7rem;
+  }
+  .teacher-student__action .button svg {
+    display: none;
+  }
 }
 .teacher-student__sent {
-  color: var(--lavender-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--ink);
   font-size: 0.78rem;
+  font-weight: 600;
+}
+.teacher-student__sent svg {
+  flex: none;
+  color: var(--blue);
 }
 .teacher-student__failed {
   color: var(--coral-action);
@@ -2356,4 +2358,351 @@
   margin-top: 0.3rem;
   color: var(--lavender-ink);
   font: 500 0.72rem/1.4 var(--ui);
+}
+
+/* Onboarding (13 October 2026, Dan): Add a student leads the Students tab,
+   and its dialog is the student's details with the splat picker they would
+   use themselves. Nothing is emailed until Send welcome email. */
+.teacher-students__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin-bottom: 1rem;
+}
+.teacher-students__bar .button {
+  gap: 0.5rem;
+}
+.teacher-students__bar .teacher-inline-success {
+  margin: 0;
+}
+/* One dialog for a student and their lessons: details, then lessons, then
+   their welcome; or, from a free time, whose lesson it is first. */
+.teacher-student-dialog {
+  width: min(580px, calc(100vw - 2rem));
+}
+.teacher-student-dialog h2 {
+  margin-right: 2.5rem;
+}
+.teacher-student-dialog__who {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding-right: 2.5rem;
+}
+.teacher-student-dialog__who .account-avatar {
+  width: 44px;
+  height: 44px;
+}
+.teacher-student-dialog__who p {
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
+  color: var(--lavender-ink);
+  font-size: 0.78rem;
+}
+/* The dialog's gap spaces its parts; the free time stays close under its
+   title. */
+.teacher-student-dialog__when {
+  margin: -0.5rem 0 0;
+  font: 700 0.95rem/1.35 var(--ui);
+}
+.teacher-student-dialog__facts,
+.teacher-student-dialog__added {
+  margin: 0;
+}
+.teacher-student-dialog__added {
+  font-weight: 600;
+}
+.teacher-student-dialog__pick {
+  display: grid;
+  gap: 0.6rem;
+}
+.teacher-student-dialog__pick .teacher-eyebrow {
+  margin: 0;
+}
+.teacher-student-dialog__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  gap: 0.5rem;
+  max-height: 18rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.teacher-student-dialog__choices button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-field);
+  padding: 0.45rem 0.7rem;
+  background: var(--paper-light);
+  color: var(--ink);
+  font: 600 0.85rem/1.3 var(--ui);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 200ms, background 200ms;
+}
+/* A touch never leaves a hover behind; the keyboard's focus always shows. */
+@media (hover: hover) {
+  .teacher-student-dialog__choices button:hover {
+    border-color: var(--blue);
+    background: var(--lavender-soft);
+  }
+}
+.teacher-student-dialog__choices button:focus-visible {
+  border-color: var(--blue);
+  background: var(--lavender-soft);
+}
+.teacher-student-dialog__choices .account-avatar {
+  width: 34px;
+  height: 34px;
+  flex: none;
+}
+.teacher-student-dialog__new.button {
+  gap: 0.5rem;
+}
+.teacher-student-dialog__form,
+.teacher-student-dialog .teacher-manual-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin: 0;
+}
+.teacher-student-dialog .teacher-manual-choice,
+.teacher-student-dialog .teacher-manual-submit,
+.teacher-student-dialog__splat,
+.teacher-student-dialog__form > .teacher-dialog-actions {
+  grid-column: 1 / -1;
+}
+.teacher-student-dialog__splat {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+/* Their price: the two lengths side by side, a euro sign inside each field
+   and the standard price showing until she types her own. */
+.teacher-student-dialog__price {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.teacher-price-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.teacher-price-input {
+  position: relative;
+  display: block;
+}
+.teacher-price-input > span {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  transform: translateY(-50%);
+  color: var(--lavender-ink);
+  font: 600 0.84rem/1 var(--ui);
+  pointer-events: none;
+}
+.teacher-form .teacher-price-input input {
+  padding-left: 1.6rem;
+}
+.teacher-price {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--squiggle-field);
+  padding: 0.85rem;
+  background: var(--raised);
+}
+.teacher-history-dialog .teacher-price h3 {
+  margin: 0;
+}
+.teacher-price__view {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.teacher-price__facts {
+  margin: 0;
+}
+.teacher-price__view .button {
+  width: auto;
+}
+.teacher-price .teacher-form {
+  display: grid;
+  gap: 0.6rem;
+}
+.teacher-price__hint {
+  margin: 0;
+  color: var(--lavender-ink);
+  font-size: 0.72rem;
+}
+.teacher-price .teacher-inline-success,
+.teacher-price .teacher-inline-error {
+  margin: 0;
+}
+.teacher-student-dialog__finish {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-top: 0;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 1rem;
+}
+.teacher-student-dialog__finish .button {
+  flex: 1 1 12rem;
+  width: auto;
+}
+.teacher-student-dialog__finish .teacher-inline-success {
+  flex: 1 1 12rem;
+  margin: 0;
+}
+@media (max-width: 480px) {
+  .teacher-student-dialog__form,
+  .teacher-student-dialog .teacher-manual-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Receipts, a month at a time: the month and its pager, what there is to
+   issue, then one plain table row per amount (13 October 2026, Dan). */
+.teacher-receipts {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: clamp(1rem, 2.4vw, 1.5rem);
+  background: var(--sheet);
+}
+.teacher-receipts .teacher-month-heading {
+  margin: 0;
+}
+.teacher-receipts__lead {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.teacher-receipts__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.2rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.teacher-receipts__summary .button {
+  width: auto;
+  gap: 0.4rem;
+}
+.teacher-receipts__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 0.4rem;
+  font-size: 0.8rem;
+}
+.teacher-receipts__table th {
+  padding: 0 0.75rem 0.1rem;
+  color: var(--lavender-ink);
+  font: 700 0.62rem/1.4 var(--ui);
+  letter-spacing: 0.12em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.teacher-receipts__table td {
+  padding: 0.7rem 0.75rem;
+  background: var(--raised);
+  vertical-align: middle;
+}
+.teacher-receipts__table td:first-child {
+  border-radius: 14px 0 0 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.teacher-receipts__table td:first-child span {
+  font-weight: 500;
+}
+.teacher-receipts__table td:last-child {
+  border-radius: 0 14px 14px 0;
+}
+.teacher-receipts__state {
+  display: inline-block;
+  border-radius: var(--squiggle-pill);
+  padding: 0.2rem 0.55rem;
+  background: var(--lavender-soft);
+  color: var(--ink);
+  font: 600 0.68rem/1.4 var(--ui);
+  white-space: nowrap;
+}
+.teacher-receipts__state.is-ready {
+  background: var(--blue-deep);
+  color: var(--paper-light);
+}
+.teacher-receipts__state.is-due {
+  background: #f9ddcc;
+  color: var(--coral-action);
+}
+/* On a phone each amount is a small card: when and who on top, the rest as
+   labelled lines beneath. */
+@media (max-width: 640px) {
+  .teacher-receipts__table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .teacher-receipts__table,
+  .teacher-receipts__table tbody {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .teacher-receipts__table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 0.75rem;
+    border-radius: var(--squiggle-field);
+    padding: 0.75rem 0.85rem;
+    background: var(--raised);
+  }
+  .teacher-receipts__table td,
+  .teacher-receipts__table td:first-child,
+  .teacher-receipts__table td:last-child {
+    border-radius: 0;
+    padding: 0;
+    background: none;
+  }
+  .teacher-receipts__table td[data-label="Student"] {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .teacher-receipts__table td[data-label="Amount"] {
+    grid-column: 2;
+    grid-row: 1;
+    font-weight: 700;
+    text-align: right;
+  }
+  .teacher-receipts__table td[data-label="Paid"] {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: right;
+  }
+  .teacher-receipts__table td[data-label="NIF"],
+  .teacher-receipts__table td[data-label="For"] {
+    grid-column: 1 / -1;
+    color: var(--lavender-ink);
+    font-size: 0.75rem;
+  }
+  .teacher-receipts__table tr:not([data-nif=""]) td[data-label="NIF"]::before {
+    content: "NIF ";
+  }
 }
