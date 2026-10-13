@@ -21,6 +21,7 @@ function statusOf(student: AdminStudent, cards: boolean) {
   const byHand = cards && student.unpaidUpcoming && !student.cardForAllLessons
     ? `${student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} paid by hand`
     : "";
+  if (!student.email) return "Set up, no email yet";
   if (student.awaitingWelcome) return "Set up, not emailed yet";
   if (!student.signedIn) return ["Not signed in yet", byHand].filter(Boolean).join(" · ");
   if (byHand) return `No card yet · ${byHand}`;
@@ -138,7 +139,7 @@ export function StudentList({
                   <AccountAvatar className="teacher-student__avatar" mark={student.mark} name={student.name} />
                   <span className="teacher-student__main">
                     <strong className="teacher-student__name">{student.name}</strong>
-                    <span className="teacher-student__email">{student.email}</span>
+                    <span className="teacher-student__email">{student.email || "No email yet"}</span>
                   </span>
                   <ChevronRight className="teacher-student__open" size={18} aria-hidden="true" />
                 </button>
@@ -155,8 +156,8 @@ export function StudentList({
                     Add lesson
                     <span className="visually-hidden"> for {student.name}</span>
                   </button>
-                  {/* Only someone still to bring in needs a way in sent. */}
-                  {waitingOn && !answer?.ok ? (
+                  {/* Only someone still to bring in needs a way in sent, and only to an address. */}
+                  {waitingOn && student.email && !answer?.ok ? (
                     <button
                       className="button button--coral button--compact"
                       disabled={sending === student.id}

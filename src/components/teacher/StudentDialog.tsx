@@ -11,6 +11,7 @@ import { lockPageScroll } from "@/lib/scroll-lock";
 import { STUDENT_MARKS } from "@/lib/student-marks";
 import { dateLabel, minuteLabel } from "@/lib/teacher-calendar";
 import { PriceFields, pricesFromDraft, type PriceDraft } from "@/components/teacher/StudentPrice";
+import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
 
 /** Where the dialog opens: a new student, one of hers, or a free time on her week. */
 export type StudentDialogStart =
@@ -99,7 +100,7 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
           <AccountAvatar mark={student.mark} name={student.name} />
           <div>
             <h2 id="teacher-student-dialog-title">{title}</h2>
-            <p>{student.email}</p>
+            <p>{student.email || "No email yet"}</p>
           </div>
         </div>
       ) : (
@@ -178,9 +179,10 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
               <span>Full name</span>
               <input autoComplete="off" disabled={busy} onChange={set("name")} required type="text" value={details.name} />
             </label>
+            {/* A name is enough to start; she can add the rest later (13 October 2026, Dan). */}
             <label>
-              <span>Email</span>
-              <input autoComplete="off" disabled={busy} onChange={set("email")} required type="email" value={details.email} />
+              <span>Email <span className="teacher-field-optional">(optional, needed for lessons and their welcome)</span></span>
+              <input autoComplete="off" disabled={busy} onChange={set("email")} type="email" value={details.email} />
             </label>
             <label>
               <span>Phone <span className="teacher-field-optional">(optional)</span></span>
@@ -224,7 +226,28 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
         </>
       ) : null}
 
-      {step === "lessons" && student ? (
+      {step === "lessons" && student && !student.email ? (
+        <>
+          <ul className="booking-payment-facts teacher-student-dialog__facts">
+            <li>Their lessons and welcome need an email</li>
+            <li>Add it now, or later from their profile</li>
+          </ul>
+          <StudentDetailsForm
+            token={token}
+            student={student}
+            submitLabel="Save, then their lessons"
+            onSaved={(updated) => {
+              setStudent(updated);
+              changedNow();
+            }}
+          />
+          <div className="teacher-student-dialog__finish">
+            <button className="button button--outline" onClick={onClose} type="button">Done for now</button>
+          </div>
+        </>
+      ) : null}
+
+      {step === "lessons" && student && student.email ? (
         <>
           {added.length ? (
             <ul className="booking-payment-facts teacher-student-dialog__added" aria-label="Added">
