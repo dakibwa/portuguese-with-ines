@@ -3,7 +3,8 @@
 ## Verification and release
 
 - During implementation, run the smallest relevant check. Use `npm run test:booking` for Worker logic and the focused Playwright smoke test for affected customer journeys.
-- Do not run the whole journey suite locally before pushing (13 October 2026, Dan: it took 20 minutes). Run the one or two checks for what changed; the release runs every journey check, split across four runners at once, and will stop a broken one from publishing.
+- Keep tests lean (13 October 2026, Dan: "always be as lean as possible"). A test earns its place only by protecting a student, Inês or money in a way no other check already does. Prove logic once, at the lowest layer (Worker or unit tests); a browser journey covers only the path through the UI, at one desktop and one phone width, not a sweep. Prefer extending an existing check to adding a new one, and delete checks that only repeat others.
+- Locally, run the one or two checks for what changed, never the whole suite; the release runs the twelve journeys in about three minutes and stops a broken one from publishing.
 - `npm run check:fast` combines types, lint, booking and redirect tests. Use the aggregate when changes span those areas or focused checks leave unresolved risk. Isolated copy, styling and documentation use the shared narrow tier; reserve live probes and the production build for the relevant release gate.
 - `npm run check:release` adds the live booking probe and production build. CI runs it once on `main`, then exercises the customer journey against that same built export before automatically publishing it.
 - Run `npm run check:booking` directly only when booking configuration or routing changes, or to diagnose the release gate. If a local environment points it at a localhost Worker, start that Worker first; otherwise let CI exercise the configured live endpoint.

@@ -57,7 +57,7 @@ async function oneBlueBoundary(field) {
 }
 
 try {
-  for (const width of [1280, 390]) {
+  for (const width of [390]) {
     // Sign-up: optional, last, explained in two words, and a refused NIF says why.
     let attempts = 0;
     const signUp = await open(width, "/book/?view=lessons", {

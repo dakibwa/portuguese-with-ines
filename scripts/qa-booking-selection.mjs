@@ -15,7 +15,7 @@ const types = [
 ];
 const addWeeks = (start, index) => new Date(Date.parse(start) + index * 7 * 86400000).toISOString();
 try {
-  for (const width of [320, 390, 1280]) {
+  for (const width of [390, 1280]) {
     // A student on Porto's clock: elsewhere every time shows on the browser's
     // own, so exact time labels would depend on the machine running the check.
     const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce", timezoneId: "Europe/Lisbon" });

@@ -2650,7 +2650,7 @@ const submitBooking = accountPage.getByRole("button", { name: "Book lesson & agr
 await agreement.waitFor();
 await accountPage.locator(".student-details-form textarea").fill("Keep this note while I read the terms.");
 const choicesBeforeTerms = JSON.stringify(await accountPage.locator(".booking-selection-stack strong").allTextContents());
-for (const width of [390, 1440, 320]) {
+for (const width of [390, 1440]) {
   await accountPage.setViewportSize({ width, height: 844 });
   if (await agreement.getAttribute("aria-pressed") !== "false" || await submitBooking.isEnabled()) {
     throw new Error("A new booking must require an explicit agreement before it can be submitted.");

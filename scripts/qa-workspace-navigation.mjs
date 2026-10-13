@@ -80,7 +80,7 @@ try {
   await page.waitForLoadState("networkidle");
   assert.equal(accountLoads, 1, "Arriving signed in should load the account once");
   const layouts = [];
-  for (const width of [1920, 1440, 1280, 1101, 1100, 900, 821, 820, 390, 320]) {
+  for (const width of [1920, 390]) {
     await page.setViewportSize({ width, height: width < 500 ? 844 : 1100 });
     await settle();
     const layout = await page.evaluate(() => {
@@ -181,7 +181,7 @@ try {
   assert.match(await page.locator(".lesson-overview__next").innerText(), /Monday, 7 September 2026/);
   await page.screenshot({ path: `${out}/upcoming-long-desktop.png`, fullPage: true });
 
-  for (const width of [320, 390, 820]) {
+  for (const width of [390]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto(`${base}/`);
     await openMenuWithStationaryHeader(`${width}px header`);

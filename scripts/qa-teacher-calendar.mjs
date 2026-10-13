@@ -351,7 +351,7 @@ try {
 
   const { page, state } = await fixture(1440);
   // Both lesson lengths retain visible location text through the week/day layout switch.
-  for (const width of [1440, 827, 741, 667, 601, 600, 390, 320]) {
+  for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
     if (width <= 600)
       await page
@@ -871,7 +871,7 @@ try {
     .getByRole("status")
     .filter({ hasText: "Weekly hours saved" })
     .waitFor();
-  for (const width of [390, 320, 827]) {
+  for (const width of [390]) {
     await mobile.page.setViewportSize({ width, height: 900 });
     await noOverflow(mobile.page);
   }
@@ -883,7 +883,7 @@ try {
   const phoneMessage = mobile.page.getByLabel(/^Add a message to the email \(optional\)/);
   const longMessage = "Obrigada! ".repeat(100);
   await phoneMessage.fill(longMessage);
-  for (const width of [390, 320, 827]) {
+  for (const width of [390]) {
     await mobile.page.setViewportSize({ width, height: 844 });
     const confirm = mobile.page.getByRole("button", { name: "Yes, cancel lesson" });
     await confirm.scrollIntoViewIfNeeded();
@@ -898,7 +898,7 @@ try {
   assert.deepEqual(mobile.state.errors, []);
   await mobile.page.close();
 
-  for (const width of [1280, 667, 390, 320]) {
+  for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
     state.history = [
       { ...lesson("past", "Sam Known", "2025-12-12T09:00:00Z"), student_id: "sam", student_email: "old-address@example.invalid", payment_status: "paid", reschedule_count: 1 },
@@ -965,7 +965,7 @@ try {
 
   // A chosen day's card offers the whole day or some hours; hours open an
   // explicit draft of one or more breaks, saved only when she presses Save.
-  for (const width of [1280, 390, 320]) {
+  for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
     const originalBookings = structuredClone(state.bookings);
     const originalRules = structuredClone(state.rules);
@@ -1060,7 +1060,7 @@ try {
 
   // A clash card uses the existing lesson editor, including lessons hidden
   // under More. Moving one refreshes the cards and preserves unsaved hours.
-  for (const width of [1280, 390, 320]) {
+  for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
     for (let week = 1; week <= 5; week++) state.bookings.push(lesson(`repeat-${week}`, `Repeat ${week}`, new Date(Date.parse("2026-09-07T10:00:00Z") + week * 7 * 86400000).toISOString()));
     await page.reload();
@@ -1090,7 +1090,7 @@ try {
     await page.close();
   }
 
-  for (const width of [1280, 390, 320]) {
+  for (const width of [1280, 390]) {
     const tabs = await fixture(width);
     const { page, state } = tabs;
     const chosenDay = (date) => page.locator(`[data-timeoff-date="${date}"]`);

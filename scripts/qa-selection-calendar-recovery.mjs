@@ -186,7 +186,7 @@ async function confirm(page) {
 
 let cases = 0;
 try {
-  for (const width of [320, 390, 1280]) {
+  for (const width of [390]) {
     // A spring gap has no UTC instant for the intended time. Legacy skipped
     // values still identify the correct date; neither their shifted time nor
     // a normal skipped week's time should be invented in the date list.

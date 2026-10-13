@@ -94,7 +94,7 @@ async function chooseFromMenu(page, name) {
 }
 
 try {
-  for (const width of [1280, 820, 390]) {
+  for (const width of [1280, 390]) {
     // Sign-up is not the place for a code: only some students have one, and a
     // field there would suggest most people should.
     const signedOut = await open(width, { session: false });
