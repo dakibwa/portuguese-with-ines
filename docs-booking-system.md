@@ -155,12 +155,13 @@ created here are never touched.
 
 ## Expressions collection — Stage 1
 
-The teacher portal's `Expressions` tab follows Receipts. All reads and writes
-pass through `handleAdmin`, so either any account with `role = 'teacher'` or the
+The teacher portal's `Expressions` tab follows Receipts. Its collection reads
+and writes pass through `handleAdmin`, so either any account with `role = 'teacher'` or the
 existing shared `ADMIN_TOKEN` can use them. Students and anonymous callers are
-refused before any expression data is read or changed. Existing origin, JSON
-content-type, bounded request-body and no-cache rules apply unchanged. Stage 1
-has no public or student expression endpoint and sends no email.
+refused before any collection data is read or changed. Existing origin, JSON
+content-type, bounded request-body and no-cache rules apply. The student picker
+has separate authenticated endpoints below. There is no anonymous expression
+endpoint, and this feature sends no email.
 
 | Method and path | Request and result |
 | --- | --- |
@@ -214,18 +215,46 @@ The output is the seed section of `0026-expressions.sql`. Repeating it preserves
 existing IDs and teacher edits (`ON CONFLICT(id) DO NOTHING`); it does not refresh
 or overwrite an existing collection. Reorder is bounded to 500 entries.
 
-**Release is pending Dan and Inês's review.** This change does not apply 0026,
-deploy the Worker, merge the PR or touch staging/production data. When Dan
-authorizes release, apply 0026 to the chosen database before the Worker and site
-release. Until then the new endpoint reports a controlled 503 if its table is
-absent, while the existing portal continues to work. `published = 1` still
-grants no student/public access in this stage.
+## Student expression picker
+
+A signed-in student can pick a published expression below Your lessons. The
+server chooses randomly from that student's unseen published entries. Different
+students can receive the same expression. Teachers use the private preview in
+Expressions; neither anonymous callers nor teacher sessions can draw.
+
+| Method and path | Request and result |
+| --- | --- |
+| `GET /me/expressions` | The student's latest still-published pick, whether another is available, whether any published content exists, and up to eight unseen titles for the animation. |
+| `POST /me/expressions/pick` | Only `{ requestId }`, a UUID v4. Reserves one unseen published expression and returns the same state shape with that request's result. |
+
+Both return `{ expression, canPick, hasPublished, shuffleLabels }`. No client
+student ID or chosen expression ID is accepted. The session supplies the
+student identity. A single SQLite INSERT selects with `ORDER BY random()` and
+reserves the pick atomically. Migration `0027-expression-picks.sql` adds
+`expression_picks`: student and expression foreign keys, a request UUID, UTC
+creation time and an ordered ID. Unique constraints cover student + expression
+and student + request. Retrying one request returns the original result without
+consuming another. History belongs to the account, across browsers and devices;
+unpublishing and republishing an expression does not reset it.
+
+The UI restores the last available result on return. The short slowing reel
+only presents the server's already-saved result. Reduced motion skips it, and
+navigation cancels it without undoing the pick. No published entries means no
+student card. An exhausted pool waits for newly published entries; there is no
+student reset or repeat action. Failed or lost replies retain the request UUID
+for retry. All replies use the existing no-cache and origin rules; POST bodies
+are bounded to 1 KiB.
+
+**Release is pending Dan and Inês's review.** This change does not apply either
+migration, deploy the Worker, merge the PR or touch staging/production data.
+When Dan authorizes release, apply 0026 and then 0027 to the chosen database
+before the Worker and site release. Missing tables produce a controlled 503
+on the affected endpoint while the existing portal continues to work.
 
 The content inventory, original schema and feature map are in
-[Expressions: source and scope](docs/expressions-stage-1.md). Stage 2 is a
-published-only Expression of the week in signed-in students' Your lessons.
-Stage 3 is a public Expressões page, with a possible home-page expression.
-Neither stage is implemented here.
+[Expressions: source and scope](docs/expressions-stage-1.md). A public Expressões
+page and optional home-page expression remain plan only. Multilingual student
+contributions and a weekly selection policy are also outside this change.
 
 ## Teacher calendar
 

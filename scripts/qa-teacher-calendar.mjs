@@ -99,6 +99,7 @@ async function fixture(width, options = {}) {
   await page.route("**/auth/login", (route) => route.fulfill({
     json: { student: teacher, session: "isolated-teacher-fixture" },
   }));
+  await page.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
   await page.route("**/me", (route) =>
     route.fulfill({
       json: {

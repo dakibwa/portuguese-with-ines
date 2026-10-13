@@ -85,7 +85,7 @@ export function ExpressionDialog({ expression, preview, fallbackFocus, onSave, o
         </>
       ) : preview && expression ? (
         <>
-          <p className="expression-dialog__hint">This is a private preview. Students cannot open this collection yet.</p>
+          <p className="expression-dialog__hint">This is a private preview. Students can only pick published expressions.</p>
           <ExpressionCard expression={expression} />
           <div className="teacher-dialog-actions"><button className="button button--outline" type="button" onClick={onClose}>Done</button></div>
         </>

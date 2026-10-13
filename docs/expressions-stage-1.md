@@ -1,4 +1,4 @@
-# Expressions: source and Stage 1 scope
+# Expressions: source and integration scope
 
 Reference: the private `dakibwa/ines-idioms-app` repository at
 `599b6f5b8fca848f91bd439c4268344b6a29bb16`, imported from Inês's 13 October 2026
@@ -7,24 +7,24 @@ dependencies, app, tests or build from that repository were installed or run.
 
 ## Feature and screen map
 
-| Original feature or screen | Stage 1 location or later decision |
+| Original feature or screen | Website location or later decision |
 | --- | --- |
-| Single-screen roulette landing page, wordmark and organic watermark | The website supplies its own existing portal, type, palette, header and splats. The private Expressions tab is the entry point. |
+| Single-screen roulette landing page, wordmark and organic watermark | The website supplies its own existing portal, type, palette, header and splats. The teacher Expressions tab manages the collection; students draw below Your lessons. |
 | Latest dictionary entry: “expressão idiomática”, “nome feminino”, “Conjunto de palavras com um significado próprio, diferente do seu sentido literal.” | Preserved verbatim in the tab introduction. |
-| Instruction to press “Rodar”; “Que expressão vai sair?” ready screen | Later student discovery experience. The teacher catalogue opens directly for reviewing and editing. |
-| Random selection, previous/next reel lines, 18 slowing frames, blue-only transitions, no final jump, repeat spin | Deferred to a separately agreed student discovery feature in Stage 2 or 3. Not required by the planned Expression of the week card. No decorative spinning is added to the editor. |
-| Reduced-motion instant result, disabled double spins, cleanup on leaving | Roulette-specific mechanics deferred with the roulette. The portal retains its existing reduced-motion behavior. Writes have duplicate-submission guards. |
-| “Ver mais informação” / “Ocultar informação” result detail state | Meanings, literal English and examples are immediately readable on cream cards. Notes/origin have a disclosure. The same reading component appears in the private student preview. |
+| Instruction to press “Rodar”; “Que expressão vai sair?” ready screen | The student card offers “Pick an expression” and a Portuguese discovery prompt. The teacher catalogue opens directly for reviewing and editing. |
+| Random selection, previous/next reel lines, 18 slowing frames, blue-only transitions, no final jump, repeat spin | A slowing vertical reel reveals a server-selected published expression. Each student has independent saved history and no repeats; once exhausted, they wait for new expressions. The teacher editor does not spin. |
+| Reduced-motion instant result, disabled double spins, cleanup on leaving | Implemented for the student picker. Picks are saved before animation, the button stays disabled until reveal, and reduced motion shows the result immediately. |
+| “Ver mais informação” / “Ocultar informação” result detail state | Meanings, literal English and examples are immediately readable on cream cards. Notes/origin have a disclosure. The same reading component appears in the student picker and private teacher preview. |
 | Portuguese meaning, literal English translation, idiomatic English equivalent | All preserved separately; English equivalent seeds Meaning or equivalent in English. Inês can refine it before publication. |
 | Context/usage caveats and external reference link | Preserved as editable notes/origin and reference link, visible under “Notas e origem”. |
 | Built-in catalogue combined with previously saved Portuguese expressions | All 52 recoverable built-ins become D1 drafts. No live saved expressions were included in the bundle. Teacher create/edit/delete now manages the collection. |
 | Legacy expression-creation endpoint returns 410 | Not carried over. The teacher-only endpoint is the sole creation path in this stage. Students do not add roulette entries. |
 | “Como se diz na tua língua?” / “Adiciona uma expressão idiomática equivalente.” | Exact copy recorded here, including its full stop. Student contributions are deferred to an explicit Stage 2/3 decision; they must stay attached to a parent expression. |
-| Student equivalent list grouped under the selected expression, language labels and automatic text direction | Deferred. No live suggestions were included; no student submissions are invented or imported. |
-| “Adicionar equivalente” dialog: parent expression, language, equivalent text, Cancel/Save | Deferred with student contributions. Stage 1 has an expression editor and a private student preview instead. |
-| Student-equivalent sign-in, same-origin checks, validation, duplicate refusal | Sites sign-in is dropped. All Stage 1 collection endpoints use the website's existing teacher/shared-token authorization, origin checks and input validation. Student contribution authorization is future work. |
+| Student equivalent list grouped under the selected expression, language labels and automatic text direction | Deferred. No live suggestions were included; no student submissions are invented or imported. The picker does not add a contribution form. |
+| “Adicionar equivalente” dialog: parent expression, language, equivalent text, Cancel/Save | Deferred with student contributions. The teacher collection has an expression editor and a private student preview. |
+| Student-equivalent sign-in, same-origin checks, validation, duplicate refusal | Sites sign-in is dropped. All teacher collection endpoints use the website's existing teacher/shared-token authorization, origin checks and input validation. Student contribution authorization is future work. |
 | Per-expression unsent suggestion drafts, pending state, save error/retry and success notice | Teacher edit drafts stay present after a failed save; dirty close asks before discarding. Loading, error, empty and success states stay separate. Student draft preservation waits with contributions. |
-| Catalogue/equivalent load errors and retry, abort stale reads, merge successful concurrent suggestion saves | The tab has reload/error/empty states, ignores replies after account changes or unmount, and rejects stale editing versions. Student-specific read/save merging is deferred. |
+| Catalogue/equivalent load errors and retry, abort stale reads, merge successful concurrent suggestion saves | The tab has reload/error/empty states, ignores replies after account changes or unmount, and rejects stale editing versions. Concurrent merging of student contributions remains deferred. |
 | Keyboard modal, Escape, return to opener, result live announcements | Editor/preview reuse the portal's focus trap, backdrop gesture checks, scroll lock, close/return focus and status/error announcements. |
 | No visible count of the original expressions | Preserved. No “52 expressions” count appears in the tool. |
 | Source fonts, brand SVGs, favicon/Open Graph images, Sites Worker and Vite setup | Website-owned assets and configuration are reused. No separate app, package, deployment or sign-in is installed. |
@@ -50,7 +50,8 @@ The source D1/Drizzle schema contains:
 The new schema keeps expression identity and a separate normalized duplicate
 key. It adds the requested content/review fields and drops the separate app's
 creator/sign-in coupling. Student equivalents are not created as an unused
-table in Stage 1. API and field limits are documented in
+table. A new student-pick table stores each account’s independent draw history.
+API and field limits are documented in
 [the booking-system contract](../docs-booking-system.md#expressions-collection--stage-1).
 
 ## Publication uncertainty and later stages
@@ -61,16 +62,21 @@ punctuation changes exist in local source, but the next publication attempt was
 interrupted. Those changes were **not confirmed live**. This work uses the
 latest local copy and does not claim access to, or verification of, that app.
 
-- Stage 2 (plan only): one published Expression of the week in signed-in
-  students' Your lessons. Decide the weekly selection policy and whether
-  multilingual suggestions or roulette belong in this stage. No student route
-  or endpoint is added now.
+- Student discovery (now included at Dan's request): random published picks in
+  signed-in students' Your lessons, with a slowing animation and no repeats per
+  student. Different students can receive the same expression. This replaces
+  the earlier weekly-card plan; no weekly cadence is imposed.
+- Multilingual student suggestions remain deferred. They require a separate
+  decision about contribution and moderation behavior.
 - Stage 3 (plan only): a public Expressões page and optionally a home-page
   expression after Inês approves the collection. Public menu and home page are
   unchanged.
 - Inês needs to review the meanings/equivalents, supply one or two examples per
   expression, and choose any themes or illustrations. Drafts allow these to be
   incomplete; publication requires both meanings and at least one example.
+  “Draft” describes this publication state, not a judgment that the original
+  expression text is unfinished or incorrect. Inês edits and publishes in her
+  existing teacher interface.
 - Dan controls release after review. This PR does not merge, migrate, deploy,
   send correspondence or change production records.
 

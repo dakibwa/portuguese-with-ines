@@ -2,6 +2,7 @@
 
 import { MeetingLink } from "@/components/MeetingLink";
 import { LessonsLoading } from "@/components/LessonsLoading";
+import { StudentExpressions } from "@/components/expressions/StudentExpressions";
 
 import { type ComponentType, type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -4561,6 +4562,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </div>
         ) : null}
       </StageElement>
+
+      {isLessonsCalendarOverview && student?.role === "student" ? (
+        <StudentExpressions key={`${student.id}:${readSession()}`} token={readSession()} />
+      ) : null}
 
     </section>
   );

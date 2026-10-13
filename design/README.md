@@ -499,10 +499,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
 
 ### Expressions in her portal — 13 October 2026
 
-Stage 1 is an `Expressions` tab immediately after `Receipts`. Only a teacher
-can load its collection. No student card, public page or main-menu item is
-part of this stage. `Published` marks editorial readiness; the collection
-remains private until a later, separately reviewed stage.
+The `Expressions` tab immediately follows `Receipts`. Only a teacher can
+manage its collection. Publishing makes an expression available in the
+signed-in student picker below Your lessons. Drafts stay in her interface;
+there is no anonymous page or main-menu item.
 
 - Use the same lilac sheet as Receipts, cream reading cards, Beth Ellen
   expression titles and Montserrat labels and content. Keep the latest bundle
@@ -524,7 +524,7 @@ remains private until a later, separately reviewed stage.
   each require an explicit confirmation. Stale versions never overwrite an edit.
 - `Preview as students see it` renders the same reading-card component, without
   teacher actions or publication pills. The surrounding private-preview note
-  is for Inês only. It does not create student access.
+  is for Inês only. Previewing a draft does not publish it.
 - Two reading columns fit a wide desktop; use one on phones. All seven tabs
   remain reachable without horizontal page overflow, including at 320px.
   Long expressions, notes and examples wrap within the card. Fields and actions
@@ -534,7 +534,17 @@ remains private until a later, separately reviewed stage.
   meanings and at least one example. Preserve Inês's punctuation and accents.
 - The original strip photographs are reference material, with text too small
   for a reading card. The packaging photos and business card do not illustrate
-  individual meanings. None is copied into `public/visuals/` in Stage 1.
+  individual meanings. None is copied into `public/visuals/` for this integration.
+
+The student card uses the same lilac sheet, cream reading card and handwritten
+Portuguese title. A coral Pick button starts a short, slowing vertical shuffle
+and reveals the saved result. Reduced-motion users see the result immediately;
+assistive technology announces the result rather than every passing title.
+Keep the button disabled during the request and animation. A failed reply can
+be retried without spending another pick. Returning students see their last
+available result, and every student has an independent history. Once their
+published pool is exhausted, show a quiet note and wait for new expressions.
+Do not reset their history or imply another student has taken an expression.
 
 The full source inventory and later-stage feature map are in
 [Expressions: source and scope](../docs/expressions-stage-1.md).

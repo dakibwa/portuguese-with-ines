@@ -78,6 +78,11 @@ export async function listExpressions(db) {
   return results.map(unpack);
 }
 
+export async function publishedExpression(db, id) {
+  const row = await db.prepare(`${select} WHERE id = ? AND published = 1`).bind(id).first();
+  return row ? unpack(row) : null;
+}
+
 export async function expressionsRequest(db, method, path, body) {
   if (path === "/admin/expressions" && method === "GET") return { expressions: await listExpressions(db) };
   if (method !== "POST") problem("Not found.", 404);

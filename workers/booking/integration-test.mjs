@@ -2504,8 +2504,11 @@ await test("only a teacher can manage expressions; drafts, exact text, publicati
     item = (await published.json()).expression;
     assert.equal(item.published, 1);
     assert.equal((await adminCall(`/${item.id}`, { body: { ...editedInput, examples: [], updatedAt: item.updatedAt } })).status, 400, "published content remains complete");
-    assert.equal((await call("/expressions", { method: "GET", user: "alice" })).status, 404, "no student or public endpoint ships in stage 1");
+    assert.equal((await call("/expressions", { method: "GET", user: "alice" })).status, 404, "no anonymous catalogue endpoint");
     const order = (await list()).map((row) => row.id);
+    const largerOrder = Array.from({ length: 500 }, () => crypto.randomUUID());
+    const orderBody = { ids: largerOrder, expectedOrder: largerOrder };
+    assert.equal((await adminCall("/reorder", { body: orderBody, headers: { "Content-Length": String(JSON.stringify(orderBody).length) } })).status, 409, "a full-sized order reaches validation instead of the generic 32 KiB limit");
     const desired = [item.id, ...order.filter((id) => id !== item.id)];
     const reordered = await adminCall("/reorder", { body: { ids: desired, expectedOrder: order } });
     assert.equal(reordered.status, 200, await reordered.clone().text());
@@ -2524,6 +2527,58 @@ await test("only a teacher can manage expressions; drafts, exact text, publicati
     db.exec(migration);
     assert.equal(db.prepare("SELECT meaning_pt FROM expressions WHERE id = 'original-1'").get().meaning_pt, "Reviewed by teacher", "repeating the import preserves review edits");
   } finally { db.exec("DELETE FROM expressions"); }
+});
+
+await test("expression picks are personal, published-only, atomic and safe to retry across visits", async () => {
+  db.exec(readFileSync(new URL("./migrations/0026-expressions.sql", import.meta.url), "utf8"));
+  db.exec(readFileSync(new URL("./migrations/0027-expression-picks.sql", import.meta.url), "utf8"));
+  for (const id of ["expression-a", "expression-b"]) { student(id); sessions[id] = await createSession(id, env.BOOKING_TOKEN_SECRET); }
+  const publish = (id, value = 1) => db.prepare("UPDATE expressions SET published = ?, examples = '[\"Exemplo de revisão.\"]' WHERE id = ?").run(value, id);
+  const current = async (user) => {
+    const response = await call("/me/expressions", { method: "GET", user });
+    assert.equal(response.status, 200, await response.clone().text());
+    return response.json();
+  };
+  const pick = async (user, requestId = crypto.randomUUID()) => {
+    const response = await call("/me/expressions/pick", { user, body: { requestId } });
+    assert.equal(response.status, 200, await response.clone().text());
+    return response.json();
+  };
+  try {
+    assert.equal((await current("expression-a")).hasPublished, false);
+    for (const [path, method] of [["/me/expressions", "GET"], ["/me/expressions/pick", "POST"]]) {
+      assert.equal((await call(path, { method, user: null, body: { requestId: crypto.randomUUID() } })).status, 401);
+      assert.equal((await call(path, { method, user: "teacher", body: { requestId: crypto.randomUUID() } })).status, 403);
+    }
+    assert.equal((await call("/me/expressions/pick", { user: "expression-a", body: { requestId: crypto.randomUUID(), studentId: "expression-b", expressionId: "original-3" } })).status, 400);
+    publish("original-1");
+    const requestId = crypto.randomUUID();
+    const [first, retry] = await Promise.all([pick("expression-a", requestId), pick("expression-a", requestId)]);
+    assert.equal(first.expression.id, "original-1");
+    assert.equal(retry.expression.id, first.expression.id);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM expression_picks WHERE student_id = 'expression-a'").get().n, 1);
+    assert.equal((await current("expression-b")).expression, null, "another student's history is private");
+    assert.equal((await pick("expression-b", requestId)).expression.id, first.expression.id, "students have separate pools, including request IDs");
+    assert.equal((await pick("expression-a")).expression, null, "an exhausted collection never automatically repeats");
+
+    publish("original-2");
+    const secondId = crypto.randomUUID();
+    const simultaneous = await Promise.all([pick("expression-a", secondId), pick("expression-a")]);
+    assert.deepEqual(simultaneous.flatMap((reply) => reply.expression ? [reply.expression.id] : []), ["original-2"], "two devices cannot reserve the last expression twice");
+    const resumed = await current("expression-a");
+    assert.equal(resumed.expression.id, "original-2");
+    assert.equal(resumed.canPick, false);
+    assert.deepEqual(resumed.shuffleLabels, [], "the reel does not leak unpublished drafts");
+    assert.equal((await current("expression-b")).canPick, true);
+    assert.equal((await pick("expression-a", requestId)).expression.id, "original-1", "a delayed retry still returns its original result");
+    publish("original-1", 0);
+    assert.equal((await pick("expression-a", requestId)).expression, null, "an old request cannot reopen withdrawn teaching content");
+    publish("original-1");
+    assert.equal((await current("expression-a")).canPick, false, "unpublishing and republishing does not erase a student's history");
+    publish("original-3");
+    assert.equal((await pick("expression-a")).expression.id, "original-3", "new published material becomes available");
+    assert.equal(db.prepare("SELECT COUNT(DISTINCT expression_id) AS n FROM expression_picks WHERE student_id = 'expression-a'").get().n, 3);
+  } finally { db.exec("DELETE FROM expression_picks; DELETE FROM expressions; DELETE FROM students WHERE id IN ('expression-a', 'expression-b');"); }
 });
 
 await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {

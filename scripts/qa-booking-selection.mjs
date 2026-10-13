@@ -24,6 +24,7 @@ try {
     let bookings = [], series = [], rejectNext = false;
     const json = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     await context.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-selection-fixture"));
+    await context.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
     await context.route("**/me", route => json(route, { student, bookings, series, sameDayFeeCents: 500 }));
     await context.route("**/me/recurring-rates", route => json(route, { rates: { 60: 1500 } }));
     await context.route("**/lesson-types", route => json(route, { lessonTypes: types, paymentMode: "postpay", postpay: true, paymentReady: true }));

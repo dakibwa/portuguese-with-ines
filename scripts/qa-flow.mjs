@@ -841,6 +841,7 @@ await accountPage.route("**/bookings", async (route) => {
 await accountPage.route("**/me/recurring-rates", (route) => route.fulfill({
   status: 200, contentType: "application/json", body: JSON.stringify({ rates: {} })
 }));
+await accountPage.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
 await accountPage.route("**/me", async (route) => {
   accountRequestMethods.push(route.request().method());
   if (route.request().method() === "OPTIONS") {
@@ -2727,6 +2728,29 @@ await accountPage.setViewportSize({ width: 390, height: 844 });
 await accountPage.locator(".booking-bar__head #account-menu-button").click();
 await accountPage.locator(".booking-bar__head #account-menu").getByRole("button", { name: /^Your lessons/ }).click();
 await accountPage.locator("#upcoming-lessons-heading").waitFor();
+// One student-picker journey. Server tests own randomness, history and access.
+const expression = {
+  id: "original-1", expression: "Partir o coco a rir", meaningPt: "Rir muito.", meaningEn: "To split your sides laughing",
+  literalEn: "To crack the coconut laughing", examples: ["Com aquela história, partimos o coco a rir."],
+  notes: "", sourceUrl: "", tags: ["Humor"], imageUrl: "", imageAlt: "", published: 1, sortOrder: 0,
+  createdAt: "2026-10-13T00:00:00.000Z", updatedAt: "2026-10-13T00:00:00.000Z",
+};
+let expressionPicked = false;
+await accountPage.route("**/me/expressions", route => route.fulfill({ json: {
+  expression: expressionPicked ? expression : null, canPick: !expressionPicked, hasPublished: true, shuffleLabels: expressionPicked ? [] : [expression.expression],
+} }));
+await accountPage.route("**/me/expressions/pick", route => {
+  if (expressionPicked || !route.request().postDataJSON().requestId) throw new Error("The picker must submit one identified draw.");
+  expressionPicked = true;
+  return route.fulfill({ json: { expression, canPick: false, hasPublished: true, shuffleLabels: [] } });
+});
+await accountPage.reload({ waitUntil: "domcontentloaded" });
+await accountPage.getByRole("button", { name: "Pick an expression", exact: true }).click();
+await accountPage.locator(".student-expressions__result .expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
+await accountPage.reload({ waitUntil: "domcontentloaded" });
+await accountPage.locator(".student-expressions__result .expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
+if (await accountPage.getByRole("button", { name: "Pick another expression", exact: true }).count()) throw new Error("An exhausted collection must wait for new expressions.");
+
 // The account is remembered for a quick return visit, and forgotten on
 // signing out with the session it belonged to.
 if (!(await accountPage.evaluate(() => window.localStorage.getItem("ines-account-snapshot")))) {

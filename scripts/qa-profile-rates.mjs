@@ -41,6 +41,7 @@ async function open(width, { session = true, ratesReadFails = false } = {}) {
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
     return route.fallback();
   });
+  await context.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
   await context.route("**/me", (route) => json(route, { student, bookings: [], series: [], sameDayFeeCents: 500 }));
   await context.route("**/me/recurring-rates", (route) => {
     if (route.request().method() === "GET") {

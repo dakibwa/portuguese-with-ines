@@ -36,6 +36,7 @@ for (const width of [390, 1440]) {
   await page.close();
   const diary = await browser.newPage({ viewport: { width, height: 1000 } });
   await diary.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-teacher-fixture"));
+  await diary.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
   await diary.route("**/me", (route) => route.fulfill({ json: {
     student: { id: "teacher", name: "Inês", email: "teacher@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "teacher" }, bookings: [], series: [], sameDayFeeCents: 500
   } }));

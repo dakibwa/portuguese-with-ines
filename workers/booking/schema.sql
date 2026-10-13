@@ -352,3 +352,15 @@ CREATE TABLE IF NOT EXISTS expressions (
   CHECK (published = 0 OR (length(trim(meaning_pt)) > 0 AND length(trim(meaning_en)) > 0 AND json_array_length(examples) BETWEEN 1 AND 2))
 );
 CREATE INDEX IF NOT EXISTS expressions_order ON expressions(sort_order, id);
+
+-- A student's own draws; another student has an independent collection.
+CREATE TABLE IF NOT EXISTS expression_picks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  expression_id TEXT NOT NULL REFERENCES expressions(id) ON DELETE CASCADE,
+  request_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(student_id, expression_id),
+  UNIQUE(student_id, request_id)
+);
+CREATE INDEX IF NOT EXISTS expression_picks_latest ON expression_picks(student_id, id DESC);

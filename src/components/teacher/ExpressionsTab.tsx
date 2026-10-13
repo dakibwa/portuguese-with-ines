@@ -63,7 +63,7 @@ export function ExpressionsTab({ token }: { token: string }) {
     const saved = await publishExpression(token, item, item.published ? 0 : 1);
     if (canUpdate()) {
       replace(saved);
-      setNotice(saved.published ? "Marked as published. It stays in your portal for now." : "Moved back to draft.");
+      setNotice(saved.published ? "Published. Your students can now pick this expression." : "Moved back to draft.");
     }
   }
   async function move(index: number, direction: -1 | 1) {
@@ -92,7 +92,7 @@ export function ExpressionsTab({ token }: { token: string }) {
           onClick={() => setDialog({ expression: null, preview: false })}><Plus size={17} aria-hidden="true" />Add an expression</button>
       </div>
       <ul className="booking-payment-facts teacher-expressions__help">
-        <li>This collection stays in your portal for now.</li>
+        <li>Your students can pick published expressions from Your lessons.</li>
         <li>Add both meanings and one or two examples before publishing.</li>
       </ul>
       <div className="teacher-form teacher-expressions__filters">
