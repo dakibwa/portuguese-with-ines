@@ -513,10 +513,13 @@ there is no anonymous page or main-menu item.
 - The coral `Add an expression` leads. Search matches accents flexibly across
   expressions, meanings, examples and notes. The theme filter includes entries
   with no theme. Do not display the original collection's count.
-- Each card shows a small `Draft` or `Published` pill, its Portuguese meaning,
-  English meaning/equivalent and optional literal translation as dab facts,
-  then one or two example dabs when supplied. Notes/origin and reference links
-  open in a quiet disclosure. Optional themes use the existing lilac pill fill.
+- Each card shows a small `Draft` or `Published` pill, then its facts in
+  reading order, each under a small uppercase label after a dab of paint:
+  `Ao pé da letra` (the literal translation, when there is one), `Quer dizer`
+  (the Portuguese meaning, a step larger than the rest) and `Em inglês`; then
+  `Exemplo`/`Exemplos`, where the expression's own words are marked with a
+  soft wash of the paint, taking in a verb the example has conjugated. Notes/origin and reference links
+  open in a quiet disclosure. Optional themes use a lilac pill fill.
 - Reuse blue for Edit, soft lilac for Preview and publication changes, coral
   for saving, and outline for Cancel/Done. Up/down buttons reorder the whole
   collection; clear filters first. Every phone action is at least 44px.
@@ -538,23 +541,52 @@ there is no anonymous page or main-menu item.
   for a reading card. The packaging photos and business card do not illustrate
   individual meanings. None is copied into `public/visuals/` for this integration.
 
-The student card uses the same lilac sheet, cream reading card and handwritten
-Portuguese title. Its centre is a painted wheel (13 October 2026, at Dan's
-request for a wheel that lands on an expression, each phrase on its own splat,
-in the style of the site): a lavender wheel whose ten arms each carry a splat
-with a phrase on it in Beth Ellen, the top arc showing, the coral chapéu from
-the wordmark marking the top. The splat nearing the top swells so its phrase
-reads large. The wheel sits beside the card where there is room and above it
-on a phone, with `Spin the wheel` (then `Spin again`) between them. The press
-turns the wheel at once; it slows over the last few phrases onto the saved
-pick, rolls a touch past and settles back, the chapéu hopping as each splat
-passes under it, and the chosen splat blooms as droplets splash out round it.
-Only then does the reading card dissolve in. The wheel is decorative: the pick
-is the Worker's, the wheel only slows onto it, and assistive technology hears
-the result rather than every passing phrase. Reduced-motion users see the
-result on the top splat at once. The paintings live in
-`public/visuals/expression-wheel/`. Keep the button disabled during the request
-and animation. A failed reply stops the wheel and can be retried without
+The student card, `Uma expressão para ti`, sits on the same lilac sheet below
+the lessons calendar. Its centre is `Pinta e descobre` (13 October 2026, at
+Dan's choice; it replaced a spinning wheel he rejected): Inês has written the
+expression in wax on a cream sheet, and a gouache brush sweeps across it line
+by line so the phrase shows through the paint in cream Beth Ellen, in reading
+order. The painted phrase is the reading's title; the facts follow it.
+
+- Colour: each painting is in one of four paints, every one clear of AA for
+  the cream lettering: deep blue `#203E82`, blue `#2C54AA`, coral `#B43A26` and
+  lavender ink `#554F91`. A new painting is never the colour of the last one
+  painted on this device. A returning student sees their expression in the
+  colour it was painted in, remembered on the device, or else in a colour that
+  expression always gets. The reading's labels, dabs, marked words and the
+  drops thrown off the brush all follow the paint and its companion colours.
+- Composition: on a phone the sheet fills the cream card, the reading opens
+  beneath it, and `Paint it` (then `Paint another`) follows, full width. Where
+  the section is wide, the facts sit beside the painting, the example sits
+  under it, themes and notes under the facts, and the button moves up beside
+  the heading; no column is left empty. Nothing above the section moves; the
+  card grows and shrinks smoothly below.
+- At rest the sheet invites: a few real, unseen phrases are written faintly in
+  wax, just readable if you look, and a flat pool of the next paint waits by
+  the margin. On a wide card the facts still to come wait in wax beside it.
+  Gouache is matte: nothing glossy.
+- The press starts the painting at once while the Worker picks and saves the
+  expression: a dab lands in the pool and spreads. On about one press in three
+  the wait becomes a near-miss: a thin lavender dry brush starts the first word
+  or two of an unseen phrase near the top, and a quick stroke of the real paint
+  crosses it out, before the real phrase is painted. The near-miss never sits
+  under the real phrase and dries away as the reading opens. The whole reveal,
+  press to reading, takes no more than about 3.2 seconds, even after a slow
+  reply. `Paint another` fades the last reading, folds it away under the sheet
+  and paints afresh.
+- Only the button paints: no swipe or drag on the sheet, and no loose chapéu at
+  the card's corner.
+- The painting is decorative: the pick is the Worker's and the brush paints only
+  what it saved, so nothing done mid-stroke can change or lose a pick. Assistive
+  technology hears the result in words and the reading takes the focus.
+  Reduced-motion users see the finished painting and reading at once.
+- The strokes, pool, drops and wax are drawn in code for now.
+  [Expressions: paintings to commission](../docs/expressions-paint-assets.md)
+  lists the painted assets that would replace them.
+
+Keep the button disabled, reading `Painting…`, during the request and the
+painting. A failed reply dries the new paint away, puts the last painting (or
+the waiting sheet) back, and `Try again` repeats the same request without
 spending another pick. If the collection cannot be read at all, the section
 stays away rather than raising an alarm beside the lessons. Returning students see their last
 available result, and every student has an independent history. Once their
