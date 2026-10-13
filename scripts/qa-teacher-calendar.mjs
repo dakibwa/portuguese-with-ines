@@ -210,6 +210,13 @@ async function fixture(width, options = {}) {
       });
     }
     // Her students, for suggestions in the form and her list beneath it.
+    if (path === "/admin/students" && data) {
+      // Set up quietly: nothing is emailed until her welcome.
+      const student = { id: "ana", name: data.name, email: data.email, phone: data.phone, mark: data.mark, signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0 };
+      state.added = student;
+      return route.fulfill({ status: 201, json: { student } });
+    }
+    if (path === "/admin/students/ana/welcome") return route.fulfill({ json: { ok: true, card: true } });
     if (path === "/admin/students") {
       return route.fulfill({
         json: {
@@ -217,6 +224,7 @@ async function fixture(width, options = {}) {
           students: [
             { id: "sam", name: "Sam Known", email: "sam@example.invalid", phone: "", signedIn: false, hasCard: false, cardForAllLessons: false, nextLessonAt: "2026-09-10T16:00:00.000Z", upcoming: 1, unpaidUpcoming: 1, weekly: 0 },
             { id: "alex", name: "Alex", email: "alex@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 1 },
+            ...(state.added ? [state.added] : []),
           ],
         },
       });
@@ -651,14 +659,10 @@ try {
   await manual.locator("summary").click();
   await manual.getByLabel("Student’s email").fill("manual@example.invalid");
   await manual.getByLabel("Student’s full name").fill("Robin");
-  // Someone new can start with their details and a splat.
-  await manual.getByLabel(/^Phone/).fill("+351 912 345 678");
-  await manual.getByLabel(/^NIF/).fill("123456789");
-  await manual.getByRole("button", { name: "Bloom", exact: true }).click();
   await manual.getByRole("radio", { name: "In Porto", exact: true }).check();
   await manual.getByLabel("Date", { exact: true }).fill("2026-09-11");
   await manual
-    .getByRole("button", { name: "Add lesson and email student" })
+    .getByRole("button", { name: /^Add lesson( and email student)?$/ })
     .click();
   await manual.getByRole("status").waitFor();
   assert.equal(
@@ -666,8 +670,6 @@ try {
       .location,
     "porto",
   );
-  const robin = state.writes.find((entry) => entry.path === "/admin/bookings").data;
-  assert.deepEqual([robin.phone, robin.nif, robin.mark], ["+351 912 345 678", "123456789", "bloom"]);
   await page.getByRole("button", { name: /^Robin,.*View lesson$/ }).click();
   await page
     .getByRole("button", { name: "Cancel lesson", exact: true })
@@ -722,7 +724,7 @@ try {
   await expect(addDialog.getByLabel("Time in Porto")).toHaveValue("18:00");
   await addDialog.getByLabel("Student’s email").fill("slot@example.invalid");
   await addDialog.getByLabel("Student’s full name").fill("Kai");
-  await addDialog.getByRole("button", { name: "Add lesson and email student" }).click();
+  await addDialog.getByRole("button", { name: /^Add lesson( and email student)?$/ }).click();
   await expect(addDialog).toHaveCount(0);
   await expect(page.locator(".teacher-workspace > .teacher-inline-success")).toContainText("Lesson added");
   assert.equal(
@@ -745,7 +747,7 @@ try {
   await weeklyDialog.getByRole("radio", { name: "Weekly", exact: true }).check();
   await expect(weeklyDialog.getByRole("radio", { name: "Until stopped", exact: true })).toBeChecked();
   await weeklyDialog.getByRole("radio", { name: "4 weeks", exact: true }).check();
-  await weeklyDialog.getByRole("button", { name: "Add weekly lessons and email student" }).click();
+  await weeklyDialog.getByRole("button", { name: /^Add weekly lessons( and email student)?$/ }).click();
   await expect(weeklyDialog).toHaveCount(0);
   await expect(page.locator(".teacher-workspace > .teacher-inline-success")).toContainText("Weekly lessons added: 3 booked. One week was left out (1 Oct).");
   const weekly = state.writes.filter((entry) => entry.path === "/admin/bookings").at(-1).data;
@@ -761,7 +763,24 @@ try {
   await expect(students.locator(".teacher-student").nth(1)).toContainText("All set: signed in, card saved");
   await expect(students.getByRole("button", { name: "Send sign-in link to Alex" })).toHaveCount(0);
   await students.getByRole("button", { name: "Send sign-in link to Sam Known" }).click();
-  await expect(students.locator(".teacher-student").first()).toContainText("Sent: a link to sign in and add a card");
+  // Onboarding: set a student up with their details, nothing emailed, then
+  // their welcome from their card.
+  await students.getByRole("button", { name: "Add a student", exact: true }).click();
+  const addStudent = page.getByRole("dialog", { name: "Add a student" });
+  await addStudent.getByLabel("Full name").fill("Ana Costa");
+  await addStudent.getByLabel("Email").fill("ana@example.invalid");
+  await addStudent.getByLabel(/^Phone/).fill("+351 912 345 678");
+  await addStudent.getByLabel(/^NIF/).fill("123456789");
+  await addStudent.getByRole("button", { name: "Bloom", exact: true }).click();
+  await addStudent.getByRole("button", { name: "Add student", exact: true }).click();
+  await expect(addStudent).toHaveCount(0);
+  assert.deepEqual(state.writes.find((entry) => entry.path === "/admin/students").data,
+    { email: "ana@example.invalid", name: "Ana Costa", phone: "+351 912 345 678", nif: "123456789", mark: "bloom" });
+  const ana = students.locator(".teacher-student").filter({ hasText: "Ana Costa" });
+  await expect(ana).toContainText("Set up, not emailed yet");
+  await ana.getByRole("button", { name: "Send welcome email to Ana Costa" }).click();
+  await expect(ana).toContainText("Welcome sent, with their lessons");
+  await expect(students.locator(".teacher-student").filter({ hasText: "Sam Known" })).toContainText("Sent: a link to sign in and add a card");
   await students.getByRole("button", { name: "Add lesson for Alex" }).click();
   await expect(manual).toHaveAttribute("open", "");
   await expect(manual.getByLabel("Student’s email")).toHaveValue("alex@example.invalid");

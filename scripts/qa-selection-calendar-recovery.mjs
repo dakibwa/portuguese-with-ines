@@ -540,7 +540,7 @@ try {
         await form.getByLabel("Student’s full name", { exact: true }).fill("New student");
         await form.getByLabel("Date", { exact: true }).fill("2026-10-06");
         await form.getByLabel("Time in Porto", { exact: true }).fill("10:00");
-        await form.getByRole("button", { name: "Add lesson and email student", exact: true }).click();
+        await form.getByRole("button", { name: /^Add lesson( and email student)?$/ }).click();
         await expect(page.getByRole("alert").filter({ hasText: unreadable })).toBeVisible();
         await expect(form.getByLabel("Student’s email", { exact: true })).toHaveValue("other@example.invalid");
         await expect(form.getByLabel("Date", { exact: true })).toHaveValue("2026-10-06");

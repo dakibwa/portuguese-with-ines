@@ -9,7 +9,7 @@ import {
   slotOf
 } from "./series.mjs";
 import { buildCalendarInvite, buildCalendarSeriesInvite, calendarUid } from "./ics.mjs";
-import { deliver } from "./email.mjs";
+import { deliver as sendEmail } from "./email.mjs";
 import {
   chargeSavedCard,
   checkoutSessionProblem,
@@ -272,10 +272,47 @@ function teacherNotificationsEnabled(env) {
 }
 
 /**
+ * A student Inês set up and hasn't welcomed yet, who has never signed in
+ * (13 October 2026, Dan): she can add their details and lessons first, and
+ * the site sends them nothing until she presses `Send welcome email`. Her own
+ * calendar, the blocked time and the lesson's NIF are untouched by this.
+ */
+function awaitingWelcome(student) {
+  return Boolean(student && student.role === "student" && student.awaiting_welcome &&
+    !student.password_hash && !student.google_sub && !student.last_login_at);
+}
+
+/** If the look-up itself fails, the email goes as it always did. */
+async function awaitingWelcomeAt(env, email) {
+  try {
+    const student = await env.DB.prepare(
+      "SELECT role, awaiting_welcome, password_hash, google_sub, last_login_at FROM students WHERE email = ?"
+    ).bind(normaliseEmail(email)).first();
+    return awaitingWelcome(student);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Every email leaves through here. Anything about lessons for a student still
+ * awaiting their welcome is held: added, moved, cancelled, the Meet link,
+ * charges. The welcome itself, and sign-in or address emails they ask for,
+ * always go.
+ */
+async function deliver(env, message) {
+  if (message.kind?.startsWith("student_") && message.kind !== "student_welcome" && await awaitingWelcomeAt(env, message.to)) {
+    return { ok: true, held: true };
+  }
+  return sendEmail(env, message);
+}
+
+/**
  * Every student-facing and teacher-facing message for one lifecycle event.
  * Kept in one place so a change to wording cannot drift between the two sides.
  */
 async function notify(env, { event, row, lessonType, settings, manageUrl, previousStartsAt, previousLessonType, byTeacher = false, welcome = null }) {
+  const held = byTeacher && await awaitingWelcomeAt(env, row.student_email);
   const notifyingSequence = row.sequence;
   const notifyingStatus = row.status;
   row = await prepareMeeting(env, row).catch(() => row);
@@ -457,7 +494,9 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
     booked: byTeacher ? {
       subject: `You added a lesson — ${row.student_name}, ${shortWhen}`,
       heading: "You added a lesson",
-      intro: `You added a lesson for ${row.student_name}. They have been emailed the details${welcomeNote(welcome)}.`,
+      intro: held
+        ? `You added a lesson for ${row.student_name}. They haven't been emailed: send their welcome from Students when you're ready.`
+        : `You added a lesson for ${row.student_name}. They have been emailed the details${welcomeNote(welcome)}.`,
       callout: ""
     } : {
       subject: `New booking — ${row.student_name}, ${shortWhen}`,
@@ -485,7 +524,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       intro: byTeacher
         ? `You moved ${row.student_name}'s lesson${
             previousStartsAt ? ` from ${formatInZone(new Date(previousStartsAt), PORTO)}` : ""
-          }. They have been told, and your calendar has been updated.`
+          }. ${held ? "They haven't been emailed yet" : "They have been told"}, and your calendar has been updated.`
         : lessonTypeChanged
           ? `${row.student_name} changed their lesson from ${previousLessonType.duration_minutes} to ${lessonType.duration_minutes} minutes${
               previousStartsAt ? ` and moved it from ${formatInZone(new Date(previousStartsAt), PORTO)}` : ""
@@ -505,7 +544,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         : `${row.same_day_change ? "Late cancellation" : "Cancellation"} — ${row.student_name}, ${shortWhen}`,
       heading: byTeacher ? "You cancelled this lesson" : row.same_day_change ? `Cancelled less than ${notice} before` : "Lesson cancelled",
       intro: byTeacher
-        ? `You cancelled ${row.student_name}'s lesson on ${formatInZone(start, PORTO)}. They have been told, and it is off your calendar.`
+        ? `You cancelled ${row.student_name}'s lesson on ${formatInZone(start, PORTO)}. ${held ? "They hadn't been emailed about it" : "They have been told"}, and it is off your calendar.`
         : `${row.student_name} cancelled their lesson on ${formatInZone(start, PORTO)}. It has been removed from your calendar.`,
       callout: wasRefunded
         ? `${formatEuros(row.amount_cents ?? lessonType.price_cents)} was refunded automatically — nothing to sort out.`
@@ -620,6 +659,7 @@ async function notifyMeetingReady(env, input) {
 export async function notifySeries(env, { rows, lessonType, settings, series, manageUrls, skipped, reason = "booked", byTeacher = false, welcome = null }) {
   lessonType = { ...lessonType, price_cents: rows[0]?.amount_cents ?? lessonType.price_cents };
   if (!rows.length) return [];
+  const held = byTeacher && await awaitingWelcomeAt(env, rows[0].student_email);
   // Bound provider work inside the request. The durable minute sweep finishes
   // larger selections and emails links that were not ready for confirmation.
   const notifyingVersions = new Map(rows.map(row => [row.id, `${row.status}:${row.sequence}`]));
@@ -814,7 +854,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
               : moved
                 ? `${first.student_name}'s upcoming weekly lessons have moved. The updated events will appear in your calendar.`
               : byTeacher
-                ? `You added a weekly slot for ${first.student_name}. They have been emailed the details${welcomeNote(welcome)}, and every lesson will appear in your calendar.`
+                ? `You added a weekly slot for ${first.student_name}. ${held ? "They haven't been emailed: send their welcome from Students when you're ready" : `They have been emailed the details${welcomeNote(welcome)}`}, and every lesson will appear in your calendar.`
               : `${first.student_name} booked ${series.oneOff ? "these individual lessons" : multipleWeeklyTimes ? "two times each week" : "the same slot each week"}. Every lesson will appear in your calendar.`,
           callout:
             skippedNote,
@@ -1105,9 +1145,20 @@ function welcomeAction(welcome) {
 
 const WELCOME_FOOTER = "The button lasts 14 days. Later, press Sign in on the website, then “Email me a sign-in link”.";
 
-/** The link on its own, when she sends it from her list of students. */
-async function sendWelcome(env, { student, settings, welcome }) {
+/**
+ * Her welcome, sent from her list of students: their lessons so far, each on
+ * its own clock, and the one-click way in. For someone she set up it is the
+ * first email the site sends them (13 October 2026, Dan).
+ */
+async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
+  const first = student.name.split(" ")[0];
+  const shown = lessons.slice(0, 12);
+  const rows = shown.map((lesson) => ({
+    label: lesson.location === "porto" ? "Lesson · In Porto" : "Lesson · Online",
+    value: lessonWhen(new Date(lesson.starts_at), lessonZone(lesson))
+  }));
+  if (lessons.length > shown.length) rows.push({ label: "And more", value: "The rest are on the website" });
   return deliver(env, {
     to: student.email,
     subject: welcome.card ? "Your lessons with Inês: add your card" : "Your lessons with Inês, in one place",
@@ -1117,9 +1168,11 @@ async function sendWelcome(env, { student, settings, welcome }) {
     content: {
       heading: "Your lessons, in one place",
       preheader: "Sign in with one click, no password needed.",
-      intro: `Olá ${student.name.split(" ")[0]}, your lessons with Inês are now on her website, where you can see and change them.`,
+      intro: rows.length
+        ? `Olá ${first}, Inês has set up your lessons on her website. Here they are; sign in to see or change them.`
+        : `Olá ${first}, your lessons with Inês are now on her website, where you can see and change them.`,
       callout: "",
-      rows: [],
+      rows,
       steps: welcomeSteps(welcome),
       action: welcomeAction(welcome),
       footer: WELCOME_FOOTER
@@ -1131,7 +1184,7 @@ async function sendWelcome(env, { student, settings, welcome }) {
 async function teacherStudentList(env) {
   const now = new Date().toISOString();
   const { results } = await env.DB.prepare(
-    `SELECT s.id, s.name, s.email, s.phone, s.created_at, COALESCE(s.mark, '') AS mark,
+    `SELECT s.id, s.name, s.email, s.phone, s.created_at, COALESCE(s.mark, '') AS mark, s.awaiting_welcome,
        (COALESCE(s.stripe_payment_method, '') != '') AS has_card,
        s.card_consent_at,
        (s.password_hash != '' OR s.google_sub IS NOT NULL OR s.last_login_at IS NOT NULL) AS signed_in,
@@ -1154,6 +1207,7 @@ async function teacherStudentList(env) {
     phone: row.phone,
     mark: row.mark ?? "",
     signedIn: Boolean(row.signed_in),
+    awaitingWelcome: Boolean(row.awaiting_welcome) && !row.signed_in,
     cardForAllLessons: Boolean(row.has_card && row.card_consent_at),
     nextLessonAt: row.next_lesson_at ?? null,
     unpaidUpcoming: Number(row.unpaid_upcoming ?? 0),
@@ -4594,6 +4648,16 @@ async function handleConfirmEmailChange(request, env) {
 // src/lib/student-marks.ts names the same set); empty is their initial.
 const STUDENT_MARKS = new Set(["", "burst", "bloom", "pool", "dance", "drift", "four", "duo", "scatter"]);
 
+/** The details Inês can give for a student she sets up; each is optional. */
+function studentDetails(body) {
+  const nif = normaliseNif(body.nif);
+  const problem = nifProblem(nif);
+  if (problem) return { problem };
+  const mark = typeof body.mark === "string" ? body.mark : "";
+  if (!STUDENT_MARKS.has(mark)) return { problem: "Choose one of the splats." };
+  return { phone: cleanText(body.phone, 40), nif, mark };
+}
+
 async function handleUpdateMe(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
@@ -4682,7 +4746,9 @@ async function handleAdmin(request, env, ctx, url, path) {
     // without it still answers, so her schedule never depends on the order
     // the database and the Worker are updated in.
     const lessonsQuery = (mark) => env.DB.prepare(
-      `SELECT b.*, l.name AS lesson_name, COALESCE(s.nif, '') AS student_nif${mark ? ", COALESCE(s.mark, '') AS student_mark" : ""} FROM bookings b
+      `SELECT b.*, l.name AS lesson_name, COALESCE(s.nif, '') AS student_nif${mark ? ", COALESCE(s.mark, '') AS student_mark" : ""},
+         (COALESCE(s.awaiting_welcome, 0) = 1 AND COALESCE(s.password_hash, '') = '' AND s.google_sub IS NULL AND s.last_login_at IS NULL) AS student_awaiting_welcome
+       FROM bookings b
        JOIN lesson_types l ON l.id = b.lesson_type_id LEFT JOIN students s ON s.id = b.student_id
        WHERE b.starts_at > ? ORDER BY b.starts_at`
     )
@@ -4819,8 +4885,32 @@ async function handleAdmin(request, env, ctx, url, path) {
     return json({ students: await teacherStudentList(env), cardsAccepted: cardsTaken(env, settings) }, 200, request, env);
   }
 
-  // A fresh one-click link for a student, from her list: for someone who lost
-  // the first email, or never had one (12 October 2026, Dan).
+  // Onboarding starts here (13 October 2026, Dan): she sets a student up with
+  // their details, adds their lessons, and only then sends their welcome.
+  // Nothing is emailed by this.
+  if (request.method === "POST" && path === "/admin/students") {
+    const body = await readJson(request);
+    const email = normaliseEmail(body.email);
+    const name = cleanText(body.name, 120);
+    if (!isEmail(email)) return fail("Please give the student's email address.", 400, request, env);
+    if (!name) return fail("Please give the student's name.", 400, request, env);
+    const details = studentDetails(body);
+    if (details.problem) return fail(details.problem, 400, request, env);
+    const id = crypto.randomUUID();
+    const added = await env.DB.prepare(
+      `INSERT INTO students (id, email, name, phone, nif, mark, timezone, password_hash, created_at, awaiting_welcome)
+       VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, 1) ON CONFLICT(email) DO NOTHING`
+    )
+      .bind(id, email, name, details.phone, details.nif, details.mark, PORTO, new Date().toISOString())
+      .run();
+    if (!(added?.meta?.changes > 0)) return fail("Someone with that email is already on the site.", 409, request, env);
+    const list = await teacherStudentList(env);
+    return json({ student: list.find((entry) => entry.id === id) }, 201, request, env);
+  }
+
+  // Her welcome for a student: their one-click way in and the lessons she has
+  // added, the first email the site sends someone she set up. Also a fresh
+  // link for someone who lost theirs (12 October 2026, Dan).
   const welcomeStudent = path.match(/^\/admin\/students\/([^/]+)\/welcome$/);
   if (welcomeStudent && request.method === "POST") {
     const student = await env.DB.prepare("SELECT * FROM students WHERE id = ? AND role = 'student'")
@@ -4832,8 +4922,14 @@ async function handleAdmin(request, env, ctx, url, path) {
     }
     const settings = await loadSettings(env);
     const welcome = await issueWelcome(env, settings, student, { always: true });
-    const sent = await sendWelcome(env, { student, settings, welcome });
+    const { results: lessons } = await env.DB.prepare(
+      `SELECT starts_at, ends_at, location, student_timezone FROM bookings
+       WHERE student_id = ? AND status = 'confirmed' AND ends_at > ? ORDER BY starts_at LIMIT 13`
+    ).bind(student.id, new Date().toISOString()).all();
+    const sent = await sendWelcome(env, { student, settings, welcome, lessons: lessons ?? [] });
     if (!sent.ok) return fail("The email could not be sent just now. Please try again.", 502, request, env);
+    // From now on, emails about their lessons reach them as usual.
+    await env.DB.prepare("UPDATE students SET awaiting_welcome = 0 WHERE id = ?").bind(student.id).run();
     return json({ ok: true, card: welcome.card }, 200, request, env);
   }
 
@@ -4842,14 +4938,6 @@ async function handleAdmin(request, env, ctx, url, path) {
     const email = normaliseEmail(body.email);
     const name = cleanText(body.name, 120);
     if (!isEmail(email)) return fail("Please give the student's email address.", 400, request, env);
-    // Details she can give for someone new (13 October 2026, Dan), so their
-    // account is ready when they first sign in. Each is optional.
-    const phone = cleanText(body.phone, 40);
-    const nif = normaliseNif(body.nif);
-    const nifTrouble = nifProblem(nif);
-    if (nifTrouble) return fail(nifTrouble, 400, request, env);
-    const mark = typeof body.mark === "string" ? body.mark : "";
-    if (!STUDENT_MARKS.has(mark)) return fail("Choose one of the splats.", 400, request, env);
 
     let lessonType = await loadLessonType(env, cleanText(body.lessonType, 40) || "single");
     if (!lessonType) return fail("That lesson type is not available.", 400, request, env);
@@ -4889,26 +4977,14 @@ async function handleAdmin(request, env, ctx, url, path) {
       // No password: the student signs in with the link in their first email,
       // with Google, or by asking for a link on the sign-in page.
       const id = crypto.randomUUID();
+      // Someone she sets up hears nothing until she sends their welcome.
       await env.DB.prepare(
-        `INSERT INTO students (id, email, name, phone, nif, mark, timezone, password_hash, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, '', ?)`
+        `INSERT INTO students (id, email, name, phone, timezone, password_hash, created_at, awaiting_welcome)
+         VALUES (?, ?, ?, '', ?, '', ?, 1)`
       )
-        .bind(id, email, name || email.split("@")[0], phone, nif, mark, PORTO, now)
+        .bind(id, email, name || email.split("@")[0], PORTO, now)
         .run();
       student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(id).first();
-    } else if (student.role === "student" && (phone || nif || mark)) {
-      // Someone she already has keeps what they set themselves: her details
-      // only fill gaps, never overwrite.
-      await env.DB.prepare(
-        `UPDATE students SET
-           phone = CASE WHEN COALESCE(phone, '') = '' THEN ? ELSE phone END,
-           nif = CASE WHEN COALESCE(nif, '') = '' THEN ? ELSE nif END,
-           mark = CASE WHEN COALESCE(mark, '') = '' THEN ? ELSE mark END
-         WHERE id = ?`
-      )
-        .bind(phone, nif, mark, student.id)
-        .run();
-      student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(student.id).first();
     }
 
     /*
@@ -4981,7 +5057,8 @@ async function handleAdmin(request, env, ctx, url, path) {
     const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
     // The student is told, and given one link into their account when they
     // have never been in or still have a card to add.
-    const welcome = await issueWelcome(env, settings, student, { always: reclaimed });
+    const held = awaitingWelcome(student);
+    const welcome = held ? null : await issueWelcome(env, settings, student, { always: reclaimed });
 
     if (wantsRepeat) {
       // As a student's own run: the first lesson is real before the series
@@ -5019,7 +5096,8 @@ async function handleAdmin(request, env, ctx, url, path) {
       ctx.waitUntil(notifySeries(env, { rows, lessonType, settings, series, manageUrls, skipped: filled.skipped, byTeacher: true, welcome }));
       return json({
         booking: publicBooking(first, lessonType, settings),
-        series: { id: seriesId, weeks: repeatWeeks, booked: rows.length, skipped: filled.skipped }
+        series: { id: seriesId, weeks: repeatWeeks, booked: rows.length, skipped: filled.skipped },
+        emailed: !held
       }, 201, request, env);
     }
 
@@ -5036,7 +5114,7 @@ async function handleAdmin(request, env, ctx, url, path) {
       })
     );
 
-    return json({ booking: publicBooking(row, lessonType, settings) }, 201, request, env);
+    return json({ booking: publicBooking(row, lessonType, settings), emailed: !held }, 201, request, env);
   }
 
   const adminReschedule = path.match(/^\/admin\/bookings\/([^/]+)\/reschedule$/);
@@ -5092,7 +5170,7 @@ async function handleAdmin(request, env, ctx, url, path) {
       })
     );
 
-    return json({ booking: publicBooking(updated, lessonType, settings) }, 200, request, env);
+    return json({ booking: publicBooking(updated, lessonType, settings), emailed: !await awaitingWelcomeAt(env, updated.student_email) }, 200, request, env);
   }
 
   const adminCancel = path.match(/^\/admin\/bookings\/([^/]+)\/cancel$/);
@@ -5121,7 +5199,7 @@ async function handleAdmin(request, env, ctx, url, path) {
       const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
       const settings = await loadSettings(env);
       ctx.waitUntil(notify(env, { event: "cancelled", row: updated, lessonType, settings, manageUrl: "", byTeacher: true }));
-      return json({ booking: publicBooking(updated, lessonType, settings) }, 200, request, env);
+      return json({ booking: publicBooking(updated, lessonType, settings), emailed: !await awaitingWelcomeAt(env, updated.student_email) }, 200, request, env);
     }
 
     const now = new Date().toISOString();
@@ -5148,7 +5226,7 @@ async function handleAdmin(request, env, ctx, url, path) {
       notify(env, { event: "cancelled", row: updated, lessonType, settings, manageUrl: "", byTeacher: true })
     );
 
-    return json({ booking: publicBooking(updated, lessonType, settings) }, 200, request, env);
+    return json({ booking: publicBooking(updated, lessonType, settings), emailed: !await awaitingWelcomeAt(env, updated.student_email) }, 200, request, env);
   }
 
   const adminNoShow = path.match(/^\/admin\/bookings\/([^/]+)\/no-show$/);

@@ -780,6 +780,7 @@ export function TeacherSchedule() {
         cards={Boolean(students?.cardsAccepted)}
         error={studentsError}
         onAddLesson={(student) => setFormStudent((current) => ({ email: student.email, name: student.name, key: (current?.key ?? 0) + 1 }))}
+        onStudentsChanged={() => void reloadStudents()}
       />
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "meet"}>

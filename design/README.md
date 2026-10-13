@@ -410,6 +410,15 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - Every booked lesson shows its time, student and explicit `Online` or `In Porto`
   label in both layouts, including 60-minute blocks. Keep the location icons and
   coral marker for Porto lessons.
+- Onboarding is three steps, each its own button (13 October 2026, Dan):
+  `Add a student` (coral, leading the Students tab) opens a dialog of full
+  name, email, phone, NIF (for receipts) and their splat in the student's own
+  picker, with two dabs saying nothing is emailed yet; then `Add lesson` on
+  their card; then `Send welcome email`, which sends their lessons so far and
+  the one-click way in. Until then their card reads `Set up, not emailed yet`,
+  lesson forms say `Add lesson` without `and email student`, and moving or
+  cancelling says they aren't emailed. Everything for Inês still happens: her
+  calendar, the blocked time and the lesson's NIF.
 - Keep `Sign out` beside the tools bar. `Students` holds the student
   cards and their actions, with the add-a-lesson form also available there,
   and no sentence above them. Selecting a student's card opens their lesson
@@ -1171,10 +1180,7 @@ as a form:
   in, a coral `Send sign-in link`. Those come first, their card edged in
   coral (12 October 2026, Dan: "can this be more beautiful"). Her form's
   email field suggests the students she already has, and choosing one fills
-  in their name (`Already one of your students`). For someone new she can
-  also give `Phone`, `NIF` (for receipts) and `Their splat`, the student's own
-  picker, all optional, so their account is ready when they first sign in
-  (13 October 2026, Dan): everything she does here
+  in their name (`Already one of your students`): everything she does here
   should take as few steps as it can. A lesson opens in the student's own dialog: status, the student,
   the time in bold with its length and place beneath, then `Move lesson` in
   coral beside `Cancel lesson`, with `Mark no-show` a quiet link below.

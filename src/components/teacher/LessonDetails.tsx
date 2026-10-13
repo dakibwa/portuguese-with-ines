@@ -46,6 +46,8 @@ export function LessonDetails({
   const [time, setTime] = useState(formatSlotTime(booking.starts_at));
   const [cancelMessage, setCancelMessage] = useState("");
   const firstName = booking.student_name.split(" ")[0];
+  // Set up by her and not welcomed yet: the site emails them nothing.
+  const awaiting = Boolean(booking.student_awaiting_welcome);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const noShowCloses = new Date(new Date(booking.ends_at).getTime() + NO_SHOW_WINDOW_HOURS_AFTER * 3_600_000);
@@ -103,17 +105,17 @@ export function LessonDetails({
     setError("");
     try {
       if (action === "move") {
-        await rescheduleBookingAs(
+        const moved = await rescheduleBookingAs(
           token,
           booking.id,
           portoTimeToUtc(date, time, booking.starts_at),
         );
         changed.current = true;
-        onChanged("Lesson moved. The student has been emailed the new time.");
+        onChanged(moved.emailed === false ? "Lesson moved." : "Lesson moved. The student has been emailed the new time.");
       } else if (action === "cancel") {
-        await cancelBookingAs(token, booking.id, cancelMessage);
+        const cancelled = await cancelBookingAs(token, booking.id, awaiting ? "" : cancelMessage);
         changed.current = true;
-        onChanged("Lesson cancelled. The student has been emailed.");
+        onChanged(cancelled.emailed === false ? "Lesson cancelled." : "Lesson cancelled. The student has been emailed.");
       } else if (action === "no-show") {
         await setNoShow(token, booking.id, !noShow);
         changed.current = true;
@@ -336,7 +338,7 @@ export function LessonDetails({
                   onChange={(event) => setTime(event.target.value)}
                 />
               </label>
-              <p>The student will be emailed the new time.</p>
+              <p>{awaiting ? `${firstName} isn’t emailed until you send their welcome.` : "The student will be emailed the new time."}</p>
               <div className="teacher-dialog-actions">
                 <button
                   className="button button--coral"
@@ -360,7 +362,11 @@ export function LessonDetails({
               <ul className="booking-payment-facts teacher-confirm-facts">
                 {action === "cancel" ? (
                   <>
-                    <li>{firstName} gets an email saying you’ve cancelled, with an update for their calendar</li>
+                    <li>
+                      {awaiting
+                        ? `${firstName} isn’t emailed: they haven’t had their welcome yet`
+                        : `${firstName} gets an email saying you’ve cancelled, with an update for their calendar`}
+                    </li>
                     {booking.payment_status === "paid" ? (
                       <li>{firstName} is refunded in full, automatically</li>
                     ) : booking.payment_status === "scheduled" ? (
@@ -374,7 +380,7 @@ export function LessonDetails({
                   <li>{firstName} is charged only {SAME_DAY_FEE_LABEL}, instead of the lesson price</li>
                 )}
               </ul>
-              {action === "cancel" ? (
+              {action === "cancel" && !awaiting ? (
                 <div className="teacher-form teacher-cancel-message">
                   <label htmlFor="teacher-cancel-message">
                     <span>Add a message to the email <span className="teacher-field-optional">(optional)</span></span>

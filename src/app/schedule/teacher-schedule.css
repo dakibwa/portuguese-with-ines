@@ -874,16 +874,6 @@
   gap: 1rem;
   margin-top: 1.5rem;
 }
-/* A new student's splat, as they would choose it themselves. */
-.teacher-manual-splat {
-  display: grid;
-  grid-column: 1 / -1;
-  gap: 0.35rem;
-  min-width: 0;
-}
-.teacher-manual-splat > span {
-  font: 600 0.68rem/1.5 var(--ui);
-}
 /* Lesson length and place as the booking's sliders. */
 .teacher-manual-choice {
   min-width: 0;
@@ -2340,4 +2330,53 @@
   margin-top: 0.3rem;
   color: var(--lavender-ink);
   font: 500 0.72rem/1.4 var(--ui);
+}
+
+/* Onboarding (13 October 2026, Dan): Add a student leads the Students tab,
+   and its dialog is the student's details with the splat picker they would
+   use themselves. Nothing is emailed until Send welcome email. */
+.teacher-students__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin-bottom: 1rem;
+}
+.teacher-students__bar .button {
+  gap: 0.5rem;
+}
+.teacher-students__bar .teacher-inline-success {
+  margin: 0;
+}
+.teacher-add-student {
+  width: min(560px, calc(100vw - 2rem));
+}
+.teacher-add-student h2 {
+  margin-right: 2.5rem;
+}
+.teacher-add-student__facts {
+  margin: 0.6rem 0 1.1rem;
+}
+.teacher-add-student__form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+.teacher-add-student__splat,
+.teacher-add-student__form > .teacher-inline-error,
+.teacher-add-student__form > .teacher-dialog-actions {
+  grid-column: 1 / -1;
+}
+.teacher-add-student__splat {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.teacher-add-student__splat > span {
+  font: 600 0.68rem/1.5 var(--ui);
+}
+@media (max-width: 480px) {
+  .teacher-add-student__form {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

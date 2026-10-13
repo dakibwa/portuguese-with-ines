@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarPlus, CheckCircle2, ChevronRight, Repeat, Send } from "lucide-react";
+import { CalendarPlus, CheckCircle2, ChevronRight, Repeat, Send, UserPlus } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
 import { formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { StudentHistory } from "@/components/teacher/StudentHistory";
+import { AddStudentDialog } from "@/components/teacher/AddStudentDialog";
 
 /**
  * Someone she still needs to bring in comes first: never signed in, or (where
@@ -21,6 +22,7 @@ function statusOf(student: AdminStudent, cards: boolean) {
   const byHand = cards && student.unpaidUpcoming && !student.cardForAllLessons
     ? `${student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} paid by hand`
     : "";
+  if (student.awaitingWelcome) return "Set up, not emailed yet";
   if (!student.signedIn) return ["Not signed in yet", byHand].filter(Boolean).join(" · ");
   if (byHand) return `No card yet · ${byHand}`;
   return student.cardForAllLessons ? "All set: signed in, card saved" : "Signed in";
@@ -43,6 +45,7 @@ export function StudentList({
   cards,
   error,
   onAddLesson,
+  onStudentsChanged,
 }: {
   token: string;
   students: AdminStudent[] | null;
@@ -50,7 +53,11 @@ export function StudentList({
   cards: boolean;
   error: string;
   onAddLesson: (student: AdminStudent) => void;
+  /** After a student is added or welcomed, so her list reads afresh. */
+  onStudentsChanged: () => void;
 }) {
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState("");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<AdminStudent | null>(null);
   const [sending, setSending] = useState("");
@@ -63,8 +70,14 @@ export function StudentList({
       const result = await sendStudentWelcome(token, student.id);
       setSent((current) => ({
         ...current,
-        [student.id]: { ok: true, message: result.card ? "Sent: a link to sign in and add a card" : "Sent: a link to sign in" },
+        [student.id]: {
+          ok: true,
+          message: student.awaitingWelcome
+            ? "Welcome sent, with their lessons"
+            : result.card ? "Sent: a link to sign in and add a card" : "Sent: a link to sign in",
+        },
       }));
+      if (student.awaitingWelcome) onStudentsChanged();
     } catch (caught) {
       setSent((current) => ({
         ...current,
@@ -83,6 +96,13 @@ export function StudentList({
   return (
     <section className="teacher-students" aria-labelledby="teacher-students-title">
       <h2 className="visually-hidden" id="teacher-students-title">Students</h2>
+      <div className="teacher-students__bar">
+        <button className="button button--coral" onClick={() => setAdding(true)} type="button">
+          <UserPlus size={16} aria-hidden="true" />
+          Add a student
+        </button>
+        {added ? <p className="teacher-inline-success" role="status">{added}</p> : null}
+      </div>
       <div className="teacher-manual-body">
         {students && students.length > 8 ? (
           <label className="teacher-students__search">
@@ -102,7 +122,7 @@ export function StudentList({
         ) : null}
         {!students && !error ? <p className="teacher-students__lead">Loading your students…</p> : null}
         {students && !students.length ? (
-          <p className="teacher-students__lead">No students yet. Anyone you add a lesson for appears here.</p>
+          <p className="teacher-students__lead">No students yet.</p>
         ) : null}
         <ul className="teacher-students__list">
           {shown.map((student) => {
@@ -150,7 +170,7 @@ export function StudentList({
                       type="button"
                     >
                       <Send size={15} aria-hidden="true" />
-                      {sending === student.id ? "Sending…" : "Send sign-in link"}
+                      {sending === student.id ? "Sending…" : student.awaitingWelcome ? "Send welcome email" : "Send sign-in link"}
                       <span className="visually-hidden"> to {student.name}</span>
                     </button>
                   ) : null}
@@ -165,6 +185,17 @@ export function StudentList({
           })}
         </ul>
       </div>
+      {adding ? (
+        <AddStudentDialog
+          token={token}
+          onAdded={(student) => {
+            setAdding(false);
+            setAdded(`${student.name} added. Add their lessons, then send their welcome when you’re ready.`);
+            onStudentsChanged();
+          }}
+          onClose={() => setAdding(false)}
+        />
+      ) : null}
       {selected ? <StudentHistory key={`${token}:${selected.id}`} student={selected} token={token} onClose={() => setSelected(null)} /> : null}
     </section>
   );

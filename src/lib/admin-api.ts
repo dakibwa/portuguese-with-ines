@@ -11,6 +11,8 @@ export type AdminStudent = {
   mark?: string;
   /** Has ever signed in, or set a password or Google sign-in. */
   signedIn?: boolean;
+  /** Set up by her and not emailed yet: the site sends them nothing until she sends their welcome. */
+  awaitingWelcome?: boolean;
   hasCard?: boolean;
   /** A card saved from their account, which pays for the lessons she adds. */
   cardForAllLessons?: boolean;
@@ -53,6 +55,8 @@ export type AdminBooking = {
   student_nif?: string;
   /** The splat the student chose to wear beside their name; empty for none. */
   student_mark?: string;
+  /** Their student is set up but not welcomed yet, so no email reaches them. */
+  student_awaiting_welcome?: number;
   starts_at: string;
   ends_at: string;
   status: "confirmed" | "cancelled";
@@ -217,7 +221,18 @@ export function fetchStudents(token: string) {
   return adminRequest<{ students: AdminStudent[]; cardsAccepted?: boolean }>(token, "/admin/students");
 }
 
-/** Emails a student a fresh one-click way into their account. */
+/** Sets a student up with their details; nothing is emailed (13 October 2026, Dan). */
+export function addStudent(
+  token: string,
+  input: { email: string; name: string; phone: string; nif: string; mark: string },
+) {
+  return adminRequest<{ student: AdminStudent }>(token, "/admin/students", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Emails a student their lessons so far and a one-click way into their account. */
 export function sendStudentWelcome(token: string, studentId: string) {
   return adminRequest<{ ok: true; card?: boolean }>(token, `/admin/students/${encodeURIComponent(studentId)}/welcome`, {
     method: "POST",
@@ -235,16 +250,14 @@ export function createBookingFor(
     startAt: string;
     location: "online" | "porto";
     notes: string;
-    /** For someone new: filled in on their account; an existing one keeps their own. */
-    phone?: string;
-    nif?: string;
-    mark?: string;
     /** Weekly: 4, 6 or 8 weeks, or "open" until stopped. Left out, one lesson. */
     repeat?: 4 | 6 | 8 | "open";
   },
 ) {
   return adminRequest<{
     booking: { reference: string };
+    /** False while the student awaits their welcome: nothing was sent to them. */
+    emailed?: boolean;
     series?: { booked: number; skipped: { key: string; startAt: string; reason: string }[] };
   }>(
     token,
@@ -261,7 +274,7 @@ export function rescheduleBookingAs(
   bookingId: string,
   startAt: string,
 ) {
-  return adminRequest<{ booking: { reference: string } }>(
+  return adminRequest<{ booking: { reference: string }; emailed?: boolean }>(
     token,
     `/admin/bookings/${bookingId}/reschedule`,
     {
@@ -272,7 +285,7 @@ export function rescheduleBookingAs(
 }
 
 export function cancelBookingAs(token: string, bookingId: string, message?: string) {
-  return adminRequest<{ booking: { reference: string } }>(
+  return adminRequest<{ booking: { reference: string }; emailed?: boolean }>(
     token,
     `/admin/bookings/${bookingId}/cancel`,
     {

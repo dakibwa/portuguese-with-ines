@@ -95,7 +95,11 @@ CREATE TABLE IF NOT EXISTS students (
   -- A card saved at one booking's checkout leaves this empty.
   card_consent_at TEXT,
   created_at    TEXT NOT NULL,
-  last_login_at TEXT
+  last_login_at TEXT,
+  -- 1 for a student Inês set up who hasn't been emailed by the site yet
+  -- (migration 0025). Until she sends their welcome, and while they have
+  -- never signed in, emails about their lessons are held.
+  awaiting_welcome INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_students_role ON students (role);

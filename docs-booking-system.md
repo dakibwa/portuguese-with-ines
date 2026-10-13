@@ -240,10 +240,22 @@ row's `Add lesson` opens the form with that student in it. Form drafts survive
 tab changes. All teacher actions still use the authenticated admin endpoints and
 their existing booking, payment and email safeguards.
 
-For a new student the form also takes an optional phone, NIF and splat;
-`POST /admin/bookings` accepts them as `phone`, `nif` and `mark`, checks the NIF
-as `/me` does and refuses an unknown splat before creating anything. An
-existing student keeps their own details: hers only fill fields still empty.
+Onboarding (13 October 2026, Dan) lets Inês set a student up before they hear
+anything. `POST /admin/students` takes `email`, `name` and optional `phone`,
+`nif` (checked as `/me` checks it) and `mark`, creates the account with no
+password and `awaiting_welcome = 1` (migration `0025-awaiting-welcome.sql`,
+applied to staging and production on 13 October 2026), and sends nothing; an
+address already on the site is refused. A student she creates from the lesson
+form is set up the same way. While a student is awaiting their welcome and has
+never signed in, every `student_*` email about them is held at the one sending
+point (lessons added, moved or cancelled, the Meet link, charges); her Google
+Calendar, the blocked time and the lesson's NIF are unaffected, and her own
+copy says they weren't emailed. Lesson, move and cancel replies carry
+`emailed: false` so her page says so. `POST /admin/students/:id/welcome` sends
+their upcoming lessons (up to twelve, each on the lesson's clock) and the
+one-click way in, then clears the flag, after which emails reach them as
+usual. Signing in themselves also ends the hold. Students made before this keep
+`awaiting_welcome = 0`, so nothing about them changes.
 
 ## Accounts
 
