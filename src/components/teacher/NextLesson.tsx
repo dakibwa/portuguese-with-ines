@@ -4,7 +4,7 @@ import { Globe, UserRound } from "lucide-react";
 import { addedByTeacher, type AdminBooking } from "@/lib/admin-api";
 import { formatSlotTime } from "@/lib/booking-api";
 import { meetingHref } from "@/components/MeetingLink";
-import { GoogleMeetLogo } from "@/components/teacher/TeacherMeetConnection";
+import { GoogleMeetLogo } from "@/components/GoogleMeetLogo";
 import { dateKey, dateLabel, shiftDate } from "@/lib/teacher-calendar";
 
 /**

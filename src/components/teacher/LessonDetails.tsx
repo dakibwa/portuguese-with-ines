@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { X, ArrowLeft, CheckCircle2, CircleX, Globe, UserRound } from "lucide-react";
+import { X, ArrowLeft, CheckCircle2, CircleX } from "lucide-react";
 import {
   addedByTeacher,
   cancelBookingAs,
@@ -10,7 +10,7 @@ import {
   setNoShow,
   type AdminBooking,
 } from "@/lib/admin-api";
-import { formatBookedLessonLabel, formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
+import { formatBookedLessonLabel, formatMoneyCents, formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
 import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { AssetMark } from "@/components/BrandMarks";
@@ -65,6 +65,21 @@ export function LessonDetails({
   const locked =
     booking.payment_status === "processing" ||
     booking.same_day_fee_status === "processing";
+  const minutes = Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60_000);
+  // Its price and how it is paid, one dab: "€25 · paid to you by hand". A
+  // cancelled lesson's money matters only if some moved.
+  const paid = {
+    paid: "paid",
+    refunded: "refunded",
+    payment_due: "payment due",
+    processing: "payment processing",
+    scheduled: "charged to their card after the lesson",
+    pending: "waiting for their card",
+    not_required: "paid to you by hand",
+  }[booking.payment_status];
+  const money = booking.status === "cancelled" && !["paid", "refunded"].includes(booking.payment_status)
+    ? ""
+    : booking.amount_cents ? `${formatMoneyCents(booking.amount_cents)} · ${paid}` : paid.charAt(0).toUpperCase() + paid.slice(1);
   const backdropHandlers = useDialogBackdrop(() => { if (!busy) onClose(); });
 
   useLayoutEffect(() => {
@@ -180,42 +195,21 @@ export function LessonDetails({
           <span className="visually-hidden">, </span>
           <span className="lesson-when__time">{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
         </strong>
-        <span>
-          {formatBookedLessonLabel({
-            id: booking.lesson_type_id ?? "",
-            name: booking.lesson_name,
-            durationMinutes: Math.round(
-              (Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) /
-                60_000,
-            ),
-          })}{" "}
-          ·{" "}
-          <span className="teacher-lesson-place">
-            {booking.location === "porto" ? (
-              <UserRound size={13} strokeWidth={2.4} aria-hidden="true" />
-            ) : (
-              <Globe size={13} strokeWidth={2.4} aria-hidden="true" />
-            )}
-            {booking.location === "porto" ? "In Porto" : "Online"}
-          </span>{" "}
-          · Porto time
-        </span>
         {action === "view" ? (
           <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
         ) : null}
       </div>
-      {/* Who they are and how it is paid, as the confirm step's dab list
-          rather than sentences (13 October 2026, Dan). While she confirms a
-          change these step aside; Back to lesson brings them back. */}
+      {/* The lesson, not the student (13 October 2026, Dan: "this page is
+          more about the lesson"): its place, length, price and how it is
+          paid as dabs, as her history shows a lesson. Who they are lives in
+          Students. While she confirms a change these step aside. */}
       {action === "view" ? (
         <>
           <ul className="booking-payment-facts teacher-lesson-facts">
-            <li><a href={`mailto:${booking.student_email}`}>{booking.student_email}</a></li>
-            {/* Her receipt automation reads this, so absence is stated too. */}
-            <li>{booking.student_nif ? `NIF ${booking.student_nif}` : "NIF not given (consumidor final)"}</li>
-            {addedByTeacher(booking) && booking.status !== "cancelled" ? (
-              <li>{booking.payment_status === "scheduled" ? "Charged to their card after the lesson" : "Paid to you by hand"}</li>
-            ) : null}
+            <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
+            <li>{formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: minutes })}</li>
+            {money ? <li>{money}</li> : null}
+            {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
             {awaiting ? <li>Not emailed yet: send their welcome from Students</li> : null}
           </ul>
           {addedByTeacher(booking) && booking.status !== "cancelled" && booking.payment_status === "scheduled" ? (
@@ -244,7 +238,7 @@ export function LessonDetails({
         </>
       ) : null}
       {action === "view" && booking.notes ? (
-        <p className="teacher-lesson-note">{booking.notes}</p>
+        <p className="teacher-history-lesson__note teacher-lesson-note"><span>Their note</span>{booking.notes}</p>
       ) : null}
       {noShow ? (
         <p className="teacher-inline-notice">No-show · {SAME_DAY_FEE_LABEL} after this lesson</p>

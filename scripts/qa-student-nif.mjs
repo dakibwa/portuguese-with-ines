@@ -175,22 +175,29 @@ try {
     assert.deepEqual(details.errors, []);
     await details.page.close();
 
-    // Inês, and the receipt automation reading her schedule, see the NIF or that there is none.
+    // Inês, and her receipt automation, see each receipt's NIF or that there is none, in Receipts.
+    const receipt = (id, name, nif) => ({
+      id: `${id}:lesson`, bookingId: id, reference: `TEST-${id}`, kind: "lesson", label: "60-minute lesson",
+      lessonStartsAt: "2026-09-01T13:00:00Z", studentName: name, studentEmail: `${id}@example.invalid`, nif,
+      amountCents: 2500, method: "by hand", state: "paid", ready: true, stripePaymentIntent: "",
+    });
     const schedule = await open(width, "/schedule/", {
       session: "qa-nif-teacher",
       me: teacher,
       reply: (endpoint) => endpoint === "/admin/bookings"
         ? { json: { bookings: [lesson("with-nif", "Beatriz", "2026-09-07T13:00:00Z", "123456789"), lesson("without-nif", "Carla", "2026-09-07T15:00:00Z", "")] } }
-        : null,
+        : endpoint === "/admin/receipts"
+          ? { json: { month: "2026-09", receipts: [receipt("with-nif", "Beatriz", "123456789"), receipt("without-nif", "Carla", "")], totals: { ready: 2, readyCents: 5000 } } }
+          : null,
     });
     await schedule.page.getByRole("heading", { name: "7 Sept – 13 Sept 2026" }).waitFor();
-    await schedule.page.getByRole("button", { name: /^Beatriz, .*View lesson$/ }).click();
-    const dialog = schedule.page.locator(".teacher-lesson-facts");
-    await expect(dialog).toContainText("NIF 123456789");
-    await schedule.page.getByRole("button", { name: "Close lesson details" }).click();
+    await schedule.page.getByRole("tab", { name: "Receipts", exact: true }).click();
+    await expect(schedule.page.locator('[data-receipt-id="with-nif:lesson"]')).toContainText("123456789");
+    await expect(schedule.page.locator('[data-receipt-id="without-nif:lesson"]')).toContainText("Consumidor final");
+    await expect(schedule.page.locator(".teacher-receipts")).toContainText("2 receipts to issue · €50");
+    assert.ok(await noOverflow(schedule.page), "Receipts fit the phone");
+    await schedule.page.getByRole("tab", { name: "Week", exact: true }).click();
     await schedule.page.getByRole("button", { name: /^Carla, .*View lesson$/ }).click();
-    await expect(dialog).toContainText("without-nif@example.invalid");
-    await expect(dialog).toContainText("NIF not given (consumidor final)");
     await schedule.page.getByRole("button", { name: "Move lesson", exact: true }).click();
     const newDate = schedule.page.getByLabel("New date");
     await newDate.focus();
@@ -198,7 +205,7 @@ try {
     assert.deepEqual(schedule.errors, []);
     await schedule.page.close();
   }
-  console.log("Student NIF passed: optional sign-up field, refused typo, edit/clear in details and Inês's lesson view, one blue focus boundary on each form's fields; desktop/mobile.");
+  console.log("Student NIF passed: optional sign-up field, refused typo, edit/clear in details and Inês's Receipts, one blue focus boundary on each form's fields; desktop/mobile.");
 } finally {
   await browser.close();
 }

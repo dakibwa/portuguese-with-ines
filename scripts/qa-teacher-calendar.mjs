@@ -1118,7 +1118,7 @@ try {
     const chosenDay = (date) => page.locator(`[data-timeoff-date="${date}"]`);
     const timeOff = page.locator(".teacher-timeoff");
     const initialBookings = structuredClone(state.bookings);
-    await expect(page.getByRole("tablist", { name: "Teacher tools" }).getByRole("tab")).toHaveCount(5);
+    await expect(page.getByRole("tablist", { name: "Teacher tools" }).getByRole("tab")).toHaveCount(6);
     await expect(page.getByRole("tab", { name: "Week", exact: true })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("tab", { name: "Week", exact: true }).focus();
     await page.keyboard.press("ArrowRight");

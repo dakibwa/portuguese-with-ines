@@ -61,9 +61,11 @@ import {
   formatShort,
   isValidTimeZone,
   parseDateKey,
-  zoneName
+  zoneName,
+  zonedToUtc
 } from "./time.mjs";
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
+import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { findRecurringCode, studentRates, studentLessonType, priceForMove, teacherRate, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
 import { formatEuros } from "./money.mjs";
@@ -1191,7 +1193,7 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
 async function teacherStudentList(env) {
   const now = new Date().toISOString();
   const { results } = await env.DB.prepare(
-    `SELECT s.id, s.name, s.email, s.phone, s.created_at, COALESCE(s.mark, '') AS mark, s.awaiting_welcome,
+    `SELECT s.id, s.name, s.email, s.phone, COALESCE(s.nif, '') AS nif, s.created_at, COALESCE(s.mark, '') AS mark, s.awaiting_welcome,
        (COALESCE(s.stripe_payment_method, '') != '') AS has_card,
        s.card_consent_at,
        (s.password_hash != '' OR s.google_sub IS NOT NULL OR s.last_login_at IS NOT NULL) AS signed_in,
@@ -1215,6 +1217,7 @@ async function teacherStudentList(env) {
     name: row.name,
     email: row.email,
     phone: row.phone,
+    nif: row.nif ?? "",
     mark: row.mark ?? "",
     signedIn: Boolean(row.signed_in),
     awaitingWelcome: Boolean(row.awaiting_welcome) && !row.signed_in,
@@ -4950,6 +4953,31 @@ async function handleAdmin(request, env, ctx, url, path) {
   }
 
   // --- Bookings on a student's behalf --------------------------------------
+
+  // Her receipts for a month: every amount paid or to be paid for lessons
+  // starting in it, with the NIF to issue to (13 October 2026, Dan: "make her
+  // automation as easy as possible"). The tab and her automation both read it.
+  if (request.method === "GET" && path === "/admin/receipts") {
+    const month = receiptMonth(url.searchParams.get("month") ?? dateKey(new Date()).slice(0, 7));
+    if (!month) return fail("Choose a month as YYYY-MM.", 400, request, env);
+    const from = zonedToUtc(month.year, month.month, 1, 0);
+    const to = month.month === 12 ? zonedToUtc(month.year + 1, 1, 1, 0) : zonedToUtc(month.year, month.month + 1, 1, 0);
+    const { results } = await env.DB.prepare(
+      `SELECT b.*, l.duration_minutes, l.price_cents, COALESCE(s.nif, '') AS student_nif
+       FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id LEFT JOIN students s ON s.id = b.student_id
+       WHERE b.starts_at >= ? AND b.starts_at < ? AND b.status IN ('confirmed', 'cancelled')
+       ORDER BY b.starts_at`
+    ).bind(from.toISOString(), to.toISOString()).all();
+    const receipts = receiptLines(results ?? []);
+    return json({
+      month: `${month.year}-${String(month.month).padStart(2, "0")}`,
+      receipts,
+      totals: {
+        readyCents: receipts.filter((line) => line.ready).reduce((sum, line) => sum + (line.amountCents ?? 0), 0),
+        ready: receipts.filter((line) => line.ready).length
+      }
+    }, 200, request, env);
+  }
 
   if (request.method === "GET" && path === "/admin/students") {
     const settings = await loadSettings(env);

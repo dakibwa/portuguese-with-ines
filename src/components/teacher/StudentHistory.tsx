@@ -128,7 +128,7 @@ export function StudentHistory({ student, token, onChanged, onClose }: {
       <button className="teacher-dialog-close" aria-label="Close student history" onClick={onClose} type="button"><X size={20} aria-hidden="true" /></button>
       <header className="teacher-history-heading">
         <AccountAvatar mark={student.mark} name={student.name} />
-        <div><p id="teacher-history-label">Lesson history</p><h2 id="teacher-history-name">{student.name}</h2><p className="teacher-history-email">{student.email}</p></div>
+        <div><p id="teacher-history-label">Lesson history</p><h2 id="teacher-history-name">{student.name}</h2><p className="teacher-history-email">{student.email}</p><p className="teacher-history-email">{student.nif ? `NIF ${student.nif}` : "No NIF (consumidor final)"}</p></div>
       </header>
       <StudentPrice token={token} student={student} onChanged={onChanged} />
       {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={() => { setError(""); setBookings(null); setAttempt(value => value + 1); }} type="button">Try again</button></div>

@@ -1,13 +1,14 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { GoogleMeetLogo } from "@/components/teacher/TeacherMeetConnection";
+import { GoogleMeetLogo } from "@/components/GoogleMeetLogo";
 
 const tabs = [
   { id: "week", label: "Week" },
   { id: "hours", label: "Weekly hours" },
   { id: "time-off", label: "Time off" },
   { id: "students", label: "Students" },
+  { id: "receipts", label: "Receipts" },
   { id: "meet", label: "Google Meet" },
 ] as const;
 

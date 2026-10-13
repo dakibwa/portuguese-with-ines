@@ -45,6 +45,8 @@ Inês on /schedule                     (her own account, role=teacher)
                                                      account)
   → POST /admin/students                             set a student up (details, optional prices); nothing emailed
   → POST /admin/students/:id/prices                  her price for a student per length; null is standard
+  → GET  /admin/receipts?month=YYYY-MM               every amount paid or due for a Porto month's lessons,
+                                                     with the NIF to issue to (her Receipts tab and automation)
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
   → POST /admin/bookings/:id/reschedule | /cancel
 Stripe → POST /stripe/webhook                        signature-verified
@@ -691,12 +693,26 @@ lessons, so its cancellation set includes every occurrence committed first.
   restore stale values in D1. Account creation handles an email claimed after
   its lookup: password registration offers sign-in; Google resolves the winning
   row through the existing verified identity and first-link rules.
+- **Receipts (13 October 2026, Dan).** `GET /admin/receipts?month=YYYY-MM`
+  (teacher session or `ADMIN_TOKEN`) answers every amount for lessons starting
+  in that Porto month: one line per lesson price (or the no-show amount that
+  replaced it) and one per late change fee, each with a stable `id`
+  (`<booking id>:lesson` / `:fee`), the student's name, email and current NIF
+  (empty for consumidor final), `amountCents`, `method` (`card` / `by hand`),
+  `state` (`paid`, `refunded`, `due`, `charging`), the Stripe PaymentIntent
+  for card payments, and `ready`, true once the money is in. A lesson with
+  nothing on a card counts as paid by hand once it has happened; a cancelled
+  lesson appears only if money moved; a lesson still to come only once paid.
+  Her Receipts tab shows the same lines and downloads them as CSV, so her
+  automation can work from the JSON, the CSV or the table and remember each
+  `id` it has issued. The rules live in `workers/booking/receipts.mjs`.
 - **Where it appears.** Inês's fatura-recibo automation reads her booking
   emails and schedule, so every email she gets about a student's lessons
   (bookings, weekly runs, moves, cancellations, declined cards and payments)
   carries a `NIF` row beside the student, with the number or
-  `Not given (consumidor final)`, read when the email is sent. Her lesson
-  details state it the same way. The student's own payment email shows it,
+  `Not given (consumidor final)`, read when the email is sent. Her Receipts
+  tab and her student profiles state it the same way; her lesson details are
+  about the lesson and no longer carry it. The student's own payment email shows it,
   when given, so they can check it before the receipt is issued; their other
   booking emails do not. It is never sent to Stripe or written to logs, and it
   stays out of the shareable Google Calendar events.

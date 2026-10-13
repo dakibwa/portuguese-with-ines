@@ -433,6 +433,16 @@ usual lesson starts and days off; avoid a wall of administration forms.
   not emailed yet`, lesson buttons drop `and email student`, and moving or
   cancelling says they aren't emailed. Everything for Inês still happens: her
   calendar, the blocked time and the lesson's NIF.
+- `Receipts`, a tab of its own beside `Students` (13 October 2026, Dan: "make
+  her automation as easy as possible"), shows a month at a time with the
+  Time off month's pager: two dabs for what there is to issue (`3 receipts
+  to issue · €50`) and what is still to be paid, a lilac `Download CSV`, then
+  one plain table row per amount (lesson, student, NIF or `Consumidor final`,
+  what it is for, amount, and a pill: `Paid by card`, `Paid by hand`,
+  `Payment due`, `Being charged`, `Refunded`). On a phone each row is a small
+  cream card. Rows carry their id and figures as data attributes, so her
+  automation can read the table, the CSV or the Worker's JSON alike. On a
+  phone the six tabs sit as two even rows of three.
 - Keep `Sign out` beside the tools bar. `Students` holds the student
   cards, each a profile (splat, name, address and an arrow into their history)
   over dabs for where they are, their next lesson and their own price when
@@ -453,9 +463,14 @@ usual lesson starts and days off; avoid a wall of administration forms.
   small coral `No-show` tag beside its time, so she can see it at a glance.
 - Selecting a booked lesson opens its details and the existing move, cancel,
   attendance and payment-status controls. Keep cancellation confirmation,
-  permission checks and server error handling intact. The details always
-  state the student's NIF, or `NIF not given (consumidor final)`, because her
-  receipt automation reads them.
+  permission checks and server error handling intact. The details are about
+  the lesson, not the student (13 October 2026, Dan): who it is with and when,
+  `Join Google Meet` with Meet's own mark, then dabs for its place and length
+  side by side, its price and how it is paid (`€25 · paid to you by hand`),
+  any moves and, until their welcome, `Not emailed yet`. The student's
+  address and NIF live in Students, and receipts in their own tab (Dan: her
+  automation can be reworked around it). Their note is labelled `Their note`,
+  as in history.
   Closing without a change returns keyboard focus to its opener. Completing
   an action returns focus to the stable week heading while the timetable
   reloads, with a single blue outline; it never steals a later focus choice.

@@ -7,6 +7,8 @@ export type AdminStudent = {
   name: string;
   email: string;
   phone: string;
+  /** Nine digits for their receipts; empty for consumidor final. */
+  nif?: string;
   /** The splat they chose for their account; empty for their initial. */
   mark?: string;
   /** Has ever signed in, or set a password or Google sign-in. */
@@ -89,6 +91,8 @@ export type AdminBooking = {
   attendance_status: "expected" | "no_show";
   /** 1 when Inês added it herself (migration 0023). */
   added_by_teacher?: number;
+  /** The lesson's own price, as booked. */
+  amount_cents?: number | null;
 };
 
 /**
@@ -224,6 +228,37 @@ function validateBookingAcknowledgment<T extends { booking: { reference: string 
 
 export function fetchStudents(token: string) {
   return adminRequest<{ students: AdminStudent[]; cardsAccepted?: boolean }>(token, "/admin/students");
+}
+
+/**
+ * One amount Inês owes a fatura-recibo for: a lesson's price (or the no-show
+ * amount) or a late change fee. `id` is stable, so her automation can remember
+ * what it has issued; `ready` is true once the money is in.
+ */
+export type ReceiptLine = {
+  id: string;
+  bookingId: string;
+  reference: string;
+  kind: "lesson" | "no-show" | "late-change-fee";
+  label: string;
+  lessonStartsAt: string;
+  studentName: string;
+  studentEmail: string;
+  /** Nine digits, or empty for consumidor final. */
+  nif: string;
+  amountCents: number | null;
+  method: "card" | "by hand";
+  state: "paid" | "refunded" | "due" | "charging";
+  ready: boolean;
+  stripePaymentIntent: string;
+};
+
+/** A Porto month's receipts ("2026-10"), as her automation reads them too. */
+export function fetchReceipts(token: string, month: string) {
+  return adminRequest<{ month: string; receipts: ReceiptLine[]; totals: { ready: number; readyCents: number } }>(
+    token,
+    `/admin/receipts?month=${encodeURIComponent(month)}`,
+  );
 }
 
 /** Sets a student up with their details; nothing is emailed (13 October 2026, Dan). */

@@ -18,6 +18,7 @@ import { NextLesson } from "@/components/teacher/NextLesson";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
+import { ReceiptsTab } from "@/components/teacher/ReceiptsTab";
 import {
   fetchBookings,
   fetchSchedule,
@@ -784,6 +785,9 @@ export function TeacherSchedule() {
         onAddLesson={(student) => openStudentDialog({ step: "lessons", student })}
         onStudentsChanged={() => void reloadStudents()}
       />
+      </div>
+      <div className="teacher-tab-view" hidden={activeTab !== "receipts"}>
+        {activeTab === "receipts" ? <ReceiptsTab token={token} today={today} /> : null}
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "meet"}>
         <TeacherMeetConnection token={token} onAttentionChange={setMeetAttention} />

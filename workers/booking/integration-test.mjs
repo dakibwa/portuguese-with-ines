@@ -2360,6 +2360,42 @@ await test("her price for a student prices their lessons, and only lessons nothi
     forgetStudent("priced@example.invalid");
   }
 });
+await test("her receipts list each amount paid or due for a month's lessons, with the NIF to issue to", async () => {
+  await enrol("receipts");
+  db.prepare("UPDATE students SET nif = '123456789', name = 'Rita Receipts' WHERE id = 'receipts'").run();
+  const at = (day, hour) => ({ start: `2026-08-${day}T${hour}:00:00.000Z`, end: `2026-08-${day}T${Number(hour) + 1}:00:00.000Z` });
+  booking("r-card", { owner: "receipts", payment: "paid", ...at("03", "09") });
+  db.prepare("UPDATE bookings SET charged_cents = 1500, stripe_payment_intent = 'pi_card' WHERE id = 'r-card'").run();
+  booking("r-hand", { owner: "receipts", payment: "not_required", ...at("04", "09") });
+  booking("r-noshow", { owner: "receipts", payment: "paid", ...at("05", "09") });
+  db.prepare("UPDATE bookings SET attendance_status = 'no_show', charged_cents = 500 WHERE id = 'r-noshow'").run();
+  booking("r-fee", { owner: "receipts", payment: "not_required", ...at("06", "09") });
+  db.prepare("UPDATE bookings SET status = 'cancelled', same_day_fee_status = 'paid', same_day_fee_cents = 500, same_day_fee_payment_intent = 'pi_fee' WHERE id = 'r-fee'").run();
+  booking("r-due", { owner: "receipts", payment: "payment_due", ...at("07", "09") });
+  booking("r-cancelled", { owner: "receipts", payment: "not_required", ...at("10", "09") });
+  db.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = 'r-cancelled'").run();
+  try {
+    assert.equal((await call("/admin/receipts?month=2026-08", { method: "GET", user: "alice" })).status, 401);
+    assert.equal((await call("/admin/receipts?month=2026-13", { method: "GET", user: "teacher" })).status, 400);
+    const reply = await call("/admin/receipts?month=2026-08", { method: "GET", user: "teacher" });
+    assert.equal(reply.status, 200, await reply.clone().text());
+    const { month, receipts } = await reply.json();
+    assert.equal(month, "2026-08");
+    const mine = receipts.filter((line) => line.studentEmail === "receipts@example.invalid");
+    assert.deepEqual(mine.map((line) => [line.id, line.label, line.amountCents, line.method, line.state, line.ready]), [
+      ["r-card:lesson", "60-minute lesson", 1500, "card", "paid", true],
+      ["r-hand:lesson", "60-minute lesson", 1500, "by hand", "paid", true],
+      ["r-noshow:lesson", "No-show", 500, "card", "paid", true],
+      ["r-fee:fee", "Late change fee", 500, "card", "paid", true],
+      ["r-due:lesson", "60-minute lesson", 1500, "card", "due", false]
+    ], "a cancelled lesson with no money moved has no line");
+    assert.ok(mine.every((line) => line.nif === "123456789" && line.studentName === "Test Student"));
+    assert.equal(mine.find((line) => line.id === "r-card:lesson").stripePaymentIntent, "pi_card");
+    assert.equal(mine.find((line) => line.id === "r-fee:fee").stripePaymentIntent, "pi_fee");
+  } finally {
+    db.prepare("DELETE FROM bookings WHERE student_id = 'receipts'").run();
+  }
+});
 await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('launch-check','launch-check-0000@example.invalid','Launch Verification','x','2026-09-05T08:56:55.286Z')").run();

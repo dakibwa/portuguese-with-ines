@@ -8365,6 +8365,23 @@ dialog[open]::backdrop {
   flex: 0 0 auto;
 }
 
+/* Google Meet's own mark (13 October 2026, Dan), in a small white disc so
+   its colours hold on the blue button as on the cream. */
+.meeting-link__logo {
+  display: inline-grid;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.meeting-link__logo svg {
+  width: 15px;
+  height: auto;
+}
+
 .meeting-link:hover {
   color: var(--coral-action);
 }
