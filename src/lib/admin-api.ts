@@ -5,6 +5,7 @@ import { BOOKING_REPLY_ERROR, isApiInstant, isApiRecord } from "@/lib/api-respon
 export type AdminStudent = {
   id: string;
   name: string;
+  /** Empty when she set them up from a name alone and has not given one yet. */
   email: string;
   phone: string;
   /** Nine digits for their receipts; empty for consumidor final. */
@@ -261,12 +262,22 @@ export function fetchReceipts(token: string, month: string) {
   );
 }
 
-/** Sets a student up with their details; nothing is emailed (13 October 2026, Dan). */
-export function addStudent(
-  token: string,
-  input: { email: string; name: string; phone: string; nif: string; mark: string; prices?: StudentPrices },
-) {
+export type StudentDetailsInput = { email: string; name: string; phone: string; nif: string; mark: string };
+
+/**
+ * Sets a student up with their details; nothing is emailed (13 October 2026,
+ * Dan). Only the name is needed: an empty email shows as "" until she gives one.
+ */
+export function addStudent(token: string, input: StudentDetailsInput & { prices?: StudentPrices }) {
   return adminRequest<{ student: AdminStudent }>(token, "/admin/students", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Their details, all at once. Their email can change only until they first sign in. */
+export function updateStudentDetails(token: string, studentId: string, input: StudentDetailsInput) {
+  return adminRequest<{ student: AdminStudent }>(token, `/admin/students/${encodeURIComponent(studentId)}/details`, {
     method: "POST",
     body: JSON.stringify(input),
   });

@@ -1215,7 +1215,7 @@ async function teacherStudentList(env) {
   return (results ?? []).map((row) => ({
     id: row.id,
     name: row.name,
-    email: row.email,
+    email: hasEmail(row) ? row.email : "",
     phone: row.phone,
     nif: row.nif ?? "",
     mark: row.mark ?? "",
@@ -4665,6 +4665,20 @@ async function handleConfirmEmailChange(request, env) {
 // src/lib/student-marks.ts names the same set); empty is their initial.
 const STUDENT_MARKS = new Set(["", "burst", "bloom", "pool", "dance", "drift", "four", "duo", "scatter"]);
 
+/*
+ * A student she sets up from a name alone (13 October 2026, Dan: "she can
+ * build upon that"). Email is the unique sign-in key and cannot be empty, so
+ * theirs holds a placeholder no address can equal: every sign-in and send
+ * path checks for a real address first, so nobody can sign in as them and
+ * nothing is sent to them. Her list shows no email; their lessons and welcome
+ * wait for a real one.
+ */
+const NO_EMAIL_YET = "no-email:";
+
+function hasEmail(student) {
+  return !String(student?.email ?? "").startsWith(NO_EMAIL_YET);
+}
+
 /** The details Inês can give for a student she sets up; each is optional. */
 function studentDetails(body) {
   const nif = normaliseNif(body.nif);
@@ -4986,12 +5000,12 @@ async function handleAdmin(request, env, ctx, url, path) {
 
   // Onboarding starts here (13 October 2026, Dan): she sets a student up with
   // their details, adds their lessons, and only then sends their welcome.
-  // Nothing is emailed by this.
+  // Nothing is emailed by this. A name is enough; the rest can follow.
   if (request.method === "POST" && path === "/admin/students") {
     const body = await readJson(request);
     const email = normaliseEmail(body.email);
     const name = cleanText(body.name, 120);
-    if (!isEmail(email)) return fail("Please give the student's email address.", 400, request, env);
+    if (email && !isEmail(email)) return fail("Please check the student's email address.", 400, request, env);
     if (!name) return fail("Please give the student's name.", 400, request, env);
     const details = studentDetails(body);
     if (details.problem) return fail(details.problem, 400, request, env);
@@ -5002,12 +5016,45 @@ async function handleAdmin(request, env, ctx, url, path) {
       `INSERT INTO students (id, email, name, phone, nif, mark, timezone, password_hash, created_at, awaiting_welcome)
        VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, 1) ON CONFLICT(email) DO NOTHING`
     )
-      .bind(id, email, name, details.phone, details.nif, details.mark, PORTO, new Date().toISOString())
+      .bind(id, email || `${NO_EMAIL_YET}${id}`, name, details.phone, details.nif, details.mark, PORTO, new Date().toISOString())
       .run();
     if (!(added?.meta?.changes > 0)) return fail("Someone with that email is already on the site.", 409, request, env);
     await setStudentPrices(env, id, priced.prices);
     const list = await teacherStudentList(env);
     return json({ student: list.find((entry) => entry.id === id) }, 201, request, env);
+  }
+
+  // Their details, filled in or corrected later. Their email is how they sign
+  // in, so she can give or correct it only until they first do; after that
+  // they change it from their account, where the new address proves itself.
+  const detailedStudent = path.match(/^\/admin\/students\/([^/]+)\/details$/);
+  if (detailedStudent && request.method === "POST") {
+    const student = await env.DB.prepare("SELECT * FROM students WHERE id = ? AND role = 'student'").bind(detailedStudent[1]).first();
+    if (!student) return fail("That student could not be found.", 404, request, env);
+    const body = await readJson(request);
+    const name = cleanText(body.name, 120);
+    if (!name) return fail("Please give the student's name.", 400, request, env);
+    const details = studentDetails(body);
+    if (details.problem) return fail(details.problem, 400, request, env);
+    const current = hasEmail(student) ? student.email : "";
+    const email = normaliseEmail(body.email);
+    if (email && !isEmail(email)) return fail("Please check the student's email address.", 400, request, env);
+    const moving = email !== current;
+    if (moving && (student.password_hash || student.google_sub || student.last_login_at)) {
+      return fail("They sign in with that email, so they can change it from their account.", 409, request, env);
+    }
+    if (moving && !email) return fail("Please give the student's email address.", 400, request, env);
+    const stored = email || student.email;
+    const updated = await env.DB.prepare(
+      `UPDATE students SET name = ?, email = ?, phone = ?, nif = ?, mark = ?,
+         email_verified_at = CASE WHEN email = ? THEN email_verified_at ELSE NULL END
+       WHERE id = ? AND NOT EXISTS (SELECT 1 FROM students other WHERE other.email = ? AND other.id != ?)`
+    ).bind(name, stored, details.phone, details.nif, details.mark, stored, student.id, stored, student.id).run();
+    if (!(updated?.meta?.changes > 0)) return fail("Someone with that email is already on the site.", 409, request, env);
+    // Lessons she already added for them follow them to the new address.
+    if (moving) await env.DB.prepare("UPDATE bookings SET student_email = ? WHERE student_id = ?").bind(email, student.id).run();
+    const list = await teacherStudentList(env);
+    return json({ student: list.find((entry) => entry.id === student.id) }, 200, request, env);
   }
 
   // Her price for a student, per length; null is the standard price again.
@@ -5031,6 +5078,7 @@ async function handleAdmin(request, env, ctx, url, path) {
       .bind(welcomeStudent[1])
       .first();
     if (!student) return fail("That student could not be found.", 404, request, env);
+    if (!hasEmail(student)) return fail("Add their email first, so the welcome has somewhere to go.", 400, request, env);
     if (!await takeRateLimit(env, `welcome:${student.id}`, 3, 3600)) {
       return fail("A link was sent to them recently. Please wait an hour before sending another.", 429, request, env);
     }

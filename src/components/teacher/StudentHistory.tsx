@@ -11,6 +11,7 @@ import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { StudentPrice } from "@/components/teacher/StudentPrice";
+import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
 
 function paymentLabel(booking: AdminBooking) {
   switch (booking.payment_status) {
@@ -29,7 +30,7 @@ function paymentLabel(booking: AdminBooking) {
 export function StudentHistory({ student, token, onChanged, onClose }: {
   student: AdminStudent;
   token: string;
-  /** After she changes their price. */
+  /** After she changes their price or details. */
   onChanged: (student: AdminStudent) => void;
   onClose: () => void;
 }) {
@@ -37,6 +38,7 @@ export function StudentHistory({ student, token, onChanged, onClose }: {
   const [bookings, setBookings] = useState<AdminBooking[] | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [editing, setEditing] = useState(false);
   const [now] = useState(() => Date.now());
   const backdrop = useDialogBackdrop(onClose);
 
@@ -62,7 +64,7 @@ export function StudentHistory({ student, token, onChanged, onClose }: {
         (booking.status === "confirmed" || booking.status === "cancelled") &&
         (booking.student_id
           ? booking.student_id === student.id
-          : booking.student_email.trim().toLowerCase() === student.email.trim().toLowerCase())
+          : Boolean(student.email) && booking.student_email.trim().toLowerCase() === student.email.trim().toLowerCase())
       ));
     }).catch(caught => {
       if (active && readSession() === token)
@@ -128,8 +130,23 @@ export function StudentHistory({ student, token, onChanged, onClose }: {
       <button className="teacher-dialog-close" aria-label="Close student history" onClick={onClose} type="button"><X size={20} aria-hidden="true" /></button>
       <header className="teacher-history-heading">
         <AccountAvatar mark={student.mark} name={student.name} />
-        <div><p id="teacher-history-label">Lesson history</p><h2 id="teacher-history-name">{student.name}</h2><p className="teacher-history-email">{student.email}</p><p className="teacher-history-email">{student.nif ? `NIF ${student.nif}` : "No NIF (consumidor final)"}</p></div>
+        <div>
+          <p id="teacher-history-label">Lesson history</p>
+          <h2 id="teacher-history-name">{student.name}</h2>
+          <p className="teacher-history-email">{student.email || "No email yet"}</p>
+          {student.phone ? <p className="teacher-history-email">{student.phone}</p> : null}
+          <p className="teacher-history-email">{student.nif ? `NIF ${student.nif}` : "No NIF (consumidor final)"}</p>
+          {editing ? null : <button className="teacher-text-button" onClick={() => setEditing(true)} type="button">Edit details</button>}
+        </div>
       </header>
+      {editing ? (
+        <StudentDetailsForm
+          token={token}
+          student={student}
+          onCancel={() => setEditing(false)}
+          onSaved={(updated) => { setEditing(false); onChanged(updated); }}
+        />
+      ) : null}
       <StudentPrice token={token} student={student} onChanged={onChanged} />
       {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={() => { setError(""); setBookings(null); setAttempt(value => value + 1); }} type="button">Try again</button></div>
         : bookings === null ? <p role="status">Loading lesson history…</p>

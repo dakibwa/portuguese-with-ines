@@ -2307,6 +2307,49 @@ await test("she sets a student up and adds their lessons without emailing them, 
     forgetStudent("quiet@example.invalid");
   }
 });
+await test("she can set a student up from a name alone and give their email later, until they sign in", async () => {
+  captureEmail();
+  const to = (email) => sentEmails.filter((sent) => sent.to[0] === email);
+  try {
+    const add = (body) => call("/admin/students", { user: "teacher", body });
+    assert.equal((await add({ email: "not-an-address", name: "Bea" })).status, 400, "a mistyped email is still refused");
+    const created = await add({ name: "Bea", nif: "123456789", prices: { 60: 2000 } });
+    assert.equal(created.status, 201, await created.clone().text());
+    const { student } = await created.json();
+    assert.deepEqual([student.email, student.awaitingWelcome, student.prices], ["", true, { 60: 2000 }]);
+    assert.equal((await add({ name: "Bea's sister" })).status, 201, "any number of them can wait for an email");
+    assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 400, "no welcome without an email");
+
+    const details = (body) => call(`/admin/students/${student.id}/details`, { user: "teacher", body });
+    assert.equal((await call(`/admin/students/${student.id}/details`, { user: "alice", body: { name: "Bea" } })).status, 401);
+    assert.equal((await details({ name: "Bea", email: "alice@example.invalid" })).status, 409, "another student's email is refused");
+    const filled = await details({ name: "Bea Lopes", email: "Later@Example.invalid", phone: "+351 911 111 111", nif: "123456789", mark: "pool" });
+    assert.equal(filled.status, 200, await filled.clone().text());
+    const now = (await filled.json()).student;
+    assert.deepEqual([now.name, now.email, now.phone, now.mark], ["Bea Lopes", "later@example.invalid", "+351 911 111 111", "pool"]);
+
+    // With an email, she adds their lessons and sends their welcome as usual.
+    const lesson = await call("/admin/bookings", { user: "teacher", body: { email: "later@example.invalid", lessonType: "single", startAt: "2026-10-21T10:00:00.000Z" } });
+    assert.equal(lesson.status, 201, await lesson.clone().text());
+    await drain();
+    assert.equal(to("later@example.invalid").length, 0);
+    assert.equal((await details({ name: "Bea Lopes", email: "bea@example.invalid", nif: "123456789" })).status, 200, "a typo can be corrected before they sign in");
+    assert.equal(db.prepare("SELECT student_email FROM bookings WHERE student_id=?").get(student.id).student_email, "bea@example.invalid", "her lessons follow the new address");
+    assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 200);
+    await drain();
+    assert.equal(to("bea@example.invalid").length, 1);
+
+    // Once they have signed in, the address is theirs to change.
+    db.prepare("UPDATE students SET last_login_at=? WHERE id=?").run(new Date().toISOString(), student.id);
+    assert.equal((await details({ name: "Bea Lopes", email: "other@example.invalid" })).status, 409);
+    assert.equal((await details({ name: "Bea Lopes", email: "bea@example.invalid", nif: "" })).status, 200, "her other details stay hers to correct");
+  } finally {
+    releaseEmail();
+    forgetStudent("bea@example.invalid");
+    db.prepare("DELETE FROM student_recurring_rates WHERE student_id IN (SELECT id FROM students WHERE email LIKE 'no-email:%')").run();
+    db.prepare("DELETE FROM students WHERE email LIKE 'no-email:%'").run();
+  }
+});
 await test("her price for a student prices their lessons, and only lessons nothing is settled on follow a change", async () => {
   try {
     const add = (body) => call("/admin/students", { user: "teacher", body });

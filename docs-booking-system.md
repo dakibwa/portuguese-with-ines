@@ -44,6 +44,8 @@ Inês on /schedule                     (her own account, role=teacher)
                                                      once the student saved one from their
                                                      account)
   → POST /admin/students                             set a student up (details, optional prices); nothing emailed
+  → POST /admin/students/:id/details                 their name, email, phone, NIF and splat; email only
+                                                     until they first sign in
   → POST /admin/students/:id/prices                  her price for a student per length; null is standard
   → GET  /admin/receipts?month=YYYY-MM               every amount paid or due for a Porto month's lessons,
                                                      with the NIF to issue to (her Receipts tab and automation)
@@ -261,6 +263,19 @@ their upcoming lessons (up to twelve, each on the lesson's clock) and the
 one-click way in, then clears the flag, after which emails reach them as
 usual. Signing in themselves also ends the hold. Students made before this keep
 `awaiting_welcome = 0`, so nothing about them changes.
+
+A name alone is enough to set a student up (13 October 2026, Dan: she builds
+on it later). `students.email` stays `NOT NULL UNIQUE`, so a student without
+one stores `no-email:<id>`. No address can equal that, and every sign-in,
+registration, reset and email-change path checks for a real address first.
+`GET /admin/students` shows such a student's email as `""`. Their welcome is
+refused (400) and `POST /admin/bookings` cannot reach them, so their lessons
+and welcome wait until she gives an email. `POST /admin/students/:id/details`
+sets name, phone, NIF and splat at any time. It sets or corrects the email only
+while the student has never signed in (no password, Google link or sign-in);
+after that it answers 409 and the student changes it from their account. A
+changed address clears `email_verified_at` and moves their bookings'
+`student_email` with it. An address another student has is refused (409).
 
 ## Accounts
 
