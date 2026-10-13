@@ -1981,8 +1981,8 @@ await accountPage.mouse.move(1, 1);
 await calendarTip.waitFor({ state: "hidden" });
 await waitForOrientation(accountPage);
 // The row sits on the card's own colour (9 October 2026, at Dan's request),
-// so it needs no inset of its own: its mark and details sit inside it, side
-// by side, the mark on the card's edge like everything else.
+// so it needs no inset of its own: on a phone its details sit on the card's
+// left edge and the lesson's mark at the right, as its seal (13 October 2026).
 const mobileNextLessonLayout = await accountPage.locator(".lesson-overview__next").evaluate((row) => {
   const bounds = (selector) => row.querySelector(selector)?.getBoundingClientRect().toJSON() ?? null;
   return {
@@ -1996,9 +1996,9 @@ if (
   !mobileNextLessonLayout.mark ||
   !mobileNextLessonLayout.copy ||
   mobileNextLessonLayout.background !== "rgba(0, 0, 0, 0)" ||
-  mobileNextLessonLayout.mark.left < mobileNextLessonLayout.row.left - 1 ||
-  mobileNextLessonLayout.copy.left < mobileNextLessonLayout.mark.right - 2 ||
-  mobileNextLessonLayout.copy.right > mobileNextLessonLayout.row.right + 1
+  mobileNextLessonLayout.copy.left < mobileNextLessonLayout.row.left - 1 ||
+  mobileNextLessonLayout.copy.right > mobileNextLessonLayout.mark.left + 2 ||
+  mobileNextLessonLayout.mark.right > mobileNextLessonLayout.row.right + 1
 ) {
   throw new Error(`The next lesson should keep its mark and details inside one clean row, on the card's colour, on a phone: ${JSON.stringify(mobileNextLessonLayout)}.`);
 }
@@ -2016,7 +2016,7 @@ await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible
 const mobileAccountLayout = await accountPage.evaluate(() => {
   const calendar = document.querySelector("#lesson-calendar .unified-calendar__grid");
   const calendarBounds = calendar?.getBoundingClientRect();
-  const firstWeekday = calendar?.querySelector(".calendar-weekdays span:first-child")?.getBoundingClientRect();
+  const firstWeekday = calendar?.querySelector(".calendar-weekdays span:not(.calendar-weekdays__corner)")?.getBoundingClientRect();
   const lastWeekday = calendar?.querySelector(".calendar-weekdays span:last-child")?.getBoundingClientRect();
   const legend = calendar?.querySelector(".unified-calendar__legend")?.getBoundingClientRect();
   return {

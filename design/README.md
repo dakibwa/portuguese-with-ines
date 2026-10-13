@@ -849,7 +849,8 @@ Preserve these desktop and mobile states:
   `Book a lesson` at the right; the name and `Sign out` live in Your details
   (10 October 2026, at Dan's request). On a narrower card the student's name leads it as the account's menu, with
   `Book a lesson` at its top right (`Book` on phones, keeping the full name
-  for assistive technology); the banner above already says Your lessons, so
+  for assistive technology); on a phone `Book` always shares the name's row,
+  the name cut short first if it must be; the banner above already says Your lessons, so
   the card's own title is for screen readers, as on a wide card.
   On a wide card each booked day spells its lessons out (9 October 2026, at
   Dan's request): the time each runs from and until (`09:00–10:00`), after a
@@ -862,7 +863,9 @@ Preserve these desktop and mobile states:
   `Weekly`. Clicking opens the lesson, with its Meet link, `Change` and
   `Cancel`. On a phone a day shows the mark over the start time, and the next
   lesson, or `Happening now`, keeps its row beneath the header, on the card's
-  own colour, as it does on
+  own colour (on a phone its words on the card's left edge with the name and
+  the weeks, its mark at the right as its seal, and `Join Google Meet` beneath
+  as a cream button, 13 October 2026, at Dan's request), as it does on
   any card when the next lesson lies beyond the first four weeks: its date and
   time in one plain line, then its length, location, `Weekly` when it repeats
   and its Meet link, opening that lesson directly. With nothing booked, `Nothing booked yet.` says so
@@ -999,11 +1002,16 @@ Preserve these desktop and mobile states:
   elsewhere, and the `Earlier weeks` and `Later weeks` arrows on the right,
   solid blue with white arrows.
   `Later weeks` carries a small coral count of the booked lessons beyond the
-  page, so nothing booked is out of sight without a sign. Each week starts with
-  its month (`OCT`), in ink where a month begins and lilac ink where it carries
-  on, and a month that begins part-way through a week marks its 1st (`1 NOV`);
-  there are no caption rows across the grid. The key sits beneath the weeks it
-  explains. A new
+  page, so nothing booked is out of sight without a sign. On a wider card each
+  week starts with its month (`OCT`), in ink where a month begins and lilac ink
+  where it carries on, and a month that begins part-way through a week marks
+  its 1st (`1 NOV`); on a phone's lessons card the header names the months and
+  every 1st carries its own, so the seven days take the card's whole width (13
+  October 2026, Dan: "less cramped"). There are no caption rows across the
+  grid. A booked day's times are sized by the day itself, so they always sit
+  inside its splat at any width. The key sits beneath the weeks it explains,
+  on a phone in two short columns, the kinds of lesson on the left and the
+  places on the right, beside the corner splat. A new
   booking pages through the whole twelve-week booking window; the lessons view
   pages from this week through the same window, or to the last booked lesson
   when that is later. The lessons view has no second context strip or

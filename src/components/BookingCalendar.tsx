@@ -3930,7 +3930,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               {displayedCalendarWeeks.map((week, row) => (
                 <div className="calendar-week" key={week.key}>
                   {/* Each week starts with its month, so a date is never far
-                      from it; a month that begins mid-week marks its 1st. The
+                      from it; a month that begins mid-week marks its 1st. On a
+                      phone's lessons card the month column is hidden, and
+                      every 1st names its month itself, Mondays included. The
                       days' own labels carry the full date. */}
                   <span
                     aria-hidden="true"
@@ -4017,7 +4019,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       >
                         <span>
                           {cell.day}
-                          {cell.day === 1 && column > 0 ? <em>{shortMonth(cell.month, cell.key)}</em> : null}
+                          {cell.day === 1 ? <em className={column === 0 ? "calendar-week__first" : undefined}>{shortMonth(cell.month, cell.key)}</em> : null}
                           {lessons.length ? (
                             <small className="calendar-booking-times">
                               {(lessons.length <= 2 ? lessons : lessons.slice(0, 1)).map((booking) => (
