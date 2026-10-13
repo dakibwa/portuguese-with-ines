@@ -99,6 +99,7 @@ async function fixture(width, options = {}) {
   await page.route("**/auth/login", (route) => route.fulfill({
     json: { student: teacher, session: "isolated-teacher-fixture" },
   }));
+  await page.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
   await page.route("**/me", (route) =>
     route.fulfill({
       json: {
@@ -115,6 +116,12 @@ async function fixture(width, options = {}) {
     const fail = (error) => route.fulfill({ status: 503, json: { error } });
     if (data) state.writes.push({ path, data });
     if (path === "/admin/google-calendar") return route.fulfill({ json: { configured: false, connected: false, email: null, needsReconnect: false, pending: 0 } });
+    if (path === "/admin/expressions" && request.method() === "GET") return route.fulfill({ json: { expressions: [{
+      id: "original-1", expression: "Partir o coco a rir", meaningPt: "Rir muito.", meaningEn: "To split your sides laughing",
+      literalEn: "To crack the coconut laughing", examples: ["Com aquela história, partimos o coco a rir."],
+      notes: "", sourceUrl: "", tags: ["Humor"], imageUrl: "", imageAlt: "", published: 0, sortOrder: 0,
+      createdAt: "2026-10-13T00:00:00.000Z", updatedAt: "2026-10-13T00:00:00.000Z",
+    }] } });
     if (path === "/admin/availability") {
       if (data) {
         if (state.failHours-- > 0)
@@ -1118,7 +1125,7 @@ try {
     const chosenDay = (date) => page.locator(`[data-timeoff-date="${date}"]`);
     const timeOff = page.locator(".teacher-timeoff");
     const initialBookings = structuredClone(state.bookings);
-    await expect(page.getByRole("tablist", { name: "Teacher tools" }).getByRole("tab")).toHaveCount(6);
+    await expect(page.getByRole("tablist", { name: "Teacher tools" }).getByRole("tab")).toHaveCount(7);
     await expect(page.getByRole("tab", { name: "Timetable", exact: true })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("tab", { name: "Timetable", exact: true }).focus();
     await page.keyboard.press("ArrowRight");
@@ -1198,6 +1205,13 @@ try {
     assert.deepEqual(state.errors, []);
     await page.close();
   }
+
+  // One reachability check; the Worker integration test owns mutations and permissions.
+  const expressions = await fixture(390);
+  await expressions.page.getByRole("tab", { name: "Expressions", exact: true }).click();
+  await expect(expressions.page.locator(".expression-card")).toContainText("Partir o coco a rir");
+  assert.deepEqual(expressions.state.errors, []);
+  await expressions.page.close();
 
   const student = await fixture(390, { student: true });
   await student.page

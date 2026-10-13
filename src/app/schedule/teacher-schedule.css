@@ -2145,7 +2145,7 @@
   .teacher-sign-out,
   .teacher-workspace .button--compact,
   .teacher-lesson-dialog .button--compact { min-height: 44px; }
-  /* Six tabs, two even rows of three. */
+  /* Keep every tool in view as the collection grows. */
   .teacher-tabs button[aria-selected="true"] { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); }
 }
 @media (max-width: 820px) {
@@ -2585,6 +2585,56 @@
   border-radius: var(--squiggle-panel);
   padding: clamp(1rem, 2.4vw, 1.5rem);
   background: var(--sheet);
+}
+
+/* The collection uses the Receipts sheet and the same raised reading cards.
+   Student preview renders this very card, without the teacher's controls. */
+.teacher-expressions {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: clamp(1rem, 2.4vw, 1.5rem);
+  background: var(--sheet);
+}
+.teacher-expressions__intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1.25rem 2rem; }
+.teacher-expressions__intro dl { flex: 1 1 28rem; margin: 0; max-width: 44rem; }
+.teacher-expressions__intro dt { font: 400 clamp(1.05rem, 2vw, 1.3rem)/2 var(--display); }
+.teacher-expressions__intro dt span { display: block; margin-top: 0.35rem; font: 500 0.75rem/1.5 var(--ui); color: var(--lavender-ink); }
+.teacher-expressions__intro dd { margin: 0.4rem 0 0; font-size: 0.88rem; line-height: 1.65; }
+.teacher-expressions__intro > .button { flex: 0 1 auto; }
+.teacher-expressions .teacher-expressions__help { margin: 0; font-size: 0.8rem; }
+.teacher-expressions__filters { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; gap: 0.75rem; }
+.teacher-expressions__filters .button { width: auto; }
+.teacher-expressions__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem; }
+.teacher-expressions__hint, .expression-dialog__hint { margin: 0; font-size: 0.8rem; line-height: 1.6; }
+.teacher-expression { display: flex; flex-direction: column; min-width: 0; padding: clamp(1rem, 2vw, 1.35rem); border-radius: var(--squiggle-field); background: var(--raised); }
+.teacher-expression > .teacher-receipts__state { align-self: flex-start; margin-bottom: 0.8rem; }
+.teacher-expression__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; margin-top: auto; padding-top: 1.2rem; }
+.teacher-expression__order { display: flex; gap: 0.1rem; margin-left: auto; }
+.teacher-expression__order .teacher-icon-button { width: 44px; height: 44px; }
+.expression-dialog { width: min(720px, calc(100vw - 2rem)); }
+.expression-dialog > h2 { margin-right: 2.8rem; line-height: 1.45; }
+.expression-dialog--preview { width: min(620px, calc(100vw - 2rem)); }
+.expression-dialog--preview > .expression-card { padding: clamp(1rem, 3vw, 1.5rem); border-radius: var(--squiggle-field); }
+.expression-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; }
+.expression-form__wide { grid-column: 1 / -1; }
+.expression-form textarea { resize: vertical; line-height: 1.6; }
+.expression-form__more { font-size: 0.85rem; }
+.expression-form__more > div { display: grid; gap: 0.8rem; }
+.expression-form__delete { justify-self: start; min-height: 44px; }
+@media (max-width: 740px) {
+  .teacher-expressions__list { grid-template-columns: minmax(0, 1fr); }
+  .teacher-expressions__filters { grid-template-columns: minmax(0, 1fr); }
+  .teacher-expressions__filters .button { justify-self: start; }
+  .expression-form { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .teacher-expressions__intro > .button { width: 100%; }
+  .teacher-expression__actions .button { width: auto; flex: 1 1 auto; }
+  .teacher-expression__order { margin-left: 0; }
+  .teacher-tabs .teacher-tab--meet { grid-column: 1 / -1; }
 }
 .teacher-receipts .teacher-month-heading {
   margin: 0;

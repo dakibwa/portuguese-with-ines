@@ -48,6 +48,7 @@ async function fixture(width, reply = async () => null, signed = true) {
     if (answer?.abort) return route.abort();
     if (answer) return route.fulfill({ headers: cors, ...answer });
     if (request.method() === "GET") {
+      if (path === "/me/expressions") return route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } });
       if (path === "/me") return route.fulfill({ headers: cors, json: { student, bookings: [lesson], series: [], sameDayFeeCents: 500 } });
       if (path === "/me/recurring-rates") return route.fulfill({ headers: cors, json: { rates: {} } });
       if (path === "/lesson-types") return route.fulfill({ headers: cors, json: { lessonTypes: types, postpay: false, paymentReady: true } });

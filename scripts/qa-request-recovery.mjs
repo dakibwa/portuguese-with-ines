@@ -68,6 +68,7 @@ async function fixture(width, reply = async () => null) {
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
     const answer = await reply(pathname, request);
     if (answer) return route.fulfill({ headers: cors, ...answer });
+    if (pathname === "/me/expressions") return route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } });
     if (pathname === "/me") {
       const replacement = request.headers().authorization === `Bearer ${newSession}`;
       return route.fulfill({ headers: cors, json: { student: replacement ? replacementStudent : student, bookings: replacement ? [] : [nextLesson], series: [], sameDayFeeCents: 500 } });
