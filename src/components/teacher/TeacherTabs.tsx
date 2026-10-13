@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { GoogleMeetLogo } from "@/components/teacher/TeacherMeetConnection";
 
 const tabs = [
   { id: "week", label: "Week" },
@@ -61,6 +62,7 @@ export function TeacherTabs({ current, hoursDirty, meetAttention, onSelect }: {
           <button
             aria-controls="teacher-tools-panel"
             aria-selected={current === tab.id}
+            className={tab.id === "meet" ? "teacher-tab--meet" : undefined}
             id={`teacher-tab-${tab.id}`}
             key={tab.id}
             onClick={() => onSelect(tab.id)}
@@ -77,7 +79,7 @@ export function TeacherTabs({ current, hoursDirty, meetAttention, onSelect }: {
             tabIndex={current === tab.id ? 0 : -1}
             type="button"
           >
-            {tab.label}
+            {tab.id === "meet" ? <><GoogleMeetLogo /><span className="visually-hidden">Google Meet</span></> : tab.label}
             {tab.id === "hours" && hoursDirty ? <span className="teacher-tab-dot" aria-label="unsaved changes" /> : null}
             {tab.id === "meet" && meetAttention ? <span className="teacher-tab-dot" aria-label="needs attention" /> : null}
           </button>

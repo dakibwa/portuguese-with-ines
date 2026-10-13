@@ -341,30 +341,42 @@ usual lesson starts and days off; avoid a wall of administration forms.
   and `Google Meet`. Open on `Week`; keep the week pager beside its date heading.
   On narrow screens only the tab strip scrolls horizontally. Arrow keys, Home
   and End move between tabs. Unsaved hours and selected dates survive tab changes;
-  an unsaved-hours dot stays visible on its tab.
+  an unsaved-hours dot stays visible on its tab. Google Meet uses its logo,
+  with an accessible name and its connection-attention dot.
+- Keep help short. The active tab supplies the page name; avoid repeating it
+  under an eyebrow. Weekly hours leads with `Repeats every week` and one short
+  instruction. Use the emails' small coloured dab marks for helpful bullet points.
 - `Weekly hours` opens the repeating weekly pattern. Clicking or
   dragging marks lesson start times. Preserve exact existing first/last-start
   values and provide an exact-time editor. The last start is not a finishing
   time. Weekly edits remain a draft until `Save weekly hours`, and booking
   activity must never silently discard that draft.
+  If changed hours cross an existing lesson, name the affected lessons before
+  saving and say that they stay booked. Check booked lessons before allowing a save.
   Half-hour cells include both quarter-hour starts when the booking interval
   is 15 minutes. A partly available cell names its actual start and shows a
   mixed state; clearing it removes its selected starts, and enabling an empty
   cell enables both. Dragging includes the final cell, and the exact-time
   editor retains control of off-grid windows.
-- `Time off` shows a month calendar. Select one or several dates, including
-  across months, then `Mark days off` or `Make available`. Mark saved days off
-  and booked lessons on their dates; list booked lessons before applying a change.
-  Reopening removes the whole-day block and retains weekly hours and partial
-  time off. Failed saves restore that date and name it.
+- `Time off` shows a month calendar. Opening a date offers `Full day off` or
+  `Specific times`, with one or more timed breaks in Porto time. Save explicitly;
+  a failed save keeps the draft and offers a retry. Removing time off clears
+  that date's whole-day and timed blocks, while retaining weekly rules and breaks.
+  The month marks whole days off and booked lessons, without repeating weekly
+  unavailability or partial blocks from the timetable.
+  `Select several days` keeps the bulk option across months and tabs. Mark those
+  days off or make them available again; bulk reopening removes only the whole-day
+  block and retains partial time off. Name overlapping lessons before saving.
   Time off prevents new bookings; existing lessons remain visible and need
   their own deliberate move/cancel action.
-- Show the full week on desktop. On small screens, keep a seven-day selector
+- Show the full working week on desktop and in a panel wide enough to read it.
+  On phones, keep the displayed days in a compact selector
   above a spacious single-day timetable and that day's `Day off` switch, with
   no horizontal page overflow. On desktop the timetable stands at its full
   height, with no scroll of its own, so an evening lesson is never hidden
   inside it. On a phone the day scrolls within its box and opens at her first
   teaching hour that day or its first lesson, whichever is earlier.
+  Compact rows must retain legible lesson times, names and call controls.
   Dates and timed lessons always use Porto time, including at DST boundaries.
   Entering a time skipped by the spring clock change shows an error and keeps
   the form available to correct. Moving a lesson in autumn's repeated hour
@@ -382,6 +394,11 @@ usual lesson starts and days off; avoid a wall of administration forms.
   coral marker for Porto lessons.
 - Keep `Sign out` beside the tools bar. `Manage students` holds the student
   cards and their actions, with the add-a-lesson form also available there.
+  Selecting a student's card opens their lesson history: upcoming lessons first,
+  then past and cancelled lessons, with dates, places and payment status.
+  History includes older lessons outside the current week and follows the account
+  after an email change. Loading, failed reads and an empty history stay distinct.
+  Reading history never changes a booking or sends a message.
 - A lesson marked as a no-show turns lavender in the calendar and carries a
   small coral `No-show` tag beside its time, so she can see it at a glance.
 - Selecting a booked lesson opens its details and the existing move, cancel,
@@ -1111,13 +1128,13 @@ as a form:
   Porto); choosing a free time offers `Add a lesson here` (her add-a-lesson
   form in a dialog, its date and time already in place) or `Take this time
   off`, while a time already off reopens at once and dragging across several
-  still takes them off together. The `Time off` tab has a month calendar:
-  she selects days, then marks them off or makes them available again.
-  Selected days stay selected across months and tabs; booked lessons are
-  named and stay until she moves or cancels them. A lesson she
+  still takes them off together. The `Time off` month opens each date in a popup
+  for a whole day off or specific hours. `Select several days` keeps bulk changes
+  available across months and tabs. Booked lessons are named and stay until she
+  moves or cancels them. A lesson she
   added herself, for a booking arranged elsewhere, reads apart from the
   students' own while lessons move onto the site: lilac with a dashed edge
-  and `Added` beside its time on the week, `Added by you` in the key, the
+  and `Added` within its card on the week, `Added by you` in the key, the
   strip and its dialog, which says it isn't charged through the site. The
   booking system records which lessons she added, so they stay hers once a
   student's card pays for them. Her add-a-lesson form asks `How often`:

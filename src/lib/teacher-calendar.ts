@@ -135,6 +135,23 @@ export function lessonStarts(windows: TeachingWindow[], interval = 30) {
   });
 }
 
+/** Booked lessons touched by a changed weekly start time still stay booked. */
+export function bookingsAffectedByHours(bookings: AdminBooking[], before: WeekHours, after: WeekHours, interval: number, now: Date) {
+  const changes = new Map(WEEKDAYS.map(({ value }) => {
+    const saved = new Set(lessonStarts(before[value] ?? [], interval));
+    const draft = new Set(lessonStarts(after[value] ?? [], interval));
+    return [value, [...new Set([...saved, ...draft])].filter(minute => saved.has(minute) !== draft.has(minute))];
+  }));
+  return bookings.filter(booking => {
+    if (booking.status !== "confirmed" || Date.parse(booking.ends_at) <= now.getTime()) return false;
+    const weeks = new Set([mondayOf(dateKey(new Date(booking.starts_at))), mondayOf(dateKey(new Date(Date.parse(booking.ends_at) - 1)))]);
+    return [...weeks].some(week => bookingSegments([booking], week).some(segment => {
+      const weekday = new Date(`${segment.date}T12:00:00Z`).getUTCDay();
+      return changes.get(weekday)?.some(minute => minute >= segment.start && minute < segment.end);
+    }));
+  }).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+}
+
 export function canPaintHours(windows: TeachingWindow[], interval: number) {
   return (
     [15, 30, 60].includes(interval) &&

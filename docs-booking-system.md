@@ -124,6 +124,15 @@ those who still need to sign in or add a card first, each with
 `Send sign-in link` (`POST /admin/students/:id/welcome`, three an hour per
 student).
 
+Selecting a student opens their lesson history. The teacher UI reads
+`GET /admin/bookings?from=1970-01-01T00:00:00.000Z` through the existing teacher
+permission path and matches the account ID (email only for older unlinked rows).
+It shows confirmed and cancelled lessons, including old dates, with upcoming
+lessons first and past/cancelled lessons newest first. Unfinished checkout holds
+are excluded. Payment and cancellation status are read-only; viewing history
+does not send emails or alter lessons. Failed reads offer a retry, and closing
+or changing accounts discards late responses.
+
 Registering proves nothing about an address, so an existing account may belong
 to whoever registered the address first rather than to the student Inês means.
 When the account's address has never been proven (see *Accounts*) and it has a
@@ -163,15 +172,27 @@ The week itself is where Inês takes time off. Choosing a free time offers
 `Add a lesson here` or `Take this time off`; dragging across times on a date
 blocks them all for that date only, and choosing a blocked time reopens it.
 The `Day off` switch above each date blocks the whole day. The `Time off`
-tab shows a month calendar: select one or several dates, including across
-months, then `Mark days off` or `Make available`. Selected dates survive tab
-changes. Booked lessons are shown before applying changes, and unavailable
-booking data must be retried first. Each selected date uses the same queue;
+tab shows a month calendar. Each date opens a popup for `Full day off` or
+`Specific times`, including multiple timed breaks. In the time picker, `00:00` means the end
+of that day (stored as minute 1440).
+This draft saves explicitly through the same `/admin/exceptions/day` endpoint.
+Switching to timed breaks removes that date's whole-day block; removing time
+off clears its whole-day and partial blocks. Weekly blocks and extra hours stay.
+The month marks whole days off and booked lessons, without displaying weekly
+unavailability or partial blocks from the week.
+`Select several days` enables bulk changes across months; selected dates survive
+tab changes. Booked lessons are shown before applying changes, and unavailable
+booking data must be retried first. Each bulk-selected date uses the same queue;
 already-matching days require no write. Reopening a day removes only its
 whole-day block, retaining partial time off and weekly hours. Each change
 saves one request at a time, so quick clicks coalesce
 into the date's latest choice. A failed older save keeps a newer choice queued;
 failure of the latest choice puts that date back as saved and says so.
+
+Weekly-hours drafts warn when changed lesson start times overlap an existing
+confirmed lesson in Porto time, including ongoing and future lessons. Saving
+waits for booked lessons to load; the warning and save confirmation both state
+that existing lessons stay booked. Hours edits never move or cancel them.
 Leaving the teacher page releases its queue: an already submitted write may
 finish, but no later queued write starts. Unreadable time-off or weekly-hours
 acknowledgments show an error instead of claiming success. Past dates and

@@ -33,7 +33,7 @@
   display: flex;
   align-items: center;
   gap: 1.25rem;
-  margin-bottom: 1.6rem;
+  margin-bottom: 1rem;
 }
 .teacher-tabs-scroll {
   flex: 1 1 auto;
@@ -86,6 +86,11 @@
 .teacher-tabs button[aria-selected="true"] {
   color: var(--paper-light);
 }
+.teacher-tabs .teacher-tab--meet {
+  flex: 0 0 52px;
+  padding: 0.6rem 0.75rem;
+}
+.teacher-tab--meet .teacher-meet-logo { width: 25px; height: 21px; flex: none; }
 .teacher-tabs button:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
@@ -110,9 +115,9 @@
   border-radius: 12px;
 }
 .teacher-tool-heading {
-  margin-bottom: 1.3rem;
+  margin-bottom: 0.85rem;
 }
-.teacher-tool-heading h2 {
+.teacher-tool-heading h2:not(.visually-hidden) {
   margin: 0.35rem 0 0;
   color: var(--ink);
   font: 600 clamp(1.25rem, 2.4vw, 1.55rem)/1.45 var(--ui);
@@ -123,6 +128,36 @@
   margin: 0.6rem 0 0;
   font-size: 0.84rem;
   line-height: 1.6;
+}
+.teacher-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--lavender-ink);
+  font: 500 0.8rem/1.5 var(--ui);
+}
+.teacher-help li {
+  position: relative;
+  padding-left: 1.1rem;
+}
+.teacher-help li::before {
+  content: "";
+  position: absolute;
+  top: 0.3em;
+  left: 0;
+  width: 0.7rem;
+  height: 0.7rem;
+  background: url("/email/dab-blue.png") center / contain no-repeat;
+}
+.teacher-help li:nth-child(2)::before {
+  background-image: url("/email/dab-coral.png");
+}
+.teacher-week--editing .teacher-week-title h2 {
+  font-size: 1rem;
+  letter-spacing: 0;
 }
 .teacher-workspace button,
 .teacher-lesson-dialog button {
@@ -215,16 +250,6 @@
 .teacher-week-navigation .teacher-text-button {
   margin: 0 0.25rem;
 }
-.teacher-repeat-note {
-  display: flex;
-  grid-area: pager;
-  justify-self: end;
-  gap: 0.45rem;
-  align-items: center;
-  font: 500 0.73rem/1.5 var(--ui);
-  flex: none;
-  color: var(--lavender-ink);
-}
 .teacher-icon-button {
   display: inline-grid;
   place-items: center;
@@ -307,7 +332,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 72px;
+  min-height: 56px;
   gap: 0.3rem;
   border: 0;
   border-left: 1px solid var(--rule-soft);
@@ -348,7 +373,7 @@
   display: none;
 }
 .teacher-timetable--editing .teacher-day-heading {
-  min-height: 50px;
+  min-height: 44px;
 }
 .teacher-day-toggles {
   display: grid;
@@ -849,8 +874,8 @@
   width: 100%;
 }
 .teacher-manual {
-  margin-top: 3rem;
-  padding-top: 1.5rem;
+  margin-top: 1.6rem;
+  padding-top: 0.75rem;
   border-top: 1px solid var(--rule);
 }
 .teacher-manual summary {
@@ -858,7 +883,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  min-height: 64px;
+  min-height: 48px;
   cursor: pointer;
   list-style: none;
 }
@@ -1272,7 +1297,7 @@
   }
 }
 
-@media (max-width: 740px) {
+@media (max-width: 600px) {
   .teacher-page .account-hero {
     min-height: 126px;
     padding: 1.4rem var(--page-pad);
@@ -1293,7 +1318,7 @@
     padding-top: 1.6rem;
   }
   .teacher-workspace {
-    --teacher-slot-height: 42px;
+    --teacher-slot-height: 36px;
   }
   /* Keep the date and its arrows together; the tools have their own tabs. */
   .teacher-week-toolbar {
@@ -1314,12 +1339,8 @@
     order: 1;
     font-size: 0.76rem;
   }
-  .teacher-week-navigation,
-  .teacher-repeat-note {
+  .teacher-week-navigation {
     margin-left: auto;
-  }
-  .teacher-repeat-note {
-    min-height: 44px;
   }
   .teacher-week-days {
     grid-template-columns: repeat(var(--teacher-days, 7), minmax(0, 1fr));
@@ -1328,7 +1349,7 @@
     display: none;
   }
   .teacher-day-heading {
-    min-height: 68px;
+    min-height: 56px;
     border-left: 0;
     font-size: 0.61rem;
   }
@@ -1392,7 +1413,7 @@
     font-size: 0.74rem;
   }
   .teacher-calendar-lesson {
-    padding: 10px 12px;
+    padding: 7px 12px;
     left: 6px;
     right: 7px;
   }
@@ -1403,7 +1424,7 @@
     font-size: 0.71rem;
   }
   .teacher-lesson-location {
-    top: 11px;
+    top: 8px;
     right: 12px;
   }
   .teacher-lesson-meet {
@@ -1441,7 +1462,7 @@
     width: 100%;
   }
   .teacher-manual {
-    margin-top: 2rem;
+    margin-top: 1.5rem;
   }
   .teacher-manual-title {
     font-size: 0.92rem;
@@ -1462,6 +1483,19 @@
     padding: 1rem 1.1rem 1.15rem;
   }
 
+}
+
+/* A side panel has room for the working week; phones retain one roomy day. */
+@media (min-width: 601px) and (max-width: 740px) {
+  .teacher-workspace { --teacher-slot-height: 32px; }
+  .teacher-time-grid,
+  .teacher-week-days,
+  .teacher-day-toggles { grid-template-columns: 44px repeat(var(--teacher-days, 7), minmax(0, 1fr)); }
+  .teacher-calendar-lesson { padding: 5px 5px; }
+  .teacher-calendar-lesson strong { font-size: 0.7rem; }
+  .teacher-lesson-time { font-size: 0.52rem; }
+  .teacher-lesson-location { right: 5px; top: 5px; }
+  .teacher-lesson-meet { left: 9px; }
 }
 
 /* The date keeps its full wording on small phones, with its pager beneath. */
@@ -1754,6 +1788,19 @@
 .teacher-calendar-lesson--added .teacher-lesson-location {
   color: var(--lavender-ink);
 }
+@media (min-width: 601px) and (max-width: 740px) {
+  .teacher-calendar-lesson .teacher-lesson-added,
+  .teacher-calendar-lesson .teacher-lesson-no-show {
+    position: absolute;
+    right: 5px;
+    bottom: 7px;
+    margin: 0;
+    font-size: 0.5rem;
+    line-height: 1.5;
+  }
+  .teacher-lesson-time:has(.teacher-lesson-no-show) .teacher-lesson-added { display: none; }
+  .teacher-lesson-meet { font-size: 0; gap: 0; }
+}
 .teacher-key-added {
   border: 1.5px dashed var(--lavender-ink) !important;
   background: var(--lavender-soft);
@@ -1843,6 +1890,28 @@
   margin: 0;
   padding-left: 1.1rem;
 }
+.teacher-hours-warning:not(:empty) {
+  margin: 0 0 0.8rem;
+  padding: 0.65rem 0.85rem;
+  border-left: 3px solid var(--coral);
+  border-radius: 0 10px 12px 0;
+  background: rgba(239, 93, 60, 0.08);
+  font: 400 0.8rem/1.5 var(--ui);
+}
+.teacher-hours-warning p { margin: 0; }
+.teacher-hours-warning ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+.teacher-timeoff > .teacher-tool-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
+.teacher-timeoff-dialog h2 { margin-right: 2.5rem; }
+.teacher-timeoff-dialog form { display: grid; gap: 1rem; }
+.teacher-timeoff-options { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0; padding: 0; border: 0; }
+.teacher-timeoff-options label { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; min-height: 44px; padding: 0.5rem 0.7rem; border: 1px solid var(--rule); border-radius: var(--squiggle-field); font-size: 0.8rem; cursor: pointer; }
+.teacher-timeoff-options label:has(:checked) { background: var(--lavender-soft); border-color: var(--blue); }
+.teacher-timeoff-options input { width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: var(--blue); }
+.teacher-timeoff-times { display: grid; gap: 0.65rem; }
+.teacher-timeoff-times > p { margin: 0; }
+.teacher-timeoff-time { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 0.5rem; align-items: end; }
+.teacher-timeoff-time input { width: 100%; min-width: 0; }
+.teacher-timeoff-dialog .teacher-dialog-actions { margin: 0; }
 
 /* Whole days use the booking calendar's cream sheet and clear date buttons. */
 .teacher-timeoff-layout {
@@ -1851,6 +1920,7 @@
   align-items: start;
   gap: 2rem;
 }
+.teacher-timeoff-layout.is-single { display: block; max-width: 44rem; }
 .teacher-month {
   min-width: 0;
   border: 1px solid var(--rule);
@@ -2119,6 +2189,64 @@
   min-width: 0;
   gap: 0.1rem;
 }
+.teacher-student__profile {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.85rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.teacher-student__profile:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 6px;
+}
+.teacher-student__history-link {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.55rem;
+  color: var(--blue);
+  font: 600 0.74rem/1.4 var(--ui);
+}
+.teacher-student__profile:hover .teacher-student__history-link {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.teacher-history-dialog { width: min(620px, calc(100vw - 2rem)); }
+.teacher-history-heading {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding-right: 2.5rem;
+}
+.teacher-history-heading .account-avatar { width: 42px; height: 42px; }
+.teacher-history-heading p { margin: 0 0 0.2rem; font-size: 0.72rem; color: var(--lavender-ink); }
+.teacher-history-heading .teacher-history-email { margin: 0.35rem 0 0; overflow-wrap: anywhere; }
+.teacher-history-clock { margin: 0; font-size: 0.7rem; color: var(--lavender-ink); }
+.teacher-history-dialog h3 { margin: 0.8rem 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
+.teacher-history-dialog h3 span { color: var(--lavender-ink); font-weight: 500; }
+.teacher-history-list { display: grid; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
+.teacher-history-lesson { padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--sheet); }
+.teacher-history-lesson.is-cancelled { background: var(--lavender-pale, #f1eef7); }
+.teacher-history-lesson__top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.45rem; font-size: 0.8rem; }
+.teacher-history-status { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); padding: 0.2rem 0.5rem; font: 600 0.65rem/1.4 var(--ui); }
+.teacher-history-status.is-muted { background: var(--lavender-soft); color: var(--ink); }
+.teacher-history-lesson__time { margin: 0.4rem 0; font: 600 0.8rem/1.5 var(--ui); }
+.teacher-history-lesson__time span { font-weight: 400; }
+.teacher-history-lesson__facts { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin: 0; font: 500 0.7rem/1.5 var(--ui); color: var(--lavender-ink); }
+.teacher-history-lesson__facts > span { display: inline-flex; align-items: center; gap: 0.25rem; }
+.teacher-history-lesson__note { margin: 0.6rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 0.75rem/1.5 var(--ui); }
+.teacher-history-empty { font-size: 0.85rem; }
 .teacher-student__name {
   font: 600 0.95rem/1.35 var(--ui);
 }

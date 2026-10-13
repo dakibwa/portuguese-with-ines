@@ -5,6 +5,7 @@ import { wallTimeToUtc } from "../src/lib/wall-time.ts";
 import {
   addSpan,
   bookingSegments,
+  bookingsAffectedByHours,
   canPaintHours,
   dateBlocks,
   dateKey,
@@ -19,6 +20,25 @@ import {
   weeklyBlocks,
   withDayChanges,
 } from "../src/lib/teacher-calendar.ts";
+
+test("weekly-hour warnings use Porto time and only changed starts inside booked lessons", () => {
+  const before = hoursFromRules([{ weekday: 1, start_minute: 600, last_start_minute: 690 }]);
+  const after = { ...before, 1: [{ start: 600, lastStart: 630 }] };
+  const bookings = [
+    { id: "summer", status: "confirmed", starts_at: "2026-09-07T10:00:00Z", ends_at: "2026-09-07T11:00:00Z" },
+    { id: "winter", status: "confirmed", starts_at: "2026-11-02T11:00:00Z", ends_at: "2026-11-02T12:00:00Z" },
+    { id: "untouched", status: "confirmed", starts_at: "2026-09-07T09:00:00Z", ends_at: "2026-09-07T10:00:00Z" },
+    { id: "cancelled", status: "cancelled", starts_at: "2026-09-07T10:00:00Z", ends_at: "2026-09-07T11:00:00Z" },
+    { id: "past", status: "confirmed", starts_at: "2026-08-31T10:00:00Z", ends_at: "2026-08-31T11:00:00Z" },
+  ];
+  const now = new Date("2026-09-07T08:00:00Z");
+  assert.deepEqual(bookingsAffectedByHours(bookings, before, after, 30, now).map(row => row.id), ["summer", "winter"]);
+  assert.deepEqual(bookingsAffectedByHours(bookings, before, before, 30, now), []);
+  assert.deepEqual(bookingsAffectedByHours(bookings, after, before, 30, now).map(row => row.id), ["summer", "winter"], "Adding hours across a booked lesson warns too");
+  const overnight = [{ id: "overnight", status: "confirmed", starts_at: "2026-09-06T22:30:00Z", ends_at: "2026-09-07T00:30:00Z" }];
+  const empty = hoursFromRules([]);
+  assert.equal(bookingsAffectedByHours(overnight, empty, { ...empty, 1: [{ start: 0, lastStart: 30 }] }, 30, new Date("2026-09-01")).length, 1, "The Monday half of a Sunday-night lesson is included");
+});
 
 test("Porto wall times round-trip across DST and reject the missing spring hour", () => {
   const convert = (date, time) => wallTimeToUtc(date, time, "Europe/Lisbon");

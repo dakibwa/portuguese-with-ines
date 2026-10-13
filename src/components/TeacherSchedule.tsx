@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Repeat2,
 } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
@@ -29,12 +28,13 @@ import {
   type AvailabilityException,
 } from "@/lib/admin-api";
 import { clearSession, fetchMe, readSession, subscribeToSession, type Student } from "@/lib/auth-api";
-import { portoTimeToUtc } from "@/lib/booking-api";
+import { formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
 import { BOOKING_CONFIGURED } from "@/lib/config";
 import { SITE_BASE_PATH } from "@/lib/paths";
 import {
   addSpan,
   bookingSegments,
+  bookingsAffectedByHours,
   dateBlocks,
   dateKey,
   daysOff,
@@ -128,6 +128,7 @@ export function TeacherSchedule() {
   );
   const hoursDirty = serialiseHours(savedHours) !== serialiseHours(draftHours);
   const invalidHours = hoursProblem(draftHours);
+  const affectedLessons = useMemo(() => bookingsAffectedByHours(bookings, savedHours, draftHours, interval, now), [bookings, savedHours, draftHours, interval, now]);
 
   const resetAccount = useCallback(() => {
     accountGeneration.current += 1;
@@ -293,7 +294,7 @@ export function TeacherSchedule() {
   }, [hoursDirty, dayChanges]);
 
   async function saveHours() {
-    if (savingHours || invalidHours) return;
+    if (savingHours || invalidHours || bookingsLoading || bookingsError) return;
     const account = accountGeneration.current;
     setSavingHours(true);
     setError("");
@@ -312,7 +313,7 @@ export function TeacherSchedule() {
       );
       if (account !== accountGeneration.current) return;
       setSavedHours(submitted);
-      setStatus("Weekly hours saved. Students can now book these times.");
+      setStatus(`Weekly hours saved. Students can now book these times.${stayBooked(affectedLessons.length)}`);
     } catch (caught) {
       if (account !== accountGeneration.current) return;
       setError(
@@ -448,6 +449,25 @@ export function TeacherSchedule() {
     });
   }
 
+  /** The modal keeps its draft until this explicit save is confirmed. */
+  async function saveTimeOffDay(date: string, change: { dayOff: boolean; blocks?: Span[] }) {
+    if (sendingDays.current || bookingsLoading || bookingsError) throw new Error("Please wait until your calendar has finished loading or saving.");
+    const account = accountGeneration.current;
+    sendingDays.current = true;
+    setSavingDays(true);
+    try {
+      const result = await saveDayOff(token, date, change);
+      if (account !== accountGeneration.current) return;
+      setExceptions(current => [...current.filter(row => row.date !== date), ...result.exceptions]);
+      setDayNote({ error: false, text: `Time off updated for ${shortDate(date)}.${stayBooked(lessonsDuring(date))}` });
+    } finally {
+      if (account === accountGeneration.current) {
+        sendingDays.current = false;
+        setSavingDays(false);
+      }
+    }
+  }
+
   const weekEnd = shiftDate(weekStart, 6);
   const weekCount = bookings.filter(
     (booking) =>
@@ -575,29 +595,21 @@ export function TeacherSchedule() {
         <NextLesson bookings={bookings} now={now} onOpen={setSelectedBooking} />
       ) : null}
 
-      <section className="teacher-week" aria-labelledby="teacher-week-title">
+      <section className={`teacher-week${editing ? " teacher-week--editing" : ""}`} aria-labelledby="teacher-week-title">
         <div className="teacher-week-toolbar">
           <div className="teacher-week-title">
-            <span className="teacher-eyebrow">
-              {editing ? "Set your rhythm" : "Your week at a glance"}
-            </span>
             <div className="teacher-week-heading">
               <h2 id="teacher-week-title" ref={calendarTitleRef} tabIndex={-1}>
                 {editing
-                  ? "Your weekly hours"
+                  ? "Repeats every week"
                   : `${dateLabel(weekStart, { day: "numeric", month: "short" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}`}
               </h2>
             </div>
           </div>
           {editing ? (
-            <p className="teacher-week-hint">Click or drag down a day to mark lesson start times.</p>
+            <ul className="teacher-help teacher-week-hint"><li>Tap or drag to set lesson start times.</li></ul>
           ) : null}
-          {editing ? (
-            <span className="teacher-repeat-note">
-              <Repeat2 size={15} aria-hidden="true" />
-              Repeats every week
-            </span>
-          ) : (
+          {!editing ? (
             <div className="teacher-week-navigation">
               <button
                 className="teacher-icon-button"
@@ -623,8 +635,17 @@ export function TeacherSchedule() {
                 <ChevronRight size={19} aria-hidden="true" />
               </button>
             </div>
-          )}
+          ) : null}
         </div>
+        {editing && hoursDirty ? (
+          <div className="teacher-hours-warning" aria-live="polite">
+            {bookingsLoading ? <p>Checking booked lessons…</p> : bookingsError ? <div role="alert"><p>Booked lessons could not be checked.</p><button className="teacher-text-button" onClick={() => void reloadBookings()} type="button">Try again</button></div> : affectedLessons.length ? <>
+              <p><strong>{affectedLessons.length === 1 ? "1 booked lesson falls" : `${affectedLessons.length} booked lessons fall`} in the hours you’re changing.</strong> {affectedLessons.length === 1 ? "It stays" : "They stay"} booked.</p>
+              <ul>{affectedLessons.slice(0, 4).map(booking => <li key={booking.id}>{booking.student_name} · {shortDate(dateKey(new Date(booking.starts_at)))} · {formatSlotTime(booking.starts_at)}</li>)}</ul>
+              {affectedLessons.length > 4 ? <p>And {affectedLessons.length - 4} more.</p> : null}
+            </> : null}
+          </div>
+        ) : null}
         {!editing && bookingsLoading && !bookingsShown ? (
           <p className="teacher-calendar-loading" role="status">
             Loading this week&rsquo;s lessons…
@@ -686,8 +707,7 @@ export function TeacherSchedule() {
         {editing ? (
           <div className="teacher-hours-save">
             <p className="teacher-secondary-copy">
-              The last marked time is the last a lesson can{" "}
-              <strong>start</strong>. A lesson can finish later.
+              Marked times are lesson <strong>starts</strong>, not finishing times.
             </p>
             <div className="teacher-save-row">
               <span className="teacher-save-note" aria-live="polite">
@@ -708,7 +728,7 @@ export function TeacherSchedule() {
               <button
                 className="button button--coral"
                 type="button"
-                disabled={savingHours || !hoursDirty || Boolean(invalidHours)}
+                disabled={savingHours || !hoursDirty || Boolean(invalidHours) || bookingsLoading || Boolean(bookingsError)}
                 onClick={() => void saveHours()}
               >
                 {savingHours ? "Saving…" : "Save weekly hours"}
@@ -722,7 +742,7 @@ export function TeacherSchedule() {
           </div>
         ) : !bookingsLoading && !bookingsError && !weekCount ? (
           <p className="teacher-empty-week">
-            No lessons booked this week. Your weekly hours are shown above.
+            No lessons booked this week.
           </p>
         ) : null}
       </section>
@@ -730,7 +750,6 @@ export function TeacherSchedule() {
       <div className="teacher-tab-view" hidden={activeTab !== "time-off"}>
         <TimeOffCalendar
           today={today}
-          hours={savedHours}
           exceptions={shownExceptions}
           bookings={bookings}
           bookingsLoading={bookingsLoading}
@@ -739,6 +758,7 @@ export function TeacherSchedule() {
           busy={savingDays}
           status={<p className={`teacher-save-state ${dayNote?.error ? "is-error" : ""}`} role={dayNote?.error ? "alert" : "status"}>{savingDays ? "Saving…" : dayNote?.text}</p>}
           onChange={takeTimeOff}
+          onSaveDay={saveTimeOffDay}
         />
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "students"}>

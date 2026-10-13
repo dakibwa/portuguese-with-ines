@@ -103,22 +103,21 @@ export function TeacherMeetConnection({ token, onAttentionChange }: { token: str
   return (
     <section className="teacher-meet" aria-labelledby="teacher-meet-title">
       <header className="teacher-tool-heading">
-        <span className="teacher-eyebrow">Your calendar and calls</span>
-        <h2 id="teacher-meet-title"><GoogleMeetLogo /> Google Meet</h2>
-        {attention ? <p className="teacher-meet-attention">{attention}</p> : healthy ? <p className="teacher-meet-connected"><Check size={16} aria-hidden="true" />Connected</p> : null}
+        <h2 className="visually-hidden" id="teacher-meet-title">Google Meet</h2>
+        {attention ? <p className="teacher-meet-attention">{attention}</p> : healthy ? <p className="teacher-meet-connected"><GoogleMeetLogo /><Check size={16} aria-hidden="true" />Connected{connection?.email ? ` as ${connection.email}` : ""}</p> : null}
       </header>
       {!connection && !error ? <p role="status">Checking Google Meet…</p> : null}
       {feedback ? <p role="status">{feedback}</p> : null}
       {error ? <div className="teacher-meet-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={() => setAttempt(value => value + 1)} type="button">Try again</button></div> : null}
       {connection?.configured ? (
         <div className="teacher-meet-settings">
-          <p>
+          <ul className="teacher-help"><li>
             {healthy
-              ? `Connected${connection.email ? ` as ${connection.email}` : ""}. Lessons sync to your Google Calendar with Meet links.`
+              ? "Lessons and Meet links sync automatically."
               : connection.needsReconnect
-                ? "Reconnect your Google account to keep lessons and Meet links syncing."
-                : "Connect your Google account to sync lessons to your calendar and create Meet links."}
-          </p>
+                ? "Reconnect to sync lessons and Meet links."
+                : "Connect to add lessons and Meet links to Google Calendar."}
+          </li>{connection.connected ? <li>Move or cancel lessons here.</li> : null}</ul>
           {connection.pending > 0 ? (
             <p>{connection.pending} {connection.pending === 1 ? "lesson is" : "lessons are"} waiting to sync.</p>
           ) : null}
@@ -131,9 +130,7 @@ export function TeacherMeetConnection({ token, onAttentionChange }: { token: str
             ) : null}
           </div>
           {connection.connected ? (
-            <p className="teacher-meet-note">
-              To share lessons, open “Português com a Inês — lessons” in Google Calendar → Settings and sharing → Add people. Change or cancel lessons here, not in Google.
-            </p>
+            <details className="teacher-meet-note"><summary>Share your calendar</summary><p>In Google Calendar, open “Português com a Inês — lessons” → Settings and sharing → Add people.</p></details>
           ) : null}
         </div>
       ) : null}

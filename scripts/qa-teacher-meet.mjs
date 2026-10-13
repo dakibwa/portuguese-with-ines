@@ -90,13 +90,14 @@ try {
 
     // The same tab holds the working connection and its settings.
     const working = await fixture(width, { ...disconnected, connected: true, email: "teacher@example.invalid", pending: 0 });
-    await expect(working.panel.getByRole("heading", { name: "Google Meet", exact: true })).toBeVisible();
+    await expect(working.panel.locator(".teacher-meet-connected")).toContainText("Connected");
     await expect(working.panel.locator(".teacher-meet-logo")).toBeVisible();
     await expect(working.page.getByRole("tab", { name: /^Google Meet/ }).locator(".teacher-tab-dot")).toHaveCount(0);
     await expect(working.panel).toContainText("Connected as teacher@example.invalid");
     await expect(working.panel.getByRole("button", { name: "Reconnect Google Meet", exact: true })).toBeVisible();
     await expect(working.panel.getByRole("link", { name: "Open Google Calendar", exact: true })).toHaveAttribute("href", "https://calendar.google.com/");
-    await expect(working.panel).toContainText("Settings and sharing");
+    await working.panel.locator("summary").filter({ hasText: "Share your calendar" }).click();
+    await expect(working.panel.locator("details p")).toContainText("Settings and sharing");
     assert.deepEqual(working.calls, [], "Opening the tab never starts OAuth");
     assert.ok(await working.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     await working.page.close();
