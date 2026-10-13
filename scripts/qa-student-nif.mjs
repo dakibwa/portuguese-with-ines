@@ -32,6 +32,7 @@ async function open(width, path, { session = "", me = student, reply = () => nul
     if (fixture) return route.fulfill(fixture);
     if (endpoint === "/me") return route.fulfill({ json: { student: me, bookings: [], series: [], sameDayFeeCents: 500 } });
     if (endpoint === "/me/recurring-rates") return route.fulfill({ json: { rates: {} } });
+    if (endpoint === "/me/expressions") return route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } });
     if (endpoint === "/lesson-types") return route.fulfill({ json: { lessonTypes: [], postpay: false } });
     if (endpoint === "/availability") return route.fulfill({ json: { slotsByDate: {}, horizonDays: 56 } });
     if (endpoint === "/admin/google-calendar") return route.fulfill({ json: { configured: false, connected: false, email: null, needsReconnect: false, pending: 0 } });
