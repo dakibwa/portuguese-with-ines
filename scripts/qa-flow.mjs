@@ -2745,11 +2745,11 @@ await accountPage.route("**/me/expressions/pick", route => {
   return route.fulfill({ json: { expression, canPick: false, hasPublished: true, shuffleLabels: [] } });
 });
 await accountPage.reload({ waitUntil: "domcontentloaded" });
-await accountPage.getByRole("button", { name: "Pick an expression", exact: true }).click();
+await accountPage.getByRole("button", { name: "Spin the wheel", exact: true }).click();
 await accountPage.locator(".student-expressions__result .expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
 await accountPage.reload({ waitUntil: "domcontentloaded" });
 await accountPage.locator(".student-expressions__result .expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
-if (await accountPage.getByRole("button", { name: "Pick another expression", exact: true }).count()) throw new Error("An exhausted collection must wait for new expressions.");
+if (await accountPage.getByRole("button", { name: "Spin again", exact: true }).count()) throw new Error("An exhausted collection must wait for new expressions.");
 
 // The account is remembered for a quick return visit, and forgotten on
 // signing out with the session it belonged to.

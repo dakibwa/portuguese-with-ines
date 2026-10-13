@@ -539,11 +539,24 @@ there is no anonymous page or main-menu item.
   individual meanings. None is copied into `public/visuals/` for this integration.
 
 The student card uses the same lilac sheet, cream reading card and handwritten
-Portuguese title. A coral Pick button starts a short, slowing vertical shuffle
-and reveals the saved result. Reduced-motion users see the result immediately;
-assistive technology announces the result rather than every passing title.
-Keep the button disabled during the request and animation. A failed reply can
-be retried without spending another pick. Returning students see their last
+Portuguese title. Its centre is a painted wheel (13 October 2026, at Dan's
+request for a wheel that lands on an expression, each phrase on its own splat,
+in the style of the site): a lavender wheel whose ten arms each carry a splat
+with a phrase on it in Beth Ellen, the top arc showing, the coral chapéu from
+the wordmark marking the top. The splat nearing the top swells so its phrase
+reads large. The wheel sits beside the card where there is room and above it
+on a phone, with `Spin the wheel` (then `Spin again`) between them. The press
+turns the wheel at once; it slows over the last few phrases onto the saved
+pick, rolls a touch past and settles back, the chapéu hopping as each splat
+passes under it, and the chosen splat blooms as droplets splash out round it.
+Only then does the reading card dissolve in. The wheel is decorative: the pick
+is the Worker's, the wheel only slows onto it, and assistive technology hears
+the result rather than every passing phrase. Reduced-motion users see the
+result on the top splat at once. The paintings live in
+`public/visuals/expression-wheel/`. Keep the button disabled during the request
+and animation. A failed reply stops the wheel and can be retried without
+spending another pick. If the collection cannot be read at all, the section
+stays away rather than raising an alarm beside the lessons. Returning students see their last
 available result, and every student has an independent history. Once their
 published pool is exhausted, show a quiet note and wait for new expressions.
 Do not reset their history or imply another student has taken an expression.
