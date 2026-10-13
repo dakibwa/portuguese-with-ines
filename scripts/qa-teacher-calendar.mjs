@@ -1017,11 +1017,54 @@ try {
     // Weekly edits that cross a booked time warn before saving, and on success.
     await showHours(page);
     await slot(page, 1, 660).click();
-    await expect(page.locator(".teacher-hours-warning")).toContainText("1 booked lesson falls in the hours you’re changing. It stays booked.");
-    await expect(page.locator(".teacher-hours-warning")).toContainText("Alex");
+    const clash = page.locator(".teacher-hours-clash");
+    await expect(clash).toHaveCount(1);
+    await expect(clash).toContainText("Alex");
+    await expect(clash).toContainText("Hours clash");
+    await expect(clash).toContainText("Stays booked");
+    const changeLesson = clash.getByRole("button", { name: /^Change lesson for Alex/ });
+    const writesBeforeOpen = state.writes.length;
+    await changeLesson.click();
+    await expect(page.getByRole("dialog", { name: "Alex", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Close lesson details", exact: true }).click();
+    await expect(changeLesson).toBeFocused();
+    await expect(slot(page, 1, 660)).toHaveAttribute("aria-pressed", "false");
+    assert.equal(state.writes.length, writesBeforeOpen, "Opening a clash leaves the lesson and weekly-hours draft unchanged");
     await page.getByRole("button", { name: "Save weekly hours", exact: true }).click();
     await expect(page.locator(".teacher-workspace > .teacher-inline-success")).toContainText("The lesson already booked stays in place.");
     assert.deepEqual(state.bookings, originalBookings);
+    await noOverflow(page);
+    assert.deepEqual(state.errors, []);
+    await page.close();
+  }
+
+  // A clash card uses the existing lesson editor, including lessons hidden
+  // under More. Moving one refreshes the cards and preserves unsaved hours.
+  for (const width of [1280, 390, 320]) {
+    const { page, state } = await fixture(width);
+    for (let week = 1; week <= 5; week++) state.bookings.push(lesson(`repeat-${week}`, `Repeat ${week}`, new Date(Date.parse("2026-09-07T10:00:00Z") + week * 7 * 86400000).toISOString()));
+    await page.reload();
+    await showHours(page);
+    await slot(page, 1, 660).click();
+    await expect(page.locator(".teacher-hours-clash:visible")).toHaveCount(4);
+    await page.locator(".teacher-hours-clashes-more > summary").click();
+    await expect(page.locator(".teacher-hours-clash:visible")).toHaveCount(6);
+    await page.getByRole("button", { name: /^Change lesson for Repeat 5/ }).click();
+    await expect(page.getByRole("dialog", { name: "Repeat 5", exact: true })).toBeVisible();
+    assert.deepEqual(state.writes, []);
+    await page.getByRole("button", { name: "Move lesson", exact: true }).click();
+    await page.getByLabel("New date").fill("2026-10-13");
+    await page.getByRole("dialog").getByLabel("Time in Porto").fill("11:00");
+    await page.getByRole("button", { name: "Save new time", exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator(".teacher-hours-clash")).toHaveCount(5);
+    await expect(page.locator(".teacher-hours-warning")).not.toContainText("Repeat 5");
+    await expect(page.getByRole("tab", { name: /^Weekly hours/ })).toHaveAttribute("aria-selected", "true");
+    await expect(slot(page, 1, 660)).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByRole("button", { name: "Save weekly hours", exact: true })).toBeEnabled();
+    await expect(page.getByRole("heading", { name: "Repeats every week", exact: true })).toBeFocused();
+    assert.deepEqual(state.writes.map(({ path }) => path), ["/admin/bookings/repeat-5/reschedule"]);
+    assert.ok(state.bookings.every(booking => booking.status === "confirmed"));
     await noOverflow(page);
     assert.deepEqual(state.errors, []);
     await page.close();
