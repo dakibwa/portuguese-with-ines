@@ -1023,11 +1023,28 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   box-shadow: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
 }
 
+/*
+ * The quiet constructive choice beside a coral one (13 October 2026, Dan:
+ * "just the subtle lilac"): the soft lilac of the palette filled, ink on it
+ * at 9:1, so Take some hours off or Add a new student reads as something to
+ * do rather than a way out. Cancel, Back and Done stay outlined.
+ */
+.button--lilac {
+  background: var(--lavender-soft);
+  color: var(--ink);
+}
+
+.button--lilac:hover {
+  background: #cdc8f1;
+  box-shadow: 0 12px 22px -14px rgba(85, 79, 145, 0.6);
+}
+
 /* Until it can act, a filled button is the same quiet outline as the booking's
    final action, so coral and blue appear only when the action is live. White
    on a faded fill read as broken. A disabled button does not answer either. */
 .button--coral:disabled,
-.button--blue:disabled {
+.button--blue:disabled,
+.button--lilac:disabled {
   border: 1px solid var(--rule);
   background: transparent;
   box-shadow: none;

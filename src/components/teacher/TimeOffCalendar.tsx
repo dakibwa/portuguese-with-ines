@@ -177,13 +177,13 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
                 </button>
               ) : null}
               {one ? (
-                <button className="button button--outline" disabled={busy || unchecked} onClick={() => setHoursFor(one)} ref={hoursButtonRef} type="button">
+                <button className="button button--lilac" disabled={busy || unchecked} onClick={() => setHoursFor(one)} ref={hoursButtonRef} type="button">
                   <Clock size={16} aria-hidden="true" />
                   {hoursOff.length ? "Change hours off" : "Take some hours off"}
                 </button>
               ) : null}
               {chosen.some(date => off.has(date)) ? (
-                <button className="button button--outline" disabled={busy || unchecked} onClick={() => onChange(chosen, false)} type="button">
+                <button className="button button--lilac" disabled={busy || unchecked} onClick={() => onChange(chosen, false)} type="button">
                   <CalendarCheck size={16} aria-hidden="true" />
                   Make available
                 </button>

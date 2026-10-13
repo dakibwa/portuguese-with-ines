@@ -134,7 +134,7 @@ export function TeacherMeetConnection({ token, onAttentionChange }: { token: str
           <div className="teacher-meet-actions">
             {healthy ? (
               <>
-                <a className="button button--outline" href="https://calendar.google.com/" target="_blank" rel="noopener noreferrer">Open Google Calendar</a>
+                <a className="button button--lilac" href="https://calendar.google.com/" target="_blank" rel="noopener noreferrer">Open Google Calendar</a>
                 <button className="teacher-text-button" disabled={busy} onClick={() => void connect()} type="button">
                   {busy ? "Opening Google…" : "Reconnect Google Meet"}
                 </button>

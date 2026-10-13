@@ -118,7 +118,7 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
               ))}
             </ul>
           ) : null}
-          <button className="button button--outline teacher-student-dialog__new" onClick={() => setStep("details")} type="button">
+          <button className="button button--lilac teacher-student-dialog__new" onClick={() => setStep("details")} type="button">
             <UserPlus size={16} aria-hidden="true" />
             Add a new student
           </button>

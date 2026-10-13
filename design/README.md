@@ -370,7 +370,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   date for one, chips for several), what they already hold (`A day off`,
   `Off 10:00–11:30`), and under `Already booked` each lesson on them as a
   booked-lesson card. Then `Take the day off` / `Take 3 days off` in coral,
-  `Take some hours off` (one day) in outline, and `Make available` only when a
+  `Take some hours off` (one day) in soft lilac, and `Make available` only when a
   chosen day is off. Some hours opens a small dialog of one or more breaks in
   Porto time, saved only with `Save hours off`; a failed save keeps the draft.
   `Remove hours off` clears that date's breaks. Making days available removes
@@ -430,7 +430,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - Keep `Sign out` beside the tools bar. `Students` holds the student
   cards, each a profile (splat, name, address and an arrow into their history)
   over dabs for where they are and their next lesson, then the site's own
-  outline `Add lesson` and coral `Send welcome email`; no sentence above them. Selecting a student's card opens their lesson
+  blue `Add lesson` and coral `Send welcome email`; no sentence above them. Selecting a student's card opens their lesson
   history: upcoming lessons first, then past and cancelled, one card each with
   the date and time on one line (the year only when it isn't this one), a pill
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
@@ -454,7 +454,11 @@ usual lesson starts and days off; avoid a wall of administration forms.
   never an outline. Use space and contrast well (13 October 2026, Dan): two
   actions share a row rather than stacking full width (a student card's blue
   `Add lesson` beside its coral `Send welcome email`, a lesson's `Move` beside
-  `Cancel`), and coral marks the one thing still to do. On a phone every tab
+  `Cancel`), and coral marks the one thing still to do. A quieter constructive
+  choice is filled in the palette's soft lilac (`Take some hours off`, `Make
+  available`, `Add a new student`, `Open Google Calendar`, a booked lesson's
+  `Change`; 13 October 2026, Dan: "just the subtle lilac"); a way out
+  (`Cancel`, `Back`, `Done`) stays an outline. On a phone every tab
   is in view at once, as a grid. Booked is the calendar's navy everywhere. A lesson's details read as dabs (their address, NIF, how
   it is paid, whether they have been emailed) rather than sentences.
 
