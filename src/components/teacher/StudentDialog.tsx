@@ -213,6 +213,9 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
             token={token}
             date={slot?.date}
             time={slot?.time}
+            // Coral always marks what is still to do for them: their first
+            // lesson, then their welcome (13 October 2026, Dan).
+            tone={student.awaitingWelcome && (added.length || student.nextLessonAt) ? "blue" : "coral"}
             onBusy={setBusy}
             onCreated={(message) => {
               setAdded((current) => [...current, message]);
@@ -222,8 +225,8 @@ export function StudentDialog({ token, known, start, afterCloseFocusRef, onChang
           <div className="teacher-student-dialog__finish">
             {welcomed ? (
               <p className="teacher-inline-success" role="status"><CheckCircle2 size={18} aria-hidden="true" />Welcome sent</p>
-            ) : student.awaitingWelcome ? (
-              <button className="button button--blue" disabled={busy || !added.length && !student.nextLessonAt} onClick={() => void sendWelcome()} type="button">
+            ) : student.awaitingWelcome && (added.length || student.nextLessonAt) ? (
+              <button className="button button--coral" disabled={busy} onClick={() => void sendWelcome()} type="button">
                 Send welcome email
               </button>
             ) : null}

@@ -49,6 +49,7 @@ export function LessonForm({
   date = "",
   time = "17:00",
   idPrefix,
+  tone = "coral",
   onCreated,
   onBusy,
 }: {
@@ -57,6 +58,8 @@ export function LessonForm({
   date?: string;
   time?: string;
   idPrefix: string;
+  /** Coral while adding a lesson is the next thing to do; blue once something else is. */
+  tone?: "coral" | "blue";
   onCreated: (message: string) => void;
   onBusy?: (busy: boolean) => void;
 }) {
@@ -224,7 +227,7 @@ export function LessonForm({
         </label>
         <div className="teacher-manual-submit">
           <button
-            className="button button--coral"
+            className={`button button--${tone}`}
             type="submit"
             disabled={busy}
           >

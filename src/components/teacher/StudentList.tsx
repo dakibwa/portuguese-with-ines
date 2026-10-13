@@ -139,7 +139,7 @@ export function StudentList({
                   {student.weekly ? <li>Weekly lessons</li> : null}
                 </ul>
                 <div className="teacher-student__action">
-                  <button className="button button--outline button--compact" onClick={() => onAddLesson(student)} type="button">
+                  <button className="button button--blue button--compact" onClick={() => onAddLesson(student)} type="button">
                     <CalendarPlus size={15} aria-hidden="true" />
                     Add lesson
                     <span className="visually-hidden"> for {student.name}</span>

@@ -775,7 +775,7 @@ try {
   assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/students").at(-1).data,
     { email: "ana@example.invalid", name: "Ana Costa", phone: "+351 912 345 678", nif: "123456789", mark: "bloom" });
   await expect(addStudent.getByRole("heading", { name: "Ana Costa" })).toBeVisible();
-  await expect(addStudent.getByRole("button", { name: "Send welcome email", exact: true })).toBeDisabled();
+  await expect(addStudent.getByRole("button", { name: "Send welcome email", exact: true })).toHaveCount(0);
   await addStudent.getByRole("button", { name: "Done, send later", exact: true }).click();
   const ana = students.locator(".teacher-student").filter({ hasText: "Ana Costa" });
   await expect(ana).toContainText("Set up, not emailed yet");

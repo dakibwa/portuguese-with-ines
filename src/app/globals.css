@@ -1412,8 +1412,12 @@ html:active-view-transition-type(document)::view-transition-new(root) {
     align-self: stretch;
   }
 
-  .home-hero__links {
-    grid-template-columns: minmax(0, 1fr);
+  /* The two ways in stay side by side, a size smaller, rather than a whole
+     extra row above the fold (13 October 2026, Dan). */
+  .home-hero__links .button {
+    padding-inline: 0.6rem;
+    font-size: 0.64rem;
+    letter-spacing: 0.08em;
   }
 }
 
@@ -4969,6 +4973,13 @@ textarea,
 
 .slot-grid button:hover {
   transform: translateY(-1px);
+}
+
+/* In a dialog the times sit on the dialog's own cream, so each is drawn on
+   the sheet with a rule, to read as something to press. */
+dialog .slot-grid button:not(.is-selected) {
+  border-color: var(--rule);
+  background: var(--sheet);
 }
 
 .slot-grid button:hover,

@@ -451,7 +451,11 @@ usual lesson starts and days off; avoid a wall of administration forms.
   reloads, with a single blue outline; it never steals a later focus choice.
 - Her buttons are the site's buttons: the same fill, weight, spacing and lift,
   a little denser, and `Join Google Meet` in a lesson is a solid blue button,
-  never an outline. A lesson's details read as dabs (their address, NIF, how
+  never an outline. Use space and contrast well (13 October 2026, Dan): two
+  actions share a row rather than stacking full width (a student card's blue
+  `Add lesson` beside its coral `Send welcome email`, a lesson's `Move` beside
+  `Cancel`), and coral marks the one thing still to do. On a phone every tab
+  is in view at once, as a grid. Booked is the calendar's navy everywhere. A lesson's details read as dabs (their address, NIF, how
   it is paid, whether they have been emailed) rather than sentences.
 
 ## Wording and confirmation — 13 September 2026

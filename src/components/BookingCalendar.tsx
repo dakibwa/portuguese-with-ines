@@ -197,7 +197,9 @@ function TimePicker({ halves, renderTime, selected = "", slots, zone }: {
         <div
           className="slot-grid time-picker__times"
           key={current.id}
-          style={timetable ? { gridTemplateColumns: `repeat(${minutes.length}, minmax(0, 1fr))` } : undefined}
+          // At least three columns, so one free time is a time, not a bar
+          // across the dialog (13 October 2026, Dan).
+          style={timetable ? { gridTemplateColumns: `repeat(${Math.max(minutes.length, 3)}, minmax(0, 1fr))` } : undefined}
         >
           {current.slots.map((slot) => renderTime(slot, timetable ? {
             gridColumn: minutes.indexOf(clock(slot.startAt).slice(3, 5)) + 1,
