@@ -271,7 +271,7 @@ try {
         await expect(state.page.locator(".faq-index")).toHaveAttribute("data-ready", "true");
         const original = state.page.url(), payment = state.page.locator(".faq-index").getByRole("link", { name: /Payment/ });
         const popupPromise = state.context.waitForEvent("page");
-        await payment.click({ modifiers: ["Control"] });
+        await payment.click({ modifiers: ["ControlOrMeta"] });
         const popup = await popupPromise;
         await popup.waitForLoadState("networkidle");
         assert.equal(state.page.url(), original);
@@ -417,7 +417,8 @@ try {
           await state.page.getByRole("button", { name: "Try again", exact: true }).click();
           await response;
           await expect(state.page.locator(".teacher-workspace")).toBeVisible();
-          await expect(state.page.getByText("Your week at a glance", { exact: true })).toBeVisible();
+          await expect(state.page.getByRole("tab", { name: "Week", exact: true })).toHaveAttribute("aria-selected", "true");
+          await expect(state.page.locator(".teacher-timetable")).toBeVisible();
           await expect(state.page.locator("main").getByRole("alert")).toHaveCount(0);
           await check(state);
         } finally { await state.context.close(); }
