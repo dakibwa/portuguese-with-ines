@@ -436,8 +436,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   lessons come first. Count students needing her attention once, not each task.
   Meet and unmatched payment notices remain visible above the list; never match
   a payment to a student by name alone.
-  Incomplete students have compact, distinct steps: Email, Price, Lessons,
-  Welcome, Signed in and Card. Checks mark completion, the next action has an
+  Incomplete students have compact, distinct steps: Price, Lessons, Email,
+  Welcome email, Sign in and Card. Later unfinished steps stay locked until
+  the preceding steps are complete; completed steps remain editable. A lock
+  gives the missing prerequisite. Checks mark completion, the next action has an
   outline, and a clock marks waiting on the student. Say what is needed beside
   their name; do not use vague ownership labels such as Yours or Theirs.
   Completed onboarding becomes a normal row labelled Student, with their
@@ -446,8 +448,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   name and action share the first line, with steps directly below. The opened
   editor spans the row and replaces the row's action with one X close control
   at the top right. Status sits alongside the name, and the selected step's
-  heading and short bullet facts share a band above its action or form, wrapping
-  on phones. Hover gently changes the row's border; a strong outline is reserved
+  heading and short bullet facts share a band with status actions. Details and
+  price fields use the full row width, with their save action alongside when
+  space allows; fields stack on phones. Hover gently changes the row's border; a strong outline is reserved
   for keyboard focus. Help states the current status and anything still
   needed, rather than explaining controls or repeating their labels.
   Standard prices count as ready. A confirmed past lesson counts for Lessons;

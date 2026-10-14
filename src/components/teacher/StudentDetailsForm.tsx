@@ -11,12 +11,14 @@ import { updateStudentDetails, type AdminStudent } from "@/lib/admin-api";
  * hers to give only until they first do; after that they change it from their
  * account. It is never needed for her to add their lessons.
  */
-export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy }: {
+export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy, emailRequired = false, emailLockedReason }: {
   token: string;
   student: AdminStudent;
   onSaved: (student: AdminStudent) => void;
   onCancel?: () => void;
   onBusy?: (busy: boolean) => void;
+  emailRequired?: boolean;
+  emailLockedReason?: string;
 }) {
   const [details, setDetails] = useState({ name: student.name, email: student.email, phone: student.phone, nif: student.nif ?? "" });
   const [busy, setBusy] = useState(false);
@@ -58,14 +60,14 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy }
         <span>
           Email{" "}
           <span className="teacher-field-optional">
-            {student.signedIn ? "(they change it from their account)" : student.email ? "" : "(optional, their welcome needs one)"}
+            {student.signedIn ? "(they change it from their account)" : emailLockedReason ? `(${emailLockedReason})` : student.email || emailRequired ? "" : "(optional, their welcome needs one)"}
           </span>
         </span>
         <input
           autoComplete="off"
-          disabled={busy || student.signedIn}
+          disabled={busy || student.signedIn || Boolean(emailLockedReason)}
           onChange={set("email")}
-          required={Boolean(student.email)}
+          required={emailRequired || Boolean(student.email)}
           type="email"
           value={details.email}
         />

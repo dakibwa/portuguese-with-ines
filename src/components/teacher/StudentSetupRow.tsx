@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, Clock3, X } from "lucide-react";
+import { Check, Clock3, LockKeyhole, X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { LessonForm } from "@/components/teacher/LessonForm";
 import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
@@ -10,7 +10,7 @@ import type { AdminStudent } from "@/lib/admin-api";
 import type { StudentSetup, StudentSetupStep } from "@/lib/teacher-calendar";
 
 /** Her setup stays together: each dab opens its work beneath the same row. */
-export function StudentSetupRow({ setup, token, step, sending, locked, attention, onOpenProfile, onSelect, onChanged, onWelcome, onBusy }: {
+export function StudentSetupRow({ setup, token, step: requestedStep, sending, locked, attention, onOpenProfile, onSelect, onChanged, onWelcome, onBusy }: {
   setup: StudentSetup;
   token: string;
   step: StudentSetupStep | null;
@@ -25,6 +25,8 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
   onBusy?: (busy: boolean) => void;
 }) {
   const { student, steps, next, owner } = setup;
+  const step = steps.find(entry => entry.id === requestedStep && !entry.lockedReason)?.id ?? null;
+  const statusStep = step === "welcome" || step === "sign-in" || step === "card";
   const [busy, setBusyState] = useState(false);
   const setBusy = (value: boolean) => { setBusyState(value); onBusy?.(value); };
   const [notice, setNotice] = useState("");
@@ -50,7 +52,7 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
           ? student.signedIn ? "Sign-in is set up." : "Student hasn’t signed in yet."
           : student.hasCard ? "Student has saved a card." : "Student hasn’t added a card yet.",
       ...(!student.email ? ["Email address needed."] : step === "card" && !student.hasCard && !student.signedIn ? ["Student needs to sign in first."] : []),
-    ] : [];
+    ] : step === "email" && !student.email ? ["Email address needed."] : [];
 
   useEffect(() => {
     if (!step || !body.current) return;
@@ -81,16 +83,17 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
       type="button"
     ><AccountAvatar mark={student.mark} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong><span className="teacher-setup__status">{status}</span></span></button>
     <ol className="teacher-setup__steps" ref={stepControls}>
-      {steps.map(entry => <li className={entry.done ? "is-done" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
+      {steps.map(entry => <li className={entry.done ? "is-done" : entry.lockedReason ? "is-locked" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
         <button
           aria-controls={paneId}
           aria-expanded={step === entry.id}
           aria-label={`${entry.label} for ${student.name}`}
           aria-describedby={`${paneId}-${entry.id}-status`}
-          disabled={disabled}
+          disabled={disabled || Boolean(entry.lockedReason)}
+          title={entry.lockedReason}
           onClick={() => { setNotice(""); onSelect(step === entry.id ? null : entry.id); }}
           type="button"
-        ><i aria-hidden="true">{entry.done ? <Check size={12} strokeWidth={3} /> : entry.id === next && waitingOnStudent ? <Clock3 size={12} strokeWidth={2} /> : null}</i><span>{entry.label}<span className="visually-hidden" id={`${paneId}-${entry.id}-status`}>{entry.done ? ": done" : entry.id === next && waitingOnStudent ? ": waiting for the student" : ": waiting"}</span></span></button>
+        ><i aria-hidden="true">{entry.done ? <Check size={12} strokeWidth={3} /> : entry.lockedReason ? <LockKeyhole size={12} strokeWidth={2} /> : entry.id === next && waitingOnStudent ? <Clock3 size={12} strokeWidth={2} /> : null}</i><span>{entry.label}<span className="visually-hidden" id={`${paneId}-${entry.id}-status`}>{entry.done ? ": done" : entry.lockedReason ? `: ${entry.lockedReason}` : entry.id === next && waitingOnStudent ? ": waiting for the student" : ": waiting"}</span></span></button>
       </li>)}
     </ol>
     {step ? <div className="teacher-setup__action teacher-setup__close">
@@ -105,14 +108,15 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
       type="button"
     >{sending === student.id ? "Sending…" : primaryLabel}<span className="visually-hidden"> for {student.name}</span></button></div>}
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
-    {step ? <div className="teacher-setup__body" id={paneId} aria-label={`${student.name}’s setup`} role="region" ref={body} tabIndex={-1}>
+    {step ? <div className={`teacher-setup__body${statusStep ? " teacher-setup__body--status" : ""}`} id={paneId} aria-label={`${student.name}’s setup`} role="region" ref={body} tabIndex={-1}>
       <div className="teacher-setup__body-heading">
         <h3 id={`${paneId}-heading`}>{step === "email" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome email" : step === "sign-in" ? "Sign in" : "Saved card"}</h3>
         {help.length ? <ul className="booking-payment-facts teacher-setup__help">{help.map(text => <li key={text}>{text}</li>)}</ul> : null}
-        {(step === "welcome" || step === "sign-in" || step === "card") && student.email ? <p className="teacher-setup__email">{student.email}</p> : null}
+        {statusStep && student.email ? <p className="teacher-setup__email">{student.email}</p> : null}
       </div>
       {step === "email" ? <StudentDetailsForm
         key={`${student.id}-details`}
+        emailRequired
         onBusy={setBusy}
         onSaved={updated => { setNotice("Their details are saved."); onChanged?.(updated); close(); }}
         student={student}

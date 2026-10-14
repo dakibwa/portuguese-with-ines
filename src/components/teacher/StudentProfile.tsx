@@ -6,7 +6,7 @@ import { AccountAvatar } from "@/components/AccountMenu";
 import { LessonForm } from "@/components/teacher/LessonForm";
 import { NewStudentForm } from "@/components/teacher/NewStudentForm";
 import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
-import { StudentLessons, upcomingLessons } from "@/components/teacher/StudentLessons";
+import { StudentLessons } from "@/components/teacher/StudentLessons";
 import { StudentPrice } from "@/components/teacher/StudentPrice";
 import { needsHer } from "@/components/teacher/StudentList";
 import { fetchBookings, sendStudentWelcome, type AdminBooking, type AdminStudent } from "@/lib/admin-api";
@@ -14,7 +14,7 @@ import { readSession } from "@/lib/auth-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 import { lockPageScroll } from "@/lib/scroll-lock";
-import { dateLabel, minuteLabel } from "@/lib/teacher-calendar";
+import { dateLabel, gettingStarted, minuteLabel } from "@/lib/teacher-calendar";
 
 /** Where the profile opens: one of her students, a new one, or a free time on her week. */
 export type StudentProfileStart =
@@ -28,8 +28,8 @@ export type StudentProfileStart =
  * card, its Add a lesson button, Add a student and a free time on her week
  * all land here. Their details open in place from Edit details, their price
  * is changed where it is shown, lessons are added without leaving, and their
- * welcome is sent from here once they have an email. Nothing reaches someone
- * she has just set up until she presses Send welcome email.
+ * first welcome is sent from here once they have a lesson and an email.
+ * Nothing reaches someone she has just set up until she presses Send welcome email.
  */
 export function StudentProfile({ token, known, cards, start, afterCloseFocusRef, onChanged, onClose }: {
   token: string;
@@ -116,7 +116,7 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
   }
 
   async function sendWelcome() {
-    if (!student || busy) return;
+    if (!student || busy || !studentEmail || welcomeLockedReason) return;
     setBusy(true);
     setError("");
     try {
@@ -138,10 +138,20 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
       ? booking.student_id === student.id
       : Boolean(studentEmail) && booking.student_email.trim().toLowerCase() === studentEmail.trim().toLowerCase())
     : null;
+  // The setup row and the full profile use the same prerequisite order.
+  // A lesson just created here counts before the history read returns.
+  const setupStudent = student ? {
+    ...student,
+    hasLessons: Boolean(student.hasLessons || added.length || mine?.some(booking => booking.status === "confirmed")),
+  } : null;
+  const setupSteps = setupStudent ? gettingStarted([setupStudent], cards)[0]?.steps : undefined;
+  const emailLockedReason = setupSteps?.find(entry => entry.id === "email")?.lockedReason;
+  const welcomeLockedReason = student?.awaitingWelcome
+    ? setupSteps?.find(entry => entry.id === "welcome")?.lockedReason ?? "" : "";
   const canWelcome = Boolean(student && studentEmail && needsHer(student, cards));
   // Coral marks the one thing still to do for them: their first lesson, then
   // their welcome (13 October 2026, Dan).
-  const welcomeNext = canWelcome && Boolean(student?.awaitingWelcome) && (added.length > 0 || upcomingLessons(mine ?? [], now).length > 0);
+  const welcomeNext = canWelcome && Boolean(student?.awaitingWelcome) && !welcomeLockedReason;
   // While their details are open, Save details is the one coral action.
   const welcomeFirst = welcomeNext && !editing;
   const sorted = [...known].sort((a, b) => a.name.localeCompare(b.name));
@@ -229,6 +239,7 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
           </header>
           {editing ? (
             <StudentDetailsForm
+              emailLockedReason={emailLockedReason}
               token={token}
               student={student}
               onCancel={() => setEditing(false)}
@@ -267,7 +278,7 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
               {welcomed ? (
                 <p className="teacher-inline-success" role="status"><CheckCircle2 size={18} aria-hidden="true" />Welcome sent</p>
               ) : canWelcome ? (
-                <button className={`button button--${welcomeFirst ? "coral" : "lilac"}`} disabled={busy} onClick={() => void sendWelcome()} type="button">
+                <button className={`button button--${welcomeFirst ? "coral" : "lilac"}`} aria-describedby={welcomeLockedReason ? "teacher-profile-welcome-blocked" : undefined} disabled={busy || Boolean(welcomeLockedReason)} onClick={() => void sendWelcome()} type="button">
                   <Send size={16} aria-hidden="true" />
                   {busy ? "Sending…" : "Send welcome email"}
                 </button>
@@ -283,6 +294,7 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
             </div>
           ) : null}
           {studentEmail || editing ? null : <p className="teacher-profile__note">Their welcome email waits until you add their email under Edit details.</p>}
+          {canWelcome && welcomeLockedReason && !adding ? <p className="teacher-profile__note" id="teacher-profile-welcome-blocked">{welcomeLockedReason}</p> : null}
           {error ? <p className="teacher-inline-error" role="alert">{error}</p> : null}
 
           <StudentLessons

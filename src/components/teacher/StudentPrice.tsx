@@ -145,7 +145,10 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
       {editing ? (
         <form className="teacher-form" noValidate onSubmit={(event) => { event.preventDefault(); void save(); }}>
           <PriceFields draft={draft} disabled={busy} idPrefix={idPrefix} onChange={setDraft} />
-          <p className="teacher-price__hint">Leave 90 mins empty for 1.5× their 60, or both for the standard price.</p>
+          <ul className="booking-payment-facts teacher-price__hint">
+            <li>90 mins empty: 1.5× the 60-minute price.</li>
+            <li>Both empty: standard prices.</li>
+          </ul>
           <div className="teacher-dialog-actions">
             <button className="button button--coral button--compact" disabled={busy} type="submit">{busy ? "Saving…" : "Save price"}</button>
             {showCancel ? <button className="button button--outline button--compact" disabled={busy} onClick={() => { setEditing(false); setDraft(priceDraft(student)); setError(""); onCancel?.(); }} type="button">Cancel</button> : null}

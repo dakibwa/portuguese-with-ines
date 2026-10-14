@@ -415,7 +415,7 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
 });
 
 
-test("setup steps separate her to-dos from waiting on students, with welcomes at any time", () => {
+test("setup follows lessons before email and student steps, while completed steps stay editable", () => {
   const student = (id, extra) => ({ id, name: id, email: `${id}@example.invalid`, signedIn: false, hasCard: false, hasLessons: true, awaitingWelcome: true, ...extra });
   const students = [
     student("email", { email: "" }),
@@ -432,11 +432,23 @@ test("setup steps separate her to-dos from waiting on students, with welcomes at
     ["email", "email", "Yours"], ["lessons", "lessons", "Yours"], ["welcome", "welcome", "Yours"], ["far", "welcome", "Yours"],
     ["sign-in", "sign-in", "Theirs"], ["card", "card", "Theirs"],
   ]);
+  assert.deepEqual(setup[0].steps.map(step => step.id), ["price", "lessons", "email", "welcome", "sign-in", "card"]);
   assert.deepEqual(setup.map(row => row.steps.map(step => step.done)), [
-    [false, true, true, false, false, false], [true, true, false, false, false, false],
+    [true, true, false, false, false, false], [true, false, true, false, false, false],
     [true, true, true, false, false, false], [true, true, true, false, false, false],
     [true, true, true, true, false, false], [true, true, true, true, true, false],
   ]);
+  const by = (row, id) => row.steps.find(step => step.id === id);
+  const nameOnly = gettingStarted([student("name-only", { email: "", hasLessons: false })])[0];
+  assert.equal(nameOnly.next, "lessons", "standard prices are ready, so the first lesson comes before the email");
+  assert.equal(by(nameOnly, "lessons").lockedReason, undefined);
+  assert.ok(nameOnly.steps.filter(step => ["email", "welcome", "sign-in", "card"].includes(step.id)).every(step => Boolean(step.lockedReason)));
+  assert.ok(by(setup[0], "welcome").lockedReason);
+  assert.ok(by(setup[2], "sign-in").lockedReason);
+  assert.ok(by(setup[4], "card").lockedReason);
+  const legacy = gettingStarted([student("legacy", { hasLessons: false, awaitingWelcome: undefined, signedIn: true, hasCard: true })])[0];
+  assert.equal(legacy.next, "lessons");
+  assert.ok(legacy.steps.filter(step => step.done).every(step => !step.lockedReason), "existing email, sign-in and card remain accessible despite an earlier missing lesson");
   const tasks = needsYou({ now: new Date("2026-10-14T10:00:00Z"), meet: null, payments: [], students, lessons: [], cancellations: [] });
   assert.deepEqual(new Set(tasks.map(item => item.key)), new Set(["welcome:far", "email:email", "lessons:lessons", "welcome:lessons", "welcome:welcome"]));
   assert.ok(tasks.every(item => setup.some(row => row.student.id === item.student.id && row.owner === "Yours")), "the tab count excludes waiting on them");
