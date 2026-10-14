@@ -168,6 +168,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   student_id        TEXT REFERENCES students (id),
   -- Name and email are copied onto the booking rather than only joined, so a
   -- past lesson still reads correctly if the student later changes either.
+  -- Inês's own corrections from Students (the name, phone and, for someone who
+  -- never signed in, the email) are the exception: they reach every booking.
   student_name      TEXT NOT NULL,
   student_email     TEXT NOT NULL,
   student_phone     TEXT NOT NULL DEFAULT '',

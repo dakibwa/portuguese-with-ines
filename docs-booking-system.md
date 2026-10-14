@@ -361,14 +361,18 @@ The Google Meet tab holds the connection controls; Google callbacks open it
 directly. `Needs you`, under her next lesson, gathers what waits on her (below).
 
 Lessons only belong to students (13 October 2026, Dan: no loose lessons).
-`POST /admin/bookings` refuses an email that isn't on the site ("Add them as a
-student first.", 404); students come from `POST /admin/students`. The page's
-one student dialog adds a student, then their lessons (online or in Porto,
-once or weekly for 4, 6 or 8 weeks or until stopped), then their welcome; a
-student card's `Add lesson` and a free time's `Add a lesson here` open the same
-dialog, the latter asking whose lesson first. All teacher actions still use the
-authenticated admin endpoints and
-their existing booking, payment and email safeguards.
+`POST /admin/bookings` names the student by `studentId` (their account, which
+works for a student with no email yet) or, for older callers, by `email`; one
+who isn't on the site is refused ("Add them as a student first.", 404), and
+students come from `POST /admin/students`. The page's one student profile
+(14 October 2026, Dan) is what a student's card, its `Add a lesson` button,
+the end of `Add a student` and a free time's `Add a lesson here` all open, the
+latter asking whose lesson first. It shows their details (`Edit details` brings
+every field out in place), their price, an `Add a lesson` form (online or in
+Porto, once or weekly for 4, 6 or 8 weeks or until stopped), `Send welcome
+email` where it applies, and their lessons. All teacher actions still use the
+authenticated admin endpoints and their existing booking, payment and email
+safeguards.
 
 Onboarding (13 October 2026, Dan) lets Inês set a student up before they hear
 anything. `POST /admin/students` takes `email`, `name` and optional `phone`,
@@ -382,23 +386,78 @@ point (lessons added, moved or cancelled, the Meet link, charges); her Google
 Calendar, the blocked time and the lesson's NIF are unaffected, and her own
 copy says they weren't emailed. Lesson, move and cancel replies carry
 `emailed: false` so her page says so. `POST /admin/students/:id/welcome` sends
-their upcoming lessons (up to twelve, each on the lesson's clock) and the
-one-click way in, then clears the flag, after which emails reach them as
-usual. Signing in themselves also ends the hold. Students made before this keep
-`awaiting_welcome = 0`, so nothing about them changes.
+their upcoming lessons and prices (below) and the one-click way in, then clears
+the flag, after which emails reach them as usual. Signing in themselves also
+ends the hold. Students made before this keep `awaiting_welcome = 0`, so
+nothing about them changes.
+
+The welcome's lessons (14 October 2026, Dan: "all their lessons and prices
+already done properly") are read from the lessons themselves, so they are right
+whenever she added them and whatever she has since changed. Each of a student's
+upcoming confirmed lessons becomes a line, in the site's email design with its
+subject and preheader unchanged: a weekly run is **one** line (`Weekly ·
+Online`, `Every Tuesday, 17:00 · Porto time`, `From 20 October 2026 until 8
+December 2026`, or `…, until you stop it` for a run with no end, and `60
+minutes · €22 a lesson`), a lesson on its own is one line (`Lesson · Online`,
+its date and time, `60 minutes · €22`, or `…· €22 paid` once it is paid), and the
+trial is named. A lesson belongs to its run while it still sits on the run's own
+Porto slot, length (lesson type) and place, and keeps its time on the student's
+own clock; one that was moved, lengthened or put elsewhere reads as the lesson it
+now is, never as a second run. A run never hides a week it has no lesson: for a
+student she set up, the welcome is the only email they will have, because the
+emails about a skipped week (her day off) or a cancelled one were held. So a run
+line names the weeks between its first and last lesson that have none
+(`No lesson on 22 September or 6 October`), unless the run has a lesson on that
+day that now reads as its own line. A run with no end says `until you stop it`
+only while it is active and only for its latest stretch; a stopped one says
+`until` its last remaining lesson. The price is the lesson's own `amount_cents`,
+which `repriceStudent` keeps on the student's own rate for lessons still to come
+(a run's line uses the next lesson whose price is still open, never one she
+marked paid by hand), and the length is the lesson type's. Times are on the
+student's own clock, their timezone (Porto by default) for an online lesson and
+Porto's for one in Porto, each time naming its clock as every email to them
+does (`17:00 · Porto time`). Their own `Your price · 60 / 90 minutes` rows still
+lead when she has set a price. Past twelve lines an `And more` line says how
+many lessons are left to the website.
+How they pay is as before: a link that adds their card where the site takes
+cards, or the plain sign-in link.
 
 A name alone is enough to set a student up (13 October 2026, Dan: she builds
-on it later). `students.email` stays `NOT NULL UNIQUE`, so a student without
-one stores `no-email:<id>`. No address can equal that, and every sign-in,
-registration, reset and email-change path checks for a real address first.
-`GET /admin/students` shows such a student's email as `""`. Their welcome is
-refused (400) and `POST /admin/bookings` cannot reach them, so their lessons
-and welcome wait until she gives an email. `POST /admin/students/:id/details`
-sets name, phone, NIF and splat at any time. It sets or corrects the email only
-while the student has never signed in (no password, Google link or sign-in);
-after that it answers 409 and the student changes it from their account. A
-changed address clears `email_verified_at` and moves their bookings'
-`student_email` with it. An address another student has is refused (409).
+on it later), and a student with no email yet has lessons like anyone else
+(14 October 2026, Dan). `students.email` and `bookings.student_email` stay
+`NOT NULL`, so a student without an address stores `no-email:<id>` in both,
+as the key that stands in for it. No address can equal that, and every
+sign-in, registration, reset and email-change path checks for a real address
+first. The stand-in never leaves the database (`workers/booking/no-email.mjs`):
+- nothing is sent to it. `deliver` in `email.mjs` returns without logging,
+  rendering or sending for it, and drops it as a reply-to; every `student_*`
+  message to them is also held, as for any student awaiting their welcome;
+- no calendar file names it: `ics.mjs` leaves it out of `ATTENDEE`, and a
+  lesson's description omits the `Email:` line;
+- Stripe is never given it as `customer_email`;
+- her copies of a lesson's emails read `No email yet` where the student's
+  address would be, and are sent with no reply-to;
+- `GET /admin/students`, `GET /admin/bookings`, the booking and student JSON,
+  the no-show and paid-by-hand replies and `GET /admin/receipts` (so the CSV)
+  show `""` for it.
+
+`POST /admin/students/:id/welcome` is refused (400) until she gives an email.
+`POST /admin/students/:id/details` sets name, phone, NIF and splat at any time.
+It sets or corrects the email only while the student has never signed in (no
+password, Google link or sign-in); after that it answers 409 and the student
+changes it from their account. A changed address clears `email_verified_at`
+and, in the same write as the account, moves **every** booking of theirs (past
+ones too, so a receipt reads right) to it; a series has no address of its own,
+and later weeks take the account's. Her corrections to a student's name and
+phone reach every booking of theirs the same way, whether or not the address
+moves (she adds `Adam` first and completes him later, and a receipt prints the
+name on the booking). The welcome also gives any lesson still holding the
+stand-in (one added from a stale read as the address was saved) the real
+address before it sends. Nothing is sent by the change: they stay
+awaiting their welcome until she sends it. An address another student has is
+refused (409) and moves nothing. The student's own change of address
+(`/me/email/confirm`) still moves only lessons still to come, and cannot apply
+to an account that has never signed in.
 
 ### Needs you
 

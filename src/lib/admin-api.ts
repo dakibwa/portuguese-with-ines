@@ -6,7 +6,7 @@ import { isExpression, type Expression, type ExpressionInput } from "@/lib/expre
 export type AdminStudent = {
   id: string;
   name: string;
-  /** Empty when she set them up from a name alone and has not given one yet. */
+  /** Empty when she set them up from a name alone and has not given one yet; the Worker never sends its stand-in. */
   email: string;
   phone: string;
   /** Nine digits for their receipts; empty for consumidor final. */
@@ -373,12 +373,14 @@ export function sendStudentWelcome(token: string, studentId: string, options?: {
   });
 }
 
-/** Creates the student's account too, if this is their first lesson. */
+/**
+ * A lesson for one of her students, named by their account so one with no
+ * email yet has lessons too (14 October 2026, Dan).
+ */
 export function createBookingFor(
   token: string,
   input: {
-    email: string;
-    name: string;
+    studentId: string;
     lessonType: string;
     startAt: string;
     location: "online" | "porto";

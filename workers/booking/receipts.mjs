@@ -11,6 +11,8 @@
  * lesson that has happened.
  */
 
+import { realEmail } from "./no-email.mjs";
+
 const LESSON_STATES = {
   paid: "paid",
   refunded: "refunded",
@@ -39,7 +41,7 @@ export function receiptLines(rows, now = new Date()) {
       reference: row.reference,
       lessonStartsAt: row.starts_at,
       studentName: row.student_name,
-      studentEmail: row.student_email,
+      studentEmail: realEmail(row.student_email),
       nif: row.student_nif || "",
       bookingId: row.id
     };

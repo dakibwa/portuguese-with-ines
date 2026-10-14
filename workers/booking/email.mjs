@@ -10,6 +10,8 @@
  * reconciliation sweep instead of being thrown back at them.
  */
 
+import { isNoEmailYet, realEmail } from "./no-email.mjs";
+
 const BRAND = {
   blue: "#203e82",
   ink: "#1a3169",
@@ -311,6 +313,11 @@ export function renderEmail(content) {
  * best-effort and the log is the audit trail.
  */
 export async function deliver(env, { to, subject, content, calendar, dedupeKey, bookingId, kind, replyTo }) {
+  // A student with no email yet has nowhere to be written to: nothing is
+  // logged, rendered or sent, and the caller is told it went nowhere.
+  if (isNoEmailYet(to)) return { ok: true, skipped: "no-email-yet" };
+  // Her copies reply to the student; with no address yet there is none.
+  replyTo = realEmail(replyTo);
   const { html, text } = renderEmail(content);
   const from = env.MAIL_FROM || "Português com a Inês <bookings@portuguesewithines.com>";
   const now = new Date().toISOString();

@@ -797,7 +797,7 @@
 /* Field labels as the booking's: small capitals over the field; a legend
    over a choice is the lilac eyebrow the student side uses. */
 .teacher-form label > span,
-.teacher-student-dialog__splat > span {
+.teacher-profile__splat > span {
   font: 600 0.72rem/1.5 var(--ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -874,7 +874,7 @@
   padding: 0;
 }
 .teacher-manual-choice legend,
-.teacher-student-dialog__price legend {
+.teacher-profile__price legend {
   margin-bottom: 0.35rem;
   padding: 0;
   color: var(--lavender-ink);
@@ -2327,25 +2327,28 @@
   outline: 2px solid var(--blue);
   outline-offset: 6px;
 }
-.teacher-history-dialog { width: min(620px, calc(100vw - 2rem)); }
-.teacher-history-heading {
+/* One profile for a student, their card and its Add a lesson button, Add a
+   student and a free time on her week all open (14 October 2026, Dan). */
+.teacher-profile { width: min(620px, calc(100vw - 2rem)); }
+.teacher-profile-heading {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 0.75rem;
   align-items: center;
 }
-.teacher-history-heading .account-avatar { width: 42px; height: 42px; }
-.teacher-history-heading p { margin: 0 0 0.2rem; font-size: 0.72rem; color: var(--lavender-ink); }
+.teacher-profile-heading .account-avatar { width: 42px; height: 42px; }
+.teacher-profile-heading p { margin: 0 0 0.2rem; font-size: 0.72rem; color: var(--lavender-ink); }
 /* An address too long for a phone ends in an ellipsis, as on her card. */
-.teacher-history-heading .teacher-history-email { margin: 0.35rem 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Their phone, NIF and Edit details share a line where they fit, rather
-   than a line each; the label and name keep clear of the close button. */
-.teacher-history-heading > div { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.75rem; min-width: 0; }
-.teacher-history-heading > div > :is(#teacher-history-label, h2, #teacher-history-name + .teacher-history-email) { flex: 1 0 100%; }
-.teacher-history-heading > div > :is(#teacher-history-label, h2) { padding-right: 2.5rem; }
-.teacher-history-heading .teacher-history-email { flex: 0 1 auto; min-width: 0; }
-.teacher-history-dialog h3 { margin: 0.25rem 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
-.teacher-history-dialog h3 span { color: var(--lavender-ink); font-weight: 500; }
+.teacher-profile-heading .teacher-profile-line { margin: 0.35rem 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Their email and phone have a line each; the NIF and Edit details share the
+   last, at any width, so the button is never alone. The label and name keep
+   clear of the close button. */
+.teacher-profile-heading > div { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.75rem; min-width: 0; }
+.teacher-profile-heading > div > :is(#teacher-profile-label, h2, .teacher-profile-line:not(:last-of-type)) { flex: 1 0 100%; }
+.teacher-profile-heading > div > :is(#teacher-profile-label, h2) { padding-right: 2.5rem; }
+.teacher-profile-heading .teacher-profile-line { flex: 0 1 auto; min-width: 0; }
+.teacher-profile h3 { margin: 0.25rem 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
+.teacher-profile h3 span { color: var(--lavender-ink); font-weight: 500; }
 .teacher-history-list { display: grid; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
 .teacher-history-lesson { padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
 .teacher-history-lesson.is-cancelled { background: var(--lavender-pale, #f1eef7); }
@@ -2436,52 +2439,28 @@
 .teacher-students__bar .teacher-inline-success {
   margin: 0;
 }
-/* One dialog for a student and their lessons: details, then lessons, then
-   their welcome; or, from a free time, whose lesson it is first. */
-.teacher-student-dialog {
-  width: min(580px, calc(100vw - 2rem));
-}
-.teacher-student-dialog h2 {
+/* The profile's steps: whose lesson a free time is, a new student's details,
+   then the profile itself. The title clears the close button. */
+.teacher-profile > h2 {
   margin-right: 2.5rem;
-}
-.teacher-student-dialog__who {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 0.75rem;
-  align-items: center;
-  padding-right: 2.5rem;
-}
-.teacher-student-dialog__who .account-avatar {
-  width: 44px;
-  height: 44px;
-}
-.teacher-student-dialog__who p {
-  margin: 0.15rem 0 0;
-  overflow-wrap: anywhere;
-  color: var(--lavender-ink);
-  font-size: 0.78rem;
 }
 /* The dialog's gap spaces its parts; the free time stays close under its
    title. */
-.teacher-student-dialog__when {
+.teacher-profile__when {
   margin: -0.5rem 0 0;
   font: 700 0.95rem/1.35 var(--ui);
 }
-.teacher-student-dialog__facts,
-.teacher-student-dialog__added {
+.teacher-profile__facts {
   margin: 0;
 }
-.teacher-student-dialog__added {
-  font-weight: 600;
-}
-.teacher-student-dialog__pick {
+.teacher-profile__pick {
   display: grid;
   gap: 0.6rem;
 }
-.teacher-student-dialog__pick .teacher-eyebrow {
+.teacher-profile__pick .teacher-eyebrow {
   margin: 0;
 }
-.teacher-student-dialog__choices {
+.teacher-profile__choices {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
   gap: 0.5rem;
@@ -2491,7 +2470,7 @@
   padding: 0;
   list-style: none;
 }
-.teacher-student-dialog__choices button {
+.teacher-profile__choices button {
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -2509,25 +2488,28 @@
 }
 /* A touch never leaves a hover behind; the keyboard's focus always shows. */
 @media (hover: hover) {
-  .teacher-student-dialog__choices button:hover {
+  .teacher-profile__choices button:hover {
     border-color: var(--blue);
     background: var(--lavender-soft);
   }
 }
-.teacher-student-dialog__choices button:focus-visible {
+.teacher-profile__choices button:focus-visible {
   border-color: var(--blue);
   background: var(--lavender-soft);
 }
-.teacher-student-dialog__choices .account-avatar {
+.teacher-profile__choices .account-avatar {
   width: 34px;
   height: 34px;
   flex: none;
 }
-.teacher-student-dialog__new.button {
+.teacher-profile__new.button {
   gap: 0.5rem;
 }
-.teacher-student-dialog__form,
-.teacher-student-dialog .teacher-manual-form {
+/* Their details, whether adding a student or bringing them out with Edit
+   details: labelled fields two to a row where the dialog is wide, one column
+   on a phone, and the actions sharing the last row (14 October 2026, Dan). */
+.teacher-profile__form,
+.teacher-profile .teacher-manual-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
@@ -2535,23 +2517,58 @@
 }
 /* Fields in a row line up by their boxes, so a label that wraps (Email's
    aside, NIF's on a phone) never drops its field below its neighbour's. */
-.teacher-student-dialog__form {
+.teacher-profile__form {
   align-items: end;
 }
-.teacher-student-dialog .teacher-manual-choice,
-.teacher-student-dialog .teacher-manual-submit,
-.teacher-student-dialog__splat,
-.teacher-student-dialog__form > .teacher-dialog-actions {
+.teacher-profile .teacher-manual-choice,
+.teacher-profile .teacher-manual-submit,
+.teacher-profile__splat,
+.teacher-profile__form > :is(.teacher-dialog-actions, .teacher-inline-error) {
   grid-column: 1 / -1;
 }
-.teacher-student-dialog__splat {
+.teacher-profile__splat {
   display: grid;
   gap: 0.35rem;
   min-width: 0;
 }
+/* The lesson form opens in place, under its own heading, and takes focus
+   as a whole rather than ringing its section. */
+.teacher-profile__add h3 {
+  margin-top: 0;
+}
+.teacher-profile__add:focus {
+  outline: 0;
+}
+/* Lessons just added, kept in view for as long as the profile is open. */
+.teacher-profile__added {
+  display: grid;
+  gap: 0.45rem;
+}
+.teacher-profile__added .teacher-eyebrow,
+.teacher-profile__added .booking-payment-facts {
+  margin: 0;
+}
+.teacher-profile__added .booking-payment-facts {
+  font-weight: 600;
+}
+.teacher-profile__note {
+  margin: 0;
+  color: var(--lavender-ink);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+/* Add a lesson and Send welcome email share a row; the welcome's answer
+   takes the place of its button, never a line of its own. */
+.teacher-profile__actions {
+  margin-top: 0;
+}
+.teacher-profile__actions > .teacher-inline-success {
+  flex: 1 1 12rem;
+  margin: 0;
+}
 /* Their price: the two lengths side by side, a euro sign inside each field
    and the standard price showing until she types her own. */
-.teacher-student-dialog__price {
+.teacher-profile__price {
   grid-column: 1 / -1;
   min-width: 0;
   margin: 0;
@@ -2588,7 +2605,7 @@
   padding: 0.85rem;
   background: var(--raised);
 }
-.teacher-history-dialog .teacher-price h3 {
+.teacher-profile .teacher-price h3 {
   margin: 0;
 }
 .teacher-price__view {
@@ -2643,35 +2660,11 @@
 .teacher-price .teacher-inline-error {
   margin: 0;
 }
-.teacher-student-dialog__finish {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  align-items: center;
-  margin-top: 0;
-  border-top: 1px solid var(--rule-soft);
-  padding-top: 1rem;
-}
-.teacher-student-dialog__finish .button {
-  flex: 1 1 12rem;
-  width: auto;
-}
-.teacher-student-dialog__finish .teacher-inline-success {
-  flex: 1 1 12rem;
-  margin: 0;
-}
-@media (max-width: 480px) {
-  .teacher-student-dialog .teacher-manual-form {
+/* On a phone each field has the full width, one under another. */
+@media (max-width: 520px) {
+  .teacher-profile__form,
+  .teacher-profile .teacher-manual-form {
     grid-template-columns: minmax(0, 1fr);
-  }
-  /* On a phone the name and email take the width, and phone and NIF share
-     a row where each still shows a whole number, as her two prices do
-     beneath them; on the narrowest phones they stack. */
-  .teacher-student-dialog__form {
-    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  }
-  .teacher-student-dialog__form > label:nth-of-type(-n + 2) {
-    grid-column: 1 / -1;
   }
 }
 
