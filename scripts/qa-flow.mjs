@@ -2764,8 +2764,10 @@ await accountPage.locator("#upcoming-lessons-heading").waitFor();
 if (!(await accountPage.evaluate(() => window.localStorage.getItem("ines-account-snapshot")))) {
   throw new Error("A signed-in visit should remember its account for the next one.");
 }
-await accountMenuButton.click();
-await accountPanel.getByRole("button", { name: "Sign out", exact: true }).click();
+// A return navigation restores the responsive account header. Its places
+// are already open on wide cards; Sign out is always in Your details.
+await chooseAccountAction("Edit details");
+await accountPanel.locator(".my-lessons__details").getByRole("button", { name: "Sign out", exact: true }).click();
 await accountPage.locator("#lesson-calendar .booking-bar__sign-in").waitFor();
 await accountPanel.waitFor({ state: "detached" });
 if (await accountPage.evaluate(() => window.localStorage.getItem("ines-account-snapshot"))) {
