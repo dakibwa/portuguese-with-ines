@@ -430,10 +430,10 @@
 .teacher-time-slot.is-hour {
   border-top: 1px solid var(--rule-soft);
 }
-/* Her weekly hours are a faint coral wash under blue lessons (10 October
-   2026, at Dan's request); while editing, marked starts stay lilac. */
+/* Lilac marks weekly starts; booked lessons stay clear blue against the
+   cream outside her hours. Labels and hatching also distinguish time off. */
 .teacher-time-slot.is-available {
-  background: rgba(239, 93, 60, 0.13);
+  background: rgba(170, 164, 230, 0.22);
 }
 .teacher-timetable--editing .teacher-time-slot.is-available {
   background: var(--lavender-soft);
@@ -488,8 +488,8 @@
     -45deg,
     transparent,
     transparent 8px,
-    rgba(139, 130, 211, 0.16) 8px,
-    rgba(139, 130, 211, 0.16) 9px
+    rgba(85, 79, 145, 0.2) 8px,
+    rgba(85, 79, 145, 0.2) 9px
   );
 }
 .teacher-time-day--past > .teacher-time-slot {
@@ -538,8 +538,8 @@
     -45deg,
     transparent,
     transparent 8px,
-    rgba(139, 130, 211, 0.1) 8px,
-    rgba(139, 130, 211, 0.1) 9px
+    rgba(85, 79, 145, 0.2) 8px,
+    rgba(85, 79, 145, 0.2) 9px
   );
 }
 .teacher-off-label {
@@ -595,6 +595,10 @@
   border-left: 3px solid var(--coral);
   padding-left: 6px;
 }
+.teacher-calendar-lesson.teacher-calendar-lesson--short { flex-direction: row; align-items: center; gap: 0.35rem; padding-block: 0; }
+.teacher-calendar-lesson--short .teacher-lesson-time { padding-right: 0; }
+.teacher-calendar-lesson--short strong { min-width: 0; flex: 1; }
+.teacher-calendar-lesson--short .teacher-lesson-location { display: none; }
 .teacher-calendar-lesson:hover {
   background: var(--blue);
   box-shadow: 0 3px 0 rgba(32, 62, 130, 0.15);
@@ -703,8 +707,8 @@
   border: 1px solid transparent;
 }
 .teacher-key-starts {
-  background: rgba(239, 93, 60, 0.2);
-  border-color: rgba(239, 93, 60, 0.4) !important;
+  background: rgba(170, 164, 230, 0.22);
+  border-color: var(--lavender) !important;
 }
 .teacher-key-booked {
   background: var(--blue-deep);
@@ -825,6 +829,7 @@
   gap: 1rem;
   margin-top: 1.5rem;
 }
+.teacher-manual-settings { display: contents; }
 /* Lesson length and place as the booking's sliders. */
 .teacher-manual-choice {
   min-width: 0;
@@ -1277,6 +1282,27 @@
   }
 }
 
+/* Fit a normal working week beneath its tabs and calendar controls. Keep a
+   readable floor for exceptional early-to-late weeks instead of clipping. */
+@media (min-width: 1001px) {
+  .teacher-timetable:not(.teacher-timetable--editing) {
+    --teacher-slot-height: clamp(calc(21px * var(--slot-step) / 30), calc((100dvh - 12rem) / var(--slot-count)), calc(28px * var(--slot-step) / 30));
+    --teacher-lesson-min-height: 0px;
+  }
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-calendar-lesson { padding: 4px 6px; gap: 1px; }
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-calendar-lesson strong { padding-right: 26px; font-size: 0.7rem; }
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-lesson-time { font-size: 0.55rem; }
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-lesson-meet { left: auto; right: 8px; min-height: 18px; padding-inline: 0.3rem; font-size: 0; gap: 0; }
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-lesson-meet:hover,
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-lesson-meet:focus-visible { background: var(--blue); color: var(--paper-light); }
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-calendar-lesson .teacher-lesson-added,
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-calendar-lesson .teacher-lesson-no-show { position: static; margin-left: 0.3rem; font-size: 0.5rem; }
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-calendar-lesson--short { flex-direction: row; align-items: center; gap: 0.35rem; padding-block: 0; }
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-calendar-lesson--short .teacher-lesson-time { padding-right: 0; }
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-calendar-lesson--short strong { min-width: 0; flex: 1; padding-right: 26px; }
+  .teacher-timetable:not(.teacher-timetable--editing) .teacher-calendar-lesson--short .teacher-lesson-location { display: none; }
+}
+
 @media (max-width: 980px) {
   .teacher-calendar-lesson {
     padding: 5px;
@@ -1442,12 +1468,12 @@
   .teacher-exact-windows {
     width: 100%;
   }
-      .teacher-manual-form {
+  .teacher-manual-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .teacher-manual-form > label:first-child,
   .teacher-manual-form > label:nth-child(2),
-  .teacher-manual-form > .teacher-manual-choice {
+  .teacher-manual-form .teacher-manual-choice {
     grid-column: 1/-1;
   }
   .teacher-manual-submit .button {
@@ -1476,6 +1502,10 @@
   .teacher-lesson-time { font-size: 0.52rem; }
   .teacher-lesson-location { right: 5px; top: 5px; }
   .teacher-lesson-meet { left: 9px; }
+}
+@media (max-width: 1000px) {
+  .teacher-calendar-lesson.teacher-calendar-lesson--short strong { padding-right: 26px; font-size: 0.76rem; }
+  .teacher-lesson-meet--short { left: auto; right: 10px; }
 }
 
 /* A phone held sideways has little height to spare: the band keeps its
@@ -2920,16 +2950,29 @@
 .teacher-setup__body-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 1rem; min-width: 0; }
 .teacher-setup__body-heading h3 { margin: 0; font-size: 0.9rem; }
 .teacher-setup__body .teacher-price { border: 0; padding: 0; background: none; }
-.teacher-setup__body .teacher-manual-form { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.teacher-setup__body .teacher-manual-form { grid-template-columns: minmax(0, 1fr); max-width: none; margin: 0; }
+.teacher-setup__body .teacher-manual-settings { display: grid; align-content: start; gap: 1rem; min-width: 0; }
 .teacher-setup__body .teacher-manual-choice,
 .teacher-setup__body .teacher-manual-submit { grid-column: 1 / -1; }
-.teacher-setup__body .teacher-form { max-width: 42rem; width: 100%; }
+.teacher-setup__body .teacher-form { width: 100%; }
+.teacher-setup__body .teacher-form:not(.teacher-manual-form) { max-width: 42rem; }
 .teacher-setup__body .teacher-price-fields { max-width: 27rem; }
 .teacher-setup__body .teacher-dialog-actions { margin-top: 0; }
 .teacher-setup__email { margin: 0; font-size: 0.8rem; overflow-wrap: anywhere; }
 .teacher-setup__notice { grid-column: 1 / -1; margin: 0; }
 .teacher-setup__attention { grid-column: 1 / -1; min-width: 0; }
 .teacher-setup__body .teacher-setup__help { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0; font-size: 0.78rem; }
+@container setup-list (min-width: 58rem) {
+  .teacher-setup__body .teacher-manual-form { grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 1.6fr); align-items: start; column-gap: 1.5rem; }
+  .teacher-setup__body .teacher-lesson-picker { grid-column: 2; grid-row: 1; }
+  .teacher-setup__body .teacher-manual-submit { grid-column: 2; }
+  .teacher-setup__body .teacher-manual-settings .segmented--three label { grid-auto-flow: row; gap: 0.05rem; line-height: 1.25; }
+  .teacher-setup__body .teacher-manual-price::before { content: none; }
+  .teacher-setup__body .teacher-manual-settings .segmented--four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .teacher-setup__body .teacher-manual-settings .segmented--four .segmented__thumb { bottom: auto; width: calc(50% - 6px); height: calc(50% - 6px); }
+  .teacher-setup__body .teacher-manual-settings .segmented--four.segmented--position-2 .segmented__thumb { transform: translateY(calc(100% + 4px)); }
+  .teacher-setup__body .teacher-manual-settings .segmented--four.segmented--position-3 .segmented__thumb { transform: translate(calc(100% + 4px), calc(100% + 4px)); }
+}
 @container setup-list (max-width: 48rem) {
   .teacher-setup { grid-template-columns: minmax(0, 1fr) max-content; }
   .teacher-setup__action { grid-column: 2; grid-row: 1; }

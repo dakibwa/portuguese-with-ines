@@ -455,8 +455,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   are unavailable. Saved cards and permission to charge every lesson differ.
   Every student's name opens their full profile. The step buttons keep details,
   prices, lessons and welcome editable in the row. Adding a
-  lesson opens the calendar with available Porto start times; manual entry,
-  location, length and weekly repeat remain available. Welcomes are explicit:
+  lesson opens the calendar with available Porto start times. In a wide row,
+  compact lesson settings sit beside the calendar and its available times;
+  they stack on a phone. Manual entry, location, length and weekly repeat
+  remain available. Welcomes are explicit:
   opening a step never sends email. First welcomes use `onlyIfWaiting: true`;
   `Send the link again` deliberately requests a fresh link without that guard.
   The Timetable keeps up to three operational notices under the next lesson,
@@ -473,9 +475,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - Show the full working week on desktop and in a panel wide enough to read it.
   On phones, keep the displayed days in a compact selector
   above a spacious single-day timetable and that day's `Day off` switch, with
-  no horizontal page overflow. On desktop the timetable stands at its full
-  height, with no scroll of its own, so an evening lesson is never hidden
-  inside it. On a phone the day scrolls within its box and opens at her first
+  no horizontal page overflow. On desktop a normal working week fits the
+  viewport beneath its tabs and calendar controls. Rows keep a readable
+  minimum height; unusually long days extend the page instead of clipping
+  lessons or adding an inner scrollbar. On a phone the day scrolls within its box and opens at her first
   teaching hour that day or its first lesson, whichever is earlier.
   Compact rows must retain legible lesson times, names and call controls.
   Dates and timed lessons always use Porto time, including at DST boundaries.
@@ -484,9 +487,14 @@ usual lesson starts and days off; avoid a wall of administration forms.
   preserves its original occurrence while its wall time remains unchanged.
   Skipped weekly occurrences are listed by date in previews, confirmations
   and emails; a missing wall time never appears as a different real time.
-- The timetable spans 08:00–20:00 and widens to fit any weekly hours or
-  lessons outside it. There is no 24-hour view; early or late hours are set
-  with the exact-time editor.
+- The timetable trims empty hours before and after the weekly starts,
+  booked lessons and timed breaks, rounding outward to full hours. A normal
+  09:00 start does not carry an empty 08:00 row. Early, late and overnight
+  lessons always widen the visible range. A completely empty timetable
+  offers 09:00–20:00; Weekly hours keeps its 08:00–20:00 paint range and its
+  exact-time editor. Weekly starts use a quiet lilac wash, unavailable time
+  stays cream, booked lessons are blue, and time off is hatched and labelled.
+  Added lessons retain their lilac fill, dashed edge and `Added` label.
 - Google Meet lives inside `Profile` (14 October 2026, Dan), in one card: the logo and `Connected as …` (or what
   it needs), two dabs (every lesson goes to her Google Calendar with its Meet
   link; move or cancel lessons here, not in Google), then `Open Google

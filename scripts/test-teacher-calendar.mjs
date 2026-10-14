@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { candidateStartMinutes } from "../workers/booking/availability.mjs";
 import { wallTimeToUtc } from "../src/lib/wall-time.ts";
 import { tryOutExpressions } from "../src/lib/expression-try-out.ts";
+import { timetableBounds } from "../src/lib/timetable-bounds.ts";
 import {
   addSpan,
   bookingSegments,
@@ -24,6 +25,16 @@ import {
   weeklyBlocks,
   withDayChanges,
 } from "../src/lib/teacher-calendar.ts";
+
+test("timetable trims empty edges without hiding early, late or overnight lessons", () => {
+  const normal = { windows: [{ start: 540, lastStart: 1110 }], lessons: [], blocks: [], step: 30, editing: false };
+  assert.deepEqual(timetableBounds(normal), { start: 540, end: 1140 });
+  assert.deepEqual(timetableBounds({ ...normal, lessons: [{ start: 345, end: 405 }, { start: 1350, end: 1430 }] }), { start: 300, end: 1440 });
+  assert.deepEqual(timetableBounds({ ...normal, lessons: [{ start: 0, end: 45 }, { start: 1395, end: 1440 }] }), { start: 0, end: 1440 });
+  assert.deepEqual(timetableBounds({ ...normal, blocks: [{ start: 450, end: 510 }, { start: 0, end: 1440 }] }), { start: 420, end: 1140 }, "timed breaks widen the range; a whole day off does not");
+  assert.deepEqual(timetableBounds({ ...normal, windows: [] }), { start: 540, end: 1200 });
+  assert.deepEqual(timetableBounds({ ...normal, editing: true }), { start: 480, end: 1200 }, "the weekly editor retains empty early cells to paint");
+});
 
 test("weekly-hour warnings use Porto time and only changed starts inside booked lessons", () => {
   const before = hoursFromRules([{ weekday: 1, start_minute: 600, last_start_minute: 690 }]);
