@@ -158,12 +158,25 @@
 .teacher-week-toolbar {
   display: grid;
   grid-template-areas:
-    "title pager"
-    "hint hint";
-  grid-template-columns: minmax(0, 1fr) auto;
+    "title mode pager"
+    "hint hint hint";
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 0.5rem 1rem;
   margin-bottom: 0.7rem;
+}
+.teacher-week--editing .teacher-week-toolbar {
+  grid-template-areas: "title mode" "hint hint";
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.teacher-week-mode {
+  grid-area: mode;
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 0.4rem;
+  min-height: 36px;
+  white-space: nowrap;
 }
 .teacher-week-title {
   grid-area: title;
@@ -1492,17 +1505,17 @@
   .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto 36px 36px;
-    grid-template-areas: "title day previous next";
+    grid-template-areas: "title day previous next" "mode mode current current";
     gap: 0 0.4rem;
   }
   .teacher-week-day-control { display: flex; grid-area: day; }
+  .teacher-week:not(.teacher-week--editing) .teacher-week-mode { justify-self: start; }
   .teacher-week-day-control .teacher-day-toggle { padding-inline: 0.3rem; font-size: 0.7rem; }
   .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-pager { display: contents; }
   .teacher-week-toolbar .teacher-pager .teacher-icon-button:nth-of-type(2) { grid-area: previous; }
   .teacher-week-toolbar .teacher-pager .teacher-icon-button:nth-of-type(3) { grid-area: next; }
   .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-pager .teacher-text-button {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    grid-area: current;
     justify-self: end;
     margin: 0;
   }
@@ -2172,9 +2185,9 @@
    tab filled. Account controls and Google Meet live inside Profile. */
 @media (max-width: 1000px) {
   .teacher-tabs-scroll { overflow: visible; }
-  /* Each row fills the strip, including the three tools in the second row. */
+  /* Six tools form two balanced rows. Weekly hours lives in Timetable. */
   .teacher-tabs { display: flex; flex-wrap: wrap; width: 100%; }
-  .teacher-tabs button { flex: 1 1 calc(25% - 4px); min-width: 0; gap: 0.2rem; font-size: clamp(0.56rem, 2.5vw, 0.85rem); }
+  .teacher-tabs button { flex: 1 1 calc(33.333% - 4px); min-width: 0; gap: 0.2rem; font-size: clamp(0.56rem, 2.5vw, 0.85rem); }
   .teacher-tabs .teacher-tabs__thumb { display: none; }
   .teacher-tabs button { min-height: 44px; padding-inline: 0.4rem; }
   /* Keep every tool in view as the collection grows. */

@@ -279,7 +279,7 @@ try {
       });
       try {
         const { page } = state;
-        await monday(page); await page.getByRole("tab", { name: /^Weekly hours/ }).click();
+        await monday(page); await page.getByRole("button", { name: "Edit weekly hours", exact: true }).click();
         await page.getByRole("button", { name: "Monday, show weekly hours", exact: true }).click();
         await slot(page, 1, 600).click();
         const save = page.getByRole("button", { name: "Save weekly hours", exact: true });
@@ -644,7 +644,7 @@ try {
           recovered = true;
           if (malformed.startsWith("teacher-")) {
             await page.getByRole("button", { name: "Try again", exact: true }).click();
-            await expect(page.getByRole("tab", { name: /^Weekly hours/ })).toBeVisible();
+            await expect(page.getByRole("button", { name: "Edit weekly hours", exact: true })).toBeVisible();
           } else if (malformed === "managed") {
             await page.getByRole("button", { name: "Close lesson management", exact: true }).click();
             await check(state); await page.goto(`${base}/book/?manage=fixture`);

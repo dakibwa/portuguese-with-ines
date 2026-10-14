@@ -354,14 +354,17 @@ dates, are refused rather than partly saved. `GET /admin/availability` returns
 weekly blocks alongside the upcoming one-off rows so the calendar shows every
 time students cannot book.
 
-The `Weekly hours` tab edits the usual weekly pattern with click/drag,
-touch or keyboard input. `Save weekly hours` writes the existing first-start and
+The Timetable's `Edit weekly hours` control edits the usual weekly pattern in
+the same calendar with click/drag, touch or keyboard input. `View lessons`
+returns to the chosen week and day. Neither switching mode nor leaving the
+tab saves or discards a draft; Timetable and its edit control mark unsaved hours.
+`Save weekly hours` writes the existing first-start and
 last-start rule format; it does not reinterpret the last start as a finishing
 time. Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
-The tools bar groups `Students`, `Timetable`, `Weekly hours`, `Time off`,
+The tools bar groups `Students`, `Timetable`, `Time off`,
 `Receipts`, `Expressions` and `Profile`, opening on `Timetable`.
 Profile holds her sign-in email change, password reset link, Google Meet
 connection and Sign out. Email changes use the existing new-address confirmation

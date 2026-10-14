@@ -335,10 +335,16 @@ async function fixture(width, options = {}) {
 
 const slot = (page, day, minute) =>
   page.locator(`[data-slot-day="${day}"][data-slot-minute="${minute}"]`);
-const showHours = (page) =>
-  page.getByRole("tab", { name: /^Weekly hours/ }).click();
-const showLessons = (page) =>
-  page.getByRole("tab", { name: "Timetable", exact: true }).click();
+async function showHours(page) {
+  await page.getByRole("tab", { name: /^Timetable/ }).click();
+  const edit = page.getByRole("button", { name: /^Edit weekly hours/ });
+  if (await edit.isVisible()) await edit.click();
+}
+async function showLessons(page) {
+  await page.getByRole("tab", { name: /^Timetable/ }).click();
+  const lessons = page.getByRole("button", { name: "View lessons", exact: true });
+  if (await lessons.isVisible()) await lessons.click();
+}
 const dayWrites = (state, date) =>
   state.writes
     .filter((entry) => entry.path === "/admin/exceptions/day")
@@ -1300,7 +1306,7 @@ try {
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.locator(".teacher-hours-warning .teacher-lesson-card")).toHaveCount(5);
     await expect(page.locator(".teacher-hours-warning")).not.toContainText("Repeat 5");
-    await expect(page.getByRole("tab", { name: /^Weekly hours/ })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: /^Timetable/ })).toHaveAttribute("aria-selected", "true");
     await expect(slot(page, 1, 660)).toHaveAttribute("aria-pressed", "false");
     await expect(page.getByRole("button", { name: "Save weekly hours", exact: true })).toBeEnabled();
     await expect(page.getByRole("heading", { name: "Your weekly hours", exact: true })).toBeFocused();
@@ -1320,10 +1326,11 @@ try {
     await expect(page.getByRole("tab", { name: "Timetable", exact: true })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("tab", { name: "Timetable", exact: true }).focus();
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByRole("tab", { name: /^Weekly hours/ })).toBeFocused();
+    await expect(page.getByRole("tab", { name: "Time off", exact: true })).toBeFocused();
+    await showHours(page);
     await slot(page, 1, 600).click();
     await page.getByRole("tab", { name: /^Students/ }).click();
-    await expect(page.getByRole("tab", { name: /^Weekly hours/ }).locator(".teacher-tab-dot")).toHaveAttribute("aria-label", "unsaved changes");
+    await expect(page.getByRole("tab", { name: /^Timetable/ }).locator(".teacher-tab-dot")).toHaveAttribute("aria-label", "unsaved changes");
     await showHours(page);
     await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "false");
     await page.getByRole("button", { name: "Discard", exact: true }).click();

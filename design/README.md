@@ -360,14 +360,14 @@ usual lesson starts and days off; avoid a wall of administration forms.
   as she clicks; the line under the calendar says what changed or what failed.
   Weekly blocks such as lunch are shown but not toggled per date. Keyboard and
   touch input must work without dragging.
-- A sliding tab bar with a thin dark-blue border groups `Students`, `Timetable`, `Weekly hours`, `Time off`,
+- A sliding tab bar with a thin dark-blue border groups `Students`, `Timetable`, `Time off`,
   `Receipts`, `Expressions` and `Profile`. Open on `Timetable`;
-  keep the week pager beside its month-and-year heading. The phone bar holds all seven
-  tabs in two rows that each fill the available width, without scrolling. Dates
+  keep the week pager beside its month-and-year heading. The phone bar holds all six
+  tabs in two balanced rows that fill the available width, without scrolling. Dates
   are centred evenly across the timetable header; omit the Porto gutter label.
   Arrow keys, Home and End move between
-  tabs. Unsaved hours and selected dates survive tab changes. Weekly hours
-  keeps its unsaved dot; Students shows a coral count of students and notices needing attention,
+  tabs. Unsaved hours and selected dates survive tab changes. Timetable
+  keeps an unsaved dot while weekly hours have a draft; Students shows a coral count of students and notices needing attention,
   absent at zero. Profile holds her sign-in email, password link, Google Meet
   connection and Sign out, keeping account controls away from daily work.
 - One pager turns the Timetable's week and the Time off and Receipts months
@@ -389,7 +389,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   use the site's buttons: coral for the main action, outline for the other, a
   quiet link for a rare one. Weekly hours is headed `Your weekly hours` with two dabs:
   tap or drag to mark when a lesson can start, and that it repeats every week.
-- `Weekly hours` opens the repeating weekly pattern. Clicking or
+- `Edit weekly hours` in the Timetable opens the repeating weekly pattern in
+  the same calendar. `View lessons` returns to the chosen week and day without
+  losing unsaved hours. It does not save them; only `Save weekly hours` does.
+  The edit control also marks a waiting draft. Clicking or
   dragging marks lesson start times. Preserve exact existing first/last-start
   values and provide an exact-time editor. The last start is not a finishing
   time. Weekly edits remain a draft until `Save weekly hours`, and booking
@@ -1561,7 +1564,7 @@ as a form:
 - signed in, booking is headed by the account's own bar, as Your lessons is:
   the name's menu, or the places open on a wide card, holding the way back;
 - Inês's schedule reads as the same place: the booking page's blue band,
-  one bar for `Students`, `Timetable`, `Weekly hours`, `Time off`,
+  one bar for `Students`, `Timetable`, `Time off`,
   `Receipts`, `Expressions` and `Profile`; sliders for a
   lesson's length and place in her lesson form, with the
   timetable's globe and person beside Online and In Porto, her sign-in with no `Create an account`, and each student's chosen
