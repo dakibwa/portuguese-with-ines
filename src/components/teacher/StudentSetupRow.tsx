@@ -24,12 +24,13 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
   onWelcome: (student: AdminStudent, again?: boolean) => void;
   onBusy?: (busy: boolean) => void;
 }) {
-  const { student, steps, next, owner } = setup;
+  const { student, steps, next } = setup;
   const step = steps.find(entry => entry.id === requestedStep && !entry.lockedReason)?.id ?? null;
   const statusStep = step === "welcome" || step === "sign-in" || step === "card";
   const [busy, setBusyState] = useState(false);
   const setBusy = (value: boolean) => { setBusyState(value); onBusy?.(value); };
   const [notice, setNotice] = useState("");
+  const header = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const stepControls = useRef<HTMLOListElement>(null);
   const paneId = `teacher-setup-${student.id}`;
@@ -39,7 +40,6 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
     onSelect(null);
   };
   const waitingOnStudent = next === "sign-in" || next === "card";
-  const status = next === "email" ? "" : next === "lessons" ? "No lessons yet" : next === "welcome" ? "Welcome ready" : next === "sign-in" ? "Waiting for sign-in" : "Waiting for card";
   const help: string[] = step === "price"
     ? [Object.keys(student.ownPrices ?? student.prices ?? {}).length ? "Custom lesson price set." : "Standard lesson price applies."]
     : step === "lessons" ? [
@@ -60,10 +60,18 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
       : step === "price" ? body.current.querySelector<HTMLInputElement>('input[type="text"]')
       : step === "lessons" ? body.current.querySelector<HTMLButtonElement>('.teacher-lesson-picker [data-lesson-date][tabindex="0"]') : null;
     (input ?? body.current).focus({ preventScroll: true });
-    body.current.scrollIntoView({ block: "nearest" });
+    if (!header.current) return;
+    const bounds = header.current.getBoundingClientRect();
+    const siteHeader = document.querySelector<HTMLElement>(".site-header");
+    const headerPosition = siteHeader && getComputedStyle(siteHeader).position;
+    const inset = siteHeader && (headerPosition === "sticky" || headerPosition === "fixed")
+      ? Math.max(0, siteHeader.getBoundingClientRect().bottom) : 0;
+    const top = inset + 16;
+    // Reveal the name and steps, rather than aligning a tall editor's bottom.
+    if (bounds.top < top || body.current.getBoundingClientRect().bottom > window.innerHeight - 16)
+      window.scrollBy({ top: bounds.top - top, behavior: "instant" });
   }, [step]);
 
-  const primaryLabel = next === "lessons" ? "Add a lesson" : next === "welcome" ? "Send welcome email" : "Send the link again";
   const send = (again: boolean) => onWelcome(student, again);
   const sendButton = (again: boolean) => <button
     className={`button button--${again ? "lilac" : "coral"} button--compact`}
@@ -73,44 +81,38 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
   >{sending === student.id ? "Sending…" : again ? "Send the link again" : "Send welcome email"}<span className="visually-hidden"> to {student.name}</span></button>;
 
   return <li className={`teacher-setup teacher-setup--inline${step ? " is-open" : ""}`}>
-    <button
-      className="teacher-setup__profile"
-      aria-controls={onOpenProfile ? undefined : paneId}
-      aria-expanded={onOpenProfile ? undefined : step === "email"}
-      aria-label={onOpenProfile ? `Open ${student.name}’s profile` : `Edit ${student.name}’s details`}
-      disabled={disabled}
-      onClick={() => onOpenProfile ? onOpenProfile() : onSelect(step === "email" ? null : "email")}
-      type="button"
-    ><AccountAvatar mark={student.mark} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{status ? <span className="teacher-setup__status">{status}</span> : null}</span></button>
-    <ol className="teacher-setup__steps" ref={stepControls}>
-      {steps.map(entry => <li className={entry.done ? "is-done" : entry.lockedReason ? "is-locked" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
-        <button
-          aria-controls={paneId}
-          aria-expanded={step === entry.id}
-          aria-label={`${entry.label} for ${student.name}`}
-          aria-describedby={`${paneId}-${entry.id}-status`}
-          disabled={disabled || Boolean(entry.lockedReason)}
-          title={entry.lockedReason}
-          onClick={() => { setNotice(""); onSelect(step === entry.id ? null : entry.id); }}
-          type="button"
-        ><i aria-hidden="true">{entry.done ? <Check size={12} strokeWidth={3} /> : entry.lockedReason ? <LockKeyhole size={12} strokeWidth={2} /> : entry.id === next && waitingOnStudent ? <Clock3 size={12} strokeWidth={2} /> : null}</i><span>{entry.label}<span className="visually-hidden" id={`${paneId}-${entry.id}-status`}>{entry.done ? ": done" : entry.lockedReason ? `: ${entry.lockedReason}` : entry.id === next && waitingOnStudent ? ": waiting for the student" : ": waiting"}</span></span></button>
-      </li>)}
-    </ol>
-    {step ? <div className="teacher-setup__action teacher-setup__close">
-      <button className="teacher-dialog-close" aria-label="Close" aria-controls={paneId} disabled={disabled} onClick={close} type="button"><X size={20} aria-hidden="true" /></button>
-    </div> : next !== "email" ? <div className="teacher-setup__action"><button
-      className={`button button--${owner === "Yours" ? "coral" : "lilac"} button--compact`}
-      disabled={disabled || ((next === "welcome" || next === "sign-in" || next === "card") && Boolean(sending))}
-      onClick={() => {
-        if (next === "welcome" || next === "sign-in" || next === "card") send(next !== "welcome");
-        else onSelect(next);
-      }}
-      type="button"
-    >{sending === student.id ? "Sending…" : primaryLabel}<span className="visually-hidden"> for {student.name}</span></button></div> : null}
+    <div className="teacher-setup__header" ref={header}>
+      <button
+        className="teacher-setup__profile"
+        aria-controls={onOpenProfile ? undefined : paneId}
+        aria-expanded={onOpenProfile ? undefined : step === "email"}
+        aria-label={onOpenProfile ? `Open ${student.name}’s profile` : `Edit ${student.name}’s details`}
+        disabled={disabled}
+        onClick={() => onOpenProfile ? onOpenProfile() : onSelect(step === "email" ? null : "email")}
+        type="button"
+      ><AccountAvatar mark={student.mark} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong></span></button>
+      <ol className="teacher-setup__steps" ref={stepControls}>
+        {steps.map(entry => <li className={entry.done ? "is-done" : entry.lockedReason ? "is-locked" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
+          <button
+            aria-controls={paneId}
+            aria-expanded={step === entry.id}
+            aria-label={`${entry.label} for ${student.name}`}
+            aria-describedby={`${paneId}-${entry.id}-status`}
+            disabled={disabled || Boolean(entry.lockedReason)}
+            title={entry.lockedReason}
+            onClick={() => { setNotice(""); onSelect(step === entry.id ? null : entry.id); }}
+            type="button"
+          ><i aria-hidden="true">{entry.done ? <Check size={12} strokeWidth={3} /> : entry.lockedReason ? <LockKeyhole size={12} strokeWidth={2} /> : entry.id === next && waitingOnStudent ? <Clock3 size={12} strokeWidth={2} /> : null}</i><span>{entry.label}<span className="visually-hidden" id={`${paneId}-${entry.id}-status`}>{entry.done ? ": done" : entry.lockedReason ? `: ${entry.lockedReason}` : entry.id === next && waitingOnStudent ? ": waiting for the student" : ": waiting"}</span></span></button>
+        </li>)}
+      </ol>
+      {step ? <div className="teacher-setup__action teacher-setup__close">
+        <button className="teacher-dialog-close" aria-label="Close" aria-controls={paneId} disabled={disabled} onClick={close} type="button"><X size={20} aria-hidden="true" /></button>
+      </div> : null}
+    </div>
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
     {step ? <div className={`teacher-setup__body${statusStep ? " teacher-setup__body--status" : ""}`} id={paneId} aria-label={`${student.name}’s setup`} role="region" ref={body} tabIndex={-1}>
       <div className="teacher-setup__body-heading">
-        <h3 id={`${paneId}-heading`}>{step === "email" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome email" : step === "sign-in" ? "Sign in" : "Saved card"}</h3>
+        <h3 id={`${paneId}-heading`}>{step === "email" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome" : step === "sign-in" ? "Sign in" : "Saved card"}</h3>
         {help.length ? <ul className="booking-payment-facts teacher-setup__help">{help.map(text => <li key={text}>{text}</li>)}</ul> : null}
         {statusStep && student.email ? <p className="teacher-setup__email">{student.email}</p> : null}
       </div>

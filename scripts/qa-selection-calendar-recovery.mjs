@@ -538,7 +538,7 @@ try {
         await page.goto(`${base}/schedule/`);
         await page.getByRole("tab", { name: /^Students/ }).click();
         const rui = page.locator(".teacher-setup").filter({ hasText: "Rui" });
-        await rui.getByRole("button", { name: "Add a lesson for Rui", exact: true }).click();
+        await rui.getByRole("button", { name: "Lessons for Rui", exact: true }).click();
         // An unfinished student adds their lesson beneath the setup row.
         const form = rui.getByRole("region", { name: "Rui’s setup", exact: true }).locator(".teacher-manual-form");
         await form.getByText("Enter another time", { exact: true }).click();

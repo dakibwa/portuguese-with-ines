@@ -82,6 +82,7 @@ export function TeacherSchedule() {
   const [mobileDay, setMobileDay] = useState(
     () => (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7,
   );
+  const [dayControlHost, setDayControlHost] = useState<HTMLDivElement | null>(null);
   const [activeTab, setActiveTab] = useState<TeacherTab>("week");
   const editing = activeTab === "hours";
   // Her Google Meet connection, read in Profile and listed in Needs you when it needs her.
@@ -695,6 +696,7 @@ export function TeacherSchedule() {
               <li>Repeats every week</li>
             </ul>
           ) : null}
+          {!editing ? <div className="teacher-week-day-control" ref={setDayControlHost} /> : null}
           {!editing ? (
             <TeacherPager
               unit="week"
@@ -755,6 +757,7 @@ export function TeacherSchedule() {
             interval={interval}
             disabled={savingHours}
             mobileDay={mobileDay}
+            dayControlHost={dayControlHost}
             status={
               editing ? null : (
                 <p

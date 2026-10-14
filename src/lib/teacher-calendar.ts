@@ -435,7 +435,7 @@ export function gettingStarted(students: AdminStudent[], cardsAccepted = true): 
       { id: "price", label: "Price", done: true },
       { id: "lessons", label: "Lessons", done: hasLessons(student) },
       { id: "email", label: "Email", done: email },
-      { id: "welcome", label: "Welcome email", done: email && !student.awaitingWelcome },
+      { id: "welcome", label: "Welcome", done: email && !student.awaitingWelcome },
       { id: "sign-in", label: "Sign in", done: Boolean(student.signedIn) },
       ...(cardsAccepted ? [{ id: "card" as const, label: "Card", done: Boolean(student.hasCard) }] : []),
     ];

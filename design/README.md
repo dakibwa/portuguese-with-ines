@@ -439,19 +439,19 @@ usual lesson starts and days off; avoid a wall of administration forms.
   Meet and unmatched payment notices remain visible above the list; never match
   a payment to a student by name alone.
   Incomplete students have compact, distinct steps: Price, Lessons, Email,
-  Welcome email, Sign in and Card. Later unfinished steps stay locked until
+  Welcome, Sign in and Card. Later unfinished steps stay locked until
   the preceding steps are complete; completed steps remain editable. A lock
   gives the missing prerequisite. Checks mark completion, the next action has an
-  outline, and a clock marks waiting on the student. Say what is needed beside
-  their name; do not use vague ownership labels such as Yours or Theirs.
-  Email uses its step control, without a duplicate Add email button or
-  Email needed label.
+  outline, and a clock marks waiting on the student. The steps are the controls;
+  do not repeat the next action as a top-right button or status beside the name.
+  Explain what is outstanding inside the selected step, without vague ownership
+  labels such as Yours or Theirs.
   Completed onboarding becomes a normal row labelled Student, with their
   details, next lesson, price and profile access. No duplicate To do list.
-  The collapsed row uses one band when space permits. In narrower panels,
-  name and action share the first line, with steps directly below. The opened
-  editor spans the row and replaces the row's action with one X close control
-  at the top right. Status sits alongside the name, and the selected step's
+  The name and journey share one band where they fit. On small phones the steps
+  wrap beneath the name without horizontal scrolling. Opening a step keeps the
+  student's name visible and places one X close control at the top right.
+  The editor spans the row, and the selected step's
   heading and short bullet facts share a band with status actions. Details and
   price fields use the full row width, with their save action alongside when
   space allows; fields stack on phones. Hover gently changes the row's border; a strong outline is reserved
@@ -471,14 +471,15 @@ usual lesson starts and days off; avoid a wall of administration forms.
   The Timetable keeps up to three operational notices under the next lesson,
   with `See all in Students`. Setup tasks live in Students. Notices clear from
   existing reads; there is nothing new to store or dismiss.
-- Each date has one compact header cell: weekday and bold date baseline-aligned
+- Each date has one compact header cell: weekday and bold date centred together
   on one line (`Mon 7`), today's number in a filled blue lozenge with cream
-  type, and the booked dot inline after it. Its Day off switch sits at the
+  type, and a booked dot that does not shift the date. Its Day off switch sits at the
   right, moving to a second short line inside the cell when the column cannot
   fit both. It has a 44px hit area and keeps its full dated accessible name.
-  There is no separate Day off row. The phone's day choices stay compact;
-  the shown day's matching heading and switch share the band immediately
-  above its time grid. `PORTO` stays aligned with the time column.
+  There is no separate Day off row. On phones, the selected date appears only
+  in the compact day selector. Its Day off switch sits between the month and
+  the arrows, with the full selected date in its accessible name. The time
+  grid starts directly below the selector; no repeated date or Porto label.
 - Show the full working week on desktop and in a panel wide enough to read it.
   On phones, keep the displayed days in a compact selector
   above a spacious single-day timetable and that day's `Day off` switch, with
