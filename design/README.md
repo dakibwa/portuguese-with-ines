@@ -453,13 +453,16 @@ usual lesson starts and days off; avoid a wall of administration forms.
   text `Edit details` button on one line; the cream `Their price` card (each
   length as a dab, a lilac `Change price`); the `Add a lesson` button, with
   `Send welcome email` beside it where it applies; what was just added; then
-  their upcoming and past lessons. Opening it reads and writes nothing.
+  their upcoming and past lessons. Opening it changes nothing and sends nothing.
   - `Edit details` stays one button. It brings out everything together, in
     place, under the name: full name, email, phone and NIF, labelled, two to a
     row where the dialog is wide and one column on a phone, with `Save details`
     and `Cancel` sharing the last row and the address and NIF lines it replaces
     put away meanwhile. There are no per-field buttons. A student who has
-    signed in changes their own email, so that field is disabled.
+    signed in changes their own email, so that field is disabled. While it is
+    open `Save details` is the one coral action, and `Add a lesson` and `Send
+    welcome email` are lilac. Their email and phone have a line each; the NIF
+    and `Edit details` share the last line at any width.
   - `Add a lesson` opens the lesson form in place, under its own heading, with
     `Cancel` beside the submit. Lengths carry their price from the student's
     own rate. Adding returns to the profile with each addition as a dab line
@@ -492,14 +495,17 @@ usual lesson starts and days off; avoid a wall of administration forms.
     they have an address. After the two `Your price` dabs (for each length she
     has priced), each lesson on its own is one dab: `Lesson · Online` (or
     `Trial lesson`, `In Porto`) over its date and time on the student's own
-    clock, named once (`Tuesday 20 October 2026, 17:00 · Porto time`), and its
-    length and the price it will be charged or owed beneath (`60 minutes ·
-    €22`). A weekly run is one dab, never a row of dates: `Weekly · Online`
-    over `Every Tuesday, 17:00 · Porto time`, `From 20 October 2026 until 8
-    December 2026` (or `…, until you stop it`) and `60 minutes · €22 a
-    lesson`. A lesson moved or lengthened from its run reads as the lesson it
-    now is. Past twelve lines an `And more` dab says how many lessons are left
-    to the website. Its subject and preheader do not change.
+    clock, each time naming it as every email to them does (`Tuesday 20 October
+    2026, 17:00 · Porto time`), and its length and the price it will be charged
+    or owed beneath (`60 minutes · €22`, or `· €22 paid` once paid). A weekly
+    run is one dab, never a row of dates: `Weekly · Online` over `Every Tuesday,
+    17:00 · Porto time`, `From 20 October 2026 until 8 December 2026` (or `…,
+    until you stop it` while it is active), any week between with no lesson
+    (`No lesson on 3 November`, so a skipped or cancelled week is never read as
+    a lesson) and `60 minutes · €22 a lesson`. A lesson moved, lengthened or put
+    elsewhere reads as the lesson it now is. Past twelve lines an `And more` dab
+    says how many lessons are left to the website. Its subject and preheader do
+    not change.
 - `Receipts`, a tab of its own beside `Students` (13 October 2026, Dan: "make
   her automation as easy as possible"), shows a month at a time with the
   Time off month's pager: two dabs for what there is to issue (`3 receipts

@@ -379,16 +379,26 @@ subject and preheader unchanged: a weekly run is **one** line (`Weekly ·
 Online`, `Every Tuesday, 17:00 · Porto time`, `From 20 October 2026 until 8
 December 2026`, or `…, until you stop it` for a run with no end, and `60
 minutes · €22 a lesson`), a lesson on its own is one line (`Lesson · Online`,
-its date and time, `60 minutes · €22`), and the trial is named. A lesson
-belongs to its run while it still sits on the run's own Porto slot and length;
-one that was moved or lengthened reads as the lesson it now is. The price is
-the lesson's own `amount_cents`, which `repriceStudent` keeps on the student's
-own rate for lessons still to come (a run's line uses the next lesson whose
-price is still open), and the length is the lesson type's. Times are on the
-student's own clock, their timezone (Porto by default) for an online lesson
-and Porto's for one in Porto, the clock named once after the time. Their own
-`Your price · 60 / 90 minutes` rows still lead when she has set a price. Past
-twelve lines an `And more` line says how many lessons are left to the website.
+its date and time, `60 minutes · €22`, or `…· €22 paid` once it is paid), and the
+trial is named. A lesson belongs to its run while it still sits on the run's own
+Porto slot, length (lesson type) and place, and keeps its time on the student's
+own clock; one that was moved, lengthened or put elsewhere reads as the lesson it
+now is, never as a second run. A run never hides a week it has no lesson: for a
+student she set up, the welcome is the only email they will have, because the
+emails about a skipped week (her day off) or a cancelled one were held. So a run
+line names the weeks between its first and last lesson that have none
+(`No lesson on 22 September or 6 October`), unless the run has a lesson on that
+day that now reads as its own line. A run with no end says `until you stop it`
+only while it is active and only for its latest stretch; a stopped one says
+`until` its last remaining lesson. The price is the lesson's own `amount_cents`,
+which `repriceStudent` keeps on the student's own rate for lessons still to come
+(a run's line uses the next lesson whose price is still open, never one she
+marked paid by hand), and the length is the lesson type's. Times are on the
+student's own clock, their timezone (Porto by default) for an online lesson and
+Porto's for one in Porto, each time naming its clock as every email to them
+does (`17:00 · Porto time`). Their own `Your price · 60 / 90 minutes` rows still
+lead when she has set a price. Past twelve lines an `And more` line says how
+many lessons are left to the website.
 How they pay is as before: a link that adds their card where the site takes
 cards, or the plain sign-in link.
 
@@ -418,7 +428,12 @@ password, Google link or sign-in); after that it answers 409 and the student
 changes it from their account. A changed address clears `email_verified_at`
 and, in the same write as the account, moves **every** booking of theirs (past
 ones too, so a receipt reads right) to it; a series has no address of its own,
-and later weeks take the account's. Nothing is sent by the change: they stay
+and later weeks take the account's. Her corrections to a student's name and
+phone reach every booking of theirs the same way, whether or not the address
+moves (she adds `Adam` first and completes him later, and a receipt prints the
+name on the booking). The welcome also gives any lesson still holding the
+stand-in (one added from a stale read as the address was saved) the real
+address before it sends. Nothing is sent by the change: they stay
 awaiting their welcome until she sends it. An address another student has is
 refused (409) and moves nothing. The student's own change of address
 (`/me/email/confirm`) still moves only lessons still to come, and cannot apply

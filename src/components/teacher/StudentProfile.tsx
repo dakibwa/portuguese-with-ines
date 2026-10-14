@@ -142,6 +142,8 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
   // Coral marks the one thing still to do for them: their first lesson, then
   // their welcome (13 October 2026, Dan).
   const welcomeNext = canWelcome && Boolean(student?.awaitingWelcome) && (added.length > 0 || upcomingLessons(mine ?? [], now).length > 0);
+  // While their details are open, Save details is the one coral action.
+  const welcomeFirst = welcomeNext && !editing;
   const sorted = [...known].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
@@ -258,14 +260,14 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
             </section>
           ) : (
             <div className="teacher-dialog-actions teacher-profile__actions">
-              <button className={`button button--${welcomeNext ? "lilac" : "coral"}`} disabled={busy} onClick={() => { setAdding(true); setError(""); }} ref={addButton} type="button">
+              <button className={`button button--${welcomeFirst || editing ? "lilac" : "coral"}`} disabled={busy} onClick={() => { setAdding(true); setError(""); }} ref={addButton} type="button">
                 <CalendarPlus size={16} aria-hidden="true" />
                 Add a lesson
               </button>
               {welcomed ? (
                 <p className="teacher-inline-success" role="status"><CheckCircle2 size={18} aria-hidden="true" />Welcome sent</p>
               ) : canWelcome ? (
-                <button className={`button button--${welcomeNext ? "coral" : "lilac"}`} disabled={busy} onClick={() => void sendWelcome()} type="button">
+                <button className={`button button--${welcomeFirst ? "coral" : "lilac"}`} disabled={busy} onClick={() => void sendWelcome()} type="button">
                   <Send size={16} aria-hidden="true" />
                   {busy ? "Sending…" : "Send welcome email"}
                 </button>

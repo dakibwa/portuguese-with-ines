@@ -357,7 +357,8 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const teacherHeroNote = studentTime
     ? `${row.student_name.split(" ")[0]}’s time: ${formatShort(start, studentZone)} · ${zoneName(studentZone, start)}`
     : "";
-  const cancellationMessage = event === "cancelled" && byTeacher
+  // Her words go to a student who is emailed; one who is held is not.
+  const cancellationMessage = event === "cancelled" && byTeacher && !held
     ? row.cancellation_message?.trim() : "";
 
   // A cancelled lesson has no call to join, so its place is named, not linked.
@@ -519,7 +520,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       subject: `You added a lesson — ${row.student_name}, ${shortWhen}`,
       heading: "You added a lesson",
       intro: held
-        ? `You added a lesson for ${row.student_name}. They haven't been emailed: send their welcome from Students when you're ready.`
+        ? `You added a lesson for ${row.student_name}. They haven't been emailed: ${isNoEmailYet(row.student_email) ? "add their email under Edit details, then send their welcome." : "send their welcome from Students when you're ready."}`
         : `You added a lesson for ${row.student_name}. They have been emailed the details${welcomeNote(welcome)}.`,
       callout: ""
     } : {
@@ -878,7 +879,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
               : moved
                 ? `${first.student_name}'s upcoming weekly lessons have moved. The updated events will appear in your calendar.`
               : byTeacher
-                ? `You added a weekly slot for ${first.student_name}. ${held ? "They haven't been emailed: send their welcome from Students when you're ready" : `They have been emailed the details${welcomeNote(welcome)}`}, and every lesson will appear in your calendar.`
+                ? `You added a weekly slot for ${first.student_name}. ${held ? `They haven't been emailed: ${isNoEmailYet(first.student_email) ? "add their email under Edit details, then send their welcome" : "send their welcome from Students when you're ready"}` : `They have been emailed the details${welcomeNote(welcome)}`}, and every lesson will appear in your calendar.`
               : `${first.student_name} booked ${series.oneOff ? "these individual lessons" : multipleWeeklyTimes ? "two times each week" : "the same slot each week"}. Every lesson will appear in your calendar.`,
           callout:
             skippedNote,
@@ -1176,62 +1177,90 @@ const WELCOME_LESSON_LINES = 12;
 /**
  * The lessons a welcome tells, as lines (14 October 2026, Dan: "all their
  * lessons and prices already done properly"): a weekly run is one line, its
- * day and time, when it starts and, if it ends, until when; a lesson on its
- * own has its own line. Each carries its length and the price it will be
- * charged or owed, read from the lesson itself, so a price Inês set after
- * adding it, or a lesson that changed length, is right. Times are on the
- * student's own clock, named once, as every email to them.
+ * day and time, when it starts and, if it ends, until when, and the weeks it
+ * has no lesson; a lesson on its own has its own line. Each carries its
+ * length and the price it will be charged or owed, read from the lesson
+ * itself, so a price Inês set after adding it, or a lesson that changed
+ * length, is right. Times are on the student's own clock, each naming it as
+ * every email to them does.
  */
 export function welcomeLessonLines(student, lessons, limit = WELCOME_LESSON_LINES) {
   const onTheirClock = (lesson) => lessonZone({ ...lesson, student_timezone: student.timezone });
   const when = (lesson) => splitWhen(lessonWhen(new Date(lesson.starts_at), onTheirClock(lesson)));
   const price = (lesson) => formatEuros(lesson.amount_cents ?? 0);
   const length = (lesson) => `${lesson.duration_minutes} minutes`;
+  // The weekday is already said by "Every Tuesday".
+  const dayOnly = (lesson) => when(lesson).date.replace(/^\S+ /, "");
 
-  // A lesson belongs to its run while it still sits at the run's own slot and
-  // length; one that was moved or changed reads as the lesson it now is.
+  // A lesson belongs to its run while it still sits at the run's own slot,
+  // length and place, and keeps the time it has on the student's clock; one
+  // that was moved or changed reads as the lesson it now is.
   const runs = new Map();
   const items = [];
+  // The days each run has a lesson on, however that lesson now reads.
+  const dated = new Set(lessons.filter((lesson) => lesson.series_id)
+    .map((lesson) => `${lesson.series_id}|${slotOf(new Date(lesson.starts_at)).dateKey}`));
   for (const lesson of lessons) {
     const slot = lesson.series_id ? slotOf(new Date(lesson.starts_at)) : null;
-    if (slot && slot.weekday === lesson.series_weekday && slot.minuteOfDay === lesson.series_minute) {
-      const key = `${lesson.series_id}:${lesson.duration_minutes}`;
+    const asRun = slot && slot.weekday === lesson.series_weekday && slot.minuteOfDay === lesson.series_minute &&
+      (lesson.series_lesson_type == null || lesson.lesson_type_id === lesson.series_lesson_type) &&
+      (lesson.series_location == null || lesson.location === lesson.series_location);
+    if (asRun) {
+      const clock = when(lesson);
+      const key = `${lesson.series_id}|${clock.date.split(" ")[0]}|${clock.time.split(" ")[0]}`;
       if (!runs.has(key)) runs.set(key, []);
       runs.get(key).push(lesson);
     } else {
       items.push({ at: lesson.starts_at, lessons: [lesson] });
     }
   }
+  // Only the latest stretch of a run with no end goes on being scheduled.
+  const latest = new Map();
+  for (const group of runs.values()) {
+    const current = latest.get(group[0].series_id);
+    if (!current || group[group.length - 1].starts_at > current[current.length - 1].starts_at) latest.set(group[0].series_id, group);
+  }
   for (const group of runs.values()) {
     const [first] = group;
-    const keepsGoing = first.series_occurrences == null && first.series_status === "active";
-    if (group.length > 1 || keepsGoing) items.push({ at: first.starts_at, lessons: group, run: true });
+    const goesOn = first.series_occurrences == null && first.series_status === "active" && latest.get(first.series_id) === group;
+    if (group.length > 1 || goesOn) items.push({ at: first.starts_at, lessons: group, run: true, goesOn });
     else items.push({ at: first.starts_at, lessons: group });
   }
   items.sort((a, b) => a.at.localeCompare(b.at));
 
+  const days = (keys) => keys.length > 1 ? `${keys.slice(0, -1).join(", ")} or ${keys[keys.length - 1]}` : keys[0];
   const lines = items.slice(0, limit).map((item) => {
     const [first] = item.lessons;
     const { date, time } = when(first);
     if (!item.run) {
       return {
         label: `${first.lesson_type_id === "trial" ? "Trial lesson" : "Lesson"} · ${placeLabel(first)}`,
-        value: [`${date}, ${time}`, `${length(first)} · ${price(first)}`].join("\n")
+        value: [`${date}, ${time}`, `${length(first)} · ${first.payment_status === "paid" ? `${price(first)} paid` : price(first)}`].join("\n")
       };
     }
-    // The price still open is the one the run is on; a lesson already paid
-    // keeps the amount it was paid at.
-    const priced = item.lessons.find((lesson) => lesson.payment_status === "not_required" || lesson.payment_status === "scheduled") ?? first;
+    // The price still open is the one the run is on; a lesson already paid, or
+    // one she marked paid by hand, keeps the amount it was settled at.
+    const priced = item.lessons.find((lesson) =>
+      (lesson.payment_status === "not_required" || lesson.payment_status === "scheduled") &&
+      lesson.payment_consent_version !== PAID_BY_HAND_MARK
+    ) ?? first;
     const last = item.lessons[item.lessons.length - 1];
-    // The weekday is already said by "Every Tuesday".
-    const dayOnly = (instant) => when(instant).date.replace(/^\S+ /, "");
+    // A week with no lesson (her day off, a lesson she cancelled) is named,
+    // never left to read as one: this may be the only email they get.
+    const lastKey = slotOf(new Date(last.starts_at)).dateKey;
+    const missing = [];
+    for (let key = addDaysToKey(slotOf(new Date(first.starts_at)).dateKey, 7); key && key < lastKey; key = addDaysToKey(key, 7)) {
+      if (dated.has(`${first.series_id}|${key}`)) continue;
+      const { year, month, day } = parseDateKey(key);
+      const instant = zonedToUtc(year, month, day, first.series_minute);
+      missing.push(dayOnly({ ...first, starts_at: instant.toISOString() }).replace(/ \d{4}$/, ""));
+    }
     return {
       label: `Weekly · ${placeLabel(first)}`,
       value: [
         `Every ${date.split(" ")[0]}, ${time}`,
-        first.series_occurrences == null
-          ? `From ${dayOnly(first)}, until you stop it`
-          : `From ${dayOnly(first)} until ${dayOnly(last)}`,
+        item.goesOn ? `From ${dayOnly(first)}, until you stop it` : `From ${dayOnly(first)} until ${dayOnly(last)}`,
+        ...(missing.length ? [`No lesson on ${days(missing)}`] : []),
         `${length(priced)} · ${price(priced)} a lesson`
       ].join("\n")
     };
@@ -1244,9 +1273,10 @@ export function welcomeLessonLines(student, lessons, limit = WELCOME_LESSON_LINE
 /** Her upcoming lessons for a student, with what a welcome tells of each. */
 async function welcomeLessons(env, studentId) {
   const { results } = await env.DB.prepare(
-    `SELECT b.starts_at, b.location, b.student_timezone, b.lesson_type_id, b.payment_status, b.series_id,
+    `SELECT b.starts_at, b.location, b.student_timezone, b.lesson_type_id, b.payment_status, b.payment_consent_version, b.series_id,
        COALESCE(b.amount_cents, l.price_cents) AS amount_cents, l.duration_minutes,
-       s.weekday AS series_weekday, s.minute_of_day AS series_minute, s.occurrences AS series_occurrences, s.status AS series_status
+       s.weekday AS series_weekday, s.minute_of_day AS series_minute, s.occurrences AS series_occurrences, s.status AS series_status,
+       s.lesson_type_id AS series_lesson_type, s.location AS series_location
      FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id LEFT JOIN booking_series s ON s.id = b.series_id
      WHERE b.student_id = ? AND b.status = 'confirmed' AND b.ends_at > ? ORDER BY b.starts_at`
   ).bind(studentId, new Date().toISOString()).all();
@@ -5203,18 +5233,20 @@ async function handleAdmin(request, env, ctx, url, path) {
          AND (? = 0 OR (password_hash = '' AND google_sub IS NULL AND last_login_at IS NULL))`
     ).bind(name, stored, details.phone, details.nif, details.mark, stored, stored, student.id, stored, student.id, moving ? 1 : 0);
     // Every lesson of theirs, past ones too so a receipt reads right, takes
-    // the new address in the same write as the account does (14 October 2026,
-    // Dan): never one without the other. Nothing is sent by this; they stay
-    // awaiting their welcome until she sends it.
-    const [updated] = moving
-      ? await env.DB.batch([
-          rewrite,
-          env.DB.prepare(
-            `UPDATE bookings SET student_email = ? WHERE student_id = ?
-               AND EXISTS (SELECT 1 FROM students WHERE id = ? AND email = ?)`
-          ).bind(email, student.id, student.id, email)
-        ])
-      : [await rewrite.run()];
+    // their name, phone and any new address in the same write as the account
+    // does (14 October 2026, Dan): never one without the other, for she adds
+    // "Adam" first and completes him later. Nothing is sent by this; they
+    // stay awaiting their welcome until she sends it.
+    const [updated] = await env.DB.batch([
+      rewrite,
+      env.DB.prepare(
+        `UPDATE bookings SET student_name = ?, student_phone = ?${moving ? ", student_email = ?" : ""} WHERE student_id = ?
+           AND EXISTS (SELECT 1 FROM students WHERE id = ? AND name = ? AND phone = ?${moving ? " AND email = ?" : ""})`
+      ).bind(
+        name, details.phone, ...(moving ? [email] : []), student.id,
+        student.id, name, details.phone, ...(moving ? [email] : [])
+      )
+    ]);
     if (!(updated?.meta?.changes > 0)) {
       const now = await env.DB.prepare("SELECT password_hash, google_sub, last_login_at FROM students WHERE id = ?").bind(student.id).first();
       return now && (now.password_hash || now.google_sub || now.last_login_at)
@@ -5254,6 +5286,10 @@ async function handleAdmin(request, env, ctx, url, path) {
       return fail("A link was sent to them recently. Please wait an hour before sending another.", 429, request, env);
     }
     const settings = await loadSettings(env);
+    // A lesson added from a stale read while their address was saved still
+    // holds the stand-in; it takes the real one before anything goes out.
+    await env.DB.prepare("UPDATE bookings SET student_email = ? WHERE student_id = ? AND student_email LIKE ?")
+      .bind(student.email, student.id, `${NO_EMAIL_YET}%`).run();
     const welcome = await issueWelcome(env, settings, student, { always: true });
     const sent = await sendWelcome(env, { student, settings, welcome, lessons: await welcomeLessons(env, student.id) });
     if (!sent.ok) return fail("The email could not be sent just now. Please try again.", 502, request, env);

@@ -2298,11 +2298,9 @@ await test("she sets a student up and adds their lessons without emailing them, 
     const [welcome] = to("quiet@example.invalid");
     assert.ok(welcome.subject.startsWith("Your lessons with Inês"));
     assert.ok(welcome.text.includes("Inês has set up your lessons"));
-    // The weekly run is one line, the lesson on its own another, each with its length and price.
+    // The weekly run is one line, the lesson on its own another.
     assert.equal((welcome.text.match(/Lesson · Online/g) ?? []).length, 1, "the lesson on its own has its own line");
     assert.equal((welcome.text.match(/Weekly · Online/g) ?? []).length, 1, "a weekly run is one line, not a row of dates");
-    assert.ok(welcome.text.includes("Lesson · Online: Tuesday 20 October 2026, 15:00 · Porto time\n60 minutes · €25"), welcome.text);
-    assert.ok(welcome.text.includes("Every Thursday, 11:00 · Porto time\nFrom 22 October 2026 until 12 November 2026\n60 minutes · €25 a lesson"), welcome.text);
     assert.equal(db.prepare("SELECT awaiting_welcome FROM students WHERE id=?").get(student.id).awaiting_welcome, 0);
 
     // After the welcome, her changes reach them as usual.
@@ -2366,6 +2364,7 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
   captureEmail();
   Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", TEACHER_NOTIFICATIONS_ENABLED: "1" });
   const isolated = "Dina Dias";
+  const full = "Dina Dias Marques";
   try {
     const created = await call("/admin/students", { user: "teacher", body: { name: isolated, prices: { 60: 2000 } } });
     const { student } = await created.json();
@@ -2411,18 +2410,25 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     assert.equal((await details({ email: "alice@example.invalid" })).status, 409);
     assert.deepEqual([...new Set(rows().map((row) => row.student_email))], [`no-email:${student.id}`]);
     sentEmails.length = 0;
-    assert.equal((await details({ email: "Dina@Example.invalid" })).status, 200);
+    // She added "Dina" by first name and completes her now: name and phone reach every lesson too.
+    assert.equal((await details({ name: full, phone: "+351 911 222 333", email: "Dina@Example.invalid" })).status, 200);
     assert.deepEqual([...new Set(rows().map((row) => row.student_email))], ["dina@example.invalid"], "every lesson, past ones too, carries the real address");
+    assert.deepEqual(db.prepare("SELECT DISTINCT student_name, student_phone FROM bookings WHERE student_id=?").all(student.id).map((row) => [row.student_name, row.student_phone]),
+      [[full, "+351 911 222 333"]], "and her name and phone");
     await drain();
     assert.deepEqual(sentEmails, [], "giving the address sends nothing; she sends the welcome herself");
     const now = (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).students.find((entry) => entry.id === student.id);
     assert.deepEqual([now.email, now.awaitingWelcome], ["dina@example.invalid", true]);
-    assert.equal((await (await call("/admin/receipts?month=2026-08", { method: "GET", user: "teacher" })).json()).receipts.find((line) => line.studentName === isolated).studentEmail, "dina@example.invalid");
+    const fatura = (await (await call("/admin/receipts?month=2026-08", { method: "GET", user: "teacher" })).json()).receipts.find((line) => line.studentName === full);
+    assert.equal(fatura.studentEmail, "dina@example.invalid", "a receipt reads her full name and real address");
 
     // Her price changes after the lessons, and they live in another clock: the welcome follows both.
     db.prepare("UPDATE students SET timezone='America/Los_Angeles' WHERE id=?").run(student.id);
     assert.equal((await call(`/admin/students/${student.id}/prices`, { user: "teacher", body: { prices: { 60: 2400 } } })).status, 200);
+    // A lesson added from a stale read while the address was saved still holds the stand-in: the welcome mends it.
+    db.prepare("UPDATE bookings SET student_email=? WHERE id=(SELECT id FROM bookings WHERE student_id=? ORDER BY starts_at DESC LIMIT 1)").run(`no-email:${student.id}`, student.id);
     assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 200);
+    assert.deepEqual([...new Set(rows().map((row) => row.student_email))], ["dina@example.invalid"]);
     await drain();
     const [welcome] = sentEmails.filter((sent) => sent.to[0] === "dina@example.invalid");
     const lines = welcome.text.split("\n");
@@ -2444,8 +2450,8 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     delete env.TEACHER_EMAIL;
     releaseEmail();
     forgetStudent("dina@example.invalid");
-    db.prepare("DELETE FROM student_recurring_rates WHERE student_id IN (SELECT id FROM students WHERE name=?)").run(isolated);
-    db.prepare("DELETE FROM students WHERE name=?").run(isolated);
+    db.prepare("DELETE FROM student_recurring_rates WHERE student_id IN (SELECT id FROM students WHERE name IN (?, ?))").run(isolated, full);
+    db.prepare("DELETE FROM students WHERE name IN (?, ?)").run(isolated, full);
   }
 });
 await test("her price for a student prices their lessons, and only lessons nothing is settled on follow a change", async () => {

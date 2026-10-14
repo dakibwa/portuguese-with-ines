@@ -2330,10 +2330,11 @@
 .teacher-profile-heading p { margin: 0 0 0.2rem; font-size: 0.72rem; color: var(--lavender-ink); }
 /* An address too long for a phone ends in an ellipsis, as on her card. */
 .teacher-profile-heading .teacher-profile-line { margin: 0.35rem 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Their phone, NIF and Edit details share a line where they fit, rather
-   than a line each; the label and name keep clear of the close button. */
+/* Their email and phone have a line each; the NIF and Edit details share the
+   last, at any width, so the button is never alone. The label and name keep
+   clear of the close button. */
 .teacher-profile-heading > div { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.75rem; min-width: 0; }
-.teacher-profile-heading > div > :is(#teacher-profile-label, h2, #teacher-profile-name + .teacher-profile-line) { flex: 1 0 100%; }
+.teacher-profile-heading > div > :is(#teacher-profile-label, h2, .teacher-profile-line:not(:last-of-type)) { flex: 1 0 100%; }
 .teacher-profile-heading > div > :is(#teacher-profile-label, h2) { padding-right: 2.5rem; }
 .teacher-profile-heading .teacher-profile-line { flex: 0 1 auto; min-width: 0; }
 .teacher-profile h3 { margin: 0.25rem 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }

@@ -77,7 +77,7 @@ async function fixture(width, options = {}) {
     ],
     // Her students; Nora was set up from a name alone and has no email yet.
     students: [
-      { id: "sam", name: "Sam Known", email: "sam@example.invalid", phone: "", signedIn: false, hasCard: false, cardForAllLessons: false, nextLessonAt: "2026-09-10T16:00:00.000Z", upcoming: 1, unpaidUpcoming: 1, weekly: 0 },
+      { id: "sam", name: "Sam Known", email: "sam@example.invalid", phone: "+351 912 345 678", nif: "123456789", signedIn: false, hasCard: false, cardForAllLessons: false, nextLessonAt: "2026-09-10T16:00:00.000Z", upcoming: 1, unpaidUpcoming: 1, weekly: 0 },
       { id: "alex", name: "Alex", email: "alex@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 1 },
       { id: "nora", name: "Nora Lima", email: "", phone: "", nif: "", signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0, prices: { 60: 2200, 90: 3300 }, ownPrices: { 60: 2200 } },
     ],
@@ -1023,6 +1023,9 @@ try {
     await expect(history.getByRole("heading", { name: "Upcoming · 1" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 4" })).toBeVisible();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(5);
+    // Nothing stranded: with a phone as well, the NIF and Edit details still share the last line.
+    const [nifLine, editButton] = [await history.locator(".teacher-profile-line").last().boundingBox(), await history.getByRole("button", { name: "Edit details", exact: true }).boundingBox()];
+    assert.ok(nifLine.y < editButton.y + editButton.height && editButton.y < nifLine.y + nifLine.height, `NIF and Edit details share a line at ${width}px`);
     await expect(history).toContainText("12 Dec 2025");
     await expect(history).toContainText("Payment arranged directly");
     await expect(history).toContainText("Refunded");
