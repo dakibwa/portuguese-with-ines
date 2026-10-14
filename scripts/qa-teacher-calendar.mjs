@@ -842,7 +842,7 @@ try {
   const students = page.locator(".teacher-students");
   await page.getByRole("tab", { name: /^Students/ }).click();
   const samSetup = students.locator(".teacher-setup").filter({ hasText: "Sam Known" });
-  await samSetup.getByRole("button", { name: "Welcome email for Sam Known", exact: true }).click();
+  await samSetup.getByRole("button", { name: "Welcome for Sam Known", exact: true }).click();
   const samPane = samSetup.getByRole("region", { name: "Sam Known’s setup", exact: true });
   await samPane.getByRole("button", { name: "Send the link again to Sam Known", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/sam/welcome").length).toBe(1);
@@ -869,7 +869,7 @@ try {
   const ana = students.locator(".teacher-setup").filter({ hasText: "Ana Costa" });
   const anaId = state.added.id;
   assert.equal(state.writes.filter(entry => entry.path === `/admin/students/${anaId}/welcome`).length, 0, "Setting up Ana does not email her");
-  await expect(ana.getByRole("button", { name: "Welcome email for Ana Costa", exact: true })).toBeDisabled();
+  await expect(ana.getByRole("button", { name: "Welcome for Ana Costa", exact: true })).toBeDisabled();
 
   // A completed student's whole card opens their profile; its lesson action
   // opens the calendar in that same profile.
@@ -890,7 +890,7 @@ try {
   // steps stay closed; completed steps can still be corrected.
   const noraSetup = students.locator(".teacher-setup").filter({ hasText: "Nora Lima" });
   const setupForm = noraSetup.getByRole("region", { name: "Nora Lima’s setup", exact: true });
-  for (const label of ["Email", "Welcome email", "Sign in", "Card"])
+  for (const label of ["Email", "Welcome", "Sign in", "Card"])
     await expect(noraSetup.getByRole("button", { name: `${label} for Nora Lima`, exact: true })).toBeDisabled();
   await noraSetup.getByRole("button", { name: "Open Nora Lima’s profile", exact: true }).click();
   const noraProfile = page.getByRole("dialog", { name: "Nora Lima", exact: true });
@@ -926,7 +926,7 @@ try {
   assert.ok(state.availabilityReads.includes("long"), "90-minute choices request 90-minute availability");
   await expect(noraSetup.getByRole("status")).not.toContainText("emailed");
   assert.equal(state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length, 0, "Adding the lesson waits for Nora's welcome");
-  await expect(noraSetup.getByRole("button", { name: "Welcome email for Nora Lima", exact: true })).toBeDisabled();
+  await expect(noraSetup.getByRole("button", { name: "Welcome for Nora Lima", exact: true })).toBeDisabled();
   // The completed price remains editable after a lesson exists.
   await noraSetup.getByRole("button", { name: "Price for Nora Lima", exact: true }).click();
   await expect(setupForm.getByLabel("Price for 60 minutes, in euros", { exact: true })).toHaveValue("24");
@@ -943,7 +943,7 @@ try {
   assert.equal(state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length, 0, "Adding the email does not send Nora's welcome");
   await expect(noraSetup.getByRole("button", { name: "Sign in for Nora Lima", exact: true })).toBeDisabled();
 
-  await noraSetup.getByRole("button", { name: "Welcome email for Nora Lima", exact: true }).click();
+  await noraSetup.getByRole("button", { name: "Welcome for Nora Lima", exact: true }).click();
   await setupForm.getByRole("button", { name: "Send welcome email to Nora Lima", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length).toBe(1);
   // Sign-in belongs to the student; her card step waits until she has signed in.

@@ -48,6 +48,7 @@ type Props = {
   interval: number;
   disabled: boolean;
   mobileDay: number;
+  dayControlHost?: HTMLElement | null;
   status?: ReactNode;
   onSelectDay: (index: number) => void;
   onChange: (day: number, windows: TeachingWindow[]) => void;
@@ -77,6 +78,7 @@ export function WeeklyTimetable({
   interval,
   disabled,
   mobileDay,
+  dayControlHost,
   status,
   onSelectDay,
   onChange,
@@ -462,6 +464,7 @@ export function WeeklyTimetable({
 
   return (
     <>
+      {!editing && dayControlHost ? createPortal(dayOffSwitch(activeDay), dayControlHost) : null}
       <div
         className={`teacher-timetable ${editing ? "teacher-timetable--editing" : ""}`}
         ref={gridRef}
@@ -486,11 +489,6 @@ export function WeeklyTimetable({
             </div>;
           })}
         </div>
-        {!editing ? <div className="teacher-mobile-day-band">
-          <span className="teacher-axis-heading" aria-hidden="true" />
-          <span className="teacher-day-heading">{dayLabel(activeDay)}</span>
-          {dayOffSwitch(activeDay)}
-        </div> : null}
         <div
           className="teacher-timetable-scroll"
           ref={scrollRef}
