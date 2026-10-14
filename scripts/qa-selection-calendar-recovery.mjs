@@ -537,16 +537,17 @@ try {
         const { page } = state;
         await page.goto(`${base}/schedule/`);
         await page.getByRole("tab", { name: /^Students/ }).click();
-        await page.getByRole("button", { name: "Add a lesson for Rui", exact: true }).click();
-        // Add a lesson opens its form in the student's profile.
-        const form = page.getByRole("dialog").locator(".teacher-manual-form");
+        const rui = page.locator(".teacher-setup").filter({ hasText: "Rui" });
+        await rui.getByRole("button", { name: "Add a lesson for Rui", exact: true }).click();
+        // An unfinished student adds their lesson beneath the setup row.
+        const form = rui.getByRole("region", { name: "Rui’s setup", exact: true }).locator(".teacher-manual-form");
         await form.getByText("Enter another time", { exact: true }).click();
         await form.getByLabel("Date", { exact: true }).fill("2026-10-06");
         await form.getByLabel("Time in Porto", { exact: true }).fill("10:00");
         await form.getByRole("button", { name: /^Add lesson( and email student)?$/ }).click();
         await expect(page.getByRole("alert").filter({ hasText: unreadable })).toBeVisible();
         await expect(form.getByLabel("Date", { exact: true })).toHaveValue("2026-10-06");
-        await expect(page.locator(".teacher-profile__added")).toHaveCount(0);
+        await expect(rui.locator(".teacher-setup__notice")).toBeHidden();
         await check(state); assert.equal(writes, 1); cases += 1;
       } finally { await state.context.close(); }
     }

@@ -46,7 +46,7 @@ import {
   hoursProblem,
   mondayOf,
   needsYou,
-  gettingStarted,
+  studentWorkspace,
   removeSpan,
   serialiseHours,
   shiftDate,
@@ -149,6 +149,11 @@ export function TeacherSchedule() {
   const needs = useMemo(
     () => needsYou({ now, meet, payments: paymentReview, students: students?.list ?? [], lessons: bookings, cancellations: studentCancellations }),
     [now, meet, paymentReview, students, bookings, studentCancellations],
+  );
+
+  const studentWork = useMemo(
+    () => studentWorkspace(students?.list ?? [], needs, Boolean(students?.cardsAccepted), [...bookings, ...studentCancellations]),
+    [students, needs, bookings, studentCancellations],
   );
 
   const resetAccount = useCallback(() => {
@@ -639,7 +644,7 @@ export function TeacherSchedule() {
   return (
     <div className="teacher-workspace">
       <div className="teacher-tools-header">
-        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} needsCount={needs.length} onSelect={setActiveTab} />
+        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} needsCount={studentWork.attentionCount} onSelect={setActiveTab} />
       </div>
       {error ? (
         <div className="teacher-inline-error" role="alert">
@@ -660,7 +665,7 @@ export function TeacherSchedule() {
       ) : null}
       {activeTab === "week" && bookingsShown ? (
         <NeedsYou
-          items={needs}
+          items={needs.filter(item => !["email", "lessons", "welcome"].includes(item.kind))}
           sending={welcoming}
           onMeet={() => {
             document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true });
@@ -669,7 +674,7 @@ export function TeacherSchedule() {
           onView={setSelectedBooking}
           onWelcome={(student) => void sendWelcome(student)}
           onStudent={(student, editDetails) => openStudentDialog({ step: "profile", student, editDetails, addLesson: !editDetails })}
-          onSeeAll={() => { setActiveTab("needs-you"); document.getElementById("teacher-tab-needs-you")?.focus({ preventScroll: true }); }}
+          onSeeAll={() => { setActiveTab("students"); document.getElementById("teacher-tab-students")?.focus({ preventScroll: true }); }}
         />
       ) : null}
 
@@ -838,29 +843,19 @@ export function TeacherSchedule() {
           onOpenBooking={setSelectedBooking}
         />
       </div>
-      {activeTab === "needs-you" ? <>
-        {studentsError || bookingsError ? <p className="teacher-inline-error" role="alert">{studentsError || bookingsError}</p> : null}
-        {!students || !bookingsShown ? <p role="status">Loading what needs you…</p> : <NeedsYou
-          items={needs}
-          setup={gettingStarted(students.list, students.cardsAccepted)}
-          token={token}
-          onChanged={() => { void reloadStudents(); void reloadBookings(true); }}
-          sending={welcoming}
-          onMeet={() => { setActiveTab("profile"); document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true }); }}
-          onView={setSelectedBooking}
-          onWelcome={(student, again) => void sendWelcome(student, again)}
-          onStudent={(student, editDetails) => openStudentDialog({ step: "profile", student, editDetails })}
-        />}
-      </> : null}
       <div className="teacher-tab-view" hidden={activeTab !== "students"}>
       <StudentList
         token={token}
         students={students?.list ?? null}
-        cards={Boolean(students?.cardsAccepted)}
-        error={studentsError}
+        workspace={studentWork}
+        error={studentsError || bookingsError}
+        sending={welcoming}
+        onMeet={() => { setActiveTab("profile"); document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true }); }}
+        onView={setSelectedBooking}
+        onWelcome={(student, again) => void sendWelcome(student, again)}
         onAddStudent={() => openStudentDialog({ step: "new" })}
         onOpenStudent={(student, addLesson) => openStudentDialog({ step: "profile", student, addLesson })}
-        onStudentsChanged={() => void reloadStudents()}
+        onStudentsChanged={() => { void reloadStudents(); void reloadBookings(true); }}
       />
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "receipts"}>

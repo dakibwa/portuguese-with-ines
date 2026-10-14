@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, Clock3 } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { LessonForm } from "@/components/teacher/LessonForm";
 import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
@@ -9,12 +10,15 @@ import type { AdminStudent } from "@/lib/admin-api";
 import type { StudentSetup, StudentSetupStep } from "@/lib/teacher-calendar";
 
 /** Her setup stays together: each dab opens its work beneath the same row. */
-export function StudentSetupRow({ setup, token, step, sending, locked, onSelect, onChanged, onWelcome, onBusy }: {
+export function StudentSetupRow({ setup, token, step, sending, locked, attention, onOpenProfile, onSelect, onChanged, onWelcome, onBusy }: {
   setup: StudentSetup;
   token: string;
   step: StudentSetupStep | null;
   sending: string;
   locked?: boolean;
+  /** Lesson changes or payment notes belong to this student's one row. */
+  attention?: ReactNode;
+  onOpenProfile?: () => void;
   onSelect: (step: StudentSetupStep | null) => void;
   onChanged?: (student?: AdminStudent) => void;
   onWelcome: (student: AdminStudent, again?: boolean) => void;
@@ -28,6 +32,8 @@ export function StudentSetupRow({ setup, token, step, sending, locked, onSelect,
   const paneId = `teacher-setup-${student.id}`;
   const disabled = busy || locked || sending === student.id;
   const close = () => onSelect(null);
+  const waitingOnStudent = next === "sign-in" || next === "card";
+  const status = next === "email" ? "Email needed" : next === "lessons" ? "No lessons yet" : next === "welcome" ? "Welcome ready" : next === "sign-in" ? "Waiting for sign-in" : "Waiting for card";
 
   useEffect(() => {
     if (!step || !body.current) return;
@@ -50,15 +56,15 @@ export function StudentSetupRow({ setup, token, step, sending, locked, onSelect,
   return <li className={`teacher-setup teacher-setup--inline${step ? " is-open" : ""}`}>
     <button
       className="teacher-setup__profile"
-      aria-controls={paneId}
-      aria-expanded={step === "email"}
-      aria-label={`Edit ${student.name}’s details`}
+      aria-controls={onOpenProfile ? undefined : paneId}
+      aria-expanded={onOpenProfile ? undefined : step === "email"}
+      aria-label={onOpenProfile ? `Open ${student.name}’s profile` : `Edit ${student.name}’s details`}
       disabled={disabled}
-      onClick={() => onSelect(step === "email" ? null : "email")}
+      onClick={() => onOpenProfile ? onOpenProfile() : onSelect(step === "email" ? null : "email")}
       type="button"
-    ><AccountAvatar mark={student.mark} name={student.name} /><strong>{student.name}</strong></button>
+    ><AccountAvatar mark={student.mark} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong><span className="teacher-setup__status">{status}</span></span></button>
     <ol className="teacher-setup__steps">
-      {steps.map(entry => <li className={entry.done ? "is-done" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
+      {steps.map(entry => <li className={entry.done ? "is-done" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
         <button
           aria-controls={paneId}
           aria-expanded={step === entry.id}
@@ -67,10 +73,10 @@ export function StudentSetupRow({ setup, token, step, sending, locked, onSelect,
           disabled={disabled}
           onClick={() => { setNotice(""); onSelect(step === entry.id ? null : entry.id); }}
           type="button"
-        ><i aria-hidden="true" /><span>{entry.label}<span className="visually-hidden" id={`${paneId}-${entry.id}-status`}>{entry.done ? ": done" : ": waiting"}</span></span></button>
+        ><i aria-hidden="true">{entry.done ? <Check size={12} strokeWidth={3} /> : entry.id === next && waitingOnStudent ? <Clock3 size={12} strokeWidth={2} /> : null}</i><span>{entry.label}<span className="visually-hidden" id={`${paneId}-${entry.id}-status`}>{entry.done ? ": done" : entry.id === next && waitingOnStudent ? ": waiting for the student" : ": waiting"}</span></span></button>
       </li>)}
     </ol>
-    <div className="teacher-setup__action"><span>{owner}</span><button
+    <div className="teacher-setup__action"><button
       className={`button button--${owner === "Yours" ? "coral" : "lilac"} button--compact`}
       disabled={disabled || ((next === "welcome" || next === "sign-in" || next === "card") && Boolean(sending))}
       onClick={() => {
@@ -79,6 +85,7 @@ export function StudentSetupRow({ setup, token, step, sending, locked, onSelect,
       }}
       type="button"
     >{sending === student.id ? "Sending…" : primaryLabel}<span className="visually-hidden"> for {student.name}</span></button></div>
+    {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
     {step ? <div className="teacher-setup__body" id={paneId} aria-label={`${student.name}’s setup`} role="region" ref={body} tabIndex={-1}>
       <div className="teacher-setup__body-heading">
         <h3 id={`${paneId}-heading`}>{step === "email" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome email" : step === "sign-in" ? "Sign in" : "Saved card"}</h3>
@@ -92,7 +99,7 @@ export function StudentSetupRow({ setup, token, step, sending, locked, onSelect,
         student={student}
         token={token}
       /> : step === "price" ? <>
-        <p className="teacher-profile__note">The standard price applies until you set their own.</p>
+        <ul className="booking-payment-facts teacher-setup__help"><li>The standard price applies until you set their own.</li></ul>
         <StudentPrice
           key={`${student.id}-price`}
           idPrefix={`${paneId}-price`}
@@ -105,7 +112,7 @@ export function StudentSetupRow({ setup, token, step, sending, locked, onSelect,
           token={token}
         />
       </> : step === "lessons" ? <>
-        <p className="teacher-profile__note">{student.awaitingWelcome ? "Their lessons stay quiet until you send their welcome." : "A lesson added here emails the student."}</p>
+        <ul className="booking-payment-facts teacher-setup__help"><li>{student.awaitingWelcome ? "No lesson emails until you send the welcome." : "Adding a lesson emails the student."}</li></ul>
         <LessonForm
           idPrefix={`${paneId}-lesson`}
           onBusy={setBusy}
@@ -115,11 +122,23 @@ export function StudentSetupRow({ setup, token, step, sending, locked, onSelect,
           token={token}
         />
       </> : <>
-        <p className="teacher-profile__note">{step === "welcome"
-          ? student.awaitingWelcome ? "Their welcome includes their prices and the lessons you have added. Send it when you are ready." : "Their welcome has been sent. You can send them a fresh sign-in link."
-          : step === "sign-in" ? "They sign in from the email link themselves. You can send them a fresh link."
-          : "They add their own card from their account. You can send them a fresh link to sign in."}</p>
-        {student.email ? <p className="teacher-setup__email">{student.email}</p> : <p className="teacher-profile__note">Add their email before you send a welcome.</p>}
+        <ul className="booking-payment-facts teacher-setup__help">
+          {step === "welcome" ? student.awaitingWelcome ? <>
+            <li>Includes their prices and the lessons you have added.</li>
+            <li>Send it when you’re ready.</li>
+          </> : <>
+            <li>Their welcome has been sent.</li>
+            <li>You can send a new sign-in link.</li>
+          </> : step === "sign-in" ? <>
+            <li>They sign in using the email link.</li>
+            <li>You can send a new link.</li>
+          </> : <>
+            <li>They add their card in their account.</li>
+            <li>You can send a sign-in link.</li>
+          </>}
+          {!student.email ? <li>Add their email first.</li> : null}
+        </ul>
+        {student.email ? <p className="teacher-setup__email">{student.email}</p> : null}
         <div className="teacher-dialog-actions">
           {student.email ? sendButton(step !== "welcome" || !student.awaitingWelcome) : <button className="button button--coral button--compact" onClick={() => onSelect("email")} type="button">Add email</button>}
           <button className="button button--outline button--compact" disabled={disabled} onClick={close} type="button">Done</button>
