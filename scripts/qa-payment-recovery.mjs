@@ -61,11 +61,12 @@ for (const width of [390, 1440]) {
   await diary.route("**/admin/google-calendar", (route) => route.fulfill({ json: { configured: true, connected: true, email: "teacher@example.invalid", needsReconnect: true, pending: 0 } }));
   await diary.route("**/admin/bookings*", (route) => route.fulfill({ json: { bookings: [], manualPaymentReconciliation: [{ id: "isolated", reference: "REVIEW-123" }] } }));
   await diary.goto(`${base}/schedule/`, { waitUntil: "domcontentloaded" });
-  // What waits on her is one list under her next lesson, not a notice above every tab.
-  await diary.locator(".teacher-needs-you").filter({ hasText: "REVIEW-123" }).waitFor();
-  const reconnect = diary.getByRole("button", { name: "Reconnect Google Meet" });
+  // Exercise the timetable's visible alerts; Students keeps its own alerts mounted.
+  const alerts = diary.locator(".teacher-needs-you:visible");
+  await alerts.filter({ hasText: "REVIEW-123" }).waitFor();
+  const reconnect = alerts.getByRole("button", { name: "Reconnect Google Meet" });
   await reconnect.waitFor();
-  assert.equal(await diary.getByRole("link", { name: "Open in Stripe for REVIEW-123" }).getAttribute("href"), "https://dashboard.stripe.com/payments", "a row with no payment id opens Stripe's payments list");
+  assert.equal(await alerts.getByRole("link", { name: "Open in Stripe for REVIEW-123" }).getAttribute("href"), "https://dashboard.stripe.com/payments", "a row with no payment id opens Stripe's payments list");
   assert.equal(await diary.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await diary.screenshot({ path: `tmp/qa/payment-review-diary-${width}.png`, fullPage: true });
   await reconnect.click();
