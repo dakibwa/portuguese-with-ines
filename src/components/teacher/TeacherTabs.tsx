@@ -5,7 +5,6 @@ import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 const tabs = [
   { id: "students", label: "Students" },
   { id: "week", label: "Timetable" },
-  { id: "hours", label: "Weekly hours" },
   { id: "time-off", label: "Time off" },
   { id: "receipts", label: "Receipts" },
   { id: "expressions", label: "Expressions" },
@@ -80,7 +79,7 @@ export function TeacherTabs({ current, hoursDirty, needsCount, onSelect }: {
             type="button"
           >
             {tab.label}
-            {tab.id === "hours" && hoursDirty ? <span className="teacher-tab-dot" aria-label="unsaved changes" /> : null}
+            {tab.id === "week" && hoursDirty ? <span className="teacher-tab-dot" aria-label="unsaved changes" /> : null}
             {tab.id === "students" && needsCount > 0 ? <span className="teacher-tab-count" aria-label={`${needsCount} need attention`}>{needsCount}</span> : null}
           </button>
         ))}

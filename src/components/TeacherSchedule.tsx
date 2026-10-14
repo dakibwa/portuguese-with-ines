@@ -84,7 +84,8 @@ export function TeacherSchedule() {
   );
   const [dayControlHost, setDayControlHost] = useState<HTMLDivElement | null>(null);
   const [activeTab, setActiveTab] = useState<TeacherTab>("week");
-  const editing = activeTab === "hours";
+  const [editingHours, setEditingHours] = useState(false);
+  const editing = activeTab === "week" && editingHours;
   // Her Google Meet connection, read in Profile and listed in Needs you when it needs her.
   const [meet, setMeet] = useState<GoogleMeetConnection | null>(null);
   const [savedHours, setSavedHours] = useState<WeekHours>(emptyWeek);
@@ -172,6 +173,7 @@ export function TeacherSchedule() {
     setMe(null);
     setInitialised(false);
     setActiveTab("week");
+    setEditingHours(false);
     setMeet(null);
     setSelectedBooking(null);
     setStudentPicker(null);
@@ -674,11 +676,11 @@ export function TeacherSchedule() {
       ) : null}
 
       <div className="teacher-tools-panel" id="teacher-tools-panel" role="tabpanel" aria-labelledby={`teacher-tab-${activeTab}`} tabIndex={0}>
-      {activeTab === "week" || editing ? <>
-      {activeTab === "week" && bookingsShown ? (
+      {activeTab === "week" ? <>
+      {!editing && bookingsShown ? (
         <NextLesson bookings={bookings} now={now} onOpen={setSelectedBooking} />
       ) : null}
-      {activeTab === "week" && bookingsShown ? (
+      {!editing && bookingsShown ? (
         <NeedsYou
           items={needs.filter(item => !["email", "lessons", "welcome"].includes(item.kind))}
           sending={welcoming}
@@ -704,6 +706,14 @@ export function TeacherSchedule() {
               </h2>
             </div>
           </div>
+          <button
+            className="teacher-text-button teacher-week-mode"
+            type="button"
+            onClick={() => setEditingHours(value => !value)}
+          >
+            {editing ? "View lessons" : "Edit weekly hours"}
+            {!editing && hoursDirty ? <span className="teacher-tab-dot" aria-label="unsaved changes" /> : null}
+          </button>
           {editing ? (
             <ul className="booking-payment-facts teacher-week-hint">
               <li>Tap or drag to mark when a lesson can <strong>start</strong></li>
