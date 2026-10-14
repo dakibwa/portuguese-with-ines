@@ -444,7 +444,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   details, next lesson, price and profile access. No duplicate To do list.
   The collapsed row uses one band when space permits. In narrower panels,
   name and action share the first line, with steps directly below. The opened
-  editor spans the row. Help uses short, plain bullets.
+  editor spans the row and replaces the row's action, with one Close control.
+  Help uses short, plain bullets stating the current status and anything still
+  needed, rather than explaining controls or repeating their labels.
   Standard prices count as ready. A confirmed past lesson counts for Lessons;
   no upcoming booking does not restart onboarding. Card is omitted when cards
   are unavailable. Saved cards and permission to charge every lesson differ.

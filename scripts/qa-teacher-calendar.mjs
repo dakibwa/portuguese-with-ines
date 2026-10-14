@@ -846,7 +846,7 @@ try {
   const samPane = samSetup.getByRole("region", { name: "Sam Known’s setup", exact: true });
   await samPane.getByRole("button", { name: "Send the link again to Sam Known", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/sam/welcome").length).toBe(1);
-  await samPane.getByRole("button", { name: "Close setup", exact: true }).click();
+  await samPane.getByRole("button", { name: "Close", exact: true }).click();
   // Onboarding: set a student up with their details, nothing emailed, then
   // their welcome from the same Students row.
   await students.getByRole("button", { name: "Add a student", exact: true }).click();
@@ -875,7 +875,7 @@ try {
   const anaPane = ana.getByRole("region", { name: "Ana Costa’s setup", exact: true });
   await anaPane.getByRole("button", { name: "Send welcome email to Ana Costa", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/ana/welcome").length).toBe(1);
-  await anaPane.getByRole("button", { name: "Close setup", exact: true }).click();
+  await anaPane.getByRole("button", { name: "Close", exact: true }).click();
 
   // A completed student's whole card opens their profile; its lesson action
   // opens the calendar in that same profile.
@@ -899,7 +899,7 @@ try {
   // No email is needed to open their lesson calendar.
   await noraSetup.getByRole("button", { name: "Lessons for Nora Lima", exact: true }).click();
   await expect(setupForm.getByRole("group", { name: "Choose a date and time", exact: true })).toBeVisible();
-  await setupForm.getByRole("button", { name: "Close setup", exact: true }).click();
+  await setupForm.getByRole("button", { name: "Close", exact: true }).click();
   await noraSetup.getByRole("button", { name: "Add email for Nora Lima", exact: true }).click();
   await expect(setupForm.getByLabel(/^Email/)).toBeFocused();
   await expect(page.getByRole("dialog")).toBeHidden();
