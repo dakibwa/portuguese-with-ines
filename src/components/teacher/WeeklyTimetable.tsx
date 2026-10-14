@@ -468,7 +468,7 @@ export function WeeklyTimetable({
         style={{ "--teacher-days": shown.length, "--slot-count": minutes.length, "--slot-step": step } as CSSProperties}
       >
         <div className="teacher-week-days">
-          <span className="teacher-axis-heading">Porto</span>
+          <span className="teacher-axis-heading" aria-hidden="true" />
           {shown.map((index) => {
             const day = WEEKDAYS[index];
             const date = shiftDate(weekStart, index);
@@ -487,7 +487,7 @@ export function WeeklyTimetable({
           })}
         </div>
         {!editing ? <div className="teacher-mobile-day-band">
-          <span className="teacher-axis-heading">Porto</span>
+          <span className="teacher-axis-heading" aria-hidden="true" />
           <span className="teacher-day-heading">{dayLabel(activeDay)}</span>
           {dayOffSwitch(activeDay)}
         </div> : null}

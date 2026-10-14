@@ -310,7 +310,7 @@
 .teacher-day-heading {
   position: relative;
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
   min-width: 0;
   min-height: 44px;
@@ -326,9 +326,9 @@
   white-space: nowrap;
 }
 .teacher-day-heading > span { opacity: 0.7; }
-.teacher-day-heading strong { font-size: 1rem; font-weight: 700; letter-spacing: 0; }
+.teacher-day-heading strong { display: inline-grid; place-items: center; min-width: 1.85rem; min-height: 1.85rem; font-size: 1rem; font-weight: 700; letter-spacing: 0; }
 .teacher-day-heading .teacher-day-today { padding: 0.15rem 0.35rem; border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); }
-.teacher-heading-booked-dot { flex: none; align-self: center; width: 4px; height: 4px; border-radius: 50%; background: var(--coral-action); }
+.teacher-heading-booked-dot { position: absolute; top: 0.35rem; right: 0.25rem; width: 4px; height: 4px; border-radius: 50%; background: var(--coral-action); }
 .teacher-day-full-name { display: none; }
 .teacher-mobile-day-band { display: none; }
 @container teacher-day (max-width: 160px) {
@@ -2153,9 +2153,9 @@
    tab filled. Account controls and Google Meet live inside Profile. */
 @media (max-width: 1000px) {
   .teacher-tabs-scroll { overflow: visible; }
-  /* Eight tools in two rows, with no hidden or scrolling tabs. */
-  .teacher-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
-  .teacher-tabs button { min-width: 0; gap: 0.2rem; font-size: clamp(0.56rem, 2vw, 0.76rem); }
+  /* Each row fills the strip, including the three tools in the second row. */
+  .teacher-tabs { display: flex; flex-wrap: wrap; width: 100%; }
+  .teacher-tabs button { flex: 1 1 calc(25% - 4px); min-width: 0; gap: 0.2rem; font-size: clamp(0.56rem, 2vw, 0.76rem); }
   .teacher-tabs .teacher-tabs__thumb { display: none; }
   .teacher-tabs button { min-height: 44px; padding-inline: 0.4rem; }
   /* Keep every tool in view as the collection grows. */

@@ -685,7 +685,7 @@ export function TeacherSchedule() {
               <h2 id="teacher-week-title" ref={calendarTitleRef} tabIndex={-1}>
                 {editing
                   ? "Your weekly hours"
-                  : `${dateLabel(weekStart, { day: "numeric", month: "short" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}`}
+                  : dateLabel(weekStart, { month: "long", year: "numeric" })}
               </h2>
             </div>
           </div>

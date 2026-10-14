@@ -361,8 +361,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   touch input must work without dragging.
 - A sliding tab bar groups `Students`, `Timetable`, `Weekly hours`, `Time off`,
   `Receipts`, `Expressions` and `Profile`. Open on `Timetable`;
-  keep the week pager beside its date heading. The phone bar holds all seven
-  tabs in two rows, without scrolling. Arrow keys, Home and End move between
+  keep the week pager beside its month-and-year heading. The phone bar holds all seven
+  tabs in two rows that each fill the available width, without scrolling. Dates
+  are centred evenly across the timetable header; omit the Porto gutter label.
+  Arrow keys, Home and End move between
   tabs. Unsaved hours and selected dates survive tab changes. Weekly hours
   keeps its unsaved dot; Students shows a coral count of students and notices needing attention,
   absent at zero. Profile holds her sign-in email, password link, Google Meet
@@ -442,6 +444,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
   gives the missing prerequisite. Checks mark completion, the next action has an
   outline, and a clock marks waiting on the student. Say what is needed beside
   their name; do not use vague ownership labels such as Yours or Theirs.
+  Email uses its step control, without a duplicate Add email button or
+  Email needed label.
   Completed onboarding becomes a normal row labelled Student, with their
   details, next lesson, price and profile access. No duplicate To do list.
   The collapsed row uses one band when space permits. In narrower panels,
