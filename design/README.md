@@ -441,27 +441,65 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - Every booked lesson shows its time, student and explicit `Online` or `In Porto`
   label in both layouts, including 60-minute blocks. Keep the location icons and
   coral marker for Porto lessons.
-- A student and their lessons live in one dialog, and there are no loose
-  lessons: every lesson belongs to a student she has set up (13 October 2026,
-  Dan: "so it all feels integrated"). `Add a student` (coral, leading the
-  Students tab) opens it on their details: full name, email, phone, NIF (for
-  receipts), their price for 60 and 90 minute lessons (two € fields side by
-  side, the standard price showing until she types her own) and their splat in
-  the student's own picker, under two dabs (their
-  details now, their lessons next; nothing is emailed until their welcome).
-  `Next: their lessons` keeps the same dialog, now headed with their splat and
-  name, on the lesson form; each lesson added becomes a dab line (`Thu 10
-  Sept, 10:00 · weekly, 8 lessons`), and the foot offers a coral `Send
-  welcome email` once there is a lesson, with `Add lesson` then turning blue,
-  and `Done, send later`. Opened from a free time, the lesson there comes
-  first: `Add lesson` stays coral and the welcome waits until it is added. `Add lesson` on a
-  student's card opens it at their lessons. A free time on her week opens it
-  as `Add a lesson` with the date and time, asking `Whose lesson?` over her
-  students' splats and names, with `Add a new student` beneath, and keeps
-  that time through to the lesson. Until their welcome a card reads `Set up,
-  not emailed yet`, lesson buttons drop `and email student`, and moving or
-  cancelling says they aren't emailed. Everything for Inês still happens: her
-  calendar, the blocked time and the lesson's NIF.
+- A student has one profile, and there are no loose lessons: every lesson
+  belongs to a student she has set up (13 October 2026, Dan: "so it all feels
+  integrated"). The profile is one dialog, and everything that is about a
+  student opens it identically (14 October 2026, Dan: "the add a lesson button
+  and click the card should be the same", "simple, beautiful and use the space
+  accordingly"): a student's card, its `Add a lesson` button, the end of `Add a
+  student`, and a free time on her week. Top to bottom it is a small `Student`
+  eyebrow over their name in bold beside their splat, their address (`No email
+  yet` where there is none), then `No NIF (consumidor final)` or their NIF and a
+  text `Edit details` button on one line; the cream `Their price` card (each
+  length as a dab, a lilac `Change price`); the `Add a lesson` button, with
+  `Send welcome email` beside it where it applies; what was just added; then
+  their upcoming and past lessons. Opening it reads and writes nothing.
+  - `Edit details` stays one button. It brings out everything together, in
+    place, under the name: full name, email, phone and NIF, labelled, two to a
+    row where the dialog is wide and one column on a phone, with `Save details`
+    and `Cancel` sharing the last row and the address and NIF lines it replaces
+    put away meanwhile. There are no per-field buttons. A student who has
+    signed in changes their own email, so that field is disabled.
+  - `Add a lesson` opens the lesson form in place, under its own heading, with
+    `Cancel` beside the submit. Lengths carry their price from the student's
+    own rate. Adding returns to the profile with each addition as a dab line
+    (`Thu 10 Sept, 10:00 · weekly, 8 lessons`) under an `Added` label and the
+    lessons list read again; `Add a lesson` is coral unless their welcome is
+    the next thing, when `Send welcome email` is coral and `Add a lesson` lilac.
+  - A lesson never needs an email. A student she set up from a name alone has
+    lessons like anyone, on the same form, prices, Meet and calendar; a quiet
+    note under the actions says their welcome email waits until she adds their
+    email under `Edit details`, and `Send welcome email` appears once there is
+    one. Until their welcome a card reads `Set up, not emailed yet` (or `Set
+    up, no email yet`), lesson buttons drop `and email student`, and moving or
+    cancelling says they aren't emailed. Everything for Inês still happens:
+    her calendar, the blocked time and the lesson's NIF.
+  - `Add a student` (coral, leading the Students tab) opens the profile's
+    first step: full name, email, phone, NIF, their price for 60 and 90 minute
+    lessons (two € fields side by side, the standard price showing until she
+    types her own) and their splat in the student's own picker, under two dabs
+    (their details now, their lessons next; nothing is emailed until their
+    welcome), in the same two-to-a-row, one-column-on-a-phone grid. `Next:
+    their lessons` lands on their profile with the lesson form already open.
+  - A free time on her week opens the dialog as `Add a lesson` with the date
+    and time, asking `Whose lesson?` over her students' splats and names, with
+    `Add a new student` beneath. Choosing one lands on their profile with the
+    lesson form already open at that date and time; adding it returns to the
+    profile, and focus returns to the week's heading when it closes.
+  - Sent from the profile or from the card, `Send welcome email` is one email
+    for everyone, in the site's email design: their lessons and prices, and the
+    way in. It shows for someone she still needs to bring in, and only once
+    they have an address. After the two `Your price` dabs (for each length she
+    has priced), each lesson on its own is one dab: `Lesson · Online` (or
+    `Trial lesson`, `In Porto`) over its date and time on the student's own
+    clock, named once (`Tuesday 20 October 2026, 17:00 · Porto time`), and its
+    length and the price it will be charged or owed beneath (`60 minutes ·
+    €22`). A weekly run is one dab, never a row of dates: `Weekly · Online`
+    over `Every Tuesday, 17:00 · Porto time`, `From 20 October 2026 until 8
+    December 2026` (or `…, until you stop it`) and `60 minutes · €22 a
+    lesson`. A lesson moved or lengthened from its run reads as the lesson it
+    now is. Past twelve lines an `And more` dab says how many lessons are left
+    to the website. Its subject and preheader do not change.
 - `Receipts`, a tab of its own beside `Students` (13 October 2026, Dan: "make
   her automation as easy as possible"), shows a month at a time with the
   Time off month's pager: two dabs for what there is to issue (`3 receipts
@@ -476,18 +514,18 @@ usual lesson starts and days off; avoid a wall of administration forms.
   then the rest with Meet's logo in the small last place), so no tab hides
   past the edge; wider, all seven and `Sign out` share one row.
 - Keep `Sign out` beside the tools bar. `Students` holds the student
-  cards, each a profile (splat, name, address and an arrow into their history)
-  over dabs for where they are, their next lesson and their own price when
-  she has set one, then the site's own
-  blue `Add lesson` and coral `Send welcome email`; no sentence above them. Selecting a student's card opens their lesson
-  profile: `Their price` first (each length as a dab, `· standard` where she
-  hasn't set one, and a lilac `Change price` that opens the two fields in
-  place and says how many lessons to come moved to it), then their lesson
-  history: upcoming lessons first, then past and cancelled, one card each with
+  cards, each a profile button (splat, name, address or `No email yet`, and an
+  arrow into their profile) over dabs for where they are, their next lesson and
+  their own price when she has set one, then the site's own blue `Add a
+  lesson` and coral `Send welcome email`; no sentence above them. The card and
+  its `Add a lesson` open the same profile, whose lessons are their history:
+  upcoming lessons first, then past and cancelled, one card each with
   the date and time on one line (the year only when it isn't this one), a pill
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
+  `Change price` opens the two fields in place and says how many lessons to
+  come moved to it, and `· standard` marks a length she hasn't priced.
   History includes older lessons outside the current week and follows the account
   after an email change. Loading, failed reads and an empty history stay distinct.
   Reading history never changes a booking or sends a message.
@@ -1458,8 +1496,8 @@ as a form:
   `Students` holds small sheet cards, two across where there is room: the student's splat (or initial), name and address, one
   plain status line (a coral dot and `Not signed in yet · 1 lesson paid by
   hand`, or a check and `All set: signed in, card saved`), the next
-  lesson with a `Weekly` pill, and beneath a rule `Add lesson` (her form
-  opens with them in it, on the date) and, only for someone still to bring
+  lesson with a `Weekly` pill, and beneath a rule `Add a lesson` (their
+  profile, the same as the card) and, only for someone still to bring
   in, a coral `Send welcome email` (one email for everyone: their lessons and the
   way in). Those come first, their card edged in
   coral (12 October 2026, Dan: "can this be more beautiful"). Her form's

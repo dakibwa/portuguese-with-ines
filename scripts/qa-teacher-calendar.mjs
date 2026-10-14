@@ -75,6 +75,12 @@ async function fixture(width, options = {}) {
       lesson("now", "Alex", "2026-09-07T10:00:00Z"),
       lesson("next", "Sam", "2026-09-08T13:00:00Z", "porto", 90),
     ],
+    // Her students; Nora was set up from a name alone and has no email yet.
+    students: [
+      { id: "sam", name: "Sam Known", email: "sam@example.invalid", phone: "", signedIn: false, hasCard: false, cardForAllLessons: false, nextLessonAt: "2026-09-10T16:00:00.000Z", upcoming: 1, unpaidUpcoming: 1, weekly: 0 },
+      { id: "alex", name: "Alex", email: "alex@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 1 },
+      { id: "nora", name: "Nora Lima", email: "", phone: "", nif: "", signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0, prices: { 60: 2200, 90: 3300 }, ownPrices: { 60: 2200 } },
+    ],
     writes: [],
     errors: [],
     failHours: 0,
@@ -204,8 +210,10 @@ async function fixture(width, options = {}) {
         return route.fulfill({ json: { bookings: state.bookings } });
       }
       // Hers are marked as hers, and wait for the student's card.
+      const owner = [state.added, ...state.students].find((entry) => entry?.id === data.studentId);
       state.bookings.push({
-        ...lesson(`manual-${state.bookings.length}`, state.added && data.email === state.added.email ? state.added.name : data.name || "Sam Known", data.startAt, data.location),
+        ...lesson(`manual-${state.bookings.length}`, owner?.name ?? "Sam Known", data.startAt, data.location),
+        student_id: owner?.id,
         payment_status: "not_required",
         added_by_teacher: 1,
       });
@@ -213,7 +221,7 @@ async function fixture(width, options = {}) {
         json: {
           booking: { reference: "TEST-manual" },
           // A student she has just set up isn't emailed until their welcome.
-          emailed: !(state.added && data.email === state.added.email),
+          emailed: !owner?.awaitingWelcome,
           ...(data.repeat ? { series: { booked: 3, skipped: [{ key: "2026-10-01", startAt: "2026-10-01T16:00:00.000Z", reason: "Day off" }] } } : {}),
         },
       });
@@ -225,20 +233,23 @@ async function fixture(width, options = {}) {
       state.added = student;
       return route.fulfill({ status: 201, json: { student } });
     }
-    if (path === "/admin/students/ana/welcome") return route.fulfill({ json: { ok: true, card: true } });
-    if (path === "/admin/students") {
-      return route.fulfill({
-        json: {
-          cardsAccepted: true,
-          students: [
-            { id: "sam", name: "Sam Known", email: "sam@example.invalid", phone: "", signedIn: false, hasCard: false, cardForAllLessons: false, nextLessonAt: "2026-09-10T16:00:00.000Z", upcoming: 1, unpaidUpcoming: 1, weekly: 0 },
-            { id: "alex", name: "Alex", email: "alex@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 1 },
-            ...(state.added ? [state.added] : []),
-          ],
-        },
-      });
+    // Their welcome, their details and their price: each answers as the Worker does.
+    const studentRoute = path.match(/^\/admin\/students\/([^/]+)\/(welcome|details|prices)$/);
+    if (studentRoute) {
+      const target = [state.added, ...state.students].find((entry) => entry?.id === studentRoute[1]);
+      if (!target) return fail("That student could not be found.");
+      if (studentRoute[2] === "details") Object.assign(target, { name: data.name, email: data.email, phone: data.phone, nif: data.nif });
+      if (studentRoute[2] === "prices") {
+        target.ownPrices = Object.fromEntries(Object.entries(data.prices).filter(([, cents]) => cents !== null));
+        const sixty = target.ownPrices[60];
+        target.prices = sixty ? { 60: sixty, 90: target.ownPrices[90] ?? Math.round(sixty * 1.5) } : { ...target.ownPrices };
+      }
+      if (studentRoute[2] === "welcome") return route.fulfill({ json: { ok: true, card: true } });
+      return route.fulfill({ json: { student: target, ...(studentRoute[2] === "prices" ? { updated: 1 } : {}) } });
     }
-    if (path === "/admin/students/sam/welcome") return route.fulfill({ json: { ok: true, card: true } });
+    if (path === "/admin/students") {
+      return route.fulfill({ json: { cardsAccepted: true, students: [...state.students, ...(state.added ? [state.added] : [])] } });
+    }
     const match = path.match(
       /^\/admin\/bookings\/([^/]+)\/(reschedule|cancel|no-show)$/,
     );
@@ -302,6 +313,23 @@ async function dragDown(page, from, to) {
     steps: 8,
   });
   await page.mouse.up();
+}
+// Edit details brings out every detail at once, spaced for the width: two
+// fields to a row where there is room, one column on a phone, Save and
+// Cancel sharing the last row, and nothing wider than the dialog.
+async function detailsLayout(page, dialog) {
+  const box = (label) => dialog.getByLabel(label).boundingBox();
+  const [name, email, phone, nif] = [await box("Full name"), await box(/^Email/), await box(/^Phone/), await box(/^NIF/)];
+  const save = await dialog.getByRole("button", { name: "Save details", exact: true }).boundingBox();
+  const cancel = await dialog.getByRole("button", { name: "Cancel", exact: true }).boundingBox();
+  const sameRow = (a, b) => Math.abs(a.y - b.y) < 4;
+  if (page.viewportSize().width > 520) {
+    assert.ok(sameRow(name, email) && sameRow(phone, nif) && !sameRow(name, phone), "wide: two fields to a row");
+  } else {
+    assert.ok([name, email, phone, nif].every((field, index, all) => !index || (field.y > all[index - 1].y && Math.abs(field.x - all[0].x) < 2)), "phone: one column");
+  }
+  assert.ok(sameRow(save, cancel), "Save and Cancel share a row");
+  assert.ok(await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth + 1), "the details fit the dialog");
 }
 const noOverflow = async (page) =>
   assert.equal(
@@ -667,9 +695,12 @@ try {
   await forSam.getByRole("radio", { name: "In Porto", exact: true }).check();
   await expect(forSam.getByLabel("Date", { exact: true })).toHaveValue("2026-09-11");
   await forSam.getByRole("button", { name: "Add lesson and email student", exact: true }).click();
-  await expect(forSam.locator(".teacher-student-dialog__added")).toContainText("emailed");
+  // The lesson is added in place and the profile it came from shows it.
+  await expect(forSam.locator(".teacher-profile__added")).toContainText("emailed");
+  await expect(forSam.getByRole("button", { name: "Add a lesson", exact: true })).toBeVisible();
   assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.location, "porto");
-  await forSam.getByRole("button", { name: "Done", exact: true }).click();
+  assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.studentId, "sam");
+  await forSam.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: /^Sam Known, .*11 September.*View lesson$/ }).click();
   await page
@@ -731,9 +762,9 @@ try {
   await expect(addDialog.getByLabel("Date", { exact: true })).toHaveValue("2026-09-10");
   await expect(addDialog.getByLabel("Time in Porto")).toHaveValue("18:00");
   await addDialog.getByRole("button", { name: "Add lesson", exact: true }).click();
-  await expect(addDialog.locator(".teacher-student-dialog__added")).toContainText("18:00");
-  await expect(addDialog.locator(".teacher-student-dialog__added")).not.toContainText("emailed");
-  await addDialog.getByRole("button", { name: "Done, send later", exact: true }).click();
+  await expect(addDialog.locator(".teacher-profile__added")).toContainText("18:00");
+  await expect(addDialog.locator(".teacher-profile__added")).not.toContainText("emailed");
+  await addDialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(addDialog).toHaveCount(0);
   assert.equal(
     state.writes.filter((entry) => entry.path === "/admin/bookings").at(-1).data.startAt,
@@ -744,8 +775,8 @@ try {
     page.getByRole("button", { name: /^Kai,.*added by you\. View lesson$/ }),
   ).toHaveClass(/teacher-calendar-lesson--added/);
 
-  // A student she already has: choosing their address brings their name. A
-  // weekly slot says what was booked and which week was left out.
+  // A student she already has: the lesson belongs to their account. A weekly
+  // slot says what was booked and which week was left out.
   await slot(page, 2, 1080).click();
   await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
   const weeklyDialog = page.getByRole("dialog");
@@ -754,10 +785,10 @@ try {
   await expect(weeklyDialog.getByRole("radio", { name: "Until stopped", exact: true })).toBeChecked();
   await weeklyDialog.getByRole("radio", { name: "4 weeks", exact: true }).check();
   await weeklyDialog.getByRole("button", { name: "Add weekly lessons and email student", exact: true }).click();
-  await expect(weeklyDialog.locator(".teacher-student-dialog__added")).toContainText("1 Oct left out");
+  await expect(weeklyDialog.locator(".teacher-profile__added")).toContainText("1 Oct left out");
   const weekly = state.writes.filter((entry) => entry.path === "/admin/bookings").at(-1).data;
-  assert.deepEqual([weekly.email, weekly.name, weekly.repeat], ["sam@example.invalid", "Sam Known", 4]);
-  await weeklyDialog.getByRole("button", { name: "Done", exact: true }).click();
+  assert.deepEqual([weekly.studentId, weekly.repeat], ["sam", 4]);
+  await weeklyDialog.getByRole("button", { name: "Close", exact: true }).click();
 
   // Her students: who still needs to come in leads, and each can be sent a
   // way in or given a lesson straight from the list.
@@ -786,16 +817,62 @@ try {
   await expect(addStudent.getByRole("heading", { name: "Ana Costa" })).toBeVisible();
   await expect(addStudent.getByRole("radio", { name: "60 mins, €20" })).toBeVisible();
   await expect(addStudent.getByRole("radio", { name: "90 mins, €35" })).toBeVisible();
+  // Their welcome waits until she asks: it is offered once the form is put away.
   await expect(addStudent.getByRole("button", { name: "Send welcome email", exact: true })).toHaveCount(0);
-  await addStudent.getByRole("button", { name: "Done, send later", exact: true }).click();
+  await addStudent.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(addStudent.getByRole("button", { name: "Send welcome email", exact: true })).toBeVisible();
+  await addStudent.getByRole("button", { name: "Close", exact: true }).click();
   const ana = students.locator(".teacher-student").filter({ hasText: "Ana Costa" });
   await expect(ana).toContainText("Set up, not emailed yet");
   await ana.getByRole("button", { name: "Send welcome email to Ana Costa" }).click();
   await expect(ana).toContainText("Welcome sent");
   await expect(students.locator(".teacher-student").filter({ hasText: "Sam Known" })).toContainText("Welcome sent");
-  await students.getByRole("button", { name: "Add lesson for Alex" }).click();
+  await students.getByRole("button", { name: "Add a lesson for Alex" }).click();
   await expect(page.getByRole("dialog").getByRole("heading", { name: "Alex" })).toBeVisible();
-  await page.getByRole("dialog").getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+
+  // One profile for a student, whether the card or its Add a lesson button
+  // opens it. Nora was set up from a name alone: she has no email yet, and
+  // that never stops her lessons.
+  const nora = students.locator(".teacher-student").filter({ hasText: "Nora Lima" });
+  await expect(nora).toContainText("Set up, no email yet");
+  await nora.getByRole("button", { name: "Open Nora Lima’s profile" }).click();
+  const profile = page.getByRole("dialog", { name: "Nora Lima" });
+  await expect(profile.getByText("No lessons recorded yet.")).toBeVisible();
+  const fromCard = await profile.innerHTML();
+  await expect(profile).toContainText("No email yet");
+  await expect(profile).toContainText("Their welcome email waits until you add their email");
+  await expect(profile.getByText("60 mins · €22")).toBeVisible();
+  await expect(profile.getByRole("button", { name: "Change price", exact: true })).toBeVisible();
+  await expect(profile.getByRole("button", { name: "Send welcome email" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(profile).toHaveCount(0);
+  await nora.getByRole("button", { name: "Add a lesson for Nora Lima" }).click();
+  await expect(profile.getByText("No lessons recorded yet.")).toBeVisible();
+  assert.equal(await profile.innerHTML(), fromCard, "the card and its Add a lesson button open the same profile");
+  // Her lesson form opens in place, on her own prices, with no email asked for.
+  await profile.getByRole("button", { name: "Add a lesson", exact: true }).click();
+  await expect(profile.getByRole("radio", { name: "60 mins, €22" })).toBeVisible();
+  await profile.getByLabel("Date", { exact: true }).fill("2026-09-30");
+  await profile.getByRole("button", { name: "Add lesson", exact: true }).click();
+  await expect(profile.locator(".teacher-profile__added")).toContainText("30 Sept");
+  assert.equal(state.writes.filter((entry) => entry.path === "/admin/bookings").at(-1).data.studentId, "nora");
+  await expect(profile.locator(".teacher-history-lesson")).toHaveCount(1);
+  // Edit details is one button that brings out all of it, two to a row where
+  // there is room and one column on a phone, Save and Cancel sharing a row.
+  await profile.getByRole("button", { name: "Edit details", exact: true }).click();
+  await detailsLayout(page, profile);
+  await profile.getByLabel(/^Email/).fill("nora@example.invalid");
+  await profile.getByRole("button", { name: "Save details", exact: true }).click();
+  assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/students/nora/details").at(-1).data,
+    { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "", mark: "" });
+  await expect(profile).toContainText("nora@example.invalid");
+  await expect(profile).not.toContainText("Their welcome email waits");
+  // Their welcome is offered once there is an address, and goes only when she sends it.
+  assert.equal(state.writes.filter((entry) => entry.path.endsWith("/welcome")).length, 2, "Nora's welcome has not been sent");
+  await profile.getByRole("button", { name: "Send welcome email", exact: true }).click();
+  await expect(profile.getByText("Welcome sent")).toBeVisible();
+  await profile.getByRole("button", { name: "Close", exact: true }).click();
 
   // Select a few dates, apply time off, then see those same days in the week.
   await page.getByRole("tab", { name: "Time off", exact: true }).click();
@@ -939,7 +1016,7 @@ try {
       { ...lesson("checkout", "Sam Known", "2026-09-12T09:00:00Z"), student_id: "sam", status: "pending_payment", payment_status: "pending", notes: "UNFINISHED CHECKOUT MUST NOT APPEAR" },
     ];
     await page.getByRole("tab", { name: /^Students/ }).click();
-    const open = page.getByRole("button", { name: "View lesson history for Sam Known" });
+    const open = page.getByRole("button", { name: "Open Sam Known’s profile" });
     await open.focus();
     await page.keyboard.press("Enter");
     const history = page.getByRole("dialog", { name: "Sam Known" });
@@ -956,6 +1033,9 @@ try {
     await expect(history).not.toContainText("MUST NOT APPEAR");
     await expect(history.locator("section").last().locator("li").first()).toContainText("11 Sept ·");
     assert.equal(state.historyReads, 1, "History requests all dates, separately from the current week");
+    await history.getByRole("button", { name: "Edit details", exact: true }).click();
+    await detailsLayout(page, history);
+    await history.getByRole("button", { name: "Cancel", exact: true }).click();
     assert.ok(await history.evaluate(node => node.scrollWidth <= node.clientWidth + 1), `History fits at ${width}px`);
     await page.keyboard.press("Shift+Tab");
     assert.ok(await history.evaluate(node => node.contains(document.activeElement)), "Focus stays inside history");
@@ -970,14 +1050,14 @@ try {
     state.failHistory = false;
     await history.getByRole("button", { name: "Try again", exact: true }).click();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(5);
-    await history.getByRole("button", { name: "Close student history" }).click();
+    await history.getByRole("button", { name: "Close", exact: true }).click();
     // Closing a slow request and opening another account cannot cross the histories.
     let release;
     state.historyGate = new Promise(resolve => { release = resolve; });
     await open.click();
     await expect(history.getByRole("status")).toHaveText("Loading lesson history…");
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: "View lesson history for Alex", exact: true }).click();
+    await page.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
     const other = page.getByRole("dialog", { name: "Alex", exact: true });
     await expect(other).toContainText("No lessons recorded yet.");
     release();

@@ -12,7 +12,7 @@ import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
-import { StudentDialog, type StudentDialogStart } from "@/components/teacher/StudentDialog";
+import { StudentProfile, type StudentProfileStart } from "@/components/teacher/StudentProfile";
 import { StudentList, needsHer } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
@@ -92,9 +92,9 @@ export function TeacherSchedule() {
     null,
   );
   // A free time chosen on the week, for a lesson added there.
-  // Adding a student, their lessons, or a lesson at a free time: one dialog.
-  const [studentDialog, setStudentDialog] = useState<(StudentDialogStart & { key: number }) | null>(null);
-  const openStudentDialog = (start: StudentDialogStart) => setStudentDialog({ ...start, key: Date.now() });
+  // A student's profile, a new student, or a lesson at a free time: one dialog.
+  const [studentDialog, setStudentDialog] = useState<(StudentProfileStart & { key: number }) | null>(null);
+  const openStudentDialog = (start: StudentProfileStart) => setStudentDialog({ ...start, key: Date.now() });
   // Her students, read once with the page and again after each lesson she
   // adds: the form suggests them and Your students lists them.
   const [students, setStudents] = useState<{ list: AdminStudent[]; cardsAccepted: boolean } | null>(null);
@@ -787,7 +787,7 @@ export function TeacherSchedule() {
         cards={Boolean(students?.cardsAccepted)}
         error={studentsError}
         onAddStudent={() => openStudentDialog({ step: "new" })}
-        onAddLesson={(student) => openStudentDialog({ step: "lessons", student })}
+        onOpenStudent={(student) => openStudentDialog({ step: "profile", student })}
         onStudentsChanged={() => void reloadStudents()}
       />
       </div>
@@ -802,10 +802,11 @@ export function TeacherSchedule() {
       </div>
       </div>
       {studentDialog ? (
-        <StudentDialog
+        <StudentProfile
           key={studentDialog.key}
           token={token}
           known={students?.list ?? []}
+          cards={Boolean(students?.cardsAccepted)}
           start={studentDialog}
           afterCloseFocusRef={studentDialog.step === "pick" ? calendarTitleRef : undefined}
           onChanged={() => {

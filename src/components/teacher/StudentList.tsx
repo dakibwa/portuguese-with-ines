@@ -6,7 +6,6 @@ import { AccountAvatar } from "@/components/AccountMenu";
 import { sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
 import { formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
-import { StudentHistory } from "@/components/teacher/StudentHistory";
 
 /**
  * Someone she still needs to bring in comes first: never signed in, or (where
@@ -55,7 +54,7 @@ export function StudentList({
   cards,
   error,
   onAddStudent,
-  onAddLesson,
+  onOpenStudent,
   onStudentsChanged,
 }: {
   token: string;
@@ -64,12 +63,12 @@ export function StudentList({
   cards: boolean;
   error: string;
   onAddStudent: () => void;
-  onAddLesson: (student: AdminStudent) => void;
+  /** Their profile: the same from their card and from its Add a lesson button. */
+  onOpenStudent: (student: AdminStudent) => void;
   /** After a student is added or welcomed, so her list reads afresh. */
   onStudentsChanged: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<AdminStudent | null>(null);
   const [sending, setSending] = useState("");
   // Each answer stays on its own student's card, where she pressed.
   const [sent, setSent] = useState<Record<string, { ok: boolean; message: string }>>({});
@@ -135,7 +134,7 @@ export function StudentList({
             const answer = sent[student.id];
             return (
               <li className={`teacher-student${waitingOn ? " needs-her" : " is-ready"}`} key={student.id}>
-                <button className="teacher-student__profile" aria-label={`View lesson history for ${student.name}`} onClick={() => setSelected(student)} type="button">
+                <button className="teacher-student__profile" aria-label={`Open ${student.name}’s profile`} onClick={() => onOpenStudent(student)} type="button">
                   <AccountAvatar className="teacher-student__avatar" mark={student.mark} name={student.name} />
                   <span className="teacher-student__main">
                     <strong className="teacher-student__name">{student.name}</strong>
@@ -151,9 +150,9 @@ export function StudentList({
                   {theirPrice(student) ? <li>{theirPrice(student)}</li> : null}
                 </ul>
                 <div className="teacher-student__action">
-                  <button className="button button--blue button--compact" onClick={() => onAddLesson(student)} type="button">
+                  <button className="button button--blue button--compact" onClick={() => onOpenStudent(student)} type="button">
                     <CalendarPlus size={15} aria-hidden="true" />
-                    Add lesson
+                    Add a lesson
                     <span className="visually-hidden"> for {student.name}</span>
                   </button>
                   {/* Only someone still to bring in needs a way in sent, and only to an address. */}
@@ -181,15 +180,6 @@ export function StudentList({
           })}
         </ul>
       </div>
-      {selected ? (
-        <StudentHistory
-          key={`${token}:${selected.id}`}
-          student={selected}
-          token={token}
-          onChanged={(updated) => { setSelected(updated); onStudentsChanged(); }}
-          onClose={() => setSelected(null)}
-        />
-      ) : null}
     </section>
   );
 }

@@ -2298,7 +2298,11 @@ await test("she sets a student up and adds their lessons without emailing them, 
     const [welcome] = to("quiet@example.invalid");
     assert.ok(welcome.subject.startsWith("Your lessons with Inês"));
     assert.ok(welcome.text.includes("Inês has set up your lessons"));
-    assert.ok((welcome.text.match(/Lesson · Online/g) ?? []).length >= 5, "every lesson so far is listed");
+    // The weekly run is one line, the lesson on its own another, each with its length and price.
+    assert.equal((welcome.text.match(/Lesson · Online/g) ?? []).length, 1, "the lesson on its own has its own line");
+    assert.equal((welcome.text.match(/Weekly · Online/g) ?? []).length, 1, "a weekly run is one line, not a row of dates");
+    assert.ok(welcome.text.includes("Lesson · Online: Tuesday 20 October 2026, 15:00 · Porto time\n60 minutes · €25"), welcome.text);
+    assert.ok(welcome.text.includes("Every Thursday, 11:00 · Porto time\nFrom 22 October 2026 until 12 November 2026\n60 minutes · €25 a lesson"), welcome.text);
     assert.equal(db.prepare("SELECT awaiting_welcome FROM students WHERE id=?").get(student.id).awaiting_welcome, 0);
 
     // After the welcome, her changes reach them as usual.
@@ -2356,6 +2360,92 @@ await test("she can set a student up from a name alone and give their email late
     forgetStudent("bea@example.invalid");
     db.prepare("DELETE FROM student_recurring_rates WHERE student_id IN (SELECT id FROM students WHERE email LIKE 'no-email:%')").run();
     db.prepare("DELETE FROM students WHERE email LIKE 'no-email:%'").run();
+  }
+});
+await test("she adds lessons for a student with no email yet: nothing leaves for the address that is not there, and the real one follows every lesson", async () => {
+  captureEmail();
+  Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", TEACHER_NOTIFICATIONS_ENABLED: "1" });
+  const isolated = "Dina Dias";
+  try {
+    const created = await call("/admin/students", { user: "teacher", body: { name: isolated, prices: { 60: 2000 } } });
+    const { student } = await created.json();
+    const book = (body) => call("/admin/bookings", { user: "teacher", body: { studentId: student.id, lessonType: "single", ...body } });
+    assert.equal((await book({ studentId: "nobody", startAt: "2026-10-20T16:00:00.000Z" })).status, 404, "a student she has not set up is still refused");
+
+    // A lesson she has already had, a one-off, a weekly run and a long lesson.
+    const had = await book({ startAt: "2026-08-20T09:00:00.000Z" });
+    assert.equal(had.status, 201, await had.clone().text());
+    const one = await book({ startAt: "2026-10-20T16:00:00.000Z" });
+    assert.equal(one.status, 201, await one.clone().text());
+    assert.equal((await one.json()).emailed, false, "she is told nothing was sent");
+    const weekly = await book({ startAt: "2026-09-17T17:00:00.000Z", repeat: 4 });
+    assert.equal(weekly.status, 201, await weekly.clone().text());
+    assert.equal((await book({ lessonType: "long", startAt: "2026-10-28T09:00:00.000Z" })).status, 201);
+    await drain();
+
+    const rows = () => db.prepare("SELECT student_email, amount_cents FROM bookings WHERE student_id=?").all(student.id);
+    assert.equal(rows().length, 7);
+    assert.deepEqual([...new Set(rows().map((row) => row.student_email))], [`no-email:${student.id}`], "the stand-in is the lessons' key and goes no further");
+    assert.deepEqual(rows().filter((row) => row.amount_cents !== 2000).map((row) => row.amount_cents), [3000], "her price, and 1.5 times it for 90 minutes");
+
+    // Nothing is addressed to it, nothing names it, no calendar file invites it. Her own copies read "No email yet".
+    const everything = sentEmails.flatMap((sent) => [sent.to.join(), sent.reply_to?.join() ?? "", sent.subject, sent.text, sent.html,
+      ...(sent.attachments ?? []).map((file) => Buffer.from(file.content, "base64").toString())]).join("\n");
+    assert.ok(!everything.includes("no-email:"), "the placeholder appears in nothing she or a provider receives");
+    assert.deepEqual(sentEmails.filter((sent) => sent.to[0] !== "ines@example.invalid"), [], "no one else is written to");
+    const hers = sentEmails.filter((sent) => sent.to[0] === "ines@example.invalid");
+    assert.ok(hers.length >= 4 && hers.every((sent) => sent.text.includes("No email yet") && !sent.reply_to), "she still hears of each, with no one to reply to");
+
+    // What her screens and automation read.
+    const listed = await (await call("/admin/bookings?from=2026-01-01T00:00:00.000Z", { method: "GET", user: "teacher" })).json();
+    const theirs = listed.bookings.filter((entry) => entry.student_id === student.id);
+    assert.equal(theirs.length, 7);
+    assert.ok(theirs.every((entry) => entry.student_email === ""), "her list shows no address for them");
+    const receipts = (await (await call("/admin/receipts?month=2026-08", { method: "GET", user: "teacher" })).json()).receipts.filter((line) => line.studentName === isolated);
+    assert.deepEqual(receipts.map((line) => [line.studentEmail, line.amountCents, line.ready]), [["", 2000, true]], "a receipt line for them has no address");
+    const marked = await call(`/admin/bookings/${theirs.find((entry) => entry.starts_at > "2026-10-01").id}/paid-by-hand`, { user: "teacher", body: {} });
+    assert.ok(!JSON.stringify(await marked.json()).includes("no-email:"), "nor does any answer to a change");
+
+    // Giving the real address: another account's is refused and moves nothing.
+    const details = (body) => call(`/admin/students/${student.id}/details`, { user: "teacher", body: { name: isolated, ...body } });
+    assert.equal((await details({ email: "alice@example.invalid" })).status, 409);
+    assert.deepEqual([...new Set(rows().map((row) => row.student_email))], [`no-email:${student.id}`]);
+    sentEmails.length = 0;
+    assert.equal((await details({ email: "Dina@Example.invalid" })).status, 200);
+    assert.deepEqual([...new Set(rows().map((row) => row.student_email))], ["dina@example.invalid"], "every lesson, past ones too, carries the real address");
+    await drain();
+    assert.deepEqual(sentEmails, [], "giving the address sends nothing; she sends the welcome herself");
+    const now = (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).students.find((entry) => entry.id === student.id);
+    assert.deepEqual([now.email, now.awaitingWelcome], ["dina@example.invalid", true]);
+    assert.equal((await (await call("/admin/receipts?month=2026-08", { method: "GET", user: "teacher" })).json()).receipts.find((line) => line.studentName === isolated).studentEmail, "dina@example.invalid");
+
+    // Her price changes after the lessons, and they live in another clock: the welcome follows both.
+    db.prepare("UPDATE students SET timezone='America/Los_Angeles' WHERE id=?").run(student.id);
+    assert.equal((await call(`/admin/students/${student.id}/prices`, { user: "teacher", body: { prices: { 60: 2400 } } })).status, 200);
+    assert.equal((await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} })).status, 200);
+    await drain();
+    const [welcome] = sentEmails.filter((sent) => sent.to[0] === "dina@example.invalid");
+    const lines = welcome.text.split("\n");
+    for (const line of [
+      "Your price · 60 minutes: €24 a lesson",
+      "Your price · 90 minutes: €36 a lesson",
+      "Weekly · Online: Every Thursday, 10:00 · Los Angeles time",
+      "From 17 September 2026 until 8 October 2026",
+      "60 minutes · €24 a lesson",
+      "Lesson · Online: Tuesday 20 October 2026, 09:00 · Los Angeles time",
+      "60 minutes · €24",
+      "Lesson · Online: Wednesday 28 October 2026, 02:00 · Los Angeles time",
+      "90 minutes · €36"
+    ]) assert.ok(lines.includes(line), `${line}\n${welcome.text}`);
+    assert.equal(welcome.text.match(/Weekly/g).length, 1, "the run is one line, not four");
+    assert.ok(!welcome.text.includes("20 August"), "a lesson that has happened is not in it");
+  } finally {
+    Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0" });
+    delete env.TEACHER_EMAIL;
+    releaseEmail();
+    forgetStudent("dina@example.invalid");
+    db.prepare("DELETE FROM student_recurring_rates WHERE student_id IN (SELECT id FROM students WHERE name=?)").run(isolated);
+    db.prepare("DELETE FROM students WHERE name=?").run(isolated);
   }
 });
 await test("her price for a student prices their lessons, and only lessons nothing is settled on follow a change", async () => {

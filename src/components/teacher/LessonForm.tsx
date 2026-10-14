@@ -43,8 +43,9 @@ function addedLine(
 /**
  * A lesson for one of her students: the lesson, where, how often and when.
  * It only ever belongs to a student she has set up (13 October 2026, Dan: no
- * loose lessons), so there is no address to type. Lessons for a student still
- * awaiting their welcome are added quietly.
+ * loose lessons), so there is no address to type, and none is needed: a
+ * student with no email yet has lessons like anyone else (14 October 2026,
+ * Dan). Lessons for a student still awaiting their welcome are added quietly.
  */
 export function LessonForm({
   token,
@@ -55,6 +56,7 @@ export function LessonForm({
   tone = "coral",
   onCreated,
   onBusy,
+  onCancel,
 }: {
   token: string;
   student: AdminStudent;
@@ -65,6 +67,8 @@ export function LessonForm({
   tone?: "coral" | "blue";
   onCreated: (message: string) => void;
   onBusy?: (busy: boolean) => void;
+  /** Back to where she was, without adding anything. */
+  onCancel?: () => void;
 }) {
   const [lesson, setLesson] = useState({ ...empty, date, time });
   const quiet = Boolean(student.awaitingWelcome);
@@ -87,8 +91,7 @@ export function LessonForm({
           setError("");
           try {
             const result = await createBookingFor(token, {
-              email: student.email,
-              name: student.name,
+              studentId: student.id,
               lessonType: lesson.lessonType,
               startAt: portoTimeToUtc(lesson.date, lesson.time),
               location: lesson.location,
@@ -233,7 +236,7 @@ export function LessonForm({
             onChange={(e) => setLesson({ ...lesson, time: e.target.value })}
           />
         </label>
-        <div className="teacher-manual-submit">
+        <div className="teacher-manual-submit teacher-dialog-actions">
           <button
             className={`button button--${tone}`}
             type="submit"
@@ -243,6 +246,11 @@ export function LessonForm({
               ? "Adding…"
               : `${weekly ? "Add weekly lessons" : "Add lesson"}${quiet ? "" : " and email student"}`}
           </button>
+          {onCancel ? (
+            <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">
+              Cancel
+            </button>
+          ) : null}
         </div>
       </form>
       {error ? (

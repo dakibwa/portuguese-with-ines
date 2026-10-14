@@ -4,17 +4,18 @@ import { useState } from "react";
 import { updateStudentDetails, type AdminStudent } from "@/lib/admin-api";
 
 /**
- * Her student's details, filled in or corrected after she set them up, from a
- * name alone if that was all she had (13 October 2026, Dan: "she can build upon
- * that"). Their email is how they sign in, so it is hers to give only until they
- * first do; after that they change it from their account.
+ * All of a student's details together, filled in or corrected after she set
+ * them up, from a name alone if that was all she had (13 October 2026, Dan:
+ * "she can build upon that"). It opens in place from Edit details on their
+ * profile (14 October 2026, Dan). Their email is how they sign in, so it is
+ * hers to give only until they first do; after that they change it from their
+ * account. It is never needed for her to add their lessons.
  */
-export function StudentDetailsForm({ token, student, submitLabel = "Save details", onSaved, onCancel }: {
+export function StudentDetailsForm({ token, student, onSaved, onCancel }: {
   token: string;
   student: AdminStudent;
-  submitLabel?: string;
   onSaved: (student: AdminStudent) => void;
-  onCancel?: () => void;
+  onCancel: () => void;
 }) {
   const [details, setDetails] = useState({ name: student.name, email: student.email, phone: student.phone, nif: student.nif ?? "" });
   const [busy, setBusy] = useState(false);
@@ -24,7 +25,7 @@ export function StudentDetailsForm({ token, student, submitLabel = "Save details
 
   return (
     <form
-      className="teacher-form teacher-student-details"
+      className="teacher-form teacher-profile__form"
       onSubmit={async (event) => {
         event.preventDefault();
         if (busy) return;
@@ -48,13 +49,13 @@ export function StudentDetailsForm({ token, student, submitLabel = "Save details
     >
       <label>
         <span>Full name</span>
-        <input autoComplete="off" disabled={busy} onChange={set("name")} required type="text" value={details.name} />
+        <input autoComplete="off" autoFocus disabled={busy} onChange={set("name")} required type="text" value={details.name} />
       </label>
       <label>
         <span>
           Email{" "}
           <span className="teacher-field-optional">
-            {student.signedIn ? "(they change it from their account)" : student.email ? "" : "(needed for lessons and their welcome)"}
+            {student.signedIn ? "(they change it from their account)" : student.email ? "" : "(optional, their welcome needs one)"}
           </span>
         </span>
         <input
@@ -75,8 +76,8 @@ export function StudentDetailsForm({ token, student, submitLabel = "Save details
         <input autoComplete="off" disabled={busy} inputMode="numeric" onChange={set("nif")} type="text" value={details.nif} />
       </label>
       <div className="teacher-dialog-actions">
-        <button className="button button--coral" disabled={busy} type="submit">{busy ? "Saving…" : submitLabel}</button>
-        {onCancel ? <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">Cancel</button> : null}
+        <button className="button button--coral" disabled={busy} type="submit">{busy ? "Saving…" : "Save details"}</button>
+        <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">Cancel</button>
       </div>
       {error ? <p className="teacher-inline-error" role="alert">{error}</p> : null}
     </form>
