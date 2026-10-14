@@ -53,7 +53,8 @@ blunt start should be a rounded cap.
 
 ## Not to commission
 
-- The wax: the phrases at rest are live text in the font, a shade brighter than
-  the paper with the faintest raised edge, so they are always real phrases.
+- The resting phrases: live text in the font, in dark blue on cream paper,
+  so they are readable and always real phrases. Pale wax loops only stand in
+  when there are no phrases to show.
 - The paper grain: the site's `paper-grain.svg` already lies over the card.
 - A chapéu or any other mark at the card's corner: the reveal has none.

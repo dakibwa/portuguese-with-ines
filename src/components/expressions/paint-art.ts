@@ -6,6 +6,8 @@
  * one (docs/expressions-paint-assets.md lists them, with sizes and colours).
  */
 
+import { PAINTS } from "@/lib/expression-paint";
+
 export const PAPER = "#FBF4E5";
 
 export type Rand = () => number;
@@ -497,9 +499,9 @@ export function waxHeight(rows: number, m: WaxMetrics) {
 }
 
 /**
- * The resting sheet: real phrases from her collection written faintly in wax,
- * the paper's own cream with the faintest raised edge, just readable if you
- * look. With no phrases to show, joined-up loops in her slant instead.
+ * The resting sheet: real phrases from her collection in dark blue, readable
+ * on the cream paper. With no phrases to show, pale joined-up loops in her
+ * slant instead.
  * Centred between `top` and `bottom`, which the sheet keeps at its top.
  */
 export function paintWax(g: CanvasRenderingContext2D, w: number, top: number, bottom: number, m: WaxMetrics, phrases: string[], family: string, R: Rand) {
@@ -514,10 +516,7 @@ export function paintWax(g: CanvasRenderingContext2D, w: number, top: number, bo
       g.font = `${row.size}px ${family}`;
       const x = m.padL + waxIndent(index, fs) + R() * fs * 0.3;
       const y = y0 + index * pitch;
-      // A raised edge first, then the wax, a shade brighter than the paper.
-      g.fillStyle = "rgba(26,49,105,0.05)";
-      g.fillText(row.text, x + 0.5, y + 0.9);
-      g.fillStyle = "rgba(255,255,253,0.9)";
+      g.fillStyle = PAINTS.deep.paint;
       g.fillText(row.text, x, y);
     });
     return;

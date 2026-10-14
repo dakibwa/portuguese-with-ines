@@ -892,6 +892,13 @@ try {
   await noraSetup.getByRole("button", { name: "Lessons for Nora Lima", exact: true }).click();
   await expect(setupForm.getByRole("radio", { name: "60 mins, €24" })).toBeVisible();
   const picker = setupForm.getByRole("group", { name: "Choose a date and time", exact: true });
+  // Keyboard navigation must keep its focus on a visible, selectable date.
+  const todayChoice = picker.getByRole("button", { name: "Monday 7 September", exact: true });
+  await todayChoice.press("ArrowLeft");
+  await expect(todayChoice).toBeFocused();
+  await picker.getByRole("button", { name: "Next month", exact: true }).click();
+  await picker.getByRole("button", { name: "Previous month", exact: true }).click();
+  await expect(picker.getByRole("button", { name: "Previous month", exact: true })).toBeDisabled();
   await picker.getByRole("button", { name: "Wednesday 30 September", exact: true }).click();
   await picker.getByRole("button", { name: "17:00 Porto time", exact: true }).click();
   // A different length needs that length's availability and a new time choice.

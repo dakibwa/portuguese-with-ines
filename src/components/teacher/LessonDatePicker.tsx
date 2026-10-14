@@ -14,23 +14,23 @@ const shiftMonth = (month: string, amount: number) => {
 
 type Choice = { date: string; time: string; startAt?: string };
 
-/** A date and its advertised free times, with her manual time still available. */
-export function LessonDatePicker({ lessonType, date, time, startAt = "", dateCaption, idPrefix, disabled, refresh = 0, onChange }: {
+/** A date and its advertised free times, starting today. */
+export function LessonDatePicker({ lessonType, date, time, startAt = "", idPrefix, disabled, refresh = 0, onChange }: {
   lessonType: string;
   date: string;
   time: string;
   startAt?: string;
-  dateCaption: string;
   idPrefix: string;
   disabled: boolean;
   refresh?: number;
   onChange: (choice: Choice) => void;
 }) {
   const today = portoDateKey(new Date());
-  const [month, setMonth] = useState(() => monthStart(date || today));
-  const [focused, setFocused] = useState(date || today);
+  const currentMonth = monthStart(today);
+  const [chosenMonth, setMonth] = useState(() => monthStart(date > today ? date : today));
+  const month = chosenMonth < currentMonth ? currentMonth : chosenMonth;
+  const [focused, setFocused] = useState(date > today ? date : today);
   const [retry, setRetry] = useState(0);
-  const [dateError, setDateError] = useState("");
   const [reply, setReply] = useState<{ key: string; slots: AvailabilityResponse["slotsByDate"]; error: boolean } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const calendar = useRef<HTMLDivElement>(null);
@@ -40,13 +40,15 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", dateCap
   const current = reply?.key === requestKey ? reply : null;
   const loading = !current;
   const slots = current?.slots ?? {};
-  const dayInView = Boolean(date && date.startsWith(month.slice(0, 7)));
+  const dayInView = Boolean(date >= today && date.startsWith(month.slice(0, 7)));
   const selectedTimes = dayInView ? slots[date] ?? [] : [];
   const last = shiftDate(shiftMonth(month, 1), -1);
   const end = shiftDate(mondayOf(last), 6);
+  const start = mondayOf(month) < today ? today : mondayOf(month);
+  const firstColumn = (new Date(`${start}T12:00:00Z`).getUTCDay() + 6) % 7 + 1;
   const dates: string[] = [];
-  for (let key = mondayOf(month); key <= end; key = shiftDate(key, 1)) dates.push(key);
-  const focusDate = dates.includes(focused) ? focused : month;
+  for (let key = start; key <= end; key = shiftDate(key, 1)) dates.push(key);
+  const focusDate = dates.includes(focused) ? focused : dates[0];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -63,8 +65,9 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", dateCap
 
   function moveMonth(amount: number) {
     const next = shiftMonth(month, amount);
+    if (disabled || next < currentMonth) return;
     setMonth(next);
-    setFocused(next);
+    setFocused(next < today ? today : next);
   }
 
   return <fieldset className="teacher-manual-choice teacher-lesson-picker">
@@ -74,13 +77,13 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", dateCap
         <div className="teacher-month-heading">
           <h3 id={monthId} ref={heading} tabIndex={-1} aria-live="polite">{dateLabel(month, { month: "long", year: "numeric" })}</h3>
           <TeacherPager
-            away={month !== monthStart(today)}
+            away={month !== currentMonth}
             headingRef={heading}
             nextDisabled={disabled}
-            onCurrent={() => { if (!disabled) { setMonth(monthStart(today)); setFocused(today); } }}
+            onCurrent={() => { if (!disabled) { setMonth(currentMonth); setFocused(today); } }}
             onNext={() => moveMonth(1)}
             onPrevious={() => moveMonth(-1)}
-            previousDisabled={disabled}
+            previousDisabled={disabled || month === currentMonth}
             unit="month"
           />
         </div>
@@ -94,8 +97,8 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", dateCap
             data-lesson-date={key}
             disabled={disabled}
             key={key}
+            style={key === start ? { gridColumnStart: firstColumn } : undefined}
             onClick={() => {
-              setDateError("");
               setFocused(key);
               if (!key.startsWith(month.slice(0, 7))) setMonth(monthStart(key));
               onChange({ date: key, time: "" });
@@ -104,7 +107,8 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", dateCap
               const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : event.key === "ArrowDown" ? 7 : event.key === "ArrowUp" ? -7 : null;
               if (step === null) return;
               event.preventDefault();
-              const next = shiftDate(key, step);
+              const candidate = shiftDate(key, step);
+              const next = candidate < today ? today : candidate;
               setFocused(next);
               if (!dates.includes(next)) setMonth(monthStart(next));
               requestAnimationFrame(() => calendar.current?.querySelector<HTMLButtonElement>(`[data-lesson-date="${next}"]`)?.focus({ preventScroll: true }));
@@ -127,37 +131,12 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", dateCap
             className="teacher-lesson-picker__slot"
             disabled={disabled}
             key={slot.startAt}
-            onClick={() => { setDateError(""); onChange({ date: portoDateKey(new Date(slot.startAt)), time: formatSlotTime(slot.startAt), startAt: slot.startAt }); }}
+            onClick={() => onChange({ date: portoDateKey(new Date(slot.startAt)), time: formatSlotTime(slot.startAt), startAt: slot.startAt })}
             type="button"
           >{formatSlotTime(slot.startAt)}</button>)}
-        </div> : <p>No online booking times on this day. You can enter another time below.</p> : <p>Choose a day to see its available times.</p>}
+        </div> : <p>No available times. Choose another day.</p> : <p>Choose a day to see its available times.</p>}
         {date && time ? <p className="teacher-lesson-picker__chosen">Chosen: <strong>{dateLabel(date, { day: "numeric", month: "short" })}, {time}</strong> · Porto time</p> : null}
       </div>
     </div>
-    <details className="teacher-lesson-picker__manual">
-      <summary>Enter another time</summary>
-      <p className="teacher-profile__note">You can add a lesson outside online booking hours, or record one already had. Booked lessons still keep their time.</p>
-      <div className="teacher-lesson-picker__fields">
-        <label><span>{dateCaption}</span><input
-          disabled={disabled}
-          max="9999-12-31"
-          onChange={event => {
-            const next = event.target.value;
-            if (next && !/^\d{4}-\d{2}-\d{2}$/.test(next)) {
-              setDateError("Choose a valid date with a four-digit year.");
-              onChange({ date: "", time: "" });
-              return;
-            }
-            setDateError("");
-            if (next) { setMonth(monthStart(next)); setFocused(next); }
-            onChange({ date: next, time });
-          }}
-          type="date"
-          value={date}
-        /></label>
-        <label><span>Time in Porto</span><input disabled={disabled} onChange={event => onChange({ date, time: event.target.value })} type="time" value={time} /></label>
-      </div>
-      {dateError ? <p className="teacher-inline-error" role="alert">{dateError}</p> : null}
-    </details>
   </fieldset>;
 }

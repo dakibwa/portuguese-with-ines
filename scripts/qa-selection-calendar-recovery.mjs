@@ -531,6 +531,7 @@ try {
       const state = await fixture(width, async (path, request) => {
         if (path === "/admin/bookings" && request.method() === "POST") { writes += 1; return { json: {} }; }
         if (path === "/admin/students") return { json: { students: [{ id: "rui", name: "Rui", email: "rui@example.invalid", phone: "", signedIn: true }], cardsAccepted: false } };
+        if (path === "/availability") return bookingDefaults(path);
         return teacherDefaults(path);
       });
       try {
@@ -541,12 +542,12 @@ try {
         await rui.getByRole("button", { name: "Lessons for Rui", exact: true }).click();
         // An unfinished student adds their lesson beneath the setup row.
         const form = rui.getByRole("region", { name: "Rui’s setup", exact: true }).locator(".teacher-manual-form");
-        await form.getByText("Enter another time", { exact: true }).click();
-        await form.getByLabel("Date", { exact: true }).fill("2026-10-06");
-        await form.getByLabel("Time in Porto", { exact: true }).fill("10:00");
+        await form.getByRole("button", { name: "Tuesday 6 October", exact: true }).click();
+        const chosenTime = form.getByRole("button", { name: "10:00 Porto time", exact: true });
+        await chosenTime.click();
         await form.getByRole("button", { name: /^Add lesson( and email student)?$/ }).click();
         await expect(page.getByRole("alert").filter({ hasText: unreadable })).toBeVisible();
-        await expect(form.getByLabel("Date", { exact: true })).toHaveValue("2026-10-06");
+        await expect(chosenTime).toHaveAttribute("aria-pressed", "true");
         await expect(rui.locator(".teacher-setup__notice")).toBeHidden();
         await check(state); assert.equal(writes, 1); cases += 1;
       } finally { await state.context.close(); }
