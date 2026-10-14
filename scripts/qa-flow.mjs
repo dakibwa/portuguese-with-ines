@@ -2906,7 +2906,10 @@ async function checkTermsDialog(targetPage, opener) {
 async function waitForOrientation(targetPage) {
   await targetPage.waitForFunction(
     () =>
-      !document.documentElement.classList.contains("booking-transitioning"),
+      !document.documentElement.classList.contains("booking-transitioning") &&
+      // The tab highlight has its own transition, after the page has opened.
+      !document.querySelector(".account-menu__thumb")?.getAnimations()
+        .some((animation) => animation.playState === "running"),
     null,
     { timeout: 2_000 }
   );
