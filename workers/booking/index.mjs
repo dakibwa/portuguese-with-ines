@@ -3529,6 +3529,18 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     return fail("That sequence or one of its times has just changed. Please reload and try again.", 409, request, env);
   }
 
+  // Needs you, as for a single lesson: only the rows this move wrote, each on
+  // the sequence it wrote, so a lesson kept inside 14 hours is never stamped.
+  try {
+    await env.DB.prepare(
+      `UPDATE bookings SET student_changed_at = ? WHERE series_id = ?
+         AND EXISTS (SELECT 1 FROM json_each(?) p WHERE json_extract(p.value, '$.id') = bookings.id
+           AND json_extract(p.value, '$.oldSequence') + 1 = bookings.sequence)`
+    ).bind(nowIso, seriesId, proposed).run();
+  } catch (error) {
+    console.warn("student-changed-at", seriesId, String(error));
+  }
+
   const placeholders = planned.map(() => "?").join(", ");
   const { results: updatedResults } = await env.DB.prepare(
     `SELECT * FROM bookings WHERE id IN (${placeholders}) ORDER BY starts_at`
@@ -3725,6 +3737,19 @@ async function handleReschedule(request, env, ctx, token) {
       return fail("That lesson has been cancelled, so it can't be moved.", 409, request, env);
     }
     return fail("That lesson has just changed. Please reload and try again.", 409, request, env);
+  }
+
+  /*
+   * Tell Inês the student changed it (Needs you, three days). A separate
+   * statement so the fee SQL above is untouched and a missing column only
+   * loses the note, never the change; the new sequence means it can never
+   * land on a later version someone else wrote.
+   */
+  try {
+    await env.DB.prepare("UPDATE bookings SET student_changed_at = ? WHERE id = ? AND sequence = ?")
+      .bind(now.toISOString(), row.id, row.sequence + 1).run();
+  } catch (error) {
+    console.warn("student-changed-at", row.id, String(error));
   }
 
   const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
@@ -5058,7 +5083,15 @@ async function handleAdmin(request, env, ctx, url, path) {
     // the database and the Worker are updated in.
     const lessonsQuery = (mark) => env.DB.prepare(
       `SELECT b.*, l.name AS lesson_name, COALESCE(s.nif, '') AS student_nif${mark ? ", COALESCE(s.mark, '') AS student_mark" : ""},
-         (COALESCE(s.awaiting_welcome, 0) = 1 AND COALESCE(s.password_hash, '') = '' AND s.google_sub IS NULL AND s.last_login_at IS NULL) AS student_awaiting_welcome
+         (COALESCE(s.awaiting_welcome, 0) = 1 AND COALESCE(s.password_hash, '') = '' AND s.google_sub IS NULL AND s.last_login_at IS NULL) AS student_awaiting_welcome,
+         -- A student's first lesson, for Needs you: the page only reads from
+         -- yesterday on, so it cannot tell for itself. Cancelled lessons never
+         -- count as earlier; rows from before accounts match by email. The
+         -- unary plus keeps SQLite on idx_bookings_student for the legacy
+         -- check; the window index would scan every earlier booking per row.
+         (b.student_id IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM bookings earlier WHERE earlier.student_id = b.student_id AND earlier.status = 'confirmed' AND earlier.starts_at < b.starts_at)
+           AND NOT EXISTS (SELECT 1 FROM bookings legacy WHERE legacy.student_id IS NULL AND legacy.student_email = b.student_email AND +legacy.status = 'confirmed' AND legacy.starts_at < b.starts_at)) AS first_lesson
        FROM bookings b
        JOIN lesson_types l ON l.id = b.lesson_type_id LEFT JOIN students s ON s.id = b.student_id
        WHERE b.starts_at > ? ORDER BY b.starts_at`
@@ -5072,7 +5105,7 @@ async function handleAdmin(request, env, ctx, url, path) {
       ({ results } = await lessonsQuery(false));
     }
     const cutoff = new Date(Date.now() - 23 * 3600000).toISOString();
-    const { results: reconciliation } = await env.DB.prepare(`SELECT id, reference, payment_status, same_day_fee_status FROM bookings
+    const { results: reconciliation } = await env.DB.prepare(`SELECT id, reference, payment_status, same_day_fee_status, student_name, starts_at, stripe_payment_intent, same_day_fee_payment_intent FROM bookings
       WHERE (payment_status = 'processing' AND (charge_started_at IS NULL OR charge_started_at < ?))
          OR (same_day_fee_status = 'processing' AND (same_day_fee_started_at IS NULL OR same_day_fee_started_at < ?))
          OR EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = bookings.id AND status = 'pending')`)
@@ -5318,6 +5351,14 @@ async function handleAdmin(request, env, ctx, url, path) {
       .first();
     if (!student) return fail("That student could not be found.", 404, request, env);
     if (!hasEmail(student)) return fail("Add their email first, so the welcome has somewhere to go.", 400, request, env);
+    // Needs you asks for the welcome only while it is still owed. A second
+    // device pressing a moment later would otherwise send a second welcome
+    // with a fresh sign-in link, and spend the hourly allowance doing it. The
+    // Students card sends no such flag, so it can still send one deliberately.
+    const welcomeBody = await readJson(request);
+    if (welcomeBody.onlyIfWaiting === true && !awaitingWelcome(student)) {
+      return fail("Their welcome has already been sent.", 409, request, env);
+    }
     if (!await takeRateLimit(env, `welcome:${student.id}`, 3, 3600)) {
       return fail("A link was sent to them recently. Please wait an hour before sending another.", 429, request, env);
     }
@@ -5541,6 +5582,15 @@ async function handleAdmin(request, env, ctx, url, path) {
       .run();
 
     if (!(moved?.meta?.changes > 0)) return fail("That lesson or time has just changed. Please reload.", 409, request, env);
+
+    // Her own move is not news to her: it clears the student's change on the
+    // version she wrote, and only that one.
+    try {
+      await env.DB.prepare("UPDATE bookings SET student_changed_at = NULL WHERE id = ? AND sequence = ?")
+        .bind(row.id, row.sequence + 1).run();
+    } catch (error) {
+      console.warn("student-changed-at", row.id, String(error));
+    }
 
     const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
     const settings = await loadSettings(env);

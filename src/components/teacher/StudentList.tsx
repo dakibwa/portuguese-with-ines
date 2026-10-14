@@ -36,8 +36,7 @@ function nextLesson(at: string) {
  * Her students at a glance, for the move onto the site (12 October 2026,
  * Dan): who has signed in, whose lessons a card pays for, and what comes
  * next, one small card each. The schedule reads the list with the page and
- * after every lesson she adds, so the count of those still to bring in shows
- * before she opens it and an open list is never stale.
+ * after every lesson she adds, so an open list is never stale.
  */
 /**
  * Her own price for them, when she has set one, read as every length choice

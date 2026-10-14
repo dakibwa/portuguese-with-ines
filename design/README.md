@@ -365,9 +365,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   beside its date heading.
   On narrow screens only the tab strip scrolls horizontally. Arrow keys, Home
   and End move between tabs. Unsaved hours and selected dates survive tab changes;
-  an unsaved-hours dot stays visible on its tab, and `Students` carries a dot
-  while someone is still to bring in. Google Meet uses its logo, with an
-  accessible name and its connection-attention dot.
+  an unsaved-hours dot stays visible on its tab; nothing else marks a tab,
+  because what waits on her is said once, in `Needs you`. Google Meet uses its
+  logo, with an accessible name.
 - Keep help short (13 October 2026, Dan: "remove all the redundant text"). The
   active tab supplies the page name; avoid repeating it under an eyebrow, and
   say a thing once. Any helpful list uses the confirm step's splat dabs
@@ -415,6 +415,22 @@ usual lesson starts and days off; avoid a wall of administration forms.
   which opens that lesson's own dialog to move or cancel it, keeping her
   draft (13 October 2026, Dan: "it should show the person's lesson card for
   Inês to move if she needs to").
+- `Needs you` (14 October 2026, Phase 2) is the one place for what waits on her.
+  It sits on `Timetable`, under the next-lesson strip and above the week: a
+  `Needs you` eyebrow over booked-lesson cards, each saying what happened and
+  when, with at most one action. It holds:
+  - Google Meet needing to be connected or reconnected (`Reconnect` opens the
+    Google Meet tab);
+  - a payment Stripe never confirmed (`Open in Stripe`);
+  - a student she set up and hasn't emailed whose lesson is within a week
+    (coral `Send welcome email`);
+  - a lesson a student changed (`View`) or cancelled in the last three days;
+  - a new student's first lesson within a week (`View`).
+  What waits on a student (a pay link, a first sign-in, a card) stays on their
+  card and in Receipts. Items clear themselves when done or when their time
+  passes; there is nothing to dismiss. A weekly run is one card. More than four
+  fold beneath `2 more`; with nothing waiting it isn't shown. It replaced the
+  payment notice above every tab and the Students and Google Meet tab dots.
 - Show the full working week on desktop and in a panel wide enough to read it.
   On phones, keep the displayed days in a compact selector
   above a spacious single-day timetable and that day's `Day off` switch, with
@@ -436,7 +452,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   it needs), two dabs (every lesson goes to her Google Calendar with its Meet
   link; move or cancel lessons here, not in Google), then `Open Google
   Calendar` with `Reconnect Google Meet` as a quiet link, or a coral connect
-  when it needs her, and `Share your calendar` folded beneath. Its tab shows a dot when the connection needs attention.
+  when it needs her, and `Share your calendar` folded beneath. When the connection needs her, `Needs you` on her Timetable says so.
   Returning from Google opens this tab with the connection result.
 - Every booked lesson shows its time, student and explicit `Online` or `In Porto`
   label in both layouts, including 60-minute blocks. Keep the location icons and

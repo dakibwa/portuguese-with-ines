@@ -13,8 +13,9 @@ import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
 import { StudentDialog, type StudentDialogStart } from "@/components/teacher/StudentDialog";
-import { StudentList, needsHer } from "@/components/teacher/StudentList";
+import { StudentList } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
+import { NeedsYou } from "@/components/teacher/NeedsYou";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
@@ -26,9 +27,12 @@ import {
   fetchStudents,
   saveDayOff,
   saveRules,
+  sendStudentWelcome,
   type AdminBooking,
   type AdminStudent,
   type AvailabilityException,
+  type GoogleMeetConnection,
+  type PaymentReview,
 } from "@/lib/admin-api";
 import { clearSession, fetchMe, readSession, subscribeToSession, type Student } from "@/lib/auth-api";
 import { portoTimeToUtc } from "@/lib/booking-api";
@@ -45,6 +49,7 @@ import {
   hoursFromRules,
   hoursProblem,
   mondayOf,
+  needsYou,
   removeSpan,
   serialiseHours,
   shiftDate,
@@ -77,7 +82,8 @@ export function TeacherSchedule() {
   );
   const [activeTab, setActiveTab] = useState<TeacherTab>("week");
   const editing = activeTab === "hours";
-  const [meetAttention, setMeetAttention] = useState(false);
+  // Her Google Meet connection, read by its tab and listed in Needs you when it needs her.
+  const [meet, setMeet] = useState<GoogleMeetConnection | null>(null);
   const [savedHours, setSavedHours] = useState<WeekHours>(emptyWeek);
   const [draftHours, setDraftHours] = useState<WeekHours>(emptyWeek);
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
@@ -88,6 +94,8 @@ export function TeacherSchedule() {
   const [dayNote, setDayNote] = useState<{ error: boolean; text: string }>();
   const [interval, setIntervalMinutes] = useState(30);
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
+  // Lessons students cancelled: the timetable drops them, Needs you says so for three days.
+  const [studentCancellations, setStudentCancellations] = useState<AdminBooking[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(
     null,
   );
@@ -100,9 +108,9 @@ export function TeacherSchedule() {
   const [students, setStudents] = useState<{ list: AdminStudent[]; cardsAccepted: boolean } | null>(null);
   const [studentsError, setStudentsError] = useState("");
   // A student chosen from her list, put straight into the add-a-lesson form.
-  const [paymentReview, setPaymentReview] = useState<
-    { id: string; reference: string }[]
-  >([]);
+  const [paymentReview, setPaymentReview] = useState<PaymentReview[]>([]);
+  // The student whose welcome she has just pressed, while it is sending.
+  const [welcoming, setWelcoming] = useState("");
   const [initialised, setInitialised] = useState(false);
   const [scheduleError, setScheduleError] = useState("");
   const [scheduleAttempt, setScheduleAttempt] = useState(0);
@@ -133,6 +141,10 @@ export function TeacherSchedule() {
   const hoursDirty = serialiseHours(savedHours) !== serialiseHours(draftHours);
   const invalidHours = hoursProblem(draftHours);
   const affectedLessons = useMemo(() => bookingsAffectedByHours(bookings, savedHours, draftHours, interval, now), [bookings, savedHours, draftHours, interval, now]);
+  const needs = useMemo(
+    () => needsYou({ now, meet, payments: paymentReview, students: students?.list ?? [], lessons: bookings, cancellations: studentCancellations }),
+    [now, meet, paymentReview, students, bookings, studentCancellations],
+  );
 
   const resetAccount = useCallback(() => {
     accountGeneration.current += 1;
@@ -141,9 +153,11 @@ export function TeacherSchedule() {
     setMe(null);
     setInitialised(false);
     setActiveTab("week");
-    setMeetAttention(false);
+    setMeet(null);
     setSelectedBooking(null);
     setBookings([]);
+    setStudentCancellations([]);
+    setWelcoming("");
     setPaymentReview([]);
     setSavedHours(emptyWeek);
     setDraftHours(emptyWeek);
@@ -249,11 +263,15 @@ export function TeacherSchedule() {
     void reloadStudents();
   }, [reloadStudents]);
 
-  const reloadBookings = useCallback(async () => {
+  // A quiet read is a background refresh: if it fails, the lessons already on
+  // screen stay, rather than giving way to an error she did not ask for.
+  const reloadBookings = useCallback(async (quiet = false) => {
     if (!token || readSession() !== token) return;
     const request = ++bookingRequest.current;
-    setBookingsLoading(true);
-    setBookingsError("");
+    if (!quiet) {
+      setBookingsLoading(true);
+      setBookingsError("");
+    }
     try {
       // Include an overnight lesson that began before the displayed week.
       const fromDate = [
@@ -268,10 +286,14 @@ export function TeacherSchedule() {
       setBookings(
         result.bookings.filter((booking) => booking.status === "confirmed"),
       );
+      setStudentCancellations(
+        result.bookings.filter((booking) => booking.status === "cancelled" && booking.cancelled_by === "student"),
+      );
       setBookingsShown(true);
+      setBookingsError("");
       setPaymentReview(result.manualPaymentReconciliation ?? []);
     } catch (caught) {
-      if (request === bookingRequest.current)
+      if (request === bookingRequest.current && !quiet)
         setBookingsError(
           caught instanceof Error
             ? caught.message
@@ -285,6 +307,48 @@ export function TeacherSchedule() {
   useEffect(() => {
     void reloadBookings();
   }, [reloadBookings]);
+
+  // Nothing polls, so a laptop left open all afternoon would never hear of a
+  // change or cancellation. Coming back after five minutes or more reads again.
+  const hiddenAt = useRef(0);
+  useEffect(() => {
+    const returned = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt.current = Date.now();
+        return;
+      }
+      const away = hiddenAt.current ? Date.now() - hiddenAt.current : 0;
+      hiddenAt.current = 0;
+      if (away < 5 * 60_000) return;
+      setNow(new Date());
+      void reloadBookings(true);
+      void reloadStudents();
+    };
+    document.addEventListener("visibilitychange", returned);
+    return () => document.removeEventListener("visibilitychange", returned);
+  }, [reloadBookings, reloadStudents]);
+
+  /** Her welcome for a student from Needs you, only while it is still owed. */
+  async function sendWelcome(student: AdminStudent) {
+    if (welcoming) return;
+    const account = accountGeneration.current;
+    setWelcoming(student.id);
+    setError("");
+    setStatus("");
+    try {
+      await sendStudentWelcome(token, student.id, { onlyIfWaiting: true });
+      if (account !== accountGeneration.current) return;
+      setStatus(`Welcome sent to ${student.name.trim().split(/\s+/)[0]}.`);
+    } catch (caught) {
+      if (account !== accountGeneration.current) return;
+      setError(caught instanceof Error ? caught.message : "The welcome couldn’t be sent.");
+    } finally {
+      if (account === accountGeneration.current) setWelcoming("");
+    }
+    // Either way the list reads afresh, so a welcome another device sent leaves too.
+    void reloadStudents();
+    calendarTitleRef.current?.focus({ preventScroll: true });
+  }
 
   useEffect(() => {
     const dirty = hoursDirty || dayChanges.size > 0;
@@ -556,7 +620,7 @@ export function TeacherSchedule() {
   return (
     <div className="teacher-workspace">
       <div className="teacher-tools-header">
-        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} studentsWaiting={(students?.list ?? []).filter(student => needsHer(student, Boolean(students?.cardsAccepted))).length} meetAttention={meetAttention} onSelect={setActiveTab} />
+        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} onSelect={setActiveTab} />
         <button
           className="teacher-sign-out"
           disabled={savingDays || savingHours}
@@ -566,20 +630,6 @@ export function TeacherSchedule() {
           Sign out
         </button>
       </div>
-      {paymentReview.length ? (
-        <div className="teacher-inline-notice" role="status">
-          <AlertCircle size={19} aria-hidden="true" />
-          <p>
-            {paymentReview.length}{" "}
-            {paymentReview.length === 1
-              ? "payment or refund needs"
-              : "payments or refunds need"}{" "}
-            review: {paymentReview.map((item) => item.reference).join(", ")}.
-            Review these in Stripe before retrying. Their lessons remain locked
-            until the result is confirmed.
-          </p>
-        </div>
-      ) : null}
       {error ? (
         <div className="teacher-inline-error" role="alert">
           {error}
@@ -596,6 +646,19 @@ export function TeacherSchedule() {
       {activeTab === "week" || editing ? <>
       {activeTab === "week" && bookingsShown ? (
         <NextLesson bookings={bookings} now={now} onOpen={setSelectedBooking} />
+      ) : null}
+      {activeTab === "week" && bookingsShown ? (
+        <NeedsYou
+          items={needs}
+          sending={welcoming}
+          onMeet={() => {
+            // Google's own sign-in starts from the Google Meet tab, where it is proven.
+            document.getElementById("teacher-tab-meet")?.focus({ preventScroll: true });
+            setActiveTab("meet");
+          }}
+          onView={setSelectedBooking}
+          onWelcome={(student) => void sendWelcome(student)}
+        />
       ) : null}
 
       <section className={`teacher-week${editing ? " teacher-week--editing" : ""}`} aria-labelledby="teacher-week-title">
@@ -795,7 +858,7 @@ export function TeacherSchedule() {
         {activeTab === "receipts" ? <ReceiptsTab token={token} today={today} /> : null}
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "meet"}>
-        <TeacherMeetConnection token={token} onAttentionChange={setMeetAttention} />
+        <TeacherMeetConnection token={token} onConnectionChange={setMeet} />
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "expressions"}>
         {activeTab === "expressions" ? <ExpressionsTab accountId={me?.id ?? "teacher"} token={token} /> : null}

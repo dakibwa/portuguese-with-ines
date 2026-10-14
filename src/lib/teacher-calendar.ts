@@ -1,7 +1,10 @@
 import type {
   AdminBooking,
+  AdminStudent,
   AvailabilityException,
   AvailabilityRule,
+  GoogleMeetConnection,
+  PaymentReview,
 } from "./admin-api";
 
 export const WEEKDAYS = [
@@ -388,4 +391,97 @@ export function bookingSegments(
     }
     return result;
   });
+}
+
+/** How long a change or cancellation by a student stays in Needs you. */
+export const NEEDS_YOU_RECENT_HOURS = 72;
+/** How close a lesson must be for its welcome or first-lesson note to show. */
+export const NEEDS_YOU_AHEAD_DAYS = 7;
+
+/**
+ * One thing waiting on Inês (Phase 2, 14 October 2026). Every kind clears
+ * itself, so there is nothing stored and nothing to dismiss.
+ */
+export type NeedsYouItem =
+  | { kind: "meet"; key: "meet"; reconnect: boolean }
+  | { kind: "payment"; key: string; review: PaymentReview; part: "lesson" | "fee" | "refund" }
+  | { kind: "welcome"; key: string; student: AdminStudent; at: string }
+  | { kind: "changed"; key: string; booking: AdminBooking; count: number; first: boolean }
+  | { kind: "cancelled"; key: string; booking: AdminBooking; count: number }
+  | { kind: "first"; key: string; booking: AdminBooking };
+
+/** Students she set up with no email hold this in place of one; nothing is ever shown or sent to it. */
+const NO_EMAIL_YET = "no-email:";
+
+/**
+ * What waits on her, from reads the page already makes: Google Meet first,
+ * then payments in the Worker's order, then everything else by lesson time.
+ * A lesson appears once. `lessons` are her confirmed lessons from yesterday
+ * on; `cancellations` the cancelled rows, which the timetable drops.
+ */
+export function needsYou({ now, meet, payments, students, lessons, cancellations }: {
+  now: Date;
+  meet: GoogleMeetConnection | null;
+  payments: PaymentReview[];
+  students: AdminStudent[];
+  lessons: AdminBooking[];
+  cancellations: AdminBooking[];
+}): NeedsYouItem[] {
+  const at = now.getTime();
+  const recent = (stamp?: string | null) => {
+    const time = Date.parse(stamp ?? "");
+    return Number.isFinite(time) && at - time < NEEDS_YOU_RECENT_HOURS * 3_600_000;
+  };
+  const ahead = (start?: string | null) => {
+    const time = Date.parse(start ?? "");
+    return Number.isFinite(time) && time > at;
+  };
+  const soon = (start?: string | null) =>
+    ahead(start) && Date.parse(start!) - at <= NEEDS_YOU_AHEAD_DAYS * 86_400_000;
+  const real = (booking: AdminBooking) => !String(booking.student_email ?? "").startsWith(NO_EMAIL_YET);
+  // A weekly run is one card: its lessons together, the earliest speaking for them.
+  const grouped = (rows: AdminBooking[], keyOf: (row: AdminBooking) => string) => {
+    const groups = new Map<string, AdminBooking[]>();
+    for (const row of [...rows].sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))) {
+      const key = keyOf(row);
+      groups.set(key, [...(groups.get(key) ?? []), row]);
+    }
+    return [...groups.values()];
+  };
+
+  const first: NeedsYouItem[] = [];
+  if (meet?.configured && (meet.needsReconnect || !meet.connected))
+    first.push({ kind: "meet", key: "meet", reconnect: Boolean(meet.needsReconnect) });
+  for (const review of payments) {
+    const part = review.payment_status === "processing" ? "lesson" : review.same_day_fee_status === "processing" ? "fee" : "refund";
+    first.push({ kind: "payment", key: `payment:${review.id}`, review, part });
+  }
+
+  // Each is placed by the lesson it concerns, soonest first.
+  const timed: { time: number; item: NeedsYouItem }[] = [];
+  for (const student of students) {
+    const email = student.email ?? "";
+    if (student.awaitingWelcome && email && !email.startsWith(NO_EMAIL_YET) && student.nextLessonAt && soon(student.nextLessonAt))
+      timed.push({ time: Date.parse(student.nextLessonAt), item: { kind: "welcome", key: `welcome:${student.id}`, student, at: student.nextLessonAt } });
+  }
+
+  const confirmed = lessons.filter((row) => row.status === "confirmed" && real(row));
+  const changedRows = confirmed.filter((row) => row.student_changed_at && recent(row.student_changed_at) && ahead(row.starts_at));
+  const shown = new Set<string>();
+  for (const group of grouped(changedRows, (row) => row.series_id ? `${row.series_id}|${row.student_changed_at}` : row.id)) {
+    const [booking] = group;
+    for (const row of group) shown.add(row.id);
+    timed.push({ time: Date.parse(booking.starts_at), item: { kind: "changed", key: `changed:${booking.id}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
+  }
+  const cancelledRows = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at) && ahead(row.starts_at));
+  for (const group of grouped(cancelledRows, (row) => row.series_id || row.id)) {
+    const [booking] = group;
+    timed.push({ time: Date.parse(booking.starts_at), item: { kind: "cancelled", key: `cancelled:${booking.id}`, booking, count: group.length } });
+  }
+  for (const booking of confirmed) {
+    if (booking.first_lesson && !booking.added_by_teacher && soon(booking.starts_at) && !shown.has(booking.id))
+      timed.push({ time: Date.parse(booking.starts_at), item: { kind: "first", key: `first:${booking.id}`, booking } });
+  }
+
+  return [...first, ...timed.sort((a, b) => a.time - b.time).map((entry) => entry.item)];
 }
