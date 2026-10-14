@@ -441,7 +441,11 @@ usual lesson starts and days off; avoid a wall of administration forms.
   `Getting started` is a working interface, not only a progress list (Dan's
   follow-up, 14 October). Each compact row has their name and splat, six
   painted dabs — Email, Price, Lessons, Welcome, Signed in and Card — and
-  `Yours` or `Theirs` beside the next action. Standard prices are valid and
+  `Yours` or `Theirs` beside the next action. The collapsed row uses one band
+  when space permits. In a narrower panel, name and action share the first
+  line and the steps sit directly below; they never become three separated
+  sections. Only the opened editor takes extra height and spans the row.
+  Standard prices are valid and
   count as ready; a custom price is optional. A confirmed past lesson counts
   for Lessons, so finishing a course does not create a new onboarding task.
   Her steps expand in place: edit details, change prices, add lessons or send
