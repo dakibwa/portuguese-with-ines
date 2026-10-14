@@ -355,12 +355,13 @@ time. Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
-The tools bar groups `Needs you`, `Timetable`, `Weekly hours`, `Time off`,
-`Students`, `Receipts`, `Expressions` and `Profile`, opening on `Timetable`.
+The tools bar groups `Students`, `Timetable`, `Weekly hours`, `Time off`,
+`Receipts`, `Expressions` and `Profile`, opening on `Timetable`.
 Profile holds her sign-in email change, password reset link, Google Meet
 connection and Sign out. Email changes use the existing new-address confirmation
 flow; password changes use the existing reset email. Google callbacks open Profile
-directly. `Needs you` has its own tab and a three-card strip under her next lesson.
+directly. Students combines setup and ongoing care; the Timetable retains a
+three-card strip for operational notices under her next lesson.
 
 Lessons only belong to students (13 October 2026, Dan: no loose lessons).
 `POST /admin/bookings` names the student by `studentId` (their account, which
@@ -462,12 +463,13 @@ refused (409) and moves nothing. The student's own change of address
 (`/me/email/confirm`) still moves only lessons still to come, and cannot apply
 to an account that has never signed in.
 
-### Needs you
+### Students and attention
 
-`Needs you` (14 October 2026) is the first tab: To do counts only her actions,
-while Getting started shows six actionable setup steps. The Timetable keeps the
-first three To do cards, with `See all in Needs you` when there are more.
-The strip stays absent when empty; the full tab says `Nothing needs you right now.`
+`Students` (14 October 2026) combines setup and ongoing care. Each student
+appears once, with inline setup while incomplete and a regular student row
+when ready. The Timetable keeps up to three operational notices, with
+`See all in Students` when there are more. It does not repeat onboarding tasks.
+The strip stays absent when empty.
 It is built in the browser by the pure `needsYou()` in
 `src/lib/teacher-calendar.ts` from reads the page already makes:
 
@@ -504,8 +506,12 @@ once. The internal `no-email:` placeholder never appears; their email reads
 as empty and the action opens their details, never sends. Declined
 cards stay with the student and in Receipts. Nothing is dismissed: items clear
 when done, after 72 hours, or once the lesson begins; the windows are
-`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. The full tab shows them
-all; its badge is this list's length. Returning after five minutes away reloads lessons and
+`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. `studentWorkspace()` groups operational notices by student ID, or an
+unambiguous real email for legacy bookings. Payments match through their
+booking ID; unmatched notices and Meet remain above the list. It ranks payments,
+recent changes, Inês's setup work, first lessons, waiting students, then ready
+students. The Students badge counts each actionable student once, plus general
+notices; it excludes waiting on student sign-in or cards. Returning after five minutes away reloads lessons and
 students, quietly: if the read fails, the lessons on screen stay and no error
 replaces them. Nothing polls.
 
@@ -514,9 +520,9 @@ The views add no endpoint or stored setup flags. A first welcome uses
 been sent.` before spending the rate limit once the student has been welcomed
 or signed in. The Students card can still re-send deliberately.
 
-Getting started uses the pure `gettingStarted()` selector over the same read:
-Email, Price, Lessons, Welcome, Signed in and Card. Filled/outlined dabs show
-completion. Standard prices count as ready; setting a custom price is optional.
+Inline setup uses the pure `gettingStarted()` selector over the same read:
+Email, Price, Lessons, Welcome, Signed in and Card. Checks mark completed
+steps, an outline marks the next action, and a clock marks waiting on a student. Standard prices count as ready; setting a custom price is optional.
 `hasLessons` includes confirmed past lessons and legacy lessons matched by email,
 so returning students do not appear to need a first lesson. `hasCard` is returned
 from the saved Stripe customer and payment method, consistent with `/me`.
@@ -527,11 +533,10 @@ Lesson creation includes a calendar and available start times from the existing
 availability read, refreshed for the chosen lesson length. Choosing a slot
 fills the date and Porto time. Manual entry remains available for times Inês
 arranges herself; the existing creation endpoint still checks clashes and
-validates a weekly run. A saved change refreshes the student list and timetable. To do can open the same
-inline task; the student's name opens their details in that row, with the
-complete profile still available in Students. Welcomes remain a separate
-explicit action. Yours marks her work; Theirs marks sign-in
-and card. `Send the link again` deliberately omits `onlyIfWaiting`, never sends
+validates a weekly run. A saved change refreshes the student list and timetable.
+Each step opens its editor in the row. The student's name opens their full
+profile and lesson history, during and after setup. Welcomes remain a separate explicit action. Each row says
+what is needed; help uses short bullets. Sign-in and card belong to the student. `Send the link again` deliberately omits `onlyIfWaiting`, never sends
 without an email, and surfaces the existing 3-per-hour endpoint's 429 message.
 Waiting on students adds no badge count. All writes use the existing teacher
 permission path and validation.

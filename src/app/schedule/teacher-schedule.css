@@ -2855,23 +2855,24 @@
 /* Needs you: her actions and each student's setup steps, 14 October. */
 .teacher-tab-count { display: inline-grid; place-items: center; min-width: 1.1rem; height: 1.1rem; padding-inline: 0.18rem; border-radius: var(--squiggle-chip); background: var(--coral-action); color: var(--paper-light); font-size: 0.63rem; line-height: 1; }
 .teacher-needs-you > section { display: grid; gap: 0.65rem; min-width: 0; }
-.teacher-needs-you--full { gap: 2rem; }
-.teacher-needs-you--full .teacher-lesson-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); align-items: start; }
 .teacher-setup-list { display: grid; gap: 0.5rem; list-style: none; padding: 0; margin: 0; container: setup-list / inline-size; }
 .teacher-setup { position: relative; display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(18rem, 2fr) max-content; align-items: center; gap: 0.35rem 1rem; padding: 0.55rem 0.8rem; border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet); }
 .teacher-setup__profile { display: flex; align-items: center; gap: 0.6rem; border: 0; padding: 0; min-width: 0; text-align: left; background: none; color: inherit; font: inherit; cursor: pointer; }
 .teacher-setup__profile strong { overflow-wrap: anywhere; }
+.teacher-setup__identity { display: grid; gap: 0.15rem; min-width: 0; }
+.teacher-setup__status { color: var(--lavender-ink); font-size: 0.66rem; font-weight: 500; line-height: 1.3; }
 .teacher-setup__profile::after { content: ""; position: absolute; z-index: 1; inset: 0; border-radius: var(--squiggle-panel); }
 .teacher-setup:has(.teacher-setup__profile:focus-visible), .teacher-setup:hover { outline: 2px solid var(--blue); outline-offset: 2px; }
 .teacher-setup__profile:focus-visible { outline: none; box-shadow: none; }
 .teacher-setup__steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.35rem; padding: 0; margin: 0; list-style: none; }
 .teacher-setup__steps:has(li:last-child:nth-child(5)) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .teacher-setup__steps li { display: grid; justify-items: center; gap: 0.35rem; font-size: 0.7rem; white-space: nowrap; }
-.teacher-setup__steps i { width: 15px; height: 15px; border: 1.5px solid var(--blue); border-radius: 40% 60% 34% 66% / 55% 32% 68% 45%; transform: rotate(-12deg); }
-.teacher-setup__steps .is-done i { background: var(--blue); }
+.teacher-setup__steps i { display: grid; place-items: center; width: 15px; height: 15px; border: 1.5px solid var(--blue); border-radius: 40% 60% 34% 66% / 55% 32% 68% 45%; transform: rotate(-12deg); }
+.teacher-setup__steps i > svg { transform: rotate(12deg); }
+.teacher-setup__steps .is-done i { background: var(--blue); color: var(--paper-light); }
+.teacher-setup__steps .is-waiting i { border-color: transparent; }
 .teacher-setup__steps [aria-current="step"] { font-weight: 700; }
 .teacher-setup__action { display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem; }
-.teacher-setup__action > span { font-size: 0.7rem; color: var(--lavender-ink); }
 .teacher-setup__action .button { position: relative; z-index: 1; }
 
 /* Inês's Profile: sign-in details and Google Meet together, 14 October. */
@@ -2902,6 +2903,7 @@
 .teacher-setup--inline .teacher-setup__profile::after { content: none; }
 .teacher-setup--inline .teacher-setup__profile { min-height: 44px; }
 .teacher-setup--inline .teacher-setup__steps button { display: grid; justify-items: center; align-content: center; gap: 0.35rem; min-width: 44px; min-height: 44px; border: 0; border-radius: var(--squiggle-field); padding: 0.3rem; background: none; color: inherit; font: inherit; cursor: pointer; }
+.teacher-setup--inline .teacher-setup__steps .is-next button { background: var(--lavender-soft); box-shadow: inset 0 0 0 1px var(--rule); }
 .teacher-setup--inline .teacher-setup__steps button:hover,
 .teacher-setup--inline .teacher-setup__steps button[aria-expanded="true"] { background: var(--lavender-soft); }
 .teacher-setup--inline .teacher-setup__steps button:focus-visible,
@@ -2921,6 +2923,8 @@
 .teacher-setup__body .teacher-dialog-actions { margin-top: 0; }
 .teacher-setup__email { margin: 0; font-size: 0.8rem; overflow-wrap: anywhere; }
 .teacher-setup__notice { grid-column: 1 / -1; margin: 0; }
+.teacher-setup__attention { grid-column: 1 / -1; min-width: 0; }
+.teacher-setup__body .teacher-setup__help { margin: 0; font-size: 0.78rem; }
 @container setup-list (max-width: 48rem) {
   .teacher-setup { grid-template-columns: minmax(0, 1fr) max-content; }
   .teacher-setup__action { grid-column: 2; grid-row: 1; }
@@ -2930,7 +2934,6 @@
   .teacher-setup__profile { gap: 0.45rem; font-size: 0.9rem; }
   .teacher-setup__action { gap: 0.35rem; }
   .teacher-setup__action .button { padding-inline: 0.65rem; font-size: 0.58rem; }
-  .teacher-setup__action > span { font-size: 0.62rem; }
   .teacher-setup--inline .teacher-setup__steps { gap: 0.15rem; }
   .teacher-setup--inline .teacher-setup__steps li { min-width: 0; font-size: 0.6rem; }
   .teacher-setup--inline .teacher-setup__steps button { min-width: 0; width: 100%; padding-inline: 0; }
@@ -2974,4 +2977,29 @@
 }
 @container (min-width: 34rem) {
   .teacher-lesson-picker__layout { grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 1.5rem; }
+}
+
+/* One ranked student list; completed setup becomes a compact student row. */
+.teacher-students__order { margin: 0; color: var(--lavender-ink); font-size: 0.72rem; }
+.teacher-student--row { grid-template-columns: minmax(10rem, 1fr) minmax(14rem, 2fr) max-content; grid-template-rows: auto; align-items: center; gap: 0.5rem 1rem; padding: 0.65rem 0.8rem; }
+.teacher-student--row .teacher-student__profile { grid-column: auto; gap: 0.6rem; }
+.teacher-student--row .teacher-student__avatar.account-avatar { width: 2rem; height: 2rem; font-size: 0.8rem; }
+.teacher-student--row .teacher-student__facts { grid-column: auto; margin: 0; font-size: 0.72rem; }
+.teacher-student--row .teacher-student__action { grid-column: auto; border: 0; padding: 0; align-self: center; }
+.teacher-student__label { color: var(--blue); font-size: 0.65rem; font-weight: 700; }
+.teacher-student__attention { position: relative; z-index: 2; grid-column: 1 / -1; min-width: 0; }
+.teacher-student-notices { position: relative; z-index: 2; margin: 0; }
+.teacher-student-notices .teacher-lesson-card { flex-wrap: wrap; padding: 0.5rem 0.65rem; }
+.teacher-student-notices .teacher-lesson-card__who { flex: 999 1 11rem; text-wrap: pretty; }
+.teacher-student-notices .teacher-lesson-card .button { flex: 1 0 auto; }
+@container setup-list (max-width: 48rem) {
+  .teacher-student--row { grid-template-columns: minmax(0, 1fr) max-content; }
+  .teacher-student--row .teacher-student__action { grid-column: 2; grid-row: 1; }
+  .teacher-student--row .teacher-student__facts { grid-column: 1 / -1; }
+}
+@container setup-list (max-width: 30rem) {
+  .teacher-student--row .teacher-student__action .button { padding-inline: 0.65rem; font-size: 0.58rem; }
+  .teacher-student--row .teacher-student__name { font-size: 0.9rem; }
+  .teacher-student--row .teacher-student__open { display: none; }
+  .teacher-student--row .teacher-student__profile { grid-template-columns: auto minmax(0, 1fr); }
 }

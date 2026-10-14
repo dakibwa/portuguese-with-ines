@@ -446,6 +446,71 @@ export function gettingStarted(students: AdminStudent[], cardsAccepted = true): 
   });
 }
 
+export type StudentWorkspaceRow = {
+  student: AdminStudent;
+  setup?: StudentSetup;
+  items: NeedsYouItem[];
+};
+
+/** One student once: her operational work first, then setup and the students already ready. */
+export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[], cardsAccepted: boolean, bookings: AdminBooking[]): {
+  rows: StudentWorkspaceRow[];
+  general: NeedsYouItem[];
+  attentionCount: number;
+} {
+  const setup = new Map(gettingStarted(students, cardsAccepted).map(row => [row.student.id, row]));
+  const rows: StudentWorkspaceRow[] = students.map(student => ({ student, setup: setup.get(student.id), items: [] }));
+  const byId = new Map(rows.map(row => [row.student.id, row]));
+  const byBooking = new Map(bookings.map(booking => [booking.id, booking]));
+  const byEmail = new Map<string, StudentWorkspaceRow | null>();
+  const realEmail = (value: string) => {
+    const email = value.trim().toLowerCase();
+    return email && !email.startsWith(NO_EMAIL_YET) ? email : "";
+  };
+  for (const row of rows) {
+    const email = realEmail(row.student.email);
+    // An ambiguous address never guesses which student owns a payment or lesson.
+    if (email) byEmail.set(email, byEmail.has(email) ? null : row);
+  }
+
+  const general: NeedsYouItem[] = [];
+  for (const item of items) {
+    // These are the row's setup steps, rather than duplicate task cards.
+    if (item.kind === "email" || item.kind === "lessons" || item.kind === "welcome") continue;
+    const booking = item.kind === "payment" ? byBooking.get(item.review.id) : "booking" in item ? item.booking : undefined;
+    const row = booking && (booking.student_id ? byId.get(booking.student_id) : byEmail.get(realEmail(booking.student_email)));
+    if (row) row.items.push(item);
+    else general.push(item);
+  }
+
+  const stamp = (value?: string | null, fallback = Infinity) => {
+    const time = Date.parse(value ?? "");
+    return Number.isFinite(time) ? time : fallback;
+  };
+  const priority = (row: StudentWorkspaceRow) => {
+    if (row.items.some(item => item.kind === "payment")) return 0;
+    if (row.items.some(item => item.kind === "changed" || item.kind === "cancelled")) return 1;
+    if (row.setup?.owner === "Yours") return 2;
+    if (row.items.some(item => item.kind === "first")) return 3;
+    return row.setup ? 4 : 5;
+  };
+  const latestChange = (row: StudentWorkspaceRow) => Math.max(0, ...row.items.map(item =>
+    item.kind === "changed" ? stamp(item.booking.student_changed_at, 0) : item.kind === "cancelled" ? stamp(item.booking.cancelled_at, 0) : 0));
+  const nextLesson = (row: StudentWorkspaceRow) => Math.min(stamp(row.student.nextLessonAt), ...row.items.map(item =>
+    item.kind === "first" ? stamp(item.booking.starts_at) : Infinity));
+  rows.sort((a, b) => priority(a) - priority(b)
+    || (priority(a) === 1 ? latestChange(b) - latestChange(a) : 0)
+    || nextLesson(a) - nextLesson(b)
+    || a.student.name.localeCompare(b.student.name)
+    || a.student.id.localeCompare(b.student.id));
+
+  return {
+    rows,
+    general,
+    attentionCount: general.length + rows.filter(row => row.items.length || row.setup?.owner === "Yours").length,
+  };
+}
+
 /**
  * What waits on her, from reads the page already makes: Google Meet first,
  * then payments in the Worker's order, then the newest student changes.

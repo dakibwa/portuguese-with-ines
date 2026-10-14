@@ -359,12 +359,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
   as she clicks; the line under the calendar says what changed or what failed.
   Weekly blocks such as lunch are shown but not toggled per date. Keyboard and
   touch input must work without dragging.
-- A sliding tab bar groups `Needs you`, `Timetable`, `Weekly hours`, `Time off`,
-  `Students`, `Receipts`, `Expressions` and `Profile`. Open on `Timetable`;
-  keep the week pager beside its date heading. The phone bar holds all eight
+- A sliding tab bar groups `Students`, `Timetable`, `Weekly hours`, `Time off`,
+  `Receipts`, `Expressions` and `Profile`. Open on `Timetable`;
+  keep the week pager beside its date heading. The phone bar holds all seven
   tabs in two rows, without scrolling. Arrow keys, Home and End move between
   tabs. Unsaved hours and selected dates survive tab changes. Weekly hours
-  keeps its unsaved dot; Needs you shows a coral count of her To do cards,
+  keeps its unsaved dot; Students shows a coral count of students and notices needing attention,
   absent at zero. Profile holds her sign-in email, password link, Google Meet
   connection and Sign out, keeping account controls away from daily work.
 - One pager turns the Timetable's week and the Time off and Receipts months
@@ -429,41 +429,34 @@ usual lesson starts and days off; avoid a wall of administration forms.
   which opens that lesson's own dialog to move or cancel it, keeping her
   draft (13 October 2026, Dan: "it should show the person's lesson card for
   Inês to move if she needs to").
-- `Needs you` (14 October 2026) is the first tab, with two sections.
-  `To do` holds one card and one action for each thing waiting on her: Meet
-  reconnect, a payment to check, a new student's first lesson, a student's
-  recent change or cancellation, a missing email, lessons still to add, and
-  every welcome owed once there is an email, even without an imminent lesson.
-  Meet and payments lead; dated student changes follow newest first, then
-  undated tasks by next lesson and name. Cancelled lessons open read-only.
-  Welcomes use `onlyIfWaiting: true`. With no tasks, say
-  `Nothing needs you right now.` Only To do contributes to the tab count.
-  `Getting started` is a working interface, not only a progress list (Dan's
-  follow-up, 14 October). Each compact row has their name and splat, six
-  painted dabs — Email, Price, Lessons, Welcome, Signed in and Card — and
-  `Yours` or `Theirs` beside the next action. The collapsed row uses one band
-  when space permits. In a narrower panel, name and action share the first
-  line and the steps sit directly below; they never become three separated
-  sections. Only the opened editor takes extra height and spans the row.
-  Standard prices are valid and
-  count as ready; a custom price is optional. A confirmed past lesson counts
-  for Lessons, so finishing a course does not create a new onboarding task.
-  Her steps expand in place: edit details, change prices, add lessons or send
-  their welcome without leaving Needs you. Adding lessons opens a calendar
-  with available starts in Porto; choosing a day and time fills the lesson
-  form. Length, location and weekly repeat stay together. A quiet manual-time
-  option keeps the times she arranges outside public availability possible. To do opens the same inline task.
-  Welcomes stay explicit: opening a step never sends an email. Each editor
-  keeps its existing validation and explains whether the change was saved.
-  Sign-in and card still belong to the student, with a quiet lilac
-  `Send the link again`. It requests a fresh link through the existing welcome
-  endpoint without `onlyIfWaiting`, shows its rate-limit message unchanged,
-  and never sends without an email. A card is not required when cards are
-  unavailable. Her student's name opens their details in the same row; the
-  complete profile remains in Students. Hide the section when everyone is set up.
-  The Timetable keeps at most three cards under the next lesson, with
-  `See all in Needs you` when more are waiting. Items clear from the same
-  existing reads; there is nothing to dismiss or new to store.
+- `Students` combines student setup and ongoing care in one searchable list
+  (14 October 2026, Dan). Show each student once. Payments to check lead,
+  then recent lesson changes, setup Inês can do, first lessons, students still
+  signing in or adding a card, and completed students. Within setup, nearer
+  lessons come first. Count students needing her attention once, not each task.
+  Meet and unmatched payment notices remain visible above the list; never match
+  a payment to a student by name alone.
+  Incomplete students have compact, distinct steps: Email, Price, Lessons,
+  Welcome, Signed in and Card. Checks mark completion, the next action has an
+  outline, and a clock marks waiting on the student. Say what is needed beside
+  their name; do not use vague ownership labels such as Yours or Theirs.
+  Completed onboarding becomes a normal row labelled Student, with their
+  details, next lesson, price and profile access. No duplicate To do list.
+  The collapsed row uses one band when space permits. In narrower panels,
+  name and action share the first line, with steps directly below. The opened
+  editor spans the row. Help uses short, plain bullets.
+  Standard prices count as ready. A confirmed past lesson counts for Lessons;
+  no upcoming booking does not restart onboarding. Card is omitted when cards
+  are unavailable. Saved cards and permission to charge every lesson differ.
+  Every student's name opens their full profile. The step buttons keep details,
+  prices, lessons and welcome editable in the row. Adding a
+  lesson opens the calendar with available Porto start times; manual entry,
+  location, length and weekly repeat remain available. Welcomes are explicit:
+  opening a step never sends email. First welcomes use `onlyIfWaiting: true`;
+  `Send the link again` deliberately requests a fresh link without that guard.
+  The Timetable keeps up to three operational notices under the next lesson,
+  with `See all in Students`. Setup tasks live in Students. Notices clear from
+  existing reads; there is nothing new to store or dismiss.
 - Each date has one compact header cell: weekday and bold date baseline-aligned
   on one line (`Mon 7`), today's number in a filled blue lozenge with cream
   type, and the booked dot inline after it. Its Day off switch sits at the
@@ -1566,7 +1559,7 @@ as a form:
 - signed in, booking is headed by the account's own bar, as Your lessons is:
   the name's menu, or the places open on a wide card, holding the way back;
 - Inês's schedule reads as the same place: the booking page's blue band,
-  one bar for `Needs you`, `Timetable`, `Weekly hours`, `Time off`, `Students`,
+  one bar for `Students`, `Timetable`, `Weekly hours`, `Time off`,
   `Receipts`, `Expressions` and `Profile`; sliders for a
   lesson's length and place in her lesson form, with the
   timetable's globe and person beside Online and In Porto, her sign-in with no `Create an account`, and each student's chosen

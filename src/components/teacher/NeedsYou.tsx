@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { StudentSetupRow } from "@/components/teacher/StudentSetupRow";
+import { type ReactNode } from "react";
 import type { AdminBooking, AdminStudent } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
-import { dateKey, dateLabel, type NeedsYouItem, type StudentSetup, type StudentSetupStep } from "@/lib/teacher-calendar";
+import { dateKey, dateLabel, type NeedsYouItem, type StudentSetup } from "@/lib/teacher-calendar";
 
 const SHOWN = 3;
 
@@ -42,7 +41,7 @@ function was(booking: AdminBooking) {
  * Every item clears itself, so nothing here is dismissed. The choosing and
  * the windows live in needsYou(); this only words and renders them.
  */
-export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent, onSeeAll, setup = [], token = "", onChanged }: {
+export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent, onSeeAll, embedded = false, heading = "Needs you" }: {
   items: NeedsYouItem[];
   /** The student whose welcome is on its way. */
   sending: string;
@@ -50,23 +49,19 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
   onView: (booking: AdminBooking) => void;
   onWelcome: (student: AdminStudent, again?: boolean) => void;
   onStudent: (student: AdminStudent, editDetails?: boolean) => void;
-  /** With this action it is the Timetable strip; otherwise the full tab. */
+  /** The Timetable shows only the first few notices. */
   onSeeAll?: () => void;
-  setup?: StudentSetup[];
-  token?: string;
-  onChanged?: (student?: AdminStudent) => void;
+  embedded?: boolean;
+  heading?: string;
 }) {
-  const [expanded, setExpanded] = useState<{ studentId: string; step: StudentSetupStep } | null>(null);
-  const [busyStudent, setBusyStudent] = useState("");
-  if (!items.length && onSeeAll) return null;
+  if (!items.length) return null;
 
   function studentAction(student: AdminStudent, next: StudentSetup["next"]) {
-    if (next === "email" || next === "lessons") return <button className="button button--coral button--compact" disabled={Boolean(busyStudent)} type="button" onClick={() => {
-      if (!onSeeAll) setExpanded({ studentId: student.id, step: next });
-      else onStudent(student, next === "email");
+    if (next === "email" || next === "lessons") return <button className="button button--coral button--compact" type="button" onClick={() => {
+      onStudent(student, next === "email");
     }}>{next === "email" ? "Add email" : "Add a lesson"}<span className="visually-hidden"> for {student.name}</span></button>;
     const again = next !== "welcome";
-    return <button className={`button button--${again ? "lilac" : "coral"} button--compact`} type="button" disabled={Boolean(sending) || Boolean(busyStudent) || !student.email} onClick={() => onWelcome(student, again)}>
+    return <button className={`button button--${again ? "lilac" : "coral"} button--compact`} type="button" disabled={Boolean(sending) || !student.email} onClick={() => onWelcome(student, again)}>
       {sending === student.id ? "Sending…" : again ? "Send the link again" : "Send welcome email"}<span className="visually-hidden"> to {student.name}</span>
     </button>;
   }
@@ -155,30 +150,13 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
     );
   }
 
-  return (
-    <div className={`teacher-needs-you${onSeeAll ? "" : " teacher-needs-you--full"}`}>
-      <section aria-labelledby="teacher-needs-you-title">
-        <h2 className="teacher-eyebrow" id="teacher-needs-you-title">{onSeeAll ? "Needs you" : "To do"}</h2>
-        {items.length ? <ul className="teacher-lesson-cards">{(onSeeAll ? items.slice(0, SHOWN) : items).map(card)}</ul> : <p>Nothing needs you right now.</p>}
-        {onSeeAll && items.length > SHOWN ? <button className="teacher-text-button" onClick={onSeeAll} type="button">See all in Needs you</button> : null}
-      </section>
-      {!onSeeAll && setup.length ? <section aria-labelledby="teacher-getting-started-title">
-        <h2 className="teacher-eyebrow" id="teacher-getting-started-title">Getting started</h2>
-        <ul className="teacher-setup-list">
-          {setup.map(row => <StudentSetupRow
-            key={row.student.id}
-            locked={Boolean(busyStudent)}
-            onBusy={busy => setBusyStudent(busy ? row.student.id : "")}
-            onChanged={onChanged}
-            onSelect={step => setExpanded(step ? { studentId: row.student.id, step } : null)}
-            onWelcome={onWelcome}
-            sending={sending}
-            setup={row}
-            step={expanded?.studentId === row.student.id ? expanded.step : null}
-            token={token}
-          />)}
-        </ul>
-      </section> : null}
-    </div>
-  );
+  if (embedded) return <ul className="teacher-lesson-cards teacher-student-notices">{items.map(card)}</ul>;
+
+  return <div className="teacher-needs-you">
+    <section aria-label={heading}>
+      <h2 className="teacher-eyebrow">{heading}</h2>
+      <ul className="teacher-lesson-cards">{(onSeeAll ? items.slice(0, SHOWN) : items).map(card)}</ul>
+      {onSeeAll && items.length > SHOWN ? <button className="teacher-text-button" onClick={onSeeAll} type="button">See all in Students</button> : null}
+    </section>
+  </div>;
 }

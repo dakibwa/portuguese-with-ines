@@ -17,6 +17,7 @@ import {
   mondayOf,
   needsYou,
   gettingStarted,
+  studentWorkspace,
   paintHours,
   removeSpan,
   shiftDate,
@@ -429,4 +430,42 @@ test("setup steps separate her to-dos from waiting on students, with welcomes at
   assert.deepEqual(new Set(tasks.map(item => item.key)), new Set(["welcome:far", "email:email", "lessons:lessons", "welcome:lessons", "welcome:welcome"]));
   assert.ok(tasks.every(item => setup.some(row => row.student.id === item.student.id && row.owner === "Yours")), "the tab count excludes waiting on them");
   assert.deepEqual(gettingStarted([student("cards-off", { awaitingWelcome: false, signedIn: true })], false), [], "cards switched off do not hold setup open");
+
+  const ready = (id, extra = {}) => student(id, { awaitingWelcome: false, signedIn: true, hasCard: true, ...extra });
+  const workspaceStudents = [
+    ready("regular", { name: "Alex" }),
+    student("waiting", { awaitingWelcome: false }),
+    ready("first"),
+    student("setup-later", { email: "", nextLessonAt: "2026-10-20T10:00:00Z" }),
+    student("setup-soon", { email: "", nextLessonAt: "2026-10-15T10:00:00Z" }),
+    ready("changed-old"),
+    ready("changed-new"),
+    ready("payment", { name: "Same Name" }),
+    ready("same-name", { name: "Same Name" }),
+  ];
+  const booking = (id, studentId, email, extra = {}) => ({ id, student_id: studentId, student_email: email, starts_at: "2026-10-16T10:00:00Z", ...extra });
+  const paymentBooking = booking("pay-one", "payment", "same-name@example.invalid");
+  const paymentBookingTwo = booking("pay-two", "payment", "");
+  const operational = [
+    { kind: "payment", key: "payment:pay-one", review: { id: "pay-one", student_name: "Same Name" }, part: "lesson" },
+    { kind: "payment", key: "payment:pay-two", review: { id: "pay-two" }, part: "fee" },
+    { kind: "changed", key: "changed:old", booking: booking("old", "changed-old", "", { student_changed_at: "2026-10-13T10:00:00Z" }), count: 1 },
+    { kind: "first", key: "first:first", booking: booking("first", "first", "") },
+    { kind: "meet", key: "meet", reconnect: true },
+    { kind: "cancelled", key: "cancelled:new", booking: booking("new", null, " CHANGED-NEW@EXAMPLE.INVALID ", { cancelled_at: "2026-10-14T10:00:00Z" }), count: 1 },
+    { kind: "payment", key: "payment:unmatched", review: { id: "unmatched", student_name: "Same Name" }, part: "refund" },
+  ];
+  const setupTasks = needsYou({ now: new Date("2026-10-14T10:00:00Z"), meet: null, payments: [], students: workspaceStudents, lessons: [], cancellations: [] });
+  const workspace = studentWorkspace(workspaceStudents, [...setupTasks, ...operational], true, [paymentBooking, paymentBookingTwo]);
+  assert.deepEqual(workspace.rows.map(row => row.student.id), ["payment", "changed-new", "changed-old", "setup-soon", "setup-later", "first", "waiting", "regular", "same-name"]);
+  assert.equal(new Set(workspace.rows.map(row => row.student.id)).size, workspaceStudents.length, "each student has one row");
+  assert.deepEqual(workspace.rows.find(row => row.student.id === "payment").items.map(item => item.key), ["payment:pay-one", "payment:pay-two"], "student identity wins over a mismatched email");
+  assert.ok(workspace.rows.every(row => row.items.every(item => !["email", "lessons", "welcome"].includes(item.kind))), "setup actions are not repeated as task cards");
+  assert.deepEqual(workspace.general.map(item => item.key), ["meet", "payment:unmatched"], "an unresolved payment never guesses by name");
+  const unknownOwner = studentWorkspace(workspaceStudents, [{ kind: "payment", key: "payment:unknown-owner", review: { id: "unknown-owner" }, part: "lesson" }], true,
+    [booking("unknown-owner", "another-account", "payment@example.invalid")]);
+  assert.deepEqual(unknownOwner.general.map(item => item.key), ["payment:unknown-owner"], "a booking with an explicit unknown owner never falls back to someone else's email");
+  assert.equal(workspace.attentionCount, 8, "count each actionable student once, plus general warnings; waiting on the student does not count");
+  assert.equal(workspace.rows.find(row => row.student.id === "regular").setup, undefined, "a past confirmed lesson and standard prices remain complete");
+  assert.equal(studentWorkspace([ready("cards-off", { hasCard: false })], [], false, []).attentionCount, 0);
 });
