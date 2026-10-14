@@ -48,6 +48,8 @@ export function LessonDetails({
   const firstName = booking.student_name.split(" ")[0];
   // Set up by her and not welcomed yet: the site emails them nothing.
   const awaiting = Boolean(booking.student_awaiting_welcome);
+  // Added by name alone: there is no address to welcome until she gives one.
+  const noEmail = !booking.student_email;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const noShowCloses = new Date(new Date(booking.ends_at).getTime() + NO_SHOW_WINDOW_HOURS_AFTER * 3_600_000);
@@ -210,7 +212,7 @@ export function LessonDetails({
             <li>{formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: minutes })}</li>
             {money ? <li>{money}</li> : null}
             {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
-            {awaiting ? <li>Not emailed yet: send their welcome from Students</li> : null}
+            {awaiting ? <li>{noEmail ? "No email yet: add it under Edit details, then send their welcome" : "Not emailed yet: send their welcome from Students"}</li> : null}
           </ul>
           {addedByTeacher(booking) && booking.status !== "cancelled" && booking.payment_status === "scheduled" ? (
             // One they already paid for by hand comes off before it is charged.
@@ -258,7 +260,7 @@ export function LessonDetails({
           A payment is being processed. Try making changes once it finishes.
         </p>
       ) : null}
-      {action === "view" ? (
+      {booking.status === "cancelled" ? <div className="teacher-dialog-actions"><button className="button button--outline" type="button" onClick={onClose}>Done</button></div> : action === "view" ? (
         <div className="teacher-dialog-actions">
           <button
             className="button button--coral"
@@ -329,7 +331,7 @@ export function LessonDetails({
                   />
                 </label>
                 <ul className="booking-payment-facts teacher-confirm-facts">
-                  <li>{awaiting ? `${firstName} isn’t emailed until you send their welcome` : `${firstName} gets an email with the new time`}</li>
+                  <li>{awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets an email with the new time`}</li>
                 </ul>
                 <div className="teacher-dialog-actions">
                   <button

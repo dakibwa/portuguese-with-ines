@@ -9,6 +9,8 @@
  * heavy for the small set of calls this Worker makes.
  */
 
+import { realEmail } from "./no-email.mjs";
+
 const API = "https://api.stripe.com/v1";
 const API_VERSION = "2026-08-26.dahlia";
 const INTEGRATION_IDENTIFIER = "portugues-com-a-ines-qjmrbzva";
@@ -156,7 +158,7 @@ export function createCardSetupSession(
       currency: "eur",
       payment_method_types: { 0: "card" },
       client_reference_id: booking.id,
-      ...(customer ? { customer } : { customer_creation: "always", customer_email: customerEmail }),
+      ...(customer ? { customer } : { customer_creation: "always", customer_email: realEmail(customerEmail) || undefined }),
       setup_intent_data: {
         metadata: {
           booking_reference: booking.reference,
@@ -197,7 +199,7 @@ export function createStudentCardSession(env, { student, successUrl, cancelUrl }
       client_reference_id: `student:${student.id}`,
       ...(student.stripe_customer_id
         ? { customer: student.stripe_customer_id }
-        : { customer_creation: "always", customer_email: student.email }),
+        : { customer_creation: "always", customer_email: realEmail(student.email) || undefined }),
       setup_intent_data: { metadata: { student_id: student.id } },
       ...uiModeFields(env, { successUrl, cancelUrl, forceHosted: true }),
       metadata: { purpose: "student_card", student_id: student.id }
@@ -281,7 +283,7 @@ export function createCheckoutSession(
     // Dashboard's optional currency-conversion offer and extra FX fee.
     adaptive_pricing: { enabled: false },
     client_reference_id: booking.id,
-    ...(customer ? { customer } : { customer_email: customerEmail }),
+    ...(customer ? { customer } : { customer_email: realEmail(customerEmail) || undefined }),
     ...(saveCard ? { customer_creation: "always" } : {}),
     ...(saveCard
       ? {

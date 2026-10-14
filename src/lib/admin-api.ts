@@ -6,7 +6,7 @@ import { isExpression, type Expression, type ExpressionInput } from "@/lib/expre
 export type AdminStudent = {
   id: string;
   name: string;
-  /** Empty when she set them up from a name alone and has not given one yet. */
+  /** Empty when she set them up from a name alone and has not given one yet; the Worker never sends its stand-in. */
   email: string;
   phone: string;
   /** Nine digits for their receipts; empty for consumidor final. */
@@ -18,6 +18,8 @@ export type AdminStudent = {
   /** Set up by her and not emailed yet: the site sends them nothing until she sends their welcome. */
   awaitingWelcome?: boolean;
   hasCard?: boolean;
+  /** Has at least one confirmed lesson, including lessons already had. */
+  hasLessons?: boolean;
   /** A card saved from their account, which pays for the lessons she adds. */
   cardForAllLessons?: boolean;
   nextLessonAt?: string | null;
@@ -97,6 +99,30 @@ export type AdminBooking = {
   added_by_teacher?: number;
   /** The lesson's own price, as booked. */
   amount_cents?: number | null;
+  /** 1 when no confirmed lesson of the student's comes before this one. */
+  first_lesson?: number;
+  /** When the student last changed the lesson themselves; empty after she moves it (migration 0028). */
+  student_changed_at?: string | null;
+  /** Where the lesson was before its last move. */
+  previous_starts_at?: string | null;
+  cancelled_at?: string | null;
+  /** The weekly run this lesson belongs to. */
+  series_id?: string | null;
+};
+
+/**
+ * A payment or refund Stripe never confirmed, for Inês to check in Stripe.
+ * Only the id and reference are required; an older Worker sends nothing else.
+ */
+export type PaymentReview = {
+  id: string;
+  reference: string;
+  student_name?: string;
+  starts_at?: string;
+  payment_status?: string;
+  same_day_fee_status?: string;
+  stripe_payment_intent?: string | null;
+  same_day_fee_payment_intent?: string | null;
 };
 
 /**
@@ -106,6 +132,16 @@ export type AdminBooking = {
  */
 export function addedByTeacher(booking: Pick<AdminBooking, "added_by_teacher">) {
   return Boolean(booking.added_by_teacher);
+}
+
+export class AdminApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AdminApiError";
+    this.status = status;
+  }
 }
 
 async function adminRequest<T>(
@@ -132,7 +168,7 @@ async function adminRequest<T>(
   if (response.status === 401) forgetSession(token);
   if (!response.ok) {
     const error = isApiRecord(data) && typeof data.error === "string" ? data.error : "";
-    throw new Error(error || `Request failed (${response.status})`);
+    throw new AdminApiError(error || `Request failed (${response.status})`, response.status);
   }
   if (!isApiRecord(data)) throw new Error(BOOKING_REPLY_ERROR);
   return data as T;
@@ -156,7 +192,7 @@ export function fetchSchedule(token: string) {
 export function fetchBookings(token: string, from?: string) {
   return adminRequest<{
     bookings: AdminBooking[];
-    manualPaymentReconciliation?: { id: string; reference: string }[];
+    manualPaymentReconciliation?: PaymentReview[];
   }>(
     token,
     `/admin/bookings${from ? `?from=${encodeURIComponent(from)}` : ""}`,
@@ -337,20 +373,26 @@ export function setStudentPrices(token: string, studentId: string, prices: Stude
   });
 }
 
-/** Emails a student their lessons so far and a one-click way into their account. */
-export function sendStudentWelcome(token: string, studentId: string) {
+/**
+ * Emails a student their lessons so far and a one-click way into their account.
+ * `onlyIfWaiting` sends it only while the welcome is still owed, so a second
+ * device pressing later is told it has gone rather than sending another.
+ */
+export function sendStudentWelcome(token: string, studentId: string, options?: { onlyIfWaiting?: boolean }) {
   return adminRequest<{ ok: true; card?: boolean }>(token, `/admin/students/${encodeURIComponent(studentId)}/welcome`, {
     method: "POST",
-    body: "{}",
+    body: JSON.stringify(options?.onlyIfWaiting ? { onlyIfWaiting: true } : {}),
   });
 }
 
-/** Creates the student's account too, if this is their first lesson. */
+/**
+ * A lesson for one of her students, named by their account so one with no
+ * email yet has lessons too (14 October 2026, Dan).
+ */
 export function createBookingFor(
   token: string,
   input: {
-    email: string;
-    name: string;
+    studentId: string;
     lessonType: string;
     startAt: string;
     location: "online" | "porto";

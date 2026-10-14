@@ -1,27 +1,25 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { GoogleMeetLogo } from "@/components/GoogleMeetLogo";
 
 const tabs = [
+  { id: "needs-you", label: "Needs you" },
   { id: "week", label: "Timetable" },
   { id: "hours", label: "Weekly hours" },
   { id: "time-off", label: "Time off" },
   { id: "students", label: "Students" },
   { id: "receipts", label: "Receipts" },
   { id: "expressions", label: "Expressions" },
-  { id: "meet", label: "Google Meet" },
+  { id: "profile", label: "Profile" },
 ] as const;
 
 export type TeacherTab = (typeof tabs)[number]["id"];
 
 /** One sliding control, with the same keyboard behaviour at every width. */
-export function TeacherTabs({ current, hoursDirty, studentsWaiting, meetAttention, onSelect }: {
+export function TeacherTabs({ current, hoursDirty, needsCount, onSelect }: {
   current: TeacherTab;
   hoursDirty: boolean;
-  /** Students she still needs to bring onto the site. */
-  studentsWaiting: number;
-  meetAttention: boolean;
+  needsCount: number;
   onSelect: (tab: TeacherTab) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
@@ -50,7 +48,7 @@ export function TeacherTabs({ current, hoursDirty, studentsWaiting, meetAttentio
     observer.observe(selected);
     if (scroller) observer.observe(scroller);
     return () => observer.disconnect();
-  }, [current, hoursDirty, studentsWaiting, meetAttention]);
+  }, [current, hoursDirty, needsCount]);
 
   return (
     <div className="teacher-tabs-scroll">
@@ -66,7 +64,6 @@ export function TeacherTabs({ current, hoursDirty, studentsWaiting, meetAttentio
           <button
             aria-controls="teacher-tools-panel"
             aria-selected={current === tab.id}
-            className={tab.id === "meet" ? "teacher-tab--meet" : undefined}
             id={`teacher-tab-${tab.id}`}
             key={tab.id}
             onClick={() => onSelect(tab.id)}
@@ -83,10 +80,9 @@ export function TeacherTabs({ current, hoursDirty, studentsWaiting, meetAttentio
             tabIndex={current === tab.id ? 0 : -1}
             type="button"
           >
-            {tab.id === "meet" ? <><GoogleMeetLogo /><span className="visually-hidden">Google Meet</span></> : tab.label}
+            {tab.label}
             {tab.id === "hours" && hoursDirty ? <span className="teacher-tab-dot" aria-label="unsaved changes" /> : null}
-            {tab.id === "students" && studentsWaiting ? <span className="teacher-tab-dot" aria-label={`${studentsWaiting} to bring in`} /> : null}
-            {tab.id === "meet" && meetAttention ? <span className="teacher-tab-dot" aria-label="needs attention" /> : null}
+            {tab.id === "needs-you" && needsCount > 0 ? <span className="teacher-tab-count" aria-label={`${needsCount} to do`}>{needsCount}</span> : null}
           </button>
         ))}
       </div>

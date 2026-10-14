@@ -355,20 +355,27 @@ time. Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
-The sliding tools bar groups `Week`, `Weekly hours`, `Time off`,
-`Students` and `Google Meet`, with the current week as the default.
-The Google Meet tab exposes the existing connection controls and its tab
-marks connection problems; Google callbacks open it directly.
+The tools bar groups `Needs you`, `Timetable`, `Weekly hours`, `Time off`,
+`Students`, `Receipts`, `Expressions` and `Profile`, opening on `Timetable`.
+Profile holds her sign-in email change, password reset link, Google Meet
+connection and Sign out. Email changes use the existing new-address confirmation
+flow; password changes use the existing reset email. Google callbacks open Profile
+directly. `Needs you` has its own tab and a three-card strip under her next lesson.
 
 Lessons only belong to students (13 October 2026, Dan: no loose lessons).
-`POST /admin/bookings` refuses an email that isn't on the site ("Add them as a
-student first.", 404); students come from `POST /admin/students`. The page's
-one student dialog adds a student, then their lessons (online or in Porto,
-once or weekly for 4, 6 or 8 weeks or until stopped), then their welcome; a
-student card's `Add lesson` and a free time's `Add a lesson here` open the same
-dialog, the latter asking whose lesson first. All teacher actions still use the
-authenticated admin endpoints and
-their existing booking, payment and email safeguards.
+`POST /admin/bookings` names the student by `studentId` (their account, which
+works for a student with no email yet) or, for older callers, by `email`; one
+who isn't on the site is refused ("Add them as a student first.", 404), and
+students come from `POST /admin/students`. The page's one student profile
+(14 October 2026, Dan) is what a student's card, its `Add a lesson` button,
+the end of `Add a student` and a free time's `Add a lesson here` all open, the
+latter asking whose lesson first. The Students card's Add a lesson opens the
+profile with the lesson calendar already expanded. It shows their details (`Edit details` brings
+every field out in place), their price, an `Add a lesson` form (online or in
+Porto, once or weekly for 4, 6 or 8 weeks or until stopped), `Send welcome
+email` where it applies, and their lessons. All teacher actions still use the
+authenticated admin endpoints and their existing booking, payment and email
+safeguards.
 
 Onboarding (13 October 2026, Dan) lets Inês set a student up before they hear
 anything. `POST /admin/students` takes `email`, `name` and optional `phone`,
@@ -382,23 +389,160 @@ point (lessons added, moved or cancelled, the Meet link, charges); her Google
 Calendar, the blocked time and the lesson's NIF are unaffected, and her own
 copy says they weren't emailed. Lesson, move and cancel replies carry
 `emailed: false` so her page says so. `POST /admin/students/:id/welcome` sends
-their upcoming lessons (up to twelve, each on the lesson's clock) and the
-one-click way in, then clears the flag, after which emails reach them as
-usual. Signing in themselves also ends the hold. Students made before this keep
-`awaiting_welcome = 0`, so nothing about them changes.
+their upcoming lessons and prices (below) and the one-click way in, then clears
+the flag, after which emails reach them as usual. Signing in themselves also
+ends the hold. Students made before this keep `awaiting_welcome = 0`, so
+nothing about them changes.
+
+The welcome's lessons (14 October 2026, Dan: "all their lessons and prices
+already done properly") are read from the lessons themselves, so they are right
+whenever she added them and whatever she has since changed. Each of a student's
+upcoming confirmed lessons becomes a line, in the site's email design with its
+subject and preheader unchanged: a weekly run is **one** line (`Weekly ·
+Online`, `Every Tuesday, 17:00 · Porto time`, `From 20 October 2026 until 8
+December 2026`, or `…, until you stop it` for a run with no end, and `60
+minutes · €22 a lesson`), a lesson on its own is one line (`Lesson · Online`,
+its date and time, `60 minutes · €22`, or `…· €22 paid` once it is paid), and the
+trial is named. A lesson belongs to its run while it still sits on the run's own
+Porto slot, length (lesson type) and place, and keeps its time on the student's
+own clock; one that was moved, lengthened or put elsewhere reads as the lesson it
+now is, never as a second run. A run never hides a week it has no lesson: for a
+student she set up, the welcome is the only email they will have, because the
+emails about a skipped week (her day off) or a cancelled one were held. So a run
+line names the weeks between its first and last lesson that have none
+(`No lesson on 22 September or 6 October`), unless the run has a lesson on that
+day that now reads as its own line. A run with no end says `until you stop it`
+only while it is active and only for its latest stretch; a stopped one says
+`until` its last remaining lesson. The price is the lesson's own `amount_cents`,
+which `repriceStudent` keeps on the student's own rate for lessons still to come
+(a run's line uses the next lesson whose price is still open, never one she
+marked paid by hand), and the length is the lesson type's. Times are on the
+student's own clock, their timezone (Porto by default) for an online lesson and
+Porto's for one in Porto, each time naming its clock as every email to them
+does (`17:00 · Porto time`). Their own `Your price · 60 / 90 minutes` rows still
+lead when she has set a price. Past twelve lines an `And more` line says how
+many lessons are left to the website.
+How they pay is as before: a link that adds their card where the site takes
+cards, or the plain sign-in link.
 
 A name alone is enough to set a student up (13 October 2026, Dan: she builds
-on it later). `students.email` stays `NOT NULL UNIQUE`, so a student without
-one stores `no-email:<id>`. No address can equal that, and every sign-in,
-registration, reset and email-change path checks for a real address first.
-`GET /admin/students` shows such a student's email as `""`. Their welcome is
-refused (400) and `POST /admin/bookings` cannot reach them, so their lessons
-and welcome wait until she gives an email. `POST /admin/students/:id/details`
-sets name, phone, NIF and splat at any time. It sets or corrects the email only
-while the student has never signed in (no password, Google link or sign-in);
-after that it answers 409 and the student changes it from their account. A
-changed address clears `email_verified_at` and moves their bookings'
-`student_email` with it. An address another student has is refused (409).
+on it later), and a student with no email yet has lessons like anyone else
+(14 October 2026, Dan). `students.email` and `bookings.student_email` stay
+`NOT NULL`, so a student without an address stores `no-email:<id>` in both,
+as the key that stands in for it. No address can equal that, and every
+sign-in, registration, reset and email-change path checks for a real address
+first. The stand-in never leaves the database (`workers/booking/no-email.mjs`):
+- nothing is sent to it. `deliver` in `email.mjs` returns without logging,
+  rendering or sending for it, and drops it as a reply-to; every `student_*`
+  message to them is also held, as for any student awaiting their welcome;
+- no calendar file names it: `ics.mjs` leaves it out of `ATTENDEE`, and a
+  lesson's description omits the `Email:` line;
+- Stripe is never given it as `customer_email`;
+- her copies of a lesson's emails read `No email yet` where the student's
+  address would be, and are sent with no reply-to;
+- `GET /admin/students`, `GET /admin/bookings`, the booking and student JSON,
+  the no-show and paid-by-hand replies and `GET /admin/receipts` (so the CSV)
+  show `""` for it.
+
+`POST /admin/students/:id/welcome` is refused (400) until she gives an email.
+`POST /admin/students/:id/details` sets name, phone, NIF and splat at any time.
+It sets or corrects the email only while the student has never signed in (no
+password, Google link or sign-in); after that it answers 409 and the student
+changes it from their account. A changed address clears `email_verified_at`
+and, in the same write as the account, moves **every** booking of theirs (past
+ones too, so a receipt reads right) to it; a series has no address of its own,
+and later weeks take the account's. Her corrections to a student's name and
+phone reach every booking of theirs the same way, whether or not the address
+moves (she adds `Adam` first and completes him later, and a receipt prints the
+name on the booking). The welcome also gives any lesson still holding the
+stand-in (one added from a stale read as the address was saved) the real
+address before it sends. Nothing is sent by the change: they stay
+awaiting their welcome until she sends it. An address another student has is
+refused (409) and moves nothing. The student's own change of address
+(`/me/email/confirm`) still moves only lessons still to come, and cannot apply
+to an account that has never signed in.
+
+### Needs you
+
+`Needs you` (14 October 2026) is the first tab: To do counts only her actions,
+while Getting started shows six actionable setup steps. The Timetable keeps the
+first three To do cards, with `See all in Needs you` when there are more.
+The strip stays absent when empty; the full tab says `Nothing needs you right now.`
+It is built in the browser by the pure `needsYou()` in
+`src/lib/teacher-calendar.ts` from reads the page already makes:
+
+- `GET /admin/bookings` rows, with the computed `first_lesson` and the
+  `student_changed_at` stamp; the cancelled rows the timetable drops are kept
+  client-side, so a student's cancellation (`cancelled_by = 'student'`) can be
+  listed;
+- `manualPaymentReconciliation`, which now carries `student_name`, `starts_at`
+  and the Stripe payment intent ids, for `Open in Stripe` (a link to the
+  payment when the id looks like `pi_…`, otherwise to Stripe's payments list);
+- `GET /admin/students` (`awaitingWelcome`, `nextLessonAt`, `email`, `signedIn`,
+  `hasCard`, `hasLessons` and existing prices);
+- `GET /admin/google-calendar`, for Meet needing to be connected or
+  reconnected.
+
+Meet first, then payments in the Worker's order, then
+student changes newest first, then undated tasks by next lesson and name:
+Google Meet; a payment Stripe never confirmed; a student
+she set up and has not emailed, at any time once they have an email; a
+student with no email, whose Add email opens their inline details editor; a
+student with no confirmed lessons, whose Add a lesson opens the inline lesson
+form; a lesson a
+student changed in the last 72 hours (one card per weekly run and stamp); a
+lesson a student cancelled in the last 72 hours (one card per weekly run,
+View opens it read-only; the time is already open to students); and a new
+student's first lesson
+in the next 7 days (a student's own booking with no earlier confirmed lesson of
+theirs, matching older rows without a `student_id` by email; a lesson Inês added
+never reads as a first lesson, even after the student moves it). The
+older-by-email check in `first_lesson` is written `+legacy.status` so SQLite
+stays on `idx_bookings_student`; without the plus it scans every earlier
+booking for each row returned. A lesson appears
+once. The internal `no-email:` placeholder never appears; their email reads
+as empty and the action opens their details, never sends. Declined
+cards stay with the student and in Receipts. Nothing is dismissed: items clear
+when done, after 72 hours, or once the lesson begins; the windows are
+`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. The full tab shows them
+all; its badge is this list's length. Returning after five minutes away reloads lessons and
+students, quietly: if the read fails, the lessons on screen stay and no error
+replaces them. Nothing polls.
+
+The views add no endpoint or stored setup flags. A first welcome uses
+`{ "onlyIfWaiting": true }`: the Worker answers 409 `Their welcome has already
+been sent.` before spending the rate limit once the student has been welcomed
+or signed in. The Students card can still re-send deliberately.
+
+Getting started uses the pure `gettingStarted()` selector over the same read:
+Email, Price, Lessons, Welcome, Signed in and Card. Filled/outlined dabs show
+completion. Standard prices count as ready; setting a custom price is optional.
+`hasLessons` includes confirmed past lessons and legacy lessons matched by email,
+so returning students do not appear to need a first lesson. `hasCard` is returned
+from the saved Stripe customer and payment method, consistent with `/me`.
+The card step does not block setup when cards are unavailable.
+
+Her steps expand in the row, reusing the details, prices and lesson forms.
+Lesson creation includes a calendar and available start times from the existing
+availability read, refreshed for the chosen lesson length. Choosing a slot
+fills the date and Porto time. Manual entry remains available for times Inês
+arranges herself; the existing creation endpoint still checks clashes and
+validates a weekly run. A saved change refreshes the student list and timetable. To do can open the same
+inline task; the student's name opens their details in that row, with the
+complete profile still available in Students. Welcomes remain a separate
+explicit action. Yours marks her work; Theirs marks sign-in
+and card. `Send the link again` deliberately omits `onlyIfWaiting`, never sends
+without an email, and surfaces the existing 3-per-hour endpoint's 429 message.
+Waiting on students adds no badge count. All writes use the existing teacher
+permission path and validation.
+
+Migration `0028-student-changed-at.sql` adds `bookings.student_changed_at`.
+A student's own move (`handleReschedule`, `handleRescheduleSeries`) stamps it in
+a separate guarded statement after the move succeeds, only on the rows and
+sequence it wrote; Inês's move (`adminReschedule`) clears it the same way. Both
+tolerate the column being absent (a warning, `student-changed-at`, in the
+Worker's log), so the move itself never depends on the migration; changes made
+before it is applied simply never show. The fee-detection SQL is not touched.
 
 ## Accounts
 
@@ -936,6 +1080,43 @@ different students were confirmed into the same lesson in testing.
   student's own name could forge calendar properties or cut the address off the
   ATTENDEE line. Parameter values are quoted per RFC 5545 §3.1 instead.
 
+### The day-before reminder
+
+- About 24 hours before each confirmed lesson, the student gets one email,
+  `Your lesson is coming up — <date, time>`, on the lesson's own clock: theirs
+  online, Porto's in Porto.
+  - An online lesson whose Google Meet link is ready has `Join Google Meet` as
+    its button, with `Change or cancel this lesson` as a quiet link beneath.
+  - Otherwise the button is `Change or cancel this lesson`.
+  - The footer names the exact time free changes end: the start less the
+    minimum notice, on the same clock. There is no price, no calendar file and
+    nothing to Inês.
+- The minute cron (`sendLessonReminders`) sends it, at most six a minute, only
+  while the lesson is between 24 hours and the minimum notice (14 hours) away.
+  That way the free change it mentions is always still open.
+  - Times are elapsed hours in UTC, so clock changes don't move it.
+  - After an outage of more than ten hours, a lesson already inside 14 hours
+    gets none.
+- A lesson booked, added or moved less than 36 hours before it starts gets no
+  reminder: the confirmation or change email has just told the student. (Read
+  from `bookings.created_at` and the `student:rescheduled:` and
+  `student:series-moved:` keys in `email_log`, so a card saved or an address
+  changed does not suppress it.)
+- One reminder per version of a lesson (`student:reminder:<id>:<sequence>` in
+  `email_log`). A lesson moved earlier is reminded at its new time; a cancelled
+  one never is, and the row is read again just before sending.
+- A student Inês set up gets nothing before their welcome. Once it has gone,
+  the reminder follows if the lesson is still more than 14 hours away,
+  carrying their Meet link. A student she set up with no email yet
+  (`no-email:` placeholder) is never listed or sent anything.
+- If the Meet link isn't ready, the reminder says it will follow (only when
+  Google Meet is configured at all), and the existing `Your online lesson link`
+  email sends it once it exists. A reminder that carried the link marks it
+  delivered, so no second link email follows.
+- Weekly lessons get one each week, including automatic top-ups. A lesson on a
+  day Inês has taken off is still reminded, because time off never cancels a
+  lesson.
+
 ### When email fails
 
 Email is best-effort, but "best effort" used to mean "one attempt, and silence".
@@ -947,6 +1128,10 @@ Email is best-effort, but "best effort" used to mean "one attempt, and silence".
 - **There is now a sweep.** The scheduled cron re-sends failed rows older than five
   minutes. Only a booking's own confirmation can be rebuilt — the body is not
   stored — so anything else stays in the log for a person to look at.
+- **The day-before reminder is retried by its own sweep** every five minutes
+  while it is still in time, and is never rebuilt as a confirmation. When two
+  sweeps reach the same failed email, only the one that reclaims it sends: the
+  reset from `failed` to `pending` is conditional, for every retried email.
 - **A cancelled run is one email, not one per lesson.** Stopping a twelve-week
   series fired twenty-four requests at the provider in the same instant; behind a
   2/second limit, twenty-two were dropped and never retried.
@@ -1439,7 +1624,9 @@ and fee retries stop automatically after 23 hours of ambiguity, before Stripe's
 minimum idempotency retention can lapse; an owner must reconcile that payment
 in Stripe before any further attempt. Such rows are excluded from the 50-item
 sweeps so newer payments are not starved; the owner-only bookings response has
-`manualPaymentReconciliation`, and Worker warnings signal outstanding counts.
+`manualPaymentReconciliation` (with the student's name, lesson time and
+payment ids), which her Timetable lists under Needs you with `Open in Stripe`,
+and Worker warnings signal outstanding counts.
 The first claim freezes every Stripe charge parameter in the booking, including
 the saved card, amount and purpose. An idempotency-parameter error remains
 ambiguous and never opens a second hosted payment path.
@@ -1586,11 +1773,17 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
   `Documents/Work/Português com a Inês/Billing and Booking - Operating Context
   and Options.md` for the full position, including the unresolved IVA exemption
   code.
-- **Reminders** before a lesson.
 - **Migration 0023** (`workers/booking/migrations/0023-transition-kit.sql`) was
   applied by hand to staging and production D1 on 12 October 2026, before the
   Worker that reads it: adding a lesson writes `added_by_teacher` and sign-in
   links need their table. Existing rows were unchanged.
+- **Migration 0028** (`workers/booking/migrations/0028-student-changed-at.sql`)
+  was applied by hand to staging, then production D1 on 14 October 2026,
+  before the Worker release. The column was absent before each application;
+  `pragma_table_info('bookings')` confirmed `student_changed_at TEXT` in both
+  afterwards. Existing rows stay NULL; changes after release can appear in
+  Needs you. The migration file was executed directly, without replaying the
+  empty migration ledger.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
 ## Google Calendar and Meet setup
@@ -1610,7 +1803,8 @@ that connection. The existing Google sign-in client remains separate.
   Bookings awaiting payment confirmation do not create calendar events.
 - The student’s booking/manage views and Inês’s lesson details show **Join Google
   Meet** for online lessons. Confirmation and change emails include the link when
-  ready; delayed links get a short follow-up email. The minute sweep also fills
+  ready; delayed links get a short follow-up email, and the day-before reminder
+  carries the link again when it is ready. The minute sweep also fills
   existing future lessons after connection.
 - Moving a lesson updates the same event. Changing to Porto removes the event’s
   conference; changing to online requests one. Cancelling cancels that event.
@@ -1658,7 +1852,7 @@ that connection. The existing Google sign-in client remains separate.
 4. Set `GOOGLE_CALENDAR_ENABLED` to `1` only after setup, and release Worker
    before frontend. Use the isolated staging Worker/database for live proof,
    with its own callback/client grant and dry-run emails.
-5. Inês signs into `/schedule/`, selects **Google Meet → Connect Google Meet**,
+5. Inês signs into `/schedule/`, selects **Profile → Google Meet → Connect Google Meet**,
    chooses her matching Google account and grants permission. The callback
    checks signed identity, teacher role, session version/revocation, expiring
    single-use state and PKCE. The shared admin token cannot start OAuth.
@@ -1686,8 +1880,9 @@ the confirmation or, when Google is slower, in its own email a couple of
 minutes later. Google itself emails no one: events carry no attendees and are
 written with `sendUpdates=none`.
 
-Expired or revoked Google permission shows **Needs reconnecting** beside Google
-Meet in her schedule; **Google Meet → Reconnect Google Meet** restores it.
+Expired or revoked Google permission shows **Needs reconnecting** on her Google
+Profile tab and `Google Meet needs reconnecting` in Needs you; **Profile → Google Meet →
+Reconnect Google Meet** restores it.
 Reconnection reuses the stored calendar and event identities. If the first
 calendar-create response is lost, the persisted creation-attempt flag prevents
 creating duplicates. An operator must locate the app calendar in Inês’s Google

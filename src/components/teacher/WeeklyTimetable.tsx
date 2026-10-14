@@ -214,7 +214,7 @@ export function WeeklyTimetable({
     const grid = gridRef.current;
     if (!grid || from === weekStart || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const distance = weekStart > from ? 40 : -40;
-    for (const day of grid.querySelectorAll(".teacher-day-heading, .teacher-day-toggle-cell, .teacher-time-day")) {
+    for (const day of grid.querySelectorAll(".teacher-day-cell, .teacher-time-day")) {
       day.animate([{ opacity: 0, translate: `${distance}px 0` }, { opacity: 1, translate: "0 0" }], {
         duration: 380,
         easing: "cubic-bezier(0.22, 1, 0.36, 1)"
@@ -450,6 +450,26 @@ export function WeeklyTimetable({
     );
   }
 
+  function dayOffSwitch(index: number) {
+    const date = shiftDate(weekStart, index);
+    const off = offDays.has(date);
+    return <button className="teacher-day-toggle" type="button" role="switch" aria-checked={off}
+      aria-label={`Day off, ${dateLabel(date)}`} disabled={date < today} onClick={() => onDayOff(date, !off)}>
+      <span className="teacher-day-toggle__track" aria-hidden="true" />Day off
+    </button>;
+  }
+
+  function dayLabel(index: number) {
+    const date = shiftDate(weekStart, index);
+    return <>
+      <span>{WEEKDAYS[index].short}</span>
+      {!editing ? <strong className={date === today ? "teacher-day-today" : undefined}>
+        {date === today ? <span className="visually-hidden">Today, </span> : null}{Number(date.slice(-2))}
+      </strong> : <span className="teacher-day-full-name">{WEEKDAYS[index].name.slice(3)}</span>}
+      {!editing && segments.some(segment => segment.date === date) ? <i className="teacher-heading-booked-dot" aria-label="Lessons booked" /> : null}
+    </>;
+  }
+
   return (
     <>
       <div
@@ -462,78 +482,25 @@ export function WeeklyTimetable({
           {shown.map((index) => {
             const day = WEEKDAYS[index];
             const date = shiftDate(weekStart, index);
-            return (
-              <button
-                className={`teacher-day-heading ${activeDay === index ? "is-selected" : ""} ${!editing && date === today ? "is-today" : ""}`}
-                key={day.value}
-                type="button"
-                aria-label={
-                  editing
-                    ? `${day.name}, show weekly hours`
-                    : `${dateLabel(date)}, show lessons`
-                }
-                aria-pressed={activeDay === index}
-                onClick={() => {
-                  if (index !== activeDay) openDay(index);
-                  onSelectDay(index);
-                  setFocus((current) => ({ ...current, day: day.value }));
-                }}
-              >
-                <span>{day.short}</span>
-                {!editing ? (
-                  <strong>{Number(date.slice(-2))}</strong>
-                ) : (
-                  <span className="teacher-day-full-name">
-                    {day.name.slice(3)}
-                  </span>
-                )}
-                {!editing && date === today ? (
-                  <small className="teacher-day-today" aria-hidden="true">Today</small>
-                ) : null}
-                {!editing &&
-                segments.some((segment) => segment.date === date) ? (
-                  <i
-                    className="teacher-heading-booked-dot"
-                    aria-label="Lessons booked"
-                  />
-                ) : null}
-              </button>
-            );
+            return <div className="teacher-day-cell" key={day.value}>
+              <div className="teacher-day-cell__band">
+                <button className={`teacher-day-heading ${activeDay === index ? "is-selected" : ""}`}
+                  type="button" aria-label={editing ? `${day.name}, show weekly hours` : `${dateLabel(date)}, show lessons`}
+                  aria-pressed={activeDay === index} onClick={() => {
+                    if (index !== activeDay) openDay(index);
+                    onSelectDay(index);
+                    setFocus(current => ({ ...current, day: day.value }));
+                  }}>{dayLabel(index)}</button>
+                {!editing ? dayOffSwitch(index) : null}
+              </div>
+            </div>;
           })}
         </div>
-        {!editing ? (
-          <div className="teacher-day-toggles">
-            <span aria-hidden="true" />
-            {shown.map((index) => {
-              const day = WEEKDAYS[index];
-              const date = shiftDate(weekStart, index);
-              const off = offDays.has(date);
-              return (
-                <div
-                  className="teacher-day-toggle-cell"
-                  data-mobile-active={activeDay === index}
-                  key={day.value}
-                >
-                  <button
-                    className="teacher-day-toggle"
-                    type="button"
-                    role="switch"
-                    aria-checked={off}
-                    aria-label={`Day off, ${dateLabel(date)}`}
-                    disabled={date < today}
-                    onClick={() => onDayOff(date, !off)}
-                  >
-                    <span
-                      className="teacher-day-toggle__track"
-                      aria-hidden="true"
-                    />
-                    Day off
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
+        {!editing ? <div className="teacher-mobile-day-band">
+          <span className="teacher-axis-heading">Porto</span>
+          <span className="teacher-day-heading">{dayLabel(activeDay)}</span>
+          {dayOffSwitch(activeDay)}
+        </div> : null}
         <div
           className="teacher-timetable-scroll"
           ref={scrollRef}

@@ -15,6 +15,8 @@ import {
   hoursProblem,
   lessonStarts,
   mondayOf,
+  needsYou,
+  gettingStarted,
   paintHours,
   removeSpan,
   shiftDate,
@@ -331,4 +333,100 @@ test("her try-out paints every expression, drafts included, before any comes aga
   for (let round = 0; round < 30; round += 3) assert.deepEqual(painted.slice(round, round + 3).sort(), ["a", "b", "c"]);
   assert.ok(painted.every((id, index) => id !== painted[index - 1]), painted.join(""));
   assert.equal((await source.pick("press-29")).expression.id, painted[29], "the same press paints the same one");
+});
+
+test("Needs you lists only what waits on her, once each, and empties on its own", () => {
+  const now = new Date("2026-09-07T10:00:00Z");
+  const ago = (hours) => new Date(now.getTime() - hours * 3_600_000).toISOString();
+  const row = (id, starts, extra = {}) => ({
+    id, status: "confirmed", student_name: "Sam Known", student_email: "sam@example.invalid",
+    starts_at: `${starts}T10:00:00Z`, ends_at: `${starts}T11:00:00Z`, reschedule_count: 0, ...extra,
+  });
+  const meet = { configured: true, connected: true, email: null, needsReconnect: true, pending: 0 };
+  const student = (id, extra) => ({ id, name: id, email: `${id}@example.invalid`, awaitingWelcome: true, ...extra });
+  const lessons = [
+    row("changed-recent", "2026-09-10", { student_changed_at: "2026-09-06T12:00:00Z", previous_starts_at: "2026-09-09T10:00:00Z" }),
+    row("changed-old", "2026-09-10", { student_changed_at: "2026-09-04T09:00:00Z" }),
+    row("moved-by-her", "2026-09-10", { reschedule_count: 1 }),
+    row("changed-started", "2026-09-07", { starts_at: "2026-09-07T09:30:00Z", ends_at: "2026-09-07T10:30:00Z", student_changed_at: ago(1) }),
+    row("w1", "2026-09-11", { series_id: "s1", student_changed_at: ago(5) }),
+    row("w2", "2026-09-18", { series_id: "s1", student_changed_at: ago(5) }),
+    row("first-soon", "2026-09-08", { first_lesson: 1 }),
+    row("first-far", "2026-09-20", { first_lesson: 1 }),
+    row("first-added", "2026-09-08", { first_lesson: 1, added_by_teacher: 1 }),
+    // A first lesson the student changes shows once, as changed.
+    row("first-changed", "2026-09-15", { first_lesson: 1, student_changed_at: ago(2) }),
+    // A lesson she added is never read as the student's first, moved or not.
+    row("added-changed", "2026-09-15", { first_lesson: 1, added_by_teacher: 1, student_changed_at: ago(2) }),
+    // Set up with no email yet, so nothing is listed or sent about them.
+    row("no-email", "2026-09-09", { first_lesson: 1, student_email: "no-email:abc" }),
+  ];
+  const cancellations = [
+    row("c1", "2026-09-12", { status: "cancelled", cancelled_by: "student", cancelled_at: ago(2) }),
+    row("c-teacher", "2026-09-12", { status: "cancelled", cancelled_by: "teacher", cancelled_at: ago(2) }),
+    // A refunded run stamps each lesson separately: still one card.
+    row("r1", "2026-09-16", { status: "cancelled", cancelled_by: "student", series_id: "s2", cancelled_at: ago(10) }),
+    row("r2", "2026-09-23", { status: "cancelled", cancelled_by: "student", series_id: "s2", cancelled_at: ago(9) }),
+    row("c-old", "2026-09-13", { status: "cancelled", cancelled_by: "student", cancelled_at: ago(73) }),
+  ];
+  const students = [
+    student("Ana", { nextLessonAt: "2026-09-09T10:00:00Z" }),
+    student("Kai", { nextLessonAt: "2026-09-20T10:00:00Z" }),
+    student("Bea", { email: "", nextLessonAt: "2026-09-08T10:00:00Z" }),
+    student("Cal", { email: "no-email:xyz", nextLessonAt: "2026-09-08T10:00:00Z" }),
+    student("Dot", { awaitingWelcome: false, nextLessonAt: "2026-09-08T10:00:00Z" }),
+  ];
+  const items = needsYou({ now, meet, payments: [{ id: "p1", reference: "REVIEW-1", payment_status: "processing" }], students, lessons, cancellations });
+  assert.deepEqual(new Set(items.map(item => item.key)), new Set([
+    "meet", "payment:p1", "first:first-soon", "welcome:Ana", "welcome:Kai", "email:Bea", "email:Cal", "changed:changed-recent", "changed:w1", "cancelled:c1", "changed:first-changed", "changed:added-changed", "cancelled:r1",
+  ]));
+  const changes = items.filter(item => item.kind === "changed");
+  assert.equal(changes[0].key, "changed:first-changed", "newest student changes lead older ones");
+  const by = (key) => items.find((item) => item.key === key);
+  assert.equal(by("meet").reconnect, true);
+  assert.equal(by("payment:p1").part, "lesson");
+  assert.equal(by("changed:w1").count, 2);
+  assert.equal(by("cancelled:r1").count, 2);
+  assert.equal(by("changed:first-changed").first, true);
+  assert.equal(by("changed:added-changed").first, false);
+
+  // Resolved, started or out of time: nothing waits, and nothing is stored to dismiss.
+  assert.deepEqual(needsYou({ now, meet: { ...meet, configured: false }, payments: [], students: [], lessons: [], cancellations: [] }), []);
+  assert.deepEqual(needsYou({ now, meet: { ...meet, needsReconnect: false }, payments: [], students: [], lessons: [], cancellations: [] }), []);
+  // Each clears on its own: after three days, or once the lesson has begun.
+  const alone = (at, rows) => needsYou({ now: new Date(at), meet: null, payments: [], students: [], lessons: rows, cancellations: [] }).map((item) => item.key);
+  assert.deepEqual(alone("2026-09-09T11:00:00Z", [lessons[0]]), ["changed:changed-recent"]);
+  assert.deepEqual(alone("2026-09-09T13:00:00Z", [lessons[0]]), []);
+  const today = row("today", "2026-09-07", { starts_at: "2026-09-07T12:00:00Z", ends_at: "2026-09-07T13:00:00Z", student_changed_at: "2026-09-07T09:00:00Z" });
+  assert.deepEqual(alone("2026-09-07T10:00:00Z", [today]), ["changed:today"]);
+  assert.deepEqual(alone("2026-09-07T12:30:00Z", [today]), []);
+});
+
+
+test("setup steps separate her to-dos from waiting on students, with welcomes at any time", () => {
+  const student = (id, extra) => ({ id, name: id, email: `${id}@example.invalid`, signedIn: false, hasCard: false, hasLessons: true, awaitingWelcome: true, ...extra });
+  const students = [
+    student("email", { email: "" }),
+    student("lessons", { hasLessons: false }),
+    student("welcome", { nextLessonAt: null }),
+    student("far", { nextLessonAt: "2027-01-01T10:00:00Z" }),
+    student("sign-in", { awaitingWelcome: false }),
+    student("card", { awaitingWelcome: false, signedIn: true }),
+    student("self-booked", { awaitingWelcome: undefined, signedIn: true, hasCard: true }),
+    student("past", { awaitingWelcome: false, signedIn: true, hasCard: true, nextLessonAt: null }),
+  ];
+  const setup = gettingStarted(students);
+  assert.deepEqual(setup.map(row => [row.student.id, row.next, row.owner]), [
+    ["email", "email", "Yours"], ["lessons", "lessons", "Yours"], ["welcome", "welcome", "Yours"], ["far", "welcome", "Yours"],
+    ["sign-in", "sign-in", "Theirs"], ["card", "card", "Theirs"],
+  ]);
+  assert.deepEqual(setup.map(row => row.steps.map(step => step.done)), [
+    [false, true, true, false, false, false], [true, true, false, false, false, false],
+    [true, true, true, false, false, false], [true, true, true, false, false, false],
+    [true, true, true, true, false, false], [true, true, true, true, true, false],
+  ]);
+  const tasks = needsYou({ now: new Date("2026-10-14T10:00:00Z"), meet: null, payments: [], students, lessons: [], cancellations: [] });
+  assert.deepEqual(new Set(tasks.map(item => item.key)), new Set(["welcome:far", "email:email", "lessons:lessons", "welcome:lessons", "welcome:welcome"]));
+  assert.ok(tasks.every(item => setup.some(row => row.student.id === item.student.id && row.owner === "Yours")), "the tab count excludes waiting on them");
+  assert.deepEqual(gettingStarted([student("cards-off", { awaitingWelcome: false, signedIn: true })], false), [], "cards switched off do not hold setup open");
 });

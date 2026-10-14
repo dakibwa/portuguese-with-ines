@@ -359,15 +359,23 @@ usual lesson starts and days off; avoid a wall of administration forms.
   as she clicks; the line under the calendar says what changed or what failed.
   Weekly blocks such as lunch are shown but not toggled per date. Keyboard and
   touch input must work without dragging.
-- A sliding tab bar groups `Timetable` (her week; renamed from `Week`, 13
-  October 2026, Dan), `Weekly hours`, `Time off`, `Students`, `Receipts`,
-  `Expressions` and `Google Meet`. Open on `Timetable`; keep the week pager
-  beside its date heading.
-  On narrow screens only the tab strip scrolls horizontally. Arrow keys, Home
-  and End move between tabs. Unsaved hours and selected dates survive tab changes;
-  an unsaved-hours dot stays visible on its tab, and `Students` carries a dot
-  while someone is still to bring in. Google Meet uses its logo, with an
-  accessible name and its connection-attention dot.
+- A sliding tab bar groups `Needs you`, `Timetable`, `Weekly hours`, `Time off`,
+  `Students`, `Receipts`, `Expressions` and `Profile`. Open on `Timetable`;
+  keep the week pager beside its date heading. The phone bar holds all eight
+  tabs in two rows, without scrolling. Arrow keys, Home and End move between
+  tabs. Unsaved hours and selected dates survive tab changes. Weekly hours
+  keeps its unsaved dot; Needs you shows a coral count of her To do cards,
+  absent at zero. Profile holds her sign-in email, password link, Google Meet
+  connection and Sign out, keeping account controls away from daily work.
+- One pager turns the Timetable's week and the Time off and Receipts months
+  (14 October 2026, Dan: "there feels inconsistencies here"): two solid blue
+  arrows that never move, and `This week` / `This month` as a quiet text
+  button to their left only while she is away from the current one, because
+  the heading already names where she is. Its place is held while it is out of
+  sight, so the arrows, the heading and the grid beneath never shift between
+  states, and a narrow screen lays heading and pager out the same either way.
+  Using it returns to the current period and puts focus on the heading, since
+  the button has just gone. It is never shown, or dead, on the current period.
 - Keep help short (13 October 2026, Dan: "remove all the redundant text"). The
   active tab supplies the page name; avoid repeating it under an eyebrow, and
   say a thing once. Any helpful list uses the confirm step's splat dabs
@@ -393,20 +401,26 @@ usual lesson starts and days off; avoid a wall of administration forms.
   editor retains control of off-grid windows.
 - `Time off` is a month beside one card, with one way to choose: tap days,
   one or several, across months and tabs (13 October 2026, Dan). The card
-  starts `Tap the days you want off`; with days chosen it names them (the
-  date for one, chips for several), what they already hold (`A day off`,
-  `Off 10:00–11:30`), and under `Already booked` each lesson on them as a
-  booked-lesson card (without its date when one day is chosen). Then `Take
-  the day off` / `Take 3 days off` in coral, counting only the days not
-  already off,
-  `Take some hours off` (one day) in soft lilac, and `Make available` only when a
+  starts `Tap the days you want off`; with days chosen it reads the same for
+  one as for many (14 October 2026, Dan: "rather than it be different if its
+  one or two days"): `1 day chosen` / `3 days chosen` with `Clear`, over a
+  removable chip for every chosen day. Beneath the chips, a single day also
+  shows what it already holds (`A day off`, `Off 10:00–11:30`); under
+  `Already booked`, each lesson on the chosen days is a booked-lesson card with
+  its date. Then `Take the day off` / `Take 3 days off` in coral, counting only
+  the days not already off,
+  `Take some hours off` (one day, because hours belong to one date) in soft
+  lilac, and `Make available` only when a
   chosen day is off. Some hours opens a small dialog of one or more breaks in
   Porto time, saved only with `Save hours off`; a failed save keeps the draft.
   `Remove hours off` clears that date's breaks. Making days available removes
   only the whole-day block and keeps their hours off and weekly rules. On a
   phone held upright the card rides at the foot of the screen once a day is
-  chosen; held sideways, and on a tablet, it sits beside the month (beneath
-  it on the smallest), never over it.
+  chosen, its chips in one row that scrolls sideways (the month behind it is
+  mostly hidden, so it still names the days without growing taller); held
+  sideways, and on a tablet, it sits beside the month (beneath it on the
+  smallest), never over it. The upright sticky card has a half-screen maximum
+  height and scrolls inside when several booked lessons fill it.
   The month marks whole days off and booked lessons, without repeating weekly
   unavailability or partial blocks from the timetable.
   Time off prevents new bookings; existing lessons stay until she changes them.
@@ -415,6 +429,45 @@ usual lesson starts and days off; avoid a wall of administration forms.
   which opens that lesson's own dialog to move or cancel it, keeping her
   draft (13 October 2026, Dan: "it should show the person's lesson card for
   Inês to move if she needs to").
+- `Needs you` (14 October 2026) is the first tab, with two sections.
+  `To do` holds one card and one action for each thing waiting on her: Meet
+  reconnect, a payment to check, a new student's first lesson, a student's
+  recent change or cancellation, a missing email, lessons still to add, and
+  every welcome owed once there is an email, even without an imminent lesson.
+  Meet and payments lead; dated student changes follow newest first, then
+  undated tasks by next lesson and name. Cancelled lessons open read-only.
+  Welcomes use `onlyIfWaiting: true`. With no tasks, say
+  `Nothing needs you right now.` Only To do contributes to the tab count.
+  `Getting started` is a working interface, not only a progress list (Dan's
+  follow-up, 14 October). Each compact row has their name and splat, six
+  painted dabs — Email, Price, Lessons, Welcome, Signed in and Card — and
+  `Yours` or `Theirs` beside the next action. Standard prices are valid and
+  count as ready; a custom price is optional. A confirmed past lesson counts
+  for Lessons, so finishing a course does not create a new onboarding task.
+  Her steps expand in place: edit details, change prices, add lessons or send
+  their welcome without leaving Needs you. Adding lessons opens a calendar
+  with available starts in Porto; choosing a day and time fills the lesson
+  form. Length, location and weekly repeat stay together. A quiet manual-time
+  option keeps the times she arranges outside public availability possible. To do opens the same inline task.
+  Welcomes stay explicit: opening a step never sends an email. Each editor
+  keeps its existing validation and explains whether the change was saved.
+  Sign-in and card still belong to the student, with a quiet lilac
+  `Send the link again`. It requests a fresh link through the existing welcome
+  endpoint without `onlyIfWaiting`, shows its rate-limit message unchanged,
+  and never sends without an email. A card is not required when cards are
+  unavailable. Her student's name opens their details in the same row; the
+  complete profile remains in Students. Hide the section when everyone is set up.
+  The Timetable keeps at most three cards under the next lesson, with
+  `See all in Needs you` when more are waiting. Items clear from the same
+  existing reads; there is nothing to dismiss or new to store.
+- Each date has one compact header cell: weekday and bold date baseline-aligned
+  on one line (`Mon 7`), today's number in a filled blue lozenge with cream
+  type, and the booked dot inline after it. Its Day off switch sits at the
+  right, moving to a second short line inside the cell when the column cannot
+  fit both. It has a 44px hit area and keeps its full dated accessible name.
+  There is no separate Day off row. The phone's day choices stay compact;
+  the shown day's matching heading and switch share the band immediately
+  above its time grid. `PORTO` stays aligned with the time column.
 - Show the full working week on desktop and in a panel wide enough to read it.
   On phones, keep the displayed days in a compact selector
   above a spacious single-day timetable and that day's `Day off` switch, with
@@ -432,62 +485,119 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - The timetable spans 08:00–20:00 and widens to fit any weekly hours or
   lessons outside it. There is no 24-hour view; early or late hours are set
   with the exact-time editor.
-- The `Google Meet` tab is one card: the logo and `Connected as …` (or what
+- Google Meet lives inside `Profile` (14 October 2026, Dan), in one card: the logo and `Connected as …` (or what
   it needs), two dabs (every lesson goes to her Google Calendar with its Meet
   link; move or cancel lessons here, not in Google), then `Open Google
   Calendar` with `Reconnect Google Meet` as a quiet link, or a coral connect
-  when it needs her, and `Share your calendar` folded beneath. Its tab shows a dot when the connection needs attention.
-  Returning from Google opens this tab with the connection result.
+  when it needs her, and `Share your calendar` folded beneath. When the connection needs her, `Needs you` on her Timetable says so.
+  Returning from Google opens Profile with the connection result. The same
+  tab lets her request a confirmed sign-in email change or an emailed password
+  reset, using the existing account flows. Sign out stays at its foot and
+  preserves the unsaved-hours warning. Account and Meet cards share a row
+  where they fit and stack on a phone.
 - Every booked lesson shows its time, student and explicit `Online` or `In Porto`
   label in both layouts, including 60-minute blocks. Keep the location icons and
   coral marker for Porto lessons.
-- A student and their lessons live in one dialog, and there are no loose
-  lessons: every lesson belongs to a student she has set up (13 October 2026,
-  Dan: "so it all feels integrated"). `Add a student` (coral, leading the
-  Students tab) opens it on their details: full name, email, phone, NIF (for
-  receipts), their price for 60 and 90 minute lessons (two € fields side by
-  side, the standard price showing until she types her own) and their splat in
-  the student's own picker, under two dabs (their
-  details now, their lessons next; nothing is emailed until their welcome).
-  `Next: their lessons` keeps the same dialog, now headed with their splat and
-  name, on the lesson form; each lesson added becomes a dab line (`Thu 10
-  Sept, 10:00 · weekly, 8 lessons`), and the foot offers a coral `Send
-  welcome email` once there is a lesson, with `Add lesson` then turning blue,
-  and `Done, send later`. Opened from a free time, the lesson there comes
-  first: `Add lesson` stays coral and the welcome waits until it is added. `Add lesson` on a
-  student's card opens it at their lessons. A free time on her week opens it
-  as `Add a lesson` with the date and time, asking `Whose lesson?` over her
-  students' splats and names, with `Add a new student` beneath, and keeps
-  that time through to the lesson. Until their welcome a card reads `Set up,
-  not emailed yet`, lesson buttons drop `and email student`, and moving or
-  cancelling says they aren't emailed. Everything for Inês still happens: her
-  calendar, the blocked time and the lesson's NIF.
+- A student has one profile, and there are no loose lessons: every lesson
+  belongs to a student she has set up (13 October 2026, Dan: "so it all feels
+  integrated"). The profile is one dialog, and everything that is about a
+  student opens that profile (14 October 2026, Dan: "the add a lesson button
+  and click the card should be the same", "simple, beautiful and use the space
+  accordingly"): a student's card, its `Add a lesson` button, the end of `Add a
+  student`, and a free time on her week. Top to bottom it is a small `Student`
+  eyebrow over their name in bold beside their splat, their address (`No email
+  yet` where there is none), then `No NIF (consumidor final)` or their NIF and a
+  text `Edit details` button on one line; the cream `Their price` card (each
+  length as a dab, a lilac `Change price`); the `Add a lesson` button, with
+  `Send welcome email` beside it where it applies; what was just added; then
+  their upcoming and past lessons. Opening it changes nothing and sends nothing.
+  - `Edit details` stays one button. It brings out everything together, in
+    place, under the name: full name, email, phone and NIF, labelled, two to a
+    row where the dialog is wide and one column on a phone, with `Save details`
+    and `Cancel` sharing the last row and the address and NIF lines it replaces
+    put away meanwhile. There are no per-field buttons. A student who has
+    signed in changes their own email, so that field is disabled. While it is
+    open `Save details` is the one coral action, and `Add a lesson` and `Send
+    welcome email` are lilac. Their email and phone have a line each; the NIF
+    and `Edit details` share the last line at any width.
+  - `Add a lesson` on a Students card opens the profile with its lesson calendar
+    already expanded. Within the profile it opens the same form in place, under its own heading, with
+    `Cancel` beside the submit. Lengths carry their price from the student's
+    own rate. Adding returns to the profile with each addition as a dab line
+    (`Thu 10 Sept, 10:00 · weekly, 8 lessons`) under an `Added` label and the
+    lessons list read again; `Add a lesson` is coral unless their welcome is
+    the next thing, when `Send welcome email` is coral and `Add a lesson` lilac.
+  - A lesson never needs an email. A student she set up from a name alone has
+    lessons like anyone, on the same form, prices, Meet and calendar; a quiet
+    note under the actions says their welcome email waits until she adds their
+    email under `Edit details`, and `Send welcome email` appears once there is
+    one. Until their welcome a card reads `Set up, not emailed yet` (or `Set
+    up, no email yet`), lesson buttons drop `and email student`, and moving or
+    cancelling says they aren't emailed. Everything for Inês still happens:
+    her calendar, the blocked time and the lesson's NIF.
+  - The Students toolbar always shares one row: `Find a student` flexes on
+    the left and coral `Add a student` stays on the right. Phones shorten it
+    to icon plus `Add`, keeping its full accessible name and 44px height.
+    A student's whole card opens the profile through the name button's
+    stretched hit area, with whole-card hover and keyboard focus. Add lesson
+    and Send welcome email sit above that hit area and keep their own actions.
+  - `Add a student` opens the profile's
+    first step: full name, email, phone, NIF, their price for 60 and 90 minute
+    lessons (two € fields side by side, the standard price showing until she
+    types her own) and their splat in the student's own picker, under two dabs
+    (their details now, their lessons next; nothing is emailed until their
+    welcome), in the same two-to-a-row, one-column-on-a-phone grid. `Next:
+    their lessons` lands on their profile with the lesson form already open.
+  - A free time on her week opens the dialog as `Add a lesson` with the date
+    and time, asking `Whose lesson?` over her students' splats and names, with
+    `Add a new student` beneath. Choosing one lands on their profile with the
+    lesson form already open at that date and time; adding it returns to the
+    profile, and focus returns to the week's heading when it closes.
+  - Opening Edit details closes the lesson form, and opening the lesson form
+    closes Edit details, so the two editors never compete.
+  - Sent from the profile or from the card, `Send welcome email` is one email
+    for everyone, in the site's email design: their lessons and prices, and the
+    way in. It shows for someone she still needs to bring in, and only once
+    they have an address. After the two `Your price` dabs (for each length she
+    has priced), each lesson on its own is one dab: `Lesson · Online` (or
+    `Trial lesson`, `In Porto`) over its date and time on the student's own
+    clock, each time naming it as every email to them does (`Tuesday 20 October
+    2026, 17:00 · Porto time`), and its length and the price it will be charged
+    or owed beneath (`60 minutes · €22`, or `· €22 paid` once paid). A weekly
+    run is one dab, never a row of dates: `Weekly · Online` over `Every Tuesday,
+    17:00 · Porto time`, `From 20 October 2026 until 8 December 2026` (or `…,
+    until you stop it` while it is active), any week between with no lesson
+    (`No lesson on 3 November`, so a skipped or cancelled week is never read as
+    a lesson) and `60 minutes · €22 a lesson`. A lesson moved, lengthened or put
+    elsewhere reads as the lesson it now is. Past twelve lines an `And more` dab
+    says how many lessons are left to the website. Its subject and preheader do
+    not change.
 - `Receipts`, a tab of its own beside `Students` (13 October 2026, Dan: "make
   her automation as easy as possible"), shows a month at a time with the
-  Time off month's pager: two dabs for what there is to issue (`3 receipts
-  to issue · €50`) and what is still to be paid, a lilac `Download CSV`, then
+  Time off month's pager (the one pager above): two dabs for what there is to
+  issue (`3 receipts to issue · €50`) and what is still to be paid, a lilac
+  `Download CSV`, then
   one plain table row per amount (lesson, student, NIF or `Consumidor final`,
   what it is for, amount, and a pill: `Paid by card`, `Paid by hand`,
   `Payment due`, `Being charged`, `Refunded`). On a phone, and up to 720 px,
   each row is a small cream card, two across where they fit, its NIF and what
   it is for sharing a line. Rows carry their id and figures as data attributes, so her
   automation can read the table, the CSV or the Worker's JSON alike. Up to a
-  small tablet, held either way, the tools sit in two rows (her week's three,
-  then the rest with Meet's logo in the small last place), so no tab hides
-  past the edge; wider, all seven and `Sign out` share one row.
-- Keep `Sign out` beside the tools bar. `Students` holds the student
-  cards, each a profile (splat, name, address and an arrow into their history)
-  over dabs for where they are, their next lesson and their own price when
-  she has set one, then the site's own
-  blue `Add lesson` and coral `Send welcome email`; no sentence above them. Selecting a student's card opens their lesson
-  profile: `Their price` first (each length as a dab, `· standard` where she
-  hasn't set one, and a lilac `Change price` that opens the two fields in
-  place and says how many lessons to come moved to it), then their lesson
-  history: upcoming lessons first, then past and cancelled, one card each with
+  small tablet, held either way, the eight tools sit in two rows, so no tab
+  hides past the edge; wider, they share one row. Sign out is inside Profile.
+- `Students` holds the student
+  cards, each a profile button (splat, name, address or `No email yet`, and an
+  arrow into their profile) over dabs for where they are, their next lesson and
+  their own price when she has set one, then the site's own blue `Add a
+  lesson` and coral `Send welcome email`; no sentence above them. The card and
+  its `Add a lesson` open the same profile, whose lessons are their history:
+  upcoming lessons first, then past and cancelled, one card each with
   the date and time on one line (the year only when it isn't this one), a pill
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
+  `Change price` opens the two fields in place and says how many lessons to
+  come moved to it, and `· standard` marks a length she hasn't priced.
   History includes older lessons outside the current week and follows the account
   after an email change. Loading, failed reads and an empty history stay distinct.
   Reading history never changes a booking or sends a message.
@@ -558,8 +668,11 @@ anonymous page or main-menu item.
 - The coral `Add an expression` leads. Search matches accents flexibly across
   expressions, meanings, examples and notes. The theme filter includes entries
   with no theme. Do not display the original collection's count.
-- Each card shows a small `Draft` or `Published` pill, then its facts in
-  reading order, each under a small uppercase label after a dab of paint:
+- Each list card groups its small `Draft` or `Published` pill with the ↑↓
+  arrows in its head. Facts keep their reading order and painted label dabs.
+  At 27rem of inner card width the head sits level with the title at the top
+  right, and each label sits beside its value; narrower cards and the preview
+  keep labels above values:
   `Ao pé da letra` (the literal translation, when there is one), `Quer dizer`
   (the Portuguese meaning, a step larger than the rest) and `Em inglês`; then
   `Exemplo`/`Exemplos`, where the expression's own words are marked with a
@@ -575,8 +688,11 @@ anonymous page or main-menu item.
 - `Preview as students see it` renders the same reading-card component, without
   teacher actions or publication pills. The surrounding private-preview note
   is for Inês only. Previewing a draft does not publish it.
-- Two reading columns fit a wide desktop; use one on phones. All seven tabs
-  remain reachable without horizontal page overflow, including at 320px.
+- A 26rem minimum card grid uses at most four columns, with cards aligned at
+  their tops and hugging their contents. Phones use one column. Edit, Preview
+  and Publish share one row, except at 320px where the last action may fill
+  its own row. The shared preview and try-out reading stay unchanged. All eight
+  tabs remain reachable without horizontal page overflow, including at 320px.
   Long expressions, notes and examples wrap within the card. Fields and actions
   also fit a 320px dialog.
 - All imported entries are drafts. The reference bundle has no usage examples
@@ -1446,13 +1562,13 @@ as a form:
 - signed in, booking is headed by the account's own bar, as Your lessons is:
   the name's menu, or the places open on a wide card, holding the way back;
 - Inês's schedule reads as the same place: the booking page's blue band,
-  one sliding bar for `Timetable`, `Weekly hours`, `Time off`, `Students`
-  and `Google Meet`, beside a small `Sign out`; sliders for a
+  one bar for `Needs you`, `Timetable`, `Weekly hours`, `Time off`, `Students`,
+  `Receipts`, `Expressions` and `Profile`; sliders for a
   lesson's length and place in her lesson form, with the
   timetable's globe and person beside Online and In Porto, her sign-in with no `Create an account`, and each student's chosen
   splat beside their name when she opens a lesson. Her week is set as the
-  student's calendar: a hand-cut card, quiet capital weekdays with `Today`
-  in words, the solid blue arrows, blue lessons over a faint coral wash for
+  student's calendar: a hand-cut card, compact weekday/date headings with today
+  in a blue date lozenge, the solid blue arrows, blue lessons over a faint coral wash for
   her weekly hours, Monday to Friday only (a weekend day appears when it
   holds a lesson or hours of its own), and each lesson marks its place
   as the student's calendar does, a globe or a person in its top right
@@ -1484,8 +1600,8 @@ as a form:
   `Students` holds small sheet cards, two across where there is room: the student's splat (or initial), name and address, one
   plain status line (a coral dot and `Not signed in yet · 1 lesson paid by
   hand`, or a check and `All set: signed in, card saved`), the next
-  lesson with a `Weekly` pill, and beneath a rule `Add lesson` (her form
-  opens with them in it, on the date) and, only for someone still to bring
+  lesson with a `Weekly` pill, and beneath a rule `Add a lesson` (their
+  profile, the same as the card) and, only for someone still to bring
   in, a coral `Send welcome email` (one email for everyone: their lessons and the
   way in). Those come first, their card edged in
   coral (12 October 2026, Dan: "can this be more beautiful"). Her form's
@@ -1505,7 +1621,24 @@ as a form:
   with no `at`, each fact beside one of the confirm step's dabs with its label
   small above it, Google Meet's mark beside a lesson's call and on its button,
   and a hand-cut button. The dabs and mark are PNGs on the live site
-  (`public/email/`, `npm run build:email-icons`);
+  (`public/email/`, `npm run build:email-icons`). The day-before reminder's
+  coral button is `Join Google Meet` when an online lesson's link is ready,
+  with `Change or cancel this lesson` as a quiet underlined link beneath it,
+  the email form of "a quiet link for a rare one" (14 October 2026);
+  otherwise its button is `Change or cancel this lesson`, as in the
+  confirmation. It names when free changes end as a date and time on the
+  lesson's own clock and uses no relative day words. Short facts at the foot
+  are the confirm step's dabs, one sentence per dab with any amount in coral
+  (`Move or cancel free until 14 hours before the lesson.` / `After that,
+  moving or cancelling costs €5.`); a one-line note (a late fee, a refund,
+  Inês's receipt reminder) is one coral dab rather than a second panel, so
+  the lesson's date is the only panel besides the numbered steps; a run of
+  lessons names each one short and bold (`Tue 3 Nov, 08:00`) over its call,
+  as the confirmation does; Inês's copies give the student's own time as a
+  labelled fact in the date panel; a date, a time and its clock, and a number
+  and its word never break inside, and no heading or fact leaves one word
+  alone. The text part says exactly what it said (14 October 2026, Dan:
+  "beautification on the emails too to use the bullets etc like in others");
 - shorter helper copy: `Nothing booked yet.` alone; no intro sentence on the
   `Your account` sign-in; a clashing week `won't be booked; the rest go ahead`
   without the advice the choices bar already gives; the change overlay asks

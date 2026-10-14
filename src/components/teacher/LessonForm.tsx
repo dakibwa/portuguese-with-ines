@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { Globe, UserRound } from "lucide-react";
-import { createBookingFor, type AdminStudent } from "@/lib/admin-api";
-import { formatMoneyCents, portoTimeToUtc } from "@/lib/booking-api";
+import { AdminApiError, createBookingFor, type AdminStudent } from "@/lib/admin-api";
+import { forgetAvailability, formatMoneyCents, portoTimeToUtc } from "@/lib/booking-api";
 import { lessonProducts } from "@/lib/lesson-products";
 import { priceFor } from "@/components/teacher/StudentPrice";
 import { dateLabel } from "@/lib/teacher-calendar";
+import { LessonDatePicker } from "@/components/teacher/LessonDatePicker";
 
 type Repeat = "once" | 4 | 6 | 8 | "open";
 
@@ -14,6 +15,7 @@ const empty = {
   lessonType: "single",
   date: "",
   time: "17:00",
+  startAt: "",
   location: "online" as "online" | "porto",
   repeat: "once" as Repeat,
 };
@@ -43,8 +45,9 @@ function addedLine(
 /**
  * A lesson for one of her students: the lesson, where, how often and when.
  * It only ever belongs to a student she has set up (13 October 2026, Dan: no
- * loose lessons), so there is no address to type. Lessons for a student still
- * awaiting their welcome are added quietly.
+ * loose lessons), so there is no address to type, and none is needed: a
+ * student with no email yet has lessons like anyone else (14 October 2026,
+ * Dan). Lessons for a student still awaiting their welcome are added quietly.
  */
 export function LessonForm({
   token,
@@ -55,6 +58,7 @@ export function LessonForm({
   tone = "coral",
   onCreated,
   onBusy,
+  onCancel,
 }: {
   token: string;
   student: AdminStudent;
@@ -65,12 +69,15 @@ export function LessonForm({
   tone?: "coral" | "blue";
   onCreated: (message: string) => void;
   onBusy?: (busy: boolean) => void;
+  /** Back to where she was, without adding anything. */
+  onCancel?: () => void;
 }) {
   const [lesson, setLesson] = useState({ ...empty, date, time });
   const quiet = Boolean(student.awaitingWelcome);
   // A trial is one first lesson, and choosing it puts How often back to once.
   const weekly = lesson.repeat !== "once";
   const [busy, setBusyState] = useState(false);
+  const [availabilityRefresh, setAvailabilityRefresh] = useState(0);
   const [error, setError] = useState("");
   const setBusy = (value: boolean) => {
     setBusyState(value);
@@ -82,23 +89,29 @@ export function LessonForm({
         className="teacher-form teacher-manual-form"
         onSubmit={async (event) => {
           event.preventDefault();
-          if (busy) return;
+          if (busy || !lesson.date || !lesson.time) return;
           setBusy(true);
           setError("");
           try {
             const result = await createBookingFor(token, {
-              email: student.email,
-              name: student.name,
+              studentId: student.id,
               lessonType: lesson.lessonType,
-              startAt: portoTimeToUtc(lesson.date, lesson.time),
+              startAt: lesson.startAt || portoTimeToUtc(lesson.date, lesson.time),
               location: lesson.location,
               notes: "",
               ...(weekly ? { repeat: lesson.repeat as Exclude<Repeat, "once"> } : {}),
             });
             // Ready for their next lesson: the same choices, a new date.
-            setLesson((current) => ({ ...current, date: "" }));
+            forgetAvailability();
+            setAvailabilityRefresh(current => current + 1);
+            setLesson((current) => ({ ...current, date: "", startAt: "" }));
             onCreated(addedLine(lesson.date, lesson.time, lesson.repeat, result.series, result.emailed !== false));
           } catch (caught) {
+            if (caught instanceof AdminApiError && caught.status === 409 && lesson.startAt) {
+              forgetAvailability();
+              setAvailabilityRefresh(current => current + 1);
+              setLesson(current => ({ ...current, time: "", startAt: "" }));
+            }
             setError(
               caught instanceof Error
                 ? caught.message
@@ -125,7 +138,7 @@ export function LessonForm({
                   checked={lesson.lessonType === value}
                   disabled={busy}
                   name={`${idPrefix}-lesson`}
-                  onChange={() => setLesson({ ...lesson, lessonType: value, ...(value === "trial" ? { repeat: "once" as Repeat } : {}) })}
+                  onChange={() => setLesson({ ...lesson, lessonType: value, ...(lesson.startAt ? { time: "", startAt: "" } : {}), ...(value === "trial" ? { repeat: "once" as Repeat } : {}) })}
                   type="radio"
                   value={value}
                 />
@@ -213,36 +226,32 @@ export function LessonForm({
             </div>
           </fieldset>
         ) : null}
-        <label>
-          <span>{weekly ? "First date" : "Date"}</span>
-          <input
-            type="date"
-            required
-            disabled={busy}
-            value={lesson.date}
-            onChange={(e) => setLesson({ ...lesson, date: e.target.value })}
-          />
-        </label>
-        <label>
-          <span>Time in Porto</span>
-          <input
-            type="time"
-            required
-            disabled={busy}
-            value={lesson.time}
-            onChange={(e) => setLesson({ ...lesson, time: e.target.value })}
-          />
-        </label>
-        <div className="teacher-manual-submit">
+        <LessonDatePicker
+          date={lesson.date}
+          dateCaption={weekly ? "First date" : "Date"}
+          disabled={busy}
+          idPrefix={`${idPrefix}-date`}
+          lessonType={lesson.lessonType}
+          onChange={choice => setLesson(current => ({ ...current, ...choice, startAt: choice.startAt ?? "" }))}
+          refresh={availabilityRefresh}
+          startAt={lesson.startAt}
+          time={lesson.time}
+        />
+        <div className="teacher-manual-submit teacher-dialog-actions">
           <button
             className={`button button--${tone}`}
             type="submit"
-            disabled={busy}
+            disabled={busy || !lesson.date || !lesson.time}
           >
             {busy
               ? "Adding…"
               : `${weekly ? "Add weekly lessons" : "Add lesson"}${quiet ? "" : " and email student"}`}
           </button>
+          {onCancel ? (
+            <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">
+              Cancel
+            </button>
+          ) : null}
         </div>
       </form>
       {error ? (

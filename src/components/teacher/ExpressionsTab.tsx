@@ -137,7 +137,13 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
           const index = rows.findIndex((row) => row.id === item.id);
           return (
             <div className="teacher-expression" data-expression-id={item.id} key={item.id}>
-              <span className={`teacher-receipts__state${item.published ? " is-ready" : ""}`}>{item.published ? "Published" : "Draft"}</span>
+              <div className="teacher-expression__head">
+                <span className={`teacher-receipts__state${item.published ? " is-ready" : ""}`}>{item.published ? "Published" : "Draft"}</span>
+                <div className="teacher-expression__order">
+                  <button className="teacher-icon-button" type="button" disabled={busy || filtered || index === 0} aria-label={`Move ${item.expression} up`} onClick={() => void change(() => move(index, -1))}><ArrowUp size={18} aria-hidden="true" /></button>
+                  <button className="teacher-icon-button" type="button" disabled={busy || filtered || index === rows.length - 1} aria-label={`Move ${item.expression} down`} onClick={() => void change(() => move(index, 1))}><ArrowDown size={18} aria-hidden="true" /></button>
+                </div>
+              </div>
               <ExpressionCard expression={item} />
               <div className="teacher-expression__actions">
                 <button className="button button--blue button--compact" type="button" disabled={busy} onClick={() => setDialog({ expression: item, preview: false })}>Edit</button>
@@ -145,10 +151,6 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
                   <Eye size={16} aria-hidden="true" />Preview<span className="visually-hidden"> as students see it: {item.expression}</span>
                 </button>
                 <button className="button button--lilac button--compact" type="button" disabled={busy} onClick={() => void change(() => publish(item))}>{item.published ? "Unpublish" : "Publish"}</button>
-                <div className="teacher-expression__order">
-                  <button className="teacher-icon-button" type="button" disabled={busy || filtered || index === 0} aria-label={`Move ${item.expression} up`} onClick={() => void change(() => move(index, -1))}><ArrowUp size={18} aria-hidden="true" /></button>
-                  <button className="teacher-icon-button" type="button" disabled={busy || filtered || index === rows.length - 1} aria-label={`Move ${item.expression} down`} onClick={() => void change(() => move(index, 1))}><ArrowDown size={18} aria-hidden="true" /></button>
-                </div>
               </div>
             </div>
           );

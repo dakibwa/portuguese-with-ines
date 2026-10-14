@@ -97,24 +97,31 @@ export function PriceFields({ draft, disabled, idPrefix, onChange }: {
  * prices every lesson of theirs at that length, and lessons to come that
  * nothing is settled on follow it.
  */
-export function StudentPrice({ token, student, onChanged }: {
+export function StudentPrice({ token, student, onChanged, startEditing = false, idPrefix = "teacher-price", labelledBy, onBusy, onCancel }: {
   token: string;
   student: AdminStudent;
   onChanged: (student: AdminStudent) => void;
+  startEditing?: boolean;
+  idPrefix?: string;
+  labelledBy?: string;
+  onBusy?: (busy: boolean) => void;
+  onCancel?: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [draft, setDraft] = useState<PriceDraft>(() => priceDraft(student));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
 
   async function save() {
+    if (busy) return;
     const prices = pricesFromDraft(draft, { keepEmpty: true });
     if (!prices) {
       setError("Each price needs to be between €1 and €100.");
       return;
     }
     setBusy(true);
+    onBusy?.(true);
     setError("");
     try {
       const result = await setStudentPrices(token, student.id, prices);
@@ -127,19 +134,20 @@ export function StudentPrice({ token, student, onChanged }: {
       setError(caught instanceof Error ? caught.message : "The price couldn’t be saved.");
     } finally {
       setBusy(false);
+      onBusy?.(false);
     }
   }
 
   return (
-    <section className="teacher-price" aria-labelledby="teacher-price-title">
-      <h3 id="teacher-price-title">Their price</h3>
+    <section className="teacher-price" aria-labelledby={labelledBy ?? `${idPrefix}-title`}>
+      {!labelledBy ? <h3 id={`${idPrefix}-title`}>Their price</h3> : null}
       {editing ? (
         <form className="teacher-form" noValidate onSubmit={(event) => { event.preventDefault(); void save(); }}>
-          <PriceFields draft={draft} disabled={busy} idPrefix="teacher-price" onChange={setDraft} />
+          <PriceFields draft={draft} disabled={busy} idPrefix={idPrefix} onChange={setDraft} />
           <p className="teacher-price__hint">Leave 90 mins empty for 1.5× their 60, or both for the standard price.</p>
           <div className="teacher-dialog-actions">
             <button className="button button--coral button--compact" disabled={busy} type="submit">{busy ? "Saving…" : "Save price"}</button>
-            <button className="button button--outline button--compact" disabled={busy} onClick={() => { setEditing(false); setDraft(priceDraft(student)); setError(""); }} type="button">Cancel</button>
+            <button className="button button--outline button--compact" disabled={busy} onClick={() => { setEditing(false); setDraft(priceDraft(student)); setError(""); onCancel?.(); }} type="button">Cancel</button>
           </div>
         </form>
       ) : (

@@ -11,8 +11,8 @@ import {
 import { GoogleMeetLogo } from "@/components/GoogleMeetLogo";
 
 
-/** Connection controls live together in the Google Meet tab. */
-export function TeacherMeetConnection({ token, onAttentionChange }: { token: string; onAttentionChange: (attention: boolean) => void }) {
+/** Connection controls live beside sign-in details in Profile. */
+export function TeacherMeetConnection({ token, onConnectionChange }: { token: string; onConnectionChange: (connection: GoogleMeetConnection | null) => void }) {
   const [connection, setConnection] = useState<GoogleMeetConnection | null>(null);
   const [error, setError] = useState("");
   const [callbackResult, setCallbackResult] = useState("");
@@ -85,9 +85,8 @@ export function TeacherMeetConnection({ token, onAttentionChange }: { token: str
         ? "Google Meet couldn’t be connected. Please try again."
         : "";
 
-  useEffect(() => {
-    onAttentionChange(Boolean(attention || error || callbackResult === "error"));
-  }, [attention, error, callbackResult, onAttentionChange]);
+  // Needs you, on her timetable, says so when the connection needs her.
+  useEffect(() => { onConnectionChange(connection); }, [connection, onConnectionChange]);
 
   return (
     <section className="teacher-meet" aria-labelledby="teacher-meet-title">

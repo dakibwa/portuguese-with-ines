@@ -982,7 +982,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   useEffect(() => {
     // The verified account role selects the workspace, including sign-in
     // halfway through booking. Keep one teacher dashboard and one URL for it.
-    if (isTeacher) window.location.replace(`${SITE_BASE_PATH}/schedule/`);
+    if (isTeacher) {
+      const destination = new URL(`${SITE_BASE_PATH}/schedule/`, window.location.origin);
+      const emailToken = new URLSearchParams(window.location.search).get("emailToken");
+      if (emailToken) destination.searchParams.set("emailToken", emailToken);
+      // This account handoff skips its outgoing page turn. Chaining a new
+      // navigation into that turn can hold Chromium's destination frame.
+      window.addEventListener("pageswap", event => event.viewTransition?.skipTransition(), { once: true });
+      window.location.replace(`${destination.pathname}${destination.search}`);
+    }
   }, [isTeacher]);
   const [recurringRates, setRecurringRates] = useState<Record<number, number>>({});
   const recurringRatesVersion = useRef(0);

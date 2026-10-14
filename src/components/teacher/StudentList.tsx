@@ -6,7 +6,6 @@ import { AccountAvatar } from "@/components/AccountMenu";
 import { sendStudentWelcome, type AdminStudent } from "@/lib/admin-api";
 import { formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
-import { StudentHistory } from "@/components/teacher/StudentHistory";
 
 /**
  * Someone she still needs to bring in comes first: never signed in, or (where
@@ -36,8 +35,7 @@ function nextLesson(at: string) {
  * Her students at a glance, for the move onto the site (12 October 2026,
  * Dan): who has signed in, whose lessons a card pays for, and what comes
  * next, one small card each. The schedule reads the list with the page and
- * after every lesson she adds, so the count of those still to bring in shows
- * before she opens it and an open list is never stale.
+ * after every lesson she adds, so an open list is never stale.
  */
 /**
  * Her own price for them, when she has set one, read as every length choice
@@ -55,7 +53,7 @@ export function StudentList({
   cards,
   error,
   onAddStudent,
-  onAddLesson,
+  onOpenStudent,
   onStudentsChanged,
 }: {
   token: string;
@@ -64,12 +62,12 @@ export function StudentList({
   cards: boolean;
   error: string;
   onAddStudent: () => void;
-  onAddLesson: (student: AdminStudent) => void;
+  /** Their profile: the same from their card and from its Add a lesson button. */
+  onOpenStudent: (student: AdminStudent, addLesson?: boolean) => void;
   /** After a student is added or welcomed, so her list reads afresh. */
   onStudentsChanged: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<AdminStudent | null>(null);
   const [sending, setSending] = useState("");
   // Each answer stays on its own student's card, where she pressed.
   const [sent, setSent] = useState<Record<string, { ok: boolean; message: string }>>({});
@@ -103,23 +101,17 @@ export function StudentList({
     <section className="teacher-students" aria-labelledby="teacher-students-title">
       <h2 className="visually-hidden" id="teacher-students-title">Students</h2>
       <div className="teacher-students__bar">
-        <button className="button button--coral" onClick={onAddStudent} type="button">
+        <label className="teacher-students__search">
+          <span className="visually-hidden">Find a student</span>
+          <input onChange={(event) => setQuery(event.target.value)} placeholder="Find a student" type="search" value={query} />
+        </label>
+        <button className="button button--coral" aria-label="Add a student" onClick={onAddStudent} type="button">
           <UserPlus size={16} aria-hidden="true" />
-          Add a student
+          <span className="teacher-students__add-full" aria-hidden="true">Add a student</span>
+          <span className="teacher-students__add-short" aria-hidden="true">Add</span>
         </button>
       </div>
       <div className="teacher-manual-body">
-        {students && students.length > 8 ? (
-          <label className="teacher-students__search">
-            <span className="visually-hidden">Find a student</span>
-            <input
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Find a student"
-              type="search"
-              value={query}
-            />
-          </label>
-        ) : null}
         {error ? (
           <p className="teacher-inline-error" role="alert">
             {error}
@@ -135,7 +127,7 @@ export function StudentList({
             const answer = sent[student.id];
             return (
               <li className={`teacher-student${waitingOn ? " needs-her" : " is-ready"}`} key={student.id}>
-                <button className="teacher-student__profile" aria-label={`View lesson history for ${student.name}`} onClick={() => setSelected(student)} type="button">
+                <button className="teacher-student__profile" aria-label={`Open ${student.name}’s profile`} onClick={() => onOpenStudent(student)} type="button">
                   <AccountAvatar className="teacher-student__avatar" mark={student.mark} name={student.name} />
                   <span className="teacher-student__main">
                     <strong className="teacher-student__name">{student.name}</strong>
@@ -151,9 +143,9 @@ export function StudentList({
                   {theirPrice(student) ? <li>{theirPrice(student)}</li> : null}
                 </ul>
                 <div className="teacher-student__action">
-                  <button className="button button--blue button--compact" onClick={() => onAddLesson(student)} type="button">
+                  <button className="button button--blue button--compact" onClick={() => onOpenStudent(student, true)} type="button">
                     <CalendarPlus size={15} aria-hidden="true" />
-                    Add lesson
+                    Add a lesson
                     <span className="visually-hidden"> for {student.name}</span>
                   </button>
                   {/* Only someone still to bring in needs a way in sent, and only to an address. */}
@@ -181,15 +173,6 @@ export function StudentList({
           })}
         </ul>
       </div>
-      {selected ? (
-        <StudentHistory
-          key={`${token}:${selected.id}`}
-          student={selected}
-          token={token}
-          onChanged={(updated) => { setSelected(updated); onStudentsChanged(); }}
-          onClose={() => setSelected(null)}
-        />
-      ) : null}
     </section>
   );
 }

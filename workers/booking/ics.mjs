@@ -14,6 +14,8 @@
  *   - METHOD is REQUEST for a booking or change, CANCEL for a cancellation.
  */
 
+import { isNoEmailYet } from "./no-email.mjs";
+
 const CRLF = "\r\n";
 
 /** RFC 5545 text escaping: backslash first, or it double-escapes the others. */
@@ -112,7 +114,7 @@ function veventLines({
 
   if (url) lines.push(`URL:${escapeText(url)}`);
 
-  for (const attendee of attendees) {
+  for (const attendee of attendees.filter((entry) => !isNoEmailYet(entry.email))) {
     lines.push(
       `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=${
         method === "CANCEL" ? "DECLINED" : "ACCEPTED"

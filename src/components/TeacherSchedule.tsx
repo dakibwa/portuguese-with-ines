@@ -1,20 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  AlertCircle,
-  Check,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { AlertCircle, Check, CheckCircle2 } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
-import { StudentDialog, type StudentDialogStart } from "@/components/teacher/StudentDialog";
-import { StudentList, needsHer } from "@/components/teacher/StudentList";
+import { TeacherAccountProfile } from "@/components/teacher/TeacherAccountProfile";
+import { StudentProfile, type StudentProfileStart } from "@/components/teacher/StudentProfile";
+import { StudentList } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
+import { NeedsYou } from "@/components/teacher/NeedsYou";
+import { TeacherPager } from "@/components/teacher/TeacherPager";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
@@ -26,9 +23,12 @@ import {
   fetchStudents,
   saveDayOff,
   saveRules,
+  sendStudentWelcome,
   type AdminBooking,
   type AdminStudent,
   type AvailabilityException,
+  type GoogleMeetConnection,
+  type PaymentReview,
 } from "@/lib/admin-api";
 import { clearSession, fetchMe, readSession, subscribeToSession, type Student } from "@/lib/auth-api";
 import { portoTimeToUtc } from "@/lib/booking-api";
@@ -45,6 +45,8 @@ import {
   hoursFromRules,
   hoursProblem,
   mondayOf,
+  needsYou,
+  gettingStarted,
   removeSpan,
   serialiseHours,
   shiftDate,
@@ -63,6 +65,11 @@ function shortDate(date: string) {
   return dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
 }
 
+function profileRequested() {
+  const params = new URL(window.location.href).searchParams;
+  return params.has("emailToken") || params.get("tab") === "profile" || ["connected", "cancelled", "error"].includes(params.get("meet") ?? "");
+}
+
 export function TeacherSchedule() {
   const [token, setToken] = useState("");
   const [me, setMe] = useState<Student | null>(null);
@@ -77,7 +84,8 @@ export function TeacherSchedule() {
   );
   const [activeTab, setActiveTab] = useState<TeacherTab>("week");
   const editing = activeTab === "hours";
-  const [meetAttention, setMeetAttention] = useState(false);
+  // Her Google Meet connection, read in Profile and listed in Needs you when it needs her.
+  const [meet, setMeet] = useState<GoogleMeetConnection | null>(null);
   const [savedHours, setSavedHours] = useState<WeekHours>(emptyWeek);
   const [draftHours, setDraftHours] = useState<WeekHours>(emptyWeek);
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
@@ -88,21 +96,23 @@ export function TeacherSchedule() {
   const [dayNote, setDayNote] = useState<{ error: boolean; text: string }>();
   const [interval, setIntervalMinutes] = useState(30);
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
+  // Lessons students cancelled: the timetable drops them, Needs you says so for three days.
+  const [studentCancellations, setStudentCancellations] = useState<AdminBooking[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(
     null,
   );
   // A free time chosen on the week, for a lesson added there.
-  // Adding a student, their lessons, or a lesson at a free time: one dialog.
-  const [studentDialog, setStudentDialog] = useState<(StudentDialogStart & { key: number }) | null>(null);
-  const openStudentDialog = (start: StudentDialogStart) => setStudentDialog({ ...start, key: Date.now() });
+  // A student's profile, a new student, or a lesson at a free time: one dialog.
+  const [studentDialog, setStudentDialog] = useState<(StudentProfileStart & { key: number }) | null>(null);
+  const openStudentDialog = (start: StudentProfileStart) => setStudentDialog({ ...start, key: Date.now() });
   // Her students, read once with the page and again after each lesson she
   // adds: the form suggests them and Your students lists them.
   const [students, setStudents] = useState<{ list: AdminStudent[]; cardsAccepted: boolean } | null>(null);
   const [studentsError, setStudentsError] = useState("");
   // A student chosen from her list, put straight into the add-a-lesson form.
-  const [paymentReview, setPaymentReview] = useState<
-    { id: string; reference: string }[]
-  >([]);
+  const [paymentReview, setPaymentReview] = useState<PaymentReview[]>([]);
+  // The student whose welcome she has just pressed, while it is sending.
+  const [welcoming, setWelcoming] = useState("");
   const [initialised, setInitialised] = useState(false);
   const [scheduleError, setScheduleError] = useState("");
   const [scheduleAttempt, setScheduleAttempt] = useState(0);
@@ -114,11 +124,14 @@ export function TeacherSchedule() {
   const [bookingsShown, setBookingsShown] = useState(false);
   const [bookingsError, setBookingsError] = useState("");
   const [savingHours, setSavingHours] = useState(false);
+  const [accountBusy, setAccountBusy] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const bookingRequest = useRef(0);
   const calendarTitleRef = useRef<HTMLHeadingElement>(null);
   const accountGeneration = useRef(0);
+  // Verified email changes renew this same account without discarding its drafts.
+  const renewedSession = useRef("");
   const dayChangesRef = useRef(dayChanges);
   const dayVersion = useRef(0);
   const sendingDays = useRef(false);
@@ -133,6 +146,10 @@ export function TeacherSchedule() {
   const hoursDirty = serialiseHours(savedHours) !== serialiseHours(draftHours);
   const invalidHours = hoursProblem(draftHours);
   const affectedLessons = useMemo(() => bookingsAffectedByHours(bookings, savedHours, draftHours, interval, now), [bookings, savedHours, draftHours, interval, now]);
+  const needs = useMemo(
+    () => needsYou({ now, meet, payments: paymentReview, students: students?.list ?? [], lessons: bookings, cancellations: studentCancellations }),
+    [now, meet, paymentReview, students, bookings, studentCancellations],
+  );
 
   const resetAccount = useCallback(() => {
     accountGeneration.current += 1;
@@ -141,9 +158,11 @@ export function TeacherSchedule() {
     setMe(null);
     setInitialised(false);
     setActiveTab("week");
-    setMeetAttention(false);
+    setMeet(null);
     setSelectedBooking(null);
     setBookings([]);
+    setStudentCancellations([]);
+    setWelcoming("");
     setPaymentReview([]);
     setSavedHours(emptyWeek);
     setDraftHours(emptyWeek);
@@ -153,6 +172,8 @@ export function TeacherSchedule() {
     sendingDays.current = false;
     setSavingDays(false);
     setSavingHours(false);
+    setAccountBusy(false);
+    renewedSession.current = "";
     setDayNote(undefined);
     setAuthError("");
     setStatus("");
@@ -161,14 +182,20 @@ export function TeacherSchedule() {
 
   useEffect(() => {
     let session = readSession();
-    return subscribeToSession(() => {
+    return subscribeToSession((event) => {
       const current = readSession();
       if (current === session) return;
+      const previous = session;
       session = current;
+      if (current && event instanceof CustomEvent && event.detail?.previousSession === previous && event.detail?.studentId === me?.id) {
+        renewedSession.current = current;
+        setToken(current);
+        return;
+      }
       resetAccount();
       setAuthAttempt(value => value + 1);
     });
-  }, [resetAccount]);
+  }, [resetAccount, me?.id]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
@@ -176,8 +203,7 @@ export function TeacherSchedule() {
   }, []);
 
   useEffect(() => {
-    const result = new URL(window.location.href).searchParams.get("meet");
-    if (result && ["connected", "cancelled", "error"].includes(result)) setActiveTab("meet");
+    if (profileRequested()) setActiveTab("profile");
   }, []);
 
   useEffect(() => {
@@ -193,7 +219,10 @@ export function TeacherSchedule() {
       .then((data) => {
         if (!active || readSession() !== session) return;
         setMe(data?.student ?? null);
-        if (data?.student.role === "teacher") setToken(session);
+        if (data?.student.role === "teacher") {
+          setToken(session);
+          if (profileRequested()) setActiveTab("profile");
+        }
       })
       .catch(() => {
         if (active)
@@ -208,7 +237,7 @@ export function TeacherSchedule() {
   }, [authAttempt]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || renewedSession.current === token) return;
     let active = true;
     setScheduleError("");
     fetchSchedule(token)
@@ -249,11 +278,15 @@ export function TeacherSchedule() {
     void reloadStudents();
   }, [reloadStudents]);
 
-  const reloadBookings = useCallback(async () => {
+  // A quiet read is a background refresh: if it fails, the lessons already on
+  // screen stay, rather than giving way to an error she did not ask for.
+  const reloadBookings = useCallback(async (quiet = false) => {
     if (!token || readSession() !== token) return;
     const request = ++bookingRequest.current;
-    setBookingsLoading(true);
-    setBookingsError("");
+    if (!quiet) {
+      setBookingsLoading(true);
+      setBookingsError("");
+    }
     try {
       // Include an overnight lesson that began before the displayed week.
       const fromDate = [
@@ -268,10 +301,14 @@ export function TeacherSchedule() {
       setBookings(
         result.bookings.filter((booking) => booking.status === "confirmed"),
       );
+      setStudentCancellations(
+        result.bookings.filter((booking) => booking.status === "cancelled" && booking.cancelled_by === "student"),
+      );
       setBookingsShown(true);
+      setBookingsError("");
       setPaymentReview(result.manualPaymentReconciliation ?? []);
     } catch (caught) {
-      if (request === bookingRequest.current)
+      if (request === bookingRequest.current && !quiet)
         setBookingsError(
           caught instanceof Error
             ? caught.message
@@ -285,6 +322,48 @@ export function TeacherSchedule() {
   useEffect(() => {
     void reloadBookings();
   }, [reloadBookings]);
+
+  // Nothing polls, so a laptop left open all afternoon would never hear of a
+  // change or cancellation. Coming back after five minutes or more reads again.
+  const hiddenAt = useRef(0);
+  useEffect(() => {
+    const returned = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt.current = Date.now();
+        return;
+      }
+      const away = hiddenAt.current ? Date.now() - hiddenAt.current : 0;
+      hiddenAt.current = 0;
+      if (away < 5 * 60_000) return;
+      setNow(new Date());
+      void reloadBookings(true);
+      void reloadStudents();
+    };
+    document.addEventListener("visibilitychange", returned);
+    return () => document.removeEventListener("visibilitychange", returned);
+  }, [reloadBookings, reloadStudents]);
+
+  /** Initial welcomes are guarded; a requested reminder sends a fresh link. */
+  async function sendWelcome(student: AdminStudent, again = false) {
+    if (welcoming || !student.email || student.email.startsWith("no-email:")) return;
+    const account = accountGeneration.current;
+    setWelcoming(student.id);
+    setError("");
+    setStatus("");
+    try {
+      await sendStudentWelcome(token, student.id, again ? undefined : { onlyIfWaiting: true });
+      if (account !== accountGeneration.current) return;
+      setStatus(`${again ? "Link" : "Welcome"} sent to ${student.name.trim().split(/\s+/)[0]}.`);
+    } catch (caught) {
+      if (account !== accountGeneration.current) return;
+      setError(caught instanceof Error ? caught.message : "The welcome couldn’t be sent.");
+    } finally {
+      if (account === accountGeneration.current) setWelcoming("");
+    }
+    // Either way the list reads afresh, so a welcome another device sent leaves too.
+    void reloadStudents();
+    if (activeTab === "week") calendarTitleRef.current?.focus({ preventScroll: true });
+  }
 
   useEffect(() => {
     const dirty = hoursDirty || dayChanges.size > 0;
@@ -522,7 +601,10 @@ export function TeacherSchedule() {
         signInOnly
         onSignedIn={(student) => {
           setMe(student);
-          if (student.role === "teacher") setToken(readSession());
+          if (student.role === "teacher") {
+            setToken(readSession());
+            if (profileRequested()) setActiveTab("profile");
+          }
         }}
       />
     );
@@ -548,6 +630,7 @@ export function TeacherSchedule() {
     );
 
   function signOut() {
+    if (savingDays || savingHours || accountBusy) return;
     if (hoursDirty && !window.confirm("Sign out and lose the weekly hours you haven’t saved?")) return;
     clearSession();
     resetAccount();
@@ -556,30 +639,8 @@ export function TeacherSchedule() {
   return (
     <div className="teacher-workspace">
       <div className="teacher-tools-header">
-        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} studentsWaiting={(students?.list ?? []).filter(student => needsHer(student, Boolean(students?.cardsAccepted))).length} meetAttention={meetAttention} onSelect={setActiveTab} />
-        <button
-          className="teacher-sign-out"
-          disabled={savingDays || savingHours}
-          onClick={signOut}
-          type="button"
-        >
-          Sign out
-        </button>
+        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} needsCount={needs.length} onSelect={setActiveTab} />
       </div>
-      {paymentReview.length ? (
-        <div className="teacher-inline-notice" role="status">
-          <AlertCircle size={19} aria-hidden="true" />
-          <p>
-            {paymentReview.length}{" "}
-            {paymentReview.length === 1
-              ? "payment or refund needs"
-              : "payments or refunds need"}{" "}
-            review: {paymentReview.map((item) => item.reference).join(", ")}.
-            Review these in Stripe before retrying. Their lessons remain locked
-            until the result is confirmed.
-          </p>
-        </div>
-      ) : null}
       {error ? (
         <div className="teacher-inline-error" role="alert">
           {error}
@@ -596,6 +657,20 @@ export function TeacherSchedule() {
       {activeTab === "week" || editing ? <>
       {activeTab === "week" && bookingsShown ? (
         <NextLesson bookings={bookings} now={now} onOpen={setSelectedBooking} />
+      ) : null}
+      {activeTab === "week" && bookingsShown ? (
+        <NeedsYou
+          items={needs}
+          sending={welcoming}
+          onMeet={() => {
+            document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true });
+            setActiveTab("profile");
+          }}
+          onView={setSelectedBooking}
+          onWelcome={(student) => void sendWelcome(student)}
+          onStudent={(student, editDetails) => openStudentDialog({ step: "profile", student, editDetails, addLesson: !editDetails })}
+          onSeeAll={() => { setActiveTab("needs-you"); document.getElementById("teacher-tab-needs-you")?.focus({ preventScroll: true }); }}
+        />
       ) : null}
 
       <section className={`teacher-week${editing ? " teacher-week--editing" : ""}`} aria-labelledby="teacher-week-title">
@@ -616,31 +691,14 @@ export function TeacherSchedule() {
             </ul>
           ) : null}
           {!editing ? (
-            <div className="teacher-week-navigation">
-              <button
-                className="teacher-icon-button"
-                type="button"
-                aria-label="Previous week"
-                onClick={() => setWeekStart(shiftDate(weekStart, -7))}
-              >
-                <ChevronLeft size={19} aria-hidden="true" />
-              </button>
-              <button
-                className="teacher-text-button"
-                type="button"
-                onClick={() => setWeekStart(mondayOf(today))}
-              >
-                This week
-              </button>
-              <button
-                className="teacher-icon-button"
-                type="button"
-                aria-label="Next week"
-                onClick={() => setWeekStart(shiftDate(weekStart, 7))}
-              >
-                <ChevronRight size={19} aria-hidden="true" />
-              </button>
-            </div>
+            <TeacherPager
+              unit="week"
+              away={weekStart !== mondayOf(today)}
+              headingRef={calendarTitleRef}
+              onCurrent={() => setWeekStart(mondayOf(today))}
+              onNext={() => setWeekStart(shiftDate(weekStart, 7))}
+              onPrevious={() => setWeekStart(shiftDate(weekStart, -7))}
+            />
           ) : null}
         </div>
         {editing && hoursDirty ? (
@@ -780,6 +838,20 @@ export function TeacherSchedule() {
           onOpenBooking={setSelectedBooking}
         />
       </div>
+      {activeTab === "needs-you" ? <>
+        {studentsError || bookingsError ? <p className="teacher-inline-error" role="alert">{studentsError || bookingsError}</p> : null}
+        {!students || !bookingsShown ? <p role="status">Loading what needs you…</p> : <NeedsYou
+          items={needs}
+          setup={gettingStarted(students.list, students.cardsAccepted)}
+          token={token}
+          onChanged={() => { void reloadStudents(); void reloadBookings(true); }}
+          sending={welcoming}
+          onMeet={() => { setActiveTab("profile"); document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true }); }}
+          onView={setSelectedBooking}
+          onWelcome={(student, again) => void sendWelcome(student, again)}
+          onStudent={(student, editDetails) => openStudentDialog({ step: "profile", student, editDetails })}
+        />}
+      </> : null}
       <div className="teacher-tab-view" hidden={activeTab !== "students"}>
       <StudentList
         token={token}
@@ -787,25 +859,29 @@ export function TeacherSchedule() {
         cards={Boolean(students?.cardsAccepted)}
         error={studentsError}
         onAddStudent={() => openStudentDialog({ step: "new" })}
-        onAddLesson={(student) => openStudentDialog({ step: "lessons", student })}
+        onOpenStudent={(student, addLesson) => openStudentDialog({ step: "profile", student, addLesson })}
         onStudentsChanged={() => void reloadStudents()}
       />
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "receipts"}>
         {activeTab === "receipts" ? <ReceiptsTab token={token} today={today} /> : null}
       </div>
-      <div className="teacher-tab-view" hidden={activeTab !== "meet"}>
-        <TeacherMeetConnection token={token} onAttentionChange={setMeetAttention} />
+      <div className="teacher-tab-view" hidden={activeTab !== "profile"}>
+        <div className="teacher-account-layout">
+          {me ? <TeacherAccountProfile token={token} student={me} disabled={savingDays || savingHours} onBusyChange={setAccountBusy} onStudentChange={setMe} onSignOut={signOut} /> : null}
+          <TeacherMeetConnection token={token} onConnectionChange={setMeet} />
+        </div>
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "expressions"}>
         {activeTab === "expressions" ? <ExpressionsTab accountId={me?.id ?? "teacher"} token={token} /> : null}
       </div>
       </div>
       {studentDialog ? (
-        <StudentDialog
+        <StudentProfile
           key={studentDialog.key}
           token={token}
           known={students?.list ?? []}
+          cards={Boolean(students?.cardsAccepted)}
           start={studentDialog}
           afterCloseFocusRef={studentDialog.step === "pick" ? calendarTitleRef : undefined}
           onChanged={() => {

@@ -10,6 +10,7 @@ import {
 } from "./series.mjs";
 import { buildCalendarInvite, buildCalendarSeriesInvite, calendarUid } from "./ics.mjs";
 import { deliver as sendEmail, splitWhen } from "./email.mjs";
+import { NO_EMAIL_YET, isNoEmailYet, realEmail, withRealEmail } from "./no-email.mjs";
 import {
   chargeSavedCard,
   checkoutSessionProblem,
@@ -198,7 +199,7 @@ function publicBooking(row, lessonType, settings) {
     location: row.location,
     meetingUrl: meetingUrl(row),
     studentName: row.student_name,
-    studentEmail: row.student_email,
+    studentEmail: realEmail(row.student_email),
     studentTimezone: row.student_timezone,
     notes: row.notes,
     rescheduleCount: row.reschedule_count,
@@ -231,9 +232,9 @@ function lessonSummary(row, lessonType) {
 function lessonDescription(row, lessonType, manageUrl) {
   const lines = [
     lessonLine(lessonType),
-    `Student: ${row.student_name}`,
-    `Email: ${row.student_email}`
+    `Student: ${row.student_name}`
   ];
+  if (!isNoEmailYet(row.student_email)) lines.push(`Email: ${row.student_email}`);
   if (row.student_phone) lines.push(`Phone: ${row.student_phone}`);
   if (row.student_timezone && row.student_timezone !== PORTO) lines.push(`Their timezone: ${row.student_timezone}`);
   if (row.notes) lines.push(`Notes: ${row.notes}`);
@@ -245,6 +246,11 @@ function lessonDescription(row, lessonType, manageUrl) {
 
 function locationLabel(row) {
   return row.location === "porto" ? "In person, Porto" : "Online";
+}
+
+/** Where a student's address would be, for her eyes: theirs, or that there is none yet. */
+function shownEmail(address) {
+  return realEmail(address) || "No email yet";
 }
 
 /** An email row's place, in the site's words; the calendar file keeps `locationLabel`. */
@@ -347,11 +353,12 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   // lifted out of the detail table into its own panel rather than being the
   // second row of five.
   const hero = portoTime;
-  // "Jessica’s time: Tue 13 Oct, 01:00 · Los Angeles time", named and short.
+  // "Jessica’s time" over "Tue 13 Oct, 01:00 · Los Angeles time", a labelled fact in the panel.
   const teacherHeroNote = studentTime
-    ? `${row.student_name.split(" ")[0]}’s time: ${formatShort(start, studentZone)} · ${zoneName(studentZone, start)}`
+    ? { label: `${row.student_name.split(" ")[0]}’s time`, value: `${formatShort(start, studentZone)} · ${zoneName(studentZone, start)}` }
     : "";
-  const cancellationMessage = event === "cancelled" && byTeacher
+  // Her words go to a student who is emailed; one who is held is not.
+  const cancellationMessage = event === "cancelled" && byTeacher && !held
     ? row.cancellation_message?.trim() : "";
 
   // A cancelled lesson has no call to join, so its place is named, not linked.
@@ -424,9 +431,9 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
 
   // Older already-paid bookings lock inside the window instead of paying.
   // Current saved-card bookings stay changeable there for EUR 5.
-  const paidChangeFooter = `Move or cancel free until ${notice} before the lesson. After that, it can't be changed or refunded.`;
-  const savedCardChangeFooter = `Move or cancel free until ${notice} before the lesson. After that, moving or cancelling costs ${fee}. A no-show costs ${fee} instead of the lesson price.`;
-  const unpaidChangeFooter = `Need to change it? Use the link above. It's free until ${notice} before the lesson; after that it costs ${fee}.`;
+  const paidChangeFooter = [`Move or cancel free until ${notice} before the lesson.`, "After that, it can't be changed or refunded."];
+  const savedCardChangeFooter = [`Move or cancel free until ${notice} before the lesson.`, `After that, moving or cancelling costs ${fee}.`, `A no-show costs ${fee} instead of the lesson price.`];
+  const unpaidChangeFooter = ["Need to change it? Use the link above.", `It's free until ${notice} before the lesson; after that it costs ${fee}.`];
   const refundNote = wasRefunded
     ? `Refunded in full: your ${formatEuros(row.amount_cents ?? lessonType.price_cents)} is on its way back to your card and usually shows within a few days.`
     : "";
@@ -445,7 +452,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
             : `Olá ${row.student_name.split(" ")[0]}, Inês has booked this lesson for you. A calendar invitation is attached.`,
           callout: "",
           footer: welcome
-            ? `It's free to change until ${notice} before the lesson; after that it costs ${fee}. ${WELCOME_FOOTER}`
+            ? [`It's free to change until ${notice} before the lesson; after that it costs ${fee}.`, ...WELCOME_FOOTER]
             : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
         }
       : {
@@ -513,7 +520,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       subject: `You added a lesson — ${row.student_name}, ${shortWhen}`,
       heading: "You added a lesson",
       intro: held
-        ? `You added a lesson for ${row.student_name}. They haven't been emailed: send their welcome from Students when you're ready.`
+        ? `You added a lesson for ${row.student_name}. They haven't been emailed: ${isNoEmailYet(row.student_email) ? "add their email under Edit details, then send their welcome." : "send their welcome from Students when you're ready."}`
         : `You added a lesson for ${row.student_name}. They have been emailed the details${welcomeNote(welcome)}.`,
       callout: ""
     } : {
@@ -626,7 +633,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
           preheader: `${row.student_name} · ${lessonName(lessonType)} · ${portoTime}`,
           rows: [
             ...baseRows,
-            { label: "Student", value: `${row.student_name}\n${row.student_email}${row.student_phone ? `\n${row.student_phone}` : ""}` },
+            { label: "Student", value: `${row.student_name}\n${shownEmail(row.student_email)}${row.student_phone ? `\n${row.student_phone}` : ""}` },
             nifRow,
             ...(row.notes ? [{ label: "Notes", value: row.notes }] : [])
           ],
@@ -661,6 +668,152 @@ async function notifyMeetingReady(env, input) {
     }
   });
   return result.ok;
+}
+
+/*
+ * The day-before reminder (14 October 2026). About 24 hours before a confirmed
+ * lesson the student gets one short email on the lesson's own clock, carrying
+ * the Meet link when it is ready. It is sent only while the lesson is still
+ * further away than the minimum notice, so the free change its footer names is
+ * always still open; after a long outage a lesson already inside that window
+ * gets none rather than a late one. There is no calendar file, no price and
+ * no copy for Inês.
+ */
+const REMINDER_KIND = "student_lesson_reminder";
+const REMINDER_LEAD_HOURS = 24;
+// A lesson booked, added or moved less than this long before it starts has just
+// been confirmed to the student by that email, so a reminder would only repeat it.
+const REMINDER_QUIET_HOURS = 36;
+const REMINDER_BATCH = 6;
+const REMINDER_RETRY_MINUTES = 5;
+
+function reminderEmail({ row, lessonType, settings, manageUrl, meetingLink, meetComing }) {
+  const start = new Date(row.starts_at);
+  const zone = lessonZone(row);
+  const first = row.student_name.split(" ")[0];
+  const cutoff = formatShort(new Date(start.getTime() - settings.minimumNoticeHours * 3600000), zone);
+  // The cut-off is where the change policy starts charging, so it is always the
+  // moment that is true; no "today" or "tomorrow" anywhere.
+  const footer = [`Free to change or cancel until ${cutoff}.`,
+    row.payment_status === "paid"
+      ? "After that, it can’t be changed or refunded."
+      : `After that, there’s a ${formatEuros(settings.sameDayChangeFeeCents)} late change fee.`
+  ];
+  const manage = { label: "Change or cancel this lesson", url: manageUrl };
+
+  return {
+    subject: `Your lesson is coming up — ${formatShort(start, zone)}`,
+    content: {
+      heading: "Your lesson is coming up",
+      preheader: `${lessonName(lessonType)} · ${meetingLink ? "Your Google Meet link is in this email." : placeLabel(row)}`,
+      intro: meetingLink
+        ? `Olá ${first}, your lesson with Inês is coming up. Here’s the Google Meet link to join it.`
+        : meetComing
+          ? `Olá ${first}, your lesson with Inês is coming up. Its Google Meet link isn’t ready yet; we’ll email it to you as soon as it is.`
+          : `Olá ${first}, your lesson with Inês is coming up.`,
+      hero: lessonWhen(start, zone),
+      heroNote: "",
+      callout: "",
+      rows: [
+        { label: "Lesson", value: lessonLine(lessonType) },
+        { label: "Where", value: placeLabel(row) },
+        { label: "Reference", value: row.reference }
+      ],
+      // The coral button marks the one thing still to do: join, when there is a
+      // link. Changing is the rare action, so it drops to a quiet link then.
+      action: meetingLink ? { label: "Join Google Meet", url: meetingLink } : manage,
+      ...(meetingLink ? { link: manage } : {}),
+      footer
+    }
+  };
+}
+
+/**
+ * Minute sweep. Which lessons qualify is read from existing columns only, so
+ * nothing needs a migration, and "already sent" is the email log's own unique
+ * key, written before the send (see deliver in email.mjs).
+ *
+ * Left out, in the query: a lesson cancelled, outside the window, or created
+ * (or whose current version was announced) in the 36 hours before it starts;
+ * a student still waiting for their welcome, so held lessons can't fill the
+ * batch every minute; and a student set up without an email, who has nowhere
+ * to receive it.
+ */
+export async function sendLessonReminders(env, now = new Date()) {
+  const settings = await loadSettings(env);
+  const hour = 3600000;
+  const earliest = new Date(now.getTime() + settings.minimumNoticeHours * hour).toISOString();
+  const latest = new Date(now.getTime() + REMINDER_LEAD_HOURS * hour).toISOString();
+  if (earliest >= latest) return;
+  const retryAfter = new Date(now.getTime() - REMINDER_RETRY_MINUTES * 60000).toISOString();
+
+  const { results } = await env.DB.prepare(
+    `SELECT b.* FROM bookings b
+     WHERE b.status = 'confirmed' AND b.starts_at > ?1 AND b.starts_at <= ?2
+       AND b.student_email NOT LIKE 'no-email:%'
+       AND julianday(b.created_at) <= julianday(b.starts_at) - ?4
+       AND NOT EXISTS (
+         SELECT 1 FROM email_log t
+         WHERE julianday(t.created_at) > julianday(b.starts_at) - ?4
+           AND (t.dedupe_key = 'student:rescheduled:' || b.id || ':' || b.sequence
+             OR (b.series_id IS NOT NULL
+               AND t.dedupe_key >= 'student:series-moved:' || b.series_id || ':'
+               AND t.dedupe_key < 'student:series-moved:' || b.series_id || ';')))
+       AND NOT EXISTS (
+         SELECT 1 FROM email_log e
+         WHERE e.dedupe_key = 'student:reminder:' || b.id || ':' || b.sequence
+           AND (e.status <> 'failed' OR e.created_at > ?3))
+       AND NOT EXISTS (
+         SELECT 1 FROM students s
+         WHERE s.email = lower(trim(b.student_email)) AND s.role = 'student' AND s.awaiting_welcome = 1
+           AND COALESCE(s.password_hash, '') = '' AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL)
+     ORDER BY b.starts_at LIMIT ${REMINDER_BATCH}`
+  )
+    .bind(earliest, latest, retryAfter, REMINDER_QUIET_HOURS / 24)
+    .all();
+
+  const lessonTypes = new Map();
+  let meetComing;
+  for (const candidate of results ?? []) {
+    try {
+      // The version selected may have been cancelled or moved since: a newer
+      // change owns its own email, as in notify().
+      const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(candidate.id).first();
+      if (!row || row.status !== "confirmed" || row.sequence !== candidate.sequence || row.starts_at !== candidate.starts_at) continue;
+      if (!hasEmail({ email: row.student_email })) continue;
+      if (!lessonTypes.has(row.lesson_type_id)) {
+        lessonTypes.set(row.lesson_type_id, await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first());
+      }
+      const lessonType = lessonTypes.get(row.lesson_type_id);
+      if (!lessonType) continue;
+
+      const meetingLink = meetingUrl(row);
+      // Promise a link only if one can ever come: the ready sweep emails it.
+      if (!meetingLink && row.location === "online" && meetComing === undefined) {
+        meetComing = (await calendarConnectionStatus(env).catch(() => ({}))).configured === true;
+      }
+      const { subject, content } = reminderEmail({
+        row, lessonType, settings, meetingLink,
+        meetComing: !meetingLink && row.location === "online" && meetComing === true,
+        manageUrl: studentManageUrl(env, await createManageToken(row.id, env.BOOKING_TOKEN_SECRET))
+      });
+      const result = await deliver(env, {
+        to: row.student_email,
+        subject,
+        kind: REMINDER_KIND,
+        bookingId: row.id,
+        dedupeKey: `student:reminder:${row.id}:${row.sequence}`,
+        replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined,
+        content
+      });
+      // The link was delivered here, so the "Your online lesson link" email must
+      // not follow. A held send delivered nothing and is not marked.
+      if (meetingLink && result.ok && !result.held && !result.skipped) await markMeetingNotified(env, row);
+      if (!result.ok) console.warn("lesson-reminder", row.reference, "send_failed");
+    } catch (error) {
+      console.error("lesson-reminder", candidate.reference, String(error?.message ?? error));
+    }
+  }
 }
 
 /**
@@ -749,8 +902,10 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
             : row.location === "online"
               ? (forTeacher ? "Meet link not ready yet" : "Online link will appear in your booking")
               : placeLabel(row),
-          url: meetingUrl(row) }))
-      : [{ label: "Dates", value: rows.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n") }])
+          url: meetingUrl(row),
+          lesson: true,
+          quiet: !meetingUrl(row) && row.location === "online" }))
+      : [{ label: "Dates", value: rows.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n"), dates: true }])
   ];
   const studentRowsOn = rowsOn(studentClock);
   const teacherRows = rowsOn(PORTO, true);
@@ -788,8 +943,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   }
   const seriesFee = formatEuros(settings.sameDayChangeFeeCents);
   const seriesFooter = seriesOnCard
-    ? `Move or cancel any single lesson free until ${settings.minimumNoticeHours} hours before it. After that, moving or cancelling costs ${seriesFee}. A no-show costs ${seriesFee} instead of the lesson price.`
-    : `Moving or cancelling a lesson is free until ${settings.minimumNoticeHours} hours before it; after that it costs ${seriesFee}.`;
+    ? [`Move or cancel any single lesson free until ${settings.minimumNoticeHours} hours before it.`, `After that, moving or cancelling costs ${seriesFee}.`, `A no-show costs ${seriesFee} instead of the lesson price.`]
+    : [`Moving or cancelling a lesson is free until ${settings.minimumNoticeHours} hours before it; after that it costs ${seriesFee}.`];
   const moved = reason === "moved";
 
   const sends = [];
@@ -835,7 +990,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
           rows: studentSeriesRows,
           steps: welcome && !moved ? welcomeSteps(welcome) : null,
           action: welcome ? welcomeAction(welcome) : { label: "See all your lessons", url: siteUrl(env, "/book/?view=lessons") },
-          footer: welcome ? `${seriesFooter} ${WELCOME_FOOTER}` : seriesFooter
+          footer: welcome ? [...seriesFooter, ...WELCOME_FOOTER] : seriesFooter
         }
       }).then(async result => {
         if (result.ok && !result.skipped) await Promise.all(rows.map(row => markMeetingNotified(env, row)));
@@ -872,7 +1027,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
               : moved
                 ? `${first.student_name}'s upcoming weekly lessons have moved. The updated events will appear in your calendar.`
               : byTeacher
-                ? `You added a weekly slot for ${first.student_name}. ${held ? "They haven't been emailed: send their welcome from Students when you're ready" : `They have been emailed the details${welcomeNote(welcome)}`}, and every lesson will appear in your calendar.`
+                ? `You added a weekly slot for ${first.student_name}. ${held ? `They haven't been emailed: ${isNoEmailYet(first.student_email) ? "add their email under Edit details, then send their welcome" : "send their welcome from Students when you're ready"}` : `They have been emailed the details${welcomeNote(welcome)}`}, and every lesson will appear in your calendar.`
               : `${first.student_name} booked ${series.oneOff ? "these individual lessons" : multipleWeeklyTimes ? "two times each week" : "the same slot each week"}. Every lesson will appear in your calendar.`,
           callout:
             skippedNote,
@@ -881,7 +1036,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
           preheader: `${first.student_name} · ${cadence}`,
           rows: [
             ...teacherRows,
-            { label: "Student", value: `${first.student_name}\n${first.student_email}${first.student_phone ? `\n${first.student_phone}` : ""}` },
+            { label: "Student", value: `${first.student_name}\n${shownEmail(first.student_email)}${first.student_phone ? `\n${first.student_phone}` : ""}` },
             nifRow,
             ...(first.notes ? [{ label: "Notes", value: first.notes }] : [])
           ],
@@ -1005,7 +1160,7 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
         callout: "",
         hero: "",
         heroNote: "",
-        rows: [{ label: `Cancelled, ${zoneName(studentClock, new Date(first.starts_at))}`, value: datesOn(studentClock) }],
+        rows: [{ label: `Cancelled, ${zoneName(studentClock, new Date(first.starts_at))}`, value: datesOn(studentClock), dates: true }],
         action: null,
         footer: "Booking is always open on portuguesewithines.com."
       }
@@ -1031,9 +1186,9 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
           hero: "",
           heroNote: "",
           rows: [
-            { label: "Student", value: `${first.student_name}\n${first.student_email}` },
+            { label: "Student", value: `${first.student_name}\n${shownEmail(first.student_email)}` },
             nifRow,
-            { label: "Cancelled", value: datesOn(PORTO) }
+            { label: "Cancelled", value: datesOn(PORTO), dates: true }
           ],
           action: null,
           footer: "Sent automatically by the booking system."
@@ -1065,7 +1220,7 @@ async function currentStudent(request, env) {
 function publicStudent(row) {
   return {
     id: row.id,
-    email: row.email,
+    email: realEmail(row.email),
     name: row.name,
     phone: row.phone,
     nif: row.nif ?? "",
@@ -1129,7 +1284,8 @@ async function issueSignInLink(env, student, minutes) {
  * account is never sent one.
  */
 async function issueWelcome(env, settings, student, { always = false } = {}) {
-  if (student.role === "teacher") return null;
+  // Nothing to send a way in to until she has given their address.
+  if (student.role === "teacher" || isNoEmailYet(student.email)) return null;
   const card = cardsTaken(env, settings) && !student.card_consent_at;
   const neverIn = !student.password_hash && !student.google_sub && !student.last_login_at;
   if (!always && !card && !neverIn) return null;
@@ -1161,27 +1317,131 @@ function welcomeAction(welcome) {
   return { label: welcome.card ? "Sign in and add card" : "Sign in, no password needed", url: welcome.url };
 }
 
-const WELCOME_FOOTER = "The button lasts 14 days. Later, press Sign in on the website, then “Email me a sign-in link”.";
+const WELCOME_FOOTER = ["The button lasts 14 days.", "Later, press Sign in on the website, then “Email me a sign-in link”."];
+
+/** How many lines of lessons a welcome carries before the rest are left to the website. */
+const WELCOME_LESSON_LINES = 12;
 
 /**
- * Her welcome, sent from her list of students: their lessons so far, each on
- * its own clock, and the one-click way in. For someone she set up it is the
- * first email the site sends them (13 October 2026, Dan).
+ * The lessons a welcome tells, as lines (14 October 2026, Dan: "all their
+ * lessons and prices already done properly"): a weekly run is one line, its
+ * day and time, when it starts and, if it ends, until when, and the weeks it
+ * has no lesson; a lesson on its own has its own line. Each carries its
+ * length and the price it will be charged or owed, read from the lesson
+ * itself, so a price Inês set after adding it, or a lesson that changed
+ * length, is right. Times are on the student's own clock, each naming it as
+ * every email to them does.
  */
-async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
-  const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
-  const first = student.name.split(" ")[0];
-  const shown = lessons.slice(0, 12);
-  // "Thursday 15 October 2026, 17:00 · Porto time": the date box's date and
-  // time on one line, its clock after the time rather than a second clause.
-  const rows = shown.map((lesson) => {
-    const when = splitWhen(lessonWhen(new Date(lesson.starts_at), lessonZone(lesson)));
+export function welcomeLessonLines(student, lessons, limit = WELCOME_LESSON_LINES) {
+  const onTheirClock = (lesson) => lessonZone({ ...lesson, student_timezone: student.timezone });
+  const when = (lesson) => splitWhen(lessonWhen(new Date(lesson.starts_at), onTheirClock(lesson)));
+  const price = (lesson) => formatEuros(lesson.amount_cents ?? 0);
+  const length = (lesson) => `${lesson.duration_minutes} minutes`;
+  // The weekday is already said by "Every Tuesday".
+  const dayOnly = (lesson) => when(lesson).date.replace(/^\S+ /, "");
+
+  // A lesson belongs to its run while it still sits at the run's own slot,
+  // length and place, and keeps the time it has on the student's clock; one
+  // that was moved or changed reads as the lesson it now is.
+  const runs = new Map();
+  const items = [];
+  // The days each run has a lesson on, however that lesson now reads.
+  const dated = new Set(lessons.filter((lesson) => lesson.series_id)
+    .map((lesson) => `${lesson.series_id}|${slotOf(new Date(lesson.starts_at)).dateKey}`));
+  for (const lesson of lessons) {
+    const slot = lesson.series_id ? slotOf(new Date(lesson.starts_at)) : null;
+    const asRun = slot && slot.weekday === lesson.series_weekday && slot.minuteOfDay === lesson.series_minute &&
+      (lesson.series_lesson_type == null || lesson.lesson_type_id === lesson.series_lesson_type) &&
+      (lesson.series_location == null || lesson.location === lesson.series_location);
+    if (asRun) {
+      const clock = when(lesson);
+      const key = `${lesson.series_id}|${clock.date.split(" ")[0]}|${clock.time.split(" ")[0]}`;
+      if (!runs.has(key)) runs.set(key, []);
+      runs.get(key).push(lesson);
+    } else {
+      items.push({ at: lesson.starts_at, lessons: [lesson] });
+    }
+  }
+  // Only the latest stretch of a run with no end goes on being scheduled.
+  const latest = new Map();
+  for (const group of runs.values()) {
+    const current = latest.get(group[0].series_id);
+    if (!current || group[group.length - 1].starts_at > current[current.length - 1].starts_at) latest.set(group[0].series_id, group);
+  }
+  for (const group of runs.values()) {
+    const [first] = group;
+    const goesOn = first.series_occurrences == null && first.series_status === "active" && latest.get(first.series_id) === group;
+    if (group.length > 1 || goesOn) items.push({ at: first.starts_at, lessons: group, run: true, goesOn });
+    else items.push({ at: first.starts_at, lessons: group });
+  }
+  items.sort((a, b) => a.at.localeCompare(b.at));
+
+  const days = (keys) => keys.length > 1 ? `${keys.slice(0, -1).join(", ")} or ${keys[keys.length - 1]}` : keys[0];
+  const lines = items.slice(0, limit).map((item) => {
+    const [first] = item.lessons;
+    const { date, time } = when(first);
+    if (!item.run) {
+      return {
+        label: `${first.lesson_type_id === "trial" ? "Trial lesson" : "Lesson"} · ${placeLabel(first)}`,
+        value: [`${date}, ${time}`, `${length(first)} · ${first.payment_status === "paid" ? `${price(first)} paid` : price(first)}`].join("\n")
+      };
+    }
+    // The price still open is the one the run is on; a lesson already paid, or
+    // one she marked paid by hand, keeps the amount it was settled at.
+    const priced = item.lessons.find((lesson) =>
+      (lesson.payment_status === "not_required" || lesson.payment_status === "scheduled") &&
+      lesson.payment_consent_version !== PAID_BY_HAND_MARK
+    ) ?? first;
+    const last = item.lessons[item.lessons.length - 1];
+    // A week with no lesson (her day off, a lesson she cancelled) is named,
+    // never left to read as one: this may be the only email they get.
+    const lastKey = slotOf(new Date(last.starts_at)).dateKey;
+    const missing = [];
+    for (let key = addDaysToKey(slotOf(new Date(first.starts_at)).dateKey, 7); key && key < lastKey; key = addDaysToKey(key, 7)) {
+      if (dated.has(`${first.series_id}|${key}`)) continue;
+      const { year, month, day } = parseDateKey(key);
+      const instant = zonedToUtc(year, month, day, first.series_minute);
+      missing.push(dayOnly({ ...first, starts_at: instant.toISOString() }).replace(/ \d{4}$/, ""));
+    }
     return {
-      label: `Lesson · ${placeLabel(lesson)}`,
-      value: when.time ? `${when.date}, ${when.time}` : when.date
+      label: `Weekly · ${placeLabel(first)}`,
+      value: [
+        `Every ${date.split(" ")[0]}, ${time}`,
+        item.goesOn ? `From ${dayOnly(first)}, until you stop it` : `From ${dayOnly(first)} until ${dayOnly(last)}`,
+        ...(missing.length ? [`No lesson on ${days(missing)}`] : []),
+        `${length(priced)} · ${price(priced)} a lesson`
+      ].join("\n")
     };
   });
-  if (lessons.length > shown.length) rows.push({ label: "And more", value: "The rest are on the website" });
+  const left = items.slice(limit).reduce((total, item) => total + item.lessons.length, 0);
+  if (left) lines.push({ label: "And more", value: `${left} more ${left === 1 ? "lesson" : "lessons"}, all on the website` });
+  return lines;
+}
+
+/** Her upcoming lessons for a student, with what a welcome tells of each. */
+async function welcomeLessons(env, studentId) {
+  const { results } = await env.DB.prepare(
+    `SELECT b.starts_at, b.location, b.student_timezone, b.lesson_type_id, b.payment_status, b.payment_consent_version, b.series_id,
+       COALESCE(b.amount_cents, l.price_cents) AS amount_cents, l.duration_minutes,
+       s.weekday AS series_weekday, s.minute_of_day AS series_minute, s.occurrences AS series_occurrences, s.status AS series_status,
+       s.lesson_type_id AS series_lesson_type, s.location AS series_location
+     FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id LEFT JOIN booking_series s ON s.id = b.series_id
+     WHERE b.student_id = ? AND b.status = 'confirmed' AND b.ends_at > ? ORDER BY b.starts_at`
+  ).bind(studentId, new Date().toISOString()).all();
+  return results ?? [];
+}
+
+/**
+ * Her welcome, sent from her list of students: their lessons so far and
+ * prices, each on its own clock, and the one-click way in. For someone she set
+ * up it is the first email the site sends them (13 October 2026, Dan).
+ */
+async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
+  // Never to a placeholder: there is no one to send it to until she gives their address.
+  if (isNoEmailYet(student.email)) return { ok: false, error: "no-email-yet" };
+  const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
+  const first = student.name.split(" ")[0];
+  const rows = welcomeLessonLines(student, lessons);
   // Already on the price Inês agreed with them, with no code to type
   // (13 October 2026, Dan).
   const prices = await studentRates(env, student.id).catch(() => ({}));
@@ -1215,9 +1475,11 @@ async function teacherStudentList(env) {
   const now = new Date().toISOString();
   const { results } = await env.DB.prepare(
     `SELECT s.id, s.name, s.email, s.phone, COALESCE(s.nif, '') AS nif, s.created_at, COALESCE(s.mark, '') AS mark, s.awaiting_welcome,
-       (COALESCE(s.stripe_payment_method, '') != '') AS has_card,
+       (COALESCE(s.stripe_customer_id, '') != '' AND COALESCE(s.stripe_payment_method, '') != '') AS has_card,
        s.card_consent_at,
        (s.password_hash != '' OR s.google_sub IS NOT NULL OR s.last_login_at IS NOT NULL) AS signed_in,
+       (EXISTS (SELECT 1 FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed')
+         OR (s.email NOT LIKE 'no-email:%' AND EXISTS (SELECT 1 FROM bookings b WHERE b.student_id IS NULL AND b.student_email = s.email AND b.status = 'confirmed'))) AS has_lessons,
        (SELECT MIN(b.starts_at) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?) AS next_lesson_at,
        (SELECT COUNT(*) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?
           AND b.added_by_teacher = 1 AND b.payment_status = 'not_required') AS unpaid_upcoming,
@@ -1242,6 +1504,8 @@ async function teacherStudentList(env) {
     mark: row.mark ?? "",
     signedIn: Boolean(row.signed_in),
     awaitingWelcome: Boolean(row.awaiting_welcome) && !row.signed_in,
+    hasCard: Boolean(row.has_card),
+    hasLessons: Boolean(row.has_lessons),
     cardForAllLessons: Boolean(row.has_card && row.card_consent_at),
     nextLessonAt: row.next_lesson_at ?? null,
     unpaidUpcoming: Number(row.unpaid_upcoming ?? 0),
@@ -1403,7 +1667,7 @@ async function confirmStudentCard(env, session) {
           : "Lessons you add for them from now on are charged to their card after each one.",
         callout: "",
         rows: onCard?.length
-          ? [{ label: "Now on their card", value: onCard.map((row) => formatInZone(new Date(row.starts_at), PORTO)).join("\n") }]
+          ? [{ label: "Now on their card", value: onCard.map((row) => formatInZone(new Date(row.starts_at), PORTO)).join("\n"), dates: true }]
           : [],
         action: { label: "Open your schedule", url: siteUrl(env, "/schedule/") },
         footer: "Sent automatically by the booking system."
@@ -1659,6 +1923,7 @@ const worker = {
     ctx.waitUntil(retryRefunds(env));
     ctx.waitUntil(resendFailedEmails(env));
     ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row)));
+    ctx.waitUntil(sendLessonReminders(env));
 
     // The account has a finite trigger allowance. One per-minute trigger owns
     // prompt money work, and only its 03:10 UTC tick runs the larger nightly
@@ -2134,7 +2399,7 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
         intro: `${row.student_name}'s ${amount} ${isSameDayFee ? "late change fee" : isNoShow ? "no-show fee" : "lesson payment"} couldn't be charged automatically. They've been sent a secure payment link.`,
         callout: "",
         rows: [
-          { label: "Student", value: `${row.student_name}\n${row.student_email}` },
+          { label: "Student", value: `${row.student_name}\n${shownEmail(row.student_email)}` },
           nifRow,
           { label: "Reference", value: row.reference }
         ],
@@ -2180,10 +2445,11 @@ export async function resendFailedEmails(env) {
   const cutoff = new Date(Date.now() - 5 * 60000).toISOString();
   const { results } = await env.DB.prepare(
     `SELECT * FROM email_log
-     WHERE status = 'failed' AND booking_id IS NOT NULL AND created_at < ?
+     WHERE status = 'failed' AND booking_id IS NOT NULL AND kind <> ? AND created_at < ?
      ORDER BY created_at LIMIT 25`
   )
-    .bind(cutoff)
+    // The reminder retries in its own sweep and must never be rebuilt as a confirmation.
+    .bind(REMINDER_KIND, cutoff)
     .all();
 
   if (!results?.length) return;
@@ -3381,6 +3647,18 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     return fail("That sequence or one of its times has just changed. Please reload and try again.", 409, request, env);
   }
 
+  // Needs you, as for a single lesson: only the rows this move wrote, each on
+  // the sequence it wrote, so a lesson kept inside 14 hours is never stamped.
+  try {
+    await env.DB.prepare(
+      `UPDATE bookings SET student_changed_at = ? WHERE series_id = ?
+         AND EXISTS (SELECT 1 FROM json_each(?) p WHERE json_extract(p.value, '$.id') = bookings.id
+           AND json_extract(p.value, '$.oldSequence') + 1 = bookings.sequence)`
+    ).bind(nowIso, seriesId, proposed).run();
+  } catch (error) {
+    console.warn("student-changed-at", seriesId, String(error));
+  }
+
   const placeholders = planned.map(() => "?").join(", ");
   const { results: updatedResults } = await env.DB.prepare(
     `SELECT * FROM bookings WHERE id IN (${placeholders}) ORDER BY starts_at`
@@ -3577,6 +3855,19 @@ async function handleReschedule(request, env, ctx, token) {
       return fail("That lesson has been cancelled, so it can't be moved.", 409, request, env);
     }
     return fail("That lesson has just changed. Please reload and try again.", 409, request, env);
+  }
+
+  /*
+   * Tell Inês the student changed it (Needs you, three days). A separate
+   * statement so the fee SQL above is untouched and a missing column only
+   * loses the note, never the change; the new sequence means it can never
+   * land on a later version someone else wrote.
+   */
+  try {
+    await env.DB.prepare("UPDATE bookings SET student_changed_at = ? WHERE id = ? AND sequence = ?")
+      .bind(now.toISOString(), row.id, row.sequence + 1).run();
+  } catch (error) {
+    console.warn("student-changed-at", row.id, String(error));
   }
 
   const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
@@ -4727,10 +5018,8 @@ const STUDENT_MARKS = new Set(["", "burst", "bloom", "pool", "dance", "drift", "
  * nothing is sent to them. Her list shows no email; their lessons and welcome
  * wait for a real one.
  */
-const NO_EMAIL_YET = "no-email:";
-
 function hasEmail(student) {
-  return !String(student?.email ?? "").startsWith(NO_EMAIL_YET);
+  return !isNoEmailYet(student?.email);
 }
 
 /** The details Inês can give for a student she sets up; each is optional. */
@@ -4910,7 +5199,15 @@ async function handleAdmin(request, env, ctx, url, path) {
     // the database and the Worker are updated in.
     const lessonsQuery = (mark) => env.DB.prepare(
       `SELECT b.*, l.name AS lesson_name, COALESCE(s.nif, '') AS student_nif${mark ? ", COALESCE(s.mark, '') AS student_mark" : ""},
-         (COALESCE(s.awaiting_welcome, 0) = 1 AND COALESCE(s.password_hash, '') = '' AND s.google_sub IS NULL AND s.last_login_at IS NULL) AS student_awaiting_welcome
+         (COALESCE(s.awaiting_welcome, 0) = 1 AND COALESCE(s.password_hash, '') = '' AND s.google_sub IS NULL AND s.last_login_at IS NULL) AS student_awaiting_welcome,
+         -- A student's first lesson, for Needs you: the page only reads from
+         -- yesterday on, so it cannot tell for itself. Cancelled lessons never
+         -- count as earlier; rows from before accounts match by email. The
+         -- unary plus keeps SQLite on idx_bookings_student for the legacy
+         -- check; the window index would scan every earlier booking per row.
+         (b.student_id IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM bookings earlier WHERE earlier.student_id = b.student_id AND earlier.status = 'confirmed' AND earlier.starts_at < b.starts_at)
+           AND NOT EXISTS (SELECT 1 FROM bookings legacy WHERE legacy.student_id IS NULL AND legacy.student_email = b.student_email AND +legacy.status = 'confirmed' AND legacy.starts_at < b.starts_at)) AS first_lesson
        FROM bookings b
        JOIN lesson_types l ON l.id = b.lesson_type_id LEFT JOIN students s ON s.id = b.student_id
        WHERE b.starts_at > ? ORDER BY b.starts_at`
@@ -4924,12 +5221,14 @@ async function handleAdmin(request, env, ctx, url, path) {
       ({ results } = await lessonsQuery(false));
     }
     const cutoff = new Date(Date.now() - 23 * 3600000).toISOString();
-    const { results: reconciliation } = await env.DB.prepare(`SELECT id, reference, payment_status, same_day_fee_status FROM bookings
+    const { results: reconciliation } = await env.DB.prepare(`SELECT id, reference, payment_status, same_day_fee_status, student_name, starts_at, stripe_payment_intent, same_day_fee_payment_intent FROM bookings
       WHERE (payment_status = 'processing' AND (charge_started_at IS NULL OR charge_started_at < ?))
          OR (same_day_fee_status = 'processing' AND (same_day_fee_started_at IS NULL OR same_day_fee_started_at < ?))
          OR EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = bookings.id AND status = 'pending')`)
       .bind(cutoff, cutoff).all();
-    return json({ bookings: results ?? [], manualPaymentReconciliation: reconciliation ?? [] }, 200, request, env);
+    // A lesson for a student with no email yet reads as having none, never as
+    // the key that stands in for it.
+    return json({ bookings: (results ?? []).map(withRealEmail), manualPaymentReconciliation: reconciliation ?? [] }, 200, request, env);
   }
 
   if (request.method === "GET" && path === "/admin/availability") {
@@ -5122,28 +5421,37 @@ async function handleAdmin(request, env, ctx, url, path) {
     const stored = email || student.email;
     // The address only moves while they have still never signed in, checked
     // in the same write so a sign-in landing meanwhile keeps their address.
-    const updated = await env.DB.prepare(
+    const rewrite = env.DB.prepare(
       `UPDATE students SET name = ?, email = ?, phone = ?, nif = ?, mark = ?,
          email_verified_at = CASE WHEN email = ? THEN email_verified_at ELSE NULL END,
          session_version = session_version + CASE WHEN email = ? THEN 0 ELSE 1 END
        WHERE id = ? AND NOT EXISTS (SELECT 1 FROM students other WHERE other.email = ? AND other.id != ?)
          AND (? = 0 OR (password_hash = '' AND google_sub IS NULL AND last_login_at IS NULL))`
-    ).bind(name, stored, details.phone, details.nif, details.mark, stored, stored, student.id, stored, student.id, moving ? 1 : 0).run();
+    ).bind(name, stored, details.phone, details.nif, details.mark, stored, stored, student.id, stored, student.id, moving ? 1 : 0);
+    // Every lesson of theirs, past ones too so a receipt reads right, takes
+    // their name, phone and any new address in the same write as the account
+    // does (14 October 2026, Dan): never one without the other, for she adds
+    // "Adam" first and completes him later. Nothing is sent by this; they
+    // stay awaiting their welcome until she sends it.
+    const [updated] = await env.DB.batch([
+      rewrite,
+      env.DB.prepare(
+        `UPDATE bookings SET student_name = ?, student_phone = ?${moving ? ", student_email = ?" : ""} WHERE student_id = ?
+           AND EXISTS (SELECT 1 FROM students WHERE id = ? AND name = ? AND phone = ?${moving ? " AND email = ?" : ""})`
+      ).bind(
+        name, details.phone, ...(moving ? [email] : []), student.id,
+        student.id, name, details.phone, ...(moving ? [email] : [])
+      )
+    ]);
     if (!(updated?.meta?.changes > 0)) {
       const now = await env.DB.prepare("SELECT password_hash, google_sub, last_login_at FROM students WHERE id = ?").bind(student.id).first();
       return now && (now.password_hash || now.google_sub || now.last_login_at)
         ? fail("They sign in with that email, so they can change it from their account.", 409, request, env)
         : fail("Someone with that email is already on the site.", 409, request, env);
     }
-    if (moving) {
-      // A welcome or sign-in link sent to the old address, a mistyped one
-      // perhaps, must not open their account now; and lessons she already
-      // added follow them to the new address.
-      await env.DB.batch([
-        ...forgetPendingAccess(env, student.id),
-        env.DB.prepare("UPDATE bookings SET student_email = ? WHERE student_id = ?").bind(email, student.id)
-      ]);
-    }
+    // A welcome or sign-in link sent to the old address, a mistyped one
+    // perhaps, must not open their account now.
+    if (moving) await env.DB.batch(forgetPendingAccess(env, student.id));
     const list = await teacherStudentList(env);
     return json({ student: list.find((entry) => entry.id === student.id) }, 200, request, env);
   }
@@ -5170,16 +5478,24 @@ async function handleAdmin(request, env, ctx, url, path) {
       .first();
     if (!student) return fail("That student could not be found.", 404, request, env);
     if (!hasEmail(student)) return fail("Add their email first, so the welcome has somewhere to go.", 400, request, env);
+    // Needs you asks for the welcome only while it is still owed. A second
+    // device pressing a moment later would otherwise send a second welcome
+    // with a fresh sign-in link, and spend the hourly allowance doing it. The
+    // Students card sends no such flag, so it can still send one deliberately.
+    const welcomeBody = await readJson(request);
+    if (welcomeBody.onlyIfWaiting === true && !awaitingWelcome(student)) {
+      return fail("Their welcome has already been sent.", 409, request, env);
+    }
     if (!await takeRateLimit(env, `welcome:${student.id}`, 3, 3600)) {
       return fail("A link was sent to them recently. Please wait an hour before sending another.", 429, request, env);
     }
     const settings = await loadSettings(env);
+    // A lesson added from a stale read while their address was saved still
+    // holds the stand-in; it takes the real one before anything goes out.
+    await env.DB.prepare("UPDATE bookings SET student_email = ? WHERE student_id = ? AND student_email LIKE ?")
+      .bind(student.email, student.id, `${NO_EMAIL_YET}%`).run();
     const welcome = await issueWelcome(env, settings, student, { always: true });
-    const { results: lessons } = await env.DB.prepare(
-      `SELECT starts_at, ends_at, location, student_timezone FROM bookings
-       WHERE student_id = ? AND status = 'confirmed' AND ends_at > ? ORDER BY starts_at LIMIT 13`
-    ).bind(student.id, new Date().toISOString()).all();
-    const sent = await sendWelcome(env, { student, settings, welcome, lessons: lessons ?? [] });
+    const sent = await sendWelcome(env, { student, settings, welcome, lessons: await welcomeLessons(env, student.id) });
     if (!sent.ok) return fail("The email could not be sent just now. Please try again.", 502, request, env);
     // From now on, emails about their lessons reach them as usual.
     await env.DB.prepare("UPDATE students SET awaiting_welcome = 0 WHERE id = ?").bind(student.id).run();
@@ -5188,8 +5504,12 @@ async function handleAdmin(request, env, ctx, url, path) {
 
   if (request.method === "POST" && path === "/admin/bookings") {
     const body = await readJson(request);
+    // A student is named by their account, so one with no email yet can have
+    // lessons too (14 October 2026, Dan); an address still names them for a
+    // caller that has only that.
+    const studentId = typeof body.studentId === "string" ? body.studentId.trim() : "";
     const email = normaliseEmail(body.email);
-    if (!isEmail(email)) return fail("Please give the student's email address.", 400, request, env);
+    if (!studentId && !isEmail(email)) return fail("Please choose the student.", 400, request, env);
 
     let lessonType = await loadLessonType(env, cleanText(body.lessonType, 40) || "single");
     if (!lessonType) return fail("That lesson type is not available.", 400, request, env);
@@ -5222,7 +5542,9 @@ async function handleAdmin(request, env, ctx, url, path) {
       .first();
     if (clash) return fail(`That overlaps an existing lesson (${clash.reference}).`, 409, request, env);
 
-    let student = await env.DB.prepare("SELECT * FROM students WHERE email = ?").bind(email).first();
+    let student = studentId
+      ? await env.DB.prepare("SELECT * FROM students WHERE id = ? AND role = 'student'").bind(studentId).first()
+      : await env.DB.prepare("SELECT * FROM students WHERE email = ?").bind(email).first();
     const now = new Date().toISOString();
 
     // Every lesson belongs to a student she has set up (13 October 2026, Dan:
@@ -5394,6 +5716,15 @@ async function handleAdmin(request, env, ctx, url, path) {
 
     if (!(moved?.meta?.changes > 0)) return fail("That lesson or time has just changed. Please reload.", 409, request, env);
 
+    // Her own move is not news to her: it clears the student's change on the
+    // version she wrote, and only that one.
+    try {
+      await env.DB.prepare("UPDATE bookings SET student_changed_at = NULL WHERE id = ? AND sequence = ?")
+        .bind(row.id, row.sequence + 1).run();
+    } catch (error) {
+      console.warn("student-changed-at", row.id, String(error));
+    }
+
     const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
     const settings = await loadSettings(env);
     const token = await createManageToken(row.id, env.BOOKING_TOKEN_SECRET);
@@ -5495,7 +5826,7 @@ async function handleAdmin(request, env, ctx, url, path) {
     }
 
     const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
-    return json({ booking: updated }, 200, request, env);
+    return json({ booking: withRealEmail(updated) }, 200, request, env);
   }
 
   /*
@@ -5515,7 +5846,7 @@ async function handleAdmin(request, env, ctx, url, path) {
       return fail("Only a lesson you added that is waiting to be charged can be marked paid by hand.", 409, request, env);
     }
     const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(adminPaidByHand[1]).first();
-    return json({ booking: updated }, 200, request, env);
+    return json({ booking: withRealEmail(updated) }, 200, request, env);
   }
 
   if (request.method === "POST" && path === "/admin/settings") {

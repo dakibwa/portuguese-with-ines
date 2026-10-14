@@ -168,6 +168,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   student_id        TEXT REFERENCES students (id),
   -- Name and email are copied onto the booking rather than only joined, so a
   -- past lesson still reads correctly if the student later changes either.
+  -- Inês's own corrections from Students (the name, phone and, for someone who
+  -- never signed in, the email) are the exception: they reach every booking.
   student_name      TEXT NOT NULL,
   student_email     TEXT NOT NULL,
   student_phone     TEXT NOT NULL DEFAULT '',
@@ -187,6 +189,9 @@ CREATE TABLE IF NOT EXISTS bookings (
   -- EUR 5 same-day fee is charged against, and why Inês is emailed about it.
   same_day_change   INTEGER NOT NULL DEFAULT 0,
   previous_starts_at TEXT,
+  -- When the student last changed this lesson (time, length or place), for Inês's
+  -- Needs you; cleared when she moves it (migration 0028).
+  student_changed_at TEXT,
   cancelled_at      TEXT,
   cancelled_by      TEXT,
   cancellation_message TEXT,

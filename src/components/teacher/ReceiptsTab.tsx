@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download } from "lucide-react";
 import { fetchReceipts, type ReceiptLine } from "@/lib/admin-api";
+import { TeacherPager } from "@/components/teacher/TeacherPager";
 import { readSession } from "@/lib/auth-api";
 import { formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
@@ -63,6 +64,7 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
   const [data, setData] = useState<{ month: string; receipts: ReceiptLine[] } | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const monthTitleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -94,12 +96,16 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
   return (
     <section className="teacher-receipts" aria-labelledby="teacher-receipts-month">
       <div className="teacher-month-heading">
-        <h3 id="teacher-receipts-month" aria-live="polite">{monthName}</h3>
-        <div className="teacher-month-navigation">
-          <button className="teacher-icon-button" aria-label="Previous month" onClick={() => setMonth(shiftMonth(month, -1))} type="button"><ChevronLeft size={19} aria-hidden="true" /></button>
-          {month !== thisMonth ? <button className="teacher-text-button" onClick={() => setMonth(thisMonth)} type="button">This month</button> : null}
-          <button className="teacher-icon-button" aria-label="Next month" disabled={month >= thisMonth} onClick={() => setMonth(shiftMonth(month, 1))} type="button"><ChevronRight size={19} aria-hidden="true" /></button>
-        </div>
+        <h3 id="teacher-receipts-month" aria-live="polite" ref={monthTitleRef} tabIndex={-1}>{monthName}</h3>
+        <TeacherPager
+          unit="month"
+          away={month !== thisMonth}
+          headingRef={monthTitleRef}
+          onCurrent={() => setMonth(thisMonth)}
+          onNext={() => setMonth(shiftMonth(month, 1))}
+          onPrevious={() => setMonth(shiftMonth(month, -1))}
+          nextDisabled={month >= thisMonth}
+        />
       </div>
 
       {error ? (
