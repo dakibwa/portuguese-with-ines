@@ -271,7 +271,7 @@ async function fixture(width, options = {}) {
     // Her students, for suggestions in the form and her list beneath it.
     if (path === "/admin/students" && data) {
       // Set up quietly: nothing is emailed until her welcome.
-      const student = { id: "ana", name: data.name, email: data.email, phone: data.phone, mark: data.mark, prices: data.prices, signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0, hasLessons: false };
+      const student = { id: `student-${++state.nextId}`, name: data.name, email: data.email, phone: data.phone, mark: data.mark, prices: data.prices, signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0, hasLessons: false };
       state.added = student;
       return route.fulfill({ status: 201, json: { student } });
     }
@@ -844,13 +844,12 @@ try {
   const students = page.locator(".teacher-students");
   await page.getByRole("tab", { name: /^Students/ }).click();
   const samSetup = students.locator(".teacher-setup").filter({ hasText: "Sam Known" });
-  await samSetup.getByRole("button", { name: "Welcome for Sam Known", exact: true }).click();
+  await samSetup.getByRole("button", { name: "Welcome email for Sam Known", exact: true }).click();
   const samPane = samSetup.getByRole("region", { name: "Sam Known’s setup", exact: true });
   await samPane.getByRole("button", { name: "Send the link again to Sam Known", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/sam/welcome").length).toBe(1);
   await samSetup.getByRole("button", { name: "Close", exact: true }).click();
-  // Onboarding: set a student up with their details, nothing emailed, then
-  // their welcome from the same Students row.
+  // Setting up a student's details does not email them or skip their lesson step.
   await students.getByRole("button", { name: "Add a student", exact: true }).click();
   const addStudent = page.getByRole("dialog");
   await addStudent.getByLabel("Full name").fill("Ana Costa");
@@ -866,18 +865,13 @@ try {
   await expect(addStudent.getByRole("heading", { name: "Ana Costa" })).toBeVisible();
   await expect(addStudent.getByRole("radio", { name: "60 mins, €20" })).toBeVisible();
   await expect(addStudent.getByRole("radio", { name: "90 mins, €35" })).toBeVisible();
-  // Their welcome waits until she asks: it is offered once the form is put away.
-  await expect(addStudent.getByRole("button", { name: "Send welcome email", exact: true })).toHaveCount(0);
   await addStudent.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(addStudent.getByRole("button", { name: "Send welcome email", exact: true })).toBeVisible();
+  await expect(addStudent.getByRole("button", { name: "Send welcome email", exact: true })).toBeDisabled();
   await addStudent.getByRole("button", { name: "Close", exact: true }).click();
   const ana = students.locator(".teacher-setup").filter({ hasText: "Ana Costa" });
-  assert.equal(state.writes.filter(entry => entry.path === "/admin/students/ana/welcome").length, 0, "Setting up Ana does not email her");
-  await ana.getByRole("button", { name: "Welcome for Ana Costa", exact: true }).click();
-  const anaPane = ana.getByRole("region", { name: "Ana Costa’s setup", exact: true });
-  await anaPane.getByRole("button", { name: "Send welcome email to Ana Costa", exact: true }).click();
-  await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/ana/welcome").length).toBe(1);
-  await ana.getByRole("button", { name: "Close", exact: true }).click();
+  const anaId = state.added.id;
+  assert.equal(state.writes.filter(entry => entry.path === `/admin/students/${anaId}/welcome`).length, 0, "Setting up Ana does not email her");
+  await expect(ana.getByRole("button", { name: "Welcome email for Ana Costa", exact: true })).toBeDisabled();
 
   // A completed student's whole card opens their profile; its lesson action
   // opens the calendar in that same profile.
@@ -894,23 +888,17 @@ try {
   await expect(profile.getByRole("group", { name: "Choose a date and time", exact: true })).toBeVisible();
   await profile.getByRole("button", { name: "Close", exact: true }).click();
 
-  // Setup work opens beneath the student's row, and stays there through
-  // details, their own price, a lesson and the explicit welcome.
+  // Her setup follows price, lessons, email and welcome. Later unfinished
+  // steps stay closed; completed steps can still be corrected.
   const noraSetup = students.locator(".teacher-setup").filter({ hasText: "Nora Lima" });
   const setupForm = noraSetup.getByRole("region", { name: "Nora Lima’s setup", exact: true });
-  // No email is needed to open their lesson calendar.
-  await noraSetup.getByRole("button", { name: "Lessons for Nora Lima", exact: true }).click();
-  await expect(setupForm.getByRole("group", { name: "Choose a date and time", exact: true })).toBeVisible();
-  await noraSetup.getByRole("button", { name: "Close", exact: true }).click();
-  await noraSetup.getByRole("button", { name: "Add email for Nora Lima", exact: true }).click();
-  await expect(setupForm.getByLabel(/^Email/)).toBeFocused();
-  await expect(page.getByRole("dialog")).toBeHidden();
-  await setupForm.getByLabel(/^Email/).fill("nora@example.invalid");
-  await setupForm.getByRole("button", { name: "Save details", exact: true }).click();
-  assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/students/nora/details").at(-1).data,
-    { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "", mark: "" });
-  await expect(setupForm).toBeHidden();
-  assert.equal(state.writes.filter((entry) => entry.path.endsWith("/welcome")).length, 2, "Adding the email does not send Nora's welcome");
+  for (const label of ["Email", "Welcome email", "Sign in", "Card"])
+    await expect(noraSetup.getByRole("button", { name: `${label} for Nora Lima`, exact: true })).toBeDisabled();
+  await noraSetup.getByRole("button", { name: "Open Nora Lima’s profile", exact: true }).click();
+  const noraProfile = page.getByRole("dialog", { name: "Nora Lima", exact: true });
+  await noraProfile.getByRole("button", { name: "Edit details", exact: true }).click();
+  await expect(noraProfile.getByLabel(/^Email/)).toBeDisabled();
+  await noraProfile.getByRole("button", { name: "Close", exact: true }).click();
 
   await noraSetup.getByRole("button", { name: "Price for Nora Lima", exact: true }).click();
   await setupForm.getByLabel("Price for 60 minutes, in euros", { exact: true }).fill("24");
@@ -938,14 +926,36 @@ try {
     studentId: "nora", lessonType: "long", startAt: "2026-09-30T17:30:00.000Z", location: "online", notes: "",
   });
   assert.ok(state.availabilityReads.includes("long"), "90-minute choices request 90-minute availability");
-  assert.equal(state.writes.filter(entry => entry.path.endsWith("/welcome")).length, 2, "Adding the lesson still waits for Nora's welcome");
+  await expect(noraSetup.getByRole("status")).not.toContainText("emailed");
+  assert.equal(state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length, 0, "Adding the lesson waits for Nora's welcome");
+  await expect(noraSetup.getByRole("button", { name: "Welcome email for Nora Lima", exact: true })).toBeDisabled();
+  // The completed price remains editable after a lesson exists.
+  await noraSetup.getByRole("button", { name: "Price for Nora Lima", exact: true }).click();
+  await expect(setupForm.getByLabel("Price for 60 minutes, in euros", { exact: true })).toHaveValue("24");
+  await noraSetup.getByRole("button", { name: "Close", exact: true }).click();
 
-  await noraSetup.getByRole("button", { name: "Welcome for Nora Lima", exact: true }).click();
+  await noraSetup.getByRole("button", { name: "Email for Nora Lima", exact: true }).click();
+  await expect(setupForm.getByLabel(/^Email/)).toBeFocused();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await setupForm.getByLabel(/^Email/).fill("nora@example.invalid");
+  await setupForm.getByRole("button", { name: "Save details", exact: true }).click();
+  assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/students/nora/details").at(-1).data,
+    { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "", mark: "" });
+  await expect(setupForm).toBeHidden();
+  assert.equal(state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length, 0, "Adding the email does not send Nora's welcome");
+  await expect(noraSetup.getByRole("button", { name: "Sign in for Nora Lima", exact: true })).toBeDisabled();
+
+  await noraSetup.getByRole("button", { name: "Welcome email for Nora Lima", exact: true }).click();
   await setupForm.getByRole("button", { name: "Send welcome email to Nora Lima", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length).toBe(1);
-  // Her next steps need the student. Each explains that and offers a fresh link.
-  await noraSetup.getByRole("button", { name: "Signed in for Nora Lima", exact: true }).click();
+  // Sign-in belongs to the student; her card step waits until she has signed in.
+  await noraSetup.getByRole("button", { name: "Sign in for Nora Lima", exact: true }).click();
   await expect(setupForm.getByRole("button", { name: "Send the link again to Nora Lima", exact: true })).toBeEnabled();
+  await expect(noraSetup.getByRole("button", { name: "Card for Nora Lima", exact: true })).toBeDisabled();
+  state.students.find(student => student.id === "nora").signedIn = true;
+  await page.reload();
+  await page.getByRole("tab", { name: /^Students/ }).click();
+  await expect(noraSetup.getByRole("button", { name: "Sign in for Nora Lima", exact: true })).toBeEnabled();
   await noraSetup.getByRole("button", { name: "Card for Nora Lima", exact: true }).click();
   await expect(setupForm.getByRole("button", { name: "Send the link again to Nora Lima", exact: true })).toBeEnabled();
   await expect(page.getByRole("dialog")).toBeHidden();

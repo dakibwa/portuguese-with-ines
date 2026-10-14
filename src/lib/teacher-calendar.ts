@@ -419,7 +419,7 @@ export type StudentSetupStep = "email" | "price" | "lessons" | "welcome" | "sign
 
 export type StudentSetup = {
   student: AdminStudent;
-  steps: { id: StudentSetupStep; label: string; done: boolean }[];
+  steps: { id: StudentSetupStep; label: string; done: boolean; lockedReason?: string }[];
   next: Exclude<StudentSetupStep, "price">;
   owner: "Yours" | "Theirs";
 };
@@ -427,21 +427,32 @@ export type StudentSetup = {
 /** A past lesson counts too; her students do not need a future booking to stay set up. */
 const hasLessons = (student: AdminStudent) => Boolean(student.hasLessons || student.nextLessonAt || student.upcoming || student.weekly);
 
-/** The standard price is ready already. Sign-in and a card are the student's own steps. */
+/** New setup follows the lesson before the email; completed steps stay editable. */
 export function gettingStarted(students: AdminStudent[], cardsAccepted = true): StudentSetup[] {
   return students.flatMap((student) => {
     const email = Boolean(student.email && !student.email.startsWith(NO_EMAIL_YET));
     const steps: StudentSetup["steps"] = [
-      { id: "email", label: "Email", done: email },
       { id: "price", label: "Price", done: true },
       { id: "lessons", label: "Lessons", done: hasLessons(student) },
-      { id: "welcome", label: "Welcome", done: email && !student.awaitingWelcome },
-      { id: "sign-in", label: "Signed in", done: Boolean(student.signedIn) },
+      { id: "email", label: "Email", done: email },
+      { id: "welcome", label: "Welcome email", done: email && !student.awaitingWelcome },
+      { id: "sign-in", label: "Sign in", done: Boolean(student.signedIn) },
       ...(cardsAccepted ? [{ id: "card" as const, label: "Card", done: Boolean(student.hasCard) }] : []),
     ];
     const index = steps.findIndex((step) => !step.done);
     if (index < 0) return [];
     const next = steps[index].id as StudentSetup["next"];
+    const prerequisite: Record<StudentSetupStep, string> = {
+      price: "Set a price first.",
+      lessons: "Add a lesson first.",
+      email: "Add an email first.",
+      welcome: "Send the welcome email first.",
+      "sign-in": "Waiting for the student to sign in.",
+      card: "Waiting for the student to add a card.",
+    };
+    for (let later = index + 1; later < steps.length; later++) {
+      if (!steps[later].done) steps[later].lockedReason = prerequisite[next];
+    }
     return [{ student, steps, next, owner: next === "sign-in" || next === "card" ? "Theirs" as const : "Yours" as const }];
   });
 }
