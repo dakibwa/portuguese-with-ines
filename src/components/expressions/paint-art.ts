@@ -56,12 +56,14 @@ export function makeCanvas(w: number, h: number, dpr: number): [HTMLCanvasElemen
 export function blob(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, R: Rand, colour: string, { lobes = 0.14, rim = true } = {}) {
   const harmonics: [number, number, number][] = [];
   for (let k = 2; k <= 7; k++) harmonics.push([k, (R() * 2 - 1) * lobes / (0.55 * k), R() * Math.PI * 2]);
-  const path = new Path2D();
   const n = 72;
+  const swing = Array.from({ length: n + 1 }, (_, i) => harmonics.reduce((sum, [k, amp, phase]) => sum + amp * Math.sin((k * i * Math.PI * 2) / n + phase), 0));
+  // Its lobes reach at most 1.4 × `lobes` beyond its radius, so a blob placed clear of a margin stays inside it.
+  const scale = Math.min(1, (1.4 * lobes) / Math.max(1e-6, ...swing.map(Math.abs)));
+  const path = new Path2D();
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * Math.PI * 2;
-    let m = 1;
-    for (const [k, amp, phase] of harmonics) m += amp * Math.sin(k * a + phase);
+    const m = 1 + swing[i] * scale;
     const x = cx + Math.cos(a) * r * m;
     const y = cy + Math.sin(a) * r * m * 0.9;
     if (i) path.lineTo(x, y);
@@ -171,6 +173,10 @@ export function paintStroke(L: number, T: number, B: number, Lb: number, colour:
   const step = 3;
   const top: [number, number][] = [];
   const bottom: [number, number][] = [];
+  // Over its last stretch the body's edges ease in to the dry brush's, so where
+  // the body ends the bristles carry on from it: no step at either edge.
+  const run = clamp(B * 0.5, 8, Lb * 0.3);
+  const envelope = 0.95;
   for (let x = startDepth; x <= Lb + 0.01; x += step) {
     const xx = Math.min(x, Lb);
     let y0 = mid(xx) - hw(xx) + edge(xx, 0);
@@ -179,6 +185,14 @@ export function paintStroke(L: number, T: number, B: number, Lb: number, colour:
     if (solid && weight) {
       y0 += (soft(y0, solid.top) - y0) * weight;
       y1 += (-soft(-y1, -solid.bottom) - y1) * weight;
+    }
+    const u = clamp((xx - (Lb - run)) / run, 0, 1);
+    const k = u * u * (3 - 2 * u);
+    if (k) {
+      const inner0 = mid(xx) - hw(xx) * envelope;
+      const inner1 = mid(xx) + hw(xx) * envelope;
+      if (y0 < inner0) y0 += (inner0 - y0) * k;
+      if (y1 > inner1) y1 += (inner1 - y1) * k;
     }
     top.push([xx, y0]);
     bottom.push([xx, y1]);
@@ -189,10 +203,17 @@ export function paintStroke(L: number, T: number, B: number, Lb: number, colour:
   for (let i = bottom.length - 1; i >= 0; i--) path.lineTo(bottom[i][0], bottom[i][1]);
   const y0 = bottom[0][1];
   const y1 = top[0][1];
-  for (let k = 1; k < 14; k++) {
-    const u = k / 14;
+  // The blunt start: a rounded cap where the loaded brush met the paper,
+  // furthest out at its middle, with a gentle wobble that never flattens it
+  // into a straight stretch or pinches it to a point, and never reaches the
+  // canvas's edge.
+  const capSteps = 28;
+  for (let k = 1; k < capSteps; k++) {
+    const u = k / capSteps;
     const v = 1 - 2 * u;
-    const x = Math.max(0.5, startDepth * Math.pow(Math.abs(v), 2.2) + B * (0.04 * Math.sin(v * 5.5 + phase[5]) + 0.025 * Math.sin(v * 13 + phase[1])) * (1 - Math.abs(v)) + B * 0.03);
+    const round = 1 - v * v;
+    const wobble = B * (0.018 * Math.sin(v * 4 + phase[5]) + 0.008 * Math.sin(v * 11 + phase[1]) + 0.027) * round;
+    const x = Math.max(0.5, startDepth * (1 - Math.sqrt(round)) + wobble + 0.5);
     path.lineTo(x, y0 + (y1 - y0) * u);
   }
   path.closePath();
@@ -304,13 +325,16 @@ export function paintBead(B: number, colour: string, R: Rand, dir: number, dpr: 
   g.beginPath();
   g.ellipse(cx, cy, rx * 0.98, ry * 0.98, 0, -1.25, 1.25);
   g.stroke();
+  // Its back melts into the stroke along a curve that follows its own round,
+  // so the streaks it covers fade out in an arc, never along a straight line.
   g.globalCompositeOperation = "destination-in";
-  const fade = g.createLinearGradient(0, 0, bw, 0);
-  fade.addColorStop(0, "rgba(0,0,0,0)");
-  fade.addColorStop(0.32, "rgba(0,0,0,1)");
-  fade.addColorStop(1, "rgba(0,0,0,1)");
+  g.translate(bw, bh / 2);
+  g.scale(1, bh / bw);
+  const fade = g.createRadialGradient(0, 0, bw * 0.6, 0, 0, bw * 1.02);
+  fade.addColorStop(0, "rgba(0,0,0,1)");
+  fade.addColorStop(1, "rgba(0,0,0,0)");
   g.fillStyle = fade;
-  g.fillRect(0, 0, bw, bh);
+  g.fillRect(-bw * 2, -bw * 2, bw * 4, bw * 4);
   return { canvas, bw, bh };
 }
 
@@ -441,8 +465,12 @@ export function layoutPhrase(text: string, m: PhraseMetrics, family: string): { 
   return result(fs, wrap(fs, pieces) ?? pieces);
 }
 
-/** How far each row of wax is set in: the first clear of the pool waiting beside it, the rest in a loose zigzag. */
-const waxIndent = (index: number, fs: number) => (index === 0 ? fs * 0.95 : index === 2 ? fs * 0.45 : 0);
+/**
+ * How far each row of wax is set in, in a loose cascade: the first two clear
+ * of the pool beside them, even once the press's dab has swollen in it, so
+ * the wax still reads while the reply is on its way.
+ */
+const waxIndent = (index: number, fs: number) => (index === 0 ? fs * 1.35 : index === 1 ? fs * 0.95 : fs * 0.4);
 
 /** The phrases that fit the sheet, up to three, each at the largest size that fits. */
 export function waxRows(g: CanvasRenderingContext2D, w: number, m: WaxMetrics, phrases: string[], family: string) {

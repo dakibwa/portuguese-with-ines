@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import type { ExpressionInput } from "@/lib/expressions";
 import { publicAssetPath } from "@/lib/paths";
 
@@ -73,26 +73,67 @@ export function ExpressionExamples({ item }: { item: ExpressionInput }) {
   );
 }
 
+function Tags({ item }: { item: ExpressionInput }) {
+  return item.tags.length ? <ul className="expression-card__tags" aria-label="Temas">{item.tags.map((tag) => <li key={tag}>{tag}</li>)}</ul> : null;
+}
+
+function Notes({ item }: { item: ExpressionInput }) {
+  return (
+    <>
+      {item.notes ? <p>{item.notes}</p> : null}
+      {item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noreferrer">Consultar referência</a> : null}
+    </>
+  );
+}
+
 /**
  * Its themes, Inês's notes and source, and an optional picture. A student's
- * card ends with its themes and `action` in one row, the action at its end.
+ * card ends in one row instead: its themes, the notes' toggle and `action`
+ * at the row's end (see ReadingFoot).
  */
 export function ExpressionExtras({ item, image = false, action }: { item: ExpressionInput; image?: boolean; action?: ReactNode }) {
   const picture = image && item.imageUrl;
-  if (!action && !item.tags.length && !item.notes && !item.sourceUrl && !picture) return null;
-  const tags = item.tags.length ? <ul className="expression-card__tags" aria-label="Temas">{item.tags.map((tag) => <li key={tag}>{tag}</li>)}</ul> : null;
+  if (action) return <ReadingFoot action={action} item={item} picture={Boolean(picture)} />;
+  if (!item.tags.length && !item.notes && !item.sourceUrl && !picture) return null;
   return (
     <div className="expression-card__extras">
-      {action ? null : tags}
+      <Tags item={item} />
       {item.notes || item.sourceUrl ? (
         <details className="expression-card__notes">
           <summary>Notas e origem</summary>
-          {item.notes ? <p>{item.notes}</p> : null}
-          {item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noreferrer">Consultar referência</a> : null}
+          <Notes item={item} />
         </details>
       ) : null}
       {picture ? <ExpressionImage item={item} /> : null}
-      {action ? <div className="expression-card__foot">{tags}{action}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * A student's reading ends in one row: its themes, then the notes' toggle and
+ * the action, which keep together at the row's end and drop beneath the
+ * themes only when the row has no room for them. The notes open below the
+ * whole row, so opening them never moves the row.
+ */
+function ReadingFoot({ item, picture, action }: { item: ExpressionInput; picture: boolean; action: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const panel = useId();
+  const notes = Boolean(item.notes || item.sourceUrl);
+  return (
+    <div className="expression-card__extras">
+      {picture ? <ExpressionImage item={item} /> : null}
+      <div className="expression-card__foot" data-lead={item.tags.length ? "tags" : notes ? "notes" : undefined}>
+        <Tags item={item} />
+        <div className="expression-card__foot-end">
+          {notes ? (
+            <button aria-controls={panel} aria-expanded={open} className="expression-card__notes-toggle" type="button" onClick={() => setOpen((value) => !value)}>
+              Notas e origem
+            </button>
+          ) : null}
+          {action}
+        </div>
+      </div>
+      {notes ? <div className="expression-card__notes" hidden={!open} id={panel}><Notes item={item} /></div> : null}
     </div>
   );
 }

@@ -553,12 +553,18 @@ reading's title; the facts follow it.
   heading, so it is still named. At rest the sheet itself invites: the same
   words as a small uppercase label at its top, in the waiting paint's
   lettering colour, and `Paint it`. Once painted, the card is the whole
-  section, and the compact `Paint another` ends the row of the reading's
-  themes, at the foot of the facts at every width. On a narrow column that row
-  starts at the dabs' column and runs to the card's edge, so a theme and the
-  button share it; the button moves to a line of its own only for several
-  themes (or, on the narrowest phones, one long one), stays a 48px target and
-  never becomes a full-width slab.
+  section, and it ends in one row at the foot of the facts at every width:
+  the reading's themes, then `Notas e origem` (when Inês has written notes or
+  a source) and the compact `Paint another` at the row's end. The notes'
+  toggle reads like the facts' labels, its chevron in the dabs' column when it
+  leads the row, and the notes open below the whole row, so opening them never
+  moves it. On a narrow column the row starts at the dabs' column and runs to
+  the card's edge, so two short themes, or the notes' toggle, share it with
+  the button; the toggle and the button drop beneath the themes together only
+  for a longer set of themes, and only on the narrowest phones (320px) does the
+  button take a line of its own. The button keeps the width of its longest
+  label, so `Painting…` and `Try again` never reflow the row; it stays a 48px
+  target and never becomes a full-width slab.
 - Colour: each painting is in one of five paints, every one with lettering
   clear of AA: deep blue `#203E82`, blue `#2C54AA`, coral `#B43A26` and
   lavender ink `#554F91` carry cream `#FBF4E5` lettering; lavender `#AAA4E6`
@@ -566,8 +572,9 @@ reading's title; the facts follow it.
   never the colour of the last one painted on this device, nor of its family
   (the two blues, the two lavenders), so each one reads as a new colour. A
   returning student sees their expression in the colour it was painted in,
-  remembered on the device for each student (two students sharing a device
-  keep their own colours), or else in a colour that expression always gets.
+  remembered on the device for each student as soon as the Worker has saved
+  the pick (two students sharing a device keep their own colours), or else in
+  a colour that expression always gets.
   The reading's labels, dabs, marked words and the drops thrown off the brush
   all follow the paint and its companion colours; on lavender the labels are
   in lavender ink and the marked words take a stronger lavender wash, so both
@@ -613,17 +620,23 @@ reading's title; the facts follow it.
   its place, at the top where it stays. The whole reveal, press to
   reading, takes about 3.2 seconds when the reply arrives within about 1.5
   seconds; after a slower reply the painting follows it at its quickest pace.
-- No paint ever shows a straight edge. Each stroke touches down as a rounded
-  mark, blunt start and front together, and is led by a rounded wet front
-  with the bead riding it (the near-miss by a dry brush's ragged front); its
-  body ends rounded under the bead until the dry brush drags out from it, and
-  the bead soaks back into the body rather than floating off.
-- The card is never left empty while it paints. On the first press the facts
-  still to come stay in wax beside the painting, as at rest. `Paint another`
+- No paint ever shows a straight edge, in any frame or once it has dried.
+  Each stroke touches down as a rounded mark, its blunt start a rounded cap,
+  and is led by a rounded wet front with the bead riding it (the near-miss by
+  a dry brush's ragged front); its body ends rounded under the bead until the
+  dry brush drags out from beneath it, and the bead soaks back into the body
+  rather than floating off. The body's edges ease into the dry brush's, so
+  where the two meet there is no step, notch or seam. Strokes, drops and the
+  pool land whole on the paper, never cut by the sheet's edge.
+- The card is never left empty while it paints. On the first press the sheet
+  keeps its wax phrases until the first stroke lands (a near-miss dries them
+  at once), and the facts still to come stay in wax beside the painting, as
+  at rest. `Paint another`
   brings the sheet into view and the last reading waits in wax where it
   stands, out of reach: its labels and dabs stay, taking the new paint's
-  colours, its words dry to wax lines and its themes fade, while the button
-  reads `Painting…`. The card never shortens while it paints, and grows
+  colours, its words dry to wax lines and its themes and notes fade, while
+  the button reads `Painting…` and the focus waits on the section. The card
+  never shortens while it paints, and grows
   smoothly only when a longer phrase needs the room, so nothing below jumps
   under the student.
 - Only the button paints: no swipe or drag on the sheet, and no loose chapéu at
@@ -631,7 +644,8 @@ reading's title; the facts follow it.
 - The painting is decorative: the pick is the Worker's and the brush paints only
   what it saved, so nothing done mid-stroke can change or lose a pick. Assistive
   technology hears the result in words and the reading takes the focus.
-  Reduced-motion users see the finished painting and reading at once. Where the
+  Reduced-motion users see the finished painting and reading at once, and the
+  card keeps the colours it shows until the new reading replaces it. Where the
   sheet cannot be painted at all, the reading shows the expression in the hand
   as its title instead.
 - The strokes, pool, drops and wax are drawn in code for now.

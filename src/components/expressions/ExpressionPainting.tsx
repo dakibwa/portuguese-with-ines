@@ -22,9 +22,9 @@ export type ExpressionPaintingHandle = {
   /**
    * The landed painting closes round its phrase as the reading opens: sets
    * its final size at once, so the card can measure it, and returns what
-   * starts the motion there.
+   * starts the motion there, over the card's own duration.
    */
-  settle(): () => void;
+  settle(): (duration?: number) => void;
 };
 
 /**

@@ -52,9 +52,10 @@ const REMEMBERED = 60;
 
 /**
  * `byId` is keyed by student and expression ("student:expression"), so two
- * students on one device keep their own colours. Entries from before it was
- * keyed by student (the expression id alone) are still read as a fallback,
- * and age out as new paintings are remembered.
+ * students on one device keep their own colours. An entry from before it was
+ * keyed by student (the expression id alone) is moved to the first student
+ * who reads it, so it then ages out with their own and no other student
+ * takes it up.
  */
 type Memory = { last: PaintKey | null; byId: Record<string, PaintKey> };
 
@@ -99,8 +100,15 @@ function write(memory: Memory) {
 
 /** What this student's expression was painted in here, or a colour its id always gives. */
 export function paintFor(student: string, id: string): PaintKey {
-  const { byId } = read();
-  return byId[keyFor(student, id)] ?? byId[id] ?? PAINT_KEYS[hash(id) % PAINT_KEYS.length];
+  const memory = read();
+  const own = memory.byId[keyFor(student, id)];
+  if (own) return own;
+  const legacy = memory.byId[id];
+  if (!legacy) return PAINT_KEYS[hash(id) % PAINT_KEYS.length];
+  delete memory.byId[id];
+  memory.byId[keyFor(student, id)] = legacy;
+  write(memory);
+  return legacy;
 }
 
 /**

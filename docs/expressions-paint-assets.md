@@ -11,7 +11,10 @@ letters and keeps the stretch under them solid, so a painted stroke must be
 solid across its body: streaks of bare paper belong only in its dry-brush end.
 The code also shapes how each piece is uncovered (a rounded wet front, a dry
 brush's ragged one for the near-miss, and a rounded end to the body under the
-bead), so no painting needs a hard edge of its own anywhere.
+bead, with the dry-brush end laid beneath it), so no painting needs a hard
+edge of its own anywhere. A stroke's body should ease into its dry-brush end,
+its edges meeting the bristles' rather than standing proud of them, and its
+blunt start should be a rounded cap.
 
 ## For every painting
 

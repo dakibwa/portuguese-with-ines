@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ExpressionExamples, ExpressionExtras, ExpressionMeanings } from "@/components/expressions/ExpressionCard";
 import { ExpressionPainting, type ExpressionPaintingHandle, type PaintingStart } from "@/components/expressions/ExpressionPainting";
-import { FACTS_OPEN, OPEN_EASE } from "@/components/expressions/painter";
+import { FACTS_OPEN, OPEN_EASE, openDuration } from "@/components/expressions/painter";
 import { AuthApiError, readSession } from "@/lib/auth-api";
 import { chooseDecoy, nextPaint, paintFor, rememberPaint, type PaintKey } from "@/lib/expression-paint";
 import { fetchStudentExpressions, type StudentExpressions as Collection } from "@/lib/student-expressions-api";
@@ -26,8 +26,12 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
 export function StudentExpressions({ studentId, token }: { studentId: string; token: string }) {
   const [collection, setCollection] = useState<Collection | null>(null);
   const [paints, setPaints] = useState<Paints | null>(null);
-  /** The paint being painted, from the press until the reading opens (or the reply fails). */
-  const [busy, setBusy] = useState<PaintKey | null>(null);
+  /**
+   * The paint being painted, from the press until the reading opens (or the
+   * reply fails); `still` when motion is reduced, and nothing is painted until
+   * the reading is replaced at once.
+   */
+  const [busy, setBusy] = useState<{ paint: PaintKey; still: boolean } | null>(null);
   const [error, setError] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const [revealed, setRevealed] = useState(0);
@@ -40,6 +44,7 @@ export function StudentExpressions({ studentId, token }: { studentId: string; to
   /** The draw in flight, and the paint it is painted in, kept for a retry. */
   const request = useRef<{ id: string; paint: PaintKey } | null>(null);
   const painting = useRef<ExpressionPaintingHandle>(null);
+  const section = useRef<HTMLElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const result = useRef<HTMLElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -84,8 +89,9 @@ export function StudentExpressions({ studentId, token }: { studentId: string; to
       return;
     }
     const to = element.getBoundingClientRect().height;
-    closeSheet?.();
-    if (Math.abs(to - from) >= 1) element.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: FACTS_OPEN, easing: OPEN_EASE });
+    const duration = openDuration(Math.abs(to - from));
+    closeSheet?.(duration);
+    if (Math.abs(to - from) >= 1) element.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration, easing: OPEN_EASE });
   }, [resized]);
 
   // The new reading takes the focus as its facts follow the paint.
@@ -105,7 +111,7 @@ export function StudentExpressions({ studentId, token }: { studentId: string; to
     if (busy || !refocus.current) return;
     refocus.current = false;
     const focused = document.activeElement;
-    if (!focused || focused === document.body) button.current?.focus({ preventScroll: true });
+    if (!focused || focused === document.body || focused === section.current) button.current?.focus({ preventScroll: true });
   }, [busy]);
 
   async function pick() {
@@ -115,7 +121,10 @@ export function StudentExpressions({ studentId, token }: { studentId: string; to
     request.current ??= { id: crypto.randomUUID(), paint: paints.next };
     const { id: requestId, paint } = request.current;
     const still = reducedMotion();
-    setBusy(paint);
+    // "Paint another" sits in the reading, which is out of reach while it
+    // paints: the focus waits on the section, never dropped to the page.
+    if (result.current?.contains(document.activeElement)) section.current?.focus({ preventScroll: true });
+    setBusy({ paint, still });
     setError("");
     setAnnouncement("Painting your expression…");
     const measure = () => { before.current = card.current?.getBoundingClientRect().height ?? null; };
@@ -139,10 +148,11 @@ export function StudentExpressions({ studentId, token }: { studentId: string; to
       if (!canUpdate()) return;
       const picked = next.expression;
       if (picked) {
+        // Remembered as soon as it is saved, so a reload mid-painting shows it in this paint.
+        rememberPaint(studentId, picked.id, paint);
         if (still) painting.current?.show(picked.expression, picked.id, paint);
         else await painting.current?.land(picked.expression, picked.id);
         if (!canUpdate()) return;
-        rememberPaint(studentId, picked.id, paint);
         request.current = null;
         measure();
         settling.current = true;
@@ -186,23 +196,25 @@ export function StudentExpressions({ studentId, token }: { studentId: string; to
   const actions = (
     <div className="expression-reading__actions" lang="en">
       {collection.canPick ? (
-        <button className="button button--coral button--compact" disabled={Boolean(busy)} ref={button} type="button" onClick={() => void pick()}>
-          {busy ? "Painting…" : error ? "Try again" : expression ? "Paint another" : "Paint it"}
+        <button className="button button--coral button--compact expression-reading__go" disabled={Boolean(busy)} ref={button} type="button" onClick={() => void pick()}>
+          <span>{busy ? "Painting…" : error ? "Try again" : expression ? "Paint another" : "Paint it"}</span>
+          {/* In the reading's last row the button keeps the width of its longest label, so the row never reflows as it changes. */}
+          {expression ? <span aria-hidden="true" className="expression-reading__go-sizer">Paint another</span> : null}
         </button>
       ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
       {error ? <p className="booking-alert" role="alert">{error}</p> : null}
     </div>
   );
   return (
-    <section className="student-expressions" aria-labelledby="student-expressions-title">
+    <section className="student-expressions" aria-labelledby="student-expressions-title" ref={section} tabIndex={-1}>
       <h2 className="visually-hidden" id="student-expressions-title" lang="pt-PT">{TITLE}</h2>
       <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
       {collection.canPick || expression ? (
         <div
           className="expression-reading"
-          data-busy={busy ? "" : undefined}
-          /* The card takes the new paint as it lands: its labels and dabs while it paints, then the reading. */
-          data-paint={busy ?? (expression ? (paints.shown ?? paints.next) : paints.next)}
+          data-busy={busy && !busy.still ? "" : undefined}
+          /* The card takes the new paint as it lands: its labels and dabs while it paints, then the reading. With reduced motion it keeps the paint it shows until the new reading replaces it. */
+          data-paint={busy && !busy.still ? busy.paint : expression ? (paints.shown ?? paints.next) : paints.next}
           data-state={expression ? "read" : "waiting"}
           data-unpainted={unpainted ? "" : undefined}
           ref={card}

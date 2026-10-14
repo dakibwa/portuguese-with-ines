@@ -9191,10 +9191,12 @@ dialog[open]::backdrop {
    then the reading's title. The section's heading is for assistive
    technology only: at rest the sheet itself invites, with a small label and
    the button, and once painted the card is the whole section. "Paint
-   another" ends the row of the reading's themes, and moves to a line of its
-   own only when they leave it no room. On a phone the reading opens beneath
+   another" ends the reading's last row, after its themes and the notes'
+   toggle. On a phone the reading opens beneath
    the sheet. On a wide card the example sits straight under the painting and
    the facts, then the themes, beside it, each column from the top. */
+/* The section holds the focus while "Paint another" paints (the reading is out of reach), with no ring of its own. */
+.student-expressions:focus { outline: none; }
 .student-expressions { position: relative; container: expressions / inline-size; width: 100%; min-width: 0; margin-top: 1.5rem; padding: var(--pad-card); border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet); }
 .expression-reading__note { margin: 0; font-size: 0.8rem; line-height: 1.6; text-wrap: balance; }
 .student-expressions > .expression-reading__note { text-align: center; }
@@ -9241,8 +9243,8 @@ dialog[open]::backdrop {
   box-decoration-break: clone;
 }
 .expression-reading[data-busy] .expression-card__phrase { background: none; }
-.expression-reading__text :is(.expression-card__tags, .expression-card__notes, .expression-card__image) { transition: opacity 220ms var(--motion-ease); }
-.expression-reading[data-busy] .expression-reading__text :is(.expression-card__tags, .expression-card__notes, .expression-card__image) { opacity: 0; }
+.expression-reading__text :is(.expression-card__tags, .expression-card__notes, .expression-card__notes-toggle, .expression-card__image) { transition: opacity 220ms var(--motion-ease); }
+.expression-reading[data-busy] .expression-reading__text :is(.expression-card__tags, .expression-card__notes, .expression-card__notes-toggle, .expression-card__image) { opacity: 0; }
 .expression-reading__text { padding: 0.15rem 1.25rem 1rem var(--paint-text-x); background: none; outline: none; }
 .expression-reading__text :is(.expression-card__fact, .expression-card__examples, .expression-card__extras) { padding-left: 0; }
 .expression-reading__text :is(.expression-card__fact, .expression-card__examples)::before { left: -1.6rem; }
@@ -9275,17 +9277,30 @@ dialog[open]::backdrop {
 .expression-reading > .expression-reading__actions { grid-row: 3; padding: 0.35rem 1rem 1rem; }
 /* Compact at every width (phones otherwise stretch every button full width), and still a 44px target. */
 .expression-reading__actions .button { width: auto; min-width: 9.5rem; min-height: 48px; padding-inline: 1.6rem; }
+.expression-reading__go { display: inline-grid; place-items: center; }
+.expression-reading__go > span { grid-area: 1 / 1; }
+.expression-reading__go-sizer { visibility: hidden; }
 .expression-reading__actions .booking-alert { flex-basis: 100%; margin: 0; }
 .expression-reading__actions .expression-reading__note { max-width: 19rem; text-align: right; }
-/* The reading's themes and the button in one row, the button at its end. */
-.expression-card__foot { display: flex; flex-wrap: wrap; align-items: center; justify-self: stretch; gap: 0.6rem; margin-top: 0.15rem; }
-.expression-card__foot > .expression-card__tags { margin: 0; }
-.expression-card__foot > .expression-reading__actions { margin-left: auto; }
-.expression-card__foot > .expression-reading__actions:has(.booking-alert) { flex-basis: 100%; }
-.expression-card__foot .button { min-width: 0; padding-inline: 0.9rem; letter-spacing: 0.1em; }
+/* The reading ends in one row: its themes, then the notes' toggle and the
+   button, which keep together at the row's end and drop beneath the themes
+   only when the row has no room for them. The notes open below the row. */
+.expression-card__foot { display: flex; flex-wrap: wrap; align-items: center; justify-self: stretch; gap: 0.4rem 0.5rem; margin-top: 0.15rem; }
+.expression-card__foot > .expression-card__tags { gap: 0.3rem; margin: 0; }
+.expression-card__foot .expression-card__tags li { padding-inline: 0.55rem; white-space: nowrap; }
+.expression-card__foot-end { display: flex; flex: 1 0 auto; flex-wrap: wrap; align-items: center; gap: 0.4rem; max-width: 100%; }
+.expression-card__foot-end > .expression-reading__actions { margin-left: auto; }
+.expression-card__foot-end:has(.booking-alert), .expression-card__foot-end > .expression-reading__actions:has(.booking-alert) { flex-basis: 100%; }
+.expression-card__foot .button { min-width: 0; padding-inline: 0.8rem; letter-spacing: 0.1em; }
+/* The notes' toggle: a label like the facts', its chevron in the dabs' column when it leads the row. */
+.expression-card__notes-toggle { display: inline-flex; align-items: center; min-height: 48px; margin: 0; padding: 0; border: 0; background: none; color: var(--paint-ink, var(--blue-deep)); cursor: pointer; font: 700 0.66rem/1.5 var(--ui); letter-spacing: 0.11em; text-transform: uppercase; }
+.expression-card__notes-toggle::before { flex: none; width: 0.4rem; height: 0.4rem; margin: 0 0.5rem 0 0.15rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; content: ""; rotate: 45deg; translate: 0 -0.12rem; transition: rotate var(--motion-surface) var(--motion-ease), translate var(--motion-surface) var(--motion-ease); }
+.expression-card__notes-toggle[aria-expanded="true"]::before { rotate: 225deg; translate: 0 0.1rem; }
+.expression-card__foot[data-lead="notes"] .expression-card__notes-toggle::before { margin-inline: 0.3rem 0.9rem; }
+.expression-card__foot + .expression-card__notes { margin-top: 0.1rem; }
 /* On a narrow column the row takes the card's whole width from the dabs'
    column, so a theme and the button share it; it wraps only for many themes. */
-.expression-reading__text .expression-card__foot { margin-inline: -1.6rem -0.5rem; }
+.expression-reading__text .expression-card__foot { margin-inline: -1.6rem -0.75rem; }
 /* Each fact still to come, written in wax: a shade brighter than the paper, the faintest raised edge. */
 .expression-reading__wax {
   display: block;
@@ -9319,11 +9334,12 @@ dialog[open]::backdrop {
 .paint-sheet__pool, .paint-sheet__group { position: absolute; top: 0; left: 0; width: 0; height: 0; }
 .paint-sheet__group > canvas { position: absolute; }
 .paint-sheet__line { position: absolute; left: 0; width: 100%; }
-/* A wipe moves and carries its window, which clips the paint, and the wet bead at its leading edge. */
-.paint-sheet__wipe { position: absolute; top: 0; will-change: transform, opacity; }
+/* A wipe moves and carries its window, which clips the paint, and the wet bead
+   at its leading edge. The painter gives it a layer of its own only while it moves. */
+.paint-sheet__wipe { position: absolute; top: 0; }
 /* Its shaped front (clip-path, set by the painter) is in place before the wipe moves: never a straight cut, even in its first frames. */
 .paint-sheet__window { position: absolute; inset: 0; overflow: hidden; }
-.paint-sheet__wipe-inner { position: absolute; inset: 0; will-change: transform; }
+.paint-sheet__wipe-inner { position: absolute; inset: 0; }
 .paint-sheet__wipe-inner > canvas, .paint-sheet__tail, .paint-sheet__bead { position: absolute; top: 0; }
 .paint-sheet__tail { opacity: 0; transform-origin: 0 50%; }
 .paint-sheet__bead { opacity: 0; }
@@ -9333,7 +9349,7 @@ dialog[open]::backdrop {
   .expression-reading { --paint-text-x: 40px; }
   .expression-reading__text { padding-right: 1rem; }
   .expression-reading > .expression-reading__actions { padding-inline: 0.75rem; }
-  .expression-reading__text .expression-card__foot { margin-right: -0.25rem; }
+  .expression-reading__text .expression-card__foot { margin-right: -0.5rem; }
 }
 
 /* From a landscape phone up, the facts sit beside the painting: stacked, a
@@ -9358,7 +9374,7 @@ dialog[open]::backdrop {
   .expression-reading__text > .expression-card__meanings { grid-column: 2; grid-row: 1; align-self: start; padding: 1.2rem 1.25rem 0 0.4rem; }
   .expression-reading__text > .expression-card__examples { grid-column: 1; grid-row: 1 / -1; align-self: start; margin: var(--paint-sheet-h) 0 0 var(--paint-text-x); padding: 0 0.5rem 1.25rem 0; }
   .expression-reading__text > .expression-card__extras { grid-column: 2; grid-row: 2; align-self: start; margin: 0; padding: 0.9rem 0.75rem 1rem 0.4rem; }
-  .expression-reading__text .expression-card__foot { margin-inline: -1.6rem 0; }
+  .expression-reading__text .expression-card__foot { margin-inline: -1.6rem -0.5rem; }
   /* At rest: the label and the button across the card's top, the facts to come in wax beneath the button. */
   .expression-reading[data-state="waiting"] > .paint-sheet { grid-row: 1 / -1; align-self: stretch; }
   .expression-reading__label { margin-top: 0.9rem; line-height: 48px; }
@@ -9380,7 +9396,7 @@ dialog[open]::backdrop {
   .expression-reading__text > .expression-card__meanings { padding-right: 2.25rem; }
   .expression-reading__text > .expression-card__examples { padding: 0 1rem 1.6rem 0; }
   .expression-reading__text > .expression-card__extras { padding: 1rem 1.25rem 1.25rem 0.4rem; }
-  .expression-reading__text .expression-card__foot { margin-right: -0.5rem; }
+  .expression-reading__text .expression-card__foot { margin-right: -0.75rem; }
   .expression-reading__text .expression-card__fact dd, .expression-reading__text .expression-card__examples li { font-size: 0.97rem; }
   .expression-reading__text .expression-card__fact[data-fact="meaning"] dd { font-size: 1.1rem; }
   .expression-reading__waiting { padding-right: 2.25rem; }
@@ -9388,8 +9404,10 @@ dialog[open]::backdrop {
 
 @container expressions (min-width: 60rem) {
   .expression-reading { grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr); }
-  /* A wide column has room: the row lines up with the facts' words again. */
+  /* A wide column has room: the row lines up with the facts' words again
+     (the notes' toggle still leads from the dabs' column). */
   .expression-reading__text .expression-card__foot { margin-inline: 0; }
+  .expression-reading__text .expression-card__foot[data-lead="notes"] { margin-left: -1.6rem; }
 }
 
 /* On a very wide card a short phrase would leave the middle empty: the
