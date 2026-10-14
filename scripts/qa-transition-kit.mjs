@@ -28,15 +28,17 @@ async function open(width, path, { session = "", me = student, bookings = [added
   const page = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width < 741 });
   const errors = [];
   const posts = [];
+  const reads = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.clock.setFixedTime(new Date("2026-09-07T10:15:00Z"));
   if (session) await page.addInitScript((value) => localStorage.setItem("ines-student-session", value), session);
   await page.route("https://checkout.stripe.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<title>Stripe</title>" }));
-  await page.route(url => /^\/(me(?:\/|$)|auth\/|lesson-types$|availability$|bookings)/.test(url.pathname), async (route) => {
+  await page.route(url => /^\/(me(?:\/|$)|auth\/|admin\/expressions$|lesson-types$|availability$|bookings)/.test(url.pathname), async (route) => {
     const request = route.request();
     const endpoint = new URL(request.url()).pathname;
     const body = request.method() === "POST" ? request.postDataJSON() : null;
     if (body) posts.push({ endpoint, body });
+    else reads.push(endpoint);
     const fixture = reply(endpoint, body);
     if (fixture) return route.fulfill(fixture);
     if (endpoint === "/me" && !body) return route.fulfill({ json: { student: me, bookings, series: [], sameDayFeeCents: 500, cardsAccepted: true } });
@@ -48,7 +50,7 @@ async function open(width, path, { session = "", me = student, bookings = [added
     return route.abort();
   });
   await page.goto(`${base}${path}`, { waitUntil: "domcontentloaded" });
-  return { page, errors, posts };
+  return { page, errors, posts, reads };
 }
 
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
@@ -145,7 +147,64 @@ try {
     assert.deepEqual(saved.errors, []);
     await saved.page.close();
   }
-  console.log("Transition kit: sign-in links, the card prompt and the card row pass at desktop and phone widths.");
+
+  // /idioms is an account page. Inês paints her drafts locally; opening the
+  // route gives no anonymous or student access to her private collection.
+  const teacher = { ...student, id: "teacher-painter", name: "Inês", role: "teacher" };
+  const draft = {
+    id: "draft-idiom", expression: "Partir o coco a rir", meaningPt: "Rir muito.", meaningEn: "To split your sides laughing",
+    literalEn: "To crack the coconut laughing", examples: ["Com aquela história, partimos o coco a rir."],
+    notes: "", sourceUrl: "", tags: ["Humor"], imageUrl: "", imageAlt: "", published: 0, sortOrder: 0,
+    createdAt: "2026-10-13T00:00:00.000Z", updatedAt: "2026-10-13T00:00:00.000Z",
+  };
+  for (const width of [1280, 390]) {
+    const painting = await open(width, "/idioms/", {
+      session: "qa-teacher-paint", me: teacher, bookings: [],
+      reply: (endpoint) => endpoint === "/admin/expressions" ? { json: { expressions: [draft], openToStudents: false } } : null,
+    });
+    await expect(painting.page.locator(".site-header")).toBeVisible();
+    await painting.page.getByRole("button", { name: "Paint it", exact: true }).click();
+    await expect(painting.page.locator(".expression-card")).toContainText(draft.meaningPt);
+    await expect(painting.page.getByRole("link", { name: "Expressions collection", exact: true })).toHaveAttribute("href", /\/schedule\/\?tab=expressions$/);
+    assert.ok(!painting.reads.includes("/me/expressions"), "a teacher's page must not spend a student pick");
+    assert.deepEqual(painting.posts, [], "teacher painting never writes to the Worker");
+    assert.ok(await noOverflow(painting.page), `idioms fits at ${width}px`);
+    await painting.page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== "running" || animation.effect?.getTiming().iterations === Infinity));
+    await painting.page.screenshot({ path: `tmp/qa/transition-kit/idioms-${width}.png`, fullPage: false });
+    // Signing out in another tab removes the private draft collection here.
+    await painting.page.evaluate(() => {
+      localStorage.removeItem("ines-student-session");
+      window.dispatchEvent(new Event("ines:student-session-change"));
+    });
+    await expect(painting.page.locator(".auth-panel")).toBeVisible();
+    await expect(painting.page.locator(".expression-card")).toHaveCount(0);
+    assert.deepEqual(painting.errors, []);
+    await painting.page.close();
+  }
+
+  const gated = await open(390, "/idioms/", { session: "qa-student-paint", bookings: [] });
+  await expect(gated.page.getByRole("status")).toContainText("Expressions aren’t available yet.");
+  assert.ok(!gated.reads.includes("/admin/expressions"), "a student never reads the teacher's draft collection");
+  assert.deepEqual(gated.posts, [], "a closed picker cannot draw");
+  assert.deepEqual(gated.errors, []);
+  await gated.page.close();
+
+  const signedOut = await open(390, "/idioms/", {
+    bookings: [],
+    reply: (endpoint) => endpoint === "/auth/login" ? { json: { student, session: "qa-idioms-login" } } : null,
+  });
+  await expect(signedOut.page.locator(".auth-panel")).toBeVisible();
+  assert.equal(signedOut.reads.length, 0, "signed-out visitors cannot read expressions");
+  await signedOut.page.getByLabel("Email", { exact: true }).fill(student.email);
+  await signedOut.page.getByLabel("Password", { exact: true }).fill("fixture-password");
+  await signedOut.page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(signedOut.page.getByRole("status")).toContainText("Expressions aren’t available yet.");
+  assert.ok(signedOut.reads.includes("/me/expressions"), "signing in keeps the same idioms route and checks student access");
+  assert.ok(!signedOut.reads.includes("/admin/expressions"));
+  assert.deepEqual(signedOut.errors, []);
+  await signedOut.page.close();
+
+  console.log("Transition kit: sign-in links, card setup and authenticated idioms pass at desktop and phone widths.");
 } finally {
   await browser.close();
 }

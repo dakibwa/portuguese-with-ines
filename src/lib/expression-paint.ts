@@ -1,8 +1,8 @@
 /**
  * The paints a student's expression can be painted in (13 October 2026, at
  * Dan's request that each painting be a different colour on top; lavender
- * joined them the same day). The four dark paints carry cream lettering, and
- * lavender carries ink, each at AA or better: deep blue 9.3:1, blue 6.5:1,
+ * joined them the same day). Dark paints carry cream lettering, and
+ * lavender carries ink, each at AA or better: the footer's dark blue 9.3:1,
  * coral 5.4:1 and lavender ink 6.6:1 with #FBF4E5, lavender 5.4:1 with #1A3169
  * (cream on lavender would be 2.1:1).
  */
@@ -33,7 +33,7 @@ const LAVENDER_WASH = "#908ACC";
 
 export const PAINTS: Record<PaintKey, Paint> = {
   deep: { paint: "#203E82", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#EF5D3C", decoy: LAVENDER_WASH, strike: "#203E82", strikeWeight: 0.17 },
-  blue: { paint: "#2C54AA", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#203E82", decoy: LAVENDER_WASH, strike: "#2C54AA", strikeWeight: 0.17 },
+  blue: { paint: "#203E82", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#203E82", decoy: LAVENDER_WASH, strike: "#203E82", strikeWeight: 0.17 },
   coral: { paint: "#B43A26", letters: CREAM, shade: "#000000", streaks: 1, companion: "#EF5D3C", accent: "#AAA4E6", decoy: LAVENDER_WASH, strike: "#B43A26", strikeWeight: 0.17 },
   "lavender-ink": { paint: "#554F91", letters: CREAM, shade: "#000000", streaks: 1, companion: "#AAA4E6", accent: "#EF5D3C", decoy: "#E2735A", strike: "#554F91", strikeWeight: 0.19 },
   // Light lavender strikes broadly across a deep blue wash, so the crossing-out reads as boldly as the others.
@@ -41,8 +41,8 @@ export const PAINTS: Record<PaintKey, Paint> = {
 };
 
 /**
- * Paints too alike to follow one another: the two blues and the two
- * lavenders differ, but the next painting would not read as a new colour.
+ * Saved blue paint keys now share the footer's dark blue. They stay in one
+ * family, as do the two lavenders, so each next painting reads as a new colour.
  */
 const FAMILY: Record<PaintKey, "blue" | "coral" | "lavender"> = { deep: "blue", blue: "blue", coral: "coral", "lavender-ink": "lavender", lavender: "lavender" };
 

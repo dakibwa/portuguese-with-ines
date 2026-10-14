@@ -17,3 +17,10 @@ export const STUDENT_MARKS = [
 export function studentMark(id: string | undefined) {
   return STUDENT_MARKS.find((mark) => mark.id === id) ?? null;
 }
+
+/** A stable default for teacher lists, without replacing a chosen mark. */
+export function defaultStudentMark(studentId: string) {
+  let hash = 2166136261;
+  for (const character of studentId) hash = Math.imul(hash ^ character.codePointAt(0)!, 16777619);
+  return STUDENT_MARKS[(hash >>> 0) % STUDENT_MARKS.length].id;
+}

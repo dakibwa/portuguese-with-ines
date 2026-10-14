@@ -9,8 +9,8 @@ design system elsewhere.
 
 The current direction is:
 
-- dark blue (`#2c54aa` and `#203e82`), lilac (`#aaa4e6`), warm cream
-  (`#f5ecd9`), and a small coral accent (`#ef5d3c`);
+- the footer's dark blue (`#203e82`) across the interface and logo, lilac
+  (`#aaa4e6`), warm cream (`#f5ecd9`), and a small coral accent (`#ef5d3c`);
 - organic, irregular, splatty marks rather than geometric emblems;
 - Beth Ellen for expressive display text;
 - Montserrat for body copy, navigation, labels, and other readable UI text;
@@ -359,7 +359,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   as she clicks; the line under the calendar says what changed or what failed.
   Weekly blocks such as lunch are shown but not toggled per date. Keyboard and
   touch input must work without dragging.
-- A sliding tab bar groups `Students`, `Timetable`, `Weekly hours`, `Time off`,
+- A sliding tab bar with a thin dark-blue border groups `Students`, `Timetable`, `Weekly hours`, `Time off`,
   `Receipts`, `Expressions` and `Profile`. Open on `Timetable`;
   keep the week pager beside its month-and-year heading. The phone bar holds all seven
   tabs in two rows that each fill the available width, without scrolling. Dates
@@ -447,7 +447,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
   Explain what is outstanding inside the selected step, without vague ownership
   labels such as Yours or Theirs.
   Completed onboarding becomes a normal row labelled Student, with their
-  details, next lesson, price and profile access. No duplicate To do list.
+  details, next lesson and price. Its controls become Details, Price, Add a lesson
+  and Lesson history. No duplicate To do list or separate student profile popup.
   The name and journey share one band where they fit. On small phones the steps
   wrap beneath the name without horizontal scrolling. Opening a step keeps the
   student's name visible and places one X close control at the top right.
@@ -460,8 +461,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
   Standard prices count as ready. A confirmed past lesson counts for Lessons;
   no upcoming booking does not restart onboarding. Card is omitted when cards
   are unavailable. Saved cards and permission to charge every lesson differ.
-  Every student's name opens their full profile. The step buttons keep details,
-  prices, lessons and welcome editable in the row. Adding a
+  Every student's name opens lesson history in the same row. Its existing
+  controls keep details, prices, lessons and welcome editable there. Adding a
   lesson opens the calendar with available Porto start times. In a wide row,
   compact lesson settings sit beside the calendar and its available times;
   they stack on a phone. Manual entry, location, length and weekly repeat
@@ -516,63 +517,37 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - Every booked lesson shows its time, student and explicit `Online` or `In Porto`
   label in both layouts, including 60-minute blocks. Keep the location icons and
   coral marker for Porto lessons.
-- A student has one profile, and there are no loose lessons: every lesson
-  belongs to a student she has set up (13 October 2026, Dan: "so it all feels
-  integrated"). The profile is one dialog, and everything that is about a
-  student opens that profile (14 October 2026, Dan: "the add a lesson button
-  and click the card should be the same", "simple, beautiful and use the space
-  accordingly"): a student's card, its `Add a lesson` button, the end of `Add a
-  student`, and a free time on her week. Top to bottom it is a small `Student`
-  eyebrow over their name in bold beside their splat, their address (`No email
-  yet` where there is none), then `No NIF (consumidor final)` or their NIF and a
-  text `Edit details` button on one line; the cream `Their price` card (each
-  length as a dab, a lilac `Change price`); the `Add a lesson` button, with
-  `Send welcome email` beside it where it applies; what was just added; then
-  their upcoming and past lessons. Opening it changes nothing and sends nothing.
-  - `Edit details` stays one button. It brings out everything together, in
-    place, under the name: full name, email, phone and NIF, labelled, two to a
-    row where the dialog is wide and one column on a phone, with `Save details`
-    and `Cancel` sharing the last row and the address and NIF lines it replaces
-    put away meanwhile. There are no per-field buttons. A student who has
-    signed in changes their own email, so that field is disabled. While it is
-    open `Save details` is the one coral action, and `Add a lesson` and `Send
-    welcome email` are lilac. Their email and phone have a line each; the NIF
-    and `Edit details` share the last line at any width.
-  - `Add a lesson` on a Students card opens the profile with its lesson calendar
-    already expanded. Within the profile it opens the same form in place, under its own heading, with
-    `Cancel` beside the submit. Lengths carry their price from the student's
-    own rate. Adding returns to the profile with each addition as a dab line
-    (`Thu 10 Sept, 10:00 · weekly, 8 lessons`) under an `Added` label and the
-    lessons list read again; `Add a lesson` is coral unless their welcome is
-    the next thing, when `Send welcome email` is coral and `Add a lesson` lilac.
-  - A lesson never needs an email. A student she set up from a name alone has
-    lessons like anyone, on the same form, prices, Meet and calendar; a quiet
-    note under the actions says their welcome email waits until she adds their
-    email under `Edit details`, and `Send welcome email` appears once there is
-    one. Until their welcome a card reads `Set up, not emailed yet` (or `Set
-    up, no email yet`), lesson buttons drop `and email student`, and moving or
-    cancelling says they aren't emailed. Everything for Inês still happens:
-    her calendar, the blocked time and the lesson's NIF.
-  - The Students toolbar always shares one row: `Find a student` flexes on
-    the left and coral `Add a student` stays on the right. Phones shorten it
-    to icon plus `Add`, keeping its full accessible name and 44px height.
-    A student's whole card opens the profile through the name button's
-    stretched hit area, with whole-card hover and keyboard focus. Add lesson
-    and Send welcome email sit above that hit area and keep their own actions.
-  - `Add a student` opens the profile's
-    first step: full name, email, phone, NIF, their price for 60 and 90 minute
-    lessons (two € fields side by side, the standard price showing until she
-    types her own) and their splat in the student's own picker, under two dabs
-    (their details now, their lessons next; nothing is emailed until their
-    welcome), in the same two-to-a-row, one-column-on-a-phone grid. `Next:
-    their lessons` lands on their profile with the lesson form already open.
-  - A free time on her week opens the dialog as `Add a lesson` with the date
-    and time, asking `Whose lesson?` over her students' splats and names, with
-    `Add a new student` beneath. Choosing one lands on their profile with the
-    lesson form already open at that date and time; adding it returns to the
-    profile, and focus returns to the week's heading when it closes.
-  - Opening Edit details closes the lesson form, and opening the lesson form
-    closes Edit details, so the two editors never compete.
+- A student's row is their profile throughout setup and ongoing use
+  (14 October 2026, Dan). Opening the name shows lesson history in that row.
+  Completed students have Details, Price, Add a lesson and Lesson history
+  controls in place of the onboarding journey. One editor opens at a time;
+  the single X closes it and returns focus to the row control. Opening a row
+  changes nothing and sends nothing.
+  - Names wrap between words. Give the name enough room before wrapping the
+    controls below it; never split an ordinary name such as Bingham midway.
+    Students without a chosen mark receive a stable default splat from their
+    account ID, shared by the row and lesson chooser. Keep chosen marks.
+  - Opening and closing gently changes the sheet's height. Its contents fade
+    into place, and scrolling keeps the student's name visible. Reduced-motion
+    users get the same result without animation.
+  - Details contains full name, email, phone and NIF, with one Save details
+    action. A student who has signed in changes their own email. Before their
+    first lesson, the email field remains locked even when Details is opened
+    from their history. Price uses the same editable rate form as onboarding.
+  - Add a lesson opens the calendar in the row. Length, location, weekly repeat
+    and available times use the full row width as described above. A successful
+    addition closes the form and leaves a short confirmation in that row.
+    No email is needed to create lessons. Their welcome controls when lesson
+    emails begin, with existing quiet-booking copy and safeguards preserved.
+  - The Students toolbar stays on one row: Find a student on the left and
+    Add a student on the right. A completed student's closed card has a
+    stretched name-button hit area; its section controls keep their own actions.
+  - Add a student opens a short creation dialog with name, optional email,
+    phone, NIF, prices and splat. Nothing is emailed. Next: their lessons closes
+    the dialog and opens that student's lesson form in the Students list.
+  - A free timetable time opens a student chooser. Choosing or creating the
+    student closes the chooser, switches to Students and opens their lesson
+    form with the same date and time. There is no second student profile dialog.
   - Sent from the profile or from the card, `Send welcome email` is one email
     for everyone, in the site's email design: their lessons and prices, and the
     way in. It shows for someone she still needs to bring in, and only once
@@ -601,20 +576,15 @@ usual lesson starts and days off; avoid a wall of administration forms.
   each row is a small cream card, two across where they fit, its NIF and what
   it is for sharing a line. Rows carry their id and figures as data attributes, so her
   automation can read the table, the CSV or the Worker's JSON alike. Up to a
-  small tablet, held either way, the eight tools sit in two rows, so no tab
+  small tablet, held either way, the teacher tools sit in two rows, so no tab
   hides past the edge; wider, they share one row. Sign out is inside Profile.
-- `Students` holds the student
-  cards, each a profile button (splat, name, address or `No email yet`, and an
-  arrow into their profile) over dabs for where they are, their next lesson and
-  their own price when she has set one, then the site's own blue `Add a
-  lesson` and coral `Send welcome email`; no sentence above them. The card and
-  its `Add a lesson` open the same profile, whose lessons are their history:
+- A student's inline Lesson history shows
   upcoming lessons first, then past and cancelled, one card each with
   the date and time on one line (the year only when it isn't this one), a pill
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
-  `Change price` opens the two fields in place and says how many lessons to
+  The Price control opens the two fields in place and says how many lessons to
   come moved to it, and `· standard` marks a length she hasn't priced.
   History includes older lessons outside the current week and follows the account
   after an email change. Loading, failed reads and an empty history stay distinct.
@@ -658,6 +628,14 @@ see no expressions card at all until Dan opens them to students (the Worker's
 Once they are open, publishing makes an expression available in the signed-in
 student picker below Your lessons. Drafts stay in her interface; there is no
 anonymous page or main-menu item.
+
+The painting and learning experience also has its own `/idioms/` page, with
+the shared site header and a full-width reading layout (14 October 2026, Dan).
+Open full page leads there from an available painting card. It keeps the same
+account: Inês paints her draft collection locally; students use the existing
+published-expression access switch. Signed-out visitors sign in there. The
+page links back to her collection or the student's lessons, and does not add
+public access or a public navigation item.
 
 - Use the same lilac sheet as Receipts, cream reading cards, Beth Ellen
   expression titles and Montserrat labels and content. Keep the latest bundle
@@ -745,12 +723,12 @@ reading's title; the facts follow it.
   button take a line of its own. The button keeps the width of its longest
   label, so `Painting…` and `Try again` never reflow the row; it stays a 48px
   target and never becomes a full-width slab.
-- Colour: each painting is in one of five paints, every one with lettering
-  clear of AA: deep blue `#203E82`, blue `#2C54AA`, coral `#B43A26` and
+- Colour: each painting uses the site's paints, every one with lettering
+  clear of AA: dark blue `#203E82`, coral `#B43A26` and
   lavender ink `#554F91` carry cream `#FBF4E5` lettering; lavender `#AAA4E6`
   carries ink `#1A3169` (5.4:1; cream on it would be 2.1:1). A new painting is
   never the colour of the last one painted on this device, nor of its family
-  (the two blues, the two lavenders), so each one reads as a new colour. A
+  (blue or the two lavenders), so each one reads as a new colour. A
   returning student sees their expression in the colour it was painted in,
   remembered on the device for each student as soon as the Worker has saved
   the pick (two students sharing a device keep their own colours), or else in

@@ -1,44 +1,65 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Clock3, LockKeyhole, X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { LessonForm } from "@/components/teacher/LessonForm";
 import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
+import { StudentHistory } from "@/components/teacher/StudentHistory";
 import { StudentPrice } from "@/components/teacher/StudentPrice";
 import type { AdminStudent } from "@/lib/admin-api";
-import type { StudentSetup, StudentSetupStep } from "@/lib/teacher-calendar";
+import { dateKey, dateLabel, type StudentSetup, type StudentSetupStep } from "@/lib/teacher-calendar";
+import { formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
+import { defaultStudentMark } from "@/lib/student-marks";
 
-/** Her setup stays together: each dab opens its work beneath the same row. */
-export function StudentSetupRow({ setup, token, step: requestedStep, sending, locked, attention, onOpenProfile, onSelect, onChanged, onWelcome, onBusy }: {
-  setup: StudentSetup;
+export type StudentPanel = StudentSetupStep | "history" | "details";
+export type StudentRowSelection = { studentId: string; panel: StudentPanel; date?: string; time?: string };
+
+/** The same row holds setup, then the student’s ongoing details and lessons. */
+export function StudentSetupRow({ student, setup, token, step: requestedStep, date, time, sending, locked, attention, onSelect, onChanged, onWelcome, onBusy }: {
+  student: AdminStudent;
+  setup: StudentSetup | null;
   token: string;
-  step: StudentSetupStep | null;
+  step: StudentPanel | null;
+  date?: string;
+  time?: string;
   sending: string;
   locked?: boolean;
   /** Lesson changes or payment notes belong to this student's one row. */
   attention?: ReactNode;
-  onOpenProfile?: () => void;
-  onSelect: (step: StudentSetupStep | null) => void;
+  onSelect: (step: StudentPanel | null) => void;
   onChanged?: (student?: AdminStudent) => void;
   onWelcome: (student: AdminStudent, again?: boolean) => void;
   onBusy?: (busy: boolean) => void;
 }) {
-  const { student, steps, next } = setup;
-  const step = steps.find(entry => entry.id === requestedStep && !entry.lockedReason)?.id ?? null;
+  const steps = setup?.steps ?? [];
+  const next = setup?.next;
+  const ready = !setup;
+  const step = requestedStep === "history" || requestedStep === "details" || ready
+    ? requestedStep : steps.find(entry => entry.id === requestedStep && !entry.lockedReason)?.id ?? null;
   const statusStep = step === "welcome" || step === "sign-in" || step === "card";
   const [busy, setBusyState] = useState(false);
   const setBusy = (value: boolean) => { setBusyState(value); onBusy?.(value); };
   const [notice, setNotice] = useState("");
+  const row = useRef<HTMLLIElement>(null);
+  const height = useRef<number | null>(null);
+  const motion = useRef<Animation | null>(null);
   const header = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
-  const stepControls = useRef<HTMLOListElement>(null);
+  const nameControl = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef<HTMLButtonElement | null>(null);
   const paneId = `teacher-setup-${student.id}`;
   const disabled = busy || locked || sending === student.id;
   const close = () => {
-    stepControls.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]')?.focus({ preventScroll: true });
+    returnFocus.current = header.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]') ?? nameControl.current;
     onSelect(null);
   };
+  useEffect(() => {
+    if (step || disabled || !returnFocus.current) return;
+    const target = returnFocus.current.isConnected ? returnFocus.current : nameControl.current;
+    target?.focus({ preventScroll: true });
+    returnFocus.current = null;
+  }, [step, disabled]);
   const waitingOnStudent = next === "sign-in" || next === "card";
   const help: string[] = step === "price"
     ? [Object.keys(student.ownPrices ?? student.prices ?? {}).length ? "Custom lesson price set." : "Standard lesson price applies."]
@@ -57,6 +78,7 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
   useEffect(() => {
     if (!step || !body.current) return;
     const input = step === "email" ? body.current.querySelector<HTMLInputElement>('input[type="email"]:not([disabled])')
+      : step === "details" ? body.current.querySelector<HTMLInputElement>('input[type="text"]')
       : step === "price" ? body.current.querySelector<HTMLInputElement>('input[type="text"]')
       : step === "lessons" ? body.current.querySelector<HTMLButtonElement>('.teacher-lesson-picker [data-lesson-date][tabindex="0"]') : null;
     (input ?? body.current).focus({ preventScroll: true });
@@ -69,8 +91,40 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
     const top = inset + 16;
     // Reveal the name and steps, rather than aligning a tall editor's bottom.
     if (bounds.top < top || body.current.getBoundingClientRect().bottom > window.innerHeight - 16)
-      window.scrollBy({ top: bounds.top - top, behavior: "instant" });
+      window.scrollBy({ top: bounds.top - top, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+  }, [step, date, time]);
+
+  // The sheet grows around its contents; the name stays still at its top.
+  useLayoutEffect(() => {
+    const element = row.current;
+    if (!element) return;
+    const from = motion.current ? element.getBoundingClientRect().height : height.current;
+    motion.current?.cancel();
+    motion.current = null;
+    element.style.overflow = "";
+    const to = element.getBoundingClientRect().height;
+    height.current = to;
+    if (from === null || Math.abs(from - to) < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const animation = element.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+      duration: Math.min(380, 220 + Math.abs(to - from) * 0.15), easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    });
+    motion.current = animation;
+    element.style.overflow = "clip";
+    if (step) body.current?.animate([{ opacity: 0, transform: "translateY(-4px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 260, easing: "ease-out" });
+    void animation.finished.then(() => {
+      if (motion.current !== animation) return;
+      motion.current = null;
+      element.style.overflow = "";
+      height.current = element.getBoundingClientRect().height;
+    }).catch(() => {});
   }, [step]);
+  useLayoutEffect(() => {
+    const element = row.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => { if (!motion.current) height.current = element.getBoundingClientRect().height; });
+    observer.observe(element);
+    return () => { observer.disconnect(); motion.current?.cancel(); };
+  }, []);
 
   const send = (again: boolean) => onWelcome(student, again);
   const sendButton = (again: boolean) => <button
@@ -80,18 +134,28 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
     type="button"
   >{sending === student.id ? "Sending…" : again ? "Send the link again" : "Send welcome email"}<span className="visually-hidden"> to {student.name}</span></button>;
 
-  return <li className={`teacher-setup teacher-setup--inline${step ? " is-open" : ""}`}>
+  const profilePanel = ready || step === "history" || step === "details";
+  const controls = [
+    ["details", "Details"], ["price", "Price"], ["lessons", "Add a lesson"], ["history", "Lesson history"],
+  ] as const;
+  const prices = ([60, 90] as const).filter(minutes => student.prices?.[minutes] !== undefined)
+    .map(minutes => `${minutes} mins · ${formatMoneyCents(student.prices![minutes]!)}`).join(", ");
+
+  return <li ref={row} className={`teacher-setup teacher-setup--inline${ready ? " teacher-student teacher-student--inline is-ready" : ""}${step ? " is-open" : ""}`}>
     <div className="teacher-setup__header" ref={header}>
       <button
         className="teacher-setup__profile"
-        aria-controls={onOpenProfile ? undefined : paneId}
-        aria-expanded={onOpenProfile ? undefined : step === "email"}
-        aria-label={onOpenProfile ? `Open ${student.name}’s profile` : `Edit ${student.name}’s details`}
+        aria-controls={paneId}
+        aria-expanded={step === "history"}
+        aria-label={`Open ${student.name}’s profile`}
+        ref={nameControl}
         disabled={disabled}
-        onClick={() => onOpenProfile ? onOpenProfile() : onSelect(step === "email" ? null : "email")}
+        onClick={() => onSelect(step === "history" ? null : "history")}
         type="button"
-      ><AccountAvatar mark={student.mark} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong></span></button>
-      <ol className="teacher-setup__steps" ref={stepControls}>
+      ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{ready ? <span className="teacher-student__label">Student</span> : null}</span></button>
+      {ready ? <div className="teacher-student__controls" aria-label={`${student.name}’s profile sections`}>
+        {controls.map(([panel, label]) => <button aria-controls={paneId} aria-expanded={step === panel} aria-label={`${label} for ${student.name}`} disabled={disabled} key={panel} onClick={() => { setNotice(""); onSelect(step === panel ? null : panel); }} type="button">{label}</button>)}
+      </div> : <ol className="teacher-setup__steps">
         {steps.map(entry => <li className={entry.done ? "is-done" : entry.lockedReason ? "is-locked" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
           <button
             aria-controls={paneId}
@@ -104,21 +168,39 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
             type="button"
           ><i aria-hidden="true">{entry.done ? <Check size={12} strokeWidth={3} /> : entry.lockedReason ? <LockKeyhole size={12} strokeWidth={2} /> : entry.id === next && waitingOnStudent ? <Clock3 size={12} strokeWidth={2} /> : null}</i><span>{entry.label}<span className="visually-hidden" id={`${paneId}-${entry.id}-status`}>{entry.done ? ": done" : entry.lockedReason ? `: ${entry.lockedReason}` : entry.id === next && waitingOnStudent ? ": waiting for the student" : ": waiting"}</span></span></button>
         </li>)}
-      </ol>
+      </ol>}
       {step ? <div className="teacher-setup__action teacher-setup__close">
         <button className="teacher-dialog-close" aria-label="Close" aria-controls={paneId} disabled={disabled} onClick={close} type="button"><X size={20} aria-hidden="true" /></button>
       </div> : null}
     </div>
+    {ready && !step ? <ul className="booking-payment-facts teacher-student__facts">
+      {student.email ? <li>{student.email}</li> : null}
+      <li>{student.nextLessonAt ? `Next lesson ${dateLabel(dateKey(new Date(student.nextLessonAt)), { weekday: "short", day: "numeric", month: "short" })}, ${formatSlotTime(student.nextLessonAt)}` : "No upcoming lesson"}</li>
+      {student.weekly ? <li>Weekly lessons</li> : null}
+      {prices ? <li>{prices}</li> : null}
+      {student.unpaidUpcoming ? <li>{student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} paid by hand</li> : null}
+    </ul> : null}
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
-    {step ? <div className={`teacher-setup__body${statusStep ? " teacher-setup__body--status" : ""}`} id={paneId} aria-label={`${student.name}’s setup`} role="region" ref={body} tabIndex={-1}>
+    {step ? <div className={`teacher-setup__body${statusStep ? " teacher-setup__body--status" : ""}`} id={paneId} aria-label={`${student.name}’s ${profilePanel ? "profile" : "setup"}`} role="region" ref={body} tabIndex={-1}>
       <div className="teacher-setup__body-heading">
-        <h3 id={`${paneId}-heading`}>{step === "email" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome" : step === "sign-in" ? "Sign in" : "Saved card"}</h3>
+        <h3 id={`${paneId}-heading`}>{step === "history" ? "Lesson history" : step === "email" || step === "details" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome" : step === "sign-in" ? "Sign in" : "Saved card"}</h3>
         {help.length ? <ul className="booking-payment-facts teacher-setup__help">{help.map(text => <li key={text}>{text}</li>)}</ul> : null}
         {statusStep && student.email ? <p className="teacher-setup__email">{student.email}</p> : null}
       </div>
-      {step === "email" ? <StudentDetailsForm
+      {step === "history" ? <>
+        <div className="teacher-student__contact">
+          <ul className="booking-payment-facts">
+            {student.email ? <li>{student.email}</li> : null}
+            {student.phone ? <li>{student.phone}</li> : null}
+            {student.nif ? <li>NIF {student.nif}</li> : null}
+          </ul>
+          {!ready ? <button className="teacher-text-button" disabled={disabled} onClick={() => onSelect("details")} type="button">Edit details</button> : null}
+        </div>
+        <div className="teacher-student__history"><StudentHistory key={`${student.id}-${token}`} student={student} token={token} /></div>
+      </> : step === "email" || step === "details" ? <StudentDetailsForm
         key={`${student.id}-details`}
-        emailRequired
+        emailRequired={step === "email"}
+        emailLockedReason={steps.find(entry => entry.id === "email")?.lockedReason}
         onBusy={setBusy}
         onSaved={updated => { setNotice("Their details are saved."); onChanged?.(updated); close(); }}
         student={student}
@@ -137,9 +219,12 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
         />
       </> : step === "lessons" ? <>
         <LessonForm
+          key={`${student.id}-${date ?? ""}-${time ?? ""}`}
+          date={date}
+          time={time}
           idPrefix={`${paneId}-lesson`}
           onBusy={setBusy}
-          onCreated={message => { setNotice(message); close(); onChanged?.(); }}
+          onCreated={message => { setNotice(message); close(); onChanged?.({ ...student, hasLessons: true }); }}
           student={student}
           token={token}
         />

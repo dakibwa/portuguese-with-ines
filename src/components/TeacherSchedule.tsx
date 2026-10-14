@@ -7,8 +7,8 @@ import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
 import { TeacherAccountProfile } from "@/components/teacher/TeacherAccountProfile";
-import { StudentProfile, type StudentProfileStart } from "@/components/teacher/StudentProfile";
-import { StudentList } from "@/components/teacher/StudentList";
+import { StudentPicker, type StudentPickerStart } from "@/components/teacher/StudentPicker";
+import { StudentList, type StudentOpenRequest } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
 import { NeedsYou } from "@/components/teacher/NeedsYou";
 import { TeacherPager } from "@/components/teacher/TeacherPager";
@@ -102,10 +102,15 @@ export function TeacherSchedule() {
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(
     null,
   );
-  // A free time chosen on the week, for a lesson added there.
-  // A student's profile, a new student, or a lesson at a free time: one dialog.
-  const [studentDialog, setStudentDialog] = useState<(StudentProfileStart & { key: number }) | null>(null);
-  const openStudentDialog = (start: StudentProfileStart) => setStudentDialog({ ...start, key: Date.now() });
+  // A new student or a free timetable slot starts with a chooser. Their
+  // details, lessons and history then stay in the Students row.
+  const [studentPicker, setStudentPicker] = useState<(StudentPickerStart & { key: number }) | null>(null);
+  const [studentRequest, setStudentRequest] = useState<StudentOpenRequest | null>(null);
+  const openStudentPicker = (start: StudentPickerStart) => setStudentPicker({ ...start, key: Date.now() });
+  const openStudent = (student: AdminStudent, panel: StudentOpenRequest["panel"], slot?: { date: string; time: string }) => {
+    setStudentRequest({ studentId: student.id, panel, ...slot, key: Date.now() });
+    setActiveTab("students");
+  };
   // Her students, read once with the page and again after each lesson she
   // adds: the form suggests them and Your students lists them.
   const [students, setStudents] = useState<{ list: AdminStudent[]; cardsAccepted: boolean } | null>(null);
@@ -129,6 +134,7 @@ export function TeacherSchedule() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const bookingRequest = useRef(0);
+  const studentRequestGeneration = useRef(0);
   const calendarTitleRef = useRef<HTMLHeadingElement>(null);
   const accountGeneration = useRef(0);
   // Verified email changes renew this same account without discarding its drafts.
@@ -139,6 +145,7 @@ export function TeacherSchedule() {
   useEffect(() => () => {
     accountGeneration.current += 1;
     bookingRequest.current += 1;
+    studentRequestGeneration.current += 1;
   }, []);
   const shownExceptions = useMemo(
     () => withDayChanges(exceptions, dayChanges),
@@ -160,12 +167,17 @@ export function TeacherSchedule() {
   const resetAccount = useCallback(() => {
     accountGeneration.current += 1;
     bookingRequest.current += 1;
+    studentRequestGeneration.current += 1;
     setToken("");
     setMe(null);
     setInitialised(false);
     setActiveTab("week");
     setMeet(null);
     setSelectedBooking(null);
+    setStudentPicker(null);
+    setStudentRequest(null);
+    setStudents(null);
+    setStudentsError("");
     setBookings([]);
     setStudentCancellations([]);
     setWelcoming("");
@@ -210,6 +222,7 @@ export function TeacherSchedule() {
 
   useEffect(() => {
     if (profileRequested()) setActiveTab("profile");
+    else if (new URL(window.location.href).searchParams.get("tab") === "expressions") setActiveTab("expressions");
   }, []);
 
   useEffect(() => {
@@ -271,13 +284,14 @@ export function TeacherSchedule() {
 
   const reloadStudents = useCallback(async () => {
     if (!token || readSession() !== token) return;
+    const request = ++studentRequestGeneration.current;
     try {
       const data = await fetchStudents(token);
-      if (readSession() !== token) return;
+      if (readSession() !== token || request !== studentRequestGeneration.current) return;
       setStudents({ list: data.students, cardsAccepted: Boolean(data.cardsAccepted) });
       setStudentsError("");
     } catch (caught) {
-      if (readSession() === token) setStudentsError(caught instanceof Error ? caught.message : "Your students couldn’t be loaded.");
+      if (readSession() === token && request === studentRequestGeneration.current) setStudentsError(caught instanceof Error ? caught.message : "Your students couldn’t be loaded.");
     }
   }, [token]);
   useEffect(() => {
@@ -674,7 +688,7 @@ export function TeacherSchedule() {
           }}
           onView={setSelectedBooking}
           onWelcome={(student) => void sendWelcome(student)}
-          onStudent={(student, editDetails) => openStudentDialog({ step: "profile", student, editDetails, addLesson: !editDetails })}
+          onStudent={(student, editDetails) => openStudent(student, editDetails ? "details" : "lessons")}
           onSeeAll={() => { setActiveTab("students"); document.getElementById("teacher-tab-students")?.focus({ preventScroll: true }); }}
         />
       ) : null}
@@ -784,7 +798,7 @@ export function TeacherSchedule() {
             }}
             onDayOff={takeDayOff}
             onBlockTime={blockTime}
-            onAddLesson={(date, minute) => openStudentDialog({ step: "pick", date, minute })}
+            onAddLesson={(date, minute) => openStudentPicker({ step: "pick", date, minute })}
             onSelectBooking={setSelectedBooking}
           />
         )}
@@ -856,9 +870,14 @@ export function TeacherSchedule() {
         onMeet={() => { setActiveTab("profile"); document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true }); }}
         onView={setSelectedBooking}
         onWelcome={(student, again) => void sendWelcome(student, again)}
-        onAddStudent={() => openStudentDialog({ step: "new" })}
-        onOpenStudent={(student, addLesson) => openStudentDialog({ step: "profile", student, addLesson })}
-        onStudentsChanged={() => { void reloadStudents(); void reloadBookings(true); }}
+        request={studentRequest}
+        onAddStudent={() => openStudentPicker({ step: "new" })}
+        onStudentsChanged={student => {
+          if (readSession() !== token) return;
+          if (student) setStudents(current => current ? { ...current, list: current.list.map(entry => entry.id === student.id ? student : entry) } : current);
+          void reloadStudents();
+          void reloadBookings(true);
+        }}
       />
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "receipts"}>
@@ -874,22 +893,20 @@ export function TeacherSchedule() {
         {activeTab === "expressions" ? <ExpressionsTab accountId={me?.id ?? "teacher"} token={token} /> : null}
       </div>
       </div>
-      {studentDialog ? (
-        <StudentProfile
-          key={studentDialog.key}
-          token={token}
-          known={students?.list ?? []}
-          cards={Boolean(students?.cardsAccepted)}
-          start={studentDialog}
-          afterCloseFocusRef={studentDialog.step === "pick" ? calendarTitleRef : undefined}
-          onChanged={() => {
-            if (readSession() !== token) return;
-            void reloadStudents();
-            void reloadBookings();
-          }}
-          onClose={() => setStudentDialog(null)}
-        />
-      ) : null}
+      {studentPicker ? <StudentPicker
+        key={studentPicker.key}
+        token={token}
+        known={students?.list ?? []}
+        start={studentPicker}
+        onSelect={(student, slot) => {
+          if (readSession() !== token) return;
+          setStudents(current => current ? { ...current, list: [...current.list.filter(entry => entry.id !== student.id), student] } : { list: [student], cardsAccepted: false });
+          setStudentPicker(null);
+          openStudent(student, "lessons", slot);
+          void reloadStudents();
+        }}
+        onClose={() => setStudentPicker(null)}
+      /> : null}
       {selectedBooking ? (
         <LessonDetails
           key={selectedBooking.id}
