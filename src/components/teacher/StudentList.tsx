@@ -62,7 +62,6 @@ export function StudentList({ token, students, workspace, error, sending, onAddS
     {error ? <p className="teacher-inline-error" role="alert">{error}</p> : null}
     {!students && !error ? <p role="status">Loading your students…</p> : null}
     {students && !students.length ? <p>No students yet.</p> : students && !shown.length ? <p>No students match.</p> : null}
-    {shown.some(row => row.setup || row.items.length) ? <p className="teacher-students__order">Needs attention first</p> : null}
     <ul className="teacher-setup-list teacher-students__unified">
       {shown.map(({ student, setup, items }) => {
         const attention = items.length ? <NeedsYou {...noticeProps} embedded items={items} /> : null;
