@@ -337,6 +337,12 @@
   font: 700 0.56rem/1 var(--ui);
   letter-spacing: 0.06em;
 }
+/* Every day's name sits level, today's too: the headings start at the top
+   rather than centring, which lifted today's above the rest by its TODAY. */
+.teacher-timetable:not(.teacher-timetable--editing) .teacher-day-heading {
+  justify-content: flex-start;
+  padding-top: 0.25rem;
+}
 /* Today's booked dot sits just right of TODAY, clear of the day's name. */
 .teacher-day-today ~ .teacher-heading-booked-dot {
   top: auto;
@@ -1358,8 +1364,10 @@
   .teacher-week-title {
     flex: 1 1 auto;
   }
+  /* At the tablet's size, so the date and its pager share a row wherever
+     both fit whole (from about 375 px); narrower, the pager wraps beneath. */
   .teacher-week-title h2 {
-    font-size: 1.3rem;
+    font-size: 1.15rem;
   }
   .teacher-week-hint {
     flex: 1 0 100%;
@@ -1515,11 +1523,17 @@
   .teacher-lesson-meet { left: 9px; }
 }
 
-/* The date keeps its full wording on small phones, with its pager beneath. */
-@media (max-width: 600px) {
-  .teacher-week-title {
-    flex-basis: 100%;
-  }
+/* A phone held sideways has little height to spare: the band keeps its
+   title on one line, so the tabs and her next lesson reach the first screen
+   rather than the band filling half of it. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .teacher-main { padding-top: 1rem; }
+}
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 820px) {
+  .teacher-page .teacher-intro { min-height: 0; padding-block: 0.65rem; }
+  .teacher-page .teacher-intro h1 { font-size: 2.4rem; }
+  .teacher-page .teacher-intro h1 br { display: none; }
+  .teacher-page .teacher-intro .booking-intro__time-window { width: 120px; right: -30px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1825,7 +1839,11 @@
 .teacher-calendar-lesson--added .teacher-lesson-location {
   color: var(--lavender-ink);
 }
-@media (min-width: 601px) and (max-width: 740px) {
+/* Where a day is too narrow for Added or No-show beside its time (to
+   1240 px; narrower, it ran under the place mark and off the edge), the
+   pill sits at the lesson's foot on the right instead. The call keeps only
+   its camera while there is no room for its word as well. */
+@media (min-width: 601px) and (max-width: 1240px) {
   .teacher-calendar-lesson .teacher-lesson-added,
   .teacher-calendar-lesson .teacher-lesson-no-show {
     position: absolute;
@@ -1836,6 +1854,8 @@
     line-height: 1.5;
   }
   .teacher-lesson-time:has(.teacher-lesson-no-show) .teacher-lesson-added { display: none; }
+}
+@media (min-width: 601px) and (max-width: 940px) {
   .teacher-lesson-meet { font-size: 0; gap: 0; }
 }
 .teacher-key-added {
@@ -2130,29 +2150,54 @@
 .teacher-timeoff-selection .teacher-save-state:empty {
   display: none;
 }
-@media (max-width: 820px) {
+@media (max-width: 900px) {
   .teacher-tools-header { gap: 0.75rem; }
+  /* Narrower tabs keep all seven and Sign out on one row down to a small
+     tablet; at the old 1.1rem the strip hid Meet past its edge to 870 px. */
+  .teacher-tabs button { padding-inline: 0.7rem; font-size: 0.76rem; }
 }
-/* On a phone every tab is in view at once (13 October 2026, Dan): the bar
-   wraps into rows, the chosen tab filled, and Sign out sits beneath. */
-@media (max-width: 480px) {
-  .teacher-tools-header { flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
-  .teacher-tabs-scroll { flex: 1 1 100%; overflow: visible; }
-  .teacher-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+/* On a phone every tab is in view at once (13 October 2026, Dan), held
+   upright or sideways: up to a small tablet the bar is two rows, the chosen
+   tab filled, where a strip had hidden Receipts, Expressions and Meet past
+   its edge. Upright, Sign out sits beneath; sideways, beside the bar. */
+@media (max-width: 760px) {
+  .teacher-tabs-scroll { overflow: visible; }
+  /* Seven tools in two rows: her week's three, then the rest with Meet's
+     logo in the small last place, so nothing sits alone on a third row. */
+  .teacher-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
+  .teacher-tabs button { grid-column: span 2; }
+  .teacher-tabs #teacher-tab-hours { grid-column: span 3; }
+  .teacher-tabs #teacher-tab-meet { grid-column: span 1; }
   .teacher-tabs .teacher-tabs__thumb { display: none; }
   .teacher-tabs button { min-height: 44px; padding-inline: 0.4rem; }
-  /* Every tap on a phone is at least 44 px. */
+  /* Meet's logo keeps its whole size in the small last place; its own
+     0.75rem padding squeezed it to 11 px wide at 320 px. */
+  .teacher-tabs #teacher-tab-meet { padding-inline: 0; }
+  /* Keep every tool in view as the collection grows. */
+  .teacher-tabs button[aria-selected="true"] { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); }
+}
+@media (max-width: 480px) {
+  .teacher-tools-header { flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
+  .teacher-tabs-scroll { flex: 1 1 100%; }
+}
+/* Every tap on a phone is at least 44 px, whichever way it is held. */
+@media (max-width: 480px), (pointer: coarse) {
   .teacher-sign-out,
   .teacher-workspace .button--compact,
   .teacher-lesson-dialog .button--compact { min-height: 44px; }
-  /* Six tabs, two even rows of three. */
-  .teacher-tabs button[aria-selected="true"] { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); }
 }
 @media (max-width: 820px) {
-  .teacher-tabs button { padding-inline: 0.9rem; font-size: 0.76rem; }
-  .teacher-timeoff-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
-  /* On a phone the card rides at the foot of the screen once a day is
-     chosen, so its buttons are in reach without scrolling past the month. */
+  /* Down to a phone held sideways the card stays beside the month, so a
+     short screen never loses the month behind it. */
+  .teacher-timeoff-layout { grid-template-columns: minmax(0, 1fr) minmax(290px, 0.9fr); gap: 1rem; }
+}
+@media (max-width: 639px) {
+  .teacher-timeoff-layout { grid-template-columns: minmax(0, 1fr); }
+}
+/* On a phone held upright the card rides at the foot of the screen once a
+   day is chosen, so its buttons are in reach without scrolling past the
+   month. A screen too short for both keeps it beneath the month instead. */
+@media (max-width: 639px) and (min-height: 501px) {
   .teacher-timeoff-selection.has-days {
     position: sticky;
     bottom: 0.75rem;
@@ -2278,12 +2323,17 @@
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 0.75rem;
   align-items: center;
-  padding-right: 2.5rem;
 }
 .teacher-history-heading .account-avatar { width: 42px; height: 42px; }
 .teacher-history-heading p { margin: 0 0 0.2rem; font-size: 0.72rem; color: var(--lavender-ink); }
 /* An address too long for a phone ends in an ellipsis, as on her card. */
 .teacher-history-heading .teacher-history-email { margin: 0.35rem 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Their phone, NIF and Edit details share a line where they fit, rather
+   than a line each; the label and name keep clear of the close button. */
+.teacher-history-heading > div { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.75rem; min-width: 0; }
+.teacher-history-heading > div > :is(#teacher-history-label, h2, #teacher-history-name + .teacher-history-email) { flex: 1 0 100%; }
+.teacher-history-heading > div > :is(#teacher-history-label, h2) { padding-right: 2.5rem; }
+.teacher-history-heading .teacher-history-email { flex: 0 1 auto; min-width: 0; }
 .teacher-history-dialog h3 { margin: 0.25rem 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
 .teacher-history-dialog h3 span { color: var(--lavender-ink); font-weight: 500; }
 .teacher-history-list { display: grid; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
@@ -2473,6 +2523,11 @@
   gap: 0.9rem;
   margin: 0;
 }
+/* Fields in a row line up by their boxes, so a label that wraps (Email's
+   aside, NIF's on a phone) never drops its field below its neighbour's. */
+.teacher-student-dialog__form {
+  align-items: end;
+}
 .teacher-student-dialog .teacher-manual-choice,
 .teacher-student-dialog .teacher-manual-submit,
 .teacher-student-dialog__splat,
@@ -2533,6 +2588,32 @@
   align-items: center;
   justify-content: space-between;
 }
+/* On a phone Change price sits beside its heading, as a label's action
+   does, rather than on a line of its own under the prices. Wider, the
+   prices and the button already share a row. */
+@media (max-width: 480px) {
+  .teacher-price {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 1rem;
+  }
+  .teacher-price > * {
+    grid-column: 1 / -1;
+  }
+  .teacher-price > h3 {
+    grid-column: 1;
+  }
+  .teacher-price__view {
+    display: contents;
+  }
+  .teacher-price__view > .teacher-price__facts {
+    grid-column: 1 / -1;
+  }
+  .teacher-price__view > .button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
 .teacher-price__facts {
   margin: 0;
 }
@@ -2570,9 +2651,17 @@
   margin: 0;
 }
 @media (max-width: 480px) {
-  .teacher-student-dialog__form,
   .teacher-student-dialog .teacher-manual-form {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* On a phone the name and email take the width, and phone and NIF share
+     a row where each still shows a whole number, as her two prices do
+     beneath them; on the narrowest phones they stack. */
+  .teacher-student-dialog__form {
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  }
+  .teacher-student-dialog__form > label:nth-of-type(-n + 2) {
+    grid-column: 1 / -1;
   }
 }
 
@@ -2585,6 +2674,57 @@
   border-radius: var(--squiggle-panel);
   padding: clamp(1rem, 2.4vw, 1.5rem);
   background: var(--sheet);
+}
+
+/* The collection uses the Receipts sheet and the same raised reading cards.
+   Student preview renders this very card, without the teacher's controls. */
+.teacher-expressions {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: clamp(1rem, 2.4vw, 1.5rem);
+  background: var(--sheet);
+}
+.teacher-expressions__intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1.25rem 2rem; }
+.teacher-expressions__intro dl { flex: 1 1 28rem; margin: 0; max-width: 44rem; }
+.teacher-expressions__intro dt { font: 400 clamp(1.05rem, 2vw, 1.3rem)/2 var(--display); }
+.teacher-expressions__intro dt span { display: block; margin-top: 0.35rem; font: 500 0.75rem/1.5 var(--ui); color: var(--lavender-ink); }
+.teacher-expressions__intro dd { margin: 0.4rem 0 0; font-size: 0.88rem; line-height: 1.65; }
+/* The plus stands apart from its words, as on Add a student. JSX drops the
+   space a line break between the icon and the label seems to give. */
+.teacher-expressions__intro > .button { flex: 0 1 auto; gap: 0.5rem; }
+.teacher-expressions .teacher-expressions__help { margin: 0; font-size: 0.8rem; }
+.teacher-expressions__filters { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; gap: 0.75rem; }
+.teacher-expressions__filters .button { width: auto; }
+.teacher-expressions__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem; }
+.teacher-expressions__hint, .expression-dialog__hint { margin: 0; font-size: 0.8rem; line-height: 1.6; }
+.teacher-expression { display: flex; flex-direction: column; min-width: 0; padding: clamp(1rem, 2vw, 1.35rem); border-radius: var(--squiggle-field); background: var(--raised); }
+.teacher-expression > .teacher-receipts__state { align-self: flex-start; margin-bottom: 0.8rem; }
+.teacher-expression__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; margin-top: auto; padding-top: 1.2rem; }
+.teacher-expression__order { display: flex; gap: 0.1rem; margin-left: auto; }
+.teacher-expression__order .teacher-icon-button { width: 44px; height: 44px; }
+.expression-dialog { width: min(720px, calc(100vw - 2rem)); }
+.expression-dialog > h2 { margin-right: 2.8rem; line-height: 1.45; }
+.expression-dialog--preview { width: min(620px, calc(100vw - 2rem)); }
+.expression-dialog--preview > .expression-card { padding: clamp(1rem, 3vw, 1.5rem); border-radius: var(--squiggle-field); }
+.expression-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; }
+.expression-form__wide { grid-column: 1 / -1; }
+.expression-form textarea { resize: vertical; line-height: 1.6; }
+.expression-form__more { font-size: 0.85rem; }
+.expression-form__more > div { display: grid; gap: 0.8rem; }
+.expression-form__delete { justify-self: start; min-height: 44px; }
+@media (max-width: 740px) {
+  .teacher-expressions__list { grid-template-columns: minmax(0, 1fr); }
+  .teacher-expressions__filters { grid-template-columns: minmax(0, 1fr); }
+  .teacher-expressions__filters .button { justify-self: start; }
+  .expression-form { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .teacher-expressions__intro > .button { width: 100%; }
+  .teacher-expression__actions .button { width: auto; flex: 1 1 auto; }
+  .teacher-expression__order { margin-left: 0; }
 }
 .teacher-receipts .teacher-month-heading {
   margin: 0;
@@ -2651,9 +2791,10 @@
   background: #f9ddcc;
   color: var(--coral-action);
 }
-/* On a phone each amount is a small card: when and who on top, the rest as
-   labelled lines beneath. */
-@media (max-width: 640px) {
+/* On a phone, and up to 720 px where the six columns no longer fit the
+   sheet, each amount is a small card, two across where they fit: when and
+   who on top, its NIF and what it is for on one line beneath. */
+@media (max-width: 720px) {
   .teacher-receipts__table thead {
     position: absolute;
     width: 1px;
@@ -2665,6 +2806,9 @@
   .teacher-receipts__table tbody {
     display: grid;
     gap: 0.5rem;
+  }
+  .teacher-receipts__table tbody {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
   }
   .teacher-receipts__table tr {
     display: grid;
@@ -2698,9 +2842,13 @@
   }
   .teacher-receipts__table td[data-label="NIF"],
   .teacher-receipts__table td[data-label="For"] {
-    grid-column: 1 / -1;
     color: var(--lavender-ink);
     font-size: 0.75rem;
+  }
+  /* What it is for sits beside its NIF, as Paid sits beside Student. */
+  .teacher-receipts__table td[data-label="For"] {
+    grid-column: 2;
+    text-align: right;
   }
   .teacher-receipts__table tr:not([data-nif=""]) td[data-label="NIF"]::before {
     content: "NIF ";

@@ -21,6 +21,7 @@ bookings[2] = { ...bookings[2], isPast: false, startAt: "2026-09-07T16:00:00Z", 
 const expectedHistory = [2, 0, 1, ...Array.from({ length: 9 }, (_, index) => index + 3)].map(index => `Reference PREVIEW-${index}`);
 await context.addInitScript(() => localStorage.setItem("ines-student-session", "navigation-fixture"));
 let accountLoads = 0;
+await context.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
 await context.route("**/me", route => {
   if (route.request().method() === "GET") accountLoads += 1;
   return route.fulfill({
@@ -295,6 +296,7 @@ try {
     lessonType, isPast: false, sameDayFeeApplies: false, seriesId: null, manageToken: reference.toLowerCase()
   });
   const abroadLessons = [abroadLesson("ABROAD-ONLINE", "online", "2026-09-09T16:00:00Z"), abroadLesson("ABROAD-PORTO", "porto", "2026-09-16T09:00:00Z")];
+  await abroad.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
   await abroad.route("**/me", route => route.fulfill({
     contentType: "application/json",
     body: JSON.stringify({ student: { ...student, timezone: "America/Los_Angeles" }, bookings: abroadLessons, series: [], sameDayFeeCents: 500 })

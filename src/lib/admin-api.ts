@@ -1,6 +1,7 @@
 import { BOOKING_API_BASE_URL } from "@/lib/config";
 import { forgetSession } from "@/lib/auth-api";
 import { BOOKING_REPLY_ERROR, isApiInstant, isApiRecord } from "@/lib/api-response";
+import { isExpression, type Expression, type ExpressionInput } from "@/lib/expressions";
 
 export type AdminStudent = {
   id: string;
@@ -262,6 +263,40 @@ export function fetchReceipts(token: string, month: string) {
     token,
     `/admin/receipts?month=${encodeURIComponent(month)}`,
   );
+}
+
+function expressionReply(data: { expression: Expression }) {
+  if (!isExpression(data.expression)) throw new Error(BOOKING_REPLY_ERROR);
+  return data.expression;
+}
+function expressionListReply(data: { expressions: Expression[] }) {
+  if (!Array.isArray(data.expressions) || !data.expressions.every(isExpression) ||
+      new Set(data.expressions.map((row) => row.id)).size !== data.expressions.length) throw new Error(BOOKING_REPLY_ERROR);
+  return data.expressions;
+}
+export function fetchExpressions(token: string) {
+  return adminRequest<{ expressions: Expression[] }>(token, "/admin/expressions").then(expressionListReply);
+}
+export function saveExpression(token: string, input: ExpressionInput, previous?: Expression) {
+  return adminRequest<{ expression: Expression }>(token, `/admin/expressions${previous ? `/${encodeURIComponent(previous.id)}` : ""}`, {
+    method: "POST", body: JSON.stringify({ ...input, ...(previous ? { updatedAt: previous.updatedAt } : {}) }),
+  }).then(expressionReply);
+}
+export function publishExpression(token: string, expression: Expression, published: 0 | 1) {
+  return adminRequest<{ expression: Expression }>(token, `/admin/expressions/${encodeURIComponent(expression.id)}/publish`, {
+    method: "POST", body: JSON.stringify({ published, updatedAt: expression.updatedAt }),
+  }).then(expressionReply);
+}
+export async function deleteExpression(token: string, expression: Expression) {
+  const reply = await adminRequest<{ ok: boolean }>(token, `/admin/expressions/${encodeURIComponent(expression.id)}/delete`, {
+    method: "POST", body: JSON.stringify({ updatedAt: expression.updatedAt }),
+  });
+  if (reply.ok !== true) throw new Error(BOOKING_REPLY_ERROR);
+}
+export function reorderExpressions(token: string, ids: string[], expectedOrder: string[]) {
+  return adminRequest<{ expressions: Expression[] }>(token, "/admin/expressions/reorder", {
+    method: "POST", body: JSON.stringify({ ids, expectedOrder }),
+  }).then(expressionListReply);
 }
 
 export type StudentDetailsInput = { email: string; name: string; phone: string; nif: string; mark: string };

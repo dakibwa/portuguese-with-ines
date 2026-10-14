@@ -841,6 +841,7 @@ await accountPage.route("**/bookings", async (route) => {
 await accountPage.route("**/me/recurring-rates", (route) => route.fulfill({
   status: 200, contentType: "application/json", body: JSON.stringify({ rates: {} })
 }));
+await accountPage.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
 await accountPage.route("**/me", async (route) => {
   accountRequestMethods.push(route.request().method());
   if (route.request().method() === "OPTIONS") {
@@ -1980,8 +1981,8 @@ await accountPage.mouse.move(1, 1);
 await calendarTip.waitFor({ state: "hidden" });
 await waitForOrientation(accountPage);
 // The row sits on the card's own colour (9 October 2026, at Dan's request),
-// so it needs no inset of its own: its mark and details sit inside it, side
-// by side, the mark on the card's edge like everything else.
+// so it needs no inset of its own: on a phone its details sit on the card's
+// left edge and the lesson's mark at the right, as its seal (13 October 2026).
 const mobileNextLessonLayout = await accountPage.locator(".lesson-overview__next").evaluate((row) => {
   const bounds = (selector) => row.querySelector(selector)?.getBoundingClientRect().toJSON() ?? null;
   return {
@@ -1995,9 +1996,9 @@ if (
   !mobileNextLessonLayout.mark ||
   !mobileNextLessonLayout.copy ||
   mobileNextLessonLayout.background !== "rgba(0, 0, 0, 0)" ||
-  mobileNextLessonLayout.mark.left < mobileNextLessonLayout.row.left - 1 ||
-  mobileNextLessonLayout.copy.left < mobileNextLessonLayout.mark.right - 2 ||
-  mobileNextLessonLayout.copy.right > mobileNextLessonLayout.row.right + 1
+  mobileNextLessonLayout.copy.left < mobileNextLessonLayout.row.left - 1 ||
+  mobileNextLessonLayout.copy.right > mobileNextLessonLayout.mark.left + 2 ||
+  mobileNextLessonLayout.mark.right > mobileNextLessonLayout.row.right + 1
 ) {
   throw new Error(`The next lesson should keep its mark and details inside one clean row, on the card's colour, on a phone: ${JSON.stringify(mobileNextLessonLayout)}.`);
 }
@@ -2015,7 +2016,7 @@ await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible
 const mobileAccountLayout = await accountPage.evaluate(() => {
   const calendar = document.querySelector("#lesson-calendar .unified-calendar__grid");
   const calendarBounds = calendar?.getBoundingClientRect();
-  const firstWeekday = calendar?.querySelector(".calendar-weekdays span:first-child")?.getBoundingClientRect();
+  const firstWeekday = calendar?.querySelector(".calendar-weekdays span:not(.calendar-weekdays__corner)")?.getBoundingClientRect();
   const lastWeekday = calendar?.querySelector(".calendar-weekdays span:last-child")?.getBoundingClientRect();
   const legend = calendar?.querySelector(".unified-calendar__legend")?.getBoundingClientRect();
   return {
@@ -2727,6 +2728,31 @@ await accountPage.setViewportSize({ width: 390, height: 844 });
 await accountPage.locator(".booking-bar__head #account-menu-button").click();
 await accountPage.locator(".booking-bar__head #account-menu").getByRole("button", { name: /^Your lessons/ }).click();
 await accountPage.locator("#upcoming-lessons-heading").waitFor();
+// One student-picker journey. Server tests own randomness, history and access.
+const expression = {
+  id: "original-1", expression: "Partir o coco a rir", meaningPt: "Rir muito.", meaningEn: "To split your sides laughing",
+  literalEn: "To crack the coconut laughing", examples: ["Com aquela história, partimos o coco a rir."],
+  notes: "", sourceUrl: "", tags: ["Humor"], imageUrl: "", imageAlt: "", published: 1, sortOrder: 0,
+  createdAt: "2026-10-13T00:00:00.000Z", updatedAt: "2026-10-13T00:00:00.000Z",
+};
+let expressionPicked = false;
+await accountPage.route("**/me/expressions", route => route.fulfill({ json: {
+  expression: expressionPicked ? expression : null, canPick: !expressionPicked, hasPublished: true, shuffleLabels: expressionPicked ? [] : [expression.expression],
+} }));
+await accountPage.route("**/me/expressions/pick", route => {
+  if (expressionPicked || !route.request().postDataJSON().requestId) throw new Error("The picker must submit one identified draw.");
+  expressionPicked = true;
+  return route.fulfill({ json: { expression, canPick: false, hasPublished: true, shuffleLabels: [] } });
+});
+await accountPage.reload({ waitUntil: "domcontentloaded" });
+// The section keeps its name for assistive technology though its heading is not shown.
+const expressions = accountPage.getByRole("region", { name: "Uma expressão para ti", exact: true });
+await expressions.getByRole("button", { name: "Paint it", exact: true }).click();
+await expressions.locator(".expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
+await accountPage.reload({ waitUntil: "domcontentloaded" });
+await expressions.locator(".expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
+if (await accountPage.getByRole("button", { name: "Paint another", exact: true }).count()) throw new Error("An exhausted collection must wait for new expressions.");
+
 // The account is remembered for a quick return visit, and forgotten on
 // signing out with the session it belonged to.
 if (!(await accountPage.evaluate(() => window.localStorage.getItem("ines-account-snapshot")))) {

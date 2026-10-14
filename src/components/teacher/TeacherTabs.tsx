@@ -4,11 +4,12 @@ import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { GoogleMeetLogo } from "@/components/GoogleMeetLogo";
 
 const tabs = [
-  { id: "week", label: "Week" },
+  { id: "week", label: "Timetable" },
   { id: "hours", label: "Weekly hours" },
   { id: "time-off", label: "Time off" },
   { id: "students", label: "Students" },
   { id: "receipts", label: "Receipts" },
+  { id: "expressions", label: "Expressions" },
   { id: "meet", label: "Google Meet" },
 ] as const;
 

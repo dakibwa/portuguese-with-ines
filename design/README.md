@@ -53,6 +53,15 @@ Use these names in review so recurring problems are easy to recognise:
 - **Intermediate-width squeeze:** preserving a wide desktop composition after
   headings, controls, or the seven-column calendar have started to clip or
   wrap unnaturally.
+- **Stranded action:** a button, pager, tag or short label dropping onto a
+  line of its own, or leaving a half-empty row, where it would share the row
+  with its neighbours; or a phone on its side or a short window keeping an
+  upright phone's tall bands, so the task starts below the first screen. Put
+  each thing where the space is: pair what fits, let a lone action span what
+  it leads, and slim headers and bands on short screens (13 October 2026,
+  Dan: "the places of where stuff sits can be more efficient like the buttons
+  and stuff rather than running onto new lines unnecessarily"). Check a page
+  upright and sideways on a phone, both ways on a tablet, and on desktop.
 - **Decorative motion:** adding ambient loops, click delay, entrance
   choreography for a page's text, controls or sections as it loads, or any
   movement that makes a reader wait or does not explain a state change. The
@@ -168,8 +177,10 @@ the same identity or action:
   supporting line describes one-to-one lessons, online or in person. `Book a lesson` appears
   once. `How I teach` and `Lessons and prices` sit beside it as quieter outline
   buttons rather than plain links or a second strip beneath the hero; on a
-  phone they share a row beneath it, and below 414 px each takes the full
-  width so neither label wraps. The blue
+  phone they share a row beneath it, a size smaller below 414 px and sized to
+  their labels below 360 px, so neither label wraps. Wherever the three do not
+  fit on one row, `Book a lesson` spans the pair beneath it rather than
+  dangling alone (13 October 2026, Dan). The blue
   hero has no painted field of its own: the heading, its rule and the actions
   have the panel to themselves (the cream wave tried on 8 October 2026 was
   removed at Dan's request on 9 October);
@@ -188,7 +199,8 @@ the same identity or action:
 - booking and privacy information belong to the booking context, with the
   minimum useful text visible. Sign-up itself carries none of it: the booking's
   sign-in card shows `Almost there` as the step's only visible heading, then
-  Google sign-in and the account form, with no data-use summary, privacy
+  Google sign-in and the account form (its fields two to a row where the card
+  has a tablet's or a sideways phone's whole width), with no data-use summary, privacy
   details, Google password note or consent checkbox. The account form ends
   with an optional NIF field labelled `NIF (optional, for your receipts)`, with no
   note beneath it (10 October 2026, at Dan's request);
@@ -239,7 +251,8 @@ Dan's 22 September review tightened the public pages:
 - the footer hugs its content. On desktop it is one row, no taller than about
   120 px: the wordmark, the four destinations, a thin divider, then `Terms &
   privacy` at the right. On phones the destinations live behind the footer
-  `Menu`, with `Terms & privacy` beneath it;
+  `Menu`, with `Terms & privacy` beside it where both fit and beneath it on
+  the narrowest phones (13 October 2026, Dan);
 - banners give the page back to the task, and their art sits halfway down the
   band rather than up in a corner. The Lessons banner is about 230 px on
   desktop; on phones it becomes a lavender band with the splat in a
@@ -250,7 +263,9 @@ Dan's 22 September review tightened the public pages:
   the booking banner keeps
   its splat at the right in a band of about 124 px, without an editorial rule,
   its two-line `Book a Lesson` or `Your Lessons` set close as one handwritten
-  block;
+  block; on a phone turned sideways it keeps the wide screens' one line in a
+  band of about 60 px, so the booking's choices start on the first screen (13
+  October 2026);
 - the three Lessons cards each have their own squiggle outline, and their own
   splat comes in large from the card's top-right corner, cropped by its edge;
   once landed it moves only to turn a little while its card is pointed at. The
@@ -262,7 +277,7 @@ Dan's 22 September review tightened the public pages:
   its own (it lifts slightly and fills) and the corner splat turns a few
   degrees. The closing blue card
   keeps its two buttons on the right, stacked when the width tightens, and
-  moves them beneath the copy only on phones;
+  moves them beneath the copy only on phones, side by side where both fit;
 - the header logo starts on the page's left edge, like the footer logo and the
   headings beneath it, rather than floating inside a wider box;
 - no handwritten descender may cross other text. Beth Ellen sits low in its
@@ -344,8 +359,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   as she clicks; the line under the calendar says what changed or what failed.
   Weekly blocks such as lunch are shown but not toggled per date. Keyboard and
   touch input must work without dragging.
-- A sliding tab bar groups `Week`, `Weekly hours`, `Time off`, `Students`
-  and `Google Meet`. Open on `Week`; keep the week pager beside its date heading.
+- A sliding tab bar groups `Timetable` (her week; renamed from `Week`, 13
+  October 2026, Dan), `Weekly hours`, `Time off`, `Students`, `Receipts`,
+  `Expressions` and `Google Meet`. Open on `Timetable`; keep the week pager
+  beside its date heading.
   On narrow screens only the tab strip scrolls horizontally. Arrow keys, Home
   and End move between tabs. Unsaved hours and selected dates survive tab changes;
   an unsaved-hours dot stays visible on its tab, and `Students` carries a dot
@@ -387,7 +404,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   Porto time, saved only with `Save hours off`; a failed save keeps the draft.
   `Remove hours off` clears that date's breaks. Making days available removes
   only the whole-day block and keeps their hours off and weekly rules. On a
-  phone the card rides at the foot of the screen once a day is chosen.
+  phone held upright the card rides at the foot of the screen once a day is
+  chosen; held sideways, and on a tablet, it sits beside the month (beneath
+  it on the smallest), never over it.
   The month marks whole days off and booked lessons, without repeating weekly
   unavailability or partial blocks from the timetable.
   Time off prevents new bookings; existing lessons stay until she changes them.
@@ -449,10 +468,13 @@ usual lesson starts and days off; avoid a wall of administration forms.
   to issue · €50`) and what is still to be paid, a lilac `Download CSV`, then
   one plain table row per amount (lesson, student, NIF or `Consumidor final`,
   what it is for, amount, and a pill: `Paid by card`, `Paid by hand`,
-  `Payment due`, `Being charged`, `Refunded`). On a phone each row is a small
-  cream card. Rows carry their id and figures as data attributes, so her
-  automation can read the table, the CSV or the Worker's JSON alike. On a
-  phone the six tabs sit as two even rows of three.
+  `Payment due`, `Being charged`, `Refunded`). On a phone, and up to 720 px,
+  each row is a small cream card, two across where they fit, its NIF and what
+  it is for sharing a line. Rows carry their id and figures as data attributes, so her
+  automation can read the table, the CSV or the Worker's JSON alike. Up to a
+  small tablet, held either way, the tools sit in two rows (her week's three,
+  then the rest with Meet's logo in the small last place), so no tab hides
+  past the edge; wider, all seven and `Sign out` share one row.
 - Keep `Sign out` beside the tools bar. `Students` holds the student
   cards, each a profile (splat, name, address and an arrow into their history)
   over dabs for where they are, their next lesson and their own price when
@@ -496,6 +518,173 @@ usual lesson starts and days off; avoid a wall of administration forms.
   (`Cancel`, `Back`, `Done`) stays an outline. On a phone every tab
   is in view at once, as a grid. Booked is the calendar's navy everywhere. A lesson's details read as dabs (their address, NIF, how
   it is paid, whether they have been emailed) rather than sentences.
+
+### Expressions in her portal — 13 October 2026
+
+The `Expressions` tab immediately follows `Receipts`. Only a teacher can
+manage its collection. Publishing makes an expression available in the
+signed-in student picker below Your lessons. Drafts stay in her interface;
+there is no anonymous page or main-menu item.
+
+- Use the same lilac sheet as Receipts, cream reading cards, Beth Ellen
+  expression titles and Montserrat labels and content. Keep the latest bundle
+  introduction exactly: `expressão idiomática`, `nome feminino`, and
+  `Conjunto de palavras com um significado próprio, diferente do seu sentido literal.`
+- The coral `Add an expression` leads. Search matches accents flexibly across
+  expressions, meanings, examples and notes. The theme filter includes entries
+  with no theme. Do not display the original collection's count.
+- Each card shows a small `Draft` or `Published` pill, then its facts in
+  reading order, each under a small uppercase label after a dab of paint:
+  `Ao pé da letra` (the literal translation, when there is one), `Quer dizer`
+  (the Portuguese meaning, a step larger than the rest) and `Em inglês`; then
+  `Exemplo`/`Exemplos`, where the expression's own words are marked with a
+  soft wash of the paint, taking in a verb the example has conjugated. Notes/origin and reference links
+  open in a quiet disclosure. Optional themes use a lilac pill fill.
+- Reuse blue for Edit, soft lilac for Preview and publication changes, coral
+  for saving, and outline for Cancel/Done. Up/down buttons reorder the whole
+  collection; clear filters first. Every phone action is at least 44px.
+- The editor and preview use the shared flat lilac dialog, cream fields,
+  the same close button, backdrop dismissal, scroll lock and focus return.
+  Failed writes retain the draft. Discarding edits and deleting an expression
+  each require an explicit confirmation. Stale versions never overwrite an edit.
+- `Preview as students see it` renders the same reading-card component, without
+  teacher actions or publication pills. The surrounding private-preview note
+  is for Inês only. Previewing a draft does not publish it.
+- Two reading columns fit a wide desktop; use one on phones. All seven tabs
+  remain reachable without horizontal page overflow, including at 320px.
+  Long expressions, notes and examples wrap within the card. Fields and actions
+  also fit a 320px dialog.
+- All imported entries are drafts. The reference bundle has no usage examples
+  or themes; leave those blank instead of inventing them. Publishing needs both
+  meanings and at least one example. Preserve Inês's punctuation and accents.
+- The original strip photographs are reference material, with text too small
+  for a reading card. The packaging photos and business card do not illustrate
+  individual meanings. None is copied into `public/visuals/` for this integration.
+
+The student card sits on the same lilac sheet below the lessons calendar. Its
+centre is `Pinta e descobre` (13 October 2026, at Dan's choice; it replaced a
+spinning wheel he rejected): Inês has written the expression in wax on a cream
+sheet, and a gouache brush sweeps across it line by line so the phrase shows
+through the paint in Beth Ellen, in reading order. The painted phrase is the
+reading's title; the facts follow it.
+
+- No visible heading and no helper text (Dan: "do we even need the top
+  stuff"). The section keeps `Uma expressão para ti` as a visually hidden
+  heading, so it is still named. At rest the sheet itself invites: the same
+  words as a small uppercase label at its top, in the waiting paint's
+  lettering colour, and `Paint it`. Once painted, the card is the whole
+  section, and it ends in one row at the foot of the facts at every width:
+  the reading's themes, then `Notas e origem` (when Inês has written notes or
+  a source) and the compact `Paint another` at the row's end. The notes'
+  toggle reads like the facts' labels, its chevron in the dabs' column when it
+  leads the row, and the notes open below the whole row, so opening them never
+  moves it. On a narrow column the row starts at the dabs' column and runs to
+  the card's edge, so two short themes, or the notes' toggle, share it with
+  the button; the toggle and the button drop beneath the themes together only
+  for a longer set of themes, and only on the narrowest phones (320px) does the
+  button take a line of its own. The button keeps the width of its longest
+  label, so `Painting…` and `Try again` never reflow the row; it stays a 48px
+  target and never becomes a full-width slab.
+- Colour: each painting is in one of five paints, every one with lettering
+  clear of AA: deep blue `#203E82`, blue `#2C54AA`, coral `#B43A26` and
+  lavender ink `#554F91` carry cream `#FBF4E5` lettering; lavender `#AAA4E6`
+  carries ink `#1A3169` (5.4:1; cream on it would be 2.1:1). A new painting is
+  never the colour of the last one painted on this device, nor of its family
+  (the two blues, the two lavenders), so each one reads as a new colour. A
+  returning student sees their expression in the colour it was painted in,
+  remembered on the device for each student as soon as the Worker has saved
+  the pick (two students sharing a device keep their own colours), or else in
+  a colour that expression always gets.
+  The reading's labels, dabs, marked words and the drops thrown off the brush
+  all follow the paint and its companion colours; on lavender the labels are
+  in lavender ink and the marked words take a stronger lavender wash, so both
+  still read.
+- Room around the words (Dan: "give it space so the words fit comfortably
+  inside so it's not ambiguous"): every letter sits in solid paint. The band is
+  sized round the phrase's own letters, with generous paint above the first
+  line's tallest letter and below the last line's deepest, a clear inset from
+  the blunt start, and the dry brush beginning only after the longest line ends
+  and a margin of paint after it. The strokes of a longer phrase overlap, so no
+  paper shows between its lines, and no streak of paper crosses a word. A
+  phrase of a few words stays on one line if type up to 15% smaller holds it.
+  Nothing is ever cut: a phrase too long for every size takes as many lines as
+  it needs at the smallest, and the sheet grows to hold them.
+- Composition: on a phone the sheet fills the cream card and the reading opens
+  beneath it. From a landscape phone up, two columns each run from the card's
+  top on their own: the painting with its example straight beneath it, and
+  beside it the facts with the themes and `Paint another` straight beneath
+  them. Neither column waits on the other, so the taller one never opens a
+  gap in the shorter, whose foot simply ends sooner. A painted card with a
+  one-line phrase fits a landscape phone's screen (667×375, 844×390). On a
+  very wide card the example moves up into a third column with the themes and
+  button beneath it, and all three columns start level. At rest the sheet
+  fills its column beside the facts still to come, with its wax and pool at
+  its top, where the paint will land: the paint lands where it stays and never
+  slides on the sheet. The painted sheet closes round its phrase as the
+  reading opens, only its foot rising, so a one-line phrase never sits in a
+  tall empty sheet. Nothing above the section moves, and the card grows and
+  shrinks smoothly below.
+- At rest a few real, unseen phrases are written faintly in wax, just readable
+  if you look, and a flat pool of the next paint waits by the margin. Beside
+  the painting, the facts still to come wait in wax. Gouache is matte: nothing
+  glossy.
+- The press starts the painting at once while the Worker picks and saves the
+  expression: a dab lands in the pool and spreads. On about one press in three
+  the wait becomes a near-miss: a thin dry brush starts the first word or two
+  of an unseen phrase near the top, and a quick stroke of the real paint
+  crosses it out, before the real phrase is painted. The near-miss is brushed
+  in a wash the real paint stands out against (lavender behind the blues and
+  coral, coral behind lavender ink, deep blue behind lavender, which strikes a
+  broader stroke), so the strike always reads. It is left crossed out for a
+  beat, then dries away as the brush comes back and paints the real phrase in
+  its place, at the top where it stays. The whole reveal, press to
+  reading, takes about 3.2 seconds when the reply arrives within about 1.5
+  seconds; after a slower reply the painting follows it at its quickest pace.
+- No paint ever shows a straight edge, in any frame or once it has dried.
+  Each stroke touches down as a rounded mark, its blunt start a rounded cap,
+  and is led by a rounded wet front with the bead riding it (the near-miss by
+  a dry brush's ragged front); its body ends rounded under the bead until the
+  dry brush drags out from beneath it, and the bead soaks back into the body
+  rather than floating off. The body's edges ease into the dry brush's, so
+  where the two meet there is no step, notch or seam. Strokes, drops and the
+  pool land whole on the paper, never cut by the sheet's edge.
+- The card is never left empty while it paints. On the first press the sheet
+  keeps its wax phrases until the first stroke lands (a near-miss dries them
+  at once), and the facts still to come stay in wax beside the painting, as
+  at rest. `Paint another`
+  brings the sheet into view and the last reading waits in wax where it
+  stands, out of reach: its labels and dabs stay, taking the new paint's
+  colours, its words dry to wax lines and its themes and notes fade, while
+  the button reads `Painting…` and the focus waits on the section. The card
+  never shortens while it paints, and grows
+  smoothly only when a longer phrase needs the room, so nothing below jumps
+  under the student.
+- Only the button paints: no swipe or drag on the sheet, and no loose chapéu at
+  the card's corner.
+- The painting is decorative: the pick is the Worker's and the brush paints only
+  what it saved, so nothing done mid-stroke can change or lose a pick. Assistive
+  technology hears the result in words and the reading takes the focus.
+  Reduced-motion users see the finished painting and reading at once, and the
+  card keeps the colours it shows until the new reading replaces it. Where the
+  sheet cannot be painted at all, the reading shows the expression in the hand
+  as its title instead.
+- The strokes, pool, drops and wax are drawn in code for now.
+  [Expressions: paintings to commission](../docs/expressions-paint-assets.md)
+  lists the painted assets that would replace them.
+
+Keep the button disabled, reading `Painting…`, during the request and the
+painting. A failed reply dries the new paint away, puts the last painting (or
+the waiting sheet) back, and `Try again` repeats the same request without
+spending another pick; the focus goes back to the button if it was lost. If the
+collection cannot be read at all, the section stays away rather than raising an
+alarm beside the lessons. Returning students see their last available result,
+and every student has an independent history. Once their published pool is
+exhausted, a quiet note takes the button's place and the card waits for new
+expressions. Do not reset their history or imply another student has taken an
+expression.
+
+The full source inventory and later-stage feature map are in
+[Expressions: source and scope](../docs/expressions-stage-1.md).
 
 ## Wording and confirmation — 13 September 2026
 
@@ -676,16 +865,20 @@ before, is not offered the trial (Inês signing in, or an account made and never
 booked, does not count); that is settled as booking opens, so creating an account at the
 confirmation never takes away the trial being booked. The bar's head offers
 `Your lessons` to a signed-in student and a coral `Already booked? Sign in`
-(`Sign in` alone on a phone) to a returning browser. A first-time visitor sees
+(`Sign in` alone on a phone) to a returning browser, leading the choices' own
+row wherever both fit. A first-time visitor sees
 no sign-in there, since booking asks for an account only at the confirmation;
 a quiet `Already booked? Sign in` line beneath the calendar still serves a
 student on a new browser. Signing in to view lessons shows the `Your account`
 card on its own, with a small `Back` above its corner. On wide screens the
-groups carry small `Lesson`, `Where`, `Length` and `Repeat` labels; on a phone
-the options name themselves and the labels remain for assistive technology.
+groups carry small `Lesson`, `Where`, `Length` and `Repeat` labels; on a phone,
+upright or sideways, the options name themselves and the labels remain for
+assistive technology.
 Each group starts as wide as its options need and a row shares out what is
 left, so a wide screen fills the line and a narrower one moves a group down;
-option labels never wrap. Below 361 px the four repeat options sit two by
+option labels never wrap. Weekly's four groups pair up, the lesson with its
+place and the length with its weeks, wherever three would fit a row and leave
+the weeks alone beneath them (13 October 2026). Below 361 px the four repeat options sit two by
 two.
 
 Choosing a free day keeps the four weeks in view on wide screens, with the day
@@ -750,8 +943,13 @@ Preserve these desktop and mobile states:
   `Book a lesson` at the right; the name and `Sign out` live in Your details
   (10 October 2026, at Dan's request). On a narrower card the student's name leads it as the account's menu, with
   `Book a lesson` at its top right (`Book` on phones, keeping the full name
-  for assistive technology); the banner above already says Your lessons, so
+  for assistive technology); on a phone `Book` always shares the name's row,
+  the name cut short first if it must be; the banner above already says Your lessons, so
   the card's own title is for screen readers, as on a wide card.
+  On a phone on its side, or any window as short and narrower than 1100px
+  (13 October 2026, Dan), the name's menu, the months with their `?`, the
+  arrows and `Book` share one header row, so the four weeks start a row
+  higher; a tall screen keeps two.
   On a wide card each booked day spells its lessons out (9 October 2026, at
   Dan's request): the time each runs from and until (`09:00–10:00`), after a
   globe for online or a little person for in Porto, both named in the key. The
@@ -763,7 +961,9 @@ Preserve these desktop and mobile states:
   `Weekly`. Clicking opens the lesson, with its Meet link, `Change` and
   `Cancel`. On a phone a day shows the mark over the start time, and the next
   lesson, or `Happening now`, keeps its row beneath the header, on the card's
-  own colour, as it does on
+  own colour (on a phone its words on the card's left edge with the name and
+  the weeks, its mark at the right as its seal, and `Join Google Meet` beneath
+  as a cream button, 13 October 2026, at Dan's request), as it does on
   any card when the next lesson lies beyond the first four weeks: its date and
   time in one plain line, then its length, location, `Weekly` when it repeats
   and its Meet link, opening that lesson directly. With nothing booked, `Nothing booked yet.` says so
@@ -803,7 +1003,9 @@ Preserve these desktop and mobile states:
   where they were and the thumb on the card showing; on a narrower one the
   title centred at the top (10 October 2026, at Dan's request) and the name's
   menu beneath it, which holds the way back to Your lessons. History has two
-  readable columns of records on wide desktop and one on mobile; order records
+  readable columns of records wherever the longest date and time stay on one
+  line (from an 840px card: a tablet on its side, the largest phones on
+  theirs, and desktop) and one on mobile; order records
   by when each lesson ended or was cancelled, newest first, so cancelled
   future dates do not bury recently completed lessons.
   Your details reads as a short list of what is saved rather than a form (10
@@ -833,9 +1035,9 @@ Preserve these desktop and mobile states:
   now pays for offers `Already paid you by hand? Take it off their card`. The sign-in panel's quiet links read `Email me a sign-in link` and
   `I’ve forgotten my password` side by side; asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.
-  Text fields are 44 px tall, the usual touch height. In the
-  change dialog, whose cream matches a track's, the sliders' tracks take a
-  lilac wash so they read as sliders. The splat
+  Text fields are 44 px tall, the usual touch height. The change dialog is
+  the same flat lilac as every dialog, so its sliders' tracks and free days
+  are raised cream there exactly as on the booking sheet. The splat
   opens as a row of the site's own marks, all but the FAQ's question, with the
   initial first; choosing one saves it, and it shows wherever the name's menu
   does. A small `Sign out` waits at the card's foot, on the right. `Done
@@ -900,11 +1102,17 @@ Preserve these desktop and mobile states:
   elsewhere, and the `Earlier weeks` and `Later weeks` arrows on the right,
   solid blue with white arrows.
   `Later weeks` carries a small coral count of the booked lessons beyond the
-  page, so nothing booked is out of sight without a sign. Each week starts with
-  its month (`OCT`), in ink where a month begins and lilac ink where it carries
-  on, and a month that begins part-way through a week marks its 1st (`1 NOV`);
-  there are no caption rows across the grid. The key sits beneath the weeks it
-  explains. A new
+  page, so nothing booked is out of sight without a sign. On a wider card each
+  week starts with its month (`OCT`), in ink where a month begins and lilac ink
+  where it carries on, and a month that begins part-way through a week marks
+  its 1st (`1 NOV`); on a phone, on the lessons card and the booking calendar
+  alike, the header names the months and every 1st carries its own, so the
+  seven days take the card's whole width (13 October 2026, Dan: "less
+  cramped", and the same logic on every screen). There are no caption rows across the
+  grid. A booked day's times are sized by the day itself, so they always sit
+  inside its splat at any width. The key sits beneath the weeks it explains,
+  on a phone in two short columns, the kinds of lesson on the left and the
+  places on the right, beside the corner splat. A new
   booking pages through the whole twelve-week booking window; the lessons view
   pages from this week through the same window, or to the last booked lesson
   when that is later. The lessons view has no second context strip or
@@ -1114,8 +1322,8 @@ And the drawing:
 
 - anything to read before trying again sits in one coral panel, on the
   student pages and Inês's alike, its ways on (`Try again`, `Message Inês`,
-  `Sign in`) after the message as small outline buttons side by side (13
-  October 2026); good news is the lavender panel with a 20 px tick, including
+  `Sign in`) after the message as small outline buttons side by side, on the
+  message's own row across a wide booking page (13 October 2026); good news is the lavender panel with a 20 px tick, including
   a saved profile field;
 - secondary actions share one outline (`Keep lesson` and `Manage weekly
   lessons` match in one dialog), and going back is always the small coral
@@ -1212,7 +1420,7 @@ as a form:
 - signed in, booking is headed by the account's own bar, as Your lessons is:
   the name's menu, or the places open on a wide card, holding the way back;
 - Inês's schedule reads as the same place: the booking page's blue band,
-  one sliding bar for `Week`, `Weekly hours`, `Time off`, `Students`
+  one sliding bar for `Timetable`, `Weekly hours`, `Time off`, `Students`
   and `Google Meet`, beside a small `Sign out`; sliders for a
   lesson's length and place in her lesson form, with the
   timetable's globe and person beside Online and In Porto, her sign-in with no `Create an account`, and each student's chosen

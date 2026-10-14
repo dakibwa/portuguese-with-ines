@@ -317,9 +317,11 @@ export function AuthPanel({
             <div className="booking-alert__body">
               <p>{error}</p>
               {accountExists ? (
-                <button className="button button--outline button--compact booking-alert__action" onClick={signInInstead} type="button">
-                  Sign in
-                </button>
+                <div className="booking-alert__actions">
+                  <button className="button button--outline button--compact" onClick={signInInstead} type="button">
+                    Sign in
+                  </button>
+                </div>
               ) : null}
             </div>
           </div>

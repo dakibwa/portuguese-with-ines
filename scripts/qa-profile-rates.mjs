@@ -41,6 +41,7 @@ async function open(width, { session = true, ratesReadFails = false } = {}) {
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
     return route.fallback();
   });
+  await context.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
   await context.route("**/me", (route) => json(route, { student, bookings: [], series: [], sameDayFeeCents: 500 }));
   await context.route("**/me/recurring-rates", (route) => {
     if (route.request().method() === "GET") {
@@ -128,17 +129,16 @@ try {
     await expect(code).toBeVisible();
     await expect(add).toBeDisabled();
     // Like every other field here, the action appears once there is something
-    // to add: beside its field whenever the row is wide enough, beneath it on
-    // a phone.
+    // to add, and it waits beside its field at every width, a phone's included,
+    // rather than alone on a line beneath it.
     await code.fill(" test15 ");
     await expect(add).toBeEnabled();
-    const [fieldRight, actionLeft, fieldBottom, actionTop] = await editor.locator("details.my-lessons__code .my-lessons__details-row").evaluate((row) => {
+    const [fieldRight, actionLeft] = await editor.locator("details.my-lessons__code .my-lessons__details-row").evaluate((row) => {
       const field = row.querySelector("label").getBoundingClientRect();
       const action = row.querySelector("button").getBoundingClientRect();
-      return [field.right, action.left, field.bottom, action.top];
+      return [field.right, action.left];
     });
-    if (width >= 700) assert.ok(actionLeft >= fieldRight - 1, `Add code sits beside its field at ${width}px`);
-    else assert.ok(actionTop >= fieldBottom - 1, `Add code sits under its field at ${width}px`);
+    assert.ok(actionLeft >= fieldRight - 1, `Add code sits beside its field at ${width}px`);
     await add.click();
     await expect(editor.getByRole("status")).toHaveText("Saved. Your 60-minute lessons are now €15 each.");
     const rows = editor.locator(".my-lessons__rates-list li");

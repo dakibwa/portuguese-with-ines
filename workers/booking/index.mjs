@@ -66,6 +66,8 @@ import {
 } from "./time.mjs";
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
+import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
+import { pickExpression, studentExpressions } from "./student-expressions.mjs";
 import { findRecurringCode, studentRates, studentLessonType, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
 import { formatEuros } from "./money.mjs";
@@ -129,8 +131,8 @@ export function bookingPaymentProblem({ paymentRequired, stripeIsReady, paymentC
  * was not enough — those went straight into handlers doing `body.notes` and
  * `"repeat" in body`, and a four-byte unauthenticated body turned into a 500.
  */
-async function readJson(request) {
-  const text = await readBody(request, 32768);
+async function readJson(request, limit = 32768) {
+  const text = await readBody(request, limit);
   try {
     const data = JSON.parse(text);
     return data && typeof data === "object" && !Array.isArray(data) ? data : {};
@@ -1533,7 +1535,8 @@ const worker = {
         if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
           return fail("Send a JSON request.", 415, request, env);
         }
-        if (Number(request.headers.get("Content-Length") || 0) > 32768) return fail("Request too large.", 413, request, env);
+        const bodyLimit = path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
+        if (Number(request.headers.get("Content-Length") || 0) > bodyLimit) return fail("Request too large.", 413, request, env);
         // Cloudflare supplies this trusted edge header. It cannot be replaced
         // with an arbitrary body/email key to bypass unauthenticated limits.
         const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
@@ -1590,6 +1593,10 @@ const worker = {
         return json({ ok: true }, 200, request, env);
       }
       if (request.method === "GET" && path === "/me") return await handleMe(request, env);
+      if ((request.method === "GET" && path === "/me/expressions") ||
+          (request.method === "POST" && path === "/me/expressions/pick")) {
+        return await handleStudentExpressions(request, env);
+      }
       if (path === "/me/recurring-rates" && ["GET", "POST"].includes(request.method)) {
         return await handleRecurringRates(request, env);
       }
@@ -4442,6 +4449,24 @@ async function handleRecurringRates(request, env) {
   return json({ rates: await studentRates(env, student.id) }, 200, request, env);
 }
 
+async function handleStudentExpressions(request, env) {
+  const student = await currentStudent(request, env);
+  if (!student) return fail("Please sign in.", 401, request, env);
+  if (student.role !== "student") return fail("The picker is for student accounts. Use the preview in Expressions.", 403, request, env);
+  try {
+    const data = request.method === "POST"
+      ? await pickExpression(env.DB, student.id, await readJson(request, 1024))
+      : await studentExpressions(env.DB, student.id);
+    return json(data, 200, request, env);
+  } catch (error) {
+    if (error instanceof ExpressionProblem) return fail(error.message, error.status, request, env);
+    if (/no such table: (expressions|expression_picks)/.test(String(error))) {
+      return fail("The expressions are not ready yet. Please try again later.", 503, request, env);
+    }
+    throw error;
+  }
+}
+
 async function handleMe(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
@@ -4840,6 +4865,18 @@ async function handleAdmin(request, env, ctx, url, path) {
   const admin = await isAdmin(request, env);
   if (admin === "throttled") return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
   if (!admin) return fail("Not authorised.", 401, request, env);
+
+  if (path === "/admin/expressions" || path.startsWith("/admin/expressions/")) {
+    try {
+      const data = await expressionsRequest(env.DB, request.method, path, request.method === "POST" ? await readJson(request, 131072) : {});
+      return json(data, path === "/admin/expressions" && request.method === "POST" ? 201 : 200, request, env);
+    } catch (error) {
+      if (error instanceof ExpressionProblem) return fail(error.message, error.status, request, env);
+      // An unreleased migration must not make the rest of her portal fail.
+      if (String(error).includes("no such table: expressions")) return fail("The expressions collection is not ready yet. Please try again after the website update.", 503, request, env);
+      throw error;
+    }
+  }
 
   if (request.method === "GET" && path === "/admin/google-calendar") {
     return json(await calendarConnectionStatus(env), 200, request, env);

@@ -69,6 +69,7 @@ async function fixture(width, reply = async () => null, mockGoogle = true) {
     if (request.method() === "POST") requests.push({ path, body: request.postDataJSON() });
     const answer = await reply(path, request);
     if (answer) return route.fulfill({ headers: cors, ...answer });
+    if (path === "/me/expressions") return route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } });
     if (path === "/me") return route.fulfill({ headers: cors, json: { student: request.headers().authorization === `Bearer ${replacementSession}` ? replacementStudent : student, bookings: [], series: [], sameDayFeeCents: 500 } });
     if (path === "/me/recurring-rates") return route.fulfill({ headers: cors, json: { rates: {} } });
     if (path === "/lesson-types") return route.fulfill({ headers: cors, json: { lessonTypes: [], postpay: false } });

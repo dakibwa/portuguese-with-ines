@@ -32,6 +32,7 @@ async function open(width, path, { session = "", me = student, reply = () => nul
     if (fixture) return route.fulfill(fixture);
     if (endpoint === "/me") return route.fulfill({ json: { student: me, bookings: [], series: [], sameDayFeeCents: 500 } });
     if (endpoint === "/me/recurring-rates") return route.fulfill({ json: { rates: {} } });
+    if (endpoint === "/me/expressions") return route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } });
     if (endpoint === "/lesson-types") return route.fulfill({ json: { lessonTypes: [], postpay: false } });
     if (endpoint === "/availability") return route.fulfill({ json: { slotsByDate: {}, horizonDays: 56 } });
     if (endpoint === "/admin/google-calendar") return route.fulfill({ json: { configured: false, connected: false, email: null, needsReconnect: false, pending: 0 } });
@@ -196,7 +197,7 @@ try {
     await expect(schedule.page.locator('[data-receipt-id="without-nif:lesson"]')).toContainText("Consumidor final");
     await expect(schedule.page.locator(".teacher-receipts")).toContainText("2 receipts to issue · €50");
     assert.ok(await noOverflow(schedule.page), "Receipts fit the phone");
-    await schedule.page.getByRole("tab", { name: "Week", exact: true }).click();
+    await schedule.page.getByRole("tab", { name: "Timetable", exact: true }).click();
     await schedule.page.getByRole("button", { name: /^Carla, .*View lesson$/ }).click();
     await schedule.page.getByRole("button", { name: "Move lesson", exact: true }).click();
     const newDate = schedule.page.getByLabel("New date");

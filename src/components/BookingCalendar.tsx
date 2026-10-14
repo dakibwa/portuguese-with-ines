@@ -2,6 +2,7 @@
 
 import { MeetingLink } from "@/components/MeetingLink";
 import { LessonsLoading } from "@/components/LessonsLoading";
+import { StudentExpressions } from "@/components/expressions/StudentExpressions";
 
 import { type ComponentType, type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -1824,7 +1825,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     });
     refreshStudentInBackground();
   };
-  const needsLessonsSignIn = intent === "lessons" && !student && (
+  // A lesson opened from its emailed link carries its own key: changing it
+  // never asks for an account.
+  const needsLessonsSignIn = intent === "lessons" && !student && !managedToken && (
     showAccountSignIn || !checkingSession && !readSession()
   );
   // A signed-in student's first visit draws Your lessons straight away, its
@@ -3927,8 +3930,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               {displayedCalendarWeeks.map((week, row) => (
                 <div className="calendar-week" key={week.key}>
                   {/* Each week starts with its month, so a date is never far
-                      from it; a month that begins mid-week marks its 1st. The
-                      days' own labels carry the full date. */}
+                      from it; a month that begins mid-week marks its 1st. On a
+                      phone, booking or on the lessons card, the month column
+                      is hidden, and every 1st names its month itself, Mondays
+                      included. The days' own labels carry the full date. */}
                   <span
                     aria-hidden="true"
                     className={`calendar-week__month${
@@ -4014,7 +4019,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       >
                         <span>
                           {cell.day}
-                          {cell.day === 1 && column > 0 ? <em>{shortMonth(cell.month, cell.key)}</em> : null}
+                          {cell.day === 1 ? <em className={column === 0 ? "calendar-week__first" : undefined}>{shortMonth(cell.month, cell.key)}</em> : null}
                           {lessons.length ? (
                             <small className="calendar-booking-times">
                               {(lessons.length <= 2 ? lessons : lessons.slice(0, 1)).map((booking) => (
@@ -4561,6 +4566,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </div>
         ) : null}
       </StageElement>
+
+      {isLessonsCalendarOverview && student?.role === "student" ? (
+        <StudentExpressions key={`${student.id}:${readSession()}`} studentId={student.id} token={readSession()} />
+      ) : null}
 
     </section>
   );

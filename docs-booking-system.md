@@ -153,6 +153,109 @@ that booking's confirmation always carries, with Google, or by choosing a new
 password. A proven address, a teacher account and the password-less accounts
 created here are never touched.
 
+## Expressions collection — Stage 1
+
+The teacher portal's `Expressions` tab follows Receipts. Its collection reads
+and writes pass through `handleAdmin`, so either any account with `role = 'teacher'` or the
+existing shared `ADMIN_TOKEN` can use them. Students and anonymous callers are
+refused before any collection data is read or changed. Existing origin, JSON
+content-type, bounded request-body and no-cache rules apply. The student picker
+has separate authenticated endpoints below. There is no anonymous expression
+endpoint, and this feature sends no email.
+
+| Method and path | Request and result |
+| --- | --- |
+| `GET /admin/expressions` | `{ expressions }`, ordered by `sort_order`, then `id`. |
+| `POST /admin/expressions` | Creates the supplied content as an unpublished draft; `{ expression }`, HTTP 201. |
+| `POST /admin/expressions/:id` | Replaces content, with `updatedAt` from the last read; `{ expression }`. |
+| `POST /admin/expressions/:id/publish` | `{ published: 0 or 1, updatedAt }`; `{ expression }`. Publishing requires both meanings and one or two examples. |
+| `POST /admin/expressions/:id/delete` | `{ updatedAt }`; `{ ok: true }`. The portal confirms deletion first. |
+| `POST /admin/expressions/reorder` | `{ ids, expectedOrder }`, each the entire ordered collection of IDs. Returns `{ expressions }`. |
+
+Migration `0026-expressions.sql` creates `expressions`; the same DDL is in
+`schema.sql`. Its fields are `id`, `expression`, a separate unique `normalized`
+duplicate key, `meaning_pt`, `meaning_en`, `literal_en`, `examples` (JSON array),
+`notes`, `source_url`, `tags` (JSON array), `image_url`, `image_alt`, `published`
+(0/1, default 0), `sort_order`, `created_at` and `updated_at` (UTC ISO strings).
+The order index is `(sort_order, id)`. No Sites project ID, Sites sign-in headers,
+student identity or student-equivalent table is imported.
+
+The JSON content fields use `expression`, `meaningPt`, `meaningEn`, `literalEn`,
+`examples`, `notes`, `sourceUrl`, `tags`, `imageUrl` and `imageAlt`. Replies add
+`id`, `published`, `sortOrder`, `createdAt` and `updatedAt`. Text is stored as
+written; normalization affects only the duplicate key. Limits are 240 characters
+for the expression and image description, 2,000 for each meaning and notes, 500
+for the literal translation, two examples of up to 1,200 characters, and eight
+themes of up to 40 characters. Links are at most 2,048 characters; references
+accept only HTTPS without credentials. Images accept only local
+`/visuals/expressions/<name>.webp` paths, matching the site's security policy,
+and need a description. There is no upload service. Expression requests are
+bounded to 128 KiB, including both ID lists when reordering up to 500 entries.
+Unknown fields, wrong types, empty list items and invalid publication values
+are rejected. Drafts may be incomplete; published entries must stay complete.
+
+Updates, publication and deletion compare `updatedAt` in the write itself.
+Stale requests receive HTTP 409. Reordering is one conditional SQLite statement
+using JSON IDs, so it cannot leave a partially reordered collection and rejects
+a changed order or membership. The browser retains failed drafts; a load failure
+is distinct from an empty collection. Nothing is cached in browser storage.
+
+The migration includes 52 drafts, preserving the original expression IDs,
+Portuguese meaning, literal English, idiomatic English equivalent (in
+`meaning_en`), notes and references. The bundle supplies no usage examples or
+themes, so those start empty. `scripts/import-expressions.mjs` parses only
+literal arrays from the bundle with the installed TypeScript parser; it never
+executes bundle code. Regenerate the seed as plain SQL with:
+
+```sh
+node scripts/import-expressions.mjs /path/to/ines-idioms-app/current-app/lib/expressions.ts
+```
+
+The output is the seed section of `0026-expressions.sql`. Repeating it preserves
+existing IDs and teacher edits (`ON CONFLICT(id) DO NOTHING`); it does not refresh
+or overwrite an existing collection. Reorder is bounded to 500 entries.
+
+## Student expression picker
+
+A signed-in student can pick a published expression below Your lessons. The
+server chooses randomly from that student's unseen published entries. Different
+students can receive the same expression. Teachers use the private preview in
+Expressions; neither anonymous callers nor teacher sessions can draw.
+
+| Method and path | Request and result |
+| --- | --- |
+| `GET /me/expressions` | The student's latest still-published pick, whether another is available, whether any published content exists, and up to eight unseen titles for the animation. |
+| `POST /me/expressions/pick` | Only `{ requestId }`, a UUID v4. Reserves one unseen published expression and returns the same state shape with that request's result. |
+
+Both return `{ expression, canPick, hasPublished, shuffleLabels }`. No client
+student ID or chosen expression ID is accepted. The session supplies the
+student identity. A single SQLite INSERT selects with `ORDER BY random()` and
+reserves the pick atomically. Migration `0027-expression-picks.sql` adds
+`expression_picks`: student and expression foreign keys, a request UUID, UTC
+creation time and an ordered ID. Unique constraints cover student + expression
+and student + request. Retrying one request returns the original result without
+consuming another. History belongs to the account, across browsers and devices;
+unpublishing and republishing an expression does not reset it.
+
+The UI restores the last available result on return. The short slowing reel
+only presents the server's already-saved result. Reduced motion skips it, and
+navigation cancels it without undoing the pick. No published entries means no
+student card. An exhausted pool waits for newly published entries; there is no
+student reset or repeat action. Failed or lost replies retain the request UUID
+for retry. All replies use the existing no-cache and origin rules; POST bodies
+are bounded to 1 KiB.
+
+**Release is pending Dan and Inês's review.** This change does not apply either
+migration, deploy the Worker, merge the PR or touch staging/production data.
+When Dan authorizes release, apply 0026 and then 0027 to the chosen database
+before the Worker and site release. Missing tables produce a controlled 503
+on the affected endpoint while the existing portal continues to work.
+
+The content inventory, original schema and feature map are in
+[Expressions: source and scope](docs/expressions-stage-1.md). A public Expressões
+page and optional home-page expression remain plan only. Multilingual student
+contributions and a weekly selection policy are also outside this change.
+
 ## Teacher calendar
 
 `/schedule` opens on the current Monday-to-Sunday week in Porto time. Booked
