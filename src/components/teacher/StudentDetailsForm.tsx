@@ -15,7 +15,7 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy }
   token: string;
   student: AdminStudent;
   onSaved: (student: AdminStudent) => void;
-  onCancel: () => void;
+  onCancel?: () => void;
   onBusy?: (busy: boolean) => void;
 }) {
   const [details, setDetails] = useState({ name: student.name, email: student.email, phone: student.phone, nif: student.nif ?? "" });
@@ -80,7 +80,7 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy }
       </label>
       <div className="teacher-dialog-actions">
         <button className="button button--coral" disabled={busy} type="submit">{busy ? "Saving…" : "Save details"}</button>
-        <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">Cancel</button>
+        {onCancel ? <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">Cancel</button> : null}
       </div>
       {error ? <p className="teacher-inline-error" role="alert">{error}</p> : null}
     </form>

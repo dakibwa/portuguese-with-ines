@@ -76,7 +76,7 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
         ><i aria-hidden="true">{entry.done ? <Check size={12} strokeWidth={3} /> : entry.id === next && waitingOnStudent ? <Clock3 size={12} strokeWidth={2} /> : null}</i><span>{entry.label}<span className="visually-hidden" id={`${paneId}-${entry.id}-status`}>{entry.done ? ": done" : entry.id === next && waitingOnStudent ? ": waiting for the student" : ": waiting"}</span></span></button>
       </li>)}
     </ol>
-    <div className="teacher-setup__action"><button
+    {!step ? <div className="teacher-setup__action"><button
       className={`button button--${owner === "Yours" ? "coral" : "lilac"} button--compact`}
       disabled={disabled || ((next === "welcome" || next === "sign-in" || next === "card") && Boolean(sending))}
       onClick={() => {
@@ -84,64 +84,56 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
         else onSelect(next);
       }}
       type="button"
-    >{sending === student.id ? "Sending…" : primaryLabel}<span className="visually-hidden"> for {student.name}</span></button></div>
+    >{sending === student.id ? "Sending…" : primaryLabel}<span className="visually-hidden"> for {student.name}</span></button></div> : null}
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
     {step ? <div className="teacher-setup__body" id={paneId} aria-label={`${student.name}’s setup`} role="region" ref={body} tabIndex={-1}>
       <div className="teacher-setup__body-heading">
         <h3 id={`${paneId}-heading`}>{step === "email" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome email" : step === "sign-in" ? "Sign in" : "Saved card"}</h3>
-        <button className="teacher-text-button" disabled={disabled} onClick={close} type="button">Close setup</button>
+        <button className="teacher-text-button" disabled={disabled} onClick={close} type="button">Close</button>
       </div>
       {step === "email" ? <StudentDetailsForm
         key={`${student.id}-details`}
         onBusy={setBusy}
-        onCancel={close}
         onSaved={updated => { setNotice("Their details are saved."); onChanged?.(updated); close(); }}
         student={student}
         token={token}
       /> : step === "price" ? <>
-        <ul className="booking-payment-facts teacher-setup__help"><li>The standard price applies until you set their own.</li></ul>
+        <ul className="booking-payment-facts teacher-setup__help"><li>{Object.keys(student.ownPrices ?? student.prices ?? {}).length ? "Custom lesson price set." : "Standard lesson price applies."}</li></ul>
         <StudentPrice
           key={`${student.id}-price`}
           idPrefix={`${paneId}-price`}
           labelledBy={`${paneId}-heading`}
           onBusy={setBusy}
-          onCancel={close}
+          showCancel={false}
           onChanged={updated => onChanged?.(updated)}
           startEditing
           student={student}
           token={token}
         />
       </> : step === "lessons" ? <>
-        <ul className="booking-payment-facts teacher-setup__help"><li>{student.awaitingWelcome ? "No lesson emails until you send the welcome." : "Adding a lesson emails the student."}</li></ul>
+        <ul className="booking-payment-facts teacher-setup__help">
+          {!steps.find(entry => entry.id === "lessons")?.done ? <li>No lessons added yet.</li> : null}
+          <li>{student.awaitingWelcome ? "Lesson emails wait for the welcome email." : "Adding a lesson emails the student."}</li>
+        </ul>
         <LessonForm
           idPrefix={`${paneId}-lesson`}
           onBusy={setBusy}
-          onCancel={close}
           onCreated={message => { setNotice(message); close(); onChanged?.(); }}
           student={student}
           token={token}
         />
       </> : <>
         <ul className="booking-payment-facts teacher-setup__help">
-          {step === "welcome" ? student.awaitingWelcome ? <>
-            <li>Includes their prices and the lessons you have added.</li>
-            <li>Send it when you’re ready.</li>
-          </> : <>
-            <li>Their welcome has been sent.</li>
-            <li>You can send a new sign-in link.</li>
-          </> : step === "sign-in" ? <>
-            <li>They sign in using the email link.</li>
-            <li>You can send a new link.</li>
-          </> : <>
-            <li>They add their card in their account.</li>
-            <li>You can send a sign-in link.</li>
-          </>}
-          {!student.email ? <li>Add their email first.</li> : null}
+          <li>{step === "welcome"
+            ? student.awaitingWelcome ? "Welcome email not sent yet." : student.signedIn ? "Sign-in is set up." : "Student hasn’t signed in yet."
+            : step === "sign-in"
+              ? student.signedIn ? "Sign-in is set up." : "Student hasn’t signed in yet."
+              : student.hasCard ? "Student has saved a card." : "Student hasn’t added a card yet."}</li>
+          {!student.email ? <li>Email address needed.</li> : step === "card" && !student.hasCard && !student.signedIn ? <li>Student needs to sign in first.</li> : null}
         </ul>
         {student.email ? <p className="teacher-setup__email">{student.email}</p> : null}
         <div className="teacher-dialog-actions">
           {student.email ? sendButton(step !== "welcome" || !student.awaitingWelcome) : <button className="button button--coral button--compact" onClick={() => onSelect("email")} type="button">Add email</button>}
-          <button className="button button--outline button--compact" disabled={disabled} onClick={close} type="button">Done</button>
         </div>
       </>}
     </div> : null}
