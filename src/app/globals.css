@@ -8836,7 +8836,9 @@ dialog[open]::backdrop {
     min-height: calc(100vh - var(--header-height));
     min-height: calc(100svh - var(--header-height));
     justify-content: flex-start;
-    padding-top: 1rem;
+    /* Clear air under the header for the heading's tall loops (14 October
+       2026, Dan: too little space between the banner and the heading). */
+    padding-top: clamp(1.75rem, 9vh, 3rem);
     padding-bottom: 1.25rem;
   }
 
