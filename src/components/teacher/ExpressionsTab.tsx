@@ -3,23 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Eye, Plus } from "lucide-react";
 import { ExpressionCard } from "@/components/expressions/ExpressionCard";
-import { StudentExpressions } from "@/components/expressions/StudentExpressions";
+import { TeacherExpressionTryOut } from "@/components/expressions/TeacherExpressionTryOut";
 import { ExpressionDialog } from "@/components/teacher/ExpressionDialog";
 import { deleteExpression, fetchExpressions, publishExpression, reorderExpressions, saveExpression } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
-import { tryOutExpressions } from "@/lib/expression-try-out";
 import { searchExpression, type Expression, type ExpressionInput } from "@/lib/expressions";
-
-/**
- * Her try-out: the students' own paint reveal, painting from her whole
- * collection, drafts included, in her browser alone. Each press reads the
- * collection as it stands, so an edit is painted the next time it comes up.
- */
-function TryOut({ accountId, token, rows }: { accountId: string; token: string; rows: Expression[] }) {
-  const [source] = useState(() => tryOutExpressions(accountId, rows));
-  useEffect(() => source.update(rows), [source, rows]);
-  return <StudentExpressions source={source} studentId={accountId} token={token} />;
-}
 
 export function ExpressionsTab({ token, accountId }: { token: string; accountId: string }) {
   const [expressions, setExpressions] = useState<Expression[] | null>(null);
@@ -111,7 +99,7 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
           Add an expression
         </button>
       </div>
-      {rows.length ? <TryOut accountId={accountId} rows={rows} token={token} /> : null}
+      {rows.length ? <TeacherExpressionTryOut accountId={accountId} rows={rows} token={token} /> : null}
       <ul className="booking-payment-facts teacher-expressions__help">
         {openToStudents === true ? <li>Your students can pick published expressions from Your lessons.</li> : null}
         {openToStudents === false ? <li>Only you can see expressions for now.{rows.length ? " Paint one above to see what your students will get." : ""}</li> : null}

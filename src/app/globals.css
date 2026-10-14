@@ -1,5 +1,6 @@
 :root {
-  --blue: #2c54aa;
+  /* One brand blue, shared by the footer, wordmark and interface. */
+  --blue: var(--blue-deep);
   --blue-deep: #203e82;
   --green: var(--blue);
   --green-deep: var(--blue-deep);
@@ -9794,6 +9795,8 @@ dialog[open]::backdrop {
 /* The section holds the focus while "Paint another" paints (the reading is out of reach), with no ring of its own. */
 .student-expressions:focus { outline: none; }
 .student-expressions { position: relative; container: expressions / inline-size; width: 100%; min-width: 0; margin-top: 1.5rem; padding: var(--pad-card); border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet); }
+.expression-page-link { display: flex; justify-content: flex-end; margin: 0.5rem 0 0; font-size: 0.78rem; }
+.expression-page-link a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blue-deep); text-underline-offset: 0.2em; }
 .expression-reading__note { margin: 0; font-size: 0.8rem; line-height: 1.6; text-wrap: balance; }
 .student-expressions > .expression-reading__note { text-align: center; }
 

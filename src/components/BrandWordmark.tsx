@@ -13,7 +13,7 @@ type WordmarkStyle = CSSProperties & {
 
 /**
  * The hand-lettered business-card wordmark is used as an alpha mask so the
- * original lettering stays crisp while it can switch between green and cream.
+ * original lettering stays crisp while it can switch between blue and cream.
  * The priority prop is retained for call-site compatibility; a CSS mask does
  * not participate in image loading priority.
  *

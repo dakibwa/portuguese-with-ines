@@ -1,0 +1,18 @@
+.idioms-page { display: flex; flex-direction: column; min-height: 100svh; }
+.idioms-main { flex: 1; width: 100%; max-width: 110rem; margin-inline: auto; padding: clamp(1rem, 3vw, 3rem); }
+.idioms-workspace { min-width: 0; }
+.idioms-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; color: var(--blue-deep); font-size: 0.85rem; }
+.idioms-toolbar > a { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 44px; color: inherit; text-underline-offset: 0.2em; }
+.idioms-account { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; font-weight: 600; }
+.idioms-account > span { overflow-wrap: anywhere; }
+.idioms-account .account-avatar { flex: 0 0 2rem; width: 2rem; height: 2rem; font-size: 0.85rem; }
+.idioms-main .student-expressions--page { margin: 0; }
+.idioms-state { max-width: 34rem; margin: 2rem auto; text-align: center; }
+.idioms-state p { margin: 0 0 1rem; }
+.idioms-main .auth-panel { margin-block: 1rem; }
+.idioms-main .auth-panel h2 { font: 400 clamp(1.9rem, 4.6vw, 2.4rem)/1.1 var(--display); }
+@media (max-width: 30rem) {
+  .idioms-account > span { max-width: 7rem; }
+  .idioms-toolbar { gap: 0.75rem; font-size: 0.75rem; }
+  .idioms-main .student-expressions--page { padding: 0; border: 0; background: none; }
+}

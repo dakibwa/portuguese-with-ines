@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { ExpressionExamples, ExpressionExtras, ExpressionMeanings } from "@/components/expressions/ExpressionCard";
 import { ExpressionPainting, type ExpressionPaintingHandle, type PaintingStart } from "@/components/expressions/ExpressionPainting";
 import { FACTS_OPEN, OPEN_EASE, openDuration } from "@/components/expressions/painter";
@@ -26,8 +27,10 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
  * `source` replaces the Worker: Inês's try-out paints from her own collection
  * in her browser, and `studentId` is then her account, for her colours.
  */
-export function StudentExpressions({ studentId, token, source }: { studentId: string; token: string; source?: ExpressionSource }) {
+export function StudentExpressions({ studentId, token, source, fullPage = false }: { studentId: string; token: string; source?: ExpressionSource; fullPage?: boolean }) {
   const [collection, setCollection] = useState<Collection | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [paints, setPaints] = useState<Paints | null>(null);
   /**
    * The paint being painted, from the press until the reading opens (or the
@@ -63,6 +66,9 @@ export function StudentExpressions({ studentId, token, source }: { studentId: st
   useEffect(() => {
     active.current = true;
     let current = true;
+    setCollection(null);
+    setPaints(null);
+    setLoadError("");
     // Expressions are a gift beside the lessons, never in their way: if they
     // cannot be read, the section stays away rather than raising an alarm.
     (source ?? workerExpressions(token)).load().then((value) => {
@@ -70,13 +76,15 @@ export function StudentExpressions({ studentId, token, source }: { studentId: st
       const shown = value.expression ? paintFor(studentId, value.expression.id) : null;
       setPaints({ shown, next: nextPaint([shown]) });
       setCollection(value);
-    }).catch(() => {});
+    }).catch((caught) => {
+      if (current && readSession() === token && fullPage) setLoadError(caught instanceof Error ? caught.message : "Expressions couldn’t be loaded.");
+    });
     return () => {
       current = false;
       active.current = false;
       window.clearTimeout(settle.current);
     };
-  }, [studentId, token, source]);
+  }, [studentId, token, source, fullPage, loadAttempt]);
 
   // The card grows or shrinks from its last height, never jumping: a new
   // reading opening as the painted sheet closes round its phrase in the same
@@ -190,7 +198,13 @@ export function StudentExpressions({ studentId, token, source }: { studentId: st
   }
 
   // Nothing published yet, or nothing to read: leave the lesson workspace clear.
-  if (!collection || !collection.hasPublished || !paints) return null;
+  if (!collection || !paints) return fullPage ? loadError ? (
+    <div className="idioms-state" role="alert">
+      <p>{loadError}</p>
+      <button className="button button--outline button--compact" type="button" onClick={() => setLoadAttempt((value) => value + 1)}>Try again</button>
+    </div>
+  ) : <p className="idioms-state" role="status">Loading expressions…</p> : null;
+  if (!collection.hasPublished) return fullPage ? <p className="idioms-state" role="status">Expressions aren’t available yet.</p> : null;
   const expression = collection.expression;
   const start: PaintingStart = expression
     ? { kind: "show", phrase: expression.expression, id: expression.id, paint: paints.shown ?? paints.next }
@@ -209,7 +223,7 @@ export function StudentExpressions({ studentId, token, source }: { studentId: st
     </div>
   );
   return (
-    <section className="student-expressions" aria-labelledby="student-expressions-title" ref={section} tabIndex={-1}>
+    <section className={`student-expressions${fullPage ? " student-expressions--page" : ""}`} aria-labelledby="student-expressions-title" ref={section} tabIndex={-1}>
       <h2 className="visually-hidden" id="student-expressions-title" lang="pt-PT">{TITLE}</h2>
       <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
       {collection.canPick || expression ? (
@@ -243,6 +257,7 @@ export function StudentExpressions({ studentId, token, source }: { studentId: st
           )}
         </div>
       ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
+      {!fullPage ? <p className="expression-page-link"><Link href="/idioms/">Open full page</Link></p> : null}
     </section>
   );
 }

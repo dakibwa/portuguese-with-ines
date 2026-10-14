@@ -202,7 +202,9 @@ is distinct from an empty collection. Nothing of the collection is cached in
 browser storage; her try-out (the students' paint reveal just under her Add an expression button,
 painting her whole collection, drafts included) keeps only the IDs she has
 painted this round on her device, and it never calls the student endpoints or
-writes to the Worker.
+writes to the Worker. `Open full page` opens the same painting and reading at
+`/idioms/`, under the shared site header. It checks the signed-in account before
+loading her collection and links back to the Expressions tab.
 
 The migration includes 52 drafts, preserving the original expression IDs,
 Portuguese meaning, literal English, idiomatic English equivalent (in
@@ -237,7 +239,8 @@ release: the Worker deploys first (the release's `worker` job, or
 `npm run worker:deploy` by hand). Setting it back to `"0"` closes them again
 without touching anyone's history.
 
-Once open, a signed-in student can pick a published expression below Your lessons. The
+Once open, a signed-in student can pick a published expression below Your lessons
+or at `/idioms/`, reached from that card's `Open full page` link. The
 server chooses randomly from that student's unseen published entries. Different
 students can receive the same expression. Teachers use the private preview in
 Expressions; neither anonymous callers nor teacher sessions can draw.
@@ -273,7 +276,10 @@ controlled 503 on the affected endpoint while the rest of the portal works.
 
 The content inventory, original schema and feature map are in
 [Expressions: source and scope](docs/expressions-stage-1.md). A public Expressões
-page and optional home-page expression remain plan only. Multilingual student
+page and optional home-page expression remain plan only. `/idioms/` is an
+authenticated painting page: teachers use their local try-out, students use the
+same feature-gated endpoints, and signed-out visitors sign in first. It adds no
+anonymous collection access or main-menu item. Multilingual student
 contributions and a weekly selection policy are also outside this change.
 
 ## Teacher calendar
@@ -367,16 +373,18 @@ Lessons only belong to students (13 October 2026, Dan: no loose lessons).
 `POST /admin/bookings` names the student by `studentId` (their account, which
 works for a student with no email yet) or, for older callers, by `email`; one
 who isn't on the site is refused ("Add them as a student first.", 404), and
-students come from `POST /admin/students`. The page's one student profile
-(14 October 2026, Dan) is what a student's card, its `Add a lesson` button,
-the end of `Add a student` and a free time's `Add a lesson here` all open, the
-latter asking whose lesson first. The Students card's Add a lesson opens the
-profile with the lesson calendar already expanded. It shows their details (`Edit details` brings
-every field out in place), their price, an `Add a lesson` form (online or in
-Porto, once or weekly for 4, 6 or 8 weeks or until stopped), `Send welcome
-email` where it applies, and their lessons. All teacher actions still use the
-authenticated admin endpoints and their existing booking, payment and email
-safeguards.
+students come from `POST /admin/students`. Each student's row is their profile
+through onboarding and regular use (14 October 2026, Dan). Its name opens
+all-time lesson history in place; details, price and lesson creation use the
+same row. Completed setup becomes normal profile controls. A new student or a
+free timetable time can start in the creation/student-choice dialog, then opens
+the chosen row's lesson calendar with the selected date and time preserved.
+History matches the linked student ID first and only falls back to an exact
+email for older unlinked lessons; stale requests and session changes cannot
+show another student's history. Default teacher-list splats derive from the
+student ID without replacing a chosen mark or writing account data.
+All teacher actions still use the authenticated admin endpoints and their
+existing booking, payment and email safeguards.
 
 Onboarding (13 October 2026, Dan) lets Inês set a student up before they hear
 anything. `POST /admin/students` takes `email`, `name` and optional `phone`,
