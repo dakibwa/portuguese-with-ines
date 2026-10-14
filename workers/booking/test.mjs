@@ -1544,6 +1544,24 @@ await test("an email's time reads as its date, then its time and clock, without 
   const { html, text } = renderEmail({ heading: "Lesson", intro: "Hi", hero: "Tuesday, 13 October 2026 at 17:00, Porto time", rows: [], footer: "" });
   assert.ok(!/ at 17:00/.test(html) && !/ at 17:00/.test(text));
   assert.match(text, /Tuesday 13 October 2026\n17:00 · Porto time/);
+
+  // The same layout with Inês's labelled fact, a one-line note and two facts at the foot (14 October 2026).
+  const lesson = renderEmail({
+    heading: "Lesson", intro: "Hi", hero: "Wednesday, 14 October 2026 at 12:00, Porto time",
+    heroNote: { label: "Jessica’s time", value: "Wed 14 Oct, 04:00 · Los Angeles time" },
+    rows: [], callout: "Refunded in full.",
+    footer: ["Free to change or cancel until Wed 14 Oct, 19:00.", "After that, there’s a €5 late change fee."]
+  });
+  // The text part reads as it always did: the facts as sentences, the note on a line of its own.
+  assert.match(lesson.text, /Free to change or cancel until Wed 14 Oct, 19:00\. After that, there’s a €5 late change fee\./);
+  assert.match(lesson.text, /\nJessica’s time: Wed 14 Oct, 04:00 · Los Angeles time\n/);
+  // One dab for the note and one per fact, the amount in coral, and the date the only panel.
+  assert.equal(lesson.html.match(/dab-(blue|lavender|coral|ink)\.png/g).length, 3);
+  assert.match(lesson.html, /color:#b43a26;white-space:nowrap">€5</);
+  assert.equal(lesson.html.split("background:#eeecf9").length - 1, 1);
+  // A date, a time and its clock, and a number and its word never break inside.
+  assert.ok(lesson.html.includes("Wed&nbsp;14&nbsp;Oct,&nbsp;19:00."));
+  assert.ok(lesson.html.includes("14&nbsp;October&nbsp;2026"));
 });
 
 await test("a welcome tells a weekly run as one line, its gaps and a changed lesson as their own, and says how many it leaves out", () => {

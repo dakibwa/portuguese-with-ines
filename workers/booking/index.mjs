@@ -353,9 +353,9 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   // lifted out of the detail table into its own panel rather than being the
   // second row of five.
   const hero = portoTime;
-  // "Jessica’s time: Tue 13 Oct, 01:00 · Los Angeles time", named and short.
+  // "Jessica’s time" over "Tue 13 Oct, 01:00 · Los Angeles time", a labelled fact in the panel.
   const teacherHeroNote = studentTime
-    ? `${row.student_name.split(" ")[0]}’s time: ${formatShort(start, studentZone)} · ${zoneName(studentZone, start)}`
+    ? { label: `${row.student_name.split(" ")[0]}’s time`, value: `${formatShort(start, studentZone)} · ${zoneName(studentZone, start)}` }
     : "";
   // Her words go to a student who is emailed; one who is held is not.
   const cancellationMessage = event === "cancelled" && byTeacher && !held
@@ -431,9 +431,9 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
 
   // Older already-paid bookings lock inside the window instead of paying.
   // Current saved-card bookings stay changeable there for EUR 5.
-  const paidChangeFooter = `Move or cancel free until ${notice} before the lesson. After that, it can't be changed or refunded.`;
-  const savedCardChangeFooter = `Move or cancel free until ${notice} before the lesson. After that, moving or cancelling costs ${fee}. A no-show costs ${fee} instead of the lesson price.`;
-  const unpaidChangeFooter = `Need to change it? Use the link above. It's free until ${notice} before the lesson; after that it costs ${fee}.`;
+  const paidChangeFooter = [`Move or cancel free until ${notice} before the lesson.`, "After that, it can't be changed or refunded."];
+  const savedCardChangeFooter = [`Move or cancel free until ${notice} before the lesson.`, `After that, moving or cancelling costs ${fee}.`, `A no-show costs ${fee} instead of the lesson price.`];
+  const unpaidChangeFooter = ["Need to change it? Use the link above.", `It's free until ${notice} before the lesson; after that it costs ${fee}.`];
   const refundNote = wasRefunded
     ? `Refunded in full: your ${formatEuros(row.amount_cents ?? lessonType.price_cents)} is on its way back to your card and usually shows within a few days.`
     : "";
@@ -452,7 +452,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
             : `Olá ${row.student_name.split(" ")[0]}, Inês has booked this lesson for you. A calendar invitation is attached.`,
           callout: "",
           footer: welcome
-            ? `It's free to change until ${notice} before the lesson; after that it costs ${fee}. ${WELCOME_FOOTER}`
+            ? [`It's free to change until ${notice} before the lesson; after that it costs ${fee}.`, ...WELCOME_FOOTER]
             : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
         }
       : {
@@ -694,11 +694,11 @@ function reminderEmail({ row, lessonType, settings, manageUrl, meetingLink, meet
   const cutoff = formatShort(new Date(start.getTime() - settings.minimumNoticeHours * 3600000), zone);
   // The cut-off is where the change policy starts charging, so it is always the
   // moment that is true; no "today" or "tomorrow" anywhere.
-  const footer = `Free to change or cancel until ${cutoff}. ${
+  const footer = [`Free to change or cancel until ${cutoff}.`,
     row.payment_status === "paid"
       ? "After that, it can’t be changed or refunded."
       : `After that, there’s a ${formatEuros(settings.sameDayChangeFeeCents)} late change fee.`
-  }`;
+  ];
   const manage = { label: "Change or cancel this lesson", url: manageUrl };
 
   return {
@@ -902,8 +902,10 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
             : row.location === "online"
               ? (forTeacher ? "Meet link not ready yet" : "Online link will appear in your booking")
               : placeLabel(row),
-          url: meetingUrl(row) }))
-      : [{ label: "Dates", value: rows.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n") }])
+          url: meetingUrl(row),
+          lesson: true,
+          quiet: !meetingUrl(row) && row.location === "online" }))
+      : [{ label: "Dates", value: rows.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n"), dates: true }])
   ];
   const studentRowsOn = rowsOn(studentClock);
   const teacherRows = rowsOn(PORTO, true);
@@ -941,8 +943,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   }
   const seriesFee = formatEuros(settings.sameDayChangeFeeCents);
   const seriesFooter = seriesOnCard
-    ? `Move or cancel any single lesson free until ${settings.minimumNoticeHours} hours before it. After that, moving or cancelling costs ${seriesFee}. A no-show costs ${seriesFee} instead of the lesson price.`
-    : `Moving or cancelling a lesson is free until ${settings.minimumNoticeHours} hours before it; after that it costs ${seriesFee}.`;
+    ? [`Move or cancel any single lesson free until ${settings.minimumNoticeHours} hours before it.`, `After that, moving or cancelling costs ${seriesFee}.`, `A no-show costs ${seriesFee} instead of the lesson price.`]
+    : [`Moving or cancelling a lesson is free until ${settings.minimumNoticeHours} hours before it; after that it costs ${seriesFee}.`];
   const moved = reason === "moved";
 
   const sends = [];
@@ -988,7 +990,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
           rows: studentSeriesRows,
           steps: welcome && !moved ? welcomeSteps(welcome) : null,
           action: welcome ? welcomeAction(welcome) : { label: "See all your lessons", url: siteUrl(env, "/book/?view=lessons") },
-          footer: welcome ? `${seriesFooter} ${WELCOME_FOOTER}` : seriesFooter
+          footer: welcome ? [...seriesFooter, ...WELCOME_FOOTER] : seriesFooter
         }
       }).then(async result => {
         if (result.ok && !result.skipped) await Promise.all(rows.map(row => markMeetingNotified(env, row)));
@@ -1158,7 +1160,7 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
         callout: "",
         hero: "",
         heroNote: "",
-        rows: [{ label: `Cancelled, ${zoneName(studentClock, new Date(first.starts_at))}`, value: datesOn(studentClock) }],
+        rows: [{ label: `Cancelled, ${zoneName(studentClock, new Date(first.starts_at))}`, value: datesOn(studentClock), dates: true }],
         action: null,
         footer: "Booking is always open on portuguesewithines.com."
       }
@@ -1186,7 +1188,7 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
           rows: [
             { label: "Student", value: `${first.student_name}\n${shownEmail(first.student_email)}` },
             nifRow,
-            { label: "Cancelled", value: datesOn(PORTO) }
+            { label: "Cancelled", value: datesOn(PORTO), dates: true }
           ],
           action: null,
           footer: "Sent automatically by the booking system."
@@ -1315,7 +1317,7 @@ function welcomeAction(welcome) {
   return { label: welcome.card ? "Sign in and add card" : "Sign in, no password needed", url: welcome.url };
 }
 
-const WELCOME_FOOTER = "The button lasts 14 days. Later, press Sign in on the website, then “Email me a sign-in link”.";
+const WELCOME_FOOTER = ["The button lasts 14 days.", "Later, press Sign in on the website, then “Email me a sign-in link”."];
 
 /** How many lines of lessons a welcome carries before the rest are left to the website. */
 const WELCOME_LESSON_LINES = 12;
@@ -1661,7 +1663,7 @@ async function confirmStudentCard(env, session) {
           : "Lessons you add for them from now on are charged to their card after each one.",
         callout: "",
         rows: onCard?.length
-          ? [{ label: "Now on their card", value: onCard.map((row) => formatInZone(new Date(row.starts_at), PORTO)).join("\n") }]
+          ? [{ label: "Now on their card", value: onCard.map((row) => formatInZone(new Date(row.starts_at), PORTO)).join("\n"), dates: true }]
           : [],
         action: { label: "Open your schedule", url: siteUrl(env, "/schedule/") },
         footer: "Sent automatically by the booking system."
