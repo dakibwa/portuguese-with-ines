@@ -53,6 +53,15 @@ Use these names in review so recurring problems are easy to recognise:
 - **Intermediate-width squeeze:** preserving a wide desktop composition after
   headings, controls, or the seven-column calendar have started to clip or
   wrap unnaturally.
+- **Stranded action:** a button, pager, tag or short label dropping onto a
+  line of its own, or leaving a half-empty row, where it would share the row
+  with its neighbours; or a phone on its side or a short window keeping an
+  upright phone's tall bands, so the task starts below the first screen. Put
+  each thing where the space is: pair what fits, let a lone action span what
+  it leads, and slim headers and bands on short screens (13 October 2026,
+  Dan: "the places of where stuff sits can be more efficient like the buttons
+  and stuff rather than running onto new lines unnecessarily"). Check a page
+  upright and sideways on a phone, both ways on a tablet, and on desktop.
 - **Decorative motion:** adding ambient loops, click delay, entrance
   choreography for a page's text, controls or sections as it loads, or any
   movement that makes a reader wait or does not explain a state change. The
@@ -168,8 +177,10 @@ the same identity or action:
   supporting line describes one-to-one lessons, online or in person. `Book a lesson` appears
   once. `How I teach` and `Lessons and prices` sit beside it as quieter outline
   buttons rather than plain links or a second strip beneath the hero; on a
-  phone they share a row beneath it, and below 414 px each takes the full
-  width so neither label wraps. The blue
+  phone they share a row beneath it, a size smaller below 414 px and sized to
+  their labels below 360 px, so neither label wraps. Wherever the three do not
+  fit on one row, `Book a lesson` spans the pair beneath it rather than
+  dangling alone (13 October 2026, Dan). The blue
   hero has no painted field of its own: the heading, its rule and the actions
   have the panel to themselves (the cream wave tried on 8 October 2026 was
   removed at Dan's request on 9 October);
@@ -188,7 +199,8 @@ the same identity or action:
 - booking and privacy information belong to the booking context, with the
   minimum useful text visible. Sign-up itself carries none of it: the booking's
   sign-in card shows `Almost there` as the step's only visible heading, then
-  Google sign-in and the account form, with no data-use summary, privacy
+  Google sign-in and the account form (its fields two to a row where the card
+  has a tablet's or a sideways phone's whole width), with no data-use summary, privacy
   details, Google password note or consent checkbox. The account form ends
   with an optional NIF field labelled `NIF (optional, for your receipts)`, with no
   note beneath it (10 October 2026, at Dan's request);
@@ -239,7 +251,8 @@ Dan's 22 September review tightened the public pages:
 - the footer hugs its content. On desktop it is one row, no taller than about
   120 px: the wordmark, the four destinations, a thin divider, then `Terms &
   privacy` at the right. On phones the destinations live behind the footer
-  `Menu`, with `Terms & privacy` beneath it;
+  `Menu`, with `Terms & privacy` beside it where both fit and beneath it on
+  the narrowest phones (13 October 2026, Dan);
 - banners give the page back to the task, and their art sits halfway down the
   band rather than up in a corner. The Lessons banner is about 230 px on
   desktop; on phones it becomes a lavender band with the splat in a
@@ -250,7 +263,9 @@ Dan's 22 September review tightened the public pages:
   the booking banner keeps
   its splat at the right in a band of about 124 px, without an editorial rule,
   its two-line `Book a Lesson` or `Your Lessons` set close as one handwritten
-  block;
+  block; on a phone turned sideways it keeps the wide screens' one line in a
+  band of about 60 px, so the booking's choices start on the first screen (13
+  October 2026);
 - the three Lessons cards each have their own squiggle outline, and their own
   splat comes in large from the card's top-right corner, cropped by its edge;
   once landed it moves only to turn a little while its card is pointed at. The
@@ -262,7 +277,7 @@ Dan's 22 September review tightened the public pages:
   its own (it lifts slightly and fills) and the corner splat turns a few
   degrees. The closing blue card
   keeps its two buttons on the right, stacked when the width tightens, and
-  moves them beneath the copy only on phones;
+  moves them beneath the copy only on phones, side by side where both fit;
 - the header logo starts on the page's left edge, like the footer logo and the
   headings beneath it, rather than floating inside a wider box;
 - no handwritten descender may cross other text. Beth Ellen sits low in its
@@ -389,7 +404,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   Porto time, saved only with `Save hours off`; a failed save keeps the draft.
   `Remove hours off` clears that date's breaks. Making days available removes
   only the whole-day block and keeps their hours off and weekly rules. On a
-  phone the card rides at the foot of the screen once a day is chosen.
+  phone held upright the card rides at the foot of the screen once a day is
+  chosen; held sideways, and on a tablet, it sits beside the month (beneath
+  it on the smallest), never over it.
   The month marks whole days off and booked lessons, without repeating weekly
   unavailability or partial blocks from the timetable.
   Time off prevents new bookings; existing lessons stay until she changes them.
@@ -451,10 +468,13 @@ usual lesson starts and days off; avoid a wall of administration forms.
   to issue · €50`) and what is still to be paid, a lilac `Download CSV`, then
   one plain table row per amount (lesson, student, NIF or `Consumidor final`,
   what it is for, amount, and a pill: `Paid by card`, `Paid by hand`,
-  `Payment due`, `Being charged`, `Refunded`). On a phone each row is a small
-  cream card. Rows carry their id and figures as data attributes, so her
-  automation can read the table, the CSV or the Worker's JSON alike. On a
-  phone the tools wrap into three-column rows, with Google Meet across the final row.
+  `Payment due`, `Being charged`, `Refunded`). On a phone, and up to 720 px,
+  each row is a small cream card, two across where they fit, its NIF and what
+  it is for sharing a line. Rows carry their id and figures as data attributes, so her
+  automation can read the table, the CSV or the Worker's JSON alike. Up to a
+  small tablet, held either way, the tools sit in two rows (her week's three,
+  then the rest with Meet's logo in the small last place), so no tab hides
+  past the edge; wider, all seven and `Sign out` share one row.
 - Keep `Sign out` beside the tools bar. `Students` holds the student
   cards, each a profile (splat, name, address and an arrow into their history)
   over dabs for where they are, their next lesson and their own price when
@@ -743,16 +763,20 @@ before, is not offered the trial (Inês signing in, or an account made and never
 booked, does not count); that is settled as booking opens, so creating an account at the
 confirmation never takes away the trial being booked. The bar's head offers
 `Your lessons` to a signed-in student and a coral `Already booked? Sign in`
-(`Sign in` alone on a phone) to a returning browser. A first-time visitor sees
+(`Sign in` alone on a phone) to a returning browser, leading the choices' own
+row wherever both fit. A first-time visitor sees
 no sign-in there, since booking asks for an account only at the confirmation;
 a quiet `Already booked? Sign in` line beneath the calendar still serves a
 student on a new browser. Signing in to view lessons shows the `Your account`
 card on its own, with a small `Back` above its corner. On wide screens the
-groups carry small `Lesson`, `Where`, `Length` and `Repeat` labels; on a phone
-the options name themselves and the labels remain for assistive technology.
+groups carry small `Lesson`, `Where`, `Length` and `Repeat` labels; on a phone,
+upright or sideways, the options name themselves and the labels remain for
+assistive technology.
 Each group starts as wide as its options need and a row shares out what is
 left, so a wide screen fills the line and a narrower one moves a group down;
-option labels never wrap. Below 361 px the four repeat options sit two by
+option labels never wrap. Weekly's four groups pair up, the lesson with its
+place and the length with its weeks, wherever three would fit a row and leave
+the weeks alone beneath them (13 October 2026). Below 361 px the four repeat options sit two by
 two.
 
 Choosing a free day keeps the four weeks in view on wide screens, with the day
@@ -820,6 +844,10 @@ Preserve these desktop and mobile states:
   for assistive technology); on a phone `Book` always shares the name's row,
   the name cut short first if it must be; the banner above already says Your lessons, so
   the card's own title is for screen readers, as on a wide card.
+  On a phone on its side, or any window as short and narrower than 1100px
+  (13 October 2026, Dan), the name's menu, the months with their `?`, the
+  arrows and `Book` share one header row, so the four weeks start a row
+  higher; a tall screen keeps two.
   On a wide card each booked day spells its lessons out (9 October 2026, at
   Dan's request): the time each runs from and until (`09:00–10:00`), after a
   globe for online or a little person for in Porto, both named in the key. The
@@ -873,7 +901,9 @@ Preserve these desktop and mobile states:
   where they were and the thumb on the card showing; on a narrower one the
   title centred at the top (10 October 2026, at Dan's request) and the name's
   menu beneath it, which holds the way back to Your lessons. History has two
-  readable columns of records on wide desktop and one on mobile; order records
+  readable columns of records wherever the longest date and time stay on one
+  line (from an 840px card: a tablet on its side, the largest phones on
+  theirs, and desktop) and one on mobile; order records
   by when each lesson ended or was cancelled, newest first, so cancelled
   future dates do not bury recently completed lessons.
   Your details reads as a short list of what is saved rather than a form (10
@@ -973,9 +1003,10 @@ Preserve these desktop and mobile states:
   page, so nothing booked is out of sight without a sign. On a wider card each
   week starts with its month (`OCT`), in ink where a month begins and lilac ink
   where it carries on, and a month that begins part-way through a week marks
-  its 1st (`1 NOV`); on a phone's lessons card the header names the months and
-  every 1st carries its own, so the seven days take the card's whole width (13
-  October 2026, Dan: "less cramped"). There are no caption rows across the
+  its 1st (`1 NOV`); on a phone, on the lessons card and the booking calendar
+  alike, the header names the months and every 1st carries its own, so the
+  seven days take the card's whole width (13 October 2026, Dan: "less
+  cramped", and the same logic on every screen). There are no caption rows across the
   grid. A booked day's times are sized by the day itself, so they always sit
   inside its splat at any width. The key sits beneath the weeks it explains,
   on a phone in two short columns, the kinds of lesson on the left and the
@@ -1189,8 +1220,8 @@ And the drawing:
 
 - anything to read before trying again sits in one coral panel, on the
   student pages and Inês's alike, its ways on (`Try again`, `Message Inês`,
-  `Sign in`) after the message as small outline buttons side by side (13
-  October 2026); good news is the lavender panel with a 20 px tick, including
+  `Sign in`) after the message as small outline buttons side by side, on the
+  message's own row across a wide booking page (13 October 2026); good news is the lavender panel with a 20 px tick, including
   a saved profile field;
 - secondary actions share one outline (`Keep lesson` and `Manage weekly
   lessons` match in one dialog), and going back is always the small coral

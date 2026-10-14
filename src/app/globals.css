@@ -1410,6 +1410,29 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   gap: 0.9rem;
 }
 
+/* Where the three do not fit on one row (38.25rem is their width together),
+   Book a lesson spans the pair beneath it, as on a phone, rather than
+   dangling alone above a longer row. */
+.home-hero__copy {
+  container-type: inline-size;
+}
+
+@media (min-width: 561px) {
+  @container (max-width: 38.25rem) {
+    .home-hero__actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      width: fit-content;
+      max-width: 100%;
+    }
+
+    .home-hero__links {
+      display: grid;
+      grid-template-columns: auto auto;
+    }
+  }
+}
+
 @media (max-width: 560px) {
   .home-hero__actions {
     align-items: stretch;
@@ -1430,8 +1453,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   }
 }
 
-/* Narrower, "Lessons and prices" would break onto a second line beside a
-   one-line "How I teach", so each takes the full width instead. */
+/* Narrower, the actions take the full width of the hero. */
 @media (max-width: 413px) {
   .home-hero__actions {
     align-self: stretch;
@@ -1443,6 +1465,15 @@ html:active-view-transition-type(document)::view-transition-new(root) {
     padding-inline: 0.6rem;
     font-size: 0.64rem;
     letter-spacing: 0.08em;
+  }
+}
+
+/* At 320px "Lessons and prices" still broke onto a second line in an equal
+   half, so below 360px the pair takes widths to suit their labels and both
+   stay on one line. */
+@media (max-width: 359px) {
+  .home-hero__links {
+    grid-template-columns: auto auto;
   }
 }
 
@@ -2035,6 +2066,20 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 
 }
 
+/* Between a phone and three across, the trial runs the full width and the
+   two lengths sit side by side beneath it, rather than three cards each the
+   width of the page with an empty half beside every line. */
+@media (min-width: 641px) and (max-width: 900px) {
+  .lesson-programme__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+
+  .lesson-product--trial {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 820px) {
   /* Title and splat side by side: one band, not a lilac screen and a blue one. */
   .lessons-hero {
@@ -2123,10 +2168,45 @@ html:active-view-transition-type(document)::view-transition-new(root) {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
+  /* Beneath the copy, side by side wherever both labels fit, as on a phone
+     held sideways; stacked, each the full width, only where they do not. */
   .lessons-closing__actions {
     display: grid;
     grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  }
+}
+
+/*
+ * Three across from 901px, or alone at 320px, a card is about 250px inside,
+ * and its button label broke onto a second line. There the labels set a
+ * little tighter, so each button stays on one line. The corner splat steps
+ * back a little and the name stops at its edge, so a name that still needs
+ * two lines takes them rather than running into the splat.
+ */
+.lesson-product {
+  container-type: inline-size;
+}
+
+@container (max-width: 252px) {
+  .lesson-product__head {
+    padding-right: 4.625rem;
+  }
+
+  .lesson-product__head .eyebrow {
+    letter-spacing: 0.12em;
+  }
+
+  .lesson-product__mark {
+    top: -26px;
+    right: -26px;
+    width: 100px;
+    height: 100px;
+  }
+
+  .lesson-product .lesson-product__link {
+    padding-inline: 0.6rem;
+    letter-spacing: 0.08em;
   }
 }
 
@@ -2252,9 +2332,20 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   color: var(--coral-action);
 }
 
+/* The number keeps its width when a label wraps, so every label starts on
+   one edge. */
 .faq-index a span {
   width: 42px;
+  flex: none;
   color: var(--lavender-ink);
+}
+
+/* Beside the questions below 1024px the rail is narrow: a shorter right
+   inset keeps more of its labels on one line. */
+@media (min-width: 821px) and (max-width: 1023px) {
+  .faq-index {
+    padding-right: 1.25rem;
+  }
 }
 
 /* Below the list, in the flow: one section at a time can be shorter than the
@@ -3164,6 +3255,22 @@ textarea,
   gap: 0.6rem;
 }
 
+/* A returning browser's `Already booked? Sign in` leads the choices' own row
+   wherever both fit, level with their controls, and keeps a row above them
+   where they don't, rather than always taking a line to itself. */
+@media (min-width: 561px) {
+  .booking-bar:has(> .booking-bar__head .booking-bar__sign-in) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.85rem 1.25rem;
+  }
+
+  .booking-bar:has(> .booking-bar__head .booking-bar__sign-in) > .booking-bar__choices {
+    flex: 1 1 auto;
+  }
+}
+
 /* Adding a lesson or changing one: the lessons so far, and the way back. */
 /* Inside the bar they sit on its sheet, so they are raised like the rest. */
 .booking-bar--progress .booking-selection-summary {
@@ -3217,6 +3324,35 @@ textarea,
 
 .booking-bar__group--repeat {
   flex-grow: 4;
+}
+
+/* Weekly's four groups pair up, the lesson with its place and the length with
+   its weeks, wherever three would fit a row and leave the weeks alone on a
+   second. Each pair shares its row in proportion to what its options need. */
+@container booking (min-width: 700px) and (max-width: 1139.98px) {
+  .booking-bar:not(.booking-bar--review) .booking-bar__choices:has(> .booking-bar__group--repeat) > .booking-bar__group {
+    flex-basis: calc(48% - 0.5rem - 1px);
+  }
+
+  .booking-bar:not(.booking-bar--review) .booking-bar__choices:has(> .booking-bar__group--repeat) > .booking-bar__group--kind {
+    flex-basis: calc(52% - 0.5rem - 1px);
+  }
+
+  .booking-bar:not(.booking-bar--review) .booking-bar__choices:has(> .booking-bar__group--repeat) > .booking-bar__group:where(:nth-child(3)) {
+    flex-basis: calc(40% - 0.5rem - 1px);
+  }
+
+  .booking-bar:not(.booking-bar--review) .booking-bar__choices:has(> .booking-bar__group--repeat) > .booking-bar__group--repeat {
+    flex-basis: calc(60% - 0.5rem - 1px);
+  }
+}
+
+/* A returning student is not offered Trial, so the lesson needs less room
+   and all four groups fit one row from here. */
+@container booking (min-width: 1070px) and (max-width: 1139.98px) {
+  .booking-bar:not(.booking-bar--review) .booking-bar__choices:not(:has(> .booking-bar__group--kind .segmented--three)) > .booking-bar__group {
+    flex-basis: auto;
+  }
 }
 
 .booking-bar .segmented label {
@@ -3300,11 +3436,17 @@ textarea,
 
   .unified-calendar--booking > .unified-calendar__panel {
     overflow: hidden;
+    transition: padding-inline 420ms var(--motion-ease-in-out);
   }
 
+  /* Waiting, it takes no width at all: its padding and border hung past the
+     calendar's edge and let a tablet's page drift sideways by a few pixels.
+     They ease back in with the column. */
   .unified-calendar--booking > .unified-calendar__panel.unified-calendar__panel--waiting {
     display: block;
     visibility: hidden;
+    border-inline-width: 0;
+    padding-inline: 0;
   }
 
   .unified-calendar--booking > .unified-calendar__panel > .unified-calendar__panel-content {
@@ -4408,9 +4550,11 @@ p.lesson-when > span {
   line-height: 1.4;
 }
 
-/* A small outline button, as every secondary action is, not underlined text. */
+/* A small outline button, as every secondary action is, not underlined text.
+   It starts on the dialog's own left edge, with Change above it, rather than
+   stepped in under the weekly time. */
 .lesson-manage-dialog__series .button {
-  grid-column: 2;
+  grid-column: 1 / -1;
   justify-self: start;
   width: auto;
   min-height: 44px;
@@ -4419,17 +4563,12 @@ p.lesson-when > span {
   font-size: 0.68rem;
 }
 
-/* On a 320px phone the longest labels, "Cancel all booked lessons" and
-   "Manage weekly lessons", broke onto a second line. The weekly choices give
-   up some side padding (each has the row to itself there), and the weekly
-   time's button starts under the repeat mark rather than beside it. */
+/* On a 320px phone the longest label, "Cancel all booked lessons", broke onto
+   a second line. The weekly choices give up some side padding (each has the
+   row to itself there). */
 @media (max-width: 360px) {
   .lesson-manage-dialog__actions--sequence .button {
     padding-inline: 0.5rem;
-  }
-
-  .lesson-manage-dialog__series .button {
-    grid-column: 1 / -1;
   }
 }
 
@@ -4441,6 +4580,40 @@ p.lesson-when > span {
 .lesson-manage-dialog__done {
   width: 100%;
   margin-top: 0.2rem;
+}
+
+/* A phone on its side is about 320-430px tall, and the lesson dialog, capped
+   at 82% of that and 440px wide, hid its own actions below its fold: Manage
+   weekly lessons, Change and Cancel beside the late fee, Done and Pay. There
+   it widens and uses the height the screen has, so each pair of buttons keeps
+   its row and the weekly time sits beside Manage weekly lessons. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .lesson-manage-overlay {
+    padding: 0.75rem;
+  }
+
+  .lesson-manage-dialog {
+    width: min(100%, 600px);
+    max-height: calc(100vh - 1.5rem);
+    max-height: calc(100dvh - 1.5rem);
+    padding-block: 1.1rem;
+  }
+
+  .lesson-manage-dialog__content {
+    gap: 0.8rem;
+  }
+
+  .lesson-manage-dialog__series {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    padding-top: 0.7rem;
+  }
+
+  .lesson-manage-dialog__series .button {
+    grid-column: 3;
+    grid-row: 1;
+    margin-top: 0;
+  }
 }
 
 .managed-lesson__current-time {
@@ -4838,6 +5011,17 @@ p.lesson-when > span {
   white-space: normal;
 }
 
+/* Where the form stacks under the calendar on a wider screen (a phone on its
+   side), it has the change overlay's whole width, and the pair shares one row
+   in equal halves, the longest labels included (Move weekly time, Keep
+   current schedule). Beside the calendar, and on an upright phone, they stay
+   stacked. */
+@container booking (min-width: 480px) and (max-width: 699px) {
+  .unified-calendar__panel .manage-booking__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @container booking (max-width: 680px) {
 
   .booking-selection-summary {
@@ -4871,6 +5055,46 @@ p.lesson-when > span {
 
   .booking-choice-summary__change-short {
     display: inline;
+  }
+}
+
+/* On the narrowest phones a date keeps its time on its own line beside
+   Change, and a heading stays beside its way back: the mark, the button's
+   sides and the lettering each give up a little rather than the time or the
+   last word dropping onto a line of its own. */
+@container booking (max-width: 340px) {
+  .booking-selection-summary {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: 0.6rem;
+  }
+
+  .booking-add-lesson {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+
+  .booking-selection-summary__mark,
+  .booking-add-lesson__mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .booking-provider button.booking-choice-summary__change,
+  .unified-calendar__panel-head .button {
+    padding-inline: 0.75rem;
+    letter-spacing: 0.04em;
+  }
+
+  .booking-choice-summary__copy strong {
+    font-size: 0.875rem;
+  }
+
+  .booking-bar--progress .booking-bar__head {
+    column-gap: 0.6rem;
+  }
+
+  .booking-bar--progress .booking-bar__head .eyebrow {
+    letter-spacing: 0.06em;
   }
 }
 
@@ -4945,6 +5169,26 @@ p.lesson-when > span {
   .calendar-week__month {
     font-size: 0.55rem;
     letter-spacing: 0.04em;
+  }
+}
+
+/* On a phone the booking calendar does as Your lessons does: its header names
+   the months and every 1st carries its own, so the seven days take the card's
+   whole width rather than giving a column to OCT OCT OCT NOV (13 October
+   2026, Dan: the same logic on every screen). */
+@container booking (max-width: 519.98px) {
+  .unified-calendar--booking .calendar-weekdays,
+  .unified-calendar--booking .calendar-week {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .unified-calendar--booking .calendar-weekdays__corner,
+  .unified-calendar--booking .calendar-week__month {
+    display: none;
+  }
+
+  .unified-calendar--booking .calendar-week button em.calendar-week__first {
+    display: block;
   }
 }
 
@@ -5241,6 +5485,30 @@ p.lesson-when > span {
   margin: 0;
 }
 
+/* Stacked on a tablet or a phone turned sideways, the card has the booking's
+   whole width, so its fields sit two to a row (name beside email, password
+   beside NIF) rather than four long fields down a short screen. Notes, alerts
+   and the button keep the full width, and so does a field on its own. */
+@container booking (min-width: 600px) and (max-width: 899.98px) {
+  .booking-confirmation-main .auth-panel__form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    column-gap: 1rem;
+  }
+
+  .booking-confirmation-main .auth-panel__form > :not(label),
+  .booking-confirmation-main .auth-panel__form > label:only-of-type {
+    grid-column: 1 / -1;
+  }
+
+  /* Side by side, the password's larger dots would leave its field a few
+     pixels taller than the one beside it. */
+  .booking-confirmation-main .auth-panel__form input[type="password"] {
+    line-height: 1;
+  }
+}
+
 @container booking (min-width: 900px) {
   /* The calendar step's proportions: the lesson where the calendar was, the
      account or final details where the times were. */
@@ -5344,6 +5612,8 @@ p.lesson-when > span {
   background: var(--coral-action);
   color: white;
   cursor: pointer;
+  /* Where it must take two lines it takes two even ones, never a lone `Pay`. */
+  text-wrap: balance;
 }
 
 .booking-confirm-button:disabled {
@@ -5352,6 +5622,15 @@ p.lesson-when > span {
   color: var(--ink);
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+/* On the narrowest phones `Book 2 lessons & agree to pay` fits one line with
+   a little less room at its sides and between its letters. */
+@container booking (max-width: 340px) {
+  .booking-provider .booking-confirm-button {
+    padding-inline: 0.9rem;
+    letter-spacing: 0.08em;
+  }
 }
 
 /* Booking outcome, and self-service management */
@@ -6059,6 +6338,53 @@ p.lesson-when > span {
   transform: scaleX(1);
 }
 
+/* On its side a phone shows the four places two by two, a little smaller,
+   and the card's two buttons side by side, so Booking and Book a lesson are
+   in view without scrolling the menu. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .nav-mobile__links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-top: 0.2rem;
+    column-gap: 1.75rem;
+  }
+
+  .nav-mobile__link {
+    grid-template-columns: 40px minmax(0, 1fr);
+    min-height: 62px;
+    gap: 0.75rem;
+  }
+
+  .nav-mobile__mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  .nav-mobile__note {
+    font-size: 0.86rem;
+  }
+
+  /* The second row closes the list, as the last link does stacked. */
+  .nav-mobile__link:nth-child(3) {
+    border-bottom: 0;
+  }
+
+  .nav-mobile__cta {
+    margin-top: 0.75rem;
+    margin-bottom: 1rem;
+    padding-top: 0.85rem;
+    padding-bottom: 1rem;
+  }
+
+  .nav-mobile__cta p {
+    margin-bottom: 0.6rem;
+  }
+
+  .nav-mobile__cta-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* /my-lessons */
 
 /* .text-action was written for links, which have no border of their own. On a
@@ -6359,7 +6685,11 @@ button.text-action {
   }
 }
 
-@container booking (min-width: 1040px) {
+/* Two columns of records wherever the longest date and time ("Wednesday
+   30 September 2026, 17:30") still fit on one line beside its mark: a tablet
+   on its side and the largest phones on theirs as well as a desktop, rather
+   than one column of rows with their right half empty. */
+@container booking (min-width: 840px) {
   .my-lessons__history-bookings {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: 1.5rem;
@@ -6714,6 +7044,17 @@ button.text-action {
   letter-spacing: var(--booking-control-tracking);
 }
 
+/* On a phone an open detail's buttons follow the dialog's rule: they share
+   the row in equal parts while both labels fit, and each takes the whole
+   width when they don't, so Cancel never dangles alone under Send
+   confirmation link or Agree & add card. */
+@container booking (max-width: 519.98px) {
+  .my-lessons__edit-actions > :is(.button, .my-lessons__change) {
+    flex: 1 1 0;
+    min-width: fit-content;
+  }
+}
+
 .my-lessons__edit > .my-lessons__details-note {
   grid-column: 1 / -1;
   margin: 0;
@@ -6743,6 +7084,20 @@ button.text-action {
   .my-lessons__fact > .my-lessons__change {
     grid-column: 2;
     grid-row: 1 / span 2;
+  }
+}
+
+/* On the narrowest phones an address, the one long value, broke mid-word
+   beside Change (`ana.martins@e` / `xample.invalid` at 320px,
+   `ana.martins@example.i` / `nvalid` at 390px). There its Change sits beside
+   its name instead, and the address takes the row's whole width beneath. */
+@container booking (max-width: 379.98px) {
+  .my-lessons__fact[data-field="email"] > .my-lessons__change {
+    grid-row: 1;
+  }
+
+  .my-lessons__fact[data-field="email"] > .my-lessons__fact-value {
+    grid-column: 1 / -1;
   }
 }
 
@@ -6907,6 +7262,19 @@ button.text-action {
 
 .my-lessons__code > .my-lessons__details-note {
   margin-top: 0.6rem;
+}
+
+/* On a phone too, Add code waits beside its field, as it does on a wider
+   card. A code is short, so the field keeps room for it, and the space Add
+   code keeps until something is typed no longer opens a gap above the note. */
+@container booking (max-width: 519.98px) {
+  .my-lessons__code > .my-lessons__details-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .my-lessons__code > .my-lessons__details-row .button {
+    min-width: 0;
+  }
 }
 
 .lesson-calendar {
@@ -7651,6 +8019,30 @@ button.text-action {
   margin-bottom: 0.8rem;
 }
 
+/* Across a wide page the message and its ways on share one row, rather than
+   two small buttons at the far left of an empty band beneath one line. */
+@container booking (min-width: 700px) {
+  .booking-steps > .booking-alert {
+    align-items: center;
+  }
+
+  .booking-steps > .booking-alert > svg {
+    margin-top: 0;
+  }
+
+  .booking-steps > .booking-alert .booking-alert__body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem 1.25rem;
+  }
+
+  .booking-steps > .booking-alert .booking-alert__actions {
+    margin-top: 0;
+  }
+}
+
 .auth-panel__form > .booking-alert {
   margin-bottom: 0.9rem;
 }
@@ -7904,8 +8296,9 @@ dialog[open]::backdrop {
 /*
  * The footer is a sign-off, so it hugs its contents: the wordmark on the left,
  * then the four destinations and Terms & privacy on one row on the right. On a
- * phone the destinations are behind Menu, and Terms & privacy sits directly
- * under it instead of on a row of its own.
+ * phone the destinations are behind Menu, with Terms & privacy beside it
+ * wherever the two fit and beneath it only on the narrowest screens; both
+ * keep a 44px touch target.
  */
 .site-footer {
   display: flex;
@@ -8030,22 +8423,19 @@ dialog[open]::backdrop {
     display: none;
   }
 
+  /* Terms & privacy and Menu share a row wherever they fit, Menu at the
+     right edge like the header's own, reading in their tab order. On the
+     narrowest phones the row wraps upwards, so Menu sits above. */
   .site-footer__actions {
-    flex-direction: column;
-    align-items: flex-end;
+    flex-wrap: wrap-reverse;
   }
 
   .site-footer__contact {
     display: flex;
-    order: -1;
   }
 
   .site-footer__legal::before {
     display: none;
-  }
-
-  .site-footer__legal a {
-    min-height: 36px;
   }
 }
 
@@ -8219,8 +8609,14 @@ dialog[open]::backdrop {
     padding-left: 1rem;
   }
 
-  .faq-index li:nth-last-child(-n + 2) {
+  /* The last row closes on one rule. An odd last entry takes the whole row
+     rather than leaving an empty cell beside it. */
+  .faq-index li:nth-last-child(2):nth-child(odd) {
     border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .faq-index li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 
   .faq-index__answer-index {
@@ -8414,6 +8810,79 @@ dialog[open]::backdrop {
   }
 }
 
+/*
+ * A phone on its side is about 320-430px tall, and the header, the hero's
+ * phone height and its padding put Book a lesson below the fold. The header
+ * slims (the menu shares its row, so it slims with it) and the hero starts
+ * at the top and fits the screen, so Book a lesson is in view. A short laptop
+ * window already shows it, so it keeps its own header and hero.
+ */
+@media (max-width: 1023px) and (max-height: 560px) and (orientation: landscape) {
+  :root {
+    --header-height: 68px;
+  }
+
+  .site-header__inner {
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+  }
+
+  .site-header__brand {
+    flex-basis: 180px;
+    width: 180px;
+  }
+
+  .home-hero__copy {
+    min-height: calc(100vh - var(--header-height));
+    min-height: calc(100svh - var(--header-height));
+    justify-content: flex-start;
+    padding-top: 1rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .home-hero__copy h1 {
+    font-size: clamp(2rem, 9.5vh, 2.9rem);
+  }
+
+  .home-hero__copy .editorial-rule {
+    margin: 0.8rem 0 0.7rem;
+  }
+
+  .home-hero__copy > p {
+    margin-bottom: 1rem;
+    font-size: 1.15rem;
+  }
+}
+
+/* A phone turned sideways is short, so the banner keeps the wide screens' one
+   line and the choices name themselves, as they do upright: the lesson's
+   choices start on the first screen rather than under a two-line title. */
+@media (max-width: 999.98px) and (max-height: 560px) and (orientation: landscape) {
+  .booking-intro {
+    min-height: 0;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .booking-intro h1 {
+    font-size: 2rem;
+  }
+
+  .booking-intro h1 br {
+    display: none;
+  }
+
+  .booking-bar__group legend,
+  .booking-bar__legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nav-mobile,
   .nav-mobile.is-open,
@@ -8443,7 +8912,8 @@ dialog[open]::backdrop {
     animation: none;
   }
 
-  .unified-calendar.unified-calendar--booking {
+  .unified-calendar.unified-calendar--booking,
+  .unified-calendar--booking > .unified-calendar__panel {
     transition: none;
   }
 
@@ -9041,6 +9511,105 @@ dialog[open]::backdrop {
   }
 }
 
+/* A phone on its side, or any screen as short (13 October 2026, Dan): the
+   lessons card's header is one row, the name's menu at the left, then the
+   months with their question mark, the arrows and Book at the right, so the
+   four weeks start a row higher. The months take their short name there,
+   and a long name is cut short before anything else gives way. A tall
+   screen keeps its two rows, as do a phone narrower than 660px, with no
+   room for one, and a window from 1100px wide, whose card can be the wide
+   one with the places in its header. The loading card takes the same row,
+   so nothing moves when the lessons arrive. Book comes second to the
+   keyboard, straight after the name, as it does on every other card. */
+@media (max-height: 560px) and (orientation: landscape) and (min-width: 660px) and (max-width: 1099.98px) {
+  .unified-calendar--overview > .calendar-panel {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) 1fr auto;
+    align-items: center;
+    column-gap: 1rem;
+  }
+
+  .unified-calendar--overview .lesson-overview,
+  .unified-calendar--overview .lesson-overview__header {
+    display: contents;
+  }
+
+  /* Its menu still opens over the weeks. */
+  .unified-calendar--overview .lesson-overview__heading {
+    position: relative;
+    z-index: 3;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .unified-calendar--overview > .calendar-panel > .unified-calendar__toolbar {
+    min-width: max-content;
+    grid-column: 2;
+    grid-row: 1;
+    align-items: center;
+    margin-bottom: 0;
+  }
+
+  .unified-calendar--overview .lesson-overview__header > .lesson-overview__book {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  /* Everything else takes the card's whole width. None of it may widen the
+     header's middle, or the name would be cut short for no reason. */
+  .unified-calendar--overview > .calendar-panel > :not(.lesson-overview, .unified-calendar__toolbar),
+  .unified-calendar--overview .lesson-overview__next,
+  .unified-calendar--overview .lesson-overview__empty,
+  .unified-calendar--overview .lessons-loading__next {
+    min-width: 0;
+    grid-column: 1 / -1;
+  }
+
+  .unified-calendar--overview .lesson-overview__next,
+  .unified-calendar--overview .lesson-overview__empty,
+  .unified-calendar--overview .lessons-loading__next {
+    margin-top: 0.85rem;
+  }
+
+  .unified-calendar--overview > .calendar-panel > .calendar-weekdays {
+    margin-top: 0.6rem;
+  }
+
+  .unified-calendar--overview .unified-calendar__month .when-long {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .unified-calendar--overview .unified-calendar__month .when-short {
+    display: inline;
+  }
+}
+
+/* Below 760px of such a screen Book says Book, as on a phone, with its full
+   name kept for assistive technology. */
+@media (max-height: 560px) and (orientation: landscape) and (min-width: 660px) and (max-width: 759px) {
+  .lesson-overview__header .lesson-overview__book {
+    padding-inline: 1rem;
+  }
+
+  .lesson-overview__book svg {
+    display: none;
+  }
+
+  .lesson-overview__book-more {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 /* A booked day's times are sized by the day itself, so at any width or
    orientation they sit inside its splat rather than spilling past its edge
    (13 October 2026, Dan: "the times sometimes go outside of the splats").
@@ -9094,6 +9663,31 @@ dialog[open]::backdrop {
   color: var(--lavender-ink);
   font-size: 0.88rem;
   line-height: 1.55;
+}
+
+/* Wherever the line and Add card fit side by side, Add card sits at the
+   card's right, level with the words it answers, instead of on a line of its
+   own under them. Open, the terms take the whole width beneath. A phone keeps
+   the full-width button under the line. */
+@container booking (min-width: 480px) {
+  .card-prompt__body {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 1.25rem;
+  }
+
+  .card-prompt__body > * {
+    grid-column: 1;
+  }
+
+  .card-prompt__body > .button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .card-prompt__body > .card-terms {
+    grid-column: 1 / -1;
+  }
 }
 
 .card-terms {

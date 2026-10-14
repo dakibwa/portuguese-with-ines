@@ -3931,9 +3931,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 <div className="calendar-week" key={week.key}>
                   {/* Each week starts with its month, so a date is never far
                       from it; a month that begins mid-week marks its 1st. On a
-                      phone's lessons card the month column is hidden, and
-                      every 1st names its month itself, Mondays included. The
-                      days' own labels carry the full date. */}
+                      phone, booking or on the lessons card, the month column
+                      is hidden, and every 1st names its month itself, Mondays
+                      included. The days' own labels carry the full date. */}
                   <span
                     aria-hidden="true"
                     className={`calendar-week__month${
