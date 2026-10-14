@@ -50,7 +50,15 @@ const STORE = "ines-expression-paint";
 /** Enough to remember every recent painting without the entry growing for ever. */
 const REMEMBERED = 60;
 
+/**
+ * `byId` is keyed by student and expression ("student:expression"), so two
+ * students on one device keep their own colours. Entries from before it was
+ * keyed by student (the expression id alone) are still read as a fallback,
+ * and age out as new paintings are remembered.
+ */
 type Memory = { last: PaintKey | null; byId: Record<string, PaintKey> };
+
+const keyFor = (student: string, id: string) => `${student}:${id}`;
 
 const isPaint = (value: unknown): value is PaintKey => typeof value === "string" && (PAINT_KEYS as readonly string[]).includes(value);
 
@@ -89,9 +97,10 @@ function write(memory: Memory) {
   }
 }
 
-/** What this expression was painted in here, or a colour its id always gives. */
-export function paintFor(id: string): PaintKey {
-  return read().byId[id] ?? PAINT_KEYS[hash(id) % PAINT_KEYS.length];
+/** What this student's expression was painted in here, or a colour its id always gives. */
+export function paintFor(student: string, id: string): PaintKey {
+  const { byId } = read();
+  return byId[keyFor(student, id)] ?? byId[id] ?? PAINT_KEYS[hash(id) % PAINT_KEYS.length];
 }
 
 /**
@@ -107,11 +116,12 @@ export function nextPaint(avoid: (PaintKey | null | undefined)[] = []): PaintKey
   return from[Math.floor(Math.random() * from.length)];
 }
 
-/** Remembers the colour an expression was painted in, as the last one used here. */
-export function rememberPaint(id: string, paint: PaintKey) {
+/** Remembers the colour a student's expression was painted in, as the last one used here. */
+export function rememberPaint(student: string, id: string, paint: PaintKey) {
   const memory = read();
-  delete memory.byId[id];
-  memory.byId[id] = paint;
+  const key = keyFor(student, id);
+  delete memory.byId[key];
+  memory.byId[key] = paint;
   const ids = Object.keys(memory.byId);
   for (const old of ids.slice(0, Math.max(0, ids.length - REMEMBERED))) delete memory.byId[old];
   write({ last: paint, byId: memory.byId });

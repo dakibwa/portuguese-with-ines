@@ -9,6 +9,9 @@ live type (Beth Ellen, in the paper's cream or, on lavender, in ink), because
 it must be the real phrase. The code sizes each stroke round the phrase's own
 letters and keeps the stretch under them solid, so a painted stroke must be
 solid across its body: streaks of bare paper belong only in its dry-brush end.
+The code also shapes how each piece is uncovered (a rounded wet front, a dry
+brush's ragged one for the near-miss, and a rounded end to the body under the
+bead), so no painting needs a hard edge of its own anywhere.
 
 ## For every painting
 
@@ -38,7 +41,7 @@ solid across its body: streaks of bare paper belong only in its dry-brush end.
 | File | Size (px, 2x) | Replaces | What it is |
 | --- | --- | --- | --- |
 | `stroke-{paint}-{1..3}.webp` | 2400 × 300 | `paintStroke` | One horizontal stroke, painted left to right. Left 12%: the loaded, blunt touchdown. 12–80%: an even body about 220 px tall, uniform enough to be cropped to any line length. Last 20%: the brush running dry, breaking into separate bristles that thin out. Three variants per paint, so the lines of one phrase differ. |
-| `bead-{paint}.webp` | 200 × 330 | `paintBead` | The wet front of the stroke as it moves: a rounded end of paint, its left half fading to transparent so it melts into the stroke behind it. The code carries it on the wipe that uncovers the letters, at its leading edge, so the front can never fall behind the paint. |
+| `bead-{paint}.webp` | 200 × 330 | `paintBead` | The wet front of the stroke as it moves: a rounded end of paint, its left half fading to transparent so it melts into the stroke behind it, with only a faint darker rim (fainter still on lavender). The code carries it on the wipe that uncovers the letters, its front at the wipe's rounded front, so the two can never part; when the brush lifts it soaks back into the stroke's body. |
 | `pool-{paint}-{1,2}.webp` | 300 × 300 | `blob` (resting pool) | The flat pool waiting by the margin, seen from above, with one small satellite drop. Two variants per paint. |
 | `dab-{paint}.webp` | 330 × 330 | `blob` (the press) | The dab that lands in the pool on the press, a little larger and looser than the pool. |
 | `drop-{1..6}.webp` | 24 to 64 square | `blob` (spatter) | Six small drops of different sizes and shapes, painted in white on transparent: the code tints them in the paint and its companion colours. |

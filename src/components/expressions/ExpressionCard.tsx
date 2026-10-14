@@ -42,7 +42,7 @@ function Example({ text, phrase }: { text: string; phrase: string }) {
   return <>{text.slice(0, found[0])}<mark className="expression-card__phrase">{text.slice(found[0], found[1])}</mark>{text.slice(found[1])}</>;
 }
 
-/** What the words say, what they mean, and the English for it. */
+/** What the words say, what they mean, and the English for it. Each value is a span, which a student's card turns to wax while it paints another. */
 export function ExpressionMeanings({ item }: { item: ExpressionInput }) {
   const facts = [
     item.literalEn ? { key: "literal", label: "Ao pé da letra", text: item.literalEn, lang: "en" } : null,
@@ -55,7 +55,7 @@ export function ExpressionMeanings({ item }: { item: ExpressionInput }) {
       {facts.map((fact) => (
         <div className="expression-card__fact" data-fact={fact.key} key={fact.key}>
           <dt className="expression-card__label">{fact.label}</dt>
-          <dd lang={fact.lang}>{fact.text}</dd>
+          <dd lang={fact.lang}><span className="expression-card__value">{fact.text}</span></dd>
         </div>
       ))}
     </dl>
@@ -68,7 +68,7 @@ export function ExpressionExamples({ item }: { item: ExpressionInput }) {
   return (
     <div className="expression-card__examples">
       <h4 className="expression-card__label">{item.examples.length === 1 ? "Exemplo" : "Exemplos"}</h4>
-      <ul>{item.examples.map((example, index) => <li key={index}><Example phrase={item.expression} text={example} /></li>)}</ul>
+      <ul>{item.examples.map((example, index) => <li key={index}><span className="expression-card__value"><Example phrase={item.expression} text={example} /></span></li>)}</ul>
     </div>
   );
 }

@@ -19,6 +19,9 @@ const DECOY_STROKE = 420;
 /** Long enough after the dry stroke for its words to be read, before they are crossed out. */
 const STRIKE_AT = DECOY_AT + DECOY_STROKE + 260;
 const STRIKE = 180;
+/** The crossed-out start is left to be read, then dries away as the brush paints the real phrase in its place. */
+const MISS_BEAT = 380;
+const MISS_FADE = 360;
 
 /*
  * The room the paint leaves round the words (13 October 2026, Dan: "give it
@@ -46,6 +49,8 @@ const BLUNT = 0.34;
 const TAIL = 0.34;
 /** A stroke's width is about this many ems, for sizing the type before it is known. */
 const BAND = 2.5;
+/** A body runs this far past where its dry brush starts, and ends rounded, under the brush's bead. */
+const BODY_RUN = 6;
 
 type Metrics = WaxMetrics & {
   w: number;
@@ -112,6 +117,34 @@ const DURATIONS: Record<number, number[]> = { 1: [700], 2: [560, 470], 3: [480, 
 const durationsFor = (n: number) => DURATIONS[n] ?? Array.from({ length: n }, () => Math.max(150, Math.round(1330 / n)));
 const gapFor = (n: number) => (n > 4 ? 50 : n > 3 ? 70 : 90);
 
+/**
+ * The leading edge of a wipe's window, `depth` deep at the right of a window
+ * `width` + `depth` wide and `T` tall: a rounded front across the band (`ry`
+ * either side of its middle), or with `R`, a dry brush's ragged bristles.
+ * The paint it uncovers never shows a straight cut, in any frame. With `lag`,
+ * the front runs that far behind the window's (the letters, under the bead).
+ * `path` is for CSS (null where clip-path paths are unsupported), `shape`
+ * for a canvas.
+ */
+type Edge = { depth: number; path: string | null; shape: string };
+
+function edge(width: number, T: number, depth: number, ry: number, shaped: boolean, R: Rand | null = null, lag = 0): Edge {
+  const base = width - lag;
+  const reachTop = Math.max(0, T / 2 - ry);
+  const rows = Math.max(10, Math.round((2 * ry) / (R ? 2.4 : 4)));
+  const points = ["M0 0", `L${base} 0`, `L${base} ${reachTop.toFixed(1)}`];
+  for (let i = 0; i <= rows; i++) {
+    const v = -1 + (2 * i) / rows;
+    let reach = Math.pow(1 - Math.pow(Math.abs(v), 2.2), 1 / 2.2);
+    // A dry brush: bristle tips of uneven length, and the gaps between them.
+    if (R) reach *= i % 2 ? 0.5 + R() * 0.25 : 0.78 + R() * 0.22;
+    points.push(`L${(base + depth * reach).toFixed(1)} ${(T / 2 + v * ry).toFixed(1)}`);
+  }
+  points.push(`L${base} ${Math.min(T, T / 2 + ry).toFixed(1)}`, `L${base} ${T}`, `L0 ${T}`, "Z");
+  const shape = points.join(" ");
+  return shaped ? { depth, path: `path("${shape}")`, shape } : { depth: 0, path: null, shape };
+}
+
 function div(className: string) {
   const element = document.createElement("div");
   element.className = className;
@@ -143,15 +176,17 @@ export class Painter {
   private readonly family: string;
   private readonly dpr: number;
   private readonly spring: string;
+  /** Whether a wipe's window can take a shaped leading edge (else the bead alone covers its cut). */
+  private readonly shaped: boolean;
   private m: Metrics;
   private h = 0;
   private shown: Shown = { kind: "none" };
   private busy = false;
   private paint: PaintKey = "deep";
   private spinAt = 0;
-  private decoy: { fragment: string; bottom: number; until: number; el: HTMLElement } | null = null;
-  /** The painting just landed, still at the height it was painted in: where its block is, and the height round it. */
-  private unsettled: { top: number; hug: number } | null = null;
+  private decoy: { fragment: string; until: number; el: HTMLElement } | null = null;
+  /** The painting just landed, still in the sheet it was painted in: the height that hugs it. */
+  private unsettled: { hug: number } | null = null;
   private dead = false;
   private fontsReady = false;
   private readonly ready: Promise<void>;
@@ -166,6 +201,7 @@ export class Painter {
     this.family = getComputedStyle(root).fontFamily || "cursive";
     const spring = getComputedStyle(document.documentElement).getPropertyValue("--motion-spring").trim();
     this.spring = spring && this.easingWorks(spring) ? spring : SPRING_FALLBACK;
+    this.shaped = typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("clip-path", 'path("M0 0L1 0L1 1Z")');
     this.wax = document.createElement("canvas");
     this.wax.className = "paint-sheet__wax";
     root.append(this.wax);
@@ -202,7 +238,26 @@ export class Painter {
     this.root.style.minHeight = "";
     this.root.style.height = `${h}px`;
     // A taller phrase lets the sheet grow downwards; nothing above it moves.
-    if (animate && from && from !== h) this.play(this.root.animate([{ height: `${from}px` }, { height: `${h}px` }], { duration: 360, easing: EASE_OUT }));
+    const options: KeyframeAnimationOptions = { duration: 360, easing: EASE_OUT };
+    if (animate && from && from !== h) this.play(this.root.animate([{ height: `${from}px` }, { height: `${h}px` }], options));
+    this.sheetHeight(h, animate ? from : 0, options);
+  }
+
+  /**
+   * Beside the facts, the reading's example sits straight under the sheet
+   * whatever the facts' height (globals.css): the card is told the sheet's
+   * height, in step with the sheet when it changes smoothly.
+   */
+  private sheetHeight(h: number, from = 0, options?: KeyframeAnimationOptions) {
+    const card = this.root.parentElement;
+    if (!card) return;
+    card.style.setProperty("--paint-sheet-h", `${h}px`);
+    if (!from || from === h || !options) return;
+    try {
+      this.play(card.animate([{ "--paint-sheet-h": `${from}px` }, { "--paint-sheet-h": `${h}px` }], options));
+    } catch {
+      // Without registered properties the example simply moves at once.
+    }
   }
 
   private play(animation: Animation) {
@@ -314,7 +369,7 @@ export class Painter {
     const colour = PAINTS[paint].paint;
     const [canvas, g] = makeCanvas(S * 1.6, S * 1.6, this.dpr);
     blob(g, S * 0.8, S * 0.8, S * 0.36, rng(seed), colour, { lobes: 0.12 });
-    blob(g, S * 1.27, S * 0.5, S * 0.06, rng(seed + 1), colour, { rim: false });
+    blob(g, S * 1.24, S * 1.14, S * 0.06, rng(seed + 1), colour, { rim: false });
     canvas.style.left = `${-S * 0.8}px`;
     canvas.style.top = `${-S * 0.8}px`;
     art.group.append(canvas);
@@ -331,15 +386,26 @@ export class Painter {
     return canvas;
   }
 
-  /** The resting sheet's height: its label, the wax beneath it and a margin. */
+  /** The resting sheet's height: its label, the wax beneath it and a margin. The wax runs from `top` to `bottom`. */
   private restHeight(phrases: string[]) {
     const g = document.createElement("canvas").getContext("2d");
     const rows = g ? waxRows(g, this.m.w, this.m, phrases, this.family).length : 3;
     const top = Math.max(this.m.labelRoom, this.m.marginV);
-    return { h: Math.round(top + waxHeight(rows, this.m) + this.m.marginV * 1.5), top };
+    const bottom = top + waxHeight(rows, this.m);
+    return { h: Math.round(bottom + this.m.marginV * 1.5), top, bottom };
   }
 
-  private drawWax(phrases: string[], h: number, top: number) {
+  /**
+   * Where the pool waits: by the margin, level with the middle of a one-line
+   * phrase painted at the sheet's top, so the paint lands where it stays, and
+   * clear of the label over the resting sheet.
+   */
+  private poolRest() {
+    const { marginV, sizes, labelRoom, poolSize } = this.m;
+    return Math.round(Math.max(marginV + 1.35 * sizes[0][0], labelRoom + poolSize * 0.42));
+  }
+
+  private drawWax(phrases: string[], h: number, top: number, bottom: number) {
     const { w } = this.m;
     const width = Math.ceil(w * this.dpr);
     const height = Math.ceil(h * this.dpr);
@@ -353,7 +419,7 @@ export class Painter {
     if (!g) return;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, w, h);
-    paintWax(g, w, top, h - this.m.marginV * 0.5, this.m, phrases, this.family, rng(hash(phrases.join("|")) || 11));
+    paintWax(g, w, top, bottom, this.m, phrases, this.family, rng(hash(phrases.join("|")) || 11));
   }
 
   /** The waiting sheet: phrases faintly in wax, the next paint pooled by the margin. */
@@ -395,11 +461,12 @@ export class Painter {
     if (fade) this.retire(old);
     else old?.el.remove();
     if (shown.kind === "rest") {
-      const { h: least, top } = this.restHeight(shown.wax);
+      // The wax and the pool wait at the sheet's top, however tall its place in the card makes it.
+      const { h: least, top, bottom } = this.restHeight(shown.wax);
       const h = this.stretch(least);
-      this.drawWax(shown.wax, h, top);
+      this.drawWax(shown.wax, h, top, bottom);
       delete this.wax.dataset.gone;
-      this.placePool(art, this.m.poolX, (top + h - this.m.marginV * 0.5) / 2);
+      this.placePool(art, this.m.poolX, this.poolRest());
       this.restPool(art, shown.paint, hash(shown.paint) % 97);
     } else {
       this.wax.dataset.gone = "";
@@ -435,7 +502,7 @@ export class Painter {
       this.retire(this.art);
       art = this.newArt();
       this.art = art;
-      this.placePool(art, this.m.poolX, this.h / 2);
+      this.placePool(art, this.m.poolX, this.poolRest());
     }
     this.shown = { kind: "none" };
     this.wax.dataset.gone = "";
@@ -493,20 +560,18 @@ export class Painter {
     const line = div("paint-sheet__line");
     Object.assign(line.style, { top: `${top}px`, height: `${T}px`, transform: `rotate(${(R() - 0.5) * 1.6}deg)`, transformOrigin: `${x0 + Lb / 2}px 50%` });
     art.decoy.append(line);
-    const body = this.slice(stroke, 0, Lb, T);
+    const body = this.slice(stroke, 0, Lb + BODY_RUN, T, edge(Lb + BODY_RUN - B * 0.4, T, B * 0.4, B * 0.62, true, R));
     const tail = this.slice(stroke, Lb - 8, tl + 8, T);
     tail.className = "paint-sheet__tail";
     tail.style.left = `${x0 + Lb - 8}px`;
     letters.canvas.style.left = `${textX + letters.offset - x0}px`;
-    const [w1, i1] = this.wipe(line, x0, Lb, T, [body]);
-    const [w2, i2] = this.wipe(line, x0, Lb, T, [letters.canvas]);
+    // A dry brush's ragged front leads the wash and the wax letters it uncovers.
+    const front = edge(Lb + BODY_RUN, T, B * 0.5, B * 0.62, this.shaped, R);
+    const [w1, i1, travel] = this.wipe(line, x0, Lb + BODY_RUN, T, [body], front);
+    const [w2, i2] = this.wipe(line, x0, Lb + BODY_RUN, T, [letters.canvas], front);
     line.append(tail);
-    const options: KeyframeAnimationOptions = { duration: DECOY_STROKE, delay: DECOY_AT, easing: STROKE_EASE, fill: "both" };
-    for (const [wipe, inner] of [[w1, i1], [w2, i2]]) {
-      this.play(wipe.animate([{ transform: `translateX(${-(Lb + 3)}px)` }, { transform: "translateX(0px)" }], options));
-      this.play(inner.animate([{ transform: `translateX(${Lb + 3}px)` }, { transform: "translateX(0px)" }], options));
-    }
-    this.play(tail.animate([{ transform: "scaleX(0.12)", opacity: 0 }, { transform: "scaleX(1)", opacity: 0.9 }], { duration: 220, delay: DECOY_AT + DECOY_STROKE - 40, easing: "cubic-bezier(.2,.75,.3,1)", fill: "both" }));
+    this.sweep([[w1, i1], [w2, i2]], travel, front, { duration: DECOY_STROKE, delay: DECOY_AT, easing: STROKE_EASE, fill: "both" });
+    this.play(tail.animate([{ transform: "scaleX(0.12)", opacity: 0 }, { transform: "scaleX(1)", opacity: 0.9 }], { duration: 220, delay: DECOY_AT + DECOY_STROKE - 60, easing: "cubic-bezier(.2,.75,.3,1)", fill: "both" }));
 
     // The quick strike through the middle of the letters: not this one.
     const Bs = Math.max(4, Math.round(B * strikeWeight));
@@ -518,47 +583,74 @@ export class Painter {
     const strikeLine = div("paint-sheet__line");
     Object.assign(strikeLine.style, { top: `${top + T / 2 - Ts / 2 + fs * 0.1}px`, height: `${Ts}px`, transform: `rotate(${-2 - R() * 2}deg)`, transformOrigin: `${sx0 + Lbs / 2}px 50%` });
     art.decoy.append(strikeLine);
-    const [ws, is] = this.wipe(strikeLine, sx0, Lbs + tls, Ts, [strike]);
-    const strikeOptions: KeyframeAnimationOptions = { duration: STRIKE, delay: STRIKE_AT, easing: "cubic-bezier(.3,.1,.2,1)", fill: "both" };
-    this.play(ws.animate([{ transform: `translateX(${-(Lbs + tls + 3)}px)` }, { transform: "translateX(0px)" }], strikeOptions));
-    this.play(is.animate([{ transform: `translateX(${Lbs + tls + 3}px)` }, { transform: "translateX(0px)" }], strikeOptions));
-    this.decoy = { fragment, bottom: top + (T + B) / 2, until: this.spinAt + STRIKE_AT + STRIKE, el: art.decoy };
+    const strikeFront = edge(Lbs + tls, Ts, Bs * 1.1, Bs * 0.85, this.shaped);
+    const [ws, is, struck] = this.wipe(strikeLine, sx0, Lbs + tls, Ts, [strike], strikeFront);
+    this.sweep([[ws, is]], struck, strikeFront, { duration: STRIKE, delay: STRIKE_AT, easing: "cubic-bezier(.3,.1,.2,1)", fill: "both" }, 40);
+    this.decoy = { fragment, until: this.spinAt + STRIKE_AT + STRIKE, el: art.decoy };
   }
 
-  /** Once the real phrase is read, the crossed-out start dries away. */
-  fadeDecoy(duration = 420) {
+  /** The crossed-out start dries away, once (after `delay`), and never comes back. */
+  private fadeDecoy(duration: number, delay = 0) {
     const decoy = this.decoy;
     if (!decoy || this.dead) return;
-    this.decoy = { ...decoy, fragment: "" };
+    this.decoy = null;
     try {
-      decoy.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: EASE_OUT, fill: "forwards" });
+      decoy.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration, delay, easing: EASE_OUT, fill: "forwards" });
     } catch {
       decoy.el.style.opacity = "0";
     }
   }
 
-  /** A part of a painted stroke, copied onto its own canvas. */
-  private slice(source: HTMLCanvasElement, from: number, width: number, T: number) {
+  /**
+   * A part of a painted stroke, copied onto its own canvas. With `end`, the
+   * part ends in that rounded (or ragged) shape rather than a straight cut, so
+   * it never shows one while the dry brush that covers it is still to come.
+   */
+  private slice(source: HTMLCanvasElement, from: number, width: number, T: number, end?: Edge) {
     const [canvas, g] = makeCanvas(width, T, this.dpr);
     g.drawImage(source, from * this.dpr, 0, width * this.dpr, T * this.dpr, 0, 0, width, T);
+    if (end) {
+      g.globalCompositeOperation = "destination-in";
+      g.fill(new Path2D(end.shape));
+      g.globalCompositeOperation = "source-over";
+    }
     return canvas;
   }
 
   /**
    * A window that slides open with its content held still: the stroke being
-   * laid down. The wipe moves and carries the window; anything riding its
-   * leading edge (the wet bead) goes in the wipe beside the window, unclipped.
+   * laid down. The wipe moves and carries the window, whose leading edge is
+   * shaped (`front`) and runs past the content's end; anything riding that
+   * edge (the wet bead) goes in the wipe beside the window, unclipped.
+   * Returns the wipe, its content and how far it travels.
    */
-  private wipe(line: HTMLElement, left: number, width: number, T: number, content: HTMLElement[]): [HTMLDivElement, HTMLDivElement] {
+  private wipe(line: HTMLElement, left: number, width: number, T: number, content: HTMLElement[], front: Edge): [HTMLDivElement, HTMLDivElement, number] {
+    const span = width + front.depth;
     const wipe = div("paint-sheet__wipe");
-    Object.assign(wipe.style, { left: `${left}px`, width: `${width}px`, height: `${T}px` });
+    Object.assign(wipe.style, { left: `${left}px`, width: `${span}px`, height: `${T}px` });
     const view = div("paint-sheet__window");
+    if (front.path) view.style.clipPath = front.path;
     const inner = div("paint-sheet__wipe-inner");
     inner.append(...content);
     view.append(inner);
     wipe.append(view);
     line.append(wipe);
-    return [wipe, inner];
+    return [wipe, inner, span + 3];
+  }
+
+  /**
+   * Lays a stroke down. The brush touches down: its blunt start and rounded
+   * (or ragged) front show at once, fading in as it meets the paper, never a
+   * sliver with a straight side; then each wipe slides open to the stroke's
+   * end, the front leading.
+   */
+  private sweep(wipes: [HTMLElement, HTMLElement][], travel: number, front: Edge, options: KeyframeAnimationOptions, touch = 70) {
+    const from = travel - front.depth - 3;
+    for (const [wipe, inner] of wipes) {
+      this.play(wipe.animate([{ transform: `translateX(${-from}px)` }, { transform: "translateX(0px)" }], options));
+      this.play(inner.animate([{ transform: `translateX(${from}px)` }, { transform: "translateX(0px)" }], options));
+      if (front.depth) this.play(wipe.animate([{ opacity: 0 }, { opacity: 1 }], { duration: touch, delay: options.delay, easing: EASE_OUT, fill: "backwards" }));
+    }
   }
 
   /**
@@ -625,7 +717,7 @@ export class Painter {
       const last = s.i === plan.n - 1;
       const stroke = paintStroke(L, T, B, Lb, colour, R, this.dpr, { flick: last ? plan.lastFlick * 0.6 : 0, shade, streaks, solid: s.solid });
       const bodyLeft = s.x0;
-      const body = this.slice(stroke, 0, Lb, T);
+      const body = this.slice(stroke, 0, Lb + BODY_RUN, T, edge(Lb + BODY_RUN - B * 0.3, T, B * 0.3, B * 0.62, true));
       const tail = this.slice(stroke, Lb - 8, s.tl + 8, T);
       const letters = paintLetters(s.text, this.family, plan.fs, T, colour, R, this.dpr, ink, s.base);
       const line = (layer: HTMLElement, under = false) => {
@@ -639,8 +731,12 @@ export class Painter {
       // Each line's letters go under the lines above, so its wet bead never covers their letters.
       const letterLine = line(art.letters, true);
       letters.canvas.style.left = `${s.textX + letters.offset - bodyLeft}px`;
-      const [w1, i1] = this.wipe(strokeLine, bodyLeft, Lb, T, [body]);
-      const [w2, i2] = this.wipe(letterLine, bodyLeft, Lb, T, [letters.canvas]);
+      // A rounded wet front leads the paint, never a straight cut; the letters
+      // come out from under the bead just behind it, never ahead of it.
+      const front = edge(Lb + BODY_RUN, T, B * 0.42, B * 0.62, this.shaped);
+      const behind = edge(Lb + BODY_RUN, T, B * 0.42, B * 0.62, this.shaped, null, B * 0.12);
+      const [w1, i1, travel] = this.wipe(strokeLine, bodyLeft, Lb + BODY_RUN, T, [body], front);
+      const [w2, i2] = this.wipe(letterLine, bodyLeft, Lb + BODY_RUN, T, [letters.canvas], behind);
       tail.className = "paint-sheet__tail";
       tail.style.left = `${s.x0 + Lb - 8}px`;
       strokeLine.append(tail);
@@ -649,30 +745,30 @@ export class Painter {
         tail.style.opacity = "1";
         continue;
       }
-      // The wet bead rides on the letters' wipe, at its leading edge, so the
-      // two can never part, whichever thread draws them.
-      const bead = paintBead(B, colour, R, 1, this.dpr, shade);
+      // The wet bead rides on the letters' wipe, its front at the window's, so
+      // the two can never part, whichever thread draws them.
+      // Its rim is as strong as the paint's streaks: faint on a light paint, so it never reads as a letter.
+      const bead = paintBead(B, colour, R, 1, this.dpr, shade, 0.5 * streaks);
       bead.canvas.className = "paint-sheet__bead";
-      Object.assign(bead.canvas.style, { left: `${Lb - bead.bw / 2}px`, top: `${(T - bead.bh) / 2}px` });
+      Object.assign(bead.canvas.style, { left: `${travel - 3 - bead.bw}px`, top: `${(T - bead.bh) / 2}px`, transformOrigin: "100% 50%" });
       w2.append(bead.canvas);
       const duration = (durations[s.i] ?? 320) * tempo * this.m.tempo;
       const start = t;
       // Each stroke draws its paint from the pool, which gives a little as it does.
       if (art.dab) this.play(art.dab.animate([{ transform: "scale(1)" }, { transform: "scale(0.93) translateX(2px)", offset: 0.3 }, { transform: "scale(1)" }], { duration: 420, delay: start, easing: "ease-out" }));
       const options: KeyframeAnimationOptions = { duration, delay: start, easing: STROKE_EASE, fill: "both" };
-      for (const [wipe, inner] of [[w1, i1], [w2, i2]]) {
-        this.play(wipe.animate([{ transform: `translateX(${-(Lb + 3)}px)` }, { transform: "translateX(0px)" }], options));
-        this.play(inner.animate([{ transform: `translateX(${Lb + 3}px)` }, { transform: "translateX(0px)" }], options));
-      }
-      // It swells as the brush meets the paper, then thins a little as it lifts.
+      this.sweep([[w1, i1], [w2, i2]], travel, front, options);
+      // It swells as the brush meets the paper, an oval at the touchdown, and holds over the body's end.
       const at = (p: number, scale: number, opacity: number): Keyframe => ({ offset: p, transform: `scale(${scale})`, opacity });
-      this.play(bead.canvas.animate([at(0, 0.3, 0), at(0.02, 0.42, 1), at(0.1, 1, 1), at(0.9, 1, 1), at(1, 0.94, 1)], options));
-      // The brush lifts: the bead goes, the dry bristles drag out.
-      const lift = last ? { dx: 26, dy: -16 * (plan.lastFlick < 0 ? 1 : 0.4), scale: 0.28, d: 230 } : { dx: 9, dy: -3, scale: 0.5, d: 150 };
+      this.play(bead.canvas.animate([at(0, 0.88, 0), at(0.05, 0.94, 1), at(0.14, 1, 1), at(1, 1, 1)], options));
+      // The brush lifts: the bead soaks back into the body it ends (it never
+      // floats off as a pale disc), and the dry bristles drag out beside it.
+      const lift = { dx: -bead.bw * 0.3, dy: last ? -4 * plan.lastFlick : 0, scale: 0.55, d: 180 };
       this.play(bead.canvas.animate([
-        { transform: "scale(0.94)", opacity: 1 },
+        { transform: "scale(1)", opacity: 1 },
+        { transform: `translate(${lift.dx * 0.4}px, ${lift.dy * 0.4}px) scale(${(1 + lift.scale) / 2})`, opacity: 0.5, offset: 0.4 },
         { transform: `translate(${lift.dx}px, ${lift.dy}px) scale(${lift.scale})`, opacity: 0 },
-      ], { duration: lift.d, delay: start + duration, easing: EASE_OUT, fill: "forwards" }));
+      ], { duration: lift.d, delay: start + duration + 60, easing: "ease-out", fill: "forwards" }));
       this.play(tail.animate([{ transform: "scaleX(0.12)", opacity: 0 }, { transform: "scaleX(1)", opacity: 1 }], { duration: 190, delay: start + duration - 30, easing: "cubic-bezier(.2,.75,.3,1)", fill: "both" }));
       t = start + duration + gap;
     }
@@ -756,19 +852,21 @@ export class Painter {
     const m = this.m;
     const R = rng(hash(id));
     const decoy = this.decoy;
-    // A decoy that is the start of the real phrase was no near-miss after all.
-    if (decoy?.fragment && normal(phrase).startsWith(normal(decoy.fragment))) this.fadeDecoy(160);
+    // A near-miss is left crossed out for a beat, then dries away as the brush
+    // comes back to paint the real phrase in its place. One that is the start
+    // of the real phrase was no near-miss after all: it dries away at once.
+    const missed = decoy && !normal(phrase).startsWith(normal(decoy.fragment)) ? decoy : null;
     const plan = this.build(phrase, R);
-    const reserve = decoy ? decoy.bottom + 6 : m.marginV;
+    // At the sheet's top, where it stays: the paint never slides on the sheet.
+    const y = m.marginV;
     // Grow now if the phrase needs it; a smaller one is painted where it is and settles later.
-    const h = Math.max(this.h, plan.hug, reserve + plan.blockH + m.marginV);
+    const h = Math.max(this.h, plan.hug);
     const grows = h > this.h;
     if (h !== this.h) this.setHeight(h, true);
-    // Out of the pool if there is room, never under the near-miss, never off the sheet.
-    const y = clamp(art.poolY - plan.blockH / 2, reserve, h - m.marginV - plan.blockH);
     this.movePool(art, y + plan.blockH / 2, grows ? 140 : 0);
     const now = performance.now();
-    const start = Math.max(now + 40, this.spinAt + 420, decoy ? decoy.until + 60 : 0);
+    const start = Math.max(now + 40, this.spinAt + 420, missed ? missed.until + MISS_BEAT : decoy ? now + 170 : 0);
+    if (decoy) this.fadeDecoy(missed ? MISS_FADE : 160, missed ? Math.max(0, start - 120 - now) : 0);
     const gaps = (plan.n - 1) * gapFor(plan.n);
     const spare = this.spinAt + BUDGET - FACTS_OPEN - FLICK - start - gaps;
     const tempo = clamp(spare / (durationsFor(plan.n).reduce((sum, value) => sum + value, 0) * m.tempo), 0.62, 1);
@@ -777,33 +875,31 @@ export class Painter {
     if (this.dead) return;
     this.busy = false;
     this.shown = { kind: "show", phrase, id, paint: this.paint };
-    this.unsettled = { top: y, hug: plan.hug };
+    this.unsettled = { hug: plan.hug };
   }
 
   /**
-   * As the reading opens, the painted sheet closes round its phrase: its foot
-   * rises and the painting glides to its place, in step with the reading, so
-   * the card never jumps. The final size is set at once, so the card can
-   * measure where it is going; the returned function starts the motion. A
-   * painting already in place, or one painted at once, stays as it is.
+   * As the reading opens, the painted sheet closes round its phrase: the paint
+   * landed where it stays, and only the sheet's foot rises, in step with the
+   * reading, so the card never jumps. The final size is set at once, so the
+   * card can measure where it is going; the returned function starts the
+   * motion. A painting painted at once stays as it is.
    */
   settle(): () => void {
     const unsettled = this.unsettled;
-    const art = this.art;
     this.unsettled = null;
-    if (this.dead || this.busy || !unsettled || !art) return () => {};
-    const shift = unsettled.top - this.m.marginV;
+    if (this.dead || this.busy || !unsettled || !this.art) return () => {};
     const from = this.h;
-    const moves = Math.abs(shift) >= 1;
     const shrinks = Math.abs(from - unsettled.hug) >= 1;
-    if (moves) art.el.style.transform = `translateY(${-shift}px)`;
     if (shrinks) this.setHeight(unsettled.hug);
     const resized = Math.abs(this.root.clientWidth - this.m.w) >= 2;
     return () => {
       if (this.dead) return;
       const options: KeyframeAnimationOptions = { duration: FACTS_OPEN, easing: OPEN_EASE };
-      if (moves) this.play(art.el.animate([{ transform: "translateY(0px)" }, { transform: `translateY(${-shift}px)` }], options));
-      if (shrinks) this.play(this.root.animate([{ height: `${from}px` }, { height: `${unsettled.hug}px` }], options));
+      if (shrinks) {
+        this.play(this.root.animate([{ height: `${from}px` }, { height: `${unsettled.hug}px` }], options));
+        this.sheetHeight(unsettled.hug, from, options);
+      }
       // The sheet changed width while it was painting: lay the finished painting out again.
       if (resized) this.resized();
     };

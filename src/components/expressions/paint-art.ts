@@ -274,7 +274,7 @@ export function paintStroke(L: number, T: number, B: number, Lb: number, colour:
 }
 
 /** The wet front of a stroke: a rounded bead of paint whose back half melts into the stroke. Matte. */
-export function paintBead(B: number, colour: string, R: Rand, dir: number, dpr: number, shade = "#000000") {
+export function paintBead(B: number, colour: string, R: Rand, dir: number, dpr: number, shade = "#000000", rim = 0.5) {
   const bw = B * 0.66;
   const bh = B * 1.1;
   const [canvas, g] = makeCanvas(bw, bh, dpr);
@@ -299,7 +299,7 @@ export function paintBead(B: number, colour: string, R: Rand, dir: number, dpr: 
   path.closePath();
   g.fillStyle = colour;
   g.fill(path);
-  g.strokeStyle = mix(colour, shade, 0.32, 0.5);
+  g.strokeStyle = mix(colour, shade, 0.32, rim);
   g.lineWidth = 1.2;
   g.beginPath();
   g.ellipse(cx, cy, rx * 0.98, ry * 0.98, 0, -1.25, 1.25);
@@ -307,7 +307,7 @@ export function paintBead(B: number, colour: string, R: Rand, dir: number, dpr: 
   g.globalCompositeOperation = "destination-in";
   const fade = g.createLinearGradient(0, 0, bw, 0);
   fade.addColorStop(0, "rgba(0,0,0,0)");
-  fade.addColorStop(0.38, "rgba(0,0,0,1)");
+  fade.addColorStop(0.32, "rgba(0,0,0,1)");
   fade.addColorStop(1, "rgba(0,0,0,1)");
   g.fillStyle = fade;
   g.fillRect(0, 0, bw, bh);
@@ -441,12 +441,15 @@ export function layoutPhrase(text: string, m: PhraseMetrics, family: string): { 
   return result(fs, wrap(fs, pieces) ?? pieces);
 }
 
+/** How far each row of wax is set in: the first clear of the pool waiting beside it, the rest in a loose zigzag. */
+const waxIndent = (index: number, fs: number) => (index === 0 ? fs * 0.95 : index === 2 ? fs * 0.45 : 0);
+
 /** The phrases that fit the sheet, up to three, each at the largest size that fits. */
 export function waxRows(g: CanvasRenderingContext2D, w: number, m: WaxMetrics, phrases: string[], family: string) {
-  const available = w - m.padL - m.padR - 6;
   const rows: { text: string; size: number }[] = [];
   for (const phrase of phrases) {
     if (rows.length === 3) break;
+    const available = w - m.padL - m.padR - 6 - waxIndent(rows.length, m.waxFs) - m.waxFs * 0.3;
     for (const size of [m.waxFs, m.waxFs * 0.86, m.waxFs * 0.74]) {
       g.font = `${size}px ${family}`;
       if (g.measureText(phrase).width <= available) {
@@ -469,7 +472,7 @@ export function waxHeight(rows: number, m: WaxMetrics) {
  * The resting sheet: real phrases from her collection written faintly in wax,
  * the paper's own cream with the faintest raised edge, just readable if you
  * look. With no phrases to show, joined-up loops in her slant instead.
- * Centred between `top` and `bottom`.
+ * Centred between `top` and `bottom`, which the sheet keeps at its top.
  */
 export function paintWax(g: CanvasRenderingContext2D, w: number, top: number, bottom: number, m: WaxMetrics, phrases: string[], family: string, R: Rand) {
   const fs = m.waxFs;
@@ -481,7 +484,7 @@ export function paintWax(g: CanvasRenderingContext2D, w: number, top: number, bo
     const y0 = centre - ((rows.length - 1) * pitch) / 2 + fs * 0.32;
     rows.forEach((row, index) => {
       g.font = `${row.size}px ${family}`;
-      const x = m.padL + (index % 2 ? fs * 0.5 : 0) + R() * fs * 0.3;
+      const x = m.padL + waxIndent(index, fs) + R() * fs * 0.3;
       const y = y0 + index * pitch;
       // A raised edge first, then the wax, a shade brighter than the paper.
       g.fillStyle = "rgba(26,49,105,0.05)";
@@ -500,7 +503,7 @@ export function paintWax(g: CanvasRenderingContext2D, w: number, top: number, bo
   g.lineJoin = "round";
   for (let row = 0; row < lines; row++) {
     const span = (w - m.padL - m.padR - 24) * (row === lines - 1 ? 0.5 + R() * 0.2 : 0.78 + R() * 0.2);
-    let x = m.padL;
+    let x = m.padL + waxIndent(row, size);
     const base = first + row * linePitch;
     while (x < m.padL + span - size * 0.8) {
       const letters = 2 + Math.floor(R() * 6);

@@ -23,10 +23,11 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
  * Inês's expressions, and the brush paints whatever it saved. A failed reply
  * keeps its request, so trying again cannot spend a second pick.
  */
-export function StudentExpressions({ token }: { token: string }) {
+export function StudentExpressions({ studentId, token }: { studentId: string; token: string }) {
   const [collection, setCollection] = useState<Collection | null>(null);
   const [paints, setPaints] = useState<Paints | null>(null);
-  const [busy, setBusy] = useState(false);
+  /** The paint being painted, from the press until the reading opens (or the reply fails). */
+  const [busy, setBusy] = useState<PaintKey | null>(null);
   const [error, setError] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const [revealed, setRevealed] = useState(0);
@@ -58,7 +59,7 @@ export function StudentExpressions({ token }: { token: string }) {
     // cannot be read, the section stays away rather than raising an alarm.
     fetchStudentExpressions(token).then((value) => {
       if (!current || readSession() !== token) return;
-      const shown = value.expression ? paintFor(value.expression.id) : null;
+      const shown = value.expression ? paintFor(studentId, value.expression.id) : null;
       setPaints({ shown, next: nextPaint([shown]) });
       setCollection(value);
     }).catch(() => {});
@@ -67,7 +68,7 @@ export function StudentExpressions({ token }: { token: string }) {
       active.current = false;
       window.clearTimeout(settle.current);
     };
-  }, [token]);
+  }, [studentId, token]);
 
   // The card grows or shrinks from its last height, never jumping: a new
   // reading opening as the painted sheet closes round its phrase in the same
@@ -87,13 +88,11 @@ export function StudentExpressions({ token }: { token: string }) {
     if (Math.abs(to - from) >= 1) element.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: FACTS_OPEN, easing: OPEN_EASE });
   }, [resized]);
 
-  // The new reading takes the focus as its facts follow the paint; the
-  // crossed-out near-miss dries away as they do.
+  // The new reading takes the focus as its facts follow the paint.
   useLayoutEffect(() => {
     if (!revealed) return;
     result.current?.focus({ preventScroll: true });
     const still = reducedMotion();
-    painting.current?.fadeDecoy();
     window.clearTimeout(settle.current);
     settle.current = window.setTimeout(() => {
       if (active.current) card.current?.scrollIntoView({ block: "nearest", behavior: still ? "instant" : "smooth" });
@@ -116,23 +115,24 @@ export function StudentExpressions({ token }: { token: string }) {
     request.current ??= { id: crypto.randomUUID(), paint: paints.next };
     const { id: requestId, paint } = request.current;
     const still = reducedMotion();
-    setBusy(true);
+    setBusy(paint);
     setError("");
     setAnnouncement("Painting your expression…");
     const measure = () => { before.current = card.current?.getBoundingClientRect().height ?? null; };
     if (!still) {
       // It starts from the press; the pick is saved while the paint pools.
-      // The last reading fades where it is, so nothing below moves until the new one opens.
+      // The last reading waits in wax where it is, so nothing below moves until the new one opens.
       painting.current?.begin(paint, chooseDecoy(collection.shuffleLabels, previous?.expression));
       card.current?.querySelector(".paint-sheet")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
-    // A failed reply puts back what was there: the last painting, or the waiting sheet.
-    const putBack = () => {
+    // A failed reply puts back what was there: the last painting, or the
+    // waiting sheet with the freshest phrases in its wax.
+    const putBack = (labels = collection.shuffleLabels) => {
       if (still) return;
       measure();
       setResized((count) => count + 1);
-      if (previous) painting.current?.show(previous.expression, previous.id, paints.shown ?? paintFor(previous.id), true);
-      else painting.current?.rest(paints.next, collection.shuffleLabels, true);
+      if (previous) painting.current?.show(previous.expression, previous.id, paints.shown ?? paintFor(studentId, previous.id), true);
+      else painting.current?.rest(paints.next, labels, true);
     };
     try {
       const next = await fetchStudentExpressions(token, requestId);
@@ -142,7 +142,7 @@ export function StudentExpressions({ token }: { token: string }) {
         if (still) painting.current?.show(picked.expression, picked.id, paint);
         else await painting.current?.land(picked.expression, picked.id);
         if (!canUpdate()) return;
-        rememberPaint(picked.id, paint);
+        rememberPaint(studentId, picked.id, paint);
         request.current = null;
         measure();
         settling.current = true;
@@ -156,7 +156,7 @@ export function StudentExpressions({ token }: { token: string }) {
         if (!canUpdate()) return;
         request.current = null;
         refocus.current = true;
-        putBack();
+        putBack(next.shuffleLabels);
         setCollection({ ...next, expression: previous });
         setAnnouncement("");
         if (next.canPick) setError("That expression is no longer available. Please try again.");
@@ -172,7 +172,7 @@ export function StudentExpressions({ token }: { token: string }) {
       setAnnouncement("");
     } finally {
       pending.current = false;
-      if (canUpdate()) setBusy(false);
+      if (canUpdate()) setBusy(null);
     }
   }
 
@@ -186,7 +186,7 @@ export function StudentExpressions({ token }: { token: string }) {
   const actions = (
     <div className="expression-reading__actions" lang="en">
       {collection.canPick ? (
-        <button className="button button--coral button--compact" disabled={busy} ref={button} type="button" onClick={() => void pick()}>
+        <button className="button button--coral button--compact" disabled={Boolean(busy)} ref={button} type="button" onClick={() => void pick()}>
           {busy ? "Painting…" : error ? "Try again" : expression ? "Paint another" : "Paint it"}
         </button>
       ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
@@ -195,21 +195,22 @@ export function StudentExpressions({ token }: { token: string }) {
   );
   return (
     <section className="student-expressions" aria-labelledby="student-expressions-title">
-      <h2 className="visually-hidden" id="student-expressions-title">{TITLE}</h2>
+      <h2 className="visually-hidden" id="student-expressions-title" lang="pt-PT">{TITLE}</h2>
       <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
       {collection.canPick || expression ? (
         <div
           className="expression-reading"
           data-busy={busy ? "" : undefined}
-          data-paint={expression ? (paints.shown ?? paints.next) : paints.next}
+          /* The card takes the new paint as it lands: its labels and dabs while it paints, then the reading. */
+          data-paint={busy ?? (expression ? (paints.shown ?? paints.next) : paints.next)}
           data-state={expression ? "read" : "waiting"}
           data-unpainted={unpainted ? "" : undefined}
           ref={card}
         >
           <ExpressionPainting ref={painting} start={start} onUnavailable={() => setUnpainted(true)} />
           {expression ? (
-            // While another is painted, the last reading fades where it stands and is out of reach.
-            <article className="expression-card expression-reading__text" inert={busy} key={expression.id} lang="pt-PT" ref={result} tabIndex={-1}>
+            // While another is painted, the last reading waits in wax where it stands, out of reach.
+            <article className="expression-card expression-reading__text" inert={Boolean(busy)} key={expression.id} lang="pt-PT" ref={result} tabIndex={-1}>
               <h3 className="expression-reading__title">{expression.expression}</h3>
               <ExpressionMeanings item={expression} />
               <ExpressionExamples item={expression} />
@@ -218,7 +219,7 @@ export function StudentExpressions({ token }: { token: string }) {
           ) : (
             <>
               {/* At rest the sheet invites; the hidden heading says the same to assistive technology. */}
-              <p aria-hidden="true" className="expression-reading__label">{TITLE}</p>
+              <p aria-hidden="true" className="expression-reading__label" lang="pt-PT">{TITLE}</p>
               <div aria-hidden="true" className="expression-reading__waiting">
                 {WAITING.map((label) => <p key={label}><span className="expression-card__label">{label}</span><span className="expression-reading__wax" /></p>)}
               </div>

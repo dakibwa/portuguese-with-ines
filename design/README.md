@@ -554,9 +554,11 @@ reading's title; the facts follow it.
   words as a small uppercase label at its top, in the waiting paint's
   lettering colour, and `Paint it`. Once painted, the card is the whole
   section, and the compact `Paint another` ends the row of the reading's
-  themes, at the foot of the facts at every width. It moves to a line of its
-  own only when the themes leave it no room, stays a 44px target and never
-  becomes a full-width slab.
+  themes, at the foot of the facts at every width. On a narrow column that row
+  starts at the dabs' column and runs to the card's edge, so a theme and the
+  button share it; the button moves to a line of its own only for several
+  themes (or, on the narrowest phones, one long one), stays a 48px target and
+  never becomes a full-width slab.
 - Colour: each painting is in one of five paints, every one with lettering
   clear of AA: deep blue `#203E82`, blue `#2C54AA`, coral `#B43A26` and
   lavender ink `#554F91` carry cream `#FBF4E5` lettering; lavender `#AAA4E6`
@@ -564,10 +566,12 @@ reading's title; the facts follow it.
   never the colour of the last one painted on this device, nor of its family
   (the two blues, the two lavenders), so each one reads as a new colour. A
   returning student sees their expression in the colour it was painted in,
-  remembered on the device, or else in a colour that expression always gets. The reading's
-  labels, dabs, marked words and the drops thrown off the brush all follow the
-  paint and its companion colours; on lavender the labels are in lavender ink
-  and the marked words take a stronger lavender wash, so both still read.
+  remembered on the device for each student (two students sharing a device
+  keep their own colours), or else in a colour that expression always gets.
+  The reading's labels, dabs, marked words and the drops thrown off the brush
+  all follow the paint and its companion colours; on lavender the labels are
+  in lavender ink and the marked words take a stronger lavender wash, so both
+  still read.
 - Room around the words (Dan: "give it space so the words fit comfortably
   inside so it's not ambiguous"): every letter sits in solid paint. The band is
   sized round the phrase's own letters, with generous paint above the first
@@ -580,17 +584,19 @@ reading's title; the facts follow it.
   it needs at the smallest, and the sheet grows to hold them.
 - Composition: on a phone the sheet fills the cream card and the reading opens
   beneath it. From a landscape phone up, two columns each run from the card's
-  top: the painting with its example straight beneath it, and beside it the
-  facts, then the themes and `Paint another`. Neither column waits on the
-  other's rows, so the taller one never opens a gap in the shorter; the
-  shorter simply ends sooner. A painted card with a one-line phrase fits a
-  landscape phone's screen (667×375, 844×390). On a very wide card the example
-  moves up into a third column with the themes and button beneath it, and all
-  three columns start level. At rest the sheet fills its column beside the
-  facts still to come, its wax centred. The painted sheet closes round its
-  phrase as the reading opens, so a one-line phrase never sits in a tall empty
-  sheet; nothing above the section moves, and the card grows and shrinks
-  smoothly below.
+  top on their own: the painting with its example straight beneath it, and
+  beside it the facts with the themes and `Paint another` straight beneath
+  them. Neither column waits on the other, so the taller one never opens a
+  gap in the shorter, whose foot simply ends sooner. A painted card with a
+  one-line phrase fits a landscape phone's screen (667×375, 844×390). On a
+  very wide card the example moves up into a third column with the themes and
+  button beneath it, and all three columns start level. At rest the sheet
+  fills its column beside the facts still to come, with its wax and pool at
+  its top, where the paint will land: the paint lands where it stays and never
+  slides on the sheet. The painted sheet closes round its phrase as the
+  reading opens, only its foot rising, so a one-line phrase never sits in a
+  tall empty sheet. Nothing above the section moves, and the card grows and
+  shrinks smoothly below.
 - At rest a few real, unseen phrases are written faintly in wax, just readable
   if you look, and a flat pool of the next paint waits by the margin. Beside
   the painting, the facts still to come wait in wax. Gouache is matte: nothing
@@ -602,13 +608,24 @@ reading's title; the facts follow it.
   crosses it out, before the real phrase is painted. The near-miss is brushed
   in a wash the real paint stands out against (lavender behind the blues and
   coral, coral behind lavender ink, deep blue behind lavender, which strikes a
-  broader stroke), so the strike always reads. It never sits under the real
-  phrase and dries away as the reading opens. The whole reveal, press to
-  reading, takes no more than about 3.2 seconds, even after a slow reply. The
-  wet front of each stroke rides its leading edge. `Paint another` brings the
-  sheet into view, fades the last reading where it stands (out of reach while
-  it is hidden) and paints afresh; the card keeps its height until the new
-  reading opens, so nothing below moves under the student while it paints.
+  broader stroke), so the strike always reads. It is left crossed out for a
+  beat, then dries away as the brush comes back and paints the real phrase in
+  its place, at the top where it stays. The whole reveal, press to
+  reading, takes about 3.2 seconds when the reply arrives within about 1.5
+  seconds; after a slower reply the painting follows it at its quickest pace.
+- No paint ever shows a straight edge. Each stroke touches down as a rounded
+  mark, blunt start and front together, and is led by a rounded wet front
+  with the bead riding it (the near-miss by a dry brush's ragged front); its
+  body ends rounded under the bead until the dry brush drags out from it, and
+  the bead soaks back into the body rather than floating off.
+- The card is never left empty while it paints. On the first press the facts
+  still to come stay in wax beside the painting, as at rest. `Paint another`
+  brings the sheet into view and the last reading waits in wax where it
+  stands, out of reach: its labels and dabs stay, taking the new paint's
+  colours, its words dry to wax lines and its themes fade, while the button
+  reads `Painting…`. The card never shortens while it paints, and grows
+  smoothly only when a longer phrase needs the room, so nothing below jumps
+  under the student.
 - Only the button paints: no swipe or drag on the sheet, and no loose chapéu at
   the card's corner.
 - The painting is decorative: the pick is the Worker's and the brush paints only

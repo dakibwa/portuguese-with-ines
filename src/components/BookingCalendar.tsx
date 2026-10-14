@@ -4568,7 +4568,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       </StageElement>
 
       {isLessonsCalendarOverview && student?.role === "student" ? (
-        <StudentExpressions key={`${student.id}:${readSession()}`} token={readSession()} />
+        <StudentExpressions key={`${student.id}:${readSession()}`} studentId={student.id} token={readSession()} />
       ) : null}
 
     </section>
