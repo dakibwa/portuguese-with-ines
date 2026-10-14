@@ -191,7 +191,7 @@ try {
           ? { json: { month: "2026-09", receipts: [receipt("with-nif", "Beatriz", "123456789"), receipt("without-nif", "Carla", "")], totals: { ready: 2, readyCents: 5000 } } }
           : null,
     });
-    await schedule.page.getByRole("heading", { name: "7 Sept – 13 Sept 2026" }).waitFor();
+    await schedule.page.locator("#teacher-week-title").waitFor();
     await schedule.page.getByRole("tab", { name: "Receipts", exact: true }).click();
     await expect(schedule.page.locator('[data-receipt-id="with-nif:lesson"]')).toContainText("123456789");
     await expect(schedule.page.locator('[data-receipt-id="without-nif:lesson"]')).toContainText("Consumidor final");

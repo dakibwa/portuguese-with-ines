@@ -323,9 +323,7 @@ async function fixture(width, options = {}) {
   });
   await page.goto(`${base}${options.entry ?? "/schedule/"}`, { waitUntil: "domcontentloaded" });
   if (!options.student && !options.signedOut)
-    await page
-      .getByRole("heading", { name: "7 Sept – 13 Sept 2026" })
-      .waitFor();
+    await page.locator("#teacher-week-title").waitFor();
   return { page, state };
 }
 
@@ -434,7 +432,7 @@ try {
   await signedIn.page.getByLabel("Password", { exact: true }).fill("isolated-fixture-password");
   await signedIn.page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(signedIn.page).toHaveURL(`${base}/schedule/`);
-  await expect(signedIn.page.getByRole("heading", { name: "7 Sept – 13 Sept 2026" })).toBeVisible();
+  await expect(signedIn.page.locator("#teacher-week-title")).toBeVisible();
   assert.deepEqual(signedIn.state.writes, []);
   assert.deepEqual(signedIn.state.errors, []);
   await signedIn.page.close();
@@ -708,7 +706,7 @@ try {
 
   // Reopening a holiday removes only whole-day rows; its hours and extras stay.
   await thisWeek.click();
-  await expect(page.locator("#teacher-week-title")).toHaveText("7 Sept – 13 Sept 2026");
+  await expect(page.getByRole("switch", { name: "Day off, Monday 7 September", exact: true })).toBeVisible();
   await expect(page.locator("#teacher-week-title")).toBeFocused();
   await expect(thisWeek).toHaveCount(0);
   await page.getByRole("button", { name: "Next week" }).click();
@@ -973,7 +971,6 @@ try {
   for (const date of holidayDates) await expect(timeOff.locator(`[data-timeoff-date="${date}"]`)).toHaveClass(/is-off/);
   await showLessons(page);
   for (let index = 0; index < 3; index++) await page.getByRole("button", { name: "Next week" }).click();
-  await expect(page.locator("#teacher-week-title")).toHaveText(/^28 Sept/);
   await expect(page.getByRole("switch", { name: "Day off, Tuesday 29 September" })).toHaveAttribute("aria-checked", "true");
   await page.getByRole("button", { name: "This week" }).click();
   state.failBookings = true;

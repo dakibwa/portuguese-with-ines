@@ -39,7 +39,7 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
     onSelect(null);
   };
   const waitingOnStudent = next === "sign-in" || next === "card";
-  const status = next === "email" ? "Email needed" : next === "lessons" ? "No lessons yet" : next === "welcome" ? "Welcome ready" : next === "sign-in" ? "Waiting for sign-in" : "Waiting for card";
+  const status = next === "email" ? "" : next === "lessons" ? "No lessons yet" : next === "welcome" ? "Welcome ready" : next === "sign-in" ? "Waiting for sign-in" : "Waiting for card";
   const help: string[] = step === "price"
     ? [Object.keys(student.ownPrices ?? student.prices ?? {}).length ? "Custom lesson price set." : "Standard lesson price applies."]
     : step === "lessons" ? [
@@ -52,7 +52,7 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
           ? student.signedIn ? "Sign-in is set up." : "Student hasn’t signed in yet."
           : student.hasCard ? "Student has saved a card." : "Student hasn’t added a card yet.",
       ...(!student.email ? ["Email address needed."] : step === "card" && !student.hasCard && !student.signedIn ? ["Student needs to sign in first."] : []),
-    ] : step === "email" && !student.email ? ["Email address needed."] : [];
+    ] : [];
 
   useEffect(() => {
     if (!step || !body.current) return;
@@ -63,7 +63,7 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
     body.current.scrollIntoView({ block: "nearest" });
   }, [step]);
 
-  const primaryLabel = next === "email" ? "Add email" : next === "lessons" ? "Add a lesson" : next === "welcome" ? "Send welcome email" : "Send the link again";
+  const primaryLabel = next === "lessons" ? "Add a lesson" : next === "welcome" ? "Send welcome email" : "Send the link again";
   const send = (again: boolean) => onWelcome(student, again);
   const sendButton = (again: boolean) => <button
     className={`button button--${again ? "lilac" : "coral"} button--compact`}
@@ -81,7 +81,7 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
       disabled={disabled}
       onClick={() => onOpenProfile ? onOpenProfile() : onSelect(step === "email" ? null : "email")}
       type="button"
-    ><AccountAvatar mark={student.mark} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong><span className="teacher-setup__status">{status}</span></span></button>
+    ><AccountAvatar mark={student.mark} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{status ? <span className="teacher-setup__status">{status}</span> : null}</span></button>
     <ol className="teacher-setup__steps" ref={stepControls}>
       {steps.map(entry => <li className={entry.done ? "is-done" : entry.lockedReason ? "is-locked" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
         <button
@@ -98,7 +98,7 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
     </ol>
     {step ? <div className="teacher-setup__action teacher-setup__close">
       <button className="teacher-dialog-close" aria-label="Close" aria-controls={paneId} disabled={disabled} onClick={close} type="button"><X size={20} aria-hidden="true" /></button>
-    </div> : <div className="teacher-setup__action"><button
+    </div> : next !== "email" ? <div className="teacher-setup__action"><button
       className={`button button--${owner === "Yours" ? "coral" : "lilac"} button--compact`}
       disabled={disabled || ((next === "welcome" || next === "sign-in" || next === "card") && Boolean(sending))}
       onClick={() => {
@@ -106,7 +106,7 @@ export function StudentSetupRow({ setup, token, step: requestedStep, sending, lo
         else onSelect(next);
       }}
       type="button"
-    >{sending === student.id ? "Sending…" : primaryLabel}<span className="visually-hidden"> for {student.name}</span></button></div>}
+    >{sending === student.id ? "Sending…" : primaryLabel}<span className="visually-hidden"> for {student.name}</span></button></div> : null}
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
     {step ? <div className={`teacher-setup__body${statusStep ? " teacher-setup__body--status" : ""}`} id={paneId} aria-label={`${student.name}’s setup`} role="region" ref={body} tabIndex={-1}>
       <div className="teacher-setup__body-heading">
