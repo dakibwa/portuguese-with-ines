@@ -1505,7 +1505,13 @@ as a form:
   with no `at`, each fact beside one of the confirm step's dabs with its label
   small above it, Google Meet's mark beside a lesson's call and on its button,
   and a hand-cut button. The dabs and mark are PNGs on the live site
-  (`public/email/`, `npm run build:email-icons`);
+  (`public/email/`, `npm run build:email-icons`). The day-before reminder's
+  coral button is `Join Google Meet` when an online lesson's link is ready,
+  with `Change or cancel this lesson` as a quiet underlined link beneath it,
+  the email form of "a quiet link for a rare one" (14 October 2026);
+  otherwise its button is `Change or cancel this lesson`, as in the
+  confirmation. It names when free changes end as a date and time on the
+  lesson's own clock and uses no relative day words;
 - shorter helper copy: `Nothing booked yet.` alone; no intro sentence on the
   `Your account` sign-in; a clashing week `won't be booked; the rest go ahead`
   without the advice the choices bar already gives; the change overlay asks

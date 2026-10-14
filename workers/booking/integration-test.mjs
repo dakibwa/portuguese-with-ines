@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
-import worker, { chargeDueLessons, chargeDueSameDayFees, notifySeries, resendFailedEmails, retryPaymentRecovery, retryRefunds } from "./index.mjs";
+import worker, { chargeDueLessons, chargeDueSameDayFees, notifySeries, resendFailedEmails, retryPaymentRecovery, retryRefunds, sendLessonReminders } from "./index.mjs";
 import { createSession, createResetToken, hashPassword, sessionVersion } from "./auth.mjs";
 import { createManageToken, readManageToken } from "./tokens.mjs";
 import { findRecurringCode, studentLessonType, priceForMove } from "./rates.mjs";
@@ -1634,6 +1634,130 @@ await test("a paid teacher cancellation keeps its message through an immediate o
     releaseEmail();
   }
 });
+// The day-before reminder (14 October 2026). A window nothing else uses; every
+// assertion is by reference, since earlier fixtures may sit nearby.
+await test("the day-before reminder goes once per lesson version, on its own clock, never after a fresh email or for a cancelled lesson, and is never rebuilt as a confirmation", async () => {
+  const N = new Date("2026-11-02T18:00:00.000Z");
+  const lesson = (id, start, fields = {}) => {
+    booking(id, { start, end: new Date(Date.parse(start) + 3600000).toISOString() });
+    for (const [column, value] of Object.entries(fields)) db.prepare(`UPDATE bookings SET ${column} = ? WHERE id = ?`).run(value, id);
+  };
+  const logged = (id, key, status, at, kind = "student_lesson_reminder") =>
+    db.prepare("INSERT INTO email_log (booking_id,kind,recipient,dedupe_key,status,created_at) VALUES (?,?,?,?,?,?)").run(id, kind, "alice@example.invalid", key, status, at);
+  const remindersFor = (id) => sentEmails.filter((sent) => sent.subject.startsWith("Your lesson is coming up") && sent.text.split("\n").includes(`Reference: ${id}`));
+  // Six a minute, so a few ticks stand in for the next few minutes.
+  const sweep = async () => { for (let tick = 0; tick < 3; tick++) await sendLessonReminders(env, N); };
+  const google = { GOOGLE_CALENDAR_ENABLED: "1", GOOGLE_CALENDAR_CLIENT_ID: "isolated-calendar-client", GOOGLE_CALENDAR_CLIENT_SECRET: "isolated-calendar-secret",
+    GOOGLE_CALENDAR_TOKEN_KEY: "ab".repeat(32), GOOGLE_CALENDAR_REDIRECT_URI: "https://api.example.invalid/google-calendar/callback" };
+  const realPrepare = DB.prepare;
+  captureEmail();
+  Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", TEACHER_NOTIFICATIONS_ENABLED: "1" });
+  try {
+    // With Google Meet off there is no link to promise.
+    lesson("rem-nolink-off", "2026-11-03T16:00:00.000Z");
+    await sweep();
+    const [off, ...offMore] = remindersFor("rem-nolink-off");
+    assert.equal(offMore.length, 0);
+    assert.ok(off.text.includes("Olá Test, your lesson with Inês is coming up.\n"));
+    assert.ok(!off.text.includes("Google Meet") && !off.text.includes("ready yet"));
+
+    Object.assign(env, google);
+    lesson("rem-meet", "2026-11-03T17:00:00.000Z", { student_timezone: "America/Los_Angeles", meeting_url: "https://meet.google.com/abc-defg-hij" });
+    lesson("rem-nolink", "2026-11-03T16:30:00.000Z");
+    lesson("rem-cancelled", "2026-11-03T12:00:00.000Z", { status: "cancelled" });
+    lesson("rem-fresh", "2026-11-03T13:00:00.000Z", { created_at: "2026-11-02T17:00:00.000Z" });
+    lesson("rem-moved", "2026-11-03T14:00:00.000Z", { sequence: 1 });
+    logged("rem-moved", "student:rescheduled:rem-moved:1", "sent", "2026-11-02T08:00:00.000Z", "student_rescheduled");
+    db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('rem-series','alice','single',2,870,?,?)").run(N.toISOString(), N.toISOString());
+    lesson("rem-series", "2026-11-03T14:30:00.000Z", { series_id: "rem-series", sequence: 3 });
+    logged("rem-series", "student:series-moved:rem-series:3", "sent", "2026-11-02T08:00:00.000Z", "student_series_moved");
+    lesson("rem-retry", "2026-11-03T15:00:00.000Z", { location: "porto", sequence: 2, payment_status: "paid" });
+    logged("rem-retry", "student:reminder:rem-retry:2", "failed", "2026-09-05T09:00:00.000Z");
+    lesson("rem-recent", "2026-11-03T15:30:00.000Z");
+    logged("rem-recent", "student:reminder:rem-recent:0", "failed", "2026-11-02T17:58:00.000Z");
+    lesson("rem-race", "2026-11-03T16:15:00.000Z", { meeting_url: "https://meet.google.com/xyz-abcd-efg" });
+    logged("rem-race", "student:reminder:rem-race:0", "failed", "2026-09-05T09:00:00.000Z");
+    lesson("rem-near", "2026-11-03T07:00:00.000Z");
+    lesson("rem-far", "2026-11-03T19:00:00.000Z");
+    lesson("rem-noemail", "2026-11-03T12:30:00.000Z", { student_email: "no-email:rem" });
+
+    // A failed reminder has a booking id, but is not "booked": it retries in its own sweep.
+    await resendFailedEmails(env);
+    assert.equal(sentEmails.filter((sent) => /Reference: rem-(retry|race)\b/.test(sent.text)).length, 0, "never rebuilt as a confirmation");
+
+    // Another tick reclaims the failed row first: only the one that flips it sends.
+    beforeRun = (sql, values) => {
+      if (sql.startsWith("UPDATE email_log SET status = 'pending'") && values[1] === "student:reminder:rem-race:0") {
+        db.prepare("UPDATE email_log SET status = 'pending' WHERE dedupe_key = ?").run(values[1]);
+      }
+    };
+    await sweep();
+    await sweep();
+    beforeRun = null;
+
+    const [meet, ...meetMore] = remindersFor("rem-meet");
+    assert.equal(meetMore.length, 0, "once");
+    assert.equal(meet.subject, "Your lesson is coming up — Tue 3 Nov, 09:00");
+    for (const part of ["09:00 · Los Angeles time", "Join Google Meet: https://meet.google.com/abc-defg-hij", "Change or cancel this lesson: https://lesson.example/book/?manage=",
+      "Free to change or cancel until Mon 2 Nov, 19:00. After that, there’s a €5 late change fee."]) {
+      assert.ok(meet.text.includes(part), part);
+    }
+    assert.ok(meet.text.indexOf("Join Google Meet") < meet.text.indexOf("Change or cancel this lesson"), "joining is the button, changing the quiet link");
+    assert.ok(meet.html.includes("text-decoration:underline\">Change or cancel this lesson</a>"));
+    assert.equal(meet.attachments, undefined);
+    assert.ok(db.prepare("SELECT meeting_notified_at FROM bookings WHERE id='rem-meet'").get().meeting_notified_at, "the link was delivered, so no second link email");
+
+    const [coming, ...comingMore] = remindersFor("rem-nolink");
+    assert.equal(comingMore.length, 0);
+    assert.ok(coming.text.includes("Its Google Meet link isn’t ready yet; we’ll email it to you as soon as it is."));
+    assert.equal(coming.text.match(/Change or cancel this lesson/g).length, 1, "the button, with no quiet link beside it");
+    assert.ok(!coming.text.includes("Join Google Meet"));
+    // A lesson moved since is a new version, reminded at its own time.
+    db.prepare("UPDATE bookings SET sequence = 1 WHERE id = 'rem-nolink'").run();
+    await sweep();
+    assert.equal(remindersFor("rem-nolink").length, 2);
+
+    const [porto, ...portoMore] = remindersFor("rem-retry");
+    assert.equal(portoMore.length, 0);
+    for (const part of ["Where: In Porto", "15:00 · Porto time", "Free to change or cancel until Tue 3 Nov, 01:00. After that, it can’t be changed or refunded."]) assert.ok(porto.text.includes(part), part);
+    assert.equal(porto.text.match(/Change or cancel this lesson/g).length, 1);
+    assert.ok(!porto.text.includes("Google Meet"));
+    assert.equal(db.prepare("SELECT status FROM email_log WHERE dedupe_key='student:reminder:rem-retry:2'").get().status, "sent");
+
+    assert.equal(remindersFor("rem-race").length, 0);
+    assert.equal(db.prepare("SELECT meeting_notified_at FROM bookings WHERE id='rem-race'").get().meeting_notified_at, null, "a reminder that did not go does not mark the link sent");
+    for (const id of ["rem-cancelled", "rem-fresh", "rem-moved", "rem-series", "rem-recent", "rem-near", "rem-far", "rem-noemail"]) assert.equal(remindersFor(id).length, 0, id);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE booking_id = 'rem-noemail'").get().n, 0);
+    assert.ok(!sentEmails.some((sent) => sent.to[0].startsWith("no-email:") || sent.to[0] === "ines@example.invalid"), "nothing to the placeholder, and no copy for Inês");
+
+    // A lesson cancelled or moved between selecting it and sending is left alone.
+    lesson("rem-gone", "2026-11-03T10:00:00.000Z");
+    lesson("rem-shifted", "2026-11-03T10:30:00.000Z");
+    DB.prepare = (sql) => {
+      const statement = realPrepare(sql);
+      if (sql === "SELECT * FROM bookings WHERE id = ?") {
+        const read = statement.first;
+        statement.first = () => {
+          db.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = 'rem-gone'").run();
+          db.prepare("UPDATE bookings SET sequence = 1, starts_at = '2026-11-04T10:00:00.000Z' WHERE id = 'rem-shifted'").run();
+          return read();
+        };
+      }
+      return statement;
+    };
+    await sweep();
+    DB.prepare = realPrepare;
+    assert.equal(remindersFor("rem-gone").length + remindersFor("rem-shifted").length, 0);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE booking_id IN ('rem-gone','rem-shifted')").get().n, 0);
+  } finally {
+    DB.prepare = realPrepare;
+    beforeRun = null;
+    for (const key of Object.keys(google)) delete env[key];
+    Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0" });
+    delete env.TEACHER_EMAIL;
+    releaseEmail();
+  }
+});
 const bookedEmailFor = (reference) => sentEmails.find((sent) => sent.subject.startsWith("Inês has booked your Portuguese lesson") && sent.text.includes(`Reference: ${reference}`));
 await test("Inês booking an address someone registered first shuts that registrant out and lets the mailbox's owner in", async () => {
   const ip = { "CF-Connecting-IP": "198.51.100.61" };
@@ -2102,8 +2226,12 @@ await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours
     const filledTo = db.prepare("SELECT filled_to FROM booking_series WHERE id=?").get(seriesId).filled_to;
     const previous = new Date(Date.parse(`${filledTo}T00:00:00Z`) - 7 * 86400000).toISOString().slice(0, 10);
     db.prepare("UPDATE booking_series SET filled_to=? WHERE id=?").run(previous, seriesId);
+    // The same tick sends the day-before reminder: 14 to 24 hours ahead of the frozen clock.
+    booking("tick-reminder", { start: "2026-09-06T00:10:00.000Z", end: "2026-09-06T01:10:00.000Z" });
+    db.prepare("UPDATE bookings SET created_at='2026-09-01T00:00:00.000Z' WHERE id='tick-reminder'").run();
     await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.parse("2026-09-06T03:10:00.000Z") }, env, ctx);
     await drain();
+    assert.equal(db.prepare("SELECT status FROM email_log WHERE dedupe_key='student:reminder:tick-reminder:0'").get()?.status, "dry-run", "the minute tick sends it");
     const regrown = db.prepare("SELECT added_by_teacher, payment_status FROM bookings WHERE series_id=? AND starts_at=?").get(seriesId, last.starts_at);
     assert.deepEqual({ ...regrown }, { added_by_teacher: 1, payment_status: "not_required" }, "the week comes back as hers, at 04:00 Porto time");
   } finally {
@@ -2291,6 +2419,10 @@ await test("she sets a student up and adds their lessons without emailing them, 
     assert.equal((await moved.json()).emailed, false);
     await drain();
     assert.equal(to("quiet@example.invalid").length, 0, "nothing reaches the student before their welcome");
+    // Nor does a reminder: it would be their first email, ahead of the welcome.
+    const remindAt = new Date(Date.parse(db.prepare("SELECT starts_at FROM bookings WHERE id=?").get(lessons[2].id).starts_at) - 23 * 3600000);
+    await sendLessonReminders(env, remindAt);
+    assert.equal(to("quiet@example.invalid").length, 0, "no reminder before the welcome");
 
     const welcomed = await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: {} });
     assert.equal(welcomed.status, 200, await welcomed.clone().text());
@@ -2300,6 +2432,10 @@ await test("she sets a student up and adds their lessons without emailing them, 
     assert.ok(welcome.text.includes("Inês has set up your lessons"));
     assert.ok((welcome.text.match(/Lesson · Online/g) ?? []).length >= 5, "every lesson so far is listed");
     assert.equal(db.prepare("SELECT awaiting_welcome FROM students WHERE id=?").get(student.id).awaiting_welcome, 0);
+    // Once welcomed, the lesson still more than 14 hours away is reminded, once.
+    await sendLessonReminders(env, remindAt);
+    await sendLessonReminders(env, remindAt);
+    assert.equal(to("quiet@example.invalid").filter((sent) => sent.subject.startsWith("Your lesson is coming up")).length, 1);
 
     // After the welcome, her changes reach them as usual.
     await call(`/admin/bookings/${lessons[1].id}/cancel`, { user: "teacher", body: {} });

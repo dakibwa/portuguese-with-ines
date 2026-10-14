@@ -103,7 +103,7 @@ function base64(text) {
  * - A preheader controls the grey preview line in the inbox list. Without one,
  *   clients scrape the first visible text, which is usually the greeting.
  */
-function layout({ heading, preheader, intro, hero, heroNote, rows, callout, message, steps, action, footer }) {
+function layout({ heading, preheader, intro, hero, heroNote, rows, callout, message, steps, action, link, footer }) {
   // Each fact is a line beside one of the confirm step's dabs, its label small
   // above it: a list to glance down rather than a ruled table.
   const rowsHtml = rows.length
@@ -247,6 +247,15 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
           : ""
       }
 
+      ${
+        // A rare action under the one button, quiet and underlined (14 October
+        // 2026): the day-before reminder's "Change or cancel this lesson" when
+        // its button is Join Google Meet. The padding makes a 45px tap target.
+        link
+          ? `<tr><td align="center" style="padding:12px 32px 0"><a href="${escapeHtml(link.url)}" style="display:inline-block;padding:12px 8px;font:600 14px/1.5 ${SANS};color:${BRAND.blue};text-decoration:underline">${escapeHtml(link.label)}</a></td></tr>`
+          : ""
+      }
+
       <tr><td style="padding:26px 32px 30px">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
           <tr><td style="border-top:1px solid ${BRAND.rule};padding-top:18px">
@@ -272,7 +281,7 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
  * deleted anything a student had written between angle brackets, including part
  * of an address, from the text part while the HTML part showed it correctly.
  */
-function plainText({ heading, intro, hero, heroNote, rows, callout, message, steps, action, footer }) {
+function plainText({ heading, intro, hero, heroNote, rows, callout, message, steps, action, link, footer }) {
   const clean = (value) => String(value ?? "").trim();
   const lines = [heading, "", clean(intro)];
   if (message?.body?.trim()) lines.push("", clean(message.label), clean(message.body));
@@ -288,6 +297,7 @@ function plainText({ heading, intro, hero, heroNote, rows, callout, message, ste
   }
   if (steps?.items?.length) lines.push("", steps.title, ...steps.items.map((item, index) => `${index + 1}. ${clean(item)}`));
   if (action) lines.push("", `${action.label}: ${action.url}`);
+  if (link) lines.push("", `${link.label}: ${link.url}`);
   lines.push("", clean(footer), "portuguesewithines.com");
   return lines.join("\n");
 }
@@ -337,9 +347,14 @@ export async function deliver(env, { to, subject, content, calendar, dedupeKey, 
 
     if (previous?.status !== "failed") return { ok: true, skipped: "already-sent" };
 
-    await env.DB.prepare("UPDATE email_log SET status = 'pending', error = NULL, created_at = ? WHERE dedupe_key = ?")
+    // Two retries can both read 'failed' here, and only the one that flips it
+    // sends: the other finds the row already pending and stands down.
+    const reset = await env.DB.prepare(
+      "UPDATE email_log SET status = 'pending', error = NULL, created_at = ? WHERE dedupe_key = ? AND status = 'failed'"
+    )
       .bind(now, dedupeKey)
       .run();
+    if (reset?.meta && !reset.meta.changes) return { ok: true, skipped: "already-sent" };
   }
 
   const attachments = calendar
