@@ -1,5 +1,16 @@
 import { ExpressionProblem, publishedExpression } from "./expressions.mjs";
 
+/**
+ * Expressions are Inês's alone until Dan opens them to students (14 October
+ * 2026, Dan: "publish them but not for students just for ines currently").
+ * Only EXPRESSIONS_FOR_STUDENTS = "1" opens them; anything else, or nothing,
+ * keeps them closed.
+ */
+export const expressionsOpenToStudents = (env) => env.EXPRESSIONS_FOR_STUDENTS === "1";
+
+/** What a student reads while expressions are closed: nothing to show, so Your lessons shows no card. */
+export const closedExpressions = () => ({ expression: null, canPick: false, hasPublished: false, shuffleLabels: [] });
+
 // The handler resolves studentId from the session. Clients never choose an
 // expression ID, reset their history, or supply another student's identity.
 export async function studentExpressions(db, studentId, requestId) {

@@ -165,7 +165,7 @@ endpoint, and this feature sends no email.
 
 | Method and path | Request and result |
 | --- | --- |
-| `GET /admin/expressions` | `{ expressions }`, ordered by `sort_order`, then `id`. |
+| `GET /admin/expressions` | `{ expressions, openToStudents }`: the collection ordered by `sort_order`, then `id`, and whether students can see expressions (the switch below), so her copy follows it. |
 | `POST /admin/expressions` | Creates the supplied content as an unpublished draft; `{ expression }`, HTTP 201. |
 | `POST /admin/expressions/:id` | Replaces content, with `updatedAt` from the last read; `{ expression }`. |
 | `POST /admin/expressions/:id/publish` | `{ published: 0 or 1, updatedAt }`; `{ expression }`. Publishing requires both meanings and one or two examples. |
@@ -198,7 +198,11 @@ Updates, publication and deletion compare `updatedAt` in the write itself.
 Stale requests receive HTTP 409. Reordering is one conditional SQLite statement
 using JSON IDs, so it cannot leave a partially reordered collection and rejects
 a changed order or membership. The browser retains failed drafts; a load failure
-is distinct from an empty collection. Nothing is cached in browser storage.
+is distinct from an empty collection. Nothing of the collection is cached in
+browser storage; her try-out (the students' paint reveal just under her Add an expression button,
+painting her whole collection, drafts included) keeps only the IDs she has
+painted this round on her device, and it never calls the student endpoints or
+writes to the Worker.
 
 The migration includes 52 drafts, preserving the original expression IDs,
 Portuguese meaning, literal English, idiomatic English equivalent (in
@@ -217,7 +221,23 @@ or overwrite an existing collection. Reorder is bounded to 500 entries.
 
 ## Student expression picker
 
-A signed-in student can pick a published expression below Your lessons. The
+**Closed to students until Dan opens it** (14 October 2026, Dan: "publish them
+but not for students just for ines currently"). The Worker var
+`EXPRESSIONS_FOR_STUDENTS` is the one switch, and only exactly `"1"` opens it;
+`workers/booking/wrangler.jsonc` sets `"0"`. Sign-in and the student-role check
+come first, as below. Then, while closed, `GET /me/expressions` answers
+`{ expression: null, canPick: false, hasPublished: false, shuffleLabels: [] }`
+without reading the database, so Your lessons shows no card, and
+`POST /me/expressions/pick` is refused with HTTP 404 (`Expressions are not open
+yet.`) before anything is written. `GET /admin/expressions` reports the same
+switch as `openToStudents`. Inês can still draft, publish and reorder, and paint
+any expression in her own tab. To open expressions to students, set
+`"EXPRESSIONS_FOR_STUDENTS": "1"` in `workers/booking/wrangler.jsonc` and
+release: the Worker deploys first (the release's `worker` job, or
+`npm run worker:deploy` by hand). Setting it back to `"0"` closes them again
+without touching anyone's history.
+
+Once open, a signed-in student can pick a published expression below Your lessons. The
 server chooses randomly from that student's unseen published entries. Different
 students can receive the same expression. Teachers use the private preview in
 Expressions; neither anonymous callers nor teacher sessions can draw.
@@ -237,19 +257,19 @@ and student + request. Retrying one request returns the original result without
 consuming another. History belongs to the account, across browsers and devices;
 unpublishing and republishing an expression does not reset it.
 
-The UI restores the last available result on return. The short slowing reel
-only presents the server's already-saved result. Reduced motion skips it, and
+The UI restores the last available result on return. The painting only
+presents the server's already-saved result. Reduced motion skips it, and
 navigation cancels it without undoing the pick. No published entries means no
 student card. An exhausted pool waits for newly published entries; there is no
 student reset or repeat action. Failed or lost replies retain the request UUID
 for retry. All replies use the existing no-cache and origin rules; POST bodies
 are bounded to 1 KiB.
 
-**Release is pending Dan and Inês's review.** This change does not apply either
-migration, deploy the Worker, merge the PR or touch staging/production data.
-When Dan authorizes release, apply 0026 and then 0027 to the chosen database
-before the Worker and site release. Missing tables produce a controlled 503
-on the affected endpoint while the existing portal continues to work.
+**Released on 14 October 2026** (PR #133). Migrations 0026 and 0027 were
+applied by hand to staging and production D1 that day, before the Worker and
+site release. Expressions stay closed to students until
+`EXPRESSIONS_FOR_STUDENTS` is `"1"`. Missing tables would still produce a
+controlled 503 on the affected endpoint while the rest of the portal works.
 
 The content inventory, original schema and feature map are in
 [Expressions: source and scope](docs/expressions-stage-1.md). A public Expressões

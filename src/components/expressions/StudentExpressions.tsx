@@ -6,7 +6,7 @@ import { ExpressionPainting, type ExpressionPaintingHandle, type PaintingStart }
 import { FACTS_OPEN, OPEN_EASE, openDuration } from "@/components/expressions/painter";
 import { AuthApiError, readSession } from "@/lib/auth-api";
 import { chooseDecoy, nextPaint, paintFor, rememberPaint, type PaintKey } from "@/lib/expression-paint";
-import { fetchStudentExpressions, type StudentExpressions as Collection } from "@/lib/student-expressions-api";
+import { workerExpressions, type ExpressionSource, type StudentExpressions as Collection } from "@/lib/student-expressions-api";
 
 /** The colour the shown expression was painted in, and the one waiting for the next. */
 type Paints = { shown: PaintKey | null; next: PaintKey };
@@ -22,8 +22,11 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
  * "Uma expressão para ti": the press asks the Worker to pick and save one of
  * Inês's expressions, and the brush paints whatever it saved. A failed reply
  * keeps its request, so trying again cannot spend a second pick.
+ *
+ * `source` replaces the Worker: Inês's try-out paints from her own collection
+ * in her browser, and `studentId` is then her account, for her colours.
  */
-export function StudentExpressions({ studentId, token }: { studentId: string; token: string }) {
+export function StudentExpressions({ studentId, token, source }: { studentId: string; token: string; source?: ExpressionSource }) {
   const [collection, setCollection] = useState<Collection | null>(null);
   const [paints, setPaints] = useState<Paints | null>(null);
   /**
@@ -62,7 +65,7 @@ export function StudentExpressions({ studentId, token }: { studentId: string; to
     let current = true;
     // Expressions are a gift beside the lessons, never in their way: if they
     // cannot be read, the section stays away rather than raising an alarm.
-    fetchStudentExpressions(token).then((value) => {
+    (source ?? workerExpressions(token)).load().then((value) => {
       if (!current || readSession() !== token) return;
       const shown = value.expression ? paintFor(studentId, value.expression.id) : null;
       setPaints({ shown, next: nextPaint([shown]) });
@@ -73,7 +76,7 @@ export function StudentExpressions({ studentId, token }: { studentId: string; to
       active.current = false;
       window.clearTimeout(settle.current);
     };
-  }, [studentId, token]);
+  }, [studentId, token, source]);
 
   // The card grows or shrinks from its last height, never jumping: a new
   // reading opening as the painted sheet closes round its phrase in the same
@@ -144,7 +147,7 @@ export function StudentExpressions({ studentId, token }: { studentId: string; to
       else painting.current?.rest(paints.next, labels, true);
     };
     try {
-      const next = await fetchStudentExpressions(token, requestId);
+      const next = await (source ?? workerExpressions(token)).pick(requestId);
       if (!canUpdate()) return;
       const picked = next.expression;
       if (picked) {

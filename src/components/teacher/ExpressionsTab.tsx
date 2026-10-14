@@ -3,13 +3,28 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Eye, Plus } from "lucide-react";
 import { ExpressionCard } from "@/components/expressions/ExpressionCard";
+import { StudentExpressions } from "@/components/expressions/StudentExpressions";
 import { ExpressionDialog } from "@/components/teacher/ExpressionDialog";
 import { deleteExpression, fetchExpressions, publishExpression, reorderExpressions, saveExpression } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
+import { tryOutExpressions } from "@/lib/expression-try-out";
 import { searchExpression, type Expression, type ExpressionInput } from "@/lib/expressions";
 
-export function ExpressionsTab({ token }: { token: string }) {
+/**
+ * Her try-out: the students' own paint reveal, painting from her whole
+ * collection, drafts included, in her browser alone. Each press reads the
+ * collection as it stands, so an edit is painted the next time it comes up.
+ */
+function TryOut({ accountId, token, rows }: { accountId: string; token: string; rows: Expression[] }) {
+  const [source] = useState(() => tryOutExpressions(accountId, rows));
+  useEffect(() => source.update(rows), [source, rows]);
+  return <StudentExpressions source={source} studentId={accountId} token={token} />;
+}
+
+export function ExpressionsTab({ token, accountId }: { token: string; accountId: string }) {
   const [expressions, setExpressions] = useState<Expression[] | null>(null);
+  /** Whether students can see expressions yet (the Worker's switch); unknown until the collection loads. */
+  const [openToStudents, setOpenToStudents] = useState<boolean | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -28,8 +43,8 @@ export function ExpressionsTab({ token }: { token: string }) {
   useEffect(() => {
     let current = true;
     setExpressions(null); setError("");
-    fetchExpressions(token).then((rows) => {
-      if (current && readSession() === token) setExpressions(rows);
+    fetchExpressions(token).then((collection) => {
+      if (current && readSession() === token) { setExpressions(collection.expressions); setOpenToStudents(collection.openToStudents); }
     }).catch((caught) => {
       if (current && readSession() === token) setError(caught instanceof Error ? caught.message : "Expressions couldn’t be loaded.");
     });
@@ -63,7 +78,9 @@ export function ExpressionsTab({ token }: { token: string }) {
     const saved = await publishExpression(token, item, item.published ? 0 : 1);
     if (canUpdate()) {
       replace(saved);
-      setNotice(saved.published ? "Published. Your students can now pick this expression." : "Moved back to draft.");
+      setNotice(!saved.published ? "Moved back to draft." : openToStudents
+        ? "Published. Your students can now pick this expression."
+        : "Published. Your students will see it once expressions open to them.");
     }
   }
   async function move(index: number, direction: -1 | 1) {
@@ -94,8 +111,10 @@ export function ExpressionsTab({ token }: { token: string }) {
           Add an expression
         </button>
       </div>
+      {rows.length ? <TryOut accountId={accountId} rows={rows} token={token} /> : null}
       <ul className="booking-payment-facts teacher-expressions__help">
-        <li>Your students can pick published expressions from Your lessons.</li>
+        {openToStudents === true ? <li>Your students can pick published expressions from Your lessons.</li> : null}
+        {openToStudents === false ? <li>Only you can see expressions for now.{rows.length ? " Paint one above to see what your students will get." : ""}</li> : null}
         <li>Add both meanings and one or two examples before publishing.</li>
       </ul>
       <div className="teacher-form teacher-expressions__filters">
@@ -135,7 +154,7 @@ export function ExpressionsTab({ token }: { token: string }) {
           );
         })}
       </div>
-      {dialog ? <ExpressionDialog key={`${dialog.expression?.id ?? "new"}-${dialog.preview}`} expression={dialog.expression} preview={dialog.preview} fallbackFocus={addButton} onSave={save} onDelete={remove} onClose={() => setDialog(null)} /> : null}
+      {dialog ? <ExpressionDialog key={`${dialog.expression?.id ?? "new"}-${dialog.preview}`} expression={dialog.expression} preview={dialog.preview} openToStudents={openToStudents === true} fallbackFocus={addButton} onSave={save} onDelete={remove} onClose={() => setDialog(null)} /> : null}
     </section>
   );
 }

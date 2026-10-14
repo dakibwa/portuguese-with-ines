@@ -798,7 +798,7 @@ export function TeacherSchedule() {
         <TeacherMeetConnection token={token} onAttentionChange={setMeetAttention} />
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "expressions"}>
-        {activeTab === "expressions" ? <ExpressionsTab token={token} /> : null}
+        {activeTab === "expressions" ? <ExpressionsTab accountId={me?.id ?? "teacher"} token={token} /> : null}
       </div>
       </div>
       {studentDialog ? (

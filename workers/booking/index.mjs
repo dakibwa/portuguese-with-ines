@@ -67,7 +67,7 @@ import {
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
-import { pickExpression, studentExpressions } from "./student-expressions.mjs";
+import { closedExpressions, expressionsOpenToStudents, pickExpression, studentExpressions } from "./student-expressions.mjs";
 import { findRecurringCode, studentRates, studentLessonType, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
 import { formatEuros } from "./money.mjs";
@@ -4453,6 +4453,13 @@ async function handleStudentExpressions(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
   if (student.role !== "student") return fail("The picker is for student accounts. Use the preview in Expressions.", 403, request, env);
+  // Closed to students (the default): they read an empty collection, so Your
+  // lessons shows no card, and a pick is refused before anything is written.
+  if (!expressionsOpenToStudents(env)) {
+    return request.method === "POST"
+      ? fail("Expressions are not open yet.", 404, request, env)
+      : json(closedExpressions(), 200, request, env);
+  }
   try {
     const data = request.method === "POST"
       ? await pickExpression(env.DB, student.id, await readJson(request, 1024))
@@ -4869,6 +4876,8 @@ async function handleAdmin(request, env, ctx, url, path) {
   if (path === "/admin/expressions" || path.startsWith("/admin/expressions/")) {
     try {
       const data = await expressionsRequest(env.DB, request.method, path, request.method === "POST" ? await readJson(request, 131072) : {});
+      // Her copy follows the same switch as the students' picker.
+      if (path === "/admin/expressions" && request.method === "GET") data.openToStudents = expressionsOpenToStudents(env);
       return json(data, path === "/admin/expressions" && request.method === "POST" ? 201 : 200, request, env);
     } catch (error) {
       if (error instanceof ExpressionProblem) return fail(error.message, error.status, request, env);

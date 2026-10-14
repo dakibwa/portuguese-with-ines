@@ -44,6 +44,11 @@
     // A sandbox key under the production secret name must never be enough to
     // open checkout. Health and booking both fail closed until this is live.
     "STRIPE_EXPECTED_MODE": "live",
+    // Expressions are Inês's alone for now (14 October 2026, Dan). Students
+    // see none and cannot pick one; she paints them in her own tab. To open
+    // them to students, set this to "1" and release the Worker. Anything else
+    // keeps them closed.
+    "EXPRESSIONS_FOR_STUDENTS": "0",
     // Google Sign-In. Public by design — it identifies the app, and the Worker
     // verifies every ID token's signature and audience against it. The client
     // *secret* is not needed: this is the ID-token flow, not the server-side

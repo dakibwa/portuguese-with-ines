@@ -274,8 +274,14 @@ function expressionListReply(data: { expressions: Expression[] }) {
       new Set(data.expressions.map((row) => row.id)).size !== data.expressions.length) throw new Error(BOOKING_REPLY_ERROR);
   return data.expressions;
 }
-export function fetchExpressions(token: string) {
-  return adminRequest<{ expressions: Expression[] }>(token, "/admin/expressions").then(expressionListReply);
+/**
+ * Her collection, and whether students can see it yet (the Worker's
+ * EXPRESSIONS_FOR_STUDENTS switch), so her copy never promises what they see.
+ */
+export async function fetchExpressions(token: string): Promise<{ expressions: Expression[]; openToStudents: boolean }> {
+  const data = await adminRequest<{ expressions: Expression[]; openToStudents?: unknown }>(token, "/admin/expressions");
+  // A Worker from before the switch has no field: it let students pick, so the copy says they can.
+  return { expressions: expressionListReply(data), openToStudents: typeof data.openToStudents === "boolean" ? data.openToStudents : true };
 }
 export function saveExpression(token: string, input: ExpressionInput, previous?: Expression) {
   return adminRequest<{ expression: Expression }>(token, `/admin/expressions${previous ? `/${encodeURIComponent(previous.id)}` : ""}`, {

@@ -32,3 +32,19 @@ export async function fetchStudentExpressions(token: string, requestId?: string)
   }
   return data as StudentExpressions;
 }
+
+/**
+ * Where a reading's expressions come from: the collection as it stands (the
+ * last one painted, whether another can be, and unseen phrases for the wax),
+ * and a pick saved under `requestId`, so asking again with the same request
+ * returns the same expression.
+ */
+export type ExpressionSource = {
+  load(): Promise<StudentExpressions>;
+  pick(requestId: string): Promise<StudentExpressions>;
+};
+
+/** A student's own: the Worker picks and saves each one. */
+export function workerExpressions(token: string): ExpressionSource {
+  return { load: () => fetchStudentExpressions(token), pick: (requestId) => fetchStudentExpressions(token, requestId) };
+}
