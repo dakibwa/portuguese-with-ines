@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, Clock3 } from "lucide-react";
+import { Check, Clock3, X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { LessonForm } from "@/components/teacher/LessonForm";
 import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
@@ -29,11 +29,28 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
   const setBusy = (value: boolean) => { setBusyState(value); onBusy?.(value); };
   const [notice, setNotice] = useState("");
   const body = useRef<HTMLDivElement>(null);
+  const stepControls = useRef<HTMLOListElement>(null);
   const paneId = `teacher-setup-${student.id}`;
   const disabled = busy || locked || sending === student.id;
-  const close = () => onSelect(null);
+  const close = () => {
+    stepControls.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]')?.focus({ preventScroll: true });
+    onSelect(null);
+  };
   const waitingOnStudent = next === "sign-in" || next === "card";
   const status = next === "email" ? "Email needed" : next === "lessons" ? "No lessons yet" : next === "welcome" ? "Welcome ready" : next === "sign-in" ? "Waiting for sign-in" : "Waiting for card";
+  const help: string[] = step === "price"
+    ? [Object.keys(student.ownPrices ?? student.prices ?? {}).length ? "Custom lesson price set." : "Standard lesson price applies."]
+    : step === "lessons" ? [
+      ...(!steps.find(entry => entry.id === "lessons")?.done ? ["No lessons added yet."] : []),
+      student.awaitingWelcome ? "Lesson emails wait for the welcome email." : "Adding a lesson emails the student.",
+    ] : step === "welcome" || step === "sign-in" || step === "card" ? [
+      step === "welcome"
+        ? student.awaitingWelcome ? "Welcome email not sent yet." : student.signedIn ? "Sign-in is set up." : "Student hasn’t signed in yet."
+        : step === "sign-in"
+          ? student.signedIn ? "Sign-in is set up." : "Student hasn’t signed in yet."
+          : student.hasCard ? "Student has saved a card." : "Student hasn’t added a card yet.",
+      ...(!student.email ? ["Email address needed."] : step === "card" && !student.hasCard && !student.signedIn ? ["Student needs to sign in first."] : []),
+    ] : [];
 
   useEffect(() => {
     if (!step || !body.current) return;
@@ -63,7 +80,7 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
       onClick={() => onOpenProfile ? onOpenProfile() : onSelect(step === "email" ? null : "email")}
       type="button"
     ><AccountAvatar mark={student.mark} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong><span className="teacher-setup__status">{status}</span></span></button>
-    <ol className="teacher-setup__steps">
+    <ol className="teacher-setup__steps" ref={stepControls}>
       {steps.map(entry => <li className={entry.done ? "is-done" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
         <button
           aria-controls={paneId}
@@ -76,7 +93,9 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
         ><i aria-hidden="true">{entry.done ? <Check size={12} strokeWidth={3} /> : entry.id === next && waitingOnStudent ? <Clock3 size={12} strokeWidth={2} /> : null}</i><span>{entry.label}<span className="visually-hidden" id={`${paneId}-${entry.id}-status`}>{entry.done ? ": done" : entry.id === next && waitingOnStudent ? ": waiting for the student" : ": waiting"}</span></span></button>
       </li>)}
     </ol>
-    {!step ? <div className="teacher-setup__action"><button
+    {step ? <div className="teacher-setup__action teacher-setup__close">
+      <button className="teacher-dialog-close" aria-label="Close" aria-controls={paneId} disabled={disabled} onClick={close} type="button"><X size={20} aria-hidden="true" /></button>
+    </div> : <div className="teacher-setup__action"><button
       className={`button button--${owner === "Yours" ? "coral" : "lilac"} button--compact`}
       disabled={disabled || ((next === "welcome" || next === "sign-in" || next === "card") && Boolean(sending))}
       onClick={() => {
@@ -84,12 +103,13 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
         else onSelect(next);
       }}
       type="button"
-    >{sending === student.id ? "Sending…" : primaryLabel}<span className="visually-hidden"> for {student.name}</span></button></div> : null}
+    >{sending === student.id ? "Sending…" : primaryLabel}<span className="visually-hidden"> for {student.name}</span></button></div>}
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
     {step ? <div className="teacher-setup__body" id={paneId} aria-label={`${student.name}’s setup`} role="region" ref={body} tabIndex={-1}>
       <div className="teacher-setup__body-heading">
         <h3 id={`${paneId}-heading`}>{step === "email" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome email" : step === "sign-in" ? "Sign in" : "Saved card"}</h3>
-        <button className="teacher-text-button" disabled={disabled} onClick={close} type="button">Close</button>
+        {help.length ? <ul className="booking-payment-facts teacher-setup__help">{help.map(text => <li key={text}>{text}</li>)}</ul> : null}
+        {(step === "welcome" || step === "sign-in" || step === "card") && student.email ? <p className="teacher-setup__email">{student.email}</p> : null}
       </div>
       {step === "email" ? <StudentDetailsForm
         key={`${student.id}-details`}
@@ -98,7 +118,6 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
         student={student}
         token={token}
       /> : step === "price" ? <>
-        <ul className="booking-payment-facts teacher-setup__help"><li>{Object.keys(student.ownPrices ?? student.prices ?? {}).length ? "Custom lesson price set." : "Standard lesson price applies."}</li></ul>
         <StudentPrice
           key={`${student.id}-price`}
           idPrefix={`${paneId}-price`}
@@ -111,10 +130,6 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
           token={token}
         />
       </> : step === "lessons" ? <>
-        <ul className="booking-payment-facts teacher-setup__help">
-          {!steps.find(entry => entry.id === "lessons")?.done ? <li>No lessons added yet.</li> : null}
-          <li>{student.awaitingWelcome ? "Lesson emails wait for the welcome email." : "Adding a lesson emails the student."}</li>
-        </ul>
         <LessonForm
           idPrefix={`${paneId}-lesson`}
           onBusy={setBusy}
@@ -123,15 +138,6 @@ export function StudentSetupRow({ setup, token, step, sending, locked, attention
           token={token}
         />
       </> : <>
-        <ul className="booking-payment-facts teacher-setup__help">
-          <li>{step === "welcome"
-            ? student.awaitingWelcome ? "Welcome email not sent yet." : student.signedIn ? "Sign-in is set up." : "Student hasn’t signed in yet."
-            : step === "sign-in"
-              ? student.signedIn ? "Sign-in is set up." : "Student hasn’t signed in yet."
-              : student.hasCard ? "Student has saved a card." : "Student hasn’t added a card yet."}</li>
-          {!student.email ? <li>Email address needed.</li> : step === "card" && !student.hasCard && !student.signedIn ? <li>Student needs to sign in first.</li> : null}
-        </ul>
-        {student.email ? <p className="teacher-setup__email">{student.email}</p> : null}
         <div className="teacher-dialog-actions">
           {student.email ? sendButton(step !== "welcome" || !student.awaitingWelcome) : <button className="button button--coral button--compact" onClick={() => onSelect("email")} type="button">Add email</button>}
         </div>
