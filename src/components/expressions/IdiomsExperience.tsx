@@ -43,6 +43,14 @@ export function IdiomsExperience() {
   const [attempt, setAttempt] = useState(0);
   useEffect(() => { setReady(true); }, []);
   useEffect(() => {
+    // A native return or reload can follow the painting page's React turn.
+    // As with the teacher account handoff, chaining those turns can hold
+    // Chromium's destination frame. The destination stays free to render.
+    const leave = (event: PageSwapEvent) => event.viewTransition?.skipTransition();
+    window.addEventListener("pageswap", leave);
+    return () => window.removeEventListener("pageswap", leave);
+  }, []);
+  useEffect(() => {
     let current = true;
     setAccount(null);
     setChecked("");
