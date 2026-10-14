@@ -83,6 +83,61 @@ function escapeRich(value) {
   return escapeHtml(value).replace(/\r?\n/g, "<br>");
 }
 
+/*
+ * Nothing left alone on a line (14 October 2026, Dan: the site's bullets and
+ * calm). A date, a time and its clock, and a number and its word never break
+ * inside, and a short line keeps its last two words together. HTML only: the
+ * text part is exactly what the caller passed.
+ *
+ *   "text"  every rule: headings, intros, notes, steps, footers.
+ *   "date"  all but the last two words: the date panel, where a line is a date.
+ *   "row"   dates and clocks only. A row can hold a phone number, an email or a
+ *           student's own notes, which the general number rule must never touch.
+ */
+const NBSP = "\u00a0";
+function keepTogether(value, mode = "text") {
+  return String(value ?? "").split(/\r?\n/).map((line) => {
+    let tied = line.replace(/ · ([^·]+ time)$/, (_, clock) => `${NBSP}·${NBSP}${clock.replace(/ /g, NBSP)}`);
+    if (mode !== "row") tied = tied.replace(/(\b\d{1,2}|€\d+(?:[.,]\d{2})?) (?=\S)/g, `$1${NBSP}`);
+    tied = tied
+      // A day keeps its month even in a row, where other numbers are left alone.
+      .replace(/\b(\d{1,2}) (?=(?:January|February|March|April|May|June|July|August|September|October|November|December)\b)/g, `$1${NBSP}`)
+      .replace(/\b([A-Z][a-z]+) (?=\d{4}\b)/g, `$1${NBSP}`)
+      .replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?=\d)/g, `$1${NBSP}`)
+      .replace(/\bat (?=\d{1,2}:\d{2})/g, `at${NBSP}`);
+    const last = tied.lastIndexOf(" ");
+    if (mode === "text" && last > 0 && tied.length - tied.lastIndexOf(" ", last - 1) - 1 <= 30) {
+      tied = `${tied.slice(0, last)}${NBSP}${tied.slice(last + 1)}`;
+    }
+    return tied;
+  }).join("\n");
+}
+
+/** Escaped, with line breaks, kept together. */
+function richTogether(value, mode = "text") {
+  return escapeRich(keepTogether(value, mode)).replace(/\u00a0/g, "&nbsp;");
+}
+
+/** A fee in a footer fact reads in coral, as the site's payment facts do. */
+function coralAmounts(html) {
+  return html.replace(/€\d+(?:[.,]\d{2})?/g, (amount) => `<span style="font-weight:700;color:${BRAND.coralAction};white-space:nowrap">${amount}</span>`);
+}
+
+/**
+ * Short facts, one per row beside a dab and without a label, as the confirm
+ * step's payment facts are. A table row each (never a padded div) so Outlook's
+ * Word engine keeps the spacing; `dabTop` centres the 14px dab on the first line.
+ */
+function dabLines(lines, { font, dabTop, gap, first = 0 }) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${lines
+    .map((html, index) => `
+          <tr>
+            <td width="28" valign="top" style="width:28px;padding:${(index ? gap : 0) + dabTop}px 0 0;line-height:0"><img src="${DABS[(first + index) % DABS.length]}" width="14" height="14" alt="" style="display:block;border:0"></td>
+            <td valign="top" style="padding:${index ? gap : 0}px 0 0;font:${font};overflow-wrap:anywhere">${html}</td>
+          </tr>`)
+    .join("")}</table>`;
+}
+
 function safeMeetingLink(url) {
   return /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(url ?? "") ? url : null;
 }
@@ -106,19 +161,34 @@ function base64(text) {
 function layout({ heading, preheader, intro, hero, heroNote, rows, callout, message, steps, action, link, footer }) {
   // Each fact is a line beside one of the confirm step's dabs, its label small
   // above it: a list to glance down rather than a ruled table.
+  //   lesson  the label is the lesson's own short date, bold and sentence case
+  //           ("Tue 3 Nov, 08:00"), as the booking confirmation names a run.
+  //   quiet   a value that is only a promise ("Online link will appear ...").
+  //   dates   one date per line, each its own paragraph so a wrapped date still
+  //           reads as one item.
   const rowsHtml = rows.length
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${rows
-        .map(({ label, value, url }, index) => {
+        .map(({ label, value, url, lesson, quiet, dates }, index) => {
           const meeting = safeMeetingLink(url);
-          const content = meeting
-            ? `<a href="${escapeHtml(url)}" style="color:${BRAND.blue};font-weight:700;text-decoration:underline">${meetMark()}${escapeRich(value)}</a>`
-            : escapeRich(value);
+          const valueFont = lesson || dates ? "400 14px/1.5" : "400 15px/1.5";
+          const valueColour = quiet ? BRAND.lavenderInk : BRAND.ink;
+          const above = index ? 12 : 0;
+          const content = dates
+            ? String(value ?? "")
+                .split(/\r?\n/)
+                .map((line, i) => `<p style="margin:${i ? 4 : 2}px 0 0;font:${valueFont} ${SANS};color:${valueColour};overflow-wrap:anywhere">${richTogether(line, "row")}</p>`)
+                .join("")
+            : `<p style="margin:2px 0 0;font:${valueFont} ${SANS};color:${valueColour};overflow-wrap:anywhere">${
+                meeting
+                  ? `<a href="${escapeHtml(url)}" style="color:${BRAND.blue};font-weight:700;text-decoration:underline">${meetMark()}${escapeRich(value)}</a>`
+                  : richTogether(value, "row")
+              }</p>`;
           return `
         <tr>
-          <td width="28" valign="top" style="width:28px;padding:${index ? 16 : 4}px 0 0;line-height:0"><img src="${DABS[index % DABS.length]}" width="14" height="14" alt="" style="display:block;border:0"></td>
-          <td valign="top" style="padding:${index ? 12 : 0}px 0 0">
-            <p style="margin:0;${LABEL}">${escapeHtml(label)}</p>
-            <p style="margin:2px 0 0;font:400 15px/1.5 ${SANS};color:${BRAND.ink}">${content}</p>
+          <td width="28" valign="top" style="width:28px;padding:${above + (lesson ? 3 : 1)}px 0 0;line-height:0"><img src="${DABS[index % DABS.length]}" width="14" height="14" alt="" style="display:block;border:0"></td>
+          <td valign="top" style="padding:${above}px 0 0">
+            <p style="margin:0;${lesson ? `font:600 15px/20px ${SANS};color:${BRAND.ink}` : LABEL}">${escapeHtml(label)}</p>
+            ${content}
           </td>
         </tr>`;
         })
@@ -132,6 +202,7 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
 <title>${escapeHtml(heading)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
@@ -152,10 +223,8 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
       </td></tr>
 
       <tr><td style="padding:30px 32px 0">
-        <h1 style="margin:0;font:600 24px/1.25 ${SANS};letter-spacing:-.01em;color:${BRAND.ink}">${escapeHtml(
-          heading
-        )}</h1>
-        <p style="margin:12px 0 0;font:400 15px/1.65 ${SANS};color:${BRAND.ink}">${escapeRich(intro)}</p>
+        <h1 style="margin:0;font:600 24px/1.25 ${SANS};letter-spacing:-.01em;color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(heading)}</h1>
+        <p style="margin:12px 0 0;font:400 15px/1.65 ${SANS};color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(intro)}</p>
       </td></tr>
 
       ${message?.body?.trim()
@@ -172,14 +241,14 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
         when
           ? `<tr><td style="padding:24px 32px 0">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${PANEL}">
-          <tr><td style="padding:18px 22px">
-            <p style="margin:0;font:600 19px/1.35 ${SANS};color:${BRAND.blue}">${escapeHtml(when.date)}</p>
-            ${when.time ? `<p style="margin:3px 0 0;font:400 16px/1.45 ${SANS};color:${BRAND.ink}">${escapeHtml(when.time)}</p>` : ""}
+          <tr><td style="padding:18px 22px;overflow-wrap:anywhere">
+            <p style="margin:0;font:600 19px/1.35 ${SANS};color:${BRAND.blue}">${richTogether(when.date, "date")}</p>
+            ${when.time ? `<p style="margin:3px 0 0;font:400 16px/1.45 ${SANS};color:${BRAND.ink}">${richTogether(when.time, "date")}</p>` : ""}
             ${
+              // The student's own time, a labelled fact inside the panel (Inês's copies).
               heroNote
-                ? `<p style="margin:6px 0 0;font:400 13px/1.5 ${SANS};color:${BRAND.lavenderInk}">${escapeHtml(
-                    heroNote
-                  )}</p>`
+                ? `<p style="margin:14px 0 0;${LABEL}">${escapeHtml(heroNote.label)}</p>
+            <p style="margin:2px 0 0;font:400 14px/1.5 ${SANS};color:${BRAND.ink}">${richTogether(heroNote.value, "date")}</p>`
                 : ""
             }
           </td></tr>
@@ -190,11 +259,10 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
 
       ${
         callout
-          ? `<tr><td style="padding:24px 32px 0">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${PANEL}">
-          <tr><td style="padding:16px 22px;font:400 15px/1.6 ${SANS};color:${BRAND.ink}">${escapeRich(callout)}</td></tr>
-        </table>
-      </td></tr>`
+          ? `<tr><td style="padding:24px 32px 0">${
+              // One note is one coral dab, not a second panel: the lesson's date is the panel.
+              dabLines([richTogether(callout)], { font: `400 15px/1.6 ${SANS};color:${BRAND.ink}`, dabTop: 5, gap: 0, first: 2 })
+            }</td></tr>`
           : ""
       }
 
@@ -221,7 +289,7 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
                   };border-radius:11px;font:700 12px/22px ${SANS};color:#ffffff">${index + 1}</td>
                 </tr></table>
               </td>
-              <td valign="top" style="padding-left:10px;font:400 15px/1.55 ${SANS};color:${BRAND.ink}">${escapeRich(item)}</td>
+              <td valign="top" style="padding-left:10px;font:400 15px/1.55 ${SANS};color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(item)}</td>
             </tr></table>
           </td></tr>`
             )
@@ -233,13 +301,13 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
 
       ${
         action
-          ? `<tr><td align="center" style="padding:24px 32px 0">
+          ? `<tr><td align="center" style="padding:32px 32px 0">
         <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate">
           <tr><td bgcolor="${BRAND.coralAction}" style="background:${
             BRAND.coralAction
           };border-radius:24px 16px 22px 18px" align="center">
             <a href="${escapeHtml(action.url)}" style="display:block;padding:15px 30px;font:700 15px/1.2 ${SANS};letter-spacing:.02em;color:#ffffff;text-decoration:none;border-radius:24px 16px 22px 18px">${
-              meetingAction ? `<span style="display:inline-block;background:#ffffff;border-radius:6px;padding:3px 4px 2px;margin-right:9px;vertical-align:-4px;line-height:0">${meetMark(18).replace("margin-right:7px", "margin:0")}</span>` : ""
+              meetingAction ? `<span style="display:inline-block;background:#ffffff;border-radius:6px;padding:3px 4px 2px;margin-right:9px;vertical-align:middle;line-height:0">${meetMark(18).replace("margin-right:7px", "margin:0")}</span>` : ""
             }${escapeHtml(action.label)}</a>
           </td></tr>
         </table>
@@ -256,10 +324,15 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
           : ""
       }
 
-      <tr><td style="padding:26px 32px 30px">
+      <tr><td style="padding:32px 32px 30px">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
           <tr><td style="border-top:1px solid ${BRAND.rule};padding-top:18px">
-            <p style="margin:0;font:400 13px/1.65 ${SANS};color:${BRAND.lavenderInk}">${escapeRich(footer)}</p>
+            ${
+              // Short facts are the confirm step's dabs; a sign-off stays a sentence.
+              Array.isArray(footer)
+                ? dabLines(footer.filter(Boolean).map((fact) => coralAmounts(richTogether(fact))), { font: `400 13px/1.6 ${SANS};color:${BRAND.lavenderInk}`, dabTop: 3, gap: 8 })
+                : `<p style="margin:0;font:400 13px/1.65 ${SANS};color:${BRAND.lavenderInk};overflow-wrap:anywhere">${richTogether(footer)}</p>`
+            }
             <p style="margin:10px 0 0;font:400 13px/1.65 ${SANS};color:${BRAND.lavenderInk}">
               <a href="https://portuguesewithines.com" style="color:${
                 BRAND.lavenderInk
@@ -288,7 +361,7 @@ function plainText({ heading, intro, hero, heroNote, rows, callout, message, ste
   // heroNote already names its clock ("Jessica’s time: …"), so it stands on its own line.
   if (hero) {
     const { date, time } = splitWhen(hero);
-    lines.push("", date, ...(time ? [time] : []), ...(heroNote ? [heroNote] : []));
+    lines.push("", date, ...(time ? [time] : []), ...(heroNote ? [`${heroNote.label}: ${heroNote.value}`] : []));
   }
   if (callout) lines.push("", clean(callout));
   if (rows.length) {
@@ -298,7 +371,7 @@ function plainText({ heading, intro, hero, heroNote, rows, callout, message, ste
   if (steps?.items?.length) lines.push("", steps.title, ...steps.items.map((item, index) => `${index + 1}. ${clean(item)}`));
   if (action) lines.push("", `${action.label}: ${action.url}`);
   if (link) lines.push("", `${link.label}: ${link.url}`);
-  lines.push("", clean(footer), "portuguesewithines.com");
+  lines.push("", clean([].concat(footer ?? "").filter(Boolean).join(" ")), "portuguesewithines.com");
   return lines.join("\n");
 }
 

@@ -1485,7 +1485,18 @@ as a form:
   the email form of "a quiet link for a rare one" (14 October 2026);
   otherwise its button is `Change or cancel this lesson`, as in the
   confirmation. It names when free changes end as a date and time on the
-  lesson's own clock and uses no relative day words;
+  lesson's own clock and uses no relative day words. Short facts at the foot
+  are the confirm step's dabs, one sentence per dab with any amount in coral
+  (`Move or cancel free until 14 hours before the lesson.` / `After that,
+  moving or cancelling costs €5.`); a one-line note (a late fee, a refund,
+  Inês's receipt reminder) is one coral dab rather than a second panel, so
+  the lesson's date is the only panel besides the numbered steps; a run of
+  lessons names each one short and bold (`Tue 3 Nov, 08:00`) over its call,
+  as the confirmation does; Inês's copies give the student's own time as a
+  labelled fact in the date panel; a date, a time and its clock, and a number
+  and its word never break inside, and no heading or fact leaves one word
+  alone. The text part says exactly what it said (14 October 2026, Dan:
+  "beautification on the emails too to use the bullets etc like in others");
 - shorter helper copy: `Nothing booked yet.` alone; no intro sentence on the
   `Your account` sign-in; a clashing week `won't be booked; the rest go ahead`
   without the advice the choices bar already gives; the change overlay asks

@@ -1045,9 +1045,11 @@ await test("skipped weekly emails show the missing spring date without inventing
     assert.equal(sentEmails.length, 2);
     for (const email of sentEmails) {
       assert.match(email.text, /One lesson time was unavailable and was left out: Sun 28 Mar\./);
-      assert.ok(email.html.includes("Sun 28 Mar"));
+      // The HTML ties "Sun 28 Mar" with non-breaking spaces, so read it as spaces.
+      const html = email.html.replaceAll("&nbsp;", " ");
+      assert.ok(html.includes("Sun 28 Mar"));
       assert.doesNotMatch(email.text, /Sun 28 Mar, 02:30/);
-      assert.ok(!email.html.includes("Sun 28 Mar, 02:30"));
+      assert.ok(!html.includes("Sun 28 Mar, 02:30"));
     }
   } finally {
     Object.assign(env, { EMAIL_DRY_RUN: "1", TEACHER_NOTIFICATIONS_ENABLED: "0" });
