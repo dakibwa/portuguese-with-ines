@@ -77,11 +77,15 @@ async function fixture(width, options = {}) {
     ],
     // Her students; Nora was set up from a name alone and has no email yet.
     students: [
-      { id: "sam", name: "Sam Known", email: "sam@example.invalid", phone: "+351 912 345 678", nif: "123456789", signedIn: false, hasCard: false, cardForAllLessons: false, nextLessonAt: "2026-09-10T16:00:00.000Z", upcoming: 1, unpaidUpcoming: 1, weekly: 0 },
-      { id: "alex", name: "Alex", email: "alex@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 1 },
-      { id: "nora", name: "Nora Lima", email: "", phone: "", nif: "", signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0, prices: { 60: 2200, 90: 3300 }, ownPrices: { 60: 2200 } },
+      { id: "sam", name: "Sam Known", email: "sam@example.invalid", phone: "+351 912 345 678", nif: "123456789", signedIn: false, hasCard: false, cardForAllLessons: false, nextLessonAt: "2026-09-10T16:00:00.000Z", upcoming: 1, unpaidUpcoming: 1, weekly: 0, hasLessons: true },
+      { id: "alex", name: "Alex", email: "alex@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 1, hasLessons: true },
+      { id: "nora", name: "Nora Lima", email: "", phone: "", nif: "", signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0, hasLessons: false, prices: { 60: 2200, 90: 3300 }, ownPrices: { 60: 2200 } },
     ],
     writes: [],
+    accountWrites: [],
+    availabilityReads: [],
+    account: { ...teacher },
+    pendingEmail: "",
     errors: [],
     failHours: 0,
     failDay: "",
@@ -91,6 +95,8 @@ async function fixture(width, options = {}) {
     failMove: 0,
     failCancel: 0,
     failBookings: false,
+    failCreate: 0,
+    conflictMoved: false,
     history: null,
     historyReads: 0,
     historyGate: null,
@@ -101,15 +107,43 @@ async function fixture(width, options = {}) {
     json: { lessonTypes: [], postpay: false },
   }));
   await page.route("**/me/recurring-rates", (route) => route.fulfill({ json: { rates: {} } }));
-  await page.route("**/availability?**", (route) => route.fulfill({ json: { slotsByDate: {}, horizonDays: 56 } }));
+  await page.route("**/availability?**", route => {
+    const query = new URL(route.request().url()).searchParams;
+    const lessonType = query.get("lessonType");
+    state.availabilityReads.push(lessonType);
+    const long = lessonType === "long";
+    const date = "2026-09-30";
+    const available = (query.get("from") ?? "") <= date && (query.get("to") ?? "") >= date;
+    return route.fulfill({ json: {
+      slotsByDate: available ? { [date]: [{
+        startAt: long ? (state.conflictMoved ? "2026-09-30T17:30:00.000Z" : "2026-09-30T17:00:00.000Z") : "2026-09-30T16:00:00.000Z",
+        endAt: long ? (state.conflictMoved ? "2026-09-30T19:00:00.000Z" : "2026-09-30T18:30:00.000Z") : "2026-09-30T17:00:00.000Z",
+      }] } : {}, horizonDays: 56,
+    } });
+  });
   await page.route("**/auth/login", (route) => route.fulfill({
-    json: { student: teacher, session: "isolated-teacher-fixture" },
+    json: { student: state.account, session: "isolated-teacher-fixture" },
   }));
+  await page.route("**/auth/forgot", route => {
+    state.accountWrites.push({ path: "/auth/forgot", data: route.request().postDataJSON() });
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.route("**/me/email", route => {
+    const data = route.request().postDataJSON();
+    state.accountWrites.push({ path: "/me/email", data, authorization: route.request().headers().authorization });
+    state.pendingEmail = data.email;
+    return route.fulfill({ json: { ok: true, pending: state.pendingEmail } });
+  });
+  await page.route("**/me/email/confirm", route => {
+    state.accountWrites.push({ path: "/me/email/confirm", data: route.request().postDataJSON(), authorization: route.request().headers().authorization });
+    state.account = { ...state.account, email: state.pendingEmail };
+    return route.fulfill({ json: { student: state.account, session: "isolated-renewed-teacher-fixture" } });
+  });
   await page.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
   await page.route("**/me", (route) =>
     route.fulfill({
       json: {
-        student: { ...teacher, role: options.student ? "student" : "teacher" },
+        student: { ...state.account, role: options.student ? "student" : "teacher" },
         bookings: [],
         series: [],
       },
@@ -209,10 +243,16 @@ async function fixture(width, options = {}) {
         if (state.failBookings) return fail("Lessons could not be loaded.");
         return route.fulfill({ json: { bookings: state.bookings } });
       }
+      if (state.failCreate > 0) {
+        state.failCreate--;
+        state.conflictMoved = true;
+        return route.fulfill({ status: 409, json: { error: "That time has just been taken. Choose another time." } });
+      }
       // Hers are marked as hers, and wait for the student's card.
       const owner = [state.added, ...state.students].find((entry) => entry?.id === data.studentId);
+      if (owner) Object.assign(owner, { hasLessons: true, nextLessonAt: data.startAt, upcoming: (owner.upcoming ?? 0) + 1 });
       state.bookings.push({
-        ...lesson(`manual-${state.bookings.length}`, owner?.name ?? "Sam Known", data.startAt, data.location),
+        ...lesson(`manual-${state.bookings.length}`, owner?.name ?? "Sam Known", data.startAt, data.location, data.lessonType === "long" ? 90 : data.lessonType === "trial" ? 30 : 60),
         student_id: owner?.id,
         payment_status: "not_required",
         added_by_teacher: 1,
@@ -229,7 +269,7 @@ async function fixture(width, options = {}) {
     // Her students, for suggestions in the form and her list beneath it.
     if (path === "/admin/students" && data) {
       // Set up quietly: nothing is emailed until her welcome.
-      const student = { id: "ana", name: data.name, email: data.email, phone: data.phone, mark: data.mark, prices: data.prices, signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0 };
+      const student = { id: "ana", name: data.name, email: data.email, phone: data.phone, mark: data.mark, prices: data.prices, signedIn: false, awaitingWelcome: true, hasCard: false, cardForAllLessons: false, nextLessonAt: null, upcoming: 0, unpaidUpcoming: 0, weekly: 0, hasLessons: false };
       state.added = student;
       return route.fulfill({ status: 201, json: { student } });
     }
@@ -700,13 +740,13 @@ try {
   const forSam = page.getByRole("dialog");
   await forSam.getByRole("button", { name: "Sam Known", exact: true }).click();
   await forSam.getByRole("radio", { name: "In Porto", exact: true }).check();
-  await expect(forSam.getByLabel("Date", { exact: true })).toHaveValue("2026-09-11");
   await forSam.getByRole("button", { name: "Add lesson and email student", exact: true }).click();
   // The lesson is added in place and the profile it came from shows it.
   await expect(forSam.locator(".teacher-profile__added")).toContainText("emailed");
   await expect(forSam.getByRole("button", { name: "Add a lesson", exact: true })).toBeVisible();
   assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.location, "porto");
   assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.studentId, "sam");
+  assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.startAt, "2026-09-11T16:00:00.000Z", "The free time keeps its Porto date and time");
   await forSam.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: /^Sam Known, .*11 September.*View lesson$/ }).click();
@@ -766,8 +806,6 @@ try {
   await addDialog.getByLabel("Email").fill("kai@example.invalid");
   await addDialog.getByRole("button", { name: "Next: their lessons", exact: true }).click();
   await expect(addDialog.getByRole("heading", { name: "Kai" })).toBeVisible();
-  await expect(addDialog.getByLabel("Date", { exact: true })).toHaveValue("2026-09-10");
-  await expect(addDialog.getByLabel("Time in Porto")).toHaveValue("18:00");
   await addDialog.getByRole("button", { name: "Add lesson", exact: true }).click();
   await expect(addDialog.locator(".teacher-profile__added")).toContainText("18:00");
   await expect(addDialog.locator(".teacher-profile__added")).not.toContainText("emailed");
@@ -843,10 +881,11 @@ try {
   // that never stops her lessons.
   const nora = students.locator(".teacher-student").filter({ hasText: "Nora Lima" });
   await expect(nora).toContainText("Set up, no email yet");
-  await nora.getByRole("button", { name: "Open Nora Lima’s profile" }).click();
+  await nora.scrollIntoViewIfNeeded();
+  const cardFacts = await nora.locator(".teacher-student__facts").boundingBox();
+  await page.mouse.click(cardFacts.x + cardFacts.width / 2, cardFacts.y + cardFacts.height / 2);
   const profile = page.getByRole("dialog", { name: "Nora Lima" });
   await expect(profile.getByText("No lessons recorded yet.")).toBeVisible();
-  const fromCard = await profile.innerHTML();
   await expect(profile).toContainText("No email yet");
   await expect(profile).toContainText("Their welcome email waits until you add their email");
   await expect(profile.getByText("60 mins · €22")).toBeVisible();
@@ -855,31 +894,62 @@ try {
   await page.keyboard.press("Escape");
   await expect(profile).toHaveCount(0);
   await nora.getByRole("button", { name: "Add a lesson for Nora Lima" }).click();
-  await expect(profile.getByText("No lessons recorded yet.")).toBeVisible();
-  assert.equal(await profile.innerHTML(), fromCard, "the card and its Add a lesson button open the same profile");
-  // Her lesson form opens in place, on her own prices, with no email asked for.
-  await profile.getByRole("button", { name: "Add a lesson", exact: true }).click();
-  await expect(profile.getByRole("radio", { name: "60 mins, €22" })).toBeVisible();
-  await profile.getByLabel("Date", { exact: true }).fill("2026-09-30");
-  await profile.getByRole("button", { name: "Add lesson", exact: true }).click();
-  await expect(profile.locator(".teacher-profile__added")).toContainText("30 Sept");
-  assert.equal(state.writes.filter((entry) => entry.path === "/admin/bookings").at(-1).data.studentId, "nora");
-  await expect(profile.locator(".teacher-history-lesson")).toHaveCount(1);
-  // Edit details is one button that brings out all of it, two to a row where
-  // there is room and one column on a phone, Save and Cancel sharing a row.
-  await profile.getByRole("button", { name: "Edit details", exact: true }).click();
-  await detailsLayout(page, profile);
-  await profile.getByLabel(/^Email/).fill("nora@example.invalid");
-  await profile.getByRole("button", { name: "Save details", exact: true }).click();
+  await expect(profile.getByRole("heading", { name: "Nora Lima" })).toBeVisible();
+  await expect(profile.getByRole("group", { name: "Choose a date and time", exact: true })).toBeVisible();
+  await profile.getByRole("button", { name: "Close", exact: true }).click();
+
+  // Setup work opens beneath the student's row, and stays there through
+  // details, their own price, a lesson and the explicit welcome.
+  await page.getByRole("tab", { name: /^Needs you/ }).click();
+  await page.locator('.teacher-needs-you section').first().getByRole("button", { name: "Add email for Nora Lima" }).click();
+  const noraSetup = page.locator(".teacher-setup").filter({ hasText: "Nora Lima" });
+  const setupForm = noraSetup.getByRole("region", { name: "Nora Lima’s setup", exact: true });
+  await expect(setupForm.getByLabel(/^Email/)).toBeFocused();
+  await expect(profile).toBeHidden();
+  await setupForm.getByLabel(/^Email/).fill("nora@example.invalid");
+  await setupForm.getByRole("button", { name: "Save details", exact: true }).click();
   assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/students/nora/details").at(-1).data,
     { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "", mark: "" });
-  await expect(profile).toContainText("nora@example.invalid");
-  await expect(profile).not.toContainText("Their welcome email waits");
-  // Their welcome is offered once there is an address, and goes only when she sends it.
-  assert.equal(state.writes.filter((entry) => entry.path.endsWith("/welcome")).length, 2, "Nora's welcome has not been sent");
-  await profile.getByRole("button", { name: "Send welcome email", exact: true }).click();
-  await expect(profile.getByText("Welcome sent")).toBeVisible();
-  await profile.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(setupForm).toBeHidden();
+  assert.equal(state.writes.filter((entry) => entry.path.endsWith("/welcome")).length, 2, "Adding the email does not send Nora's welcome");
+
+  await noraSetup.getByRole("button", { name: "Price for Nora Lima", exact: true }).click();
+  await setupForm.getByLabel("Price for 60 minutes, in euros", { exact: true }).fill("24");
+  await setupForm.getByRole("button", { name: "Save price", exact: true }).click();
+  await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/nora/prices").at(-1)?.data).toEqual({ prices: { 60: 2400, 90: null } });
+  await noraSetup.getByRole("button", { name: "Lessons for Nora Lima", exact: true }).click();
+  await expect(setupForm.getByRole("radio", { name: "60 mins, €24" })).toBeVisible();
+  const picker = setupForm.getByRole("group", { name: "Choose a date and time", exact: true });
+  await picker.getByRole("button", { name: "Wednesday 30 September", exact: true }).click();
+  await picker.getByRole("button", { name: "17:00 Porto time", exact: true }).click();
+  // A different length needs that length's availability and a new time choice.
+  await setupForm.getByRole("radio", { name: "90 mins, €36", exact: true }).check();
+  await expect(setupForm.getByRole("button", { name: "Add lesson", exact: true })).toBeDisabled();
+  await picker.getByRole("button", { name: "18:00 Porto time", exact: true }).click();
+  state.failCreate = 1;
+  const beforeConflict = state.writes.filter(entry => entry.path === "/admin/bookings").length;
+  await setupForm.getByRole("button", { name: "Add lesson", exact: true }).click();
+  await expect(setupForm.getByRole("alert")).toContainText("That time has just been taken");
+  await expect(setupForm.getByRole("button", { name: "Add lesson", exact: true })).toBeDisabled();
+  await picker.getByRole("button", { name: "18:30 Porto time", exact: true }).click();
+  assert.equal(state.writes.filter(entry => entry.path === "/admin/bookings").length, beforeConflict + 1, "A conflict does not automatically create another lesson");
+  await setupForm.getByRole("button", { name: "Add lesson", exact: true }).click();
+  await expect(noraSetup.getByRole("status")).toContainText("30 Sept, 18:30");
+  assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/bookings").at(-1).data, {
+    studentId: "nora", lessonType: "long", startAt: "2026-09-30T17:30:00.000Z", location: "online", notes: "",
+  });
+  assert.ok(state.availabilityReads.includes("long"), "90-minute choices request 90-minute availability");
+  assert.equal(state.writes.filter(entry => entry.path.endsWith("/welcome")).length, 2, "Adding the lesson still waits for Nora's welcome");
+
+  await noraSetup.getByRole("button", { name: "Welcome for Nora Lima", exact: true }).click();
+  await setupForm.getByRole("button", { name: "Send welcome email to Nora Lima", exact: true }).click();
+  await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length).toBe(1);
+  // Her next steps need the student. Each explains that and offers a fresh link.
+  await noraSetup.getByRole("button", { name: "Signed in for Nora Lima", exact: true }).click();
+  await expect(setupForm.getByRole("button", { name: "Send the link again to Nora Lima", exact: true })).toBeEnabled();
+  await noraSetup.getByRole("button", { name: "Card for Nora Lima", exact: true }).click();
+  await expect(setupForm.getByRole("button", { name: "Send the link again to Nora Lima", exact: true })).toBeEnabled();
+  await expect(profile).toBeHidden();
 
   // Select a few dates, apply time off, then see those same days in the week.
   await page.getByRole("tab", { name: "Time off", exact: true }).click();
@@ -1218,7 +1288,6 @@ try {
     const chosenDay = (date) => page.locator(`[data-timeoff-date="${date}"]`);
     const timeOff = page.locator(".teacher-timeoff");
     const initialBookings = structuredClone(state.bookings);
-    await expect(page.getByRole("tablist", { name: "Teacher tools" }).getByRole("tab")).toHaveCount(7);
     await expect(page.getByRole("tab", { name: "Timetable", exact: true })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("tab", { name: "Timetable", exact: true }).focus();
     await page.keyboard.press("ArrowRight");
@@ -1277,11 +1346,11 @@ try {
     await page.getByRole("tab", { name: /^Students/ }).click();
     await page.getByRole("tab", { name: /^Students/ }).focus();
     await page.keyboard.press("End");
-    await expect(page.getByRole("tab", { name: /^Google Meet/ })).toBeFocused();
+    await expect(page.getByRole("tab", { name: "Profile", exact: true })).toBeFocused();
     await noOverflow(page);
     if (width === 1280) {
       await page.setViewportSize({ width: 320, height: 900 });
-      await expect.poll(() => page.getByRole("tab", { name: /^Google Meet/ }).evaluate(node => {
+      await expect.poll(() => page.getByRole("tab", { name: "Profile", exact: true }).evaluate(node => {
         const tab = node.getBoundingClientRect();
         const strip = node.closest(".teacher-tabs-scroll").getBoundingClientRect();
         return tab.left >= strip.left - 1 && tab.right <= strip.right + 1;
@@ -1289,7 +1358,8 @@ try {
       await page.setViewportSize({ width, height: 900 });
     }
     await page.keyboard.press("Home");
-    await expect(page.getByRole("tab", { name: "Timetable", exact: true })).toBeFocused();
+    await expect(page.getByRole("tablist", { name: "Teacher tools" }).getByRole("tab").first()).toBeFocused();
+    await showLessons(page);
     state.failBookings = true;
     await page.getByRole("button", { name: "Next week", exact: true }).click();
     await expect(page.locator(".teacher-week").getByRole("alert")).toContainText("Lessons could not be loaded");
@@ -1317,6 +1387,41 @@ try {
   assert.deepEqual(expressions.state.errors, []);
   await expressions.page.close();
 
+  // Her profile keeps sign-out and account changes together. Email stays
+  // unchanged until its proof link returns and renews this teacher's session.
+  const accountFixture = await fixture(390);
+  const accountPage = accountFixture.page;
+  const accountState = accountFixture.state;
+  await accountPage.getByRole("tab", { name: "Profile", exact: true }).click();
+  const account = accountPage.getByRole("region", { name: "Your account", exact: true });
+  await account.getByRole("button", { name: "Send password reset link", exact: true }).click();
+  await expect(account.getByRole("status")).toContainText(teacher.email);
+  assert.deepEqual(accountState.accountWrites.at(-1), { path: "/auth/forgot", data: { email: teacher.email } });
+  await account.getByRole("button", { name: "Change email", exact: true }).click();
+  const nextEmail = "verified-teacher@example.invalid";
+  await account.getByLabel("New sign-in email", { exact: true }).fill(nextEmail);
+  await account.getByRole("button", { name: "Send confirmation email", exact: true }).click();
+  await expect(account.getByRole("status")).toContainText(nextEmail);
+  await expect(account.getByText(teacher.email, { exact: true })).toBeVisible();
+  assert.deepEqual(accountState.accountWrites.at(-1), {
+    path: "/me/email", data: { email: nextEmail }, authorization: "Bearer isolated-teacher-fixture",
+  });
+  await accountPage.goto(`${base}/book/?view=lessons&emailToken=isolated-teacher-email-proof`);
+  await expect(accountPage.getByRole("tab", { name: "Profile", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(account.getByRole("status")).toContainText("Your sign-in email has been updated");
+  await expect(account.getByText(nextEmail, { exact: true })).toBeVisible();
+  assert.equal(new URL(accountPage.url()).pathname, "/schedule/");
+  assert.equal(new URL(accountPage.url()).searchParams.has("emailToken"), false);
+  assert.equal(await accountPage.evaluate(() => localStorage.getItem("ines-student-session")), "isolated-renewed-teacher-fixture");
+  assert.deepEqual(accountState.accountWrites.at(-1), {
+    path: "/me/email/confirm", data: { token: "isolated-teacher-email-proof" }, authorization: "Bearer isolated-teacher-fixture",
+  });
+  await account.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(accountPage.locator(".teacher-workspace")).toBeHidden();
+  assert.equal(await accountPage.evaluate(() => localStorage.getItem("ines-student-session")), null);
+  assert.deepEqual(accountState.errors, []);
+  await accountPage.close();
+
   const student = await fixture(390, { student: true });
   await student.page
     .getByRole("status")
@@ -1326,7 +1431,7 @@ try {
   assert.deepEqual(student.state.writes, []);
   await student.page.close();
   console.log(
-    "Teacher calendar passed: visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, students and their lessons in one dialog, responsive layout and access gate.",
+    "Teacher calendar passed: visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, student profiles, complete inline setup, teacher email/password links and verified session renewal, responsive layout and access gate.",
   );
 } finally {
   await browser.close();

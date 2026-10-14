@@ -11,11 +11,12 @@ import { updateStudentDetails, type AdminStudent } from "@/lib/admin-api";
  * hers to give only until they first do; after that they change it from their
  * account. It is never needed for her to add their lessons.
  */
-export function StudentDetailsForm({ token, student, onSaved, onCancel }: {
+export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy }: {
   token: string;
   student: AdminStudent;
   onSaved: (student: AdminStudent) => void;
   onCancel: () => void;
+  onBusy?: (busy: boolean) => void;
 }) {
   const [details, setDetails] = useState({ name: student.name, email: student.email, phone: student.phone, nif: student.nif ?? "" });
   const [busy, setBusy] = useState(false);
@@ -30,6 +31,7 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel }: {
         event.preventDefault();
         if (busy) return;
         setBusy(true);
+        onBusy?.(true);
         setError("");
         try {
           const result = await updateStudentDetails(token, student.id, {
@@ -44,6 +46,7 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel }: {
           setError(caught instanceof Error ? caught.message : "Their details couldn’t be saved.");
         } finally {
           setBusy(false);
+          onBusy?.(false);
         }
       }}
     >

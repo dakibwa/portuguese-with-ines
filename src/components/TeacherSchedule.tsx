@@ -6,6 +6,7 @@ import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnection";
+import { TeacherAccountProfile } from "@/components/teacher/TeacherAccountProfile";
 import { StudentProfile, type StudentProfileStart } from "@/components/teacher/StudentProfile";
 import { StudentList } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
@@ -45,6 +46,7 @@ import {
   hoursProblem,
   mondayOf,
   needsYou,
+  gettingStarted,
   removeSpan,
   serialiseHours,
   shiftDate,
@@ -63,6 +65,11 @@ function shortDate(date: string) {
   return dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
 }
 
+function profileRequested() {
+  const params = new URL(window.location.href).searchParams;
+  return params.has("emailToken") || params.get("tab") === "profile" || ["connected", "cancelled", "error"].includes(params.get("meet") ?? "");
+}
+
 export function TeacherSchedule() {
   const [token, setToken] = useState("");
   const [me, setMe] = useState<Student | null>(null);
@@ -77,7 +84,7 @@ export function TeacherSchedule() {
   );
   const [activeTab, setActiveTab] = useState<TeacherTab>("week");
   const editing = activeTab === "hours";
-  // Her Google Meet connection, read by its tab and listed in Needs you when it needs her.
+  // Her Google Meet connection, read in Profile and listed in Needs you when it needs her.
   const [meet, setMeet] = useState<GoogleMeetConnection | null>(null);
   const [savedHours, setSavedHours] = useState<WeekHours>(emptyWeek);
   const [draftHours, setDraftHours] = useState<WeekHours>(emptyWeek);
@@ -117,11 +124,14 @@ export function TeacherSchedule() {
   const [bookingsShown, setBookingsShown] = useState(false);
   const [bookingsError, setBookingsError] = useState("");
   const [savingHours, setSavingHours] = useState(false);
+  const [accountBusy, setAccountBusy] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const bookingRequest = useRef(0);
   const calendarTitleRef = useRef<HTMLHeadingElement>(null);
   const accountGeneration = useRef(0);
+  // Verified email changes renew this same account without discarding its drafts.
+  const renewedSession = useRef("");
   const dayChangesRef = useRef(dayChanges);
   const dayVersion = useRef(0);
   const sendingDays = useRef(false);
@@ -162,6 +172,8 @@ export function TeacherSchedule() {
     sendingDays.current = false;
     setSavingDays(false);
     setSavingHours(false);
+    setAccountBusy(false);
+    renewedSession.current = "";
     setDayNote(undefined);
     setAuthError("");
     setStatus("");
@@ -170,14 +182,20 @@ export function TeacherSchedule() {
 
   useEffect(() => {
     let session = readSession();
-    return subscribeToSession(() => {
+    return subscribeToSession((event) => {
       const current = readSession();
       if (current === session) return;
+      const previous = session;
       session = current;
+      if (current && event instanceof CustomEvent && event.detail?.previousSession === previous && event.detail?.studentId === me?.id) {
+        renewedSession.current = current;
+        setToken(current);
+        return;
+      }
       resetAccount();
       setAuthAttempt(value => value + 1);
     });
-  }, [resetAccount]);
+  }, [resetAccount, me?.id]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
@@ -185,8 +203,7 @@ export function TeacherSchedule() {
   }, []);
 
   useEffect(() => {
-    const result = new URL(window.location.href).searchParams.get("meet");
-    if (result && ["connected", "cancelled", "error"].includes(result)) setActiveTab("meet");
+    if (profileRequested()) setActiveTab("profile");
   }, []);
 
   useEffect(() => {
@@ -202,7 +219,10 @@ export function TeacherSchedule() {
       .then((data) => {
         if (!active || readSession() !== session) return;
         setMe(data?.student ?? null);
-        if (data?.student.role === "teacher") setToken(session);
+        if (data?.student.role === "teacher") {
+          setToken(session);
+          if (profileRequested()) setActiveTab("profile");
+        }
       })
       .catch(() => {
         if (active)
@@ -217,7 +237,7 @@ export function TeacherSchedule() {
   }, [authAttempt]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || renewedSession.current === token) return;
     let active = true;
     setScheduleError("");
     fetchSchedule(token)
@@ -323,17 +343,17 @@ export function TeacherSchedule() {
     return () => document.removeEventListener("visibilitychange", returned);
   }, [reloadBookings, reloadStudents]);
 
-  /** Her welcome for a student from Needs you, only while it is still owed. */
-  async function sendWelcome(student: AdminStudent) {
-    if (welcoming) return;
+  /** Initial welcomes are guarded; a requested reminder sends a fresh link. */
+  async function sendWelcome(student: AdminStudent, again = false) {
+    if (welcoming || !student.email || student.email.startsWith("no-email:")) return;
     const account = accountGeneration.current;
     setWelcoming(student.id);
     setError("");
     setStatus("");
     try {
-      await sendStudentWelcome(token, student.id, { onlyIfWaiting: true });
+      await sendStudentWelcome(token, student.id, again ? undefined : { onlyIfWaiting: true });
       if (account !== accountGeneration.current) return;
-      setStatus(`Welcome sent to ${student.name.trim().split(/\s+/)[0]}.`);
+      setStatus(`${again ? "Link" : "Welcome"} sent to ${student.name.trim().split(/\s+/)[0]}.`);
     } catch (caught) {
       if (account !== accountGeneration.current) return;
       setError(caught instanceof Error ? caught.message : "The welcome couldn’t be sent.");
@@ -342,7 +362,7 @@ export function TeacherSchedule() {
     }
     // Either way the list reads afresh, so a welcome another device sent leaves too.
     void reloadStudents();
-    calendarTitleRef.current?.focus({ preventScroll: true });
+    if (activeTab === "week") calendarTitleRef.current?.focus({ preventScroll: true });
   }
 
   useEffect(() => {
@@ -581,7 +601,10 @@ export function TeacherSchedule() {
         signInOnly
         onSignedIn={(student) => {
           setMe(student);
-          if (student.role === "teacher") setToken(readSession());
+          if (student.role === "teacher") {
+            setToken(readSession());
+            if (profileRequested()) setActiveTab("profile");
+          }
         }}
       />
     );
@@ -607,6 +630,7 @@ export function TeacherSchedule() {
     );
 
   function signOut() {
+    if (savingDays || savingHours || accountBusy) return;
     if (hoursDirty && !window.confirm("Sign out and lose the weekly hours you haven’t saved?")) return;
     clearSession();
     resetAccount();
@@ -615,15 +639,7 @@ export function TeacherSchedule() {
   return (
     <div className="teacher-workspace">
       <div className="teacher-tools-header">
-        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} onSelect={setActiveTab} />
-        <button
-          className="teacher-sign-out"
-          disabled={savingDays || savingHours}
-          onClick={signOut}
-          type="button"
-        >
-          Sign out
-        </button>
+        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} needsCount={needs.length} onSelect={setActiveTab} />
       </div>
       {error ? (
         <div className="teacher-inline-error" role="alert">
@@ -647,12 +663,13 @@ export function TeacherSchedule() {
           items={needs}
           sending={welcoming}
           onMeet={() => {
-            // Google's own sign-in starts from the Google Meet tab, where it is proven.
-            document.getElementById("teacher-tab-meet")?.focus({ preventScroll: true });
-            setActiveTab("meet");
+            document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true });
+            setActiveTab("profile");
           }}
           onView={setSelectedBooking}
           onWelcome={(student) => void sendWelcome(student)}
+          onStudent={(student, editDetails) => openStudentDialog({ step: "profile", student, editDetails, addLesson: !editDetails })}
+          onSeeAll={() => { setActiveTab("needs-you"); document.getElementById("teacher-tab-needs-you")?.focus({ preventScroll: true }); }}
         />
       ) : null}
 
@@ -821,6 +838,20 @@ export function TeacherSchedule() {
           onOpenBooking={setSelectedBooking}
         />
       </div>
+      {activeTab === "needs-you" ? <>
+        {studentsError || bookingsError ? <p className="teacher-inline-error" role="alert">{studentsError || bookingsError}</p> : null}
+        {!students || !bookingsShown ? <p role="status">Loading what needs you…</p> : <NeedsYou
+          items={needs}
+          setup={gettingStarted(students.list, students.cardsAccepted)}
+          token={token}
+          onChanged={() => { void reloadStudents(); void reloadBookings(true); }}
+          sending={welcoming}
+          onMeet={() => { setActiveTab("profile"); document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true }); }}
+          onView={setSelectedBooking}
+          onWelcome={(student, again) => void sendWelcome(student, again)}
+          onStudent={(student, editDetails) => openStudentDialog({ step: "profile", student, editDetails })}
+        />}
+      </> : null}
       <div className="teacher-tab-view" hidden={activeTab !== "students"}>
       <StudentList
         token={token}
@@ -828,15 +859,18 @@ export function TeacherSchedule() {
         cards={Boolean(students?.cardsAccepted)}
         error={studentsError}
         onAddStudent={() => openStudentDialog({ step: "new" })}
-        onOpenStudent={(student) => openStudentDialog({ step: "profile", student })}
+        onOpenStudent={(student, addLesson) => openStudentDialog({ step: "profile", student, addLesson })}
         onStudentsChanged={() => void reloadStudents()}
       />
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "receipts"}>
         {activeTab === "receipts" ? <ReceiptsTab token={token} today={today} /> : null}
       </div>
-      <div className="teacher-tab-view" hidden={activeTab !== "meet"}>
-        <TeacherMeetConnection token={token} onConnectionChange={setMeet} />
+      <div className="teacher-tab-view" hidden={activeTab !== "profile"}>
+        <div className="teacher-account-layout">
+          {me ? <TeacherAccountProfile token={token} student={me} disabled={savingDays || savingHours} onBusyChange={setAccountBusy} onStudentChange={setMe} onSignOut={signOut} /> : null}
+          <TeacherMeetConnection token={token} onConnectionChange={setMeet} />
+        </div>
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "expressions"}>
         {activeTab === "expressions" ? <ExpressionsTab accountId={me?.id ?? "teacher"} token={token} /> : null}

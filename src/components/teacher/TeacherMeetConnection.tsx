@@ -11,7 +11,7 @@ import {
 import { GoogleMeetLogo } from "@/components/GoogleMeetLogo";
 
 
-/** Connection controls live together in the Google Meet tab. */
+/** Connection controls live beside sign-in details in Profile. */
 export function TeacherMeetConnection({ token, onConnectionChange }: { token: string; onConnectionChange: (connection: GoogleMeetConnection | null) => void }) {
   const [connection, setConnection] = useState<GoogleMeetConnection | null>(null);
   const [error, setError] = useState("");

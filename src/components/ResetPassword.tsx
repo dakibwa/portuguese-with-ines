@@ -11,6 +11,7 @@ export function ResetPassword() {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [teacher, setTeacher] = useState(false);
   const [storageNote, setStorageNote] = useState("");
   const [busy, setBusy] = useState(false);
   const resetRequest = useRef(0);
@@ -54,6 +55,7 @@ export function ResetPassword() {
         }
       }
       setSignedIn(saved);
+      setTeacher(result.student.role === "teacher");
       setDone(true);
     } catch (caught) {
       if (request !== resetRequest.current) return;
@@ -70,7 +72,7 @@ export function ResetPassword() {
         <div>
           <strong>Your password has been changed.</strong>
           <p>
-            {signedIn ? <>You&rsquo;re signed in. <a href="/book/?view=lessons">Go to your lessons</a>.</>
+            {signedIn ? <>You&rsquo;re signed in. <a href={teacher ? "/schedule/?tab=profile" : "/book/?view=lessons"}>{teacher ? "Go to your profile" : "Go to your lessons"}</a>.</>
               : storageNote || "You can use your new password next time you sign in."}
           </p>
         </div>

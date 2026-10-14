@@ -18,6 +18,8 @@ export type AdminStudent = {
   /** Set up by her and not emailed yet: the site sends them nothing until she sends their welcome. */
   awaitingWelcome?: boolean;
   hasCard?: boolean;
+  /** Has at least one confirmed lesson, including lessons already had. */
+  hasLessons?: boolean;
   /** A card saved from their account, which pays for the lessons she adds. */
   cardForAllLessons?: boolean;
   nextLessonAt?: string | null;
@@ -132,6 +134,16 @@ export function addedByTeacher(booking: Pick<AdminBooking, "added_by_teacher">) 
   return Boolean(booking.added_by_teacher);
 }
 
+export class AdminApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AdminApiError";
+    this.status = status;
+  }
+}
+
 async function adminRequest<T>(
   token: string,
   path: string,
@@ -156,7 +168,7 @@ async function adminRequest<T>(
   if (response.status === 401) forgetSession(token);
   if (!response.ok) {
     const error = isApiRecord(data) && typeof data.error === "string" ? data.error : "";
-    throw new Error(error || `Request failed (${response.status})`);
+    throw new AdminApiError(error || `Request failed (${response.status})`, response.status);
   }
   if (!isApiRecord(data)) throw new Error(BOOKING_REPLY_ERROR);
   return data as T;

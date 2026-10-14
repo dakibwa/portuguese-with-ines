@@ -1475,9 +1475,11 @@ async function teacherStudentList(env) {
   const now = new Date().toISOString();
   const { results } = await env.DB.prepare(
     `SELECT s.id, s.name, s.email, s.phone, COALESCE(s.nif, '') AS nif, s.created_at, COALESCE(s.mark, '') AS mark, s.awaiting_welcome,
-       (COALESCE(s.stripe_payment_method, '') != '') AS has_card,
+       (COALESCE(s.stripe_customer_id, '') != '' AND COALESCE(s.stripe_payment_method, '') != '') AS has_card,
        s.card_consent_at,
        (s.password_hash != '' OR s.google_sub IS NOT NULL OR s.last_login_at IS NOT NULL) AS signed_in,
+       (EXISTS (SELECT 1 FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed')
+         OR (s.email NOT LIKE 'no-email:%' AND EXISTS (SELECT 1 FROM bookings b WHERE b.student_id IS NULL AND b.student_email = s.email AND b.status = 'confirmed'))) AS has_lessons,
        (SELECT MIN(b.starts_at) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?) AS next_lesson_at,
        (SELECT COUNT(*) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?
           AND b.added_by_teacher = 1 AND b.payment_status = 'not_required') AS unpaid_upcoming,
@@ -1502,6 +1504,8 @@ async function teacherStudentList(env) {
     mark: row.mark ?? "",
     signedIn: Boolean(row.signed_in),
     awaitingWelcome: Boolean(row.awaiting_welcome) && !row.signed_in,
+    hasCard: Boolean(row.has_card),
+    hasLessons: Boolean(row.has_lessons),
     cardForAllLessons: Boolean(row.has_card && row.card_consent_at),
     nextLessonAt: row.next_lesson_at ?? null,
     unpaidUpcoming: Number(row.unpaid_upcoming ?? 0),

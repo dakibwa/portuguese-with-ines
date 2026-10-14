@@ -16,6 +16,7 @@ import {
   lessonStarts,
   mondayOf,
   needsYou,
+  gettingStarted,
   paintHours,
   removeSpan,
   shiftDate,
@@ -376,9 +377,11 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
     student("Dot", { awaitingWelcome: false, nextLessonAt: "2026-09-08T10:00:00Z" }),
   ];
   const items = needsYou({ now, meet, payments: [{ id: "p1", reference: "REVIEW-1", payment_status: "processing" }], students, lessons, cancellations });
-  assert.deepEqual(items.map((item) => item.key), [
-    "meet", "payment:p1", "first:first-soon", "welcome:Ana", "changed:changed-recent", "changed:w1", "cancelled:c1", "changed:first-changed", "changed:added-changed", "cancelled:r1",
-  ]);
+  assert.deepEqual(new Set(items.map(item => item.key)), new Set([
+    "meet", "payment:p1", "first:first-soon", "welcome:Ana", "welcome:Kai", "email:Bea", "email:Cal", "changed:changed-recent", "changed:w1", "cancelled:c1", "changed:first-changed", "changed:added-changed", "cancelled:r1",
+  ]));
+  const changes = items.filter(item => item.kind === "changed");
+  assert.equal(changes[0].key, "changed:first-changed", "newest student changes lead older ones");
   const by = (key) => items.find((item) => item.key === key);
   assert.equal(by("meet").reconnect, true);
   assert.equal(by("payment:p1").part, "lesson");
@@ -397,4 +400,33 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
   const today = row("today", "2026-09-07", { starts_at: "2026-09-07T12:00:00Z", ends_at: "2026-09-07T13:00:00Z", student_changed_at: "2026-09-07T09:00:00Z" });
   assert.deepEqual(alone("2026-09-07T10:00:00Z", [today]), ["changed:today"]);
   assert.deepEqual(alone("2026-09-07T12:30:00Z", [today]), []);
+});
+
+
+test("setup steps separate her to-dos from waiting on students, with welcomes at any time", () => {
+  const student = (id, extra) => ({ id, name: id, email: `${id}@example.invalid`, signedIn: false, hasCard: false, hasLessons: true, awaitingWelcome: true, ...extra });
+  const students = [
+    student("email", { email: "" }),
+    student("lessons", { hasLessons: false }),
+    student("welcome", { nextLessonAt: null }),
+    student("far", { nextLessonAt: "2027-01-01T10:00:00Z" }),
+    student("sign-in", { awaitingWelcome: false }),
+    student("card", { awaitingWelcome: false, signedIn: true }),
+    student("self-booked", { awaitingWelcome: undefined, signedIn: true, hasCard: true }),
+    student("past", { awaitingWelcome: false, signedIn: true, hasCard: true, nextLessonAt: null }),
+  ];
+  const setup = gettingStarted(students);
+  assert.deepEqual(setup.map(row => [row.student.id, row.next, row.owner]), [
+    ["email", "email", "Yours"], ["lessons", "lessons", "Yours"], ["welcome", "welcome", "Yours"], ["far", "welcome", "Yours"],
+    ["sign-in", "sign-in", "Theirs"], ["card", "card", "Theirs"],
+  ]);
+  assert.deepEqual(setup.map(row => row.steps.map(step => step.done)), [
+    [false, true, true, false, false, false], [true, true, false, false, false, false],
+    [true, true, true, false, false, false], [true, true, true, false, false, false],
+    [true, true, true, true, false, false], [true, true, true, true, true, false],
+  ]);
+  const tasks = needsYou({ now: new Date("2026-10-14T10:00:00Z"), meet: null, payments: [], students, lessons: [], cancellations: [] });
+  assert.deepEqual(new Set(tasks.map(item => item.key)), new Set(["welcome:far", "email:email", "lessons:lessons", "welcome:lessons", "welcome:welcome"]));
+  assert.ok(tasks.every(item => setup.some(row => row.student.id === item.student.id && row.owner === "Yours")), "the tab count excludes waiting on them");
+  assert.deepEqual(gettingStarted([student("cards-off", { awaitingWelcome: false, signedIn: true })], false), [], "cards switched off do not hold setup open");
 });

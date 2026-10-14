@@ -69,7 +69,7 @@ for (const width of [390, 1440]) {
   assert.equal(await diary.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await diary.screenshot({ path: `tmp/qa/payment-review-diary-${width}.png`, fullPage: true });
   await reconnect.click();
-  assert.equal(await diary.getByRole("tab", { name: /^Google Meet/ }).getAttribute("aria-selected"), "true", "Reconnect opens the Google Meet tab");
+  assert.equal(await diary.getByRole("tab", { name: "Profile", exact: true }).getAttribute("aria-selected"), "true", "Reconnect opens Google Meet in Profile");
   await diary.close();
 }
 await browser.close();

@@ -395,7 +395,7 @@ export function bookingSegments(
 
 /** How long a change or cancellation by a student stays in Needs you. */
 export const NEEDS_YOU_RECENT_HOURS = 72;
-/** How close a lesson must be for its welcome or first-lesson note to show. */
+/** How close a lesson must be for its first-lesson note to show. */
 export const NEEDS_YOU_AHEAD_DAYS = 7;
 
 /**
@@ -405,7 +405,9 @@ export const NEEDS_YOU_AHEAD_DAYS = 7;
 export type NeedsYouItem =
   | { kind: "meet"; key: "meet"; reconnect: boolean }
   | { kind: "payment"; key: string; review: PaymentReview; part: "lesson" | "fee" | "refund" }
-  | { kind: "welcome"; key: string; student: AdminStudent; at: string }
+  | { kind: "email"; key: string; student: AdminStudent }
+  | { kind: "lessons"; key: string; student: AdminStudent }
+  | { kind: "welcome"; key: string; student: AdminStudent; at?: string | null }
   | { kind: "changed"; key: string; booking: AdminBooking; count: number; first: boolean }
   | { kind: "cancelled"; key: string; booking: AdminBooking; count: number }
   | { kind: "first"; key: string; booking: AdminBooking };
@@ -413,9 +415,41 @@ export type NeedsYouItem =
 /** Students she set up with no email hold this in place of one; nothing is ever shown or sent to it. */
 const NO_EMAIL_YET = "no-email:";
 
+export type StudentSetupStep = "email" | "price" | "lessons" | "welcome" | "sign-in" | "card";
+
+export type StudentSetup = {
+  student: AdminStudent;
+  steps: { id: StudentSetupStep; label: string; done: boolean }[];
+  next: Exclude<StudentSetupStep, "price">;
+  owner: "Yours" | "Theirs";
+};
+
+/** A past lesson counts too; her students do not need a future booking to stay set up. */
+const hasLessons = (student: AdminStudent) => Boolean(student.hasLessons || student.nextLessonAt || student.upcoming || student.weekly);
+
+/** The standard price is ready already. Sign-in and a card are the student's own steps. */
+export function gettingStarted(students: AdminStudent[], cardsAccepted = true): StudentSetup[] {
+  return students.flatMap((student) => {
+    const email = Boolean(student.email && !student.email.startsWith(NO_EMAIL_YET));
+    const steps: StudentSetup["steps"] = [
+      { id: "email", label: "Email", done: email },
+      { id: "price", label: "Price", done: true },
+      { id: "lessons", label: "Lessons", done: hasLessons(student) },
+      { id: "welcome", label: "Welcome", done: email && !student.awaitingWelcome },
+      { id: "sign-in", label: "Signed in", done: Boolean(student.signedIn) },
+      ...(cardsAccepted ? [{ id: "card" as const, label: "Card", done: Boolean(student.hasCard) }] : []),
+    ];
+    const index = steps.findIndex((step) => !step.done);
+    if (index < 0) return [];
+    const next = steps[index].id as StudentSetup["next"];
+    return [{ student, steps, next, owner: next === "sign-in" || next === "card" ? "Theirs" as const : "Yours" as const }];
+  });
+}
+
 /**
  * What waits on her, from reads the page already makes: Google Meet first,
- * then payments in the Worker's order, then everything else by lesson time.
+ * then payments in the Worker's order, then the newest student changes.
+ * Undated setup tasks and first lessons follow by next lesson, then name.
  * A lesson appears once. `lessons` are her confirmed lessons from yesterday
  * on; `cancellations` the cancelled rows, which the timetable drops.
  */
@@ -457,12 +491,16 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
     first.push({ kind: "payment", key: `payment:${review.id}`, review, part });
   }
 
-  // Each is placed by the lesson it concerns, soonest first.
-  const timed: { time: number; item: NeedsYouItem }[] = [];
+  const timed: { time: number; changed: number; item: NeedsYouItem }[] = [];
   for (const student of students) {
     const email = student.email ?? "";
-    if (student.awaitingWelcome && email && !email.startsWith(NO_EMAIL_YET) && student.nextLessonAt && soon(student.nextLessonAt))
-      timed.push({ time: Date.parse(student.nextLessonAt), item: { kind: "welcome", key: `welcome:${student.id}`, student, at: student.nextLessonAt } });
+    const time = Date.parse(student.nextLessonAt ?? "") || Infinity;
+    if (!email || email.startsWith(NO_EMAIL_YET))
+      timed.push({ time, changed: 0, item: { kind: "email", key: `email:${student.id}`, student } });
+    else if (student.awaitingWelcome)
+      timed.push({ time, changed: 0, item: { kind: "welcome", key: `welcome:${student.id}`, student, at: student.nextLessonAt } });
+    if (!hasLessons(student))
+      timed.push({ time, changed: 0, item: { kind: "lessons", key: `lessons:${student.id}`, student } });
   }
 
   const confirmed = lessons.filter((row) => row.status === "confirmed" && real(row));
@@ -471,17 +509,18 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
   for (const group of grouped(changedRows, (row) => row.series_id ? `${row.series_id}|${row.student_changed_at}` : row.id)) {
     const [booking] = group;
     for (const row of group) shown.add(row.id);
-    timed.push({ time: Date.parse(booking.starts_at), item: { kind: "changed", key: `changed:${booking.id}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
+    timed.push({ time: Date.parse(booking.starts_at), changed: Date.parse(booking.student_changed_at!), item: { kind: "changed", key: `changed:${booking.id}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
   }
   const cancelledRows = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at) && ahead(row.starts_at));
   for (const group of grouped(cancelledRows, (row) => row.series_id || row.id)) {
     const [booking] = group;
-    timed.push({ time: Date.parse(booking.starts_at), item: { kind: "cancelled", key: `cancelled:${booking.id}`, booking, count: group.length } });
+    timed.push({ time: Date.parse(booking.starts_at), changed: Math.max(...group.map(row => Date.parse(row.cancelled_at!))), item: { kind: "cancelled", key: `cancelled:${booking.id}`, booking, count: group.length } });
   }
   for (const booking of confirmed) {
     if (booking.first_lesson && !booking.added_by_teacher && soon(booking.starts_at) && !shown.has(booking.id))
-      timed.push({ time: Date.parse(booking.starts_at), item: { kind: "first", key: `first:${booking.id}`, booking } });
+      timed.push({ time: Date.parse(booking.starts_at), changed: 0, item: { kind: "first", key: `first:${booking.id}`, booking } });
   }
 
-  return [...first, ...timed.sort((a, b) => a.time - b.time).map((entry) => entry.item)];
+  const name = (item: NeedsYouItem) => "student" in item ? item.student.name : "booking" in item ? item.booking.student_name : "";
+  return [...first, ...timed.sort((a, b) => b.changed - a.changed || a.time - b.time || name(a.item).localeCompare(name(b.item))).map((entry) => entry.item)];
 }

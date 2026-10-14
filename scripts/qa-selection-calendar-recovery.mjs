@@ -538,9 +538,9 @@ try {
         await page.goto(`${base}/schedule/`);
         await page.getByRole("tab", { name: /^Students/ }).click();
         await page.getByRole("button", { name: "Add a lesson for Rui", exact: true }).click();
-        // Her card opens their profile; the lesson form opens in place there.
-        await page.getByRole("dialog").getByRole("button", { name: "Add a lesson", exact: true }).click();
+        // Add a lesson opens its form in the student's profile.
         const form = page.getByRole("dialog").locator(".teacher-manual-form");
+        await form.getByText("Enter another time", { exact: true }).click();
         await form.getByLabel("Date", { exact: true }).fill("2026-10-06");
         await form.getByLabel("Time in Porto", { exact: true }).fill("10:00");
         await form.getByRole("button", { name: /^Add lesson( and email student)?$/ }).click();

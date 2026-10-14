@@ -355,10 +355,12 @@ time. Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
-The sliding tools bar groups `Timetable`, `Weekly hours`, `Time off`,
-`Students`, `Receipts`, `Expressions` and `Google Meet`, opening on `Timetable`.
-The Google Meet tab holds the connection controls; Google callbacks open it
-directly. `Needs you`, under her next lesson, gathers what waits on her (below).
+The tools bar groups `Needs you`, `Timetable`, `Weekly hours`, `Time off`,
+`Students`, `Receipts`, `Expressions` and `Profile`, opening on `Timetable`.
+Profile holds her sign-in email change, password reset link, Google Meet
+connection and Sign out. Email changes use the existing new-address confirmation
+flow; password changes use the existing reset email. Google callbacks open Profile
+directly. `Needs you` has its own tab and a three-card strip under her next lesson.
 
 Lessons only belong to students (13 October 2026, Dan: no loose lessons).
 `POST /admin/bookings` names the student by `studentId` (their account, which
@@ -367,7 +369,8 @@ who isn't on the site is refused ("Add them as a student first.", 404), and
 students come from `POST /admin/students`. The page's one student profile
 (14 October 2026, Dan) is what a student's card, its `Add a lesson` button,
 the end of `Add a student` and a free time's `Add a lesson here` all open, the
-latter asking whose lesson first. It shows their details (`Edit details` brings
+latter asking whose lesson first. The Students card's Add a lesson opens the
+profile with the lesson calendar already expanded. It shows their details (`Edit details` brings
 every field out in place), their price, an `Add a lesson` form (online or in
 Porto, once or weekly for 4, 6 or 8 weeks or until stopped), `Send welcome
 email` where it applies, and their lessons. All teacher actions still use the
@@ -461,10 +464,11 @@ to an account that has never signed in.
 
 ### Needs you
 
-`Needs you` (14 October 2026, Phase 2) is one list on the `Timetable` tab,
-under the next-lesson strip and above the week, of what waits on Inês herself.
-It shows nothing until the week's lessons have loaded and nothing when nothing
-waits. It is built in the browser by the pure `needsYou()` in
+`Needs you` (14 October 2026) is the first tab: To do counts only her actions,
+while Getting started shows six actionable setup steps. The Timetable keeps the
+first three To do cards, with `See all in Needs you` when there are more.
+The strip stays absent when empty; the full tab says `Nothing needs you right now.`
+It is built in the browser by the pure `needsYou()` in
 `src/lib/teacher-calendar.ts` from reads the page already makes:
 
 - `GET /admin/bookings` rows, with the computed `first_lesson` and the
@@ -474,35 +478,63 @@ waits. It is built in the browser by the pure `needsYou()` in
 - `manualPaymentReconciliation`, which now carries `student_name`, `starts_at`
   and the Stripe payment intent ids, for `Open in Stripe` (a link to the
   payment when the id looks like `pi_…`, otherwise to Stripe's payments list);
-- `GET /admin/students` (`awaitingWelcome`, `nextLessonAt`, `email`);
+- `GET /admin/students` (`awaitingWelcome`, `nextLessonAt`, `email`, `signedIn`,
+  `hasCard`, `hasLessons` and existing prices);
 - `GET /admin/google-calendar`, for Meet needing to be connected or
   reconnected.
 
-Six kinds of item, Meet first, then payments in the Worker's order, then the
-rest by lesson time: Google Meet; a payment Stripe never confirmed; a student
-she set up and hasn't emailed with a lesson in the next 7 days; a lesson a
+Meet first, then payments in the Worker's order, then
+student changes newest first, then undated tasks by next lesson and name:
+Google Meet; a payment Stripe never confirmed; a student
+she set up and has not emailed, at any time once they have an email; a
+student with no email, whose Add email opens their inline details editor; a
+student with no confirmed lessons, whose Add a lesson opens the inline lesson
+form; a lesson a
 student changed in the last 72 hours (one card per weekly run and stamp); a
-lesson a student cancelled in the last 72 hours (one card per weekly run, no
-action: the time is already open to students); and a new student's first lesson
+lesson a student cancelled in the last 72 hours (one card per weekly run,
+View opens it read-only; the time is already open to students); and a new
+student's first lesson
 in the next 7 days (a student's own booking with no earlier confirmed lesson of
 theirs, matching older rows without a `student_id` by email; a lesson Inês added
 never reads as a first lesson, even after the student moves it). The
 older-by-email check in `first_lesson` is written `+legacy.status` so SQLite
 stays on `idx_bookings_student`; without the plus it scans every earlier
 booking for each row returned. A lesson appears
-once, and a student with no email yet (`no-email:`) is never listed. Declined
+once. The internal `no-email:` placeholder never appears; their email reads
+as empty and the action opens their details, never sends. Declined
 cards stay with the student and in Receipts. Nothing is dismissed: items clear
 when done, after 72 hours, or once the lesson begins; the windows are
-`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. More than four fold under
-`n more`. Returning to the page after five minutes away reloads lessons and
+`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. The full tab shows them
+all; its badge is this list's length. Returning after five minutes away reloads lessons and
 students, quietly: if the read fails, the lessons on screen stay and no error
 replaces them. Nothing polls.
 
-It adds no endpoint and no stored state. Its only write is the existing
-welcome, sent with `{ "onlyIfWaiting": true }`: the Worker answers 409 `Their
-welcome has already been sent.` before spending the rate limit once the student
-has been welcomed or has signed in, so a second device sends nothing. The
-Students card sends no such flag and can still re-send deliberately.
+The views add no endpoint or stored setup flags. A first welcome uses
+`{ "onlyIfWaiting": true }`: the Worker answers 409 `Their welcome has already
+been sent.` before spending the rate limit once the student has been welcomed
+or signed in. The Students card can still re-send deliberately.
+
+Getting started uses the pure `gettingStarted()` selector over the same read:
+Email, Price, Lessons, Welcome, Signed in and Card. Filled/outlined dabs show
+completion. Standard prices count as ready; setting a custom price is optional.
+`hasLessons` includes confirmed past lessons and legacy lessons matched by email,
+so returning students do not appear to need a first lesson. `hasCard` is returned
+from the saved Stripe customer and payment method, consistent with `/me`.
+The card step does not block setup when cards are unavailable.
+
+Her steps expand in the row, reusing the details, prices and lesson forms.
+Lesson creation includes a calendar and available start times from the existing
+availability read, refreshed for the chosen lesson length. Choosing a slot
+fills the date and Porto time. Manual entry remains available for times Inês
+arranges herself; the existing creation endpoint still checks clashes and
+validates a weekly run. A saved change refreshes the student list and timetable. To do can open the same
+inline task; the student's name opens their details in that row, with the
+complete profile still available in Students. Welcomes remain a separate
+explicit action. Yours marks her work; Theirs marks sign-in
+and card. `Send the link again` deliberately omits `onlyIfWaiting`, never sends
+without an email, and surfaces the existing 3-per-hour endpoint's 429 message.
+Waiting on students adds no badge count. All writes use the existing teacher
+permission path and validation.
 
 Migration `0028-student-changed-at.sql` adds `bookings.student_changed_at`.
 A student's own move (`handleReschedule`, `handleRescheduleSeries`) stamps it in
@@ -1746,11 +1778,12 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
   Worker that reads it: adding a lesson writes `added_by_teacher` and sign-in
   links need their table. Existing rows were unchanged.
 - **Migration 0028** (`workers/booking/migrations/0028-student-changed-at.sql`)
-  is applied by hand to staging and production D1 before the Worker that
-  writes it, so the first changes after release are recorded; record the date
-  here once it is done. Confirm with `SELECT student_changed_at FROM bookings
-  LIMIT 0`. Until then student changes never show in Needs you, and moves are
-  unaffected.
+  was applied by hand to staging, then production D1 on 14 October 2026,
+  before the Worker release. The column was absent before each application;
+  `pragma_table_info('bookings')` confirmed `student_changed_at TEXT` in both
+  afterwards. Existing rows stay NULL; changes after release can appear in
+  Needs you. The migration file was executed directly, without replaying the
+  empty migration ledger.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
 ## Google Calendar and Meet setup
@@ -1819,7 +1852,7 @@ that connection. The existing Google sign-in client remains separate.
 4. Set `GOOGLE_CALENDAR_ENABLED` to `1` only after setup, and release Worker
    before frontend. Use the isolated staging Worker/database for live proof,
    with its own callback/client grant and dry-run emails.
-5. Inês signs into `/schedule/`, selects **Google Meet → Connect Google Meet**,
+5. Inês signs into `/schedule/`, selects **Profile → Google Meet → Connect Google Meet**,
    chooses her matching Google account and grants permission. The callback
    checks signed identity, teacher role, session version/revocation, expiring
    single-use state and PKCE. The shared admin token cannot start OAuth.
@@ -1848,7 +1881,7 @@ minutes later. Google itself emails no one: events carry no attendees and are
 written with `sendUpdates=none`.
 
 Expired or revoked Google permission shows **Needs reconnecting** on her Google
-Meet tab and `Google Meet needs reconnecting` in Needs you; **Google Meet →
+Profile tab and `Google Meet needs reconnecting` in Needs you; **Profile → Google Meet →
 Reconnect Google Meet** restores it.
 Reconnection reuses the stored calendar and event identities. If the first
 calendar-create response is lost, the persisted creation-attempt flag prevents

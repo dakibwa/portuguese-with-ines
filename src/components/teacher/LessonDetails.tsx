@@ -260,7 +260,7 @@ export function LessonDetails({
           A payment is being processed. Try making changes once it finishes.
         </p>
       ) : null}
-      {action === "view" ? (
+      {booking.status === "cancelled" ? <div className="teacher-dialog-actions"><button className="button button--outline" type="button" onClick={onClose}>Done</button></div> : action === "view" ? (
         <div className="teacher-dialog-actions">
           <button
             className="button button--coral"

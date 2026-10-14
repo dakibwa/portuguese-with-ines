@@ -18,7 +18,7 @@ import { dateLabel, minuteLabel } from "@/lib/teacher-calendar";
 
 /** Where the profile opens: one of her students, a new one, or a free time on her week. */
 export type StudentProfileStart =
-  | { step: "profile"; student: AdminStudent }
+  | { step: "profile"; student: AdminStudent; editDetails?: boolean; addLesson?: boolean }
   | { step: "new" }
   | { step: "pick"; date: string; minute: number };
 
@@ -48,8 +48,8 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
   const [student, setStudent] = useState<AdminStudent | null>(start.step === "profile" ? start.student : null);
   // A free time she chose leads the lesson form until something is added there.
   const [slot, setSlot] = useState(start.step === "pick" ? { date: start.date, time: minuteLabel(start.minute) } : null);
-  const [editing, setEditing] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(start.step === "profile" && Boolean(start.editDetails));
+  const [adding, setAdding] = useState(start.step === "profile" && Boolean(start.addLesson) && !start.editDetails);
   const [added, setAdded] = useState<string[]>([]);
   const [welcomed, setWelcomed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -100,7 +100,7 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
 
   useEffect(() => {
     if (was.current.editing && !editing) editButton.current?.focus();
-    if (was.current.adding && !adding) addButton.current?.focus();
+    if (was.current.adding && !adding && !editing) addButton.current?.focus();
     if (!was.current.adding && adding) addSection.current?.focus();
     was.current = { editing, adding };
   }, [editing, adding]);
@@ -222,7 +222,7 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
                   <p className="teacher-profile-line">{student.email || "No email yet"}</p>
                   {student.phone ? <p className="teacher-profile-line">{student.phone}</p> : null}
                   <p className="teacher-profile-line">{student.nif ? `NIF ${student.nif}` : "No NIF (consumidor final)"}</p>
-                  <button className="teacher-text-button" onClick={() => setEditing(true)} ref={editButton} type="button">Edit details</button>
+                  <button className="teacher-text-button" disabled={busy} onClick={() => { setAdding(false); setEditing(true); }} ref={editButton} type="button">Edit details</button>
                 </>
               )}
             </div>
@@ -260,7 +260,7 @@ export function StudentProfile({ token, known, cards, start, afterCloseFocusRef,
             </section>
           ) : (
             <div className="teacher-dialog-actions teacher-profile__actions">
-              <button className={`button button--${welcomeFirst || editing ? "lilac" : "coral"}`} disabled={busy} onClick={() => { setAdding(true); setError(""); }} ref={addButton} type="button">
+              <button className={`button button--${welcomeFirst || editing ? "lilac" : "coral"}`} disabled={busy} onClick={() => { setEditing(false); setAdding(true); setError(""); }} ref={addButton} type="button">
                 <CalendarPlus size={16} aria-hidden="true" />
                 Add a lesson
               </button>

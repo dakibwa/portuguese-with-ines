@@ -2411,7 +2411,7 @@ await test("she sets a student up and adds their lessons without emailing them, 
     const created = await add({ email: "quiet@example.invalid", name: "Ana Costa", phone: "+351 912 345 678", nif: "PT 123 456 789", mark: "bloom" });
     assert.equal(created.status, 201, await created.clone().text());
     const { student } = await created.json();
-    assert.deepEqual([student.awaitingWelcome, student.signedIn, student.mark], [true, false, "bloom"]);
+    assert.deepEqual([student.awaitingWelcome, student.signedIn, student.mark, student.hasCard, student.hasLessons], [true, false, "bloom", false, false]);
     assert.deepEqual({ ...db.prepare("SELECT phone, nif FROM students WHERE id=?").get(student.id) }, { phone: "+351 912 345 678", nif: "123456789" });
     assert.equal((await add({ email: "quiet@example.invalid", name: "Again" })).status, 409);
 
@@ -2527,6 +2527,8 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     // A lesson she has already had, a one-off, a weekly run and a long lesson.
     const had = await book({ startAt: "2026-08-20T09:00:00.000Z" });
     assert.equal(had.status, 201, await had.clone().text());
+    const afterPastLesson = (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).students.find(entry => entry.id === student.id);
+    assert.equal(afterPastLesson.hasLessons, true, "a confirmed lesson already had completes their lesson setup");
     const one = await book({ startAt: "2026-10-20T16:00:00.000Z" });
     assert.equal(one.status, 201, await one.clone().text());
     assert.equal((await one.json()).emailed, false, "she is told nothing was sent");
@@ -2856,12 +2858,22 @@ await test("expression picks stay closed until EXPRESSIONS_FOR_STUDENTS is \"1\"
 await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('launch-check','launch-check-0000@example.invalid','Launch Verification','x','2026-09-05T08:56:55.286Z')").run();
+  student("setup-empty"); student("setup-past");
+  db.prepare("UPDATE students SET stripe_customer_id=NULL WHERE id='setup-empty'").run();
+  booking("setup-past-only", { owner: "setup-past", start: "2026-08-01T09:00:00.000Z", end: "2026-08-01T10:00:00.000Z" });
+  db.prepare("UPDATE bookings SET student_id=NULL WHERE id='setup-past-only'").run();
   const listed = await call("/admin/students", { method: "GET", user: "teacher" });
   assert.equal(listed.status, 200);
   const { students, cardsAccepted } = await listed.json();
   db.prepare("DELETE FROM students WHERE id='launch-check'").run();
+  db.prepare("DELETE FROM bookings WHERE id='setup-past-only'").run();
+  db.prepare("DELETE FROM students WHERE id IN ('setup-empty','setup-past')").run();
   assert.ok(!students.some((row) => row.id === "teacher"), "her own account is not a student");
   assert.ok(!students.some((row) => row.id === "launch-check"), "a live check's throwaway account is not a student");
+  const setupEmpty = students.find(row => row.id === "setup-empty");
+  const setupPast = students.find(row => row.id === "setup-past");
+  assert.deepEqual([setupEmpty.hasCard, setupEmpty.hasLessons], [false, false], "a card needs its Stripe customer too");
+  assert.deepEqual([setupPast.hasCard, setupPast.cardForAllLessons, setupPast.hasLessons, setupPast.nextLessonAt], [true, false, true, null], "a legacy confirmed lesson counts without confusing a saved card with payment consent");
   const alice = students.find((row) => row.id === "alice");
   assert.deepEqual([alice.cardForAllLessons, typeof alice.unpaidUpcoming], [false, "number"]);
   assert.equal(cardsAccepted, true);
