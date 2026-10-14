@@ -2529,7 +2529,7 @@ await test("only a teacher can manage expressions; drafts, exact text, publicati
   } finally { db.exec("DELETE FROM expressions"); }
 });
 
-await test("expression picks are personal, published-only, atomic and safe to retry across visits", async () => {
+await test("expression picks stay closed until EXPRESSIONS_FOR_STUDENTS is \"1\", then are personal, published-only, atomic and safe to retry across visits", async () => {
   db.exec(readFileSync(new URL("./migrations/0026-expressions.sql", import.meta.url), "utf8"));
   db.exec(readFileSync(new URL("./migrations/0027-expression-picks.sql", import.meta.url), "utf8"));
   for (const id of ["expression-a", "expression-b"]) { student(id); sessions[id] = await createSession(id, env.BOOKING_TOKEN_SECRET); }
@@ -2544,7 +2544,27 @@ await test("expression picks are personal, published-only, atomic and safe to re
     assert.equal(response.status, 200, await response.clone().text());
     return response.json();
   };
+  const openToStudents = async () => (await (await call("/admin/expressions", { method: "GET", user: "teacher" })).json()).openToStudents;
   try {
+    // Closed by default (14 October 2026, Dan: "not for students just for
+    // ines currently"): even with a published expression, a student reads an
+    // empty collection and cannot pick, and nothing is written.
+    publish("original-1");
+    assert.equal(env.EXPRESSIONS_FOR_STUDENTS, undefined);
+    assert.deepEqual(await current("expression-a"), { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] });
+    const refused = await call("/me/expressions/pick", { user: "expression-a", body: { requestId: crypto.randomUUID() } });
+    assert.equal(refused.status, 404);
+    assert.match((await refused.json()).error, /not open yet/);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM expression_picks").get().n, 0, "a closed picker writes nothing");
+    assert.equal(await openToStudents(), false, "her copy follows the same switch");
+    for (const value of ["0", "true"]) {
+      env.EXPRESSIONS_FOR_STUDENTS = value;
+      assert.equal((await current("expression-a")).hasPublished, false, `${value} keeps them closed: only exactly "1" opens them`);
+    }
+    publish("original-1", 0);
+    env.EXPRESSIONS_FOR_STUDENTS = "1";
+    assert.equal(await openToStudents(), true);
+
     assert.equal((await current("expression-a")).hasPublished, false);
     for (const [path, method] of [["/me/expressions", "GET"], ["/me/expressions/pick", "POST"]]) {
       assert.equal((await call(path, { method, user: null, body: { requestId: crypto.randomUUID() } })).status, 401);
@@ -2578,7 +2598,10 @@ await test("expression picks are personal, published-only, atomic and safe to re
     publish("original-3");
     assert.equal((await pick("expression-a")).expression.id, "original-3", "new published material becomes available");
     assert.equal(db.prepare("SELECT COUNT(DISTINCT expression_id) AS n FROM expression_picks WHERE student_id = 'expression-a'").get().n, 3);
-  } finally { db.exec("DELETE FROM expression_picks; DELETE FROM expressions; DELETE FROM students WHERE id IN ('expression-a', 'expression-b');"); }
+  } finally {
+    delete env.EXPRESSIONS_FOR_STUDENTS;
+    db.exec("DELETE FROM expression_picks; DELETE FROM expressions; DELETE FROM students WHERE id IN ('expression-a', 'expression-b');");
+  }
 });
 
 await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {

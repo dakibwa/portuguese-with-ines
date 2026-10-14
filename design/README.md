@@ -522,14 +522,39 @@ usual lesson starts and days off; avoid a wall of administration forms.
 ### Expressions in her portal — 13 October 2026
 
 The `Expressions` tab immediately follows `Receipts`. Only a teacher can
-manage its collection. Publishing makes an expression available in the
-signed-in student picker below Your lessons. Drafts stay in her interface;
-there is no anonymous page or main-menu item.
+manage its collection. Expressions are hers alone for now (14 October 2026,
+Dan: "publish them but not for students just for ines currently"): students
+see no expressions card at all until Dan opens them to students (the Worker's
+`EXPRESSIONS_FOR_STUDENTS` switch, in
+[the booking-system contract](../docs-booking-system.md#student-expression-picker)).
+Once they are open, publishing makes an expression available in the signed-in
+student picker below Your lessons. Drafts stay in her interface; there is no
+anonymous page or main-menu item.
 
 - Use the same lilac sheet as Receipts, cream reading cards, Beth Ellen
   expression titles and Montserrat labels and content. Keep the latest bundle
   introduction exactly: `expressão idiomática`, `nome feminino`, and
   `Conjunto de palavras com um significado próprio, diferente do seu sentido literal.`
+- Her try-out comes straight after the introduction and `Add an expression`:
+  the students' own card, so she sees every expression painted as a student
+  will, drafts included. It is the same component, paint, reading, button and
+  accessibility as the student's at every width, sitting on her lilac sheet
+  without a second sheet round it, and one compact card at rest above her
+  list. It paints from her whole collection in her browser alone: nothing is
+  saved to the Worker and no student's pick is spent. It never paints the same
+  expression twice in a row, and none again until she has seen them all, then
+  starts a new round (remembered on her device); its colours follow her own
+  account. A draft shows the facts it has, with no example if it has none.
+  With an empty collection there is nothing to paint, and it stays away.
+- Her copy says only what students actually see. While expressions are closed
+  to students, the help reads `Only you can see expressions for now. Paint one
+  above to see what your students will get.`, publishing confirms `Published.
+  Your students will see it once expressions open to them.`, and the private
+  preview says `Students don’t see expressions yet.` Once they are open, these
+  return to `Your students can pick published expressions from Your lessons.`,
+  `Published. Your students can now pick this expression.` and `Students can
+  only pick published expressions.` `Add both meanings and one or two examples
+  before publishing.` stays either way.
 - The coral `Add an expression` leads. Search matches accents flexibly across
   expressions, meanings, examples and notes. The theme filter includes entries
   with no theme. Do not display the original collection's count.
@@ -561,7 +586,8 @@ there is no anonymous page or main-menu item.
   for a reading card. The packaging photos and business card do not illustrate
   individual meanings. None is copied into `public/visuals/` for this integration.
 
-The student card sits on the same lilac sheet below the lessons calendar. Its
+The student card sits on the same lilac sheet below the lessons calendar,
+once expressions are open to students and Inês has published one. Its
 centre is `Pinta e descobre` (13 October 2026, at Dan's choice; it replaced a
 spinning wheel he rejected): Inês has written the expression in wax on a cream
 sheet, and a gouache brush sweeps across it line by line so the phrase shows

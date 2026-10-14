@@ -11,8 +11,8 @@ dependencies, app, tests or build from that repository were installed or run.
 | --- | --- |
 | Single-screen roulette landing page, wordmark and organic watermark | The website supplies its own existing portal, type, palette, header and splats. The teacher Expressions tab manages the collection; students draw below Your lessons. |
 | Latest dictionary entry: “expressão idiomática”, “nome feminino”, “Conjunto de palavras com um significado próprio, diferente do seu sentido literal.” | Preserved verbatim in the tab introduction. |
-| Instruction to press “Rodar”; “Que expressão vai sair?” ready screen | The student card offers “Paint it” (then “Paint another”) beside a cream sheet with unseen phrases faintly in wax. The teacher catalogue opens directly for reviewing and editing. |
-| Random selection, previous/next reel lines, 18 slowing frames, blue-only transitions, no final jump, repeat spin | “Pinta e descobre”: a gouache brush paints the server-selected published expression through the wax, line by line, in a different paint each time; about one press in three first starts and crosses out an unseen phrase (design/README.md). Each student has independent saved history and no repeats; once exhausted, they wait for new expressions. The teacher editor does not paint. |
+| Instruction to press “Rodar”; “Que expressão vai sair?” ready screen | The student card offers “Paint it” (then “Paint another”) beside a cream sheet with unseen phrases faintly in wax. The teacher catalogue opens with the same card as her try-out, then the collection for reviewing and editing. |
+| Random selection, previous/next reel lines, 18 slowing frames, blue-only transitions, no final jump, repeat spin | “Pinta e descobre”: a gouache brush paints the server-selected published expression through the wax, line by line, in a different paint each time; about one press in three first starts and crosses out an unseen phrase (design/README.md). Each student has independent saved history and no repeats; once exhausted, they wait for new expressions. The teacher editor does not paint; her try-out paints her whole collection in her browser, saving nothing. |
 | Reduced-motion instant result, disabled double spins, cleanup on leaving | Implemented for the student picker. Picks are saved before the painting, the button stays disabled until the reveal, reduced motion shows the finished painting and reading at once, and leaving mid-stroke cancels it cleanly. |
 | “Ver mais informação” / “Ocultar informação” result detail state | Meanings, literal English and examples are immediately readable on cream cards. Notes/origin have a disclosure. The same reading component appears in the student picker and private teacher preview. |
 | Portuguese meaning, literal English translation, idiomatic English equivalent | All preserved separately; English equivalent seeds Meaning or equivalent in English. Inês can refine it before publication. |
@@ -65,7 +65,11 @@ latest local copy and does not claim access to, or verification of, that app.
 - Student discovery (now included at Dan's request): random published picks in
   signed-in students' Your lessons, painted into view and with no repeats per
   student. Different students can receive the same expression. This replaces
-  the earlier weekly-card plan; no weekly cadence is imposed.
+  the earlier weekly-card plan; no weekly cadence is imposed. It is closed to
+  students for now (14 October 2026, Dan: "publish them but not for students
+  just for ines currently"): students see nothing until Dan sets the Worker's
+  `EXPRESSIONS_FOR_STUDENTS` to `"1"`, and Inês paints any expression, drafts
+  included, in a try-out just under her Add an expression button.
 - Multilingual student suggestions remain deferred. They require a separate
   decision about contribution and moderation behavior.
 - Stage 3 (plan only): a public Expressões page and optionally a home-page

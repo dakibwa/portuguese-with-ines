@@ -8,9 +8,11 @@ import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 import { lockPageScroll } from "@/lib/scroll-lock";
 
-export function ExpressionDialog({ expression, preview, fallbackFocus, onSave, onDelete, onClose }: {
+export function ExpressionDialog({ expression, preview, openToStudents, fallbackFocus, onSave, onDelete, onClose }: {
   expression: Expression | null;
   preview: boolean;
+  /** Whether students can see expressions yet, so the preview's note says only what is true. */
+  openToStudents: boolean;
   fallbackFocus: RefObject<HTMLButtonElement | null>;
   onSave: (input: ExpressionInput) => Promise<void>;
   onDelete: () => Promise<void>;
@@ -85,7 +87,7 @@ export function ExpressionDialog({ expression, preview, fallbackFocus, onSave, o
         </>
       ) : preview && expression ? (
         <>
-          <p className="expression-dialog__hint">This is a private preview. Students can only pick published expressions.</p>
+          <p className="expression-dialog__hint">This is a private preview. {openToStudents ? "Students can only pick published expressions." : "Students don’t see expressions yet."}</p>
           <ExpressionCard expression={expression} />
           <div className="teacher-dialog-actions"><button className="button button--outline" type="button" onClick={onClose}>Done</button></div>
         </>

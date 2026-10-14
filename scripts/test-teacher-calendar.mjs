@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { candidateStartMinutes } from "../workers/booking/availability.mjs";
 import { wallTimeToUtc } from "../src/lib/wall-time.ts";
+import { tryOutExpressions } from "../src/lib/expression-try-out.ts";
 import {
   addSpan,
   bookingSegments,
@@ -317,4 +318,17 @@ test("lessons crossing midnight or the autumn clock change stay visible in Porto
   const [segment] = bookingSegments([repeatedHour], "2026-10-19");
   assert.equal(segment.date, "2026-10-25");
   assert.ok(segment.end > segment.start);
+});
+
+test("her try-out paints every expression, drafts included, before any comes again, and never one twice in a row", async () => {
+  const rows = ["a", "b", "c"].map((id, index) => ({ id, expression: `Expressão ${id}`, published: index === 1 ? 1 : 0 }));
+  let seed = 7;
+  const source = tryOutExpressions("ines", rows, () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646);
+  const atRest = await source.load();
+  assert.deepEqual([atRest.expression, atRest.canPick, atRest.shuffleLabels.length], [null, true, 3]);
+  const painted = [];
+  for (let press = 0; press < 30; press++) painted.push((await source.pick(`press-${press}`)).expression.id);
+  for (let round = 0; round < 30; round += 3) assert.deepEqual(painted.slice(round, round + 3).sort(), ["a", "b", "c"]);
+  assert.ok(painted.every((id, index) => id !== painted[index - 1]), painted.join(""));
+  assert.equal((await source.pick("press-29")).expression.id, painted[29], "the same press paints the same one");
 });

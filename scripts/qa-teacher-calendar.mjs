@@ -121,7 +121,7 @@ async function fixture(width, options = {}) {
       literalEn: "To crack the coconut laughing", examples: ["Com aquela história, partimos o coco a rir."],
       notes: "", sourceUrl: "", tags: ["Humor"], imageUrl: "", imageAlt: "", published: 0, sortOrder: 0,
       createdAt: "2026-10-13T00:00:00.000Z", updatedAt: "2026-10-13T00:00:00.000Z",
-    }] } });
+    }], openToStudents: false } });
     if (path === "/admin/availability") {
       if (data) {
         if (state.failHours-- > 0)
@@ -1209,7 +1209,14 @@ try {
   // One reachability check; the Worker integration test owns mutations and permissions.
   const expressions = await fixture(390);
   await expressions.page.getByRole("tab", { name: "Expressions", exact: true }).click();
-  await expect(expressions.page.locator(".expression-card")).toContainText("Partir o coco a rir");
+  await expect(expressions.page.locator(".teacher-expression .expression-card")).toContainText("Partir o coco a rir");
+  // Closed to students, her try-out paints her drafts in her browser alone: nothing is written.
+  await expect(expressions.page.getByText("Only you can see expressions for now.", { exact: false })).toBeVisible();
+  const tryOut = expressions.page.getByRole("region", { name: "Uma expressão para ti", exact: true });
+  await tryOut.getByRole("button", { name: "Paint it", exact: true }).click();
+  await expect(tryOut.getByRole("button", { name: "Paint another", exact: true })).toBeEnabled({ timeout: 10_000 });
+  await expect(tryOut.getByRole("heading", { name: "Partir o coco a rir", exact: true })).toBeAttached();
+  assert.deepEqual(expressions.state.writes, []);
   assert.deepEqual(expressions.state.errors, []);
   await expressions.page.close();
 
