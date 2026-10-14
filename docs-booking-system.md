@@ -406,13 +406,18 @@ student changed in the last 72 hours (one card per weekly run and stamp); a
 lesson a student cancelled in the last 72 hours (one card per weekly run, no
 action: the time is already open to students); and a new student's first lesson
 in the next 7 days (a student's own booking with no earlier confirmed lesson of
-theirs, matching older rows without a `student_id` by email). A lesson appears
+theirs, matching older rows without a `student_id` by email; a lesson Inês added
+never reads as a first lesson, even after the student moves it). The
+older-by-email check in `first_lesson` is written `+legacy.status` so SQLite
+stays on `idx_bookings_student`; without the plus it scans every earlier
+booking for each row returned. A lesson appears
 once, and a student with no email yet (`no-email:`) is never listed. Declined
 cards stay with the student and in Receipts. Nothing is dismissed: items clear
 when done, after 72 hours, or once the lesson begins; the windows are
 `NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. More than four fold under
 `n more`. Returning to the page after five minutes away reloads lessons and
-students; nothing polls.
+students, quietly: if the read fails, the lessons on screen stay and no error
+replaces them. Nothing polls.
 
 It adds no endpoint and no stored state. Its only write is the existing
 welcome, sent with `{ "onlyIfWaiting": true }`: the Worker answers 409 `Their

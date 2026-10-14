@@ -4929,10 +4929,12 @@ async function handleAdmin(request, env, ctx, url, path) {
          (COALESCE(s.awaiting_welcome, 0) = 1 AND COALESCE(s.password_hash, '') = '' AND s.google_sub IS NULL AND s.last_login_at IS NULL) AS student_awaiting_welcome,
          -- A student's first lesson, for Needs you: the page only reads from
          -- yesterday on, so it cannot tell for itself. Cancelled lessons never
-         -- count as earlier; rows from before accounts match by email.
+         -- count as earlier; rows from before accounts match by email. The
+         -- unary plus keeps SQLite on idx_bookings_student for the legacy
+         -- check; the window index would scan every earlier booking per row.
          (b.student_id IS NOT NULL
            AND NOT EXISTS (SELECT 1 FROM bookings earlier WHERE earlier.student_id = b.student_id AND earlier.status = 'confirmed' AND earlier.starts_at < b.starts_at)
-           AND NOT EXISTS (SELECT 1 FROM bookings legacy WHERE legacy.student_id IS NULL AND legacy.student_email = b.student_email AND legacy.status = 'confirmed' AND legacy.starts_at < b.starts_at)) AS first_lesson
+           AND NOT EXISTS (SELECT 1 FROM bookings legacy WHERE legacy.student_id IS NULL AND legacy.student_email = b.student_email AND +legacy.status = 'confirmed' AND legacy.starts_at < b.starts_at)) AS first_lesson
        FROM bookings b
        JOIN lesson_types l ON l.id = b.lesson_type_id LEFT JOIN students s ON s.id = b.student_id
        WHERE b.starts_at > ? ORDER BY b.starts_at`

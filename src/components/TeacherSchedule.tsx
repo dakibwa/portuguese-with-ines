@@ -263,11 +263,15 @@ export function TeacherSchedule() {
     void reloadStudents();
   }, [reloadStudents]);
 
-  const reloadBookings = useCallback(async () => {
+  // A quiet read is a background refresh: if it fails, the lessons already on
+  // screen stay, rather than giving way to an error she did not ask for.
+  const reloadBookings = useCallback(async (quiet = false) => {
     if (!token || readSession() !== token) return;
     const request = ++bookingRequest.current;
-    setBookingsLoading(true);
-    setBookingsError("");
+    if (!quiet) {
+      setBookingsLoading(true);
+      setBookingsError("");
+    }
     try {
       // Include an overnight lesson that began before the displayed week.
       const fromDate = [
@@ -286,9 +290,10 @@ export function TeacherSchedule() {
         result.bookings.filter((booking) => booking.status === "cancelled" && booking.cancelled_by === "student"),
       );
       setBookingsShown(true);
+      setBookingsError("");
       setPaymentReview(result.manualPaymentReconciliation ?? []);
     } catch (caught) {
-      if (request === bookingRequest.current)
+      if (request === bookingRequest.current && !quiet)
         setBookingsError(
           caught instanceof Error
             ? caught.message
@@ -316,7 +321,7 @@ export function TeacherSchedule() {
       hiddenAt.current = 0;
       if (away < 5 * 60_000) return;
       setNow(new Date());
-      void reloadBookings();
+      void reloadBookings(true);
       void reloadStudents();
     };
     document.addEventListener("visibilitychange", returned);

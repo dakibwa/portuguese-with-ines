@@ -341,6 +341,8 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
     row("first-added", "2026-09-08", { first_lesson: 1, added_by_teacher: 1 }),
     // A first lesson the student changes shows once, as changed.
     row("first-changed", "2026-09-15", { first_lesson: 1, student_changed_at: ago(2) }),
+    // A lesson she added is never read as the student's first, moved or not.
+    row("added-changed", "2026-09-15", { first_lesson: 1, added_by_teacher: 1, student_changed_at: ago(2) }),
     // Set up with no email yet, so nothing is listed or sent about them.
     row("no-email", "2026-09-09", { first_lesson: 1, student_email: "no-email:abc" }),
   ];
@@ -361,7 +363,7 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
   ];
   const items = needsYou({ now, meet, payments: [{ id: "p1", reference: "REVIEW-1", payment_status: "processing" }], students, lessons, cancellations });
   assert.deepEqual(items.map((item) => item.key), [
-    "meet", "payment:p1", "first:first-soon", "welcome:Ana", "changed:changed-recent", "changed:w1", "cancelled:c1", "changed:first-changed", "cancelled:r1",
+    "meet", "payment:p1", "first:first-soon", "welcome:Ana", "changed:changed-recent", "changed:w1", "cancelled:c1", "changed:first-changed", "changed:added-changed", "cancelled:r1",
   ]);
   const by = (key) => items.find((item) => item.key === key);
   assert.equal(by("meet").reconnect, true);
@@ -369,6 +371,7 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
   assert.equal(by("changed:w1").count, 2);
   assert.equal(by("cancelled:r1").count, 2);
   assert.equal(by("changed:first-changed").first, true);
+  assert.equal(by("changed:added-changed").first, false);
 
   // Resolved, started or out of time: nothing waits, and nothing is stored to dismiss.
   assert.deepEqual(needsYou({ now, meet: { ...meet, configured: false }, payments: [], students: [], lessons: [], cancellations: [] }), []);

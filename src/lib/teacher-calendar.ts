@@ -471,7 +471,7 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
   for (const group of grouped(changedRows, (row) => row.series_id ? `${row.series_id}|${row.student_changed_at}` : row.id)) {
     const [booking] = group;
     for (const row of group) shown.add(row.id);
-    timed.push({ time: Date.parse(booking.starts_at), item: { kind: "changed", key: `changed:${booking.id}`, booking, count: group.length, first: Boolean(booking.first_lesson) } });
+    timed.push({ time: Date.parse(booking.starts_at), item: { kind: "changed", key: `changed:${booking.id}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
   }
   const cancelledRows = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at) && ahead(row.starts_at));
   for (const group of grouped(cancelledRows, (row) => row.series_id || row.id)) {

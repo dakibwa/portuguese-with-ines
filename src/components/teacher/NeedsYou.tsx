@@ -54,7 +54,7 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome }: {
 
   function card(item: NeedsYouItem) {
     let who = "";
-    let detail = "";
+    let detail: ReactNode = "";
     let action: ReactNode = null;
     const view = (booking: AdminBooking) => (
       <button className="button button--lilac button--compact" type="button" onClick={() => onView(booking)}>
@@ -77,7 +77,9 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome }: {
         : part === "lesson" ? `${name}’s payment needs checking`
         : part === "fee" ? `${name}’s late change fee needs checking`
         : `${name}’s refund needs checking`;
-      detail = facts(review.starts_at && `Lesson on ${day(review.starts_at)}, ${formatSlotTime(review.starts_at)}`, review.reference);
+      // A reference is read and quoted whole, so it never breaks at its hyphen.
+      const when = Number.isFinite(Date.parse(review.starts_at ?? "")) ? `Lesson on ${day(review.starts_at!)}, ${formatSlotTime(review.starts_at!)}` : "";
+      detail = <>{when}{when ? " · " : ""}<span className="teacher-needs-you__keep">{review.reference}</span></>;
       action = (
         <a
           className="button button--lilac button--compact"

@@ -1927,7 +1927,8 @@
 /* Text beside its action; when they cannot share a row the action drops under
    the text at the card's full width. */
 .teacher-needs-you .teacher-lesson-card { flex-wrap: wrap; }
-.teacher-needs-you .teacher-lesson-card__who { flex: 999 1 11rem; }
+.teacher-needs-you .teacher-lesson-card__who { flex: 999 1 11rem; text-wrap: pretty; }
+.teacher-needs-you__keep { white-space: nowrap; }
 .teacher-needs-you .teacher-lesson-card .button { flex: 1 0 auto; }
 .teacher-timeoff-dialog h2 { margin-right: 2.5rem; }
 .teacher-timeoff-dialog form { display: grid; gap: 1rem; }
