@@ -17,6 +17,7 @@ import { CalendarOff, CalendarPlus, Plus, Trash2, Video, Globe, UserRound } from
 import { addedByTeacher, type AdminBooking, type AvailabilityException } from "@/lib/admin-api";
 import { meetingHref } from "@/components/MeetingLink";
 import { formatSlotTime } from "@/lib/booking-api";
+import { timetableBounds } from "@/lib/timetable-bounds";
 import {
   WEEKDAYS,
   bookingSegments,
@@ -130,27 +131,16 @@ export function WeeklyTimetable({
       (window) =>
         Number.isFinite(window.start) && Number.isFinite(window.lastStart),
     );
-  // 08:00–20:00, widened to fit any teaching window or lesson outside it.
-  const start = Math.max(
-    0,
-    Math.floor(
-      Math.min(
-        480,
-        ...allWindows.map((w) => w.start),
-        ...segments.map((b) => b.start),
-      ) / 60,
-    ) * 60,
-  );
-  const end = Math.min(
-    1440,
-    Math.ceil(
-      Math.max(
-        1200,
-        ...allWindows.map((w) => w.lastStart + step),
-        ...segments.map((b) => b.end),
-      ) / 60,
-    ) * 60,
-  );
+  const { start, end } = timetableBounds({
+    windows: allWindows,
+    lessons: segments,
+    blocks: editing ? [] : shown.flatMap(index => [
+      ...dateBlocks(exceptions, shiftDate(weekStart, index)),
+      ...weeklyBlocks(exceptions, WEEKDAYS[index].value),
+    ]),
+    step,
+    editing,
+  });
   const minutes = Array.from(
     { length: Math.ceil((end - start) / step) },
     (_, index) => start + index * step,
@@ -475,7 +465,7 @@ export function WeeklyTimetable({
       <div
         className={`teacher-timetable ${editing ? "teacher-timetable--editing" : ""}`}
         ref={gridRef}
-        style={{ "--teacher-days": shown.length } as CSSProperties}
+        style={{ "--teacher-days": shown.length, "--slot-count": minutes.length, "--slot-step": step } as CSSProperties}
       >
         <div className="teacher-week-days">
           <span className="teacher-axis-heading">Porto</span>
@@ -686,7 +676,8 @@ export function WeeklyTimetable({
                           position,
                         ) => {
                           const top = `calc(${(bookingStart - start) / step} * var(--teacher-slot-height) + 2px)`;
-                          const height = `max(38px, calc(${(bookingEnd - bookingStart) / step} * var(--teacher-slot-height) - 4px))`;
+                          const short = bookingEnd - bookingStart < 60;
+                          const height = `max(var(--teacher-lesson-min-height, 38px), calc(${(bookingEnd - bookingStart) / step} * var(--teacher-slot-height) - 4px))`;
                           const meet = meetingHref({
                             meetingUrl: booking.meeting_url,
                             location: booking.location,
@@ -696,7 +687,7 @@ export function WeeklyTimetable({
                           <Fragment key={`${booking.id}-${position}`}>
                           <button
                             type="button"
-                            className={`teacher-calendar-lesson ${booking.location === "porto" ? "teacher-calendar-lesson--porto" : ""}${booking.attendance_status === "no_show" ? " teacher-calendar-lesson--no-show" : ""}${addedByTeacher(booking) ? " teacher-calendar-lesson--added" : ""}`}
+                            className={`teacher-calendar-lesson ${booking.location === "porto" ? "teacher-calendar-lesson--porto" : ""}${short ? " teacher-calendar-lesson--short" : ""}${booking.attendance_status === "no_show" ? " teacher-calendar-lesson--no-show" : ""}${addedByTeacher(booking) ? " teacher-calendar-lesson--added" : ""}`}
                             style={{
                               top,
                               height,
@@ -742,12 +733,12 @@ export function WeeklyTimetable({
                               request). */}
                           {meet ? (
                             <a
-                              className="teacher-lesson-meet"
+                              className={`teacher-lesson-meet${short ? " teacher-lesson-meet--short" : ""}`}
                               href={meet}
                               target="_blank"
                               rel="noopener noreferrer"
                               aria-label={`Join Google Meet with ${booking.student_name}, ${formatSlotTime(booking.starts_at)}`}
-                              style={{ top: `calc(${top} + ${height} - 24px)` }}
+                              style={{ top: short ? `calc(${top} + (${height} - 18px) / 2)` : `calc(${top} + ${height} - 24px)` }}
                             >
                               <Video size={12} aria-hidden="true" />
                               Meet

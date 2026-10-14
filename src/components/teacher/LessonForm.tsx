@@ -122,110 +122,112 @@ export function LessonForm({
           }
         }}
       >
-        {/* Length and place as the booking's sliders, rather than menus to
-            open (10 October 2026, at Dan's request). */}
-        <fieldset className="teacher-manual-choice">
-          <legend>Lesson</legend>
-          <div
-            className={`segmented segmented--three segmented--position-${["trial", "single", "long"].indexOf(lesson.lessonType)}`}
-          >
-            <span aria-hidden="true" className="segmented__thumb" />
-            {/* Each length carries what this student pays for it (13 October 2026, Dan). */}
-            {([["trial", "Trial", trialPrice], ["single", "60 mins", priceFor(student, 60)], ["long", "90 mins", priceFor(student, 90)]] as const).map(([value, label, cents]) => (
-              <label className={lesson.lessonType === value ? "is-active" : ""} key={value}>
-                <input
-                  aria-label={`${label}, ${formatMoneyCents(cents)}`}
-                  checked={lesson.lessonType === value}
-                  disabled={busy}
-                  name={`${idPrefix}-lesson`}
-                  onChange={() => setLesson({ ...lesson, lessonType: value, ...(lesson.startAt ? { time: "", startAt: "" } : {}), ...(value === "trial" ? { repeat: "once" as Repeat } : {}) })}
-                  type="radio"
-                  value={value}
-                />
-                {/* Named "60 mins, €20"; the dot between them is drawn,
-                    and on a phone the price sits under the length. */}
-                <span>{label}</span>
-                <span className="teacher-manual-price">{formatMoneyCents(cents)}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        {/* Online and In Porto carry the timetable's own marks (12 October
-            2026, at Dan's request). */}
-        <fieldset className="teacher-manual-choice">
-          <legend>Where</legend>
-          <div className={`segmented segmented--${lesson.location}`}>
-            <span aria-hidden="true" className="segmented__thumb" />
-            {([["online", "Online"], ["porto", "In Porto"]] as const).map(([value, label]) => (
-              <label className={lesson.location === value ? "is-active" : ""} key={value}>
-                <input
-                  aria-label={label}
-                  checked={lesson.location === value}
-                  disabled={busy}
-                  name={`${idPrefix}-location`}
-                  onChange={() => setLesson({ ...lesson, location: value })}
-                  type="radio"
-                  value={value}
-                />
-                {value === "porto" ? (
-                  <UserRound size={14} strokeWidth={2.4} aria-hidden="true" />
-                ) : (
-                  <Globe size={14} strokeWidth={2.4} aria-hidden="true" />
-                )}
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        {/* A student she sees every week is set up once, as a student books a
-            weekly slot (12 October 2026, Dan). A trial is one first lesson. */}
-        {lesson.lessonType !== "trial" ? (
+        <div className="teacher-manual-settings">
+          {/* Length and place as the booking's sliders, rather than menus to
+              open (10 October 2026, at Dan's request). */}
           <fieldset className="teacher-manual-choice">
-            <legend>How often</legend>
-            <div className={`segmented${lesson.repeat === "once" ? "" : " segmented--second"}`}>
-              <span aria-hidden="true" className="segmented__thumb" />
-              {([["once", "Once"], ["weekly", "Weekly"]] as const).map(([value, label]) => {
-                const active = value === "once" ? lesson.repeat === "once" : lesson.repeat !== "once";
-                return (
-                  <label className={active ? "is-active" : ""} key={value}>
-                    <input
-                      checked={active}
-                      disabled={busy}
-                      name={`${idPrefix}-often`}
-                      onChange={() => setLesson({ ...lesson, repeat: value === "once" ? "once" : "open" })}
-                      type="radio"
-                      value={value}
-                    />
-                    {label}
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-        ) : null}
-        {weekly ? (
-          <fieldset className="teacher-manual-choice teacher-manual-choice--wide">
-            <legend>For</legend>
+            <legend>Lesson</legend>
             <div
-              className={`segmented segmented--four segmented--position-${RUN_LENGTHS.findIndex(([value]) => value === lesson.repeat)}`}
+              className={`segmented segmented--three segmented--position-${["trial", "single", "long"].indexOf(lesson.lessonType)}`}
             >
               <span aria-hidden="true" className="segmented__thumb" />
-              {RUN_LENGTHS.map(([value, label]) => (
-                <label className={lesson.repeat === value ? "is-active" : ""} key={String(value)}>
+              {/* Each length carries what this student pays for it (13 October 2026, Dan). */}
+              {([["trial", "Trial", trialPrice], ["single", "60 mins", priceFor(student, 60)], ["long", "90 mins", priceFor(student, 90)]] as const).map(([value, label, cents]) => (
+                <label className={lesson.lessonType === value ? "is-active" : ""} key={value}>
                   <input
-                    checked={lesson.repeat === value}
+                    aria-label={`${label}, ${formatMoneyCents(cents)}`}
+                    checked={lesson.lessonType === value}
                     disabled={busy}
-                    name={`${idPrefix}-weeks`}
-                    onChange={() => setLesson({ ...lesson, repeat: value })}
+                    name={`${idPrefix}-lesson`}
+                    onChange={() => setLesson({ ...lesson, lessonType: value, ...(lesson.startAt ? { time: "", startAt: "" } : {}), ...(value === "trial" ? { repeat: "once" as Repeat } : {}) })}
                     type="radio"
-                    value={String(value)}
+                    value={value}
                   />
+                  {/* Named "60 mins, €20"; the dot between them is drawn,
+                      and on a phone the price sits under the length. */}
+                  <span>{label}</span>
+                  <span className="teacher-manual-price">{formatMoneyCents(cents)}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {/* Online and In Porto carry the timetable's own marks (12 October
+              2026, at Dan's request). */}
+          <fieldset className="teacher-manual-choice">
+            <legend>Where</legend>
+            <div className={`segmented segmented--${lesson.location}`}>
+              <span aria-hidden="true" className="segmented__thumb" />
+              {([["online", "Online"], ["porto", "In Porto"]] as const).map(([value, label]) => (
+                <label className={lesson.location === value ? "is-active" : ""} key={value}>
+                  <input
+                    aria-label={label}
+                    checked={lesson.location === value}
+                    disabled={busy}
+                    name={`${idPrefix}-location`}
+                    onChange={() => setLesson({ ...lesson, location: value })}
+                    type="radio"
+                    value={value}
+                  />
+                  {value === "porto" ? (
+                    <UserRound size={14} strokeWidth={2.4} aria-hidden="true" />
+                  ) : (
+                    <Globe size={14} strokeWidth={2.4} aria-hidden="true" />
+                  )}
                   {label}
                 </label>
               ))}
             </div>
           </fieldset>
-        ) : null}
+          {/* A student she sees every week is set up once, as a student books a
+              weekly slot (12 October 2026, Dan). A trial is one first lesson. */}
+          {lesson.lessonType !== "trial" ? (
+            <fieldset className="teacher-manual-choice">
+              <legend>How often</legend>
+              <div className={`segmented${lesson.repeat === "once" ? "" : " segmented--second"}`}>
+                <span aria-hidden="true" className="segmented__thumb" />
+                {([["once", "Once"], ["weekly", "Weekly"]] as const).map(([value, label]) => {
+                  const active = value === "once" ? lesson.repeat === "once" : lesson.repeat !== "once";
+                  return (
+                    <label className={active ? "is-active" : ""} key={value}>
+                      <input
+                        checked={active}
+                        disabled={busy}
+                        name={`${idPrefix}-often`}
+                        onChange={() => setLesson({ ...lesson, repeat: value === "once" ? "once" : "open" })}
+                        type="radio"
+                        value={value}
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}
+          {weekly ? (
+            <fieldset className="teacher-manual-choice teacher-manual-choice--wide">
+              <legend>For</legend>
+              <div
+                className={`segmented segmented--four segmented--position-${RUN_LENGTHS.findIndex(([value]) => value === lesson.repeat)}`}
+              >
+                <span aria-hidden="true" className="segmented__thumb" />
+                {RUN_LENGTHS.map(([value, label]) => (
+                  <label className={lesson.repeat === value ? "is-active" : ""} key={String(value)}>
+                    <input
+                      checked={lesson.repeat === value}
+                      disabled={busy}
+                      name={`${idPrefix}-weeks`}
+                      onChange={() => setLesson({ ...lesson, repeat: value })}
+                      type="radio"
+                      value={String(value)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
+        </div>
         <LessonDatePicker
           date={lesson.date}
           dateCaption={weekly ? "First date" : "Date"}
