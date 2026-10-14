@@ -368,6 +368,15 @@ usual lesson starts and days off; avoid a wall of administration forms.
   an unsaved-hours dot stays visible on its tab; nothing else marks a tab,
   because what waits on her is said once, in `Needs you`. Google Meet uses its
   logo, with an accessible name.
+- One pager turns the Timetable's week and the Time off and Receipts months
+  (14 October 2026, Dan: "there feels inconsistencies here"): two solid blue
+  arrows that never move, and `This week` / `This month` as a quiet text
+  button to their left only while she is away from the current one, because
+  the heading already names where she is. Its place is held while it is out of
+  sight, so the arrows, the heading and the grid beneath never shift between
+  states, and a narrow screen lays heading and pager out the same either way.
+  Using it returns to the current period and puts focus on the heading, since
+  the button has just gone. It is never shown, or dead, on the current period.
 - Keep help short (13 October 2026, Dan: "remove all the redundant text"). The
   active tab supplies the page name; avoid repeating it under an eyebrow, and
   say a thing once. Any helpful list uses the confirm step's splat dabs
@@ -393,20 +402,25 @@ usual lesson starts and days off; avoid a wall of administration forms.
   editor retains control of off-grid windows.
 - `Time off` is a month beside one card, with one way to choose: tap days,
   one or several, across months and tabs (13 October 2026, Dan). The card
-  starts `Tap the days you want off`; with days chosen it names them (the
-  date for one, chips for several), what they already hold (`A day off`,
-  `Off 10:00–11:30`), and under `Already booked` each lesson on them as a
-  booked-lesson card (without its date when one day is chosen). Then `Take
-  the day off` / `Take 3 days off` in coral, counting only the days not
-  already off,
-  `Take some hours off` (one day) in soft lilac, and `Make available` only when a
+  starts `Tap the days you want off`; with days chosen it reads the same for
+  one as for many (14 October 2026, Dan: "rather than it be different if its
+  one or two days"): `1 day chosen` / `3 days chosen` with `Clear`, over a
+  removable chip for every chosen day. Beneath the chips, a single day also
+  shows what it already holds (`A day off`, `Off 10:00–11:30`); under
+  `Already booked`, each lesson on the chosen days is a booked-lesson card with
+  its date. Then `Take the day off` / `Take 3 days off` in coral, counting only
+  the days not already off,
+  `Take some hours off` (one day, because hours belong to one date) in soft
+  lilac, and `Make available` only when a
   chosen day is off. Some hours opens a small dialog of one or more breaks in
   Porto time, saved only with `Save hours off`; a failed save keeps the draft.
   `Remove hours off` clears that date's breaks. Making days available removes
   only the whole-day block and keeps their hours off and weekly rules. On a
   phone held upright the card rides at the foot of the screen once a day is
-  chosen; held sideways, and on a tablet, it sits beside the month (beneath
-  it on the smallest), never over it.
+  chosen, its chips in one row that scrolls sideways (the month behind it is
+  mostly hidden, so it still names the days without growing taller); held
+  sideways, and on a tablet, it sits beside the month (beneath it on the
+  smallest), never over it.
   The month marks whole days off and booked lessons, without repeating weekly
   unavailability or partial blocks from the timetable.
   Time off prevents new bookings; existing lessons stay until she changes them.
@@ -524,8 +538,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
     not change.
 - `Receipts`, a tab of its own beside `Students` (13 October 2026, Dan: "make
   her automation as easy as possible"), shows a month at a time with the
-  Time off month's pager: two dabs for what there is to issue (`3 receipts
-  to issue · €50`) and what is still to be paid, a lilac `Download CSV`, then
+  Time off month's pager (the one pager above): two dabs for what there is to
+  issue (`3 receipts to issue · €50`) and what is still to be paid, a lilac
+  `Download CSV`, then
   one plain table row per amount (lesson, student, NIF or `Consumidor final`,
   what it is for, amount, and a pill: `Paid by card`, `Paid by hand`,
   `Payment due`, `Being charged`, `Refunded`). On a phone, and up to 720 px,
