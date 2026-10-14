@@ -335,10 +335,10 @@ time. Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
-The sliding tools bar groups `Week`, `Weekly hours`, `Time off`,
-`Students` and `Google Meet`, with the current week as the default.
-The Google Meet tab exposes the existing connection controls and its tab
-marks connection problems; Google callbacks open it directly.
+The sliding tools bar groups `Timetable`, `Weekly hours`, `Time off`,
+`Students`, `Receipts`, `Expressions` and `Google Meet`, opening on `Timetable`.
+The Google Meet tab holds the connection controls; Google callbacks open it
+directly. `Needs you`, under her next lesson, gathers what waits on her (below).
 
 Lessons only belong to students (13 October 2026, Dan: no loose lessons).
 `POST /admin/bookings` refuses an email that isn't on the site ("Add them as a
@@ -379,6 +379,54 @@ while the student has never signed in (no password, Google link or sign-in);
 after that it answers 409 and the student changes it from their account. A
 changed address clears `email_verified_at` and moves their bookings'
 `student_email` with it. An address another student has is refused (409).
+
+### Needs you
+
+`Needs you` (14 October 2026, Phase 2) is one list on the `Timetable` tab,
+under the next-lesson strip and above the week, of what waits on Inês herself.
+It shows nothing until the week's lessons have loaded and nothing when nothing
+waits. It is built in the browser by the pure `needsYou()` in
+`src/lib/teacher-calendar.ts` from reads the page already makes:
+
+- `GET /admin/bookings` rows, with the computed `first_lesson` and the
+  `student_changed_at` stamp; the cancelled rows the timetable drops are kept
+  client-side, so a student's cancellation (`cancelled_by = 'student'`) can be
+  listed;
+- `manualPaymentReconciliation`, which now carries `student_name`, `starts_at`
+  and the Stripe payment intent ids, for `Open in Stripe` (a link to the
+  payment when the id looks like `pi_…`, otherwise to Stripe's payments list);
+- `GET /admin/students` (`awaitingWelcome`, `nextLessonAt`, `email`);
+- `GET /admin/google-calendar`, for Meet needing to be connected or
+  reconnected.
+
+Six kinds of item, Meet first, then payments in the Worker's order, then the
+rest by lesson time: Google Meet; a payment Stripe never confirmed; a student
+she set up and hasn't emailed with a lesson in the next 7 days; a lesson a
+student changed in the last 72 hours (one card per weekly run and stamp); a
+lesson a student cancelled in the last 72 hours (one card per weekly run, no
+action: the time is already open to students); and a new student's first lesson
+in the next 7 days (a student's own booking with no earlier confirmed lesson of
+theirs, matching older rows without a `student_id` by email). A lesson appears
+once, and a student with no email yet (`no-email:`) is never listed. Declined
+cards stay with the student and in Receipts. Nothing is dismissed: items clear
+when done, after 72 hours, or once the lesson begins; the windows are
+`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. More than four fold under
+`n more`. Returning to the page after five minutes away reloads lessons and
+students; nothing polls.
+
+It adds no endpoint and no stored state. Its only write is the existing
+welcome, sent with `{ "onlyIfWaiting": true }`: the Worker answers 409 `Their
+welcome has already been sent.` before spending the rate limit once the student
+has been welcomed or has signed in, so a second device sends nothing. The
+Students card sends no such flag and can still re-send deliberately.
+
+Migration `0028-student-changed-at.sql` adds `bookings.student_changed_at`.
+A student's own move (`handleReschedule`, `handleRescheduleSeries`) stamps it in
+a separate guarded statement after the move succeeds, only on the rows and
+sequence it wrote; Inês's move (`adminReschedule`) clears it the same way. Both
+tolerate the column being absent (a warning, `student-changed-at`, in the
+Worker's log), so the move itself never depends on the migration; changes made
+before it is applied simply never show. The fee-detection SQL is not touched.
 
 ## Accounts
 
@@ -1419,7 +1467,9 @@ and fee retries stop automatically after 23 hours of ambiguity, before Stripe's
 minimum idempotency retention can lapse; an owner must reconcile that payment
 in Stripe before any further attempt. Such rows are excluded from the 50-item
 sweeps so newer payments are not starved; the owner-only bookings response has
-`manualPaymentReconciliation`, and Worker warnings signal outstanding counts.
+`manualPaymentReconciliation` (with the student's name, lesson time and
+payment ids), which her Timetable lists under Needs you with `Open in Stripe`,
+and Worker warnings signal outstanding counts.
 The first claim freezes every Stripe charge parameter in the booking, including
 the saved card, amount and purpose. An idempotency-parameter error remains
 ambiguous and never opens a second hosted payment path.
@@ -1571,6 +1621,12 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
   applied by hand to staging and production D1 on 12 October 2026, before the
   Worker that reads it: adding a lesson writes `added_by_teacher` and sign-in
   links need their table. Existing rows were unchanged.
+- **Migration 0028** (`workers/booking/migrations/0028-student-changed-at.sql`)
+  is applied by hand to staging and production D1 before the Worker that
+  writes it, so the first changes after release are recorded; record the date
+  here once it is done. Confirm with `SELECT student_changed_at FROM bookings
+  LIMIT 0`. Until then student changes never show in Needs you, and moves are
+  unaffected.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
 ## Google Calendar and Meet setup
@@ -1666,8 +1722,9 @@ the confirmation or, when Google is slower, in its own email a couple of
 minutes later. Google itself emails no one: events carry no attendees and are
 written with `sendUpdates=none`.
 
-Expired or revoked Google permission shows **Needs reconnecting** beside Google
-Meet in her schedule; **Google Meet → Reconnect Google Meet** restores it.
+Expired or revoked Google permission shows **Needs reconnecting** on her Google
+Meet tab and `Google Meet needs reconnecting` in Needs you; **Google Meet →
+Reconnect Google Meet** restores it.
 Reconnection reuses the stored calendar and event identities. If the first
 calendar-create response is lost, the persisted creation-attempt flag prevents
 creating duplicates. An operator must locate the app calendar in Inês’s Google

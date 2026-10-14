@@ -410,6 +410,8 @@ await test("a move inside 14 hours preserves agreed price, charges once, then le
   const id = linkedBooking("same-day-move", { start: "2026-09-05T16:00:00.000Z", end: "2026-09-05T17:00:00.000Z" });
   const result = await call(`/bookings/${await token(id)}/reschedule`, { body: { startAt: "2026-09-08T14:00:00.000Z" } });
   assert.equal(result.status, 200, await result.clone().text());
+  // A student's change reaches Inês's Needs you.
+  assert.ok(db.prepare("SELECT student_changed_at FROM bookings WHERE id=?").get(id).student_changed_at);
   await drain();
   await chargeDueLessons(env, new Date("2026-09-05T18:00:00Z"));
   assert.equal(charges.filter((charge) => charge.key.includes(id)).length, 1);
@@ -438,8 +440,11 @@ await test("13.5 hours ahead on the next Porto day is late; lesson-day wording k
 });
 await test("teacher move and cancellation have no student action fee and cannot alter processing charges", async () => {
   booking("teacher-action", { start: "2026-09-05T18:00:00.000Z", end: "2026-09-05T19:00:00.000Z" });
+  db.prepare("UPDATE bookings SET student_changed_at='2026-09-05T09:00:00.000Z' WHERE id='teacher-action'").run();
   const result = await call("/admin/bookings/teacher-action/reschedule", { user: "teacher", body: { startAt: "2026-09-09T12:00:00.000Z" } });
   assert.equal(result.status, 200);
+  // Her own move never reads as the student's.
+  assert.equal(db.prepare("SELECT student_changed_at FROM bookings WHERE id='teacher-action'").get().student_changed_at, null);
   assert.equal((await call("/admin/bookings/teacher-action/cancel", { user: "teacher" })).status, 200);
   assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id='teacher-action'").get().same_day_fee_status, "not_required");
   booking("processing", { payment: "processing" });
@@ -1470,6 +1475,8 @@ await test("moving a recurrence leaves a lesson inside 14 hours where it is and 
     { id: "keep-late-2", starts_at: "2026-11-17T12:00:00.000Z", sequence: 1 },
     { id: "keep-late-3", starts_at: "2026-11-24T12:00:00.000Z", sequence: 1 }
   ]);
+  // Only the lessons that moved are the student's change; the one kept inside 14 hours is not.
+  assert.deepEqual(db.prepare("SELECT id FROM bookings WHERE series_id='keep-late' AND student_changed_at IS NOT NULL ORDER BY id").all().map((row) => row.id), ["keep-late-2", "keep-late-3"]);
   assert.deepEqual({ ...db.prepare("SELECT weekday, minute_of_day FROM booking_series WHERE id='keep-late'").get() }, { weekday: 2, minute_of_day: 720 });
 });
 await test("a moved recurrence cannot land on the lesson it leaves inside the window", async () => {
@@ -2300,11 +2307,19 @@ await test("she sets a student up and adds their lessons without emailing them, 
     assert.ok(welcome.text.includes("Inês has set up your lessons"));
     assert.ok((welcome.text.match(/Lesson · Online/g) ?? []).length >= 5, "every lesson so far is listed");
     assert.equal(db.prepare("SELECT awaiting_welcome FROM students WHERE id=?").get(student.id).awaiting_welcome, 0);
+    // Needs you asks only while the welcome is owed: a second device pressing later sends nothing.
+    const again = await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: { onlyIfWaiting: true } });
+    assert.equal(again.status, 409);
+    await drain();
+    assert.equal(to("quiet@example.invalid").length, 1);
 
     // After the welcome, her changes reach them as usual.
     await call(`/admin/bookings/${lessons[1].id}/cancel`, { user: "teacher", body: {} });
     await drain();
     assert.ok(to("quiet@example.invalid").some((sent) => sent.subject.startsWith("Inês has cancelled your lesson")));
+    // Only the earliest confirmed lesson reads as their first; a cancelled one never does.
+    const rows = (await (await call("/admin/bookings?from=2026-01-01T00:00:00.000Z", { method: "GET", user: "teacher" })).json()).bookings.filter((row) => row.student_id === student.id);
+    assert.deepEqual(rows.filter((row) => row.first_lesson).map((row) => row.id), [lessons[0].id]);
   } finally {
     releaseEmail();
     forgetStudent("quiet@example.invalid");

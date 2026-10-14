@@ -1920,6 +1920,15 @@
 .teacher-hours-clashes-more { margin-top: 0.55rem; }
 .teacher-hours-clashes-more > summary { width: fit-content; padding: 0.35rem 0; cursor: pointer; font-weight: 600; }
 .teacher-hours-clashes-more[open] > summary { margin-bottom: 0.35rem; }
+/* What waits on her, under her next lesson (Phase 2, 14 October 2026). */
+.teacher-needs-you { display: grid; gap: 0.45rem; margin: 0 0 1.4rem; }
+.teacher-needs-you .teacher-eyebrow { margin: 0; }
+.teacher-needs-you .teacher-hours-clashes-more { margin-top: 0; }
+/* Text beside its action; when they cannot share a row the action drops under
+   the text at the card's full width. */
+.teacher-needs-you .teacher-lesson-card { flex-wrap: wrap; }
+.teacher-needs-you .teacher-lesson-card__who { flex: 999 1 11rem; }
+.teacher-needs-you .teacher-lesson-card .button { flex: 1 0 auto; }
 .teacher-timeoff-dialog h2 { margin-right: 2.5rem; }
 .teacher-timeoff-dialog form { display: grid; gap: 1rem; }
 .teacher-timeoff-dialog .teacher-eyebrow { margin: 0 2.5rem -0.5rem 0; }
