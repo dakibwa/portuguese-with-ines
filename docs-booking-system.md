@@ -916,6 +916,43 @@ different students were confirmed into the same lesson in testing.
   student's own name could forge calendar properties or cut the address off the
   ATTENDEE line. Parameter values are quoted per RFC 5545 §3.1 instead.
 
+### The day-before reminder
+
+- About 24 hours before each confirmed lesson, the student gets one email,
+  `Your lesson is coming up — <date, time>`, on the lesson's own clock: theirs
+  online, Porto's in Porto.
+  - An online lesson whose Google Meet link is ready has `Join Google Meet` as
+    its button, with `Change or cancel this lesson` as a quiet link beneath.
+  - Otherwise the button is `Change or cancel this lesson`.
+  - The footer names the exact time free changes end: the start less the
+    minimum notice, on the same clock. There is no price, no calendar file and
+    nothing to Inês.
+- The minute cron (`sendLessonReminders`) sends it, at most six a minute, only
+  while the lesson is between 24 hours and the minimum notice (14 hours) away.
+  That way the free change it mentions is always still open.
+  - Times are elapsed hours in UTC, so clock changes don't move it.
+  - After an outage of more than ten hours, a lesson already inside 14 hours
+    gets none.
+- A lesson booked, added or moved less than 36 hours before it starts gets no
+  reminder: the confirmation or change email has just told the student. (Read
+  from `bookings.created_at` and the `student:rescheduled:` and
+  `student:series-moved:` keys in `email_log`, so a card saved or an address
+  changed does not suppress it.)
+- One reminder per version of a lesson (`student:reminder:<id>:<sequence>` in
+  `email_log`). A lesson moved earlier is reminded at its new time; a cancelled
+  one never is, and the row is read again just before sending.
+- A student Inês set up gets nothing before their welcome. Once it has gone,
+  the reminder follows if the lesson is still more than 14 hours away,
+  carrying their Meet link. A student she set up with no email yet
+  (`no-email:` placeholder) is never listed or sent anything.
+- If the Meet link isn't ready, the reminder says it will follow (only when
+  Google Meet is configured at all), and the existing `Your online lesson link`
+  email sends it once it exists. A reminder that carried the link marks it
+  delivered, so no second link email follows.
+- Weekly lessons get one each week, including automatic top-ups. A lesson on a
+  day Inês has taken off is still reminded, because time off never cancels a
+  lesson.
+
 ### When email fails
 
 Email is best-effort, but "best effort" used to mean "one attempt, and silence".
@@ -927,6 +964,10 @@ Email is best-effort, but "best effort" used to mean "one attempt, and silence".
 - **There is now a sweep.** The scheduled cron re-sends failed rows older than five
   minutes. Only a booking's own confirmation can be rebuilt — the body is not
   stored — so anything else stays in the log for a person to look at.
+- **The day-before reminder is retried by its own sweep** every five minutes
+  while it is still in time, and is never rebuilt as a confirmation. When two
+  sweeps reach the same failed email, only the one that reclaims it sends: the
+  reset from `failed` to `pending` is conditional, for every retried email.
 - **A cancelled run is one email, not one per lesson.** Stopping a twelve-week
   series fired twenty-four requests at the provider in the same instant; behind a
   2/second limit, twenty-two were dropped and never retried.
@@ -1566,7 +1607,6 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
   `Documents/Work/Português com a Inês/Billing and Booking - Operating Context
   and Options.md` for the full position, including the unresolved IVA exemption
   code.
-- **Reminders** before a lesson.
 - **Migration 0023** (`workers/booking/migrations/0023-transition-kit.sql`) was
   applied by hand to staging and production D1 on 12 October 2026, before the
   Worker that reads it: adding a lesson writes `added_by_teacher` and sign-in
@@ -1590,7 +1630,8 @@ that connection. The existing Google sign-in client remains separate.
   Bookings awaiting payment confirmation do not create calendar events.
 - The student’s booking/manage views and Inês’s lesson details show **Join Google
   Meet** for online lessons. Confirmation and change emails include the link when
-  ready; delayed links get a short follow-up email. The minute sweep also fills
+  ready; delayed links get a short follow-up email, and the day-before reminder
+  carries the link again when it is ready. The minute sweep also fills
   existing future lessons after connection.
 - Moving a lesson updates the same event. Changing to Porto removes the event’s
   conference; changing to online requests one. Cancelling cancels that event.

@@ -663,6 +663,152 @@ async function notifyMeetingReady(env, input) {
   return result.ok;
 }
 
+/*
+ * The day-before reminder (14 October 2026). About 24 hours before a confirmed
+ * lesson the student gets one short email on the lesson's own clock, carrying
+ * the Meet link when it is ready. It is sent only while the lesson is still
+ * further away than the minimum notice, so the free change its footer names is
+ * always still open; after a long outage a lesson already inside that window
+ * gets none rather than a late one. There is no calendar file, no price and
+ * no copy for Inês.
+ */
+const REMINDER_KIND = "student_lesson_reminder";
+const REMINDER_LEAD_HOURS = 24;
+// A lesson booked, added or moved less than this long before it starts has just
+// been confirmed to the student by that email, so a reminder would only repeat it.
+const REMINDER_QUIET_HOURS = 36;
+const REMINDER_BATCH = 6;
+const REMINDER_RETRY_MINUTES = 5;
+
+function reminderEmail({ row, lessonType, settings, manageUrl, meetingLink, meetComing }) {
+  const start = new Date(row.starts_at);
+  const zone = lessonZone(row);
+  const first = row.student_name.split(" ")[0];
+  const cutoff = formatShort(new Date(start.getTime() - settings.minimumNoticeHours * 3600000), zone);
+  // The cut-off is where the change policy starts charging, so it is always the
+  // moment that is true; no "today" or "tomorrow" anywhere.
+  const footer = `Free to change or cancel until ${cutoff}. ${
+    row.payment_status === "paid"
+      ? "After that, it can’t be changed or refunded."
+      : `After that, there’s a ${formatEuros(settings.sameDayChangeFeeCents)} late change fee.`
+  }`;
+  const manage = { label: "Change or cancel this lesson", url: manageUrl };
+
+  return {
+    subject: `Your lesson is coming up — ${formatShort(start, zone)}`,
+    content: {
+      heading: "Your lesson is coming up",
+      preheader: `${lessonName(lessonType)} · ${meetingLink ? "Your Google Meet link is in this email." : placeLabel(row)}`,
+      intro: meetingLink
+        ? `Olá ${first}, your lesson with Inês is coming up. Here’s the Google Meet link to join it.`
+        : meetComing
+          ? `Olá ${first}, your lesson with Inês is coming up. Its Google Meet link isn’t ready yet; we’ll email it to you as soon as it is.`
+          : `Olá ${first}, your lesson with Inês is coming up.`,
+      hero: lessonWhen(start, zone),
+      heroNote: "",
+      callout: "",
+      rows: [
+        { label: "Lesson", value: lessonLine(lessonType) },
+        { label: "Where", value: placeLabel(row) },
+        { label: "Reference", value: row.reference }
+      ],
+      // The coral button marks the one thing still to do: join, when there is a
+      // link. Changing is the rare action, so it drops to a quiet link then.
+      action: meetingLink ? { label: "Join Google Meet", url: meetingLink } : manage,
+      ...(meetingLink ? { link: manage } : {}),
+      footer
+    }
+  };
+}
+
+/**
+ * Minute sweep. Which lessons qualify is read from existing columns only, so
+ * nothing needs a migration, and "already sent" is the email log's own unique
+ * key, written before the send (see deliver in email.mjs).
+ *
+ * Left out, in the query: a lesson cancelled, outside the window, or created
+ * (or whose current version was announced) in the 36 hours before it starts;
+ * a student still waiting for their welcome, so held lessons can't fill the
+ * batch every minute; and a student set up without an email, who has nowhere
+ * to receive it.
+ */
+export async function sendLessonReminders(env, now = new Date()) {
+  const settings = await loadSettings(env);
+  const hour = 3600000;
+  const earliest = new Date(now.getTime() + settings.minimumNoticeHours * hour).toISOString();
+  const latest = new Date(now.getTime() + REMINDER_LEAD_HOURS * hour).toISOString();
+  if (earliest >= latest) return;
+  const retryAfter = new Date(now.getTime() - REMINDER_RETRY_MINUTES * 60000).toISOString();
+
+  const { results } = await env.DB.prepare(
+    `SELECT b.* FROM bookings b
+     WHERE b.status = 'confirmed' AND b.starts_at > ?1 AND b.starts_at <= ?2
+       AND b.student_email NOT LIKE 'no-email:%'
+       AND julianday(b.created_at) <= julianday(b.starts_at) - ?4
+       AND NOT EXISTS (
+         SELECT 1 FROM email_log t
+         WHERE julianday(t.created_at) > julianday(b.starts_at) - ?4
+           AND (t.dedupe_key = 'student:rescheduled:' || b.id || ':' || b.sequence
+             OR (b.series_id IS NOT NULL
+               AND t.dedupe_key >= 'student:series-moved:' || b.series_id || ':'
+               AND t.dedupe_key < 'student:series-moved:' || b.series_id || ';')))
+       AND NOT EXISTS (
+         SELECT 1 FROM email_log e
+         WHERE e.dedupe_key = 'student:reminder:' || b.id || ':' || b.sequence
+           AND (e.status <> 'failed' OR e.created_at > ?3))
+       AND NOT EXISTS (
+         SELECT 1 FROM students s
+         WHERE s.email = lower(trim(b.student_email)) AND s.role = 'student' AND s.awaiting_welcome = 1
+           AND COALESCE(s.password_hash, '') = '' AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL)
+     ORDER BY b.starts_at LIMIT ${REMINDER_BATCH}`
+  )
+    .bind(earliest, latest, retryAfter, REMINDER_QUIET_HOURS / 24)
+    .all();
+
+  const lessonTypes = new Map();
+  let meetComing;
+  for (const candidate of results ?? []) {
+    try {
+      // The version selected may have been cancelled or moved since: a newer
+      // change owns its own email, as in notify().
+      const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(candidate.id).first();
+      if (!row || row.status !== "confirmed" || row.sequence !== candidate.sequence || row.starts_at !== candidate.starts_at) continue;
+      if (!hasEmail({ email: row.student_email })) continue;
+      if (!lessonTypes.has(row.lesson_type_id)) {
+        lessonTypes.set(row.lesson_type_id, await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first());
+      }
+      const lessonType = lessonTypes.get(row.lesson_type_id);
+      if (!lessonType) continue;
+
+      const meetingLink = meetingUrl(row);
+      // Promise a link only if one can ever come: the ready sweep emails it.
+      if (!meetingLink && row.location === "online" && meetComing === undefined) {
+        meetComing = (await calendarConnectionStatus(env).catch(() => ({}))).configured === true;
+      }
+      const { subject, content } = reminderEmail({
+        row, lessonType, settings, meetingLink,
+        meetComing: !meetingLink && row.location === "online" && meetComing === true,
+        manageUrl: studentManageUrl(env, await createManageToken(row.id, env.BOOKING_TOKEN_SECRET))
+      });
+      const result = await deliver(env, {
+        to: row.student_email,
+        subject,
+        kind: REMINDER_KIND,
+        bookingId: row.id,
+        dedupeKey: `student:reminder:${row.id}:${row.sequence}`,
+        replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined,
+        content
+      });
+      // The link was delivered here, so the "Your online lesson link" email must
+      // not follow. A held send delivered nothing and is not marked.
+      if (meetingLink && result.ok && !result.held && !result.skipped) await markMeetingNotified(env, row);
+      if (!result.ok) console.warn("lesson-reminder", row.reference, "send_failed");
+    } catch (error) {
+      console.error("lesson-reminder", candidate.reference, String(error?.message ?? error));
+    }
+  }
+}
+
 /**
  * A whole run of lessons, in one email each way.
  *
@@ -1659,6 +1805,7 @@ const worker = {
     ctx.waitUntil(retryRefunds(env));
     ctx.waitUntil(resendFailedEmails(env));
     ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row)));
+    ctx.waitUntil(sendLessonReminders(env));
 
     // The account has a finite trigger allowance. One per-minute trigger owns
     // prompt money work, and only its 03:10 UTC tick runs the larger nightly
@@ -2180,10 +2327,11 @@ export async function resendFailedEmails(env) {
   const cutoff = new Date(Date.now() - 5 * 60000).toISOString();
   const { results } = await env.DB.prepare(
     `SELECT * FROM email_log
-     WHERE status = 'failed' AND booking_id IS NOT NULL AND created_at < ?
+     WHERE status = 'failed' AND booking_id IS NOT NULL AND kind <> ? AND created_at < ?
      ORDER BY created_at LIMIT 25`
   )
-    .bind(cutoff)
+    // The reminder retries in its own sweep and must never be rebuilt as a confirmation.
+    .bind(REMINDER_KIND, cutoff)
     .all();
 
   if (!results?.length) return;
