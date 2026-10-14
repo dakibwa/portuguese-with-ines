@@ -1,9 +1,10 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CalendarCheck, CalendarOff, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { CalendarCheck, CalendarOff, Clock } from "lucide-react";
 import type { AdminBooking, AvailabilityException } from "@/lib/admin-api";
 import { dateBlocks, dateKey, dateLabel, daysOff, mondayOf, shiftDate, spanLabel, WEEKDAYS, type Span } from "@/lib/teacher-calendar";
+import { TeacherPager } from "@/components/teacher/TeacherPager";
 import { TimeOffDayDialog } from "@/components/teacher/TimeOffDayDialog";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 
@@ -13,7 +14,6 @@ function shiftMonth(month: string, amount: number) {
   date.setUTCMonth(date.getUTCMonth() + amount);
   return date.toISOString().slice(0, 10);
 }
-const shortDay = (date: string) => dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
 
 /** A booked lesson on a date, counting one that runs past midnight on both. */
 function lessonsOn(bookings: AdminBooking[], date: string) {
@@ -24,7 +24,10 @@ function lessonsOn(bookings: AdminBooking[], date: string) {
 /**
  * Time off as one month (13 October 2026, Dan): she taps the days she means,
  * one or several, and the card beside the month says what she can do with
- * them. One way to choose, no modes. Booked lessons are never moved or
+ * them. One way to choose, no modes. The card reads the same for one day as
+ * for many (14 October 2026, Dan: "rather than it be different if its one or
+ * two days"): `N days chosen` over a removable chip for each, and a single
+ * day's own details and hours beneath. Booked lessons are never moved or
  * cancelled from here; the card names any that stay.
  */
 export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, bookingsError, onReloadBookings, busy, status, onChange, onSaveDay, onOpenBooking }: {
@@ -46,6 +49,7 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
   const [focused, setFocused] = useState(today);
   const [hoursFor, setHoursFor] = useState<string | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
+  const monthTitleRef = useRef<HTMLHeadingElement>(null);
   const hoursButtonRef = useRef<HTMLButtonElement>(null);
   const reopenedHours = useRef(false);
   useLayoutEffect(() => {
@@ -90,12 +94,16 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
       <div className="teacher-timeoff-layout">
         <div className="teacher-month">
           <div className="teacher-month-heading">
-            <h3 id="teacher-timeoff-month" aria-live="polite">{dateLabel(month, { month: "long", year: "numeric" })}</h3>
-            <div className="teacher-month-navigation">
-              <button className="teacher-icon-button" aria-label="Previous month" disabled={month <= monthStart(today)} onClick={() => moveMonth(-1)} type="button"><ChevronLeft size={19} aria-hidden="true" /></button>
-              <button className="teacher-text-button" onClick={() => { setMonth(monthStart(today)); setFocused(today); }} type="button">This month</button>
-              <button className="teacher-icon-button" aria-label="Next month" onClick={() => moveMonth(1)} type="button"><ChevronRight size={19} aria-hidden="true" /></button>
-            </div>
+            <h3 id="teacher-timeoff-month" aria-live="polite" ref={monthTitleRef} tabIndex={-1}>{dateLabel(month, { month: "long", year: "numeric" })}</h3>
+            <TeacherPager
+              unit="month"
+              away={month !== monthStart(today)}
+              headingRef={monthTitleRef}
+              onCurrent={() => { setMonth(monthStart(today)); setFocused(today); }}
+              onNext={() => moveMonth(1)}
+              onPrevious={() => moveMonth(-1)}
+              previousDisabled={month <= monthStart(today)}
+            />
           </div>
           <div className="teacher-month-grid" aria-labelledby="teacher-timeoff-month" ref={calendarRef}>
             {WEEKDAYS.map(day => <span aria-hidden="true" className="teacher-month-weekday" key={day.value}>{day.short}</span>)}
@@ -141,10 +149,10 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
 
         <div className={`teacher-timeoff-selection${chosen.length ? " has-days" : ""}`}>
           <div className="teacher-timeoff-selection-heading">
-            <h3 aria-live="polite">{one ? shortDay(one) : chosen.length ? `${chosen.length} days chosen` : "Tap the days you want off"}</h3>
+            <h3 aria-live="polite">{chosen.length ? `${chosen.length} ${chosen.length === 1 ? "day" : "days"} chosen` : "Tap the days you want off"}</h3>
             {chosen.length ? <button className="teacher-text-button" disabled={busy} onClick={() => setSelected(new Set())} type="button">Clear</button> : null}
           </div>
-          {chosen.length > 1 ? (
+          {chosen.length ? (
             <ul className="teacher-selected-days">
               {chosen.map(date => <li key={date}><button aria-label={`Remove ${dateLabel(date)}`} disabled={busy} onClick={() => toggle(date)} type="button">{dateLabel(date, { day: "numeric", month: "short" })}<span aria-hidden="true">×</span></button></li>)}
             </ul>
@@ -160,7 +168,7 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
             <div className="teacher-timeoff-lessons">
               <p className="teacher-eyebrow">Already booked</p>
               <ul className="teacher-lesson-cards">
-                {booked.map(booking => <BookedLessonCard booking={booking} disabled={busy} key={booking.id} onOpen={onOpenBooking} showDay={!one} />)}
+                {booked.map(booking => <BookedLessonCard booking={booking} disabled={busy} key={booking.id} onOpen={onOpenBooking} />)}
               </ul>
             </div>
           ) : null}

@@ -623,14 +623,21 @@ try {
     [[900, 990]],
   );
 
+  // One pager (14 October 2026): the way back shows only away from the current week.
+  const thisWeek = page.getByRole("button", { name: "This week", exact: true });
+  await expect(thisWeek).toHaveCount(0);
   await page.getByRole("button", { name: "Previous week" }).click();
+  await expect(thisWeek).toBeVisible();
   await expect(
     page.getByRole("switch", { name: "Day off, Monday 31 August" }),
   ).toBeDisabled();
   await expect(slot(page, 1, 600)).toHaveAttribute("aria-disabled", "true");
 
   // Reopening a holiday removes only whole-day rows; its hours and extras stay.
-  await page.getByRole("button", { name: "This week" }).click();
+  await thisWeek.click();
+  await expect(page.locator("#teacher-week-title")).toHaveText("7 Sept – 13 Sept 2026");
+  await expect(page.locator("#teacher-week-title")).toBeFocused();
+  await expect(thisWeek).toHaveCount(0);
   await page.getByRole("button", { name: "Next week" }).click();
   await page.getByRole("button", { name: "Next week" }).click();
   await expect(page.locator(".teacher-off-label")).toHaveText(
@@ -1002,10 +1009,13 @@ try {
     const timeOff = page.locator(".teacher-timeoff");
     const card = timeOff.locator(".teacher-timeoff-selection");
     await expect(card.getByRole("heading", { name: "Tap the days you want off" })).toBeVisible();
+    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toHaveCount(0);
     const date = page.locator('[data-timeoff-date="2026-09-21"]');
     await date.click();
     await expect(date).toHaveAttribute("aria-pressed", "true");
-    await expect(card.getByRole("heading", { name: "Mon 21 Sept" })).toBeVisible();
+    // One day reads as many do (14 October 2026): its chip, then its own details.
+    await expect(card.getByRole("heading", { name: "1 day chosen" })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Remove Monday 21 September" })).toBeVisible();
     await expect(card).toContainText("A day off");
     const hours = card.getByRole("button", { name: /^(Take some|Change) hours off$/ });
     await hours.click();
@@ -1142,7 +1152,9 @@ try {
     await expect(timeOff.locator(".teacher-timeoff-lessons")).toContainText("Already booked");
     await expect(timeOff.locator(".teacher-timeoff-lessons .teacher-lesson-card")).toContainText("Sam");
     await chosenDay("2026-09-21").click();
+    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toHaveCount(0);
     await timeOff.getByRole("button", { name: "Next month" }).click();
+    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toBeVisible();
     await chosenDay("2026-10-01").click();
     await page.getByRole("tab", { name: /^Students/ }).click();
     await page.getByRole("tab", { name: "Time off", exact: true }).click();
@@ -1163,6 +1175,8 @@ try {
     await expect(timeOff.getByRole("button", { name: "Make available", exact: true })).toHaveCount(0);
     await timeOff.getByRole("button", { name: "Clear", exact: true }).click();
     await timeOff.getByRole("button", { name: "This month", exact: true }).click();
+    await expect(timeOff.getByRole("heading", { name: "September 2026", exact: true })).toBeFocused();
+    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toHaveCount(0);
     await expect(chosenDay("2026-09-21")).not.toContainText("Part off");
     await expect(chosenDay("2026-09-21")).not.toHaveAttribute("aria-label", /weekly hours|some time off/);
     await expect(chosenDay("2026-09-14")).not.toHaveAttribute("aria-label", /weekly hours|some time off/);

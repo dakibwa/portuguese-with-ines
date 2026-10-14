@@ -1,13 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  AlertCircle,
-  Check,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { AlertCircle, Check, CheckCircle2 } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
@@ -15,6 +9,7 @@ import { TeacherMeetConnection } from "@/components/teacher/TeacherMeetConnectio
 import { StudentDialog, type StudentDialogStart } from "@/components/teacher/StudentDialog";
 import { StudentList, needsHer } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
+import { TeacherPager } from "@/components/teacher/TeacherPager";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
@@ -616,31 +611,14 @@ export function TeacherSchedule() {
             </ul>
           ) : null}
           {!editing ? (
-            <div className="teacher-week-navigation">
-              <button
-                className="teacher-icon-button"
-                type="button"
-                aria-label="Previous week"
-                onClick={() => setWeekStart(shiftDate(weekStart, -7))}
-              >
-                <ChevronLeft size={19} aria-hidden="true" />
-              </button>
-              <button
-                className="teacher-text-button"
-                type="button"
-                onClick={() => setWeekStart(mondayOf(today))}
-              >
-                This week
-              </button>
-              <button
-                className="teacher-icon-button"
-                type="button"
-                aria-label="Next week"
-                onClick={() => setWeekStart(shiftDate(weekStart, 7))}
-              >
-                <ChevronRight size={19} aria-hidden="true" />
-              </button>
-            </div>
+            <TeacherPager
+              unit="week"
+              away={weekStart !== mondayOf(today)}
+              headingRef={calendarTitleRef}
+              onCurrent={() => setWeekStart(mondayOf(today))}
+              onNext={() => setWeekStart(shiftDate(weekStart, 7))}
+              onPrevious={() => setWeekStart(shiftDate(weekStart, -7))}
+            />
           ) : null}
         </div>
         {editing && hoursDirty ? (
