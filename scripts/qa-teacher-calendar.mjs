@@ -48,6 +48,8 @@ async function fixture(width, options = {}) {
     rules: [
       { id: 1, weekday: 1, start_minute: 600, last_start_minute: 690 },
       { id: 2, weekday: 3, start_minute: 615, last_start_minute: 705 },
+      // Keep the afternoon actions below inside this fixture's teaching range.
+      { id: 3, weekday: 5, start_minute: 900, last_start_minute: 1110 },
     ],
     exceptions: [
       { id: 1, date: "2026-09-21", kind: "blocked", note: "Holiday" },
