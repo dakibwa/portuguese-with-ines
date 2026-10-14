@@ -230,7 +230,6 @@ export function LessonForm({
         </div>
         <LessonDatePicker
           date={lesson.date}
-          dateCaption={weekly ? "First date" : "Date"}
           disabled={busy}
           idPrefix={`${idPrefix}-date`}
           lessonType={lesson.lessonType}

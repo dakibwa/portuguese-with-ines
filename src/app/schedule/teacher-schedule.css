@@ -80,7 +80,7 @@
   background: transparent;
   color: var(--ink);
   cursor: pointer;
-  font: 600 0.8rem/1.4 var(--ui);
+  font: 600 0.9rem/1.4 var(--ui);
   white-space: nowrap;
   transition: color 260ms var(--motion-ease);
 }
@@ -2165,7 +2165,7 @@
 @media (max-width: 900px) {
   .teacher-tools-header { gap: 0.75rem; }
   /* Compact labels keep the tools readable on smaller tablets. */
-  .teacher-tabs button { padding-inline: 0.7rem; font-size: 0.76rem; }
+  .teacher-tabs button { padding-inline: 0.7rem; }
 }
 /* On a phone every tab is in view at once (13 October 2026, Dan), held
    upright or sideways: up to a small tablet the bar is two rows, the chosen
@@ -2174,7 +2174,7 @@
   .teacher-tabs-scroll { overflow: visible; }
   /* Each row fills the strip, including the three tools in the second row. */
   .teacher-tabs { display: flex; flex-wrap: wrap; width: 100%; }
-  .teacher-tabs button { flex: 1 1 calc(25% - 4px); min-width: 0; gap: 0.2rem; font-size: clamp(0.56rem, 2vw, 0.76rem); }
+  .teacher-tabs button { flex: 1 1 calc(25% - 4px); min-width: 0; gap: 0.2rem; font-size: clamp(0.56rem, 2.5vw, 0.85rem); }
   .teacher-tabs .teacher-tabs__thumb { display: none; }
   .teacher-tabs button { min-height: 44px; padding-inline: 0.4rem; }
   /* Keep every tool in view as the collection grows. */
@@ -2938,7 +2938,7 @@
 .teacher-setup--inline .teacher-setup__profile::after { content: none; }
 .teacher-setup--inline .teacher-setup__profile { min-height: 44px; }
 .teacher-setup__close .teacher-dialog-close { position: static; }
-.teacher-setup--inline .teacher-setup__steps button { display: grid; justify-items: center; align-content: center; gap: 0.35rem; min-width: 44px; min-height: 44px; border: 0; border-radius: var(--squiggle-field); padding: 0.3rem; background: none; color: inherit; font: inherit; cursor: pointer; }
+.teacher-setup--inline .teacher-setup__steps button { display: grid; justify-items: center; align-content: center; gap: 0.35rem; min-width: 44px; min-height: 44px; border: 0; border-radius: 38% 24% 34% 22% / 22% 36% 24% 38%; padding: 0.4rem 0.65rem 0.5rem; background: none; color: inherit; font: inherit; cursor: pointer; }
 .teacher-setup--inline .teacher-setup__steps .is-next button { background: var(--lavender-soft); box-shadow: inset 0 0 0 1px var(--rule); }
 .teacher-setup--inline .teacher-setup__steps button:hover:not(:disabled),
 .teacher-setup--inline .teacher-setup__steps button[aria-expanded="true"] { background: var(--lavender-soft); }
@@ -2995,7 +2995,7 @@
   .teacher-setup__action { gap: 0.35rem; }
   .teacher-setup--inline .teacher-setup__steps { gap: 0; }
   .teacher-setup--inline .teacher-setup__steps li { min-width: 0; font-size: 0.6rem; }
-  .teacher-setup--inline .teacher-setup__steps button { width: 100%; padding-inline: 0; }
+  .teacher-setup--inline .teacher-setup__steps button { width: 100%; padding-inline: 0.25rem; }
 }
 @container setup-list (max-width: 18rem) {
   .teacher-setup--inline .teacher-setup__steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
@@ -3023,14 +3023,6 @@
 .teacher-lesson-picker__slot:focus-visible { border-color: var(--blue); }
 .teacher-lesson-picker__slot[aria-pressed="true"] { border-color: var(--blue-deep); background: var(--blue-deep); color: var(--paper-light); }
 .teacher-lesson-picker__times .teacher-lesson-picker__chosen { color: var(--ink); }
-.teacher-lesson-picker__manual { margin-top: 1rem; }
-.teacher-lesson-picker__manual summary { width: fit-content; min-height: 44px; padding-block: 0.7rem; color: var(--lavender-ink); font-size: 0.75rem; font-weight: 600; cursor: pointer; }
-.teacher-lesson-picker__manual > .teacher-profile__note { margin-bottom: 0.75rem; }
-.teacher-lesson-picker__fields { display: grid; gap: 0.85rem; }
-.teacher-lesson-picker__fields input { min-width: 0; max-width: 100%; box-sizing: border-box; }
-@container (min-width: 25rem) {
-  .teacher-lesson-picker__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 @container (min-width: 34rem) {
   .teacher-lesson-picker__layout { grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 1.5rem; }
 }

@@ -248,7 +248,8 @@ Dan's 22 September review tightened the public pages:
 - every secondary action is a button: an outline on cream, a light outline on
   blue, at the compact size beside a coral primary action. Underlined text is
   kept for links inside sentences and the quiet `Terms & privacy` footer link;
-- the footer hugs its content. On desktop it is one row, no taller than about
+- the footer has a thin lilac top border so it stays distinct beside blue
+  sections, and hugs its content. On desktop it is one row, no taller than about
   120 px: the wordmark, the four destinations, a thin divider, then `Terms &
   privacy` at the right. On phones the destinations live behind the footer
   `Menu`, with `Terms & privacy` beside it where both fit and beneath it on
@@ -465,8 +466,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   controls keep details, prices, lessons and welcome editable there. Adding a
   lesson opens the calendar with available Porto start times. In a wide row,
   compact lesson settings sit beside the calendar and its available times;
-  they stack on a phone. Manual entry, location, length and weekly repeat
-  remain available. Welcomes are explicit:
+  they stack on a phone. The lesson calendar starts today, omitting past dates
+  and complete past weeks. Choose an available time; there is no manual date
+  or time entry. Location, length and weekly repeat remain available. Welcomes are explicit:
   opening a step never sends email. First welcomes use `onlyIfWaiting: true`;
   `Send the link again` deliberately requests a fresh link without that guard.
   The Timetable keeps up to three operational notices under the next lesson,
@@ -762,10 +764,11 @@ reading's title; the facts follow it.
   reading opens, only its foot rising, so a one-line phrase never sits in a
   tall empty sheet. Nothing above the section moves, and the card grows and
   shrinks smoothly below.
-- At rest a few real, unseen phrases are written faintly in wax, just readable
-  if you look, and a flat pool of the next paint waits by the margin. Beside
-  the painting, the facts still to come wait in wax. Gouache is matte: nothing
-  glossy.
+- At rest a few real, unseen phrases are written in dark blue so they are
+  readable on the cream paper, and a flat pool of the next paint waits by the
+  margin. Beside the painting, the facts still to come wait in wax. Gouache is
+  matte: nothing glossy. Finished lettering stays cream on dark paint and dark
+  on lavender.
 - The press starts the painting at once while the Worker picks and saves the
   expression: a dab lands in the pool and spreads. On about one press in three
   the wait becomes a near-miss: a thin dry brush starts the first word or two

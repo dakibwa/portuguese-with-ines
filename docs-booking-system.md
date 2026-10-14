@@ -539,9 +539,10 @@ The card step does not block setup when cards are unavailable.
 Her steps expand in the row, reusing the details, prices and lesson forms.
 Lesson creation includes a calendar and available start times from the existing
 availability read, refreshed for the chosen lesson length. Choosing a slot
-fills the date and Porto time. Manual entry remains available for times Inês
-arranges herself; the existing creation endpoint still checks clashes and
-validates a weekly run. A saved change refreshes the student list and timetable.
+fills the date and Porto time. The calendar starts today and omits past dates;
+there is no manual date or time entry in this form. The existing creation
+endpoint still checks clashes and validates a weekly run. A saved change
+refreshes the student list and timetable.
 Each step opens its editor in the row. The student's name opens their full
 profile and lesson history, during and after setup. Welcomes remain a separate explicit action. Each row says
 what is needed; help uses short bullets. Sign-in and card belong to the student. `Send the link again` deliberately omits `onlyIfWaiting`, never sends
