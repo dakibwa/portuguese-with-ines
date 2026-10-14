@@ -2745,11 +2745,13 @@ await accountPage.route("**/me/expressions/pick", route => {
   return route.fulfill({ json: { expression, canPick: false, hasPublished: true, shuffleLabels: [] } });
 });
 await accountPage.reload({ waitUntil: "domcontentloaded" });
-await accountPage.getByRole("button", { name: "Spin the wheel", exact: true }).click();
-await accountPage.locator(".student-expressions__result .expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
+// The section keeps its name for assistive technology though its heading is not shown.
+const expressions = accountPage.getByRole("region", { name: "Uma expressão para ti", exact: true });
+await expressions.getByRole("button", { name: "Paint it", exact: true }).click();
+await expressions.locator(".expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
 await accountPage.reload({ waitUntil: "domcontentloaded" });
-await accountPage.locator(".student-expressions__result .expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
-if (await accountPage.getByRole("button", { name: "Spin again", exact: true }).count()) throw new Error("An exhausted collection must wait for new expressions.");
+await expressions.locator(".expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
+if (await accountPage.getByRole("button", { name: "Paint another", exact: true }).count()) throw new Error("An exhausted collection must wait for new expressions.");
 
 // The account is remembered for a quick return visit, and forgotten on
 // signing out with the session it belonged to.

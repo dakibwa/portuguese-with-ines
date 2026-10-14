@@ -533,10 +533,13 @@ there is no anonymous page or main-menu item.
 - The coral `Add an expression` leads. Search matches accents flexibly across
   expressions, meanings, examples and notes. The theme filter includes entries
   with no theme. Do not display the original collection's count.
-- Each card shows a small `Draft` or `Published` pill, its Portuguese meaning,
-  English meaning/equivalent and optional literal translation as dab facts,
-  then one or two example dabs when supplied. Notes/origin and reference links
-  open in a quiet disclosure. Optional themes use the existing lilac pill fill.
+- Each card shows a small `Draft` or `Published` pill, then its facts in
+  reading order, each under a small uppercase label after a dab of paint:
+  `Ao pé da letra` (the literal translation, when there is one), `Quer dizer`
+  (the Portuguese meaning, a step larger than the rest) and `Em inglês`; then
+  `Exemplo`/`Exemplos`, where the expression's own words are marked with a
+  soft wash of the paint, taking in a verb the example has conjugated. Notes/origin and reference links
+  open in a quiet disclosure. Optional themes use a lilac pill fill.
 - Reuse blue for Edit, soft lilac for Preview and publication changes, coral
   for saving, and outline for Cancel/Done. Up/down buttons reorder the whole
   collection; clear filters first. Every phone action is at least 44px.
@@ -558,28 +561,127 @@ there is no anonymous page or main-menu item.
   for a reading card. The packaging photos and business card do not illustrate
   individual meanings. None is copied into `public/visuals/` for this integration.
 
-The student card uses the same lilac sheet, cream reading card and handwritten
-Portuguese title. Its centre is a painted wheel (13 October 2026, at Dan's
-request for a wheel that lands on an expression, each phrase on its own splat,
-in the style of the site): a lavender wheel whose ten arms each carry a splat
-with a phrase on it in Beth Ellen, the top arc showing, the coral chapéu from
-the wordmark marking the top. The splat nearing the top swells so its phrase
-reads large. The wheel sits beside the card where there is room and above it
-on a phone, with `Spin the wheel` (then `Spin again`) between them. The press
-turns the wheel at once; it slows over the last few phrases onto the saved
-pick, rolls a touch past and settles back, the chapéu hopping as each splat
-passes under it, and the chosen splat blooms as droplets splash out round it.
-Only then does the reading card dissolve in. The wheel is decorative: the pick
-is the Worker's, the wheel only slows onto it, and assistive technology hears
-the result rather than every passing phrase. Reduced-motion users see the
-result on the top splat at once. The paintings live in
-`public/visuals/expression-wheel/`. Keep the button disabled during the request
-and animation. A failed reply stops the wheel and can be retried without
-spending another pick. If the collection cannot be read at all, the section
-stays away rather than raising an alarm beside the lessons. Returning students see their last
-available result, and every student has an independent history. Once their
-published pool is exhausted, show a quiet note and wait for new expressions.
-Do not reset their history or imply another student has taken an expression.
+The student card sits on the same lilac sheet below the lessons calendar. Its
+centre is `Pinta e descobre` (13 October 2026, at Dan's choice; it replaced a
+spinning wheel he rejected): Inês has written the expression in wax on a cream
+sheet, and a gouache brush sweeps across it line by line so the phrase shows
+through the paint in Beth Ellen, in reading order. The painted phrase is the
+reading's title; the facts follow it.
+
+- No visible heading and no helper text (Dan: "do we even need the top
+  stuff"). The section keeps `Uma expressão para ti` as a visually hidden
+  heading, so it is still named. At rest the sheet itself invites: the same
+  words as a small uppercase label at its top, in the waiting paint's
+  lettering colour, and `Paint it`. Once painted, the card is the whole
+  section, and it ends in one row at the foot of the facts at every width:
+  the reading's themes, then `Notas e origem` (when Inês has written notes or
+  a source) and the compact `Paint another` at the row's end. The notes'
+  toggle reads like the facts' labels, its chevron in the dabs' column when it
+  leads the row, and the notes open below the whole row, so opening them never
+  moves it. On a narrow column the row starts at the dabs' column and runs to
+  the card's edge, so two short themes, or the notes' toggle, share it with
+  the button; the toggle and the button drop beneath the themes together only
+  for a longer set of themes, and only on the narrowest phones (320px) does the
+  button take a line of its own. The button keeps the width of its longest
+  label, so `Painting…` and `Try again` never reflow the row; it stays a 48px
+  target and never becomes a full-width slab.
+- Colour: each painting is in one of five paints, every one with lettering
+  clear of AA: deep blue `#203E82`, blue `#2C54AA`, coral `#B43A26` and
+  lavender ink `#554F91` carry cream `#FBF4E5` lettering; lavender `#AAA4E6`
+  carries ink `#1A3169` (5.4:1; cream on it would be 2.1:1). A new painting is
+  never the colour of the last one painted on this device, nor of its family
+  (the two blues, the two lavenders), so each one reads as a new colour. A
+  returning student sees their expression in the colour it was painted in,
+  remembered on the device for each student as soon as the Worker has saved
+  the pick (two students sharing a device keep their own colours), or else in
+  a colour that expression always gets.
+  The reading's labels, dabs, marked words and the drops thrown off the brush
+  all follow the paint and its companion colours; on lavender the labels are
+  in lavender ink and the marked words take a stronger lavender wash, so both
+  still read.
+- Room around the words (Dan: "give it space so the words fit comfortably
+  inside so it's not ambiguous"): every letter sits in solid paint. The band is
+  sized round the phrase's own letters, with generous paint above the first
+  line's tallest letter and below the last line's deepest, a clear inset from
+  the blunt start, and the dry brush beginning only after the longest line ends
+  and a margin of paint after it. The strokes of a longer phrase overlap, so no
+  paper shows between its lines, and no streak of paper crosses a word. A
+  phrase of a few words stays on one line if type up to 15% smaller holds it.
+  Nothing is ever cut: a phrase too long for every size takes as many lines as
+  it needs at the smallest, and the sheet grows to hold them.
+- Composition: on a phone the sheet fills the cream card and the reading opens
+  beneath it. From a landscape phone up, two columns each run from the card's
+  top on their own: the painting with its example straight beneath it, and
+  beside it the facts with the themes and `Paint another` straight beneath
+  them. Neither column waits on the other, so the taller one never opens a
+  gap in the shorter, whose foot simply ends sooner. A painted card with a
+  one-line phrase fits a landscape phone's screen (667×375, 844×390). On a
+  very wide card the example moves up into a third column with the themes and
+  button beneath it, and all three columns start level. At rest the sheet
+  fills its column beside the facts still to come, with its wax and pool at
+  its top, where the paint will land: the paint lands where it stays and never
+  slides on the sheet. The painted sheet closes round its phrase as the
+  reading opens, only its foot rising, so a one-line phrase never sits in a
+  tall empty sheet. Nothing above the section moves, and the card grows and
+  shrinks smoothly below.
+- At rest a few real, unseen phrases are written faintly in wax, just readable
+  if you look, and a flat pool of the next paint waits by the margin. Beside
+  the painting, the facts still to come wait in wax. Gouache is matte: nothing
+  glossy.
+- The press starts the painting at once while the Worker picks and saves the
+  expression: a dab lands in the pool and spreads. On about one press in three
+  the wait becomes a near-miss: a thin dry brush starts the first word or two
+  of an unseen phrase near the top, and a quick stroke of the real paint
+  crosses it out, before the real phrase is painted. The near-miss is brushed
+  in a wash the real paint stands out against (lavender behind the blues and
+  coral, coral behind lavender ink, deep blue behind lavender, which strikes a
+  broader stroke), so the strike always reads. It is left crossed out for a
+  beat, then dries away as the brush comes back and paints the real phrase in
+  its place, at the top where it stays. The whole reveal, press to
+  reading, takes about 3.2 seconds when the reply arrives within about 1.5
+  seconds; after a slower reply the painting follows it at its quickest pace.
+- No paint ever shows a straight edge, in any frame or once it has dried.
+  Each stroke touches down as a rounded mark, its blunt start a rounded cap,
+  and is led by a rounded wet front with the bead riding it (the near-miss by
+  a dry brush's ragged front); its body ends rounded under the bead until the
+  dry brush drags out from beneath it, and the bead soaks back into the body
+  rather than floating off. The body's edges ease into the dry brush's, so
+  where the two meet there is no step, notch or seam. Strokes, drops and the
+  pool land whole on the paper, never cut by the sheet's edge.
+- The card is never left empty while it paints. On the first press the sheet
+  keeps its wax phrases until the first stroke lands (a near-miss dries them
+  at once), and the facts still to come stay in wax beside the painting, as
+  at rest. `Paint another`
+  brings the sheet into view and the last reading waits in wax where it
+  stands, out of reach: its labels and dabs stay, taking the new paint's
+  colours, its words dry to wax lines and its themes and notes fade, while
+  the button reads `Painting…` and the focus waits on the section. The card
+  never shortens while it paints, and grows
+  smoothly only when a longer phrase needs the room, so nothing below jumps
+  under the student.
+- Only the button paints: no swipe or drag on the sheet, and no loose chapéu at
+  the card's corner.
+- The painting is decorative: the pick is the Worker's and the brush paints only
+  what it saved, so nothing done mid-stroke can change or lose a pick. Assistive
+  technology hears the result in words and the reading takes the focus.
+  Reduced-motion users see the finished painting and reading at once, and the
+  card keeps the colours it shows until the new reading replaces it. Where the
+  sheet cannot be painted at all, the reading shows the expression in the hand
+  as its title instead.
+- The strokes, pool, drops and wax are drawn in code for now.
+  [Expressions: paintings to commission](../docs/expressions-paint-assets.md)
+  lists the painted assets that would replace them.
+
+Keep the button disabled, reading `Painting…`, during the request and the
+painting. A failed reply dries the new paint away, puts the last painting (or
+the waiting sheet) back, and `Try again` repeats the same request without
+spending another pick; the focus goes back to the button if it was lost. If the
+collection cannot be read at all, the section stays away rather than raising an
+alarm beside the lessons. Returning students see their last available result,
+and every student has an independent history. Once their published pool is
+exhausted, a quiet note takes the button's place and the card waits for new
+expressions. Do not reset their history or imply another student has taken an
+expression.
 
 The full source inventory and later-stage feature map are in
 [Expressions: source and scope](../docs/expressions-stage-1.md).
