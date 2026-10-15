@@ -94,18 +94,24 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
           setSelected(null); setDraft(null); setError(""); setNotice(""); setView("online");
         }}><ArrowLeft size={16} aria-hidden="true" />All homework</button>
         {submission ? <span className={`homework-status homework-status--${awaitingReview ? "sent" : "returned"}`}>
-          {awaitingReview ? <Send size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}{awaitingReview ? "Sent to Inês" : "Feedback from Inês"}
+          {awaitingReview ? <Send size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}{awaitingReview ? "Sent to Inês" : "Done"}
         </span> : <span className="homework-status homework-status--quiet">{dirty ? "Unsaved answers" : draft.updatedAt ? "Saved" : "Ready to start"}</span>}
       </div>
       {error ? <p className="homework-error" role="alert">{error}</p> : null}
+      {/* Approved by Inês: as plain a Done as she sees on her side. */}
+      {submission?.returnedAt && !changedSinceSubmission ? <div className="homework-done">
+        <span className="homework-done__dab" aria-hidden="true"><CheckCircle2 size={26} /></span>
+        <span className="homework-done__text"><strong>Done</strong><small>Inês has checked it</small></span>
+        <HomeworkSplat seed={`${selected.bookingId}-done`} className="homework-done__mark" />
+      </div> : null}
       <HomeworkWorksheet key={selected.bookingId} {...selected} answers={draft.answers} disabled={busy || awaitingReview}
         marks={submission?.returnedAt ? submission.marks : undefined} markedAnswers={submission?.answers} onViewChange={setView}
         onAnswer={(id, answer) => setDraft({ ...draft, answers: { ...draft.answers, [id]: answer } })} />
       {view === "online" ? <div className="homework-save">
         <p role="status">{busy ? "Saving your work and preparing it for Inês…" : notice || (awaitingReview
           ? "Inês is checking your work. Your answers are saved."
-          : submission?.returnedAt ? "Read Inês’s feedback under each answer. You can change your answers and send them again."
-          : selected.aiMarking ? "Inês checks your answers before you see any feedback. OpenAI suggests marks for written answers, so keep personal details out."
+          : submission?.returnedAt ? "You can change your answers and send them again."
+          : selected.aiMarking ? "Inês checks your answers before you see any feedback. Anthropic’s Claude suggests marks for written answers, so keep personal details out."
           : "Inês checks your answers and sends you feedback here.")}</p>
         <div className="homework-save__actions">
           {awaitingReview ? <button type="button" className="button button--outline" disabled={busy} onClick={() => void open(selected.bookingId)}>Check for feedback</button> : <>
@@ -129,7 +135,7 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
             </span>
             <span className="homework-list__state">
               {state === "returned" ? <CheckCircle2 size={15} aria-hidden="true" /> : state === "sent" ? <Send size={14} aria-hidden="true" /> : null}
-              {state === "returned" ? "Feedback ready" : state === "sent" ? "With Inês" : state === "started" ? "Continue" : "Start"}
+              {state === "returned" ? "Done" : state === "sent" ? "With Inês" : state === "started" ? "Continue" : "Start"}
               {state === "new" || state === "started" ? <ArrowRight size={16} aria-hidden="true" /> : null}
             </span>
           </button>

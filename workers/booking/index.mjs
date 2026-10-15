@@ -68,7 +68,7 @@ import {
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
-import { HomeworkProblem, HOMEWORK_PHOTO_BODY_LIMIT, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing } from "./homework.mjs";
+import { HomeworkProblem, HOMEWORK_PHOTO_BODY_LIMIT, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing, notifyHomeworkSubmissions } from "./homework.mjs";
 import { closedExpressions, expressionsOpenToStudents, pickExpression, studentExpressions } from "./student-expressions.mjs";
 import { findRecurringCode, studentRates, studentLessonType, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
@@ -1875,8 +1875,11 @@ const worker = {
       if (path === "/me/homework" || /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path)) {
         const student = await currentStudent(request, env);
         if (!student) return fail("Please sign in.", 401, request, env);
-        return await homeworkReply(request, env, async () => studentHomework(env, student, request.method, path.split("/")[3] ?? null,
+        const reply = await homeworkReply(request, env, async () => studentHomework(env, student, request.method, path.split("/")[3] ?? null,
           request.method === "POST" ? await readJson(request, 65536) : {}, path.split("/")[4] ?? ""));
+        // Marking has finished by the time a submission replies; tell Inês.
+        if (reply.ok && request.method === "POST" && path.endsWith("/submit")) ctx.waitUntil(homeworkNotices(env, path.split("/")[3]));
+        return reply;
       }
 
       // Preview before commit: a student is told which weeks are free, and
@@ -1933,6 +1936,8 @@ const worker = {
     ctx.waitUntil(resendFailedEmails(env));
     ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row)));
     ctx.waitUntil(sendLessonReminders(env));
+    // Homework whose marking was interrupted, or whose notice failed to send.
+    ctx.waitUntil(homeworkNotices(env));
 
     // The account has a finite trigger allowance. One per-minute trigger owns
     // prompt money work, and only its 03:10 UTC tick runs the larger nightly
@@ -5164,6 +5169,19 @@ async function isAdmin(request, env) {
   if (env.ADMIN_TOKEN && safeEqual(provided, env.ADMIN_TOKEN)) return { via: "token", student: null };
 
   return null;
+}
+
+/** Best-effort, like every email: a failure is logged and the sweep retries. */
+function homeworkNotices(env, bookingId = null) {
+  return (async () => {
+    if (!teacherNotificationsEnabled(env)) return;
+    const settings = await loadSettings(env);
+    await notifyHomeworkSubmissions(env, {
+      to: env.TEACHER_EMAIL || settings.teacherEmail, bookingId,
+      send: message => deliver(env, message),
+      link: (lessonId, studentId) => siteUrl(env, `/schedule/?student=${encodeURIComponent(studentId)}&homework=${encodeURIComponent(lessonId)}`),
+    });
+  })().catch(error => console.error("homework-notice", String(error?.message ?? error)));
 }
 
 async function homeworkReply(request, env, operation) {

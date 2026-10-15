@@ -227,6 +227,21 @@ export function TeacherSchedule() {
     else if (new URL(window.location.href).searchParams.get("tab") === "expressions") setActiveTab("expressions");
   }, []);
 
+  // Her "Homework to review" email links to /schedule/?student=…&homework=…:
+  // once she is signed in, open that student's lesson at its homework.
+  useEffect(() => {
+    if (!token) return;
+    const url = new URL(window.location.href);
+    const studentId = url.searchParams.get("student");
+    const homeworkId = url.searchParams.get("homework");
+    if (!studentId || !homeworkId) return;
+    setStudentRequest({ studentId, panel: "history", homeworkId, homeworkRequestKey: 1, key: Date.now() });
+    setActiveTab("students");
+    url.searchParams.delete("student");
+    url.searchParams.delete("homework");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+  }, [token]);
+
   useEffect(() => {
     let active = true;
     const session = readSession();

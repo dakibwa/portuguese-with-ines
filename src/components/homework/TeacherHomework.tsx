@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Camera, Sparkles, CheckCircle2, ChevronDown, Image as ImageIcon, Lock, PenLine, Plus, RotateCcw, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, Sparkles, CheckCircle2, ChevronDown, Image as ImageIcon, Lock, PenLine, Plus, RotateCcw, Send, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { HOMEWORK_PHOTO_LIMIT, prepareHomeworkPhoto, teacherHomeworkRequest, transcribeHomeworkPhotos, type HomeworkSheet, type TeacherHomeworkData, type HomeworkMark } from "@/lib/homework-api";
 import { readSession } from "@/lib/auth-api";
 import { HomeworkSplat } from "./HomeworkArt";
@@ -29,6 +29,10 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
   const [reviewed, setReviewed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [reviewMarks, setReviewMarks] = useState<Record<string, HomeworkMark> | null>(null);
+  // A new sheet is one decision at a time: what, level, length, then Generate.
+  const [step, setStep] = useState<Step>("what");
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const moved = useRef(false);
   const active = useRef(true);
   const editor = useRef<HTMLElement>(null);
   const controller = useRef<AbortController | null>(null);
@@ -56,6 +60,10 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
     return () => window.clearInterval(interval);
   }, [bookingId, token, draft?.progress.submission?.state]);
   useEffect(() => { onBusy?.(Boolean(busy)); }, [busy, onBusy]);
+  // Each step's question takes focus as it arrives, never on first opening.
+  useEffect(() => {
+    if (moved.current) stepHeading.current?.focus({ preventScroll: true });
+  }, [step, busy]);
   useEffect(() => {
     if (!unsaved && !busy) return;
     const warn = (event: BeforeUnloadEvent) => { if (unsaved) event.preventDefault(); };
@@ -82,7 +90,7 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
       if (busy || !window.confirm("Leave without saving this homework draft?")) {
         event.preventDefault(); event.stopImmediatePropagation();
       } else {
-        setDraft(saved); setReviewMarks(null); setReviewed(false); setPhotos([]);
+        setDraft(saved); setReviewMarks(null); setReviewed(false); setPhotos([]); setStep("what");
       }
     };
     window.addEventListener("beforeunload", warn);
@@ -107,7 +115,10 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
     setBusy("photo"); setError(""); setUncertain([]);
     try {
       const images = await Promise.all(chosen.map(prepareHomeworkPhoto));
-      if (active.current) setPhotos(current => [...current, ...images].slice(0, HOMEWORK_PHOTO_LIMIT));
+      if (!active.current) return;
+      setPhotos(current => [...current, ...images].slice(0, HOMEWORK_PHOTO_LIMIT));
+      // A photo is the answer to the first step: on to the level.
+      if (step === "what" && !photos.length) { moved.current = true; setStep("level"); }
     } catch (error) { if (active.current) setError((error as Error).message); }
     finally { if (active.current) setBusy(""); }
   }
@@ -121,7 +132,7 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
     if (!active.current || readSession() !== token) return;
     setDraft(result); setSaved(result); setReviewMarks(null); setReviewed(false);
     if (action !== "save") setMode("preview");
-    setNotice(action === "return" ? "Approved and sent back. The student can now see your feedback." : action === "publish" ? "Published. It is now in the student’s Homework tab." : action === "generate" ? "Draft ready. Check the Portuguese and answers." : "Draft saved.");
+    setNotice(action === "return" ? "Done. Your feedback is with the student." : action === "publish" ? "Published to the student’s Homework." : action === "generate" ? "Draft ready." : "Draft saved.");
     if (action === "return") window.dispatchEvent(new Event("homework-returned"));
   }
   async function run(action: "save" | "generate" | "publish" | "return") {
@@ -132,7 +143,7 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
     finally { if (active.current) setBusy(""); }
   }
   /** Photos are read, then the draft is made from what they say, in one press.
-   *  Anything the reader was unsure of stops it there so Inês can check first. */
+   *  Anything the reader was unsure of stops it at Check the notes first. */
   async function make() {
     if (!draft || busy) return;
     if (draft.sheet && !window.confirm("Replace this draft with a new sheet? Your lesson notes will stay.")) return;
@@ -146,9 +157,10 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
         const notes = [draft.notes, result.notes].filter(Boolean).join("\n\n");
         if (notes.length > 10000) throw new Error("These notes are too long to add another photo. Shorten the notes, then read the photo again.");
         source = { ...draft, notes };
-        setDraft(source); setRead(photos); setPhotos([]); setShowPhoto(-1); setUncertain(result.uncertain); setWriting(true);
-        if (!result.notes) { setNotice("No lesson text was found. Try a clearer photo."); return; }
-        if (result.uncertain.length) { setNotice("Photo read. Check the readings below, then make the homework."); return; }
+        setDraft(source); setRead(photos); setPhotos([]); setShowPhoto(-1); setUncertain(result.uncertain);
+        if (!result.notes) { setWriting(true); moved.current = true; setStep("what"); setError("No lesson text was found. Try a clearer photo, or type the notes."); return; }
+        // Anything the reader was unsure of is hers to check before a draft.
+        if (result.uncertain.length) { moved.current = true; setStep("check"); return; }
       }
       if (source.notes.trim().length < 10) throw new Error("Add a few notes about what you worked on.");
       setBusy("generate");
@@ -160,7 +172,6 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
   const photoInput = (camera: boolean) => <input type="file" accept="image/*" multiple className="visually-hidden" disabled={Boolean(busy) || photos.length >= HOMEWORK_PHOTO_LIMIT}
     {...(camera ? { capture: "environment" as const } : {})} onChange={event => { const files = event.target.files; void addPhotos(files).finally(() => { event.target.value = ""; }); }} />;
   const canMake = Boolean(photos.length) || (draft?.notes.trim().length ?? 0) >= 10;
-  const makeLabel = busy === "transcribe" ? "Reading photos…" : busy === "generate" ? "Making sheet…" : photos.length ? (draft?.sheet ? "Read & make a new draft" : "Read & make homework") : draft?.sheet ? "Make a new draft" : "Make homework";
   const thumbs = (list: string[], pending: boolean) => list.length ? <ul className="homework-photos" aria-label={pending ? "Photos to read" : "Photos read"}>
     {list.map((image, index) => <li key={index}>
       <button type="button" className="homework-photo-thumb" aria-label={`${showPhoto === index && !pending ? "Hide" : "View"} photo ${index + 1}`} aria-expanded={pending ? undefined : showPhoto === index}
@@ -171,91 +182,166 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
       {pending ? <button type="button" className="homework-photo-remove" aria-label={`Remove photo ${index + 1}`} disabled={Boolean(busy)} onClick={() => setPhotos(current => current.filter((_, i) => i !== index))}><X size={15} aria-hidden="true" /></button> : null}
     </li>)}
   </ul> : null;
-  const settings = draft ? <>
-    <label htmlFor={`${inputId}-level`}>Level<select id={`${inputId}-level`} value={draft.level} onChange={event => edit({ level: event.target.value })}>{["A1", "A2", "B1", "B2", "C1", "C2"].map(level => <option key={level}>{level}</option>)}</select></label>
-    <label htmlFor={`${inputId}-minutes`}>Length<select id={`${inputId}-minutes`} value={draft.minutes} onChange={event => edit({ minutes: Number(event.target.value) })}>{[10, 15, 20].map(minutes => <option key={minutes} value={minutes}>{minutes} mins</option>)}</select></label>
-  </> : null;
-  const notesField = draft ? <label htmlFor={`${inputId}-notes`} className="homework-notes">What did you work on?
-    <textarea id={`${inputId}-notes`} value={draft.notes} rows={5} maxLength={10000} onChange={event => edit({ notes: event.target.value })} placeholder="Type the words, grammar and examples from this lesson." /></label> : null;
-  const uncertainList = uncertain.length ? <div className="homework-error"><strong>Check these readings</strong><ul>{uncertain.map((item, index) => <li key={index}>{item}</li>)}</ul></div> : null;
+  const notesField = (labelledBy?: string) => draft ? <textarea id={`${inputId}-notes`} className="homework-notes__field" aria-labelledby={labelledBy} aria-label={labelledBy ? undefined : "Lesson notes"} value={draft.notes} rows={5} maxLength={10000}
+    onChange={event => edit({ notes: event.target.value })} placeholder="Words, grammar and examples from the lesson" /> : null;
+  const uncertainList = uncertain.length ? <ul className="homework-uncertain" aria-label="Unsure readings">{uncertain.map((item, index) => <li key={index}>{item}</li>)}</ul> : null;
   // eslint-disable-next-line @next/next/no-img-element
   const fullPhoto = read[showPhoto] ? <img className="homework-photo-full" src={read[showPhoto]} alt="Lesson notes to compare with the transcription" /> : null;
-  const privacy = <ul className="homework-help booking-payment-facts"><li>OpenAI reads the photos. This site doesn’t store them.</li><li>Keep names and personal details out.</li></ul>;
   // Fine-tune and Save draft: beside the format control under a preview, on their own row above the editor.
   const draftTools = draft ? <>
     {draft.sheet ? <button type="button" className="homework-link homework-finetune" aria-pressed={mode === "edit"} disabled={Boolean(busy)} onClick={() => setMode(value => value === "edit" ? "preview" : "edit")}>
-      <SlidersHorizontal size={15} aria-hidden="true" />Fine-tune</button>
-      : <button type="button" className="button button--lilac" disabled={Boolean(busy)} onClick={() => { edit({ sheet: emptySheet() }); setMode("edit"); }}><PenLine size={16} aria-hidden="true" />Write a sheet yourself</button>}
+      <SlidersHorizontal size={15} aria-hidden="true" />Fine-tune</button> : null}
     {/* As in Your details, saving appears once there is something to save. */}
     {dirty || busy === "save" ? <button className="button button--outline" type="button" disabled={Boolean(busy)} onClick={() => void run("save")}>{busy === "save" ? "Saving…" : "Save draft"}</button> : null}
   </> : null;
-  const start = Boolean(draft && draft.aiAvailable && !draft.sheet && !draft.publishedAt);
+  const start = Boolean(draft && !draft.sheet && !draft.publishedAt);
+  const returned = Boolean(draft?.progress.submission?.returnedAt);
+  // The one place the draft's privacy is told: a lock, its words on hover and for screen readers.
+  const privateNote = `Private draft: only you can see it.${draft?.aiAvailable ? " Anthropic reads any photos; this site doesn’t keep them." : ""}`;
+  const firstName = draft?.studentName.split(" ")[0] ?? "";
+  // Steps after the first stack their decisions above, as booking's do.
+  const order: Step[] = ["what", "level", "length", "ready"];
+  const go = (next: Step) => { moved.current = true; setError(""); setNotice(""); setStep(next); };
+  const back = (from: Step) => go(from === "check" ? "ready" : order[Math.max(0, order.indexOf(from) - 1)]);
+  const whatSummary = photos.length ? `${photos.length} ${photos.length === 1 ? "photo" : "photos"}` : draft?.notes.trim() ? "Typed notes" : "No notes";
+  const summaries = draft ? ([
+    ["what", "Lesson", whatSummary, photos.length ? photos[0] : null],
+    ["level", "Level", draft.level, null],
+    ["length", "Length", `${draft.minutes} mins`, null],
+  ] as const).filter(([id]) => order.indexOf(id) < order.indexOf(step === "check" ? "ready" : step)) : [];
+  const stepHead = (title: string, from?: Step) => <div className="homework-step__head">
+    {from ? <button type="button" className="homework-back homework-step__back" onClick={() => back(from)}><ArrowLeft size={16} aria-hidden="true" />Back</button> : null}
+    <h4 id={`${inputId}-step`} tabIndex={-1} ref={stepHeading}><HomeworkSplat seed={`${bookingId}-${title}`} className="homework-step__mark" />{title}</h4>
+  </div>;
 
   return <section className="teacher-homework" ref={editor} aria-labelledby={`${inputId}-title`}>
     <div className="homework-toolbar homework-toolbar--head"><h3 id={`${inputId}-title`}><HomeworkSplat seed={bookingId} className="homework-heading-mark" />Homework</h3>
-      {draft ? <span className={`homework-status homework-status--${draft.publishedAt ? "returned" : "draft"}`}>{draft.publishedAt
-        ? <><CheckCircle2 size={15} aria-hidden="true" />Published</> : <><Lock size={14} aria-hidden="true" />Private draft</>}</span> : null}
+      {draft ? returned ? <span className="homework-status homework-status--returned homework-status--done"><CheckCircle2 size={15} aria-hidden="true" />Done</span>
+        : draft.publishedAt ? <span className="homework-status homework-status--published"><Send size={14} aria-hidden="true" />Published</span>
+        : <span className="homework-private" title={privateNote}><Lock size={15} aria-hidden="true" /><span className="visually-hidden">{privateNote}</span></span> : null}
     </div>
-    {error ? <div className="homework-error" role="alert"><p>{error}</p>{!draft ? <button type="button" className="button button--outline" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button> : null}</div> : null}
+    {error && !draft ? <div className="homework-error" role="alert"><p>{error}</p><button type="button" className="button button--outline" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button></div> : null}
     {!draft && !error ? <p className="homework-loading" role="status">Loading homework…</p> : null}
-    {draft && start ? <fieldset className="homework-start" disabled={Boolean(busy)}>
-      <legend className="visually-hidden">Make homework from this lesson</legend>
-      {/* The one big thing to press: a photo straight from the phone's camera. */}
-      {photos.length < HOMEWORK_PHOTO_LIMIT ? <label className={`homework-capture${photos.length ? " homework-capture--again" : ""}`}>
-        <HomeworkSplat seed={`${bookingId}-photo`} className="homework-capture__mark" />
-        <span className="homework-capture__icon" aria-hidden="true"><Camera size={26} /></span>
-        <span className="homework-capture__text"><strong>{photos.length ? "Add another page" : "Add a photo of your notes"}</strong>
-          <small>{photos.length ? `Up to ${HOMEWORK_PHOTO_LIMIT} photos, read together` : "Take a picture of the board or your notebook"}</small></span>
-        {photoInput(true)}
-      </label> : null}
-      <div className="homework-start__more">
-        {thumbs(photos, true)}
-        {photos.length < HOMEWORK_PHOTO_LIMIT ? <label className="homework-link homework-link--file"><ImageIcon size={15} aria-hidden="true" />From gallery{photoInput(false)}</label> : null}
-        <button type="button" className="homework-link" aria-expanded={writing} onClick={() => setWriting(value => !value)}><PenLine size={15} aria-hidden="true" />{writing ? "Hide notes" : "Type notes"}</button>
+    {draft && start ? busy === "transcribe" || busy === "generate" ? <HomeworkWorking key="working" seed={bookingId} reading={busy === "transcribe"} pages={photos.length || read.length} level={draft.level} minutes={draft.minutes} />
+      : <div className="homework-steps">
+      {summaries.map(([id, label, value, image]) => <div className="homework-summary" key={id}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {image ? <img className="homework-summary__photo" src={image} alt="" /> : <HomeworkSplat seed={`${bookingId}-${id}`} className="homework-summary__mark" />}
+        <span className="homework-summary__copy"><small>{label}</small><strong>{value}</strong></span>
+        <button type="button" className="homework-summary__change" aria-label={`Change ${label.toLowerCase()}`} disabled={Boolean(busy)} onClick={() => go(id)}>Change</button>
+      </div>)}
+      <div className="homework-step" key={step}>
+        {step === "what" ? <>
+          {stepHead("What did you work on?")}
+          {draft.aiAvailable && !writing ? <>
+            {thumbs(photos, true)}
+            {photos.length < HOMEWORK_PHOTO_LIMIT ? <label className={`homework-capture${photos.length ? " homework-capture--again" : ""}`}>
+              <HomeworkSplat seed={`${bookingId}-photo`} className="homework-capture__mark" />
+              <span className="homework-capture__icon" aria-hidden="true"><Camera size={26} /></span>
+              <span className="homework-capture__text"><strong>{photos.length ? "Add a page" : "Take a photo"}</strong></span>
+              {photoInput(true)}
+            </label> : null}
+            <div className="homework-step__options">
+              {photos.length ? <button type="button" className="button button--coral homework-step__next" disabled={Boolean(busy)} onClick={() => go("level")}>Next<ArrowRight size={16} aria-hidden="true" /></button> : null}
+              {photos.length < HOMEWORK_PHOTO_LIMIT ? <label className="homework-option"><ImageIcon size={17} aria-hidden="true" />Gallery{photoInput(false)}</label> : null}
+              {photos.length ? null : <button type="button" className="homework-option" onClick={() => setWriting(true)}><PenLine size={17} aria-hidden="true" />Type it</button>}
+            </div>
+          </> : <>
+            {notesField(`${inputId}-step`)}{thumbs(read, false)}{fullPhoto}
+            <div className="homework-step__options">
+              <button type="button" className="button button--coral homework-step__next" disabled={draft.aiAvailable && draft.notes.trim().length < 10} onClick={() => go("level")}>Next<ArrowRight size={16} aria-hidden="true" /></button>
+              {draft.aiAvailable ? <button type="button" className="homework-option" onClick={() => setWriting(false)}><Camera size={17} aria-hidden="true" />Photo instead</button> : null}
+            </div>
+          </>}
+        </> : step === "level" ? <>
+          {stepHead("Level", "level")}
+          <Choices label="Level" options={levels.map(level => [level, level])} value={draft.level} onPick={level => { edit({ level }); go("length"); }} />
+        </> : step === "length" ? <>
+          {stepHead("Length", "length")}
+          <Choices label="Length" wide options={lengths.map(minutes => [String(minutes), `${minutes} mins`])} value={String(draft.minutes)} onPick={minutes => { edit({ minutes: Number(minutes) }); go("ready"); }} />
+        </> : step === "check" ? <>
+          {stepHead("Check the notes", "check")}
+          {notesField(`${inputId}-step`)}{uncertainList}{thumbs(read, false)}{fullPhoto}
+          <button className="button button--coral homework-make" type="button" disabled={draft.notes.trim().length < 10} onClick={() => void make()}><Sparkles size={17} aria-hidden="true" />Generate homework</button>
+        </> : <>
+          {stepHead(draft.aiAvailable ? "Ready" : "Ready to write", "ready")}
+          {draft.aiAvailable
+            ? <button className="button button--coral homework-make" type="button" disabled={!canMake} onClick={() => void make()}><Sparkles size={17} aria-hidden="true" />Generate homework</button>
+            : <button className="button button--coral homework-make" type="button" onClick={() => { edit({ sheet: emptySheet() }); setMode("edit"); }}><PenLine size={17} aria-hidden="true" />Write the sheet</button>}
+        </>}
+        {error ? <div className="homework-error" role="alert"><p>{error}</p></div> : null}
       </div>
-      {writing ? <>{notesField}{thumbs(read, false)}{fullPhoto}{uncertainList}</> : null}
-      <div className="homework-settings">
-        {settings}
-        <button className="button button--coral homework-make" type="button" disabled={!canMake} onClick={() => void make()}><Sparkles size={17} aria-hidden="true" />{makeLabel}</button>
-      </div>
-      {privacy}
-    </fieldset> : null}
+    </div> : null}
     {draft && !start && !draft.publishedAt ? <>
-      <details className="homework-source" open={!draft.sheet || undefined}>
-        <summary><ChevronDown size={18} aria-hidden="true" /><strong>Lesson notes</strong><span>{draft.level} · {draft.minutes} mins</span><span><Lock size={13} aria-hidden="true" />Only you can see these</span></summary>
+      <details className="homework-source">
+        <summary><ChevronDown size={18} aria-hidden="true" /><strong>Lesson notes</strong><span>{draft.level} · {draft.minutes} mins</span><Lock size={13} aria-hidden="true" className="homework-source__lock" /></summary>
         <fieldset disabled={Boolean(busy)}>
-          {notesField}
+          {notesField()}
           {draft.aiAvailable ? <><div className="homework-photo-tools">
-            {photos.length < HOMEWORK_PHOTO_LIMIT ? <label className="button button--outline"><Camera size={17} aria-hidden="true" />Add a photo{photoInput(true)}</label> : null}
+            {photos.length < HOMEWORK_PHOTO_LIMIT ? <label className="homework-option"><Camera size={17} aria-hidden="true" />Add a photo{photoInput(true)}</label> : null}
             {thumbs(photos, true)}{thumbs(read, false)}
-          </div>
-          {fullPhoto}
-          {privacy}{uncertainList}</> : null}
+          </div>{fullPhoto}{uncertainList}</> : null}
           <div className="homework-settings">
-            {settings}
-            {draft.aiAvailable ? <button className="button button--coral" type="button" disabled={!canMake} onClick={() => void make()}><Sparkles size={17} aria-hidden="true" />{makeLabel}</button> : null}
+            <Choices label="Level" small options={levels.map(level => [level, level])} value={draft.level} onPick={level => edit({ level })} />
+            <Choices label="Length" small options={lengths.map(minutes => [String(minutes), `${minutes} mins`])} value={String(draft.minutes)} onPick={minutes => edit({ minutes: Number(minutes) })} />
           </div>
-          {!draft.aiAvailable ? <p className="homework-help">Photo reading and automatic drafts aren’t switched on yet. Keep your notes here and write the sheet yourself.</p> : null}
+          {draft.aiAvailable ? <button className="button button--outline homework-remake" type="button" disabled={!canMake} onClick={() => void make()}><Sparkles size={17} aria-hidden="true" />Make a new draft</button> : null}
         </fieldset>
       </details>
+      {busy === "transcribe" || busy === "generate" ? <HomeworkWorking seed={bookingId} reading={busy === "transcribe"} pages={photos.length} level={draft.level} minutes={draft.minutes} /> : null}
+      {error ? <div className="homework-error" role="alert"><p>{error}</p></div> : null}
       {draft.sheet && mode === "preview" ? null : <div className="homework-toolbar homework-toolbar--actions">{draftTools}</div>}
     </> : null}
+    {draft?.publishedAt && error ? <div className="homework-error" role="alert"><p>{error}</p></div> : null}
     {draft?.sheet && draft.progress.submission && !draft.progress.submission.returnedAt ? <HomeworkReview
       sheet={draft.sheet} answers={draft.progress.submission.answers}
       marks={reviewMarks ?? draft.progress.submission.marks ?? {}}
       marking={draft.progress.submission.state === "marking"} note={draft.progress.submission.markingNote}
-      busy={Boolean(busy)} onChange={setReviewMarks} onApprove={() => void run("return")} /> : draft?.sheet ? <>
+      busy={Boolean(busy)} onChange={setReviewMarks} onApprove={() => void run("return")} /> : draft?.sheet && !(start && busy) ? <>
+      {returned ? <div className="homework-done" role="status">
+        <span className="homework-done__dab" aria-hidden="true"><CheckCircle2 size={26} /></span>
+        <span className="homework-done__text"><strong>Done</strong><small>{firstName} has your feedback</small></span>
+        <HomeworkSplat seed={`${bookingId}-done`} className="homework-done__mark" />
+      </div> : null}
       {!draft.publishedAt && mode === "edit" ? <SheetEditor sheet={draft.sheet} disabled={Boolean(busy)} ai={draft.aiAvailable} onChange={sheet => edit({ sheet })} />
         : <HomeworkWorksheet sheet={draft.sheet} level={draft.level} minutes={draft.minutes} lessonAt={draft.lessonAt}
           answers={draft.progress.submission?.answers ?? (draft.publishedAt ? draft.progress.answers : undefined)}
           marks={draft.progress.submission?.marks} markedAnswers={draft.progress.submission?.answers} preview tools={draft.publishedAt ? undefined : draftTools} />}
-      {draft.publishedAt ? <p className="homework-help homework-help--state">{draft.progress.submission?.returnedAt ? "Approved feedback sent back to the student." : draft.progress.updatedAt ? "The student has started but has not submitted yet." : "The student has not submitted any answers yet."} Published questions stay fixed.</p> : <div className="homework-publish">
-        <label><input type="checkbox" checked={reviewed} disabled={Boolean(busy)} onChange={event => setReviewed(event.target.checked)} />I checked the European Portuguese and the answers.</label>
+      {draft.publishedAt ? returned ? null : <p className="homework-help homework-help--state">{draft.progress.updatedAt ? `${firstName} has started.` : `Waiting for ${firstName}.`}</p> : <div className="homework-publish">
+        <label><input type="checkbox" checked={reviewed} disabled={Boolean(busy)} onChange={event => setReviewed(event.target.checked)} />I checked the Portuguese and the answers</label>
         <button type="button" className="button button--coral" disabled={Boolean(busy) || !reviewed} onClick={() => void run("publish")}>{busy === "publish" ? "Publishing…" : "Publish for student"}</button>
       </div>}
     </> : null}
-    <p className="homework-notice" role="status">{busy === "photo" ? "Preparing photo…" : busy === "transcribe" ? "Reading your notes…" : busy === "generate" ? "Making a draft from this lesson’s notes…" : notice || (dirty ? "Unsaved changes" : "")}</p>
+    <p className="homework-notice" role="status">{busy === "photo" ? "Preparing photo…" : notice || (dirty && !start ? "Unsaved changes" : "")}</p>
   </section>;
+}
+
+const levels = ["A1", "A2", "B1", "B2", "C1", "C2"];
+const lengths = [10, 15, 20];
+type Step = "what" | "level" | "length" | "ready" | "check";
+
+/** One decision as booking's time choices: filled blobs, the current one blue. */
+function Choices({ label, options, value, onPick, wide, small }: { label: string; options: (readonly [string, string])[]; value: string; onPick: (value: string) => void; wide?: boolean; small?: boolean }) {
+  return <div role="group" aria-label={label} className={`homework-choices${wide ? " homework-choices--wide" : ""}${small ? " homework-choices--small" : ""}`}>
+    {small ? <span className="homework-choices__label" aria-hidden="true">{label}</span> : null}
+    {options.map(([id, text]) => <button key={id} type="button" aria-pressed={id === value} className={id === value ? "is-selected" : ""} onClick={() => onPick(id)}>{text}</button>)}
+  </div>;
+}
+
+/**
+ * While Claude reads and writes: what is happening now, what comes next, and
+ * a line that fills gently towards the end without pretending to know when.
+ */
+function HomeworkWorking({ seed, reading, pages, level, minutes }: { seed: string; reading: boolean; pages: number; level: string; minutes: number }) {
+  return <div className="homework-working" role="status" aria-live="polite">
+    <HomeworkSplat seed={`${seed}-working`} className="homework-working__mark" />
+    <h4>{reading ? "Reading your notes" : "Writing the homework"}</h4>
+    <ol className="homework-working__steps">
+      {pages ? <li className={reading ? "is-current" : "is-done"}>{reading ? null : <CheckCircle2 size={15} aria-hidden="true" />}Reading {pages} {pages === 1 ? "photo" : "photos"}</li> : null}
+      <li className={reading ? "" : "is-current"}>{level} · {minutes} mins</li>
+    </ol>
+    <span className="homework-working__bar" aria-hidden="true"><span key={reading ? "read" : "write"} /></span>
+  </div>;
 }
 
 function SheetEditor({ sheet, disabled, ai, onChange }: { sheet: HomeworkSheet; disabled: boolean; ai: boolean; onChange: (sheet: HomeworkSheet) => void }) {
@@ -304,8 +390,7 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
   return <div className="homework-review">
     <div className="homework-review__intro">
       <h4>Homework to review</h4>
-      <p>{marking ? "Checking answers…" : "Settled answers are folded. Open any to change it. The student sees your marks only after you approve."}</p>
-      {marking ? null : <ul className="homework-review__tally" aria-label="Marks so far">
+      {marking ? <div className="homework-review__marking" role="status"><span>Checking answers…</span><span className="homework-working__bar" aria-hidden="true"><span /></span></div> : <ul className="homework-review__tally" aria-label="Marks so far">
         <li className="homework-review__count homework-review__count--correct">{right} correct</li>
         <li className="homework-review__count homework-review__count--retry">{retry} to try again</li>
         {open ? <li className="homework-review__count homework-review__count--open">{open} {open === 1 ? "needs" : "need"} you</li> : null}
@@ -355,7 +440,7 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
       </section>)}
     </fieldset>
     <div className="homework-publish homework-publish--review">
-      <p className="homework-help">{marking ? "Automatic marking is still running." : open ? `${open === 1 ? "1 answer needs" : `${open} answers need`} a mark and feedback.` : "Ready to send back to the student."}</p>
+      <p className="homework-help">{marking ? "" : open ? `${open} left to mark` : "All marked"}</p>
       <button type="button" className="button button--coral" disabled={busy || marking || Boolean(open)} onClick={onApprove}>{busy ? "Sending…" : "Approve & send back"}</button>
     </div>
   </div>;

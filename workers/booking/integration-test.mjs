@@ -2928,7 +2928,7 @@ await test("homework: private drafts, teacher review, lesson ownership and saved
   assert.equal(published.status, 200, await published.clone().text());
   const publicVersion = await (await call(`/me/homework/${id}`, { method: "GET" })).json();
   assert.equal(publicVersion.sheet.title, "No café");
-  assert.equal(publicVersion.aiMarking, false, "students are not told OpenAI checks answers while AI is off");
+  assert.equal(publicVersion.aiMarking, false, "students are not told about AI checks while AI is off");
   assert.ok(!JSON.stringify(publicVersion).includes("Private teacher notes"));
   assert.equal((await call(`/me/homework/${id}`, { user: "bob", method: "GET" })).status, 404);
   assert.equal((await call(`/me/homework/${id}`, { user: "bob", body: { answers: { q1: "Wrong account" }, updatedAt: null, completed: true } })).status, 404);
@@ -2996,34 +2996,50 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
   const id = linkedBooking("homework-ai");
   const route = `/admin/lessons/${id}/homework`;
   const beforeFetch = globalThis.fetch;
-  let requests = 0, broken = false, markingBody;
+  let requests = 0, broken = false, refused = false, chatty = false, markingBody;
   const image = `data:image/jpeg;base64,${btoa("\xff\xd8\xff" + "x".repeat(40000))}`;
-  env.HOMEWORK_AI_ENABLED = "1"; env.OPENAI_API_KEY = "isolated-ai-key"; env.HOMEWORK_AI_MONTHLY_LIMIT = "4";
+  env.HOMEWORK_AI_ENABLED = "1"; env.ANTHROPIC_API_KEY = "isolated-ai-key"; env.HOMEWORK_AI_MONTHLY_LIMIT = "4";
   db.prepare("DELETE FROM homework_ai_usage").run();
+  const reply = (name, input) => Response.json({ type: "message", role: "assistant", stop_reason: "tool_use",
+    content: [{ type: "thinking", thinking: "", signature: "isolated" }, { type: "tool_use", id: "toolu_isolated", name, input }] });
   globalThis.fetch = async (url, options) => {
-    assert.equal(url, "https://api.openai.com/v1/responses");
+    assert.equal(url, "https://api.anthropic.com/v1/messages");
     requests++;
     const input = JSON.parse(options.body);
-    assert.equal(input.store, false);
-    assert.equal(input.service_tier, "default", "homework must not inherit a paid speed upgrade from project settings");
-    assert.ok(input.max_output_tokens <= 6500);
-    assert.equal(input.text.format.strict, true);
+    assert.equal(options.headers["x-api-key"], "isolated-ai-key");
+    assert.equal(options.headers["anthropic-version"], "2023-06-01");
+    assert.equal(input.model, "claude-opus-5-5", "the default model");
+    assert.ok(input.max_tokens <= 8000, "a bounded response");
+    assert.equal(input.thinking, undefined, "no extended thinking is requested");
+    assert.equal(input.output_config.effort, "low");
+    assert.equal(input.speed, undefined, "homework must not inherit a paid speed upgrade");
+    assert.equal(input.tools.length, 1);
+    assert.equal(input.tools[0].strict, true);
+    assert.equal(input.tool_choice.type, "auto", "current models reject forced tool choice");
+    const name = input.tools[0].name;
     if (broken) return Response.json({ error: "private provider diagnostic" }, { status: 500 });
-    if (input.text.format.name === "homework_marking") {
-      assert.ok(!JSON.stringify(input.input).includes("private teacher-only note"), "grading uses questions and answers, not private notes");
+    if (name === "homework_marking") {
+      assert.ok(!JSON.stringify(input.messages).includes("private teacher-only note"), "grading uses questions and answers, not private notes");
       const duplicate = await call(`/me/homework/${id}/submit`, { body: markingBody });
       assert.equal(duplicate.status, 200);
       assert.equal((await duplicate.json()).progress.submission.state, "marking", "an in-flight retry reuses the claimed attempt without a second bill");
       const attempt = await (await call(route, { user: "teacher", method: "GET" })).json();
       assert.equal((await call(`${route}/return`, { user: "teacher", body: { submissionId: attempt.progress.submission.id, updatedAt: attempt.progress.updatedAt, approved: true } })).status, 409);
-      return Response.json({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ marks: [{ id: "q1", status: "correct", feedback: "O teu pedido está correto." }] }) }] }] });
+      return reply(name, { marks: [{ id: "q1", status: "correct", feedback: "O teu pedido está correto." }] });
     }
-    if (input.text.format.name === "lesson_transcription") assert.equal(input.input[1].content.filter(part => part.type === "input_image").length, 2, "several photos share one paid request");
-    const output = input.text.format.name === "lesson_transcription" ? { notes: "No café: queria um café, por favor.", uncertain: ["Last word is unclear."] } : {
+    if (name === "lesson_transcription") {
+      const images = input.messages[0].content.filter(part => part.type === "image");
+      assert.equal(images.length, 2, "several photos share one paid request");
+      assert.equal(images[0].source.type, "base64");
+      assert.equal(images[0].source.media_type, "image/jpeg");
+      assert.ok(!images[0].source.data.startsWith("data:"), "the data URL prefix is not sent as image data");
+    }
+    if (name === "lesson_homework" && refused) return Response.json({ type: "message", stop_reason: "refusal", content: [] });
+    if (name === "lesson_homework" && chatty) return Response.json({ type: "message", stop_reason: "end_turn", content: [{ type: "text", text: "Here is a sheet: …" }] });
+    return reply(name, name === "lesson_transcription" ? { notes: "No café: queria um café, por favor.", uncertain: ["Last word is unclear."] } : {
       title: "No café", objective: "Pedir no café.", reminder: "Recorda amanhã.",
       sections: [{ title: "Pratica", instruction: "Faz um pedido.", example: "", questions: [{ prompt: "Pede um café.", answer: "Queria um café, por favor.", explanation: "" }] }],
-    };
-    return Response.json({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(output) }] }] });
+    });
   };
   try {
     const raw = JSON.stringify({ images: [image, image], updatedAt: null });
@@ -3074,11 +3090,114 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     assert.equal((await call(`${route}/transcribe`, { user: "teacher", raw, headers: { "Content-Length": "8402000" } })).status, 413);
   } finally {
     globalThis.fetch = beforeFetch;
-    delete env.HOMEWORK_AI_ENABLED; delete env.OPENAI_API_KEY; delete env.HOMEWORK_AI_MONTHLY_LIMIT;
+    delete env.HOMEWORK_AI_ENABLED; delete env.ANTHROPIC_API_KEY; delete env.HOMEWORK_AI_MONTHLY_LIMIT;
+  }
+});
+
+await test("homework AI: a refusal or a reply without the tool call never becomes a draft", async () => {
+  const id = linkedBooking("homework-ai-refusal");
+  const route = `/admin/lessons/${id}/homework`;
+  const beforeFetch = globalThis.fetch;
+  let refusal = true;
+  env.HOMEWORK_AI_ENABLED = "1"; env.ANTHROPIC_API_KEY = "isolated-ai-key";
+  db.prepare("DELETE FROM homework_ai_usage").run();
+  globalThis.fetch = async () => Response.json(refusal ? { type: "message", stop_reason: "refusal", content: [] }
+    : { type: "message", stop_reason: "end_turn", content: [{ type: "text", text: "{\"title\": \"Not a tool call\"}" }] });
+  try {
+    const input = { notes: "Queria um café, por favor. Pedidos no café.", level: "A1", minutes: 10, updatedAt: null };
+    assert.equal((await call(`${route}/generate`, { user: "teacher", body: input })).status, 422);
+    refusal = false;
+    assert.equal((await call(`${route}/generate`, { user: "teacher", body: input })).status, 502, "text outside the tool is not parsed as a sheet");
+    assert.equal((await (await call(route, { user: "teacher", method: "GET" })).json()).sheet, null);
+  } finally {
+    globalThis.fetch = beforeFetch;
+    delete env.HOMEWORK_AI_ENABLED; delete env.ANTHROPIC_API_KEY;
+  }
+});
+
+await test("homework notice: Inês is emailed once per submission, with a link and no answers or marks", async () => {
+  const sheet = { title: "No café", objective: "Pedir uma bebida.", reminder: "Recorda amanhã.",
+    sections: [{ title: "Pratica", instruction: "Faz um pedido.", example: "", questions: [
+      { prompt: "Completa: Queria um ____.", answer: "café", explanation: "", marking: "exact", acceptedAnswers: ["café"] },
+      { prompt: "Faz um pedido.", answer: "Queria um chá.", explanation: "", marking: "written", acceptedAnswers: [] }] }] };
+  async function published(name) {
+    const id = linkedBooking(name);
+    const body = { notes: "", level: "A1", minutes: 10, sheet, updatedAt: null };
+    const draft = await (await call(`/admin/lessons/${id}/homework`, { user: "teacher", body })).json();
+    assert.equal((await call(`/admin/lessons/${id}/homework/publish`, { user: "teacher", body: { ...body, updatedAt: draft.updatedAt, reviewed: true } })).status, 200);
+    ours.push(id);
+    return id;
+  }
+  // Earlier tests leave unannounced submissions too; count only this test's lessons.
+  const ours = [];
+  const notices = () => sentEmails.filter(email => email.subject.includes("homework") && ours.some(id => email.text.includes(id)));
+  const beforeFetch = globalThis.fetch;
+  let resendDown = false;
+  globalThis.fetch = async (url, options) => resendDown && String(url) === "https://api.resend.com/emails"
+    ? Response.json({ message: "isolated outage" }, { status: 500 }) : beforeFetch(url, options);
+  Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0", TEACHER_NOTIFICATIONS_ENABLED: "1" });
+  sentEmails.length = 0;
+  try {
+    const id = await published("homework-notice");
+    const answers = { answers: { q1: "SEGREDO-UM", q2: "SEGREDO-DOIS" }, updatedAt: null };
+    assert.equal((await call(`/me/homework/${id}/submit`, { body: answers })).status, 200);
+    await drain();
+    assert.equal(notices().length, 1);
+    const [email] = notices();
+    assert.deepEqual(email.to, ["ines@example.invalid"]);
+    assert.equal(email.subject, "Test Student sent you their homework");
+    assert.ok(email.html.includes(`https://lesson.example/schedule/?student=alice&amp;homework=${id}`) || email.html.includes(`https://lesson.example/schedule/?student=alice&homework=${id}`), "links to this lesson's review");
+    for (const secret of ["SEGREDO", "Está certo", "A Inês vai rever", "Queria um chá"]) {
+      assert.ok(!email.html.includes(secret) && !email.text.includes(secret), `no answers, answer key or marks: ${secret}`);
+    }
+    assert.equal((await call(`/me/homework/${id}/submit`, { body: answers })).status, 200, "a retried submit");
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx);
+    await drain();
+    assert.equal(notices().length, 1, "a retry or the sweep never sends a second notice");
+
+    // A failed send is released, and the next sweep delivers it.
+    const failing = await published("homework-notice-retry");
+    resendDown = true;
+    assert.equal((await call(`/me/homework/${failing}/submit`, { body: answers })).status, 200);
+    await drain();
+    resendDown = false;
+    assert.equal(notices().length, 1);
+    assert.equal(db.prepare("SELECT notified_submission_id FROM homework_progress WHERE booking_id = ?").get(failing).notified_submission_id, null);
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx);
+    await drain();
+    assert.equal(notices().length, 2);
+
+    // Interrupted marking waits for the 90-second hand-off, then is announced.
+    const stalled = await published("homework-notice-stalled");
+    const attempt = state => JSON.stringify({ id: crypto.randomUUID(), answers: answers.answers, marks: {}, submittedAt: new Date(Date.now() - state.ago).toISOString(), returnedAt: null, state: "marking", markingNote: "" });
+    db.prepare("INSERT INTO homework_progress(booking_id, student_id, answers_json, submission_json, completed_at, updated_at) VALUES (?, 'alice', ?, ?, ?, ?)")
+      .run(stalled, JSON.stringify(answers.answers), attempt({ ago: 30000 }), new Date().toISOString(), new Date().toISOString());
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx);
+    await drain();
+    assert.equal(notices().length, 2, "not while marking may still finish");
+    db.prepare("UPDATE homework_progress SET submission_json = ? WHERE booking_id = ?").run(attempt({ ago: 120000 }), stalled);
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx);
+    await drain();
+    assert.equal(notices().length, 3);
+    assert.equal(JSON.parse(db.prepare("SELECT submission_json FROM homework_progress WHERE booking_id = ?").get(stalled).submission_json).state, "submitted");
+  } finally {
+    globalThis.fetch = beforeFetch;
+    Object.assign(env, { EMAIL_DRY_RUN: "1", TEACHER_NOTIFICATIONS_ENABLED: "0" });
+    delete env.TEACHER_EMAIL; delete env.RESEND_API_KEY;
   }
 });
 
 await test("homework before migration 0029: Inês's students and a student's Homework tab still load", async () => {
+  // Before 0030, submissions still save; only the notice waits for the column.
+  db.exec("ALTER TABLE homework_progress DROP COLUMN notified_submission_id; ALTER TABLE homework_progress DROP COLUMN notified_at");
+  try {
+    env.TEACHER_NOTIFICATIONS_ENABLED = "1"; env.TEACHER_EMAIL = "ines@example.invalid";
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx);
+    await drain();
+  } finally {
+    env.TEACHER_NOTIFICATIONS_ENABLED = "0"; delete env.TEACHER_EMAIL;
+    db.exec("ALTER TABLE homework_progress ADD COLUMN notified_submission_id TEXT; ALTER TABLE homework_progress ADD COLUMN notified_at TEXT");
+  }
   db.exec("ALTER TABLE homework_progress RENAME TO homework_progress_pending");
   try {
     const students = await call("/admin/students", { user: "teacher", method: "GET" });

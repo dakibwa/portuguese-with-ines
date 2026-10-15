@@ -47,13 +47,26 @@ with answers separate from questions. Offer Do online and Print worksheet.
 Online submission saves a fixed copy for automatic marking; only Inês sees
 those suggestions until she checks, edits and approves them. Homework to review
 belongs in the relevant student row, as a coral prompt with its count.
-With AI on, Inês's new sheet opens on one large lilac blob, `Add a photo of
-your notes`, with a coral dab carrying the camera and a splat cropped into its
-corner. It opens the phone camera. Gallery and typed notes are small dabs
-beneath it, and level, length and `Read & make homework` share one row. The
-draft is a preview first, with `Fine-tune` (a dab that stays pressed blue)
-beside the format control. One tick and `Publish for student` close it (15
-October 2026: as easy as possible with AI on). In review, settled answers
+Inês's new sheet is the booking journey's step structure, one decision per
+step (15 October 2026, Dan: "far too much text"): **What did you work on?**
+with one large lilac `Take a photo` blob (a coral dab carrying the camera, a
+splat cropped into its corner; it opens the phone camera) and small cream
+`Gallery` and `Type it` blobs; then **Level** and **Length** as booking's time
+blobs, the student's last level and 15 minutes already blue. Each tap moves on,
+taken decisions fold into booking's summary rows with `Change`, `Back` steps
+back, and the last step is one coral `Generate homework`. Each step's question
+is Beth Ellen under a small splat on the booking panel, and steps dissolve in
+as booking's do. While Claude works, a progress card says what is happening
+(`Reading your notes`, then `Writing the homework`) under the turning loading
+splat, with a coral line that fills quickly, then ever more slowly. No
+explanatory sentences: privacy is a lock icon whose words are on hover and for
+screen readers. The draft is a preview first, with `Fine-tune` (a dab that
+stays pressed blue) beside the format control. One tick and `Publish for
+student` close it. Approved homework reads **Done** for both: a blue Done chip
+and a lilac Done band with a blue dab for Inês and on the student's sheet, and
+`Done` on the student's card. Inês's "Homework to review" email is a booking
+email: heading, student, sheet, lesson date and one coral `Review homework`.
+In review, settled answers
 fold to the student's words, the mark and the feedback beside `Change`, under a
 tally of dabs.
 Inês marks each answer with the sliding `Correct` / `Try again` control and

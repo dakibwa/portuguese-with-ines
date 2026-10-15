@@ -51,6 +51,7 @@
 }
 .teacher-homework .homework-status--draft { background: rgba(170, 164, 230, 0.26); }
 .homework-status--returned { background: var(--blue-deep); color: var(--paper-light); }
+.teacher-homework .homework-status--published { background: rgba(170, 164, 230, 0.26); color: var(--ink); }
 .homework-status--quiet { min-height: 0; padding-inline: 0; background: none; font-weight: 600; letter-spacing: 0.08em; }
 
 .homework-help { margin: 0.75rem 0; color: var(--lavender-ink); font: 500 0.84rem/1.6 var(--ui); }
@@ -118,8 +119,8 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
   list-style: none; cursor: pointer;
 }
 .homework-source summary::-webkit-details-marker { display: none; }
-.homework-source summary > svg { flex-shrink: 0; transform: rotate(-90deg); transition: transform 190ms var(--motion-ease); color: var(--coral-action); }
-.homework-source[open] summary > svg { transform: none; }
+.homework-source summary > svg:first-child { flex-shrink: 0; transform: rotate(-90deg); transition: transform 190ms var(--motion-ease); color: var(--coral-action); }
+.homework-source[open] summary > svg:first-child { transform: none; }
 .homework-source summary strong { font: 600 1.05rem/1.4 var(--ui); }
 .homework-source summary span { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--lavender-ink); font: 500 0.8rem/1.4 var(--ui); }
 .homework-source summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: var(--squiggle-field); }
@@ -132,15 +133,125 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .homework-photo-thumb { display: flex; padding: 0; border: 0; border-radius: var(--squiggle-chip); background: none; cursor: zoom-in; }
 .homework-photo-thumb[aria-expanded="true"] { cursor: zoom-out; }
 .homework-photo-full { display: block; max-width: 100%; max-height: 30rem; margin-top: 1rem; border: 1px solid var(--rule); border-radius: var(--squiggle-tile); object-fit: contain; }
-.homework-settings { display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
-.homework-settings label { flex: 0 1 9rem; min-width: 7rem; }
-.homework-settings .button { margin-left: auto; }
+.homework-settings { display: grid; gap: 0.75rem; margin-top: 1rem; }
 
-/* With AI on, a new sheet starts at one big painted button: the booking
-   journey's blob, lilac-washed with its splat cropped into the corner, a
-   coral dab carrying the camera and the ask in Beth Ellen. On a phone it
-   opens the camera; more pages, a gallery or typed notes sit beneath it. */
-.homework-start { display: grid; gap: 1.1rem; }
+/* A new sheet is the booking journey again: one decision per step on its
+   panel, the question in Beth Ellen under a splat, choices as filled blobs.
+   Each choice moves on; decisions already taken fold into summary rows above
+   with Change, and Back steps one back. */
+.homework-steps { display: grid; gap: 0.75rem; max-width: 46rem; }
+.teacher-homework > .homework-working { max-width: 46rem; }
+.homework-step, .homework-working {
+  position: relative; display: grid; justify-items: center; gap: 1.1rem; padding: clamp(1.25rem, 4cqi, 2rem) var(--pad-card) clamp(1.4rem, 4cqi, 2.2rem);
+  border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet);
+}
+.homework-step > * { width: 100%; }
+.homework-step__head { display: grid; justify-items: center; gap: 0.35rem; }
+.homework-step__head h4 { display: grid; justify-items: center; gap: 0.4rem; margin: 0; color: var(--ink); font: 400 clamp(1.9rem, 5.5cqi, 2.5rem)/1.15 var(--display); letter-spacing: -0.03em; text-align: center; text-wrap: balance; }
+.homework-step__head h4:focus { outline: 0; }
+.homework-step__mark { width: 2.75rem; height: 2.75rem; }
+.homework-step__back { position: absolute; top: 0.9rem; left: 0.9rem; min-height: 36px; padding: 0.4rem 0.85rem; }
+.homework-step__options { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.6rem 0.75rem; }
+.homework-step .homework-photos { justify-content: center; }
+.homework-step .homework-notes__field { min-height: 8rem; }
+.homework-step__next.button, .homework-make.button { gap: 0.55rem; }
+.homework-make.button { justify-self: center; width: min(100%, 22rem); min-height: 64px; font-size: 0.86rem; }
+
+/* The smaller options beside the big blob: cream blobs, as booking's times. */
+.homework-option {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 48px; padding: 0.55rem 1.15rem; border: 0;
+  border-radius: var(--squiggle-button-alt); background: var(--raised); color: var(--ink); cursor: pointer;
+  font: 700 0.76rem/1.2 var(--ui); letter-spacing: 0.08em; text-transform: uppercase; transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+.homework-option:focus-visible, .homework-option:focus-within { outline: 2px solid var(--ink); outline-offset: 2px; }
+.homework-option:has(input:disabled) { opacity: 0.55; cursor: default; }
+
+/* Choices: booking's time blobs. One tap picks and moves on. */
+.homework-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr)); gap: 0.55rem; width: min(100%, 36rem); justify-self: center; }
+.homework-choices--wide { grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 28rem); }
+.homework-choices--wide button { font-size: 0.98rem; white-space: nowrap; }
+.homework-choices button {
+  min-height: 60px; padding: 0.5rem; border: 1px solid transparent; border-radius: var(--squiggle-chip); background: var(--raised); color: var(--ink); cursor: pointer;
+  font: 700 1.05rem/1.2 var(--ui); font-variant-numeric: tabular-nums; transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+.homework-choices button:nth-child(even) { border-radius: var(--squiggle-button-alt); }
+/* Pointing washes a blob lilac; only the chosen one is blue, and a phone's
+   last tap never leaves a second blob looking chosen. */
+@media (hover: hover) {
+  .homework-choices button:hover { background: var(--lavender-soft); transform: translateY(-1px); }
+  .homework-option:hover { background: var(--blue-deep); color: var(--paper-light); transform: translateY(-1px); }
+}
+.homework-choices button.is-selected, .homework-choices button.is-selected:hover { background: var(--blue-deep); color: var(--paper-light); }
+.homework-choices button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.homework-choices--small { display: flex; flex-wrap: wrap; align-items: center; justify-self: start; width: auto; gap: 0.4rem; }
+.homework-choices--small button { min-height: 40px; min-width: 3.25rem; padding: 0.35rem 0.75rem; font-size: 0.84rem; }
+.homework-choices__label { min-width: 4rem; color: var(--lavender-ink); font: 700 0.72rem/1.2 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* A decision already taken, as booking folds its date and time. */
+.homework-summary {
+  display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; padding: 0.6rem var(--pad-card);
+  border: 1px solid var(--rule); border-radius: var(--squiggle-field); background: var(--sheet);
+  animation: booking-content-in var(--motion-surface) var(--motion-ease) both;
+}
+.homework-summary__mark, .homework-summary__photo { width: 48px; height: 48px; }
+.homework-summary__photo { object-fit: cover; border-radius: var(--squiggle-chip); }
+.homework-summary__copy { display: grid; min-width: 0; }
+.homework-summary__copy small { color: var(--lavender-ink); font: 700 0.68rem/1.3 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; }
+.homework-summary__copy strong { overflow: hidden; font: 700 0.98rem/1.3 var(--ui); text-overflow: ellipsis; white-space: nowrap; }
+.homework-summary__change {
+  min-height: 44px; padding: 0.4rem 1rem; border: 1.5px solid rgba(26, 49, 105, 0.55); border-radius: var(--squiggle-button-alt); background: transparent; color: var(--ink);
+  cursor: pointer; font: 700 0.8rem/1.2 var(--ui); letter-spacing: 0.06em; text-transform: uppercase; transition: background 160ms ease, border-color 160ms ease;
+}
+.homework-summary__change:hover, .homework-summary__change:focus-visible { border-color: var(--ink); background: rgba(170, 164, 230, 0.2); }
+.homework-summary__change:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* Private is a lock, not a sentence; its words are for screen readers and on hover. */
+.homework-private { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--squiggle-chip); background: rgba(170, 164, 230, 0.26); color: var(--lavender-ink); }
+.homework-source__lock { color: var(--lavender-ink); }
+
+/* While Claude works: the loading splat turns, the step in hand is named, and
+   a coral line fills quickly, then ever more slowly, towards the end. */
+.homework-working { gap: 0.85rem; text-align: center; animation: booking-content-in var(--motion-surface) var(--motion-ease) both; }
+.homework-working__mark { width: 3.6rem; height: 3.6rem; }
+.homework-working h4 { margin: 0; font: 400 clamp(1.9rem, 5.5cqi, 2.4rem)/1.15 var(--display); letter-spacing: -0.03em; }
+.homework-working__steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.homework-working__steps li {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.9rem; border-radius: var(--squiggle-chip); background: var(--raised); color: var(--lavender-ink);
+  font: 700 0.74rem/1.2 var(--ui); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.homework-working__steps li.is-current { color: var(--ink); }
+.homework-working__steps li.is-done { background: var(--blue-deep); color: var(--paper-light); }
+.homework-working__bar { display: block; overflow: hidden; width: min(100%, 18rem); height: 6px; border-radius: 999px; background: rgba(170, 164, 230, 0.35); }
+.homework-working__bar > span { display: block; width: 92%; height: 100%; border-radius: inherit; background: var(--coral); transform-origin: left; transform: scaleX(0.35); }
+@media (prefers-reduced-motion: no-preference) {
+  .homework-working__mark { animation: lessons-loading-splat 2.4s var(--motion-ease) infinite; }
+  .homework-working__bar > span { animation: homework-progress 40s cubic-bezier(0.08, 0.7, 0.2, 1) both; }
+  .homework-step { animation: booking-content-in 260ms var(--motion-ease) both; }
+}
+@keyframes homework-progress { from { transform: scaleX(0.04); } to { transform: scaleX(1); } }
+.homework-review__marking { display: grid; justify-items: start; gap: 0.5rem; color: var(--lavender-ink); font: 600 0.88rem/1.4 var(--ui); }
+
+/* Approved: a lilac band that says Done, as clearly for Inês as the student. */
+.homework-done {
+  position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: center; gap: 1rem; margin: 0 0 1.5rem; padding: 1rem clamp(4.5rem, 18cqi, 6.5rem) 1rem 1.1rem;
+  border-radius: var(--squiggle-panel); background-color: var(--lavender-soft); background-image: var(--paper-texture);
+}
+.homework-done__dab { position: relative; display: grid; place-items: center; flex: none; width: 3.4rem; aspect-ratio: 1; color: var(--paper-light); isolation: isolate; }
+.homework-done__dab::before { position: absolute; inset: 0; z-index: -1; background: var(--blue-deep); content: ""; rotate: -20deg; -webkit-mask: var(--payment-dab) center / contain no-repeat; mask: var(--payment-dab) center / contain no-repeat; }
+.homework-done__text { display: grid; gap: 0.1rem; }
+.homework-done__text strong { font: 400 2.1rem/1.1 var(--display); letter-spacing: -0.03em; }
+.homework-done__text small { color: var(--lavender-ink); font: 600 0.86rem/1.4 var(--ui); }
+.homework-done__mark { position: absolute; z-index: -1; top: 50%; right: -1.5rem; width: 7.5rem; height: 7.5rem; translate: 0 -50%; }
+
+.homework-uncertain { margin: 0; padding: 0.7rem 1rem 0.7rem 2rem; border: 1px solid var(--coral); border-radius: var(--squiggle-field); background: rgba(239, 93, 60, 0.1); color: #862c21; font: 500 0.86rem/1.5 var(--ui); }
+.homework-remake.button { margin-top: 1rem; min-height: 48px; }
+.homework-notes__field { display: block; box-sizing: border-box; width: 100%; min-height: 7.5rem; padding: 0.8rem 1rem; border: 1px solid var(--rule); border-radius: var(--squiggle-field); background: #fffaf0; color: var(--ink); font: 400 1rem/1.55 var(--body); resize: vertical; field-sizing: content; }
+.homework-notes__field::placeholder { color: #6e6aa0; }
+.homework-notes__field:focus-visible { border-color: var(--blue-deep); outline: 0; box-shadow: inset 0 0 0 1px var(--blue-deep); }
+.homework-source .homework-notes__field { margin-top: 0.25rem; }
+
+/* The first step's big blob: lilac-washed with its splat cropped into the
+   corner and a coral dab carrying the camera. On a phone it opens the camera. */
 .homework-capture {
   position: relative; isolation: isolate; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 1.1rem 1.4rem;
   min-height: clamp(9rem, 26cqi, 12.5rem); padding: clamp(1.4rem, 4cqi, 2.4rem) clamp(7rem, 26cqi, 13rem) clamp(1.4rem, 4cqi, 2.4rem) clamp(1.25rem, 4cqi, 2.4rem);
@@ -162,11 +273,6 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
   .homework-capture:hover { border-radius: var(--squiggle-button-shift); }
   .homework-capture:hover .homework-capture__mark { rotate: 8deg; scale: 1.05; }
 }
-.homework-start__more { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 0.75rem; }
-.homework-link--file { cursor: pointer; }
-.homework-link--file:focus-within { outline: 2px solid var(--ink); outline-offset: 2px; }
-.homework-start .homework-settings { margin-top: 0.25rem; }
-.homework-start .homework-help { margin: 0; }
 .homework-photos { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
 .homework-photos li { position: relative; }
 .homework-photos img { display: block; width: 4.25rem; height: 4.25rem; object-fit: cover; border: 1px solid var(--rule); border-radius: var(--squiggle-chip); }

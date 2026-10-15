@@ -197,9 +197,11 @@ are rejected. Drafts may be incomplete; published entries must stay complete.
 Lesson homework has a private photo-to-notes flow and reviewed
 publication. Its student access, AI setup, limits and print format are described
 in [Lesson homework](docs/lesson-homework.md). Online submissions get automatic
-marking for Inês to check, edit and approve before returning feedback. A separate
-black-and-white worksheet can be printed. Migration 0029 adds its tables;
-it does not change expression storage or booking/payment state.
+marking for Inês to check, edit and approve before returning feedback, and
+email Inês once per submission (no answers or marks) with a link to its review.
+A separate black-and-white worksheet can be printed. Migration 0029 adds its
+tables and 0030 the notification record; neither changes expression storage or
+booking/payment state.
 
 Updates, publication and deletion compare `updatedAt` in the write itself.
 Stale requests receive HTTP 409. Reordering is one conditional SQLite statement
@@ -1729,7 +1731,7 @@ Secrets, each via `npx wrangler secret put <NAME> --config workers/booking/wrang
 Non-secret vars in `wrangler.jsonc`: `GOOGLE_CLIENT_ID` enables Google Sign-In
 (it is public by design — the Worker verifies every token against it).
 Production uses `TEACHER_NOTIFICATIONS_ENABLED=1` to send Inês's booking,
-change and failed-payment copies. Setting it to `0` pauses these copies;
+change and failed-payment copies, and her "Homework to review" notices. Setting it to `0` pauses these copies;
 student mail and successful-payment fiscal reminders remain enabled, and
 `TEACHER_EMAIL` remains the student messages' reply-to. Staging keeps teacher
 booking copies paused and all email in dry-run mode.
