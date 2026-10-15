@@ -1,17 +1,24 @@
 import { BOOKING_API_BASE_URL } from "@/lib/config";
 import { forgetSession } from "@/lib/auth-api";
 
-export type HomeworkQuestion = { id: string; prompt: string; answer: string; explanation: string };
+export type HomeworkQuestion = { id: string; prompt: string; answer: string; explanation: string; marking?: "exact" | "written"; acceptedAnswers?: string[] };
 export type HomeworkSheet = {
   title: string;
   objective: string;
   reminder: string;
   sections: { title: string; instruction: string; example: string; questions: HomeworkQuestion[] }[];
 };
-export type HomeworkProgress = { answers: Record<string, string>; completedAt: string | null; updatedAt: string | null };
+export type HomeworkMark = { status: "correct" | "retry" | "review"; feedback: string; source: "key" | "ai" | "teacher" | "pending" };
+export type HomeworkSubmission = {
+  id: string; answers: Record<string, string>; submittedAt: string; returnedAt: string | null;
+  state: "marking" | "submitted" | "returned";
+  /** Never sent to a student until Inês approves this submission. */
+  marks?: Record<string, HomeworkMark>; markingNote?: string;
+};
+export type HomeworkProgress = { answers: Record<string, string>; completedAt: string | null; updatedAt: string | null; submission: HomeworkSubmission | null };
 export type HomeworkSummary = {
   bookingId: string; lessonAt: string; title: string; level: string; minutes: number;
-  publishedAt: string; completedAt: string | null; started: boolean;
+  publishedAt: string; completedAt: string | null; started: boolean; submittedAt: string | null; returnedAt: string | null;
 };
 export type StudentHomeworkData = {
   bookingId: string; lessonAt: string; level: string; minutes: number; sheet: HomeworkSheet; progress: HomeworkProgress;
@@ -32,7 +39,11 @@ function isSheet(value: unknown): value is HomeworkSheet {
 function isProgress(value: unknown): value is HomeworkProgress {
   const p = value as HomeworkProgress | null;
   return Boolean(p && p.answers && typeof p.answers === "object" && !Array.isArray(p.answers) && Object.values(p.answers).every(a => typeof a === "string") &&
-    (p.updatedAt === null || typeof p.updatedAt === "string") && (p.completedAt === null || typeof p.completedAt === "string"));
+    (p.updatedAt === null || typeof p.updatedAt === "string") && (p.completedAt === null || typeof p.completedAt === "string") &&
+    (p.submission === null || (p.submission && typeof p.submission.id === "string" && ["marking", "submitted", "returned"].includes(p.submission.state) &&
+      typeof p.submission.submittedAt === "string" && (p.submission.returnedAt === null || typeof p.submission.returnedAt === "string") &&
+      p.submission.answers && typeof p.submission.answers === "object" && !Array.isArray(p.submission.answers) && Object.values(p.submission.answers).every(a => typeof a === "string") &&
+      (!p.submission.marks || Object.values(p.submission.marks).every(m => m && ["correct", "retry", "review"].includes(m.status) && typeof m.feedback === "string")))));
 }
 const invalid = () => new Error("Homework could not be loaded. Please try again.");
 
@@ -71,8 +82,8 @@ export async function fetchHomeworkSheet(token: string, id: string, signal?: Abo
   if (data.bookingId !== id || typeof data.lessonAt !== "string" || !isSheet(data.sheet) || !isProgress(data.progress)) throw invalid();
   return data;
 }
-export async function saveHomeworkAnswers(token: string, id: string, progress: HomeworkProgress, completed: boolean): Promise<HomeworkProgress> {
-  const data = await request(token, `/me/homework/${encodeURIComponent(id)}`, { answers: progress.answers, updatedAt: progress.updatedAt, completed });
+export async function saveHomeworkAnswers(token: string, id: string, progress: HomeworkProgress, submit = false): Promise<HomeworkProgress> {
+  const data = await request(token, `/me/homework/${encodeURIComponent(id)}${submit ? "/submit" : ""}`, { answers: progress.answers, updatedAt: progress.updatedAt });
   if (!isProgress(data.progress)) throw invalid();
   return data.progress;
 }

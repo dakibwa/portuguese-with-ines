@@ -32,6 +32,7 @@ export type AdminStudent = {
   prices?: Partial<Record<60 | 90, number>>;
   /** The prices set for them (by her or a code), which is what she edits. */
   ownPrices?: Partial<Record<60 | 90, number>>;
+  homeworkToReview?: { bookingId: string; submittedAt: string }[];
 };
 
 /** A length mapped to cents, or to null for the standard price again. */

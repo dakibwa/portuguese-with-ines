@@ -13,21 +13,24 @@ import { formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
 import { defaultStudentMark } from "@/lib/student-marks";
 
 export type StudentPanel = StudentSetupStep | "history" | "details";
-export type StudentRowSelection = { studentId: string; panel: StudentPanel; date?: string; time?: string };
+export type StudentRowSelection = { studentId: string; panel: StudentPanel; date?: string; time?: string; homeworkId?: string; homeworkRequestKey?: number };
 
 /** The same row holds setup, then the student’s ongoing details and lessons. */
-export function StudentSetupRow({ student, setup, token, step: requestedStep, date, time, sending, locked, attention, onSelect, onChanged, onWelcome, onBusy }: {
+export function StudentSetupRow({ student, setup, token, step: requestedStep, date, time, homeworkId, homeworkRequestKey, sending, locked, attention, onSelect, onHomework, onChanged, onWelcome, onBusy }: {
   student: AdminStudent;
   setup: StudentSetup | null;
   token: string;
   step: StudentPanel | null;
   date?: string;
   time?: string;
+  homeworkId?: string;
+  homeworkRequestKey?: number;
   sending: string;
   locked?: boolean;
   /** Lesson changes or payment notes belong to this student's one row. */
   attention?: ReactNode;
   onSelect: (step: StudentPanel | null) => void;
+  onHomework?: (bookingId: string) => void;
   onChanged?: (student?: AdminStudent) => void;
   onWelcome: (student: AdminStudent, again?: boolean) => void;
   onBusy?: (busy: boolean) => void;
@@ -181,6 +184,11 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
       {student.unpaidUpcoming ? <li>{student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} paid by hand</li> : null}
     </ul> : null}
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
+    {student.homeworkToReview?.length ? <div className="teacher-homework-return">
+      <button type="button" data-homework-exit className="text-action" disabled={disabled} onClick={() => onHomework?.(student.homeworkToReview![0].bookingId)}>
+        Homework to review <span>· {student.homeworkToReview.length}</span>
+      </button>
+    </div> : null}
     {step ? <div className={`teacher-setup__body${statusStep ? " teacher-setup__body--status" : ""}`} id={paneId} aria-label={`${student.name}’s ${profilePanel ? "profile" : "setup"}`} role="region" ref={body} tabIndex={-1}>
       <div className="teacher-setup__body-heading">
         <h3 id={`${paneId}-heading`}>{step === "history" ? "Lesson history" : step === "email" || step === "details" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome" : step === "sign-in" ? "Sign in" : "Saved card"}</h3>
@@ -196,7 +204,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
           </ul>
           {!ready ? <button className="teacher-text-button" disabled={disabled} onClick={() => onSelect("details")} type="button">Edit details</button> : null}
         </div>
-        <div className="teacher-student__history"><StudentHistory key={`${student.id}-${token}`} student={student} token={token} /></div>
+        <div className="teacher-student__history"><StudentHistory key={`${student.id}-${token}-${homeworkRequestKey ?? 0}`} student={student} token={token} homeworkId={homeworkId} /></div>
       </> : step === "email" || step === "details" ? <StudentDetailsForm
         key={`${student.id}-details`}
         emailRequired={step === "email"}

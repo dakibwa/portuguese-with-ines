@@ -3,7 +3,7 @@
 import { addedByTeacher, type AdminBooking } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TeacherHomework } from "@/components/homework/TeacherHomework";
 
 function paymentLabel(booking: AdminBooking) {
@@ -30,8 +30,9 @@ export function upcomingLessons(bookings: AdminBooking[], now: number) {
  * and cancelled, reading the records from the start of time rather than the
  * visible week.
  */
-export function StudentLessons({ bookings, error, now, onRetry, token }: {
+export function StudentLessons({ bookings, error, now, onRetry, token, requestedHomeworkId }: {
   token: string;
+  requestedHomeworkId?: string;
   /** Null until they have been read. */
   bookings: AdminBooking[] | null;
   error: string;
@@ -40,6 +41,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token }: {
 }) {
   const [homeworkId, setHomeworkId] = useState<string | null>(null);
   const [homeworkBusy, setHomeworkBusy] = useState(false);
+  useEffect(() => { if (requestedHomeworkId) setHomeworkId(requestedHomeworkId); }, [requestedHomeworkId]);
   const upcoming = upcomingLessons(bookings ?? [], now);
   const past = (bookings ?? []).filter(booking => booking.status === "cancelled" || Date.parse(booking.ends_at) <= now)
     .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));

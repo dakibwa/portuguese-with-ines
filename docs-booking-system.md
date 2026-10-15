@@ -194,9 +194,11 @@ bounded to 128 KiB, including both ID lists when reordering up to 500 entries.
 Unknown fields, wrong types, empty list items and invalid publication values
 are rejected. Drafts may be incomplete; published entries must stay complete.
 
-Lesson homework has a separate, private photo-to-notes flow and reviewed
+Lesson homework has a private photo-to-notes flow and reviewed
 publication. Its student access, AI setup, limits and print format are described
-in [Lesson homework](docs/lesson-homework.md). Migration 0029 adds its tables;
+in [Lesson homework](docs/lesson-homework.md). Online submissions get automatic
+marking for Inês to check, edit and approve before returning feedback. A separate
+black-and-white worksheet can be printed. Migration 0029 adds its tables;
 it does not change expression storage or booking/payment state.
 
 Updates, publication and deletion compare `updatedAt` in the write itself.

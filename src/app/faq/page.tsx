@@ -70,7 +70,7 @@ const faqSections = [
       {
         question: "Is there homework?",
         answer:
-          "Only if you’d like it. Any sheet I share will be in your account’s Homework tab, next to its lesson. You can do it online or print it. It’s fine if you don’t have time."
+          "Only if you’d like it. Your Homework tab has each lesson’s sheet. Do it online and submit it for feedback, which I check before sending back, or print a black-and-white copy. It’s fine if you don’t have time."
       }
     ]
   },

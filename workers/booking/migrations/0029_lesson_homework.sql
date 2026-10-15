@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS homework_progress (
   booking_id TEXT PRIMARY KEY REFERENCES lesson_homework(booking_id) ON DELETE CASCADE,
   student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   answers_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(answers_json)),
+  submission_json TEXT CHECK (submission_json IS NULL OR json_valid(submission_json)),
   completed_at TEXT,
   updated_at TEXT NOT NULL
 );

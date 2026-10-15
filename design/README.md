@@ -43,8 +43,11 @@ Lesson homework stays attached to its lesson, inside the student's existing
 profile/history for Inês and under Homework for the student. Photo notes and
 drafts stay private until Inês reviews and publishes the sheet. Use short,
 level-appropriate European Portuguese instructions, recall and useful practice,
-with answers separate from questions. The print view uses a quiet brand header,
-readable type and writing space on white A4 pages. See
+with answers separate from questions. Offer Do online and Print worksheet.
+Online submission saves a fixed copy for automatic marking; only Inês sees
+those suggestions until she checks, edits and approves them. Homework to review
+belongs in the relevant student row. The print version uses black text, readable
+type and writing lines on white A4 pages, with optional answers on separate pages. See
 [the homework contract and teaching sources](../docs/lesson-homework.md).
 
 ## Named failure patterns

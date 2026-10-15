@@ -37,7 +37,7 @@ try {
     await context.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-homework-session"));
     let studentView = false, photoCalls = 0, answerSaveFails = false;
     let homework = { bookingId: lesson.id, studentName: student.name, lessonAt: lesson.starts_at, notes: "", level: "A1", minutes: 15,
-      sheet: null, publishedAt: null, updatedAt: null, aiAvailable: true, progress: { answers: {}, completedAt: null, updatedAt: null } };
+      sheet: null, publishedAt: null, updatedAt: null, aiAvailable: true, progress: { answers: {}, completedAt: null, updatedAt: null, submission: null } };
     await context.route("**/*", async route => {
       const request = route.request();
       const url = new URL(request.url());
@@ -52,7 +52,7 @@ try {
       if (url.pathname === "/me/recurring-rates") return json({ rates: {} });
       if (url.pathname === "/me/expressions") return json({ expression: null, canPick: false, hasPublished: false, shuffleLabels: [] });
       if (url.pathname === "/admin/bookings") return json({ bookings: [lesson], reconciliation: [] });
-      if (url.pathname === "/admin/students") return json({ students: [{ ...student, signedIn: true, hasLessons: true, hasCard: true, prices: { 60: 2500 }, awaitingWelcome: false, upcoming: 0 }] });
+      if (url.pathname === "/admin/students") return json({ students: [{ ...student, signedIn: true, hasLessons: true, hasCard: true, prices: { 60: 2500 }, awaitingWelcome: false, upcoming: 0, homeworkToReview: homework.progress.submission && !homework.progress.submission.returnedAt ? [{ bookingId: lesson.id, submittedAt: homework.progress.submission.submittedAt }] : [] }] });
       if (url.pathname === "/admin/availability") return json({ rules: [{ id: 1, weekday: 3, start_minute: 540, last_start_minute: 1020 }], exceptions: [], settings: { slotIntervalMinutes: 30 } });
       if (url.pathname === "/admin/google-calendar") return json({ configured: false, connected: false });
       if (url.pathname === `/admin/lessons/${lesson.id}/homework/transcribe`) {
@@ -60,18 +60,31 @@ try {
         return json({ notes: "No café: queria, um café, uma água, um chá, por favor, obrigado/obrigada.", uncertain: [] });
       }
       if (url.pathname.startsWith(`/admin/lessons/${lesson.id}/homework`)) {
-        if (data) {
+        if (data && url.pathname.endsWith("/return")) {
+          homework.progress = { ...homework.progress, updatedAt: new Date().toISOString(), submission: {
+            ...homework.progress.submission, marks: data.marks, returnedAt: new Date().toISOString(), state: "returned",
+          } };
+        } else if (data) {
           homework = { ...homework, ...data, updatedAt: new Date().toISOString() };
           if (url.pathname.endsWith("/generate")) homework.sheet = structuredClone(exampleSheet);
           if (url.pathname.endsWith("/publish")) homework.publishedAt = homework.updatedAt;
         }
         return json(homework);
       }
-      if (url.pathname === "/me/homework") return json({ homework: homework.publishedAt ? [{ bookingId: lesson.id, lessonAt: lesson.starts_at, title: homework.sheet.title, level: homework.level, minutes: homework.minutes, completedAt: homework.progress.completedAt, started: Boolean(homework.progress.updatedAt) }] : [] });
-      if (url.pathname === `/me/homework/${lesson.id}`) {
+      if (url.pathname === "/me/homework") return json({ homework: homework.publishedAt ? [{ bookingId: lesson.id, lessonAt: lesson.starts_at, title: homework.sheet.title, level: homework.level, minutes: homework.minutes, completedAt: homework.progress.completedAt, submittedAt: homework.progress.submission?.submittedAt ?? null, returnedAt: homework.progress.submission?.returnedAt ?? null, started: Boolean(homework.progress.updatedAt) }] : [] });
+      if (url.pathname === `/me/homework/${lesson.id}` || url.pathname === `/me/homework/${lesson.id}/submit`) {
         if (data && answerSaveFails) return json({ error: "Answers could not be saved. Try again." }, 503);
-        if (data) homework.progress = { answers: data.answers, updatedAt: new Date().toISOString(), completedAt: data.completed ? new Date().toISOString() : null };
-        return json({ bookingId: lesson.id, lessonAt: lesson.starts_at, sheet: homework.sheet, level: homework.level, minutes: homework.minutes, progress: homework.progress });
+        if (data) homework.progress = { ...homework.progress, answers: data.answers, updatedAt: new Date().toISOString() };
+        if (url.pathname.endsWith("/submit")) {
+          homework.progress.submission = { id: "attempt-1", submittedAt: new Date().toISOString(), returnedAt: null, state: "submitted", answers: { ...data.answers }, marks: {
+            q1: { status: "correct", feedback: "Está certo.", source: "key" }, q2: { status: "correct", feedback: "Está certo.", source: "key" },
+            q3: { status: "retry", feedback: "Escreve café com acento.", source: "key" }, q4: { status: "correct", feedback: "Está certo.", source: "key" },
+            q5: { status: "review", feedback: "Confirma este pedido.", source: "ai" }, q6: { status: "correct", feedback: "Está certo.", source: "key" },
+          } };
+        }
+        const progress = structuredClone(homework.progress);
+        if (progress.submission && !progress.submission.returnedAt) delete progress.submission.marks;
+        return json({ bookingId: lesson.id, lessonAt: lesson.starts_at, sheet: homework.sheet, level: homework.level, minutes: homework.minutes, progress });
       }
       return json({ error: "Unexpected fixture request" }, 404);
     });
@@ -143,28 +156,59 @@ try {
     await expect(page.locator(".homework-save")).toContainText("Answers saved.");
     await page.reload(); await openHomework();
     await expect(page.locator(".student-homework textarea").first()).toHaveValue("Queria.");
-    await page.getByRole("button", { name: "Mark complete", exact: true }).click();
-    await expect(page.locator(".student-homework .homework-status")).toContainText("Completed");
+    const answers = ["Queria.", "Por favor.", "cafe", "Queria", "Queria um chá, por favor.", "Obrigado."];
+    for (let i = 0; i < answers.length; i++) await page.locator(".student-homework textarea").nth(i).fill(answers[i]);
+    await page.getByRole("button", { name: "Submit to Inês", exact: true }).click();
+    await expect(page.locator(".student-homework .homework-status")).toContainText("Sent to Inês");
+    await expect(page.locator(".student-homework .homework-feedback")).toHaveCount(0);
+    await expect(page.locator(".student-homework textarea").first()).toBeDisabled();
+    studentView = false;
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem("ines-student-session", "isolated-homework-session"); });
+    await page.goto(`${base}/schedule/`);
+    await page.getByRole("tab", { name: /^Students/ }).click();
+    await page.getByRole("button", { name: /Homework to review/ }).click();
+    await expect(editor.locator(".homework-review")).toBeVisible();
+    await page.getByRole("button", { name: "Close homework", exact: true }).click();
+    await page.getByRole("button", { name: /Homework to review/ }).click();
+    await expect(editor.locator(".homework-review")).toBeVisible();
+    await expect(editor.getByRole("button", { name: "Approve & send back", exact: true })).toBeDisabled();
+    await editor.getByRole("combobox", { name: /^Mark/ }).nth(4).selectOption("correct");
+    await editor.getByLabel("Feedback", { exact: false }).nth(4).fill("Muito bem. O teu pedido está claro e educado.");
+    await editor.screenshot({ path: `${output}/teacher-review-${width}.png` });
+    await editor.getByRole("button", { name: "Approve & send back", exact: true }).click();
+    await expect(editor.getByRole("status")).toContainText("Approved and sent back");
+    studentView = true;
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem("ines-student-session", "isolated-homework-session"); });
+    await page.goto(`${base}/book/?view=lessons`); await openHomework();
+    await expect(page.locator(".student-homework .homework-feedback")).toHaveCount(6);
+    await expect(page.locator(".student-homework .homework-feedback").nth(4)).toContainText("O teu pedido está claro e educado.");
     await page.locator(".my-lessons__homework").screenshot({ path: `${output}/student-${width}.png` });
+    await page.getByRole("button", { name: "Print worksheet", exact: true }).click();
+    await expect(page.locator(".student-homework .homework-paper-preview")).toBeVisible();
+    await page.locator(".my-lessons__homework").screenshot({ path: `${output}/print-preview-${width}.png` });
     if (width === 1280) {
       await page.emulateMedia({ media: null });
       await page.pdf({ path: `${output}/worksheet.pdf`, format: "A4", preferCSSPageSize: true });
+      await page.getByLabel("Include answer key").check();
+      await page.pdf({ path: `${output}/worksheet-with-key.pdf`, format: "A4", preferCSSPageSize: true });
     }
+    await page.getByRole("button", { name: "Do online", exact: true }).click();
     // A site link is client navigation too: it must save the current answer.
-    await page.locator(".student-homework textarea").nth(1).fill("Por favor.");
+    await page.locator(".student-homework textarea").nth(2).fill("café");
+    await expect(page.locator(".student-homework .homework-feedback").nth(2)).toContainText("Edited since feedback");
     answerSaveFails = true;
     await page.getByRole("button", { name: "All homework", exact: true }).click();
     await expect(page.locator(".student-homework [role=alert]")).toContainText("Answers could not be saved");
-    await expect(page.locator(".student-homework textarea").nth(1)).toHaveValue("Por favor.");
+    await expect(page.locator(".student-homework textarea").nth(2)).toHaveValue("café");
     answerSaveFails = false;
     if (width < 821) {
       await page.getByRole("button", { name: "Open menu", exact: true }).click();
       await page.getByRole("dialog", { name: "Site navigation" }).getByRole("link", { name: "Approach", exact: true }).click();
     } else await page.locator(".site-header").getByRole("link", { name: "Approach", exact: true }).click();
     await page.waitForURL("**/approach/");
-    assert.equal(homework.progress.answers.q2, "Por favor.");
+    assert.equal(homework.progress.answers.q3, "café");
     assert.deepEqual(errors, []);
     await context.close();
   }
-  console.log("Homework passed: teacher photo, transcription, draft correction and publication; student answers survive reload, completion and print; desktop and phone. AI responses are synthetic fixtures.");
+  console.log("Homework passed: teacher photo, transcription, draft correction and publication; student submission, private automatic marking, teacher correction/approval, returned feedback and black-and-white print; desktop and phone. AI responses are synthetic fixtures.");
 } finally { await browser.close(); }

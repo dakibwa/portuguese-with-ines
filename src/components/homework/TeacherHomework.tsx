@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Camera, Sparkles, CheckCircle2, Plus, Trash2 } from "lucide-react";
-import { prepareHomeworkPhoto, teacherHomeworkRequest, transcribeHomeworkPhoto, type HomeworkSheet, type TeacherHomeworkData } from "@/lib/homework-api";
+import { prepareHomeworkPhoto, teacherHomeworkRequest, transcribeHomeworkPhoto, type HomeworkSheet, type TeacherHomeworkData, type HomeworkMark } from "@/lib/homework-api";
 import { readSession } from "@/lib/auth-api";
 import { HomeworkWorksheet } from "./HomeworkWorksheet";
 
@@ -24,10 +24,12 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
   const [mode, setMode] = useState<"edit" | "preview">("preview");
   const [reviewed, setReviewed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [reviewMarks, setReviewMarks] = useState<Record<string, HomeworkMark> | null>(null);
   const active = useRef(true);
   const editor = useRef<HTMLElement>(null);
   const controller = useRef<AbortController | null>(null);
-  const dirty = Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved));
+  const dirty = Boolean(draft && saved && (JSON.stringify(draft) !== JSON.stringify(saved) ||
+    (reviewMarks && JSON.stringify(reviewMarks) !== JSON.stringify(saved.progress.submission?.marks))));
 
   useEffect(() => {
     active.current = true;
@@ -38,6 +40,15 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
     }).catch(error => { if (!abort.signal.aborted) setError(error.message); });
     return () => { active.current = false; abort.abort(); };
   }, [bookingId, token, attempt]);
+  useEffect(() => {
+    if (draft?.progress.submission?.state !== "marking") return;
+    const interval = window.setInterval(() => {
+      void teacherHomeworkRequest(token, bookingId, "", undefined, controller.current?.signal).then(result => {
+        if (active.current && readSession() === token) { setDraft(result); setSaved(result); }
+      }).catch(() => {});
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [bookingId, token, draft?.progress.submission?.state]);
   useEffect(() => { onBusy?.(Boolean(busy)); }, [busy, onBusy]);
   useEffect(() => {
     if (!dirty && !busy) return;
@@ -65,7 +76,7 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
       if (busy || !window.confirm("Leave without saving this homework draft?")) {
         event.preventDefault(); event.stopImmediatePropagation();
       } else {
-        setDraft(saved); setReviewed(false);
+        setDraft(saved); setReviewMarks(null); setReviewed(false);
       }
     };
     window.addEventListener("beforeunload", warn);
@@ -84,7 +95,7 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
     if (!draft) return;
     setDraft({ ...draft, ...values }); setReviewed(false); setNotice("");
   }
-  async function run(action: "save" | "generate" | "publish" | "transcribe") {
+  async function run(action: "save" | "generate" | "publish" | "transcribe" | "return") {
     if (!draft || busy) return;
     setBusy(action); setError(""); setNotice("");
     try {
@@ -98,11 +109,14 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
         setNotice(result.notes ? "Photo read. Check the notes before making the sheet." : "No lesson text was found. Try a clearer photo.");
       } else {
         const result = await teacherHomeworkRequest(token, bookingId, action === "save" ? "" : action,
-          { notes: draft.notes, level: draft.level, minutes: draft.minutes, sheet: draft.sheet, updatedAt: draft.updatedAt, reviewed }, controller.current?.signal);
+          action === "return" ? { submissionId: draft.progress.submission?.id, updatedAt: draft.progress.updatedAt,
+            marks: reviewMarks ?? draft.progress.submission?.marks, approved: true }
+            : { notes: draft.notes, level: draft.level, minutes: draft.minutes, sheet: draft.sheet, updatedAt: draft.updatedAt, reviewed }, controller.current?.signal);
         if (!active.current || readSession() !== token) return;
-        setDraft(result); setSaved(result); setReviewed(false);
+        setDraft(result); setSaved(result); setReviewMarks(null); setReviewed(false);
         if (action !== "save") setMode("preview");
-        setNotice(action === "publish" ? "Published. It is now in the student’s Homework tab." : action === "generate" ? "Draft ready. Check the Portuguese and answers." : "Draft saved.");
+        setNotice(action === "return" ? "Approved and sent back. The student can now see your feedback." : action === "publish" ? "Published. It is now in the student’s Homework tab." : action === "generate" ? "Draft ready. Check the Portuguese and answers." : "Draft saved.");
+        if (action === "return") window.dispatchEvent(new Event("homework-returned"));
       }
     } catch (error) { if (active.current) setError((error as Error).message); }
     finally { if (active.current) setBusy(""); }
@@ -160,10 +174,16 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
         <button className="button button--outline" type="button" disabled={Boolean(busy) || !dirty} onClick={() => void run("save")}>{busy === "save" ? "Saving…" : "Save draft"}</button>
       </div>
     </> : null}
-    {draft?.sheet ? <>
+    {draft?.sheet && draft.progress.submission && !draft.progress.submission.returnedAt ? <HomeworkReview
+      sheet={draft.sheet} answers={draft.progress.submission.answers}
+      marks={reviewMarks ?? draft.progress.submission.marks ?? {}}
+      marking={draft.progress.submission.state === "marking"} note={draft.progress.submission.markingNote}
+      busy={Boolean(busy)} onChange={setReviewMarks} onApprove={() => void run("return")} /> : draft?.sheet ? <>
       {!draft.publishedAt && mode === "edit" ? <SheetEditor sheet={draft.sheet} disabled={Boolean(busy)} onChange={sheet => edit({ sheet })} />
-        : <HomeworkWorksheet sheet={draft.sheet} level={draft.level} minutes={draft.minutes} lessonAt={draft.lessonAt} answers={draft.publishedAt ? draft.progress.answers : undefined} preview />}
-      {draft.publishedAt ? <p className="homework-help">{draft.progress.completedAt ? "The student marked this complete." : draft.progress.updatedAt ? "The student has started. Their saved answers appear above." : "The student has not saved any answers yet."} Published questions stay fixed.</p> : <div className="homework-publish">
+        : <HomeworkWorksheet sheet={draft.sheet} level={draft.level} minutes={draft.minutes} lessonAt={draft.lessonAt}
+          answers={draft.progress.submission?.answers ?? (draft.publishedAt ? draft.progress.answers : undefined)}
+          marks={draft.progress.submission?.marks} markedAnswers={draft.progress.submission?.answers} preview />}
+      {draft.publishedAt ? <p className="homework-help">{draft.progress.submission?.returnedAt ? "Approved feedback sent back to the student." : draft.progress.updatedAt ? "The student has started but has not submitted yet." : "The student has not submitted any answers yet."} Published questions stay fixed.</p> : <div className="homework-publish">
         <label><input type="checkbox" checked={reviewed} disabled={Boolean(busy)} onChange={event => setReviewed(event.target.checked)} />I checked the European Portuguese and the answers.</label>
         <button type="button" className="button button--coral" disabled={Boolean(busy) || !reviewed} onClick={() => void run("publish")}>{busy === "publish" ? "Publishing…" : "Publish for student"}</button>
       </div>}
@@ -188,6 +208,10 @@ function SheetEditor({ sheet, disabled, onChange }: { sheet: HomeworkSheet; disa
         <div className="homework-editor__pair"><label>Question {qi + 1}<textarea rows={2} maxLength={800} value={q.prompt} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, prompt: e.target.value } : item) })} /></label>
           <label>Answer or example answer<textarea rows={2} maxLength={1200} value={q.answer} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, answer: e.target.value } : item) })} /></label></div>
         <label>Explanation <small>Optional</small><textarea rows={2} maxLength={800} value={q.explanation} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, explanation: e.target.value } : item) })} /></label>
+        <label>Marking<select value={q.marking ?? "written"} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, marking: e.target.value as "exact" | "written", acceptedAnswers: item.acceptedAnswers ?? [] } : item) })}>
+          <option value="written">Written answer · AI suggestion, then your approval</option><option value="exact">Short answer · check accepted answers</option>
+        </select></label>
+        {q.marking === "exact" ? <label>Accepted answers <small>One per line. Include every valid alternative.</small><textarea rows={3} maxLength={9600} value={(q.acceptedAnswers ?? []).join("\n")} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, acceptedAnswers: e.target.value.split("\n") } : item) })} /></label> : null}
         {section.questions.length > 1 ? <button className="text-action" type="button" onClick={() => sectionChange(si, { questions: section.questions.filter((_, i) => i !== qi) })}><Trash2 size={15} aria-hidden="true" />Remove question {qi + 1}</button> : null}
       </div>)}
       {section.questions.length < 6 && sheet.sections.flatMap(s => s.questions).length < 12 ? <button className="text-action" type="button" onClick={() => sectionChange(si, { questions: [...section.questions, { id: `new-${Date.now()}`, prompt: "", answer: "", explanation: "" }] })}><Plus size={16} aria-hidden="true" />Add question</button> : null}
@@ -195,4 +219,41 @@ function SheetEditor({ sheet, disabled, onChange }: { sheet: HomeworkSheet; disa
     {sheet.sections.length < 4 && sheet.sections.flatMap(s => s.questions).length < 12 ? <button type="button" className="button button--outline" onClick={() => onChange({ ...sheet, sections: [...sheet.sections, { title: "", instruction: "", example: "", questions: [{ id: `new-${Date.now()}`, prompt: "", answer: "", explanation: "" }] }] })}>Add section</button> : null}
     <label>Review reminder<textarea maxLength={400} rows={2} value={sheet.reminder} onChange={e => onChange({ ...sheet, reminder: e.target.value })} /></label>
   </fieldset>;
+}
+
+function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, onApprove }: {
+  sheet: HomeworkSheet; answers: Record<string, string>; marks: Record<string, HomeworkMark>; marking: boolean;
+  note?: string; busy: boolean; onChange: (marks: Record<string, HomeworkMark>) => void; onApprove: () => void;
+}) {
+  const questions = sheet.sections.flatMap(section => section.questions);
+  const unresolved = questions.some(question => !marks[question.id] || marks[question.id].status === "review" || !marks[question.id].feedback.trim());
+  return <div className="homework-review">
+    <div className="homework-review__intro"><h4>Homework to review</h4>
+      <p>{marking ? "Checking answers…" : "Check the marks and feedback. The student sees them only after you approve."}</p>
+      {note ? <p className="homework-help">{note}</p> : null}
+    </div>
+    <fieldset className="homework-editor" disabled={busy || marking}>
+      {sheet.sections.map((section, index) => <section key={index}>
+        <h4 lang="pt-PT">{section.title}</h4><p lang="pt-PT">{section.instruction}</p>
+        {section.questions.map(question => {
+          const mark = marks[question.id] ?? { status: "review", feedback: "", source: "pending" };
+          const edit = (value: Partial<HomeworkMark>) => onChange({ ...marks, [question.id]: { ...mark, ...value } });
+          return <div className="homework-editor__question" key={question.id}>
+            <strong lang="pt-PT">{question.prompt}</strong>
+            <p className="homework-review__answer" lang="pt-PT">{answers[question.id] || "Sem resposta."}</p>
+            <details><summary>Answer guide</summary><p lang="pt-PT">{question.answer}</p>{question.explanation ? <p lang="pt-PT">{question.explanation}</p> : null}</details>
+            <div className="homework-editor__pair">
+              <label>Mark<select value={mark.status} onChange={event => edit({ status: event.target.value as HomeworkMark["status"] })}>
+                <option value="review">Needs your review</option><option value="correct">Correct</option><option value="retry">Try again</option>
+              </select></label>
+              <label>Feedback <small>European Portuguese</small><textarea lang="pt-PT" rows={2} maxLength={800} value={mark.feedback} onChange={event => edit({ feedback: event.target.value })} /></label>
+            </div>
+          </div>;
+        })}
+      </section>)}
+    </fieldset>
+    <div className="homework-publish"><p className="homework-help">{unresolved ? "Resolve the answers marked for review." : "Ready to send back to the student."}</p>
+      <button type="button" className="button button--coral" disabled={busy || marking || unresolved} onClick={onApprove}>{busy ? "Sending…" : "Approve & send back"}</button>
+    </div>
+  </div>;
 }

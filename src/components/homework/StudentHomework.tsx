@@ -15,9 +15,14 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [view, setView] = useState<"online" | "print">("online");
   const active = useRef(true);
   const unsaved = useRef(false);
   const dirty = Boolean(selected && draft && JSON.stringify(draft.answers) !== JSON.stringify(selected.progress.answers));
+  const submission = draft?.submission;
+  const awaitingReview = Boolean(submission && !submission.returnedAt);
+  const answered = Object.values(draft?.answers ?? {}).filter(answer => answer.trim()).length;
+  const changedSinceSubmission = Boolean(draft && submission && Object.entries(draft.answers).some(([id, answer]) => answer !== (submission.answers[id] ?? "")));
   // Account navigation waits for a save; a failed save keeps the answers visible.
   useEffect(() => {
     leaveGuard.current = async () => !busy && (!dirty || await save());
@@ -64,16 +69,17 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
     } catch (error) { if (active.current) setError((error as Error).message); }
     finally { if (active.current) setBusy(false); }
   }
-  async function save(completed = Boolean(draft?.completedAt)) {
+  async function save(submit = false) {
     if (!selected || !draft || busy) return false;
     setBusy(true); setError(""); setNotice("");
     try {
-      const progress = await saveHomeworkAnswers(token, selected.bookingId, draft, completed);
+      const progress = await saveHomeworkAnswers(token, selected.bookingId, draft, submit);
       if (!active.current || readSession() !== token) return false;
       unsaved.current = false;
       setDraft(progress); setSelected({ ...selected, progress });
-      setList(current => current?.map(item => item.bookingId === selected.bookingId ? { ...item, started: true, completedAt: progress.completedAt } : item) ?? null);
-      setNotice(completed ? "Marked complete. Inês can see your answers." : "Answers saved.");
+      setList(current => current?.map(item => item.bookingId === selected.bookingId ? { ...item, started: true, completedAt: progress.completedAt,
+        submittedAt: progress.submission?.submittedAt ?? null, returnedAt: progress.submission?.returnedAt ?? null } : item) ?? null);
+      setNotice(submit ? "Sent to Inês. Your feedback appears here after she approves it." : "Answers saved.");
       return true;
     } catch (error) { if (active.current) setError((error as Error).message); return false; }
     finally { if (active.current) setBusy(false); }
@@ -84,17 +90,24 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
       <div className="homework-toolbar">
         <button type="button" className="text-action" disabled={busy} onClick={async () => {
           if (dirty && !await save()) return;
-          setSelected(null); setDraft(null); setError(""); setNotice("");
+          setSelected(null); setDraft(null); setError(""); setNotice(""); setView("online");
         }}><ArrowLeft size={17} aria-hidden="true" />All homework</button>
-        {draft.completedAt ? <span className="homework-status"><CheckCircle2 size={17} aria-hidden="true" />Completed</span> : <span>{dirty ? "Unsaved answers" : draft.updatedAt ? "Saved" : "Ready to start"}</span>}
+        {submission ? <span className="homework-status"><CheckCircle2 size={17} aria-hidden="true" />{awaitingReview ? "Sent to Inês" : "Feedback from Inês"}</span> : <span>{dirty ? "Unsaved answers" : draft.updatedAt ? "Saved" : "Ready to start"}</span>}
       </div>
       {error ? <p className="homework-error" role="alert">{error}</p> : null}
-      <HomeworkWorksheet {...selected} answers={draft.answers} disabled={busy} onAnswer={(id, answer) => setDraft({ ...draft, answers: { ...draft.answers, [id]: answer } })} />
-      <div className="homework-save">
-        <p role="status">{notice || "Save your answers before leaving. You can also complete the sheet on paper."}</p>
-        <button type="button" className="button button--outline" disabled={busy || !dirty} onClick={() => void save()}>{busy ? "Saving…" : "Save answers"}</button>
-        <button type="button" className={`button ${draft.completedAt ? "button--lilac" : "button--coral"}`} disabled={busy} onClick={() => void save(!draft.completedAt)}>{draft.completedAt ? "Keep practising" : "Mark complete"}</button>
-      </div>
+      <HomeworkWorksheet key={selected.bookingId} {...selected} answers={draft.answers} disabled={busy || awaitingReview}
+        marks={submission?.returnedAt ? submission.marks : undefined} markedAnswers={submission?.answers} onViewChange={setView}
+        onAnswer={(id, answer) => setDraft({ ...draft, answers: { ...draft.answers, [id]: answer } })} />
+      {view === "online" ? <div className="homework-save">
+        <p role="status">{busy ? "Saving your work and preparing it for Inês…" : notice || (awaitingReview
+          ? "Inês is checking your work. Your answers are saved."
+          : submission?.returnedAt ? "Read Inês’s feedback below each answer. You can edit and submit another attempt."
+          : "Submit for automatic checks and Inês’s approval. OpenAI checks written answers. Keep personal details out.")}</p>
+        {awaitingReview ? <button type="button" className="button button--outline" disabled={busy} onClick={() => void open(selected.bookingId)}>Check for feedback</button> : <>
+          <button type="button" className="button button--outline" disabled={busy || !dirty} onClick={() => void save()}>Save answers</button>
+          <button type="button" className="button button--coral" disabled={busy || !answered || Boolean(submission && !changedSinceSubmission)} onClick={() => void save(true)}>{busy ? "Sending…" : submission ? "Submit new attempt" : "Submit to Inês"}</button>
+        </>}
+      </div> : <p className="homework-help">Paper answers are not marked automatically. Enter your answers in Do online to submit them.</p>}
     </> : <>
       {error ? <div className="homework-error" role="alert"><p>{error}</p><button className="text-action" type="button" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button></div> : null}
       {!list && !error ? <p role="status">Loading homework…</p> : null}
@@ -102,7 +115,7 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
       <ul className="homework-list">{list?.map(item => <li key={item.bookingId}>
         <button type="button" onClick={() => void open(item.bookingId)} disabled={busy}>
           <span><small>{new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Lisbon" }).format(new Date(item.lessonAt))} · {item.minutes} min</small><strong>{item.title}</strong></span>
-          <span className="homework-list__state">{item.completedAt ? "Completed" : item.started ? "Continue" : "Start"}<ArrowRight size={18} aria-hidden="true" /></span>
+          <span className="homework-list__state">{item.returnedAt ? "Feedback ready" : item.submittedAt ? "With Inês" : item.started ? "Continue" : "Start"}<ArrowRight size={18} aria-hidden="true" /></span>
         </button>
       </li>)}</ul>
     </>}

@@ -66,7 +66,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
           locked={Boolean(busyStudent)}
           onBusy={busy => setBusyStudent(busy ? student.id : "")}
           onChanged={onStudentsChanged}
-          onSelect={panel => setExpanded(panel ? { ...selected, studentId: student.id, panel } : null)}
+          onSelect={panel => setExpanded(panel ? { ...selected, studentId: student.id, panel, homeworkId: undefined } : null)}
+          onHomework={homeworkId => setExpanded(current => ({ studentId: student.id, panel: "history", homeworkId, homeworkRequestKey: (current?.homeworkRequestKey ?? 0) + 1 }))}
           onWelcome={onWelcome}
           sending={sending}
           student={student}
@@ -74,6 +75,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
           step={selected?.panel ?? null}
           date={selected?.date}
           time={selected?.time}
+          homeworkId={selected?.homeworkId}
+          homeworkRequestKey={selected?.homeworkRequestKey}
           token={token}
         />;
       })}

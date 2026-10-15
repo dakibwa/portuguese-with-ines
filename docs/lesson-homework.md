@@ -6,14 +6,45 @@ checks the transcription, chooses a CEFR level and 10, 15 or 20 minutes, then
 makes a draft. Every instruction, question, example and answer is editable.
 She reviews the European Portuguese and answers before publishing. Students
 see only published sheets in **Homework**, grouped by lesson. They can save
-answers, resume them, mark a sheet complete, or print it. Completion is the
-student's own statement, including work done on paper; it is not an AI grade.
+answers and resume them. **Do online** submits a fixed copy for marking.
+**Print worksheet** opens a black-and-white paper preview with writing lines;
+it is blank by default, with optional student answers and a separate answer key.
+Paper work is not marked automatically: students can enter their answers online.
+
+## Marking and approval
+
+Short-answer questions declare their accepted answers. The server ignores case,
+spacing and final punctuation but preserves meaningful accents and internal
+punctuation. Written questions use a possible answer and receive an OpenAI
+suggestion. Natural, correct alternatives must be accepted; uncertain answers
+are flagged for Inês. Every question has a mark and a short pt-PT explanation.
+These are practice feedback, not a formal assessment of language ability.
+
+**Submit to Inês** saves the answers before any AI call. Automatic suggestions
+stay private to Inês, including in API responses. The student sees **Sent to Inês**
+and cannot change that submitted copy while it is awaiting review. Inês sees
+**Homework to review** on the student's existing row; opening it goes to the
+specific lesson. She checks each answer, edits the mark and feedback, resolves
+any uncertain answers, then clicks **Approve & send back**. That explicit action
+makes her approved feedback visible in the student's Homework tab. No email is
+sent. Earlier, unapproved automatic suggestions are never sent to the student.
+
+Students can practise again after feedback. A new attempt replaces the previous
+submission, not the published questions. Changed answers are labelled as not yet
+reviewed. Draft saving never changes the submitted answers or approved feedback.
+This stores the latest attempt, not a grade history.
+
+A duplicate or retried submission reuses the saved attempt without another paid
+call. Provider failure, a missing key, exhausted allowance or invalid output
+leaves written answers for Inês to mark herself; it never fabricates a mark.
+Interrupted marking is handed to teacher review after 90 seconds. Teacher
+approval uses a conditional write so a stale tab cannot overwrite another review.
 
 The sheet has recall, focused practice with a worked example, and a small
 practical communication task. Answers are separate and can be shown after an
 attempt. Personal questions use possible answers, not a single compulsory
 response. The A4 print view has writing space, a separate optional answer key,
-12-point body text and no navigation or decorative background.
+12-point body text and no navigation, coloured fills or decorative background.
 
 ## Teaching and presentation sources
 
@@ -44,15 +75,16 @@ validated for every adult learner. Inês sets the level and checks suitability.
 Migration `0029_lesson_homework.sql` adds only `lesson_homework`,
 `homework_progress` and `homework_ai_usage`. Apply that file manually, first to
 staging, then production, after release authority. Do not apply the full schema
-or replay older migrations on an existing database. The schema is for new local
-databases only. This feature does not change bookings, fees, email or meetings.
+or replay older migrations on an existing database. This migration has not been
+applied remotely yet; its new progress table includes the submission JSON column.
+The schema is for new local databases only. This feature does not change bookings, fees, email or meetings.
 
-- `/admin/lessons/:id/homework`: teacher read/save; `/transcribe`, `/generate`
-  and `/publish` are explicit POST actions. Existing teacher-session and admin
+- `/admin/lessons/:id/homework`: teacher read/save; `/transcribe`, `/generate`,
+  `/publish` and `/return` are explicit POST actions. Existing teacher-session and admin
   authentication apply before parsing a photo body.
 - `/me/homework`: published lesson list. `/me/homework/:id`: owner read/save
-  answers. Both the homework owner and current booking owner must match the
-  signed-in student. Manage links alone grant no homework access.
+  answers; `/submit` saves the attempt and requests marking. Both the homework
+  owner and current booking owner must match the signed-in student. Manage links alone grant no homework access.
 - Private notes never enter student responses. Images are normalised in the
   browser, bounded to 2 MB after conversion, and sent inline to OpenAI; the site
   does not retain the original photo. No public uploads or file URLs are created.
@@ -82,10 +114,15 @@ transcription and teaching accuracy still need Inês's review.
 
 The default ceiling is **200 AI requests per calendar month**, shared across
 all teachers and lessons, and six per lesson per hour. A photo transcription
-and a generated draft use one request each. Attempts, including errors, count;
+and a generated draft use one request each. A submission containing written
+answers uses one additional request for marking; exact-answer checks and teacher
+approval do not use AI. Attempts, including errors, count;
 there are no automatic paid retries. The limit is an atomic database claim,
 not a browser control. Each response is capped at 6,500 output tokens. Manual
-authoring and saved homework remain usable when AI is off or at its limit.
+authoring, saved homework and teacher marking remain usable when AI is off or at
+its limit. Marking sends only the relevant questions and student answers, never
+the private lesson notes, student name, email or account identifier. Students
+are told about this processing beside Submit and in the privacy notice.
 
 [OpenAI's published GPT-4.1 mini rates](https://developers.openai.com/api/docs/pricing)
 checked on 15 October 2026 are $0.40 per million input tokens and $1.60 per
@@ -102,10 +139,15 @@ upload notice and site privacy notice identify this processing.
 ## Verification
 
 The existing Worker integration suite covers owner isolation, teacher review,
-draft invisibility, stale saves, fixed published questions, bounded uploads,
-provider failures and shared usage limits. `scripts/qa-homework.mjs` exercises
-photo selection through teacher publication, student save/reload/completion and
-print at one desktop and one phone width. Its AI replies and accounts are
+draft and automatic-mark invisibility, stale saves/reviews, immutable submitted
+answers, fixed published questions, bounded uploads, provider failures and shared
+usage limits. It also checks accepted-answer variants, Portuguese accents and
+duplicate submissions during an AI call. `scripts/qa-homework.mjs` exercises
+photo selection through teacher publication, student save/reload/submission,
+teacher correction and approval, returned feedback, and black-and-white print at
+one desktop and one phone width. Its AI replies and accounts are
 synthetic fixtures; passing it is not evidence of live OCR or language quality.
 Before enabling the provider, test a synthetic lesson photo through the actual
-configured model and inspect both its transcription and pt-PT worksheet.
+configured model and inspect its transcription, pt-PT worksheet and marking of
+correct, incorrect and valid alternative answers before allowing real students
+to submit. Automatic feedback still requires Inês's approval.

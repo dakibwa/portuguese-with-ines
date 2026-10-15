@@ -2909,7 +2909,10 @@ await test("homework: private drafts, teacher review, lesson ownership and saved
   const sheet = {
     title: "No café", objective: "Pedir uma bebida com clareza.", reminder: "Amanhã, recorda o teu pedido sem olhar.",
     sections: [{ title: "Pratica", instruction: "Completa o pedido.", example: "Um chá, por favor.",
-      questions: [{ prompt: "Pede um café de forma educada.", answer: "Queria um café, por favor.", explanation: "Há outras respostas possíveis." }] }],
+      questions: [
+        { prompt: "Completa: Queria um ____, por favor.", answer: "café", explanation: "Mantém o acento.", marking: "exact", acceptedAnswers: ["café", "um café"] },
+        { prompt: "Faz um pedido.", answer: "Queria um chá.", explanation: "Há outras respostas possíveis.", marking: "written", acceptedAnswers: [] },
+      ] }],
   };
   const input = { notes: "Private teacher notes: café, chá, queria, por favor", level: "A1", minutes: 10, sheet, updatedAt: null };
   assert.equal((await call(route, { user: "bob", body: input })).status, 401);
@@ -2928,17 +2931,42 @@ await test("homework: private drafts, teacher review, lesson ownership and saved
   assert.ok(!JSON.stringify(publicVersion).includes("Private teacher notes"));
   assert.equal((await call(`/me/homework/${id}`, { user: "bob", method: "GET" })).status, 404);
   assert.equal((await call(`/me/homework/${id}`, { user: "bob", body: { answers: { q1: "Wrong account" }, updatedAt: null, completed: true } })).status, 404);
-  assert.equal((await call(`/me/homework/${id}`, { body: { answers: { q2: "Wrong question" }, updatedAt: null, completed: false } })).status, 400);
-  const answer = { answers: { q1: "Queria um café, por favor." }, updatedAt: null, completed: false };
+  assert.equal((await call(`/me/homework/${id}`, { body: { answers: { q99: "Wrong question" }, updatedAt: null } })).status, 400);
+  const answer = { answers: { q1: "  CAFÉ.  ", q2: "Queria uma água." }, updatedAt: null };
   const answered = await call(`/me/homework/${id}`, { body: answer });
   assert.equal(answered.status, 200);
   const progress = (await answered.json()).progress;
   assert.equal((await call(`/me/homework/${id}`, { body: { ...answer, answers: { q1: "Stale tab" } } })).status, 409);
-  const completed = await call(`/me/homework/${id}`, { body: { ...answer, updatedAt: progress.updatedAt, completed: true } });
+  const completed = await call(`/me/homework/${id}/submit`, { body: { ...answer, updatedAt: progress.updatedAt } });
   assert.equal(completed.status, 200);
-  assert.ok((await completed.json()).progress.completedAt);
+  const sent = (await completed.json()).progress;
+  assert.ok(sent.submission.submittedAt);
+  assert.equal(sent.submission.marks, undefined, "marks stay private before approval, including POST replies");
+  assert.equal((await (await call(`/me/homework/${id}`, { method: "GET" })).json()).progress.submission.marks, undefined);
+  assert.equal((await call(`/me/homework/${id}`, { body: { ...answer, updatedAt: sent.updatedAt, answers: { q1: "Changed while awaiting review" } } })).status, 409);
   const teacher = await (await call(route, { user: "teacher", method: "GET" })).json();
-  assert.equal(teacher.progress.answers.q1, answer.answers.q1);
+  const attempt = teacher.progress.submission;
+  assert.equal(attempt.marks.q1.status, "correct", "case, final punctuation and whitespace are harmless");
+  assert.equal(attempt.marks.q2.status, "review", "open answers are never falsely graded when AI is off");
+  assert.equal(teacher.progress.answers.q1, answer.answers.q1.trim());
+  const returnBody = { submissionId: attempt.id, updatedAt: teacher.progress.updatedAt, marks: attempt.marks, approved: true };
+  assert.equal((await call(`${route}/return`, { user: "teacher", body: returnBody })).status, 400, "unresolved answers require teacher judgement");
+  const marks = { ...attempt.marks, q2: { status: "correct", feedback: "Muito bem. Fizeste um pedido claro." } };
+  assert.equal((await call(`${route}/return`, { body: { ...returnBody, marks } })).status, 401, "students cannot approve their own marks");
+  assert.equal((await call(`${route}/return`, { user: "teacher", body: { ...returnBody, marks, approved: false } })).status, 400);
+  const returned = await call(`${route}/return`, { user: "teacher", body: { ...returnBody, marks } });
+  assert.equal(returned.status, 200, await returned.clone().text());
+  const feedback = (await (await call(`/me/homework/${id}`, { method: "GET" })).json()).progress;
+  assert.ok(feedback.submission.returnedAt);
+  assert.equal(feedback.submission.marks.q2.feedback, marks.q2.feedback);
+  assert.equal(feedback.submission.automaticMarks, undefined, "unapproved earlier suggestions never leak beside approved marks");
+  assert.equal((await call(`${route}/return`, { user: "teacher", body: { ...returnBody, marks } })).status, 409, "a stale review cannot overwrite a returned one");
+  const newAttempt = await call(`/me/homework/${id}/submit`, { body: { answers: { q1: "cafe", q2: "Queria uma água." }, updatedAt: feedback.updatedAt } });
+  assert.equal(newAttempt.status, 200);
+  const again = await (await call(route, { user: "teacher", method: "GET" })).json();
+  assert.equal(again.progress.submission.marks.q1.status, "retry", "meaningful accents are not stripped");
+  const returnedStudents = await (await call("/admin/students", { user: "teacher", method: "GET" })).json();
+  assert.ok(returnedStudents.students.find(student => student.id === "alice").homeworkToReview.some(item => item.bookingId === id));
   assert.equal((await call(route, { user: "teacher", body: { ...input, updatedAt: teacher.updatedAt } })).status, 409, "published questions cannot invalidate saved answers");
   // Old linkage must never expose homework after the booking changes owner.
   db.prepare("UPDATE bookings SET student_id = 'bob' WHERE id = ?").run(id);
@@ -2951,9 +2979,9 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
   const id = linkedBooking("homework-ai");
   const route = `/admin/lessons/${id}/homework`;
   const beforeFetch = globalThis.fetch;
-  let requests = 0, broken = false;
+  let requests = 0, broken = false, markingBody;
   const image = `data:image/jpeg;base64,${btoa("\xff\xd8\xff" + "x".repeat(40000))}`;
-  env.HOMEWORK_AI_ENABLED = "1"; env.OPENAI_API_KEY = "isolated-ai-key"; env.HOMEWORK_AI_MONTHLY_LIMIT = "3";
+  env.HOMEWORK_AI_ENABLED = "1"; env.OPENAI_API_KEY = "isolated-ai-key"; env.HOMEWORK_AI_MONTHLY_LIMIT = "4";
   db.prepare("DELETE FROM homework_ai_usage").run();
   globalThis.fetch = async (url, options) => {
     assert.equal(url, "https://api.openai.com/v1/responses");
@@ -2963,6 +2991,15 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     assert.ok(input.max_output_tokens <= 6500);
     assert.equal(input.text.format.strict, true);
     if (broken) return Response.json({ error: "private provider diagnostic" }, { status: 500 });
+    if (input.text.format.name === "homework_marking") {
+      assert.ok(!JSON.stringify(input.input).includes("private teacher-only note"), "grading uses questions and answers, not private notes");
+      const duplicate = await call(`/me/homework/${id}/submit`, { body: markingBody });
+      assert.equal(duplicate.status, 200);
+      assert.equal((await duplicate.json()).progress.submission.state, "marking", "an in-flight retry reuses the claimed attempt without a second bill");
+      const attempt = await (await call(route, { user: "teacher", method: "GET" })).json();
+      assert.equal((await call(`${route}/return`, { user: "teacher", body: { submissionId: attempt.progress.submission.id, updatedAt: attempt.progress.updatedAt, approved: true } })).status, 409);
+      return Response.json({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ marks: [{ id: "q1", status: "correct", feedback: "O teu pedido está correto." }] }) }] }] });
+    }
     const output = input.text.format.name === "lesson_transcription" ? { notes: "No café: queria um café, por favor.", uncertain: ["Last word is unclear."] } : {
       title: "No café", objective: "Pedir no café.", reminder: "Recorda amanhã.",
       sections: [{ title: "Pratica", instruction: "Faz um pedido.", example: "", questions: [{ prompt: "Pede um café.", answer: "Queria um café, por favor.", explanation: "" }] }],
@@ -2988,9 +3025,30 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     assert.equal(failed.status, 503);
     assert.ok(!(await failed.text()).includes("private provider diagnostic"));
     assert.equal((await (await call(route, { user: "teacher", method: "GET" })).json()).updatedAt, draft.updatedAt, "a failed generation leaves the draft alone");
+    broken = false;
+    const published = await call(`${route}/publish`, { user: "teacher", body: { ...input, notes: "private teacher-only note", sheet: draft.sheet, updatedAt: draft.updatedAt, reviewed: true } });
+    assert.equal(published.status, 200);
+    markingBody = { answers: { q1: "Queria um chá, por favor." }, updatedAt: null };
+    assert.equal((await call(`/me/homework/${id}/submit`, { user: "bob", body: markingBody })).status, 404);
+    const marked = await call(`/me/homework/${id}/submit`, { body: markingBody });
+    assert.equal(marked.status, 200, await marked.clone().text());
+    assert.equal((await marked.json()).progress.submission.marks, undefined, "AI suggestions cannot bypass teacher approval");
+    const graded = await (await call(route, { user: "teacher", method: "GET" })).json();
+    assert.equal(graded.progress.submission.marks.q1.source, "ai");
+    assert.equal(graded.progress.submission.marks.q1.status, "correct");
+    assert.equal((await call(`/me/homework/${id}/submit`, { body: markingBody })).status, 200, "lost-response retry is idempotent");
     const secondLesson = linkedBooking("homework-ai-limit");
     assert.equal((await call(`/admin/lessons/${secondLesson}/homework/generate`, { user: "teacher", body: input })).status, 429);
-    assert.equal(requests, 3, "the monthly ceiling covers different lessons and failed requests");
+    assert.equal(requests, 4, "the monthly ceiling covers transcription, generation, marking and failed requests");
+    const manual = await call(`/admin/lessons/${secondLesson}/homework`, { user: "teacher", body: { ...input, sheet: draft.sheet } });
+    const manualDraft = await manual.json();
+    assert.equal((await call(`/admin/lessons/${secondLesson}/homework/publish`, { user: "teacher", body: { ...input, sheet: draft.sheet, updatedAt: manualDraft.updatedAt, reviewed: true } })).status, 200);
+    const limitedSubmission = await call(`/me/homework/${secondLesson}/submit`, { body: markingBody });
+    assert.equal(limitedSubmission.status, 200, "exhausted AI allowance must not lose the submitted work");
+    const fallback = await (await call(`/admin/lessons/${secondLesson}/homework`, { user: "teacher", method: "GET" })).json();
+    assert.equal(fallback.progress.submission.marks.q1.status, "review");
+    assert.equal(fallback.progress.submission.state, "submitted");
+    assert.equal(requests, 4, "manual review needs no paid retry");
     assert.equal((await call(`${route}/transcribe`, { user: "teacher", raw, headers: { "Content-Length": "3000000" } })).status, 413);
   } finally {
     globalThis.fetch = beforeFetch;
