@@ -94,7 +94,9 @@ export type AdminBooking = {
     | "processing"
     | "paid"
     | "payment_due"
-    | "refunded";
+    | "refunded"
+    /** A lesson she recorded after it happened, still owed to her by hand. */
+    | "owed";
   attendance_status: "expected" | "no_show";
   /** 1 when Inês added it herself (migration 0023). */
   added_by_teacher?: number;
@@ -390,6 +392,9 @@ export function sendStudentWelcome(token: string, studentId: string, options?: {
  * A lesson for one of her students, named by their account so one with no
  * email yet has lessons too (14 October 2026, Dan).
  */
+/** How a lesson she records after it happened was paid. */
+export type PastPayment = "paid" | "unpaid" | "free";
+
 export function createBookingFor(
   token: string,
   input: {
@@ -400,6 +405,8 @@ export function createBookingFor(
     notes: string;
     /** Weekly: 4, 6 or 8 weeks, or "open" until stopped. Left out, one lesson. */
     repeat?: 4 | 6 | 8 | "open";
+    /** Only for a lesson already had: how it was paid. Left out, paid by hand. */
+    payment?: PastPayment;
   },
 ) {
   return adminRequest<{
@@ -445,7 +452,7 @@ export function cancelBookingAs(token: string, bookingId: string, message?: stri
 
 /**
  * A lesson she added that the student already paid her for by hand comes off
- * their card before it is charged.
+ * their card before it is charged; one she recorded as still owed is marked paid.
  */
 export function markPaidByHand(token: string, bookingId: string) {
   return adminRequest<{ booking: AdminBooking }>(token, `/admin/bookings/${bookingId}/paid-by-hand`, {

@@ -252,7 +252,11 @@ export function WeeklyTimetable({
     if (!editing) {
       setFocus({ day, minute });
       const date = dateOf(day);
-      if (date < today) return;
+      // A time gone can only have a lesson recorded in it (15 October 2026, Dan).
+      if (date < today) {
+        if (onAddLesson) setSlotMenu({ day, minute, canTakeOff: false });
+        return;
+      }
       // A time already off reopens at once; a free one offers a choice:
       // add a lesson there, or take it off (12 October 2026, at Dan's
       // request: tapping a time used to take it off without saying so).
@@ -632,11 +636,11 @@ export function WeeklyTimetable({
                         type="button"
                         className={`teacher-time-slot ${usual && !off && !blocked ? "is-available" : ""} ${blocked && !off ? "is-blocked" : ""} ${labelled ? "is-labelled" : ""} ${weeklyClass} ${hourClass}`}
                         aria-pressed={fixed ? undefined : blocked}
-                        aria-disabled={past || undefined}
-                        aria-haspopup={past || blockedHere ? undefined : "menu"}
+                        aria-disabled={(past && !onAddLesson) || undefined}
+                        aria-haspopup={past ? (onAddLesson ? "menu" : undefined) : blockedHere ? undefined : "menu"}
                         aria-label={
                           fixed
-                            ? `${minuteLabel(minute)}, ${dateLabel(date)}, ${reason}`
+                            ? `${minuteLabel(minute)}, ${dateLabel(date)}, ${reason}${past && onAddLesson ? ": add a past lesson" : ""}`
                             : blockedHere
                               ? `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}, off: reopen`
                               : `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}: add a lesson or take it off`

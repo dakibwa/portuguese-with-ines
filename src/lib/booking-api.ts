@@ -42,7 +42,7 @@ export type Booking = {
   sameDayFeeCents: number;
   sameDayFeeAutomatic?: boolean;
   /** Automatic-payment states appear once Stripe is on; older bookings say 'not_required'. */
-  paymentStatus?: "not_required" | "pending" | "scheduled" | "processing" | "paid" | "payment_due" | "refunded";
+  paymentStatus?: "not_required" | "pending" | "scheduled" | "processing" | "paid" | "payment_due" | "refunded" | "owed";
   amountCents?: number | null;
 };
 

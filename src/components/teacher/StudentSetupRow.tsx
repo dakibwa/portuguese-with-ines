@@ -68,7 +68,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     ? [Object.keys(student.ownPrices ?? student.prices ?? {}).length ? "Custom lesson price set." : "Standard lesson price applies."]
     : step === "lessons" ? [
       ...(!steps.find(entry => entry.id === "lessons")?.done ? ["No lessons added yet."] : []),
-      student.awaitingWelcome ? "Lesson emails wait for the welcome email." : "Adding a lesson emails the student.",
+      student.awaitingWelcome ? "Lesson emails wait for the welcome email." : "Lessons to come email the student.",
     ] : step === "welcome" || step === "sign-in" || step === "card" ? [
       step === "welcome"
         ? student.awaitingWelcome ? "Welcome email not sent yet." : student.signedIn ? "Sign-in is set up." : "Student hasn’t signed in yet."

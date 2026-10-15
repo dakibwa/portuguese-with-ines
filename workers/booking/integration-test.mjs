@@ -2548,7 +2548,8 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     assert.ok(!everything.includes("no-email:"), "the placeholder appears in nothing she or a provider receives");
     assert.deepEqual(sentEmails.filter((sent) => sent.to[0] !== "ines@example.invalid"), [], "no one else is written to");
     const hers = sentEmails.filter((sent) => sent.to[0] === "ines@example.invalid");
-    assert.ok(hers.length >= 4 && hers.every((sent) => sent.text.includes("No email yet") && !sent.reply_to), "she still hears of each, with no one to reply to");
+    // The one already had is recorded, not announced, so three.
+    assert.ok(hers.length >= 3 && hers.every((sent) => sent.text.includes("No email yet") && !sent.reply_to), "she still hears of each, with no one to reply to");
 
     // What her screens and automation read.
     const listed = await (await call("/admin/bookings?from=2026-01-01T00:00:00.000Z", { method: "GET", user: "teacher" })).json();
@@ -2667,6 +2668,68 @@ await test("her price for a student prices their lessons, and only lessons nothi
     forgetStudent("priced@example.invalid");
   }
 });
+await test("a lesson Inês records after it happened tells no one, charges nothing and keeps the payment she chose", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  captureEmail();
+  Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", TEACHER_NOTIFICATIONS_ENABLED: "1" });
+  const email = "recorded@example.invalid";
+  // Welcomed, with a card that pays for her lessons, so only the past decides.
+  db.prepare(`INSERT INTO students (id,email,name,password_hash,created_at,email_verified_at,stripe_customer_id,stripe_payment_method,card_consent_at)
+    VALUES ('recorded',?,'Rui Recorded','',?,?,'cus_recorded','pm_recorded',?)`).run(email, new Date().toISOString(), new Date().toISOString(), new Date().toISOString());
+  const add = (startAt, extra = {}) => call("/admin/bookings", { user: "teacher", body: { studentId: "recorded", lessonType: "single", startAt, ...extra } });
+  const row = (startAt) => db.prepare("SELECT * FROM bookings WHERE student_id='recorded' AND starts_at=?").get(startAt);
+  try {
+    const paid = await add("2026-09-01T09:00:00.000Z");
+    assert.equal(paid.status, 201, await paid.clone().text());
+    assert.equal((await paid.json()).emailed, false);
+    assert.equal((await add("2026-09-02T09:00:00.000Z", { payment: "unpaid" })).status, 201);
+    assert.equal((await add("2026-09-03T09:00:00.000Z", { payment: "free", location: "porto" })).status, 201);
+    // Started ten minutes ago and still running.
+    assert.equal((await add("2026-09-05T09:50:00.000Z")).status, 201);
+    await drain();
+    assert.deepEqual(sentEmails, [], "no email to the student or to her, and so no invitation");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sign_in_links WHERE student_id='recorded'").get().n, 0, "no sign-in link is made");
+    assert.deepEqual(["2026-09-01", "2026-09-02", "2026-09-03"].map((day) => {
+      const lesson = row(`${day}T09:00:00.000Z`);
+      return [lesson.payment_status, lesson.amount_cents, lesson.payment_consent_version, lesson.meeting_url];
+    }), [["not_required", 2500, "paid-by-hand", null], ["owed", 2500, null, null], ["not_required", 0, null, null]], "paid by hand by default; never on the card");
+    assert.equal(row("2026-09-05T09:50:00.000Z").meeting_retry_at, "2026-09-05T10:50:00.000Z", "the Meet sweep leaves a running one alone");
+
+    // Weekly hours don't apply, but the same lesson twice, an overlap, a weekly run or a payment for a lesson to come are refused.
+    assert.deepEqual(await (await add("2026-09-01T09:00:00.000Z")).json(), { error: "They already have this lesson." });
+    assert.equal((await add("2026-09-01T09:30:00.000Z")).status, 409, "an overlap");
+    assert.equal((await add("2026-08-27T09:00:00.000Z", { repeat: 4 })).status, 400);
+    assert.equal((await add("2026-08-27T09:00:00.000Z", { payment: "maybe" })).status, 400);
+    assert.equal((await add("2026-10-27T09:00:00.000Z", { payment: "free" })).status, 400);
+
+    // Nothing ever charges or chases them.
+    await chargeDueLessons(env, new Date("2026-09-06T12:00:00.000Z"));
+    await retryPaymentRecovery(env);
+    assert.equal(charges.filter((charge) => charge.key.includes(row("2026-09-02T09:00:00.000Z").id)).length, 0);
+    assert.equal(row("2026-09-02T09:00:00.000Z").payment_status, "owed");
+
+    // It is theirs: in their past lessons, and homework can be set on it.
+    const me = await (await call("/me", { method: "GET", token: await createSession("recorded", env.BOOKING_TOKEN_SECRET) })).json();
+    assert.ok(me.bookings.some((lesson) => lesson.startAt === "2026-09-02T09:00:00.000Z" && lesson.isPast));
+    const owed = row("2026-09-02T09:00:00.000Z").id;
+    assert.equal((await call(`/admin/lessons/${owed}/homework`, { method: "GET", user: "teacher" })).status, 200);
+
+    // Paid later, by hand.
+    assert.equal((await call(`/admin/bookings/${owed}/paid-by-hand`, { user: "teacher", body: {} })).status, 200);
+    assert.equal(row("2026-09-02T09:00:00.000Z").payment_status, "not_required");
+    // Moving or cancelling it within the past is as quiet as adding it.
+    const free = row("2026-09-03T09:00:00.000Z").id;
+    assert.equal((await (await call(`/admin/bookings/${free}/reschedule`, { user: "teacher", body: { startAt: "2026-09-03T10:00:00.000Z" } })).json()).emailed, false);
+    assert.equal((await (await call(`/admin/bookings/${free}/cancel`, { user: "teacher", body: {} })).json()).emailed, false);
+    await drain();
+    // The sweeps above charge other tests' lessons; none of it is about Rui.
+    assert.ok(!sentEmails.some((sent) => sent.to.includes(email) || sent.text.includes("Rui")));
+  } finally {
+    releaseEmail();
+    Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0" });
+    forgetStudent(email);
+  }
+});
 await test("her receipts list each amount paid or due for a month's lessons, with the NIF to issue to", async () => {
   await enrol("receipts");
   db.prepare("UPDATE students SET nif = '123456789', name = 'Rita Receipts' WHERE id = 'receipts'").run();
@@ -2681,6 +2744,10 @@ await test("her receipts list each amount paid or due for a month's lessons, wit
   booking("r-due", { owner: "receipts", payment: "payment_due", ...at("07", "09") });
   booking("r-cancelled", { owner: "receipts", payment: "not_required", ...at("10", "09") });
   db.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = 'r-cancelled'").run();
+  // Two she recorded after they happened: one still owed to her, one free.
+  booking("r-owed", { owner: "receipts", payment: "owed", ...at("11", "09") });
+  booking("r-free", { owner: "receipts", payment: "not_required", ...at("12", "09") });
+  db.prepare("UPDATE bookings SET amount_cents = 0 WHERE id = 'r-free'").run();
   try {
     assert.equal((await call("/admin/receipts?month=2026-08", { method: "GET", user: "alice" })).status, 401);
     assert.equal((await call("/admin/receipts?month=2026-13", { method: "GET", user: "teacher" })).status, 400);
@@ -2694,8 +2761,9 @@ await test("her receipts list each amount paid or due for a month's lessons, wit
       ["r-hand:lesson", "60-minute lesson", 1500, "by hand", "paid", true],
       ["r-noshow:lesson", "No-show", 500, "card", "paid", true],
       ["r-fee:fee", "Late change fee", 500, "card", "paid", true],
-      ["r-due:lesson", "60-minute lesson", 1500, "card", "due", false]
-    ], "a cancelled lesson with no money moved has no line");
+      ["r-due:lesson", "60-minute lesson", 1500, "card", "due", false],
+      ["r-owed:lesson", "60-minute lesson", 1500, "by hand", "due", false]
+    ], "a cancelled lesson with no money moved, or a free one, has no line");
     assert.ok(mine.every((line) => line.nif === "123456789" && line.studentName === "Test Student"));
     assert.equal(mine.find((line) => line.id === "r-card:lesson").stripePaymentIntent, "pi_card");
     assert.equal(mine.find((line) => line.id === "r-fee:fee").stripePaymentIntent, "pi_fee");

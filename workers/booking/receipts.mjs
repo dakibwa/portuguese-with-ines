@@ -48,11 +48,18 @@ export function receiptLines(rows, now = new Date()) {
     const noShow = row.attendance_status === "no_show";
     let state = LESSON_STATES[row.payment_status] ?? null;
     let method = "card";
-    // Nothing on a card: a lesson that happened was paid to her by hand.
+    // Nothing on a card: a lesson that happened was paid to her by hand,
+    // unless she recorded it as still owed to her.
     if (row.payment_status === "not_required" && row.status === "confirmed" && ended && !noShow) {
       state = "paid";
       method = "by hand";
     }
+    if (row.payment_status === "owed") {
+      state = "due";
+      method = "by hand";
+    }
+    // A free lesson has nothing to issue.
+    if (row.amount_cents === 0 && method === "by hand") state = null;
     // A lesson still to come only counts once its money is in.
     if (state && !ended && state !== "paid" && state !== "refunded") state = null;
     // A cancelled lesson keeps only money that moved.

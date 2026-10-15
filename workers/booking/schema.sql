@@ -197,6 +197,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   cancellation_message TEXT,
   created_at        TEXT NOT NULL,
   updated_at        TEXT NOT NULL,
+  -- 'owed' is a lesson Inês recorded after it happened, still owed to her by
+  -- hand: never charged, chased or put on a card (15 October 2026).
   payment_status    TEXT NOT NULL DEFAULT 'not_required',
   amount_cents      INTEGER,
   stripe_session_id TEXT,

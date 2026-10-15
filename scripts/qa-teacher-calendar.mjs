@@ -253,18 +253,22 @@ async function fixture(width, options = {}) {
       }
       // Hers are marked as hers, and wait for the student's card.
       const owner = [state.added, ...state.students].find((entry) => entry?.id === data.studentId);
-      if (owner) Object.assign(owner, { hasLessons: true, nextLessonAt: data.startAt, upcoming: (owner.upcoming ?? 0) + 1 });
+      // One already had is recorded quietly, paid as she says.
+      const past = Date.parse(data.startAt) <= Date.parse("2026-09-07T10:15:00Z");
+      if (owner) Object.assign(owner, { hasLessons: true, ...(past ? {} : { nextLessonAt: data.startAt, upcoming: (owner.upcoming ?? 0) + 1 }) });
       state.bookings.push({
         ...lesson(`manual-${state.bookings.length}`, owner?.name ?? "Sam Known", data.startAt, data.location, data.lessonType === "long" ? 90 : data.lessonType === "trial" ? 30 : 60),
         student_id: owner?.id,
-        payment_status: "not_required",
+        payment_status: data.payment === "unpaid" ? "owed" : "not_required",
+        amount_cents: data.payment === "free" ? 0 : 2400,
+        ...(past ? { meeting_url: null } : {}),
         added_by_teacher: 1,
       });
       return route.fulfill({
         json: {
           booking: { reference: "TEST-manual" },
           // A student she has just set up isn't emailed until their welcome.
-          emailed: !owner?.awaitingWelcome,
+          emailed: !owner?.awaitingWelcome && !data.payment,
           ...(data.repeat ? { series: { booked: 3, skipped: [{ key: "2026-10-01", startAt: "2026-10-01T16:00:00.000Z", reason: "Day off" }] } } : {}),
         },
       });
@@ -699,7 +703,12 @@ try {
   await expect(
     page.getByRole("switch", { name: "Day off, Monday 31 August" }),
   ).toBeDisabled();
-  await expect(slot(page, 1, 600)).toHaveAttribute("aria-disabled", "true");
+  // A time gone can't be taken off, but a lesson she has had can be recorded there.
+  await expect(slot(page, 1, 600)).not.toHaveAttribute("aria-disabled", "true");
+  await slot(page, 1, 600).click();
+  await expect(page.getByRole("menuitem", { name: "Add a lesson here", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Take this time off", exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   // Reopening a holiday removes only whole-day rows; its hours and extras stay.
   await thisWeek.click();
@@ -898,13 +907,25 @@ try {
   await noraSetup.getByRole("button", { name: "Lessons for Nora Lima", exact: true }).click();
   await expect(setupForm.getByRole("radio", { name: "60 mins, €24" })).toBeVisible();
   const picker = setupForm.getByRole("group", { name: "Choose a date and time", exact: true });
-  // Keyboard navigation must keep its focus on a visible, selectable date.
+  // Earlier days are hers to choose too, for a lesson already had (15 October 2026).
   const todayChoice = picker.getByRole("button", { name: "Monday 7 September", exact: true });
   await todayChoice.press("ArrowLeft");
-  await expect(todayChoice).toBeFocused();
+  await expect(picker.getByRole("button", { name: "Sunday 6 September", exact: true })).toBeFocused();
+  await picker.getByRole("button", { name: "Previous month", exact: true }).click();
+  await picker.getByRole("button", { name: "Thursday 27 August", exact: true }).click();
+  // Any quarter hour, weekly hours or not; then only how it was paid.
+  await picker.getByRole("button", { name: "09:30 Porto time, already past", exact: true }).click();
+  await expect(setupForm.getByRole("radio", { name: "Weekly", exact: true })).toHaveCount(0);
+  await expect(setupForm.getByRole("radio", { name: "Paid", exact: true })).toHaveAttribute("aria-checked", "true");
+  await setupForm.getByRole("radio", { name: "Unpaid", exact: true }).click();
+  await setupForm.getByRole("button", { name: "Add past lesson", exact: true }).click();
+  await expect(noraSetup.getByRole("status")).toContainText("27 Aug, 09:30 · unpaid");
+  assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/bookings").at(-1).data, {
+    studentId: "nora", lessonType: "single", startAt: "2026-08-27T08:30:00.000Z", location: "online", notes: "", payment: "unpaid",
+  });
+  await noraSetup.getByRole("button", { name: "Lessons for Nora Lima", exact: true }).click();
   await picker.getByRole("button", { name: "Next month", exact: true }).click();
   await picker.getByRole("button", { name: "Previous month", exact: true }).click();
-  await expect(picker.getByRole("button", { name: "Previous month", exact: true })).toBeDisabled();
   await picker.getByRole("button", { name: "Wednesday 30 September", exact: true }).click();
   await picker.getByRole("button", { name: "17:00 Porto time", exact: true }).click();
   // A different length needs that length's availability and a new time choice.
@@ -986,7 +1007,9 @@ try {
   const noraReady = studentRow(page, "Nora Lima");
   await noraReady.getByRole("button", { name: "Lesson history for Nora Lima", exact: true }).click();
   const readyProfile = noraReady.getByRole("region", { name: "Nora Lima’s profile", exact: true });
-  await expect(readyProfile.locator(".teacher-history-lesson")).toHaveCount(1);
+  // The 30 September lesson, and the one she recorded as had and still owed.
+  await expect(readyProfile.locator(".teacher-history-lesson")).toHaveCount(2);
+  await expect(readyProfile.getByRole("region", { name: /^Past/ }).locator(".teacher-history-lesson")).toContainText("Unpaid");
   await noraReady.getByRole("button", { name: "Details for Nora Lima", exact: true }).click();
   await expect(readyProfile.getByLabel(/^Email/)).toHaveValue("nora@example.invalid");
   await noraReady.getByRole("button", { name: "Close", exact: true }).click();

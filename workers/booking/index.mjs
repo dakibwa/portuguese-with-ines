@@ -1306,6 +1306,19 @@ function welcomeSteps(welcome) {
 /** Marks a lesson she added that was paid to her by hand; no card takes it over. */
 const PAID_BY_HAND_MARK = "paid-by-hand";
 
+/**
+ * How a lesson she records after it happened was paid: to her by hand
+ * (`not_required`, marked paid by hand), still owed to her by hand (`owed`,
+ * never put on a card or sent a payment link; she marks it paid later), or
+ * free (`not_required` at €0, so there is nothing to issue a receipt for).
+ */
+const PAST_PAYMENTS = ["paid", "unpaid", "free"];
+
+/** A lesson written after its own start: recorded by Inês, never announced. */
+function recordedAfter(row) {
+  return Date.parse(row.created_at) >= Date.parse(row.starts_at);
+}
+
 /** What a lesson Inês added costs until the student's card pays for it. */
 const PAID_BY_HAND = "pay Inês as usual until you add your card";
 
@@ -5574,6 +5587,18 @@ async function handleAdmin(request, env, ctx, url, path) {
     const endsAt = new Date(start.getTime() + lessonType.duration_minutes * 60000);
 
     /*
+     * A lesson that has already started is one she is recording (15 October
+     * 2026, Dan): it happened, so nobody is told, nothing is charged and no
+     * Meet is made. She says how it was paid; paid to her by hand is the
+     * default, as every lesson recorded after the fact has been.
+     */
+    const past = start <= new Date();
+    const payment = body.payment === undefined ? "paid" : body.payment;
+    if (!PAST_PAYMENTS.includes(payment)) return fail("Choose paid, unpaid or free.", 400, request, env);
+    if (!past && body.payment !== undefined) return fail("Only a lesson already had says how it was paid.", 400, request, env);
+    if (past && wantsRepeat) return fail("A weekly run starts today or later.", 400, request, env);
+
+    /*
      * Her own bookings are checked for clashes only — not against her published
      * hours or the notice window. Those exist to shape what students may choose;
      * she is the one who decides, and squeezing in a lesson outside them is a
@@ -5581,11 +5606,14 @@ async function handleAdmin(request, env, ctx, url, path) {
      * is still refused.
      */
     const clash = await env.DB.prepare(
-      `SELECT reference FROM bookings
+      `SELECT reference, student_id, starts_at FROM bookings
        WHERE (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?)) AND ends_at > ? AND starts_at < ?`
     )
       .bind(new Date().toISOString(), start.toISOString(), endsAt.toISOString())
       .first();
+    if (clash && studentId && clash.student_id === studentId && Date.parse(clash.starts_at) === start.getTime()) {
+      return fail("They already have this lesson.", 409, request, env);
+    }
     if (clash) return fail(`That overlaps an existing lesson (${clash.reference}).`, 409, request, env);
 
     let student = studentId
@@ -5627,9 +5655,9 @@ async function handleAdmin(request, env, ctx, url, path) {
      * was, and becomes automatic from the moment they add one.
      */
     const cardPays = cardPaysFor(env, settings, student);
-    // A lesson already had is never charged: she is recording it, and was
-    // most likely paid for it by hand.
-    const onCard = cardPays && start > new Date();
+    // A lesson already had is never charged: she is recording it.
+    const onCard = cardPays && !past;
+    const paymentStatus = onCard ? "scheduled" : past && payment === "unpaid" ? "owed" : "not_required";
     const location = body.location === "porto" ? "porto" : "online";
     const notes = cleanText(body.notes, 1000);
 
@@ -5638,7 +5666,8 @@ async function handleAdmin(request, env, ctx, url, path) {
     const claimed = await claimSlot(env, {
       columns: ["id", "reference", "lesson_type_id", "student_id", "student_name", "student_email", "student_phone",
         "student_timezone", "location", "notes", "starts_at", "ends_at", "status", "sequence", "created_at", "updated_at",
-        "payment_status", "amount_cents", "payment_consent_at", "payment_consent_version", "added_by_teacher"],
+        "payment_status", "amount_cents", "payment_consent_at", "payment_consent_version", "added_by_teacher",
+        "meeting_retry_at"],
       values: [
         id,
         reference,
@@ -5655,16 +5684,20 @@ async function handleAdmin(request, env, ctx, url, path) {
         "confirmed", 0,
         now,
         now,
-        onCard ? "scheduled" : "not_required",
-        lessonType.price_cents,
+        paymentStatus,
+        past && payment === "free" ? 0 : lessonType.price_cents,
         onCard ? student.card_consent_at : null,
-        onCard ? STUDENT_CARD_CONSENT_VERSION : null,
-        1
+        onCard ? STUDENT_CARD_CONSENT_VERSION : past && payment === "paid" ? PAID_BY_HAND_MARK : null,
+        1,
+        // One still running is left out of the Meet sweep until it is over.
+        past ? endsAt.toISOString() : null
       ], startAt: start.toISOString(), endAt: endsAt.toISOString()
     });
     if (!claimed) return fail("That time has just been booked. Please choose another time.", 409, request, env);
 
     const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
+    // Recorded, not booked: no email either way, no invitation, no sign-in link.
+    if (past) return json({ booking: publicBooking(row, lessonType, settings), emailed: false }, 201, request, env);
     // The student is told, and given one link into their account when they
     // have never been in or still have a card to add.
     const held = awaitingWelcome(student);
@@ -5774,6 +5807,10 @@ async function handleAdmin(request, env, ctx, url, path) {
     const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
     const settings = await loadSettings(env);
     const token = await createManageToken(row.id, env.BOOKING_TOKEN_SECRET);
+    // Correcting a lesson she recorded, still in the past: nobody was told of it.
+    if (recordedAfter(row) && start <= now) {
+      return json({ booking: publicBooking(updated, lessonType, settings), emailed: false }, 200, request, env);
+    }
 
     ctx.waitUntil(
       notify(env, {
@@ -5839,6 +5876,10 @@ async function handleAdmin(request, env, ctx, url, path) {
       .first();
     const settings = await loadSettings(env);
 
+    // A lesson she recorded after it happened was never announced, so its
+    // cancellation isn't either.
+    if (recordedAfter(row)) return json({ booking: publicBooking(updated, lessonType, settings), emailed: false }, 200, request, env);
+
     // No same-day fee when she is the one cancelling — and the emails should say
     // she did it, rather than telling the student they cancelled their own lesson.
     ctx.waitUntil(
@@ -5878,18 +5919,19 @@ async function handleAdmin(request, env, ctx, url, path) {
   /*
    * A lesson she added that the student already paid her for by hand comes
    * off the card before it is charged, and stays off if the student later
-   * changes card (12 October 2026: never charge twice).
+   * changes card (12 October 2026: never charge twice). One she recorded as
+   * still owed is marked paid the same way.
    */
   const adminPaidByHand = path.match(/^\/admin\/bookings\/([^/]+)\/paid-by-hand$/);
   if (adminPaidByHand && request.method === "POST") {
     const changed = await env.DB.prepare(
       `UPDATE bookings SET payment_status = 'not_required', payment_consent_at = NULL, payment_consent_version = ?, updated_at = ?
-       WHERE id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled'`
+       WHERE id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status IN ('scheduled', 'owed')`
     )
       .bind(PAID_BY_HAND_MARK, new Date().toISOString(), adminPaidByHand[1])
       .run();
     if ((changed?.meta?.changes ?? 0) === 0) {
-      return fail("Only a lesson you added that is waiting to be charged can be marked paid by hand.", 409, request, env);
+      return fail("Only a lesson you added that is waiting to be charged or still owed can be marked paid by hand.", 409, request, env);
     }
     const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(adminPaidByHand[1]).first();
     return json({ booking: withRealEmail(updated) }, 200, request, env);
