@@ -4,7 +4,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Camera, Sparkles, CheckCircle2, ChevronDown, Lock, PenLine, Plus, Trash2 } from "lucide-react";
 import { prepareHomeworkPhoto, teacherHomeworkRequest, transcribeHomeworkPhoto, type HomeworkSheet, type TeacherHomeworkData, type HomeworkMark } from "@/lib/homework-api";
 import { readSession } from "@/lib/auth-api";
-import { PaintedText } from "./HomeworkArt";
 import { HomeworkToggle, HomeworkWorksheet } from "./HomeworkWorksheet";
 
 const emptySheet = (): HomeworkSheet => ({
@@ -124,7 +123,7 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
   }
 
   return <section className="teacher-homework" ref={editor} aria-labelledby={`${inputId}-title`}>
-    <div className="homework-toolbar homework-toolbar--head"><h3 id={`${inputId}-title`}><PaintedText seed={bookingId}>Homework</PaintedText></h3>
+    <div className="homework-toolbar homework-toolbar--head"><h3 id={`${inputId}-title`}>Homework</h3>
       {draft ? <span className={`homework-status homework-status--${draft.publishedAt ? "returned" : "draft"}`}>{draft.publishedAt
         ? <><CheckCircle2 size={15} aria-hidden="true" />Published</> : <><Lock size={14} aria-hidden="true" />Private draft</>}</span> : null}
     </div>
@@ -242,7 +241,7 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
     </div>
     <fieldset className="homework-review__sheet" disabled={busy || marking}>
       {sheet.sections.map((section, index) => <section key={index}>
-        <h5 lang="pt-PT"><span aria-hidden="true">{index + 1}</span>{section.title}</h5>
+        <h5 lang="pt-PT"><span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>{section.title}</h5>
         <p className="homework-review__instruction" lang="pt-PT">{section.instruction}</p>
         {section.questions.map((question, qi) => {
           const mark = marks[question.id] ?? { status: "review", feedback: "", source: "pending" };

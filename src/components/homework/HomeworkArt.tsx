@@ -1,15 +1,11 @@
-"use client";
-
-import { useEffect, useState, type ReactNode } from "react";
 import { AssetMark } from "@/components/BrandMarks";
-import { blob, makeCanvas, paintStroke, rng } from "@/components/expressions/paint-art";
-import { PAINTS, hash, type PaintKey } from "@/lib/expression-paint";
+import { hash } from "@/lib/expression-paint";
 import { STUDENT_MARKS } from "@/lib/student-marks";
 
 /*
  * Homework’s decoration, all aria-hidden: the words around it carry the meaning.
- * On screen, a brand splat and a gouache swash from the expressions’ paint box;
- * on paper, only thin black outlines, so a printed sheet costs almost no ink.
+ * On screen, the brand splats the public pages use; on paper, thin outlines
+ * and one coral rule, so a printed sheet costs almost no ink.
  */
 
 /** The brand splat a sheet or lesson always wears, chosen from its own text. */
@@ -17,43 +13,7 @@ export function HomeworkSplat({ seed, className }: { seed: string; className?: s
   return <AssetMark asset={STUDENT_MARKS[hash(seed) % STUDENT_MARKS.length].src} className={className} />;
 }
 
-const swashes = new Map<string, string>();
-
-/**
- * One gouache stroke, with a drop of its accent flicked off the end, painted
- * once per seed into an image. Without a canvas there is simply no stroke.
- */
-function swash(seed: string, paint: PaintKey) {
-  const key = `${paint}:${seed}`;
-  if (!swashes.has(key)) {
-    let url = "";
-    try {
-      const w = 640, h = 44, reach = w - 26, B = h * 0.76;
-      const R = rng(hash(seed));
-      const { paint: colour, shade, streaks, accent } = PAINTS[paint];
-      const stroke = paintStroke(reach, h, B, reach - B * 3, colour, R, 2, { shade, streaks, flick: 0.5 });
-      const [canvas, g] = makeCanvas(w, h, 2);
-      g.drawImage(stroke, 0, 0, reach, h);
-      blob(g, w - 10, h * 0.3, 6, R, accent, { rim: false, lobes: 0.12 });
-      url = `url(${canvas.toDataURL("image/png")})`;
-    } catch {}
-    swashes.set(key, url);
-  }
-  return swashes.get(key)!;
-}
-
-/**
- * Heading text over a painted swash. The stroke is the text's background,
- * cloned per line, so a title that wraps gets a stroke under every line.
- * Ink stays readable over the light lavender paint (5.4:1).
- */
-export function PaintedText({ seed, paint = "lavender", children }: { seed: string; paint?: PaintKey; children: ReactNode }) {
-  const [image, setImage] = useState("");
-  useEffect(() => setImage(swash(seed, paint)), [seed, paint]);
-  return <span className="painted-text" style={image ? { backgroundImage: image } : undefined}>{children}</span>;
-}
-
-/** A hand-drawn rule across the full width: a pen line, never a hairline. */
+/** The paper sheet’s hand-drawn rule across the full width: a pen line, never a hairline. */
 export function DrawnRule({ className }: { className?: string }) {
   return <svg aria-hidden="true" className={className} viewBox="0 0 300 12" fill="none" preserveAspectRatio="none">
     <path d="M1 7c12-5 24 3 37-1s25 4 37 0 25 3 37-1 25 4 37 0 25 3 37-1 25 4 37 0 25 3 37-1 25 4 37 0" stroke="currentColor" strokeLinecap="round" vectorEffect="non-scaling-stroke" />

@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Printer, BookOpen, CheckCircle2, RotateCcw, CircleHelp, PencilLine, Eye, EyeOff } from "lucide-react";
 import type { HomeworkMark, HomeworkSheet } from "@/lib/homework-api";
-import { DrawnRule, HomeworkSplat, PaintedText, PaperBloom } from "./HomeworkArt";
+import { DrawnRule, HomeworkSplat, PaperBloom } from "./HomeworkArt";
 
 /** The site's sliding two-option control, for a choice of view rather than a form value. */
 export function HomeworkToggle<T extends string>({ label, value, options, onChange, controls, className = "" }: {
@@ -79,15 +79,15 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
       <article className={`homework-sheet${paper ? " homework-sheet--paper" : ""}`} lang="pt-PT">
         <header className="homework-sheet__head">
           {paper ? <PaperBloom className="homework-sheet__motif" /> : <HomeworkSplat seed={sheet.title} className="homework-sheet__splat" />}
-          <p className="homework-sheet__brand">Português com a Inês</p>
+          {paper ? <p className="homework-sheet__brand">Português com a Inês</p> : null}
           <div className="homework-sheet__meta"><span>Aula de {date}</span><span>{level} · {minutes} min</span></div>
-          <h3>{paper ? sheet.title : <PaintedText seed={sheet.title}>{sheet.title}</PaintedText>}</h3>
+          <h3>{sheet.title}</h3>
+          {paper ? null : <span className="short-rule" aria-hidden="true" />}
           <p className="homework-sheet__objective">{sheet.objective}</p>
-          {paper ? <p className="homework-sheet__name">Nome<span aria-hidden="true" /></p> : null}
-          <DrawnRule className="homework-sheet__rule" />
+          {paper ? <><p className="homework-sheet__name">Nome<span aria-hidden="true" /></p><DrawnRule className="homework-sheet__rule" /></> : null}
         </header>
         {sheet.sections.map((section, si) => <section className="homework-sheet__section" key={si}>
-          <h4><span aria-hidden="true">{si + 1}</span>{section.title}</h4>
+          <h4><span aria-hidden="true">{String(si + 1).padStart(2, "0")}</span>{section.title}</h4>
           <p className="homework-sheet__instruction">{section.instruction}</p>
           {section.example ? <p className="homework-sheet__example"><strong>Exemplo</strong>{section.example}</p> : null}
           <ol className="homework-sheet__questions">
