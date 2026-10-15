@@ -2976,6 +2976,22 @@ await test("homework: private drafts, teacher review, lesson ownership and saved
   assert.equal((await call(route, { user: "teacher", method: "GET" })).status, 409);
 });
 
+await test("homework defaults: a new sheet starts at the student's latest earlier level and 15 minutes", async () => {
+  const at = day => ({ start: `2026-${day}T09:00:00.000Z`, end: `2026-${day}T10:00:00.000Z` });
+  const earlier = linkedBooking("homework-level-earlier", at("09-20"));
+  const current = linkedBooking("homework-level-current", at("09-27"));
+  const later = linkedBooking("homework-level-later", at("10-04"));
+  const draft = level => ({ notes: "Pretérito perfeito: fui, comi, vi.", level, minutes: 20, sheet: null, updatedAt: null });
+  assert.equal((await call(`/admin/lessons/${earlier}/homework`, { user: "teacher", body: draft("B1") })).status, 200);
+  assert.equal((await call(`/admin/lessons/${later}/homework`, { user: "teacher", body: draft("B2") })).status, 200);
+  const fresh = await (await call(`/admin/lessons/${current}/homework`, { user: "teacher", method: "GET" })).json();
+  assert.deepEqual([fresh.level, fresh.minutes, fresh.notes, fresh.updatedAt], ["B1", 15, "", null], "the latest earlier sheet's level; a later lesson's draft does not count");
+  const saved = await (await call(`/admin/lessons/${current}/homework`, { user: "teacher", body: { ...draft("A2"), minutes: 10 } })).json();
+  assert.deepEqual([saved.level, saved.minutes], ["A2", 10], "Inês's own choice for this lesson outlives the default");
+  const firstSheet = linkedBooking("homework-level-first", { ...at("09-27"), owner: "bob" });
+  assert.equal((await (await call(`/admin/lessons/${firstSheet}/homework`, { user: "teacher", method: "GET" })).json()).level, "A1", "a student's first sheet starts at A1");
+});
+
 await test("homework AI: bounded photo upload, reviewed notes, provider failure and shared usage ceiling", async () => {
   const id = linkedBooking("homework-ai");
   const route = `/admin/lessons/${id}/homework`;
@@ -3002,6 +3018,7 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
       assert.equal((await call(`${route}/return`, { user: "teacher", body: { submissionId: attempt.progress.submission.id, updatedAt: attempt.progress.updatedAt, approved: true } })).status, 409);
       return Response.json({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ marks: [{ id: "q1", status: "correct", feedback: "O teu pedido está correto." }] }) }] }] });
     }
+    if (input.text.format.name === "lesson_transcription") assert.equal(input.input[1].content.filter(part => part.type === "input_image").length, 2, "several photos share one paid request");
     const output = input.text.format.name === "lesson_transcription" ? { notes: "No café: queria um café, por favor.", uncertain: ["Last word is unclear."] } : {
       title: "No café", objective: "Pedir no café.", reminder: "Recorda amanhã.",
       sections: [{ title: "Pratica", instruction: "Faz um pedido.", example: "", questions: [{ prompt: "Pede um café.", answer: "Queria um café, por favor.", explanation: "" }] }],
@@ -3009,10 +3026,13 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     return Response.json({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(output) }] }] });
   };
   try {
-    const raw = JSON.stringify({ image, updatedAt: null });
+    const raw = JSON.stringify({ images: [image, image], updatedAt: null });
     assert.equal((await call(`${route}/transcribe`, { user: "bob", raw, headers: { "Content-Length": String(raw.length) } })).status, 401);
     assert.equal(requests, 0, "unauthorised uploads never call a paid provider");
-    assert.equal((await call(`${route}/transcribe`, { user: "teacher", body: { image: "https://private.example/photo", updatedAt: null } })).status, 400);
+    assert.equal((await call(`${route}/transcribe`, { user: "teacher", body: { image: "https://private.example/photo", updatedAt: null } })).status, 400, "an older tab's single photo is still validated");
+    assert.equal((await call(`${route}/transcribe`, { user: "teacher", body: { images: [image, image, image, image], updatedAt: null } })).status, 400, "four photos are too many");
+    assert.equal((await call(`${route}/transcribe`, { user: "teacher", body: { images: [image, "https://private.example/photo"], updatedAt: null } })).status, 400, "every photo is checked");
+    assert.equal(requests, 0, "rejected photos never reach the provider");
     const read = await call(`${route}/transcribe`, { user: "teacher", raw, headers: { "Content-Length": String(raw.length) } });
     assert.equal(read.status, 200, await read.clone().text());
     assert.equal((await read.json()).uncertain.length, 1);
@@ -3051,7 +3071,7 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     assert.equal(fallback.progress.submission.marks.q1.status, "review");
     assert.equal(fallback.progress.submission.state, "submitted");
     assert.equal(requests, 4, "manual review needs no paid retry");
-    assert.equal((await call(`${route}/transcribe`, { user: "teacher", raw, headers: { "Content-Length": "3000000" } })).status, 413);
+    assert.equal((await call(`${route}/transcribe`, { user: "teacher", raw, headers: { "Content-Length": "8402000" } })).status, 413);
   } finally {
     globalThis.fetch = beforeFetch;
     delete env.HOMEWORK_AI_ENABLED; delete env.OPENAI_API_KEY; delete env.HOMEWORK_AI_MONTHLY_LIMIT;

@@ -68,7 +68,7 @@ import {
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
-import { HomeworkProblem, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing } from "./homework.mjs";
+import { HomeworkProblem, HOMEWORK_PHOTO_BODY_LIMIT, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing } from "./homework.mjs";
 import { closedExpressions, expressionsOpenToStudents, pickExpression, studentExpressions } from "./student-expressions.mjs";
 import { findRecurringCode, studentRates, studentLessonType, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
@@ -1800,7 +1800,7 @@ const worker = {
         if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
           return fail("Send a JSON request.", 415, request, env);
         }
-        const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? 2801024
+        const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
           : /^\/(?:admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?|me\/homework\/[^/]+(?:\/submit)?)$/.test(path) ? 65536
           : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
         if (Number(request.headers.get("Content-Length") || 0) > bodyLimit) return fail("Request too large.", 413, request, env);
@@ -5185,7 +5185,7 @@ async function handleAdmin(request, env, ctx, url, path) {
   const homework = path.match(/^\/admin\/lessons\/([^/]+)\/homework(?:\/(transcribe|generate|publish|return))?$/);
   if (homework) {
     return homeworkReply(request, env, async () => teacherHomework(env, request.method, homework[1], homework[2] ?? "",
-      request.method === "POST" ? await readJson(request, homework[2] === "transcribe" ? 2801024 : 65536) : {}));
+      request.method === "POST" ? await readJson(request, homework[2] === "transcribe" ? HOMEWORK_PHOTO_BODY_LIMIT : 65536) : {}));
   }
 
   if (path === "/admin/expressions" || path.startsWith("/admin/expressions/")) {
