@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Globe, UserRound } from "lucide-react";
-import { AdminApiError, createBookingFor, type AdminStudent, type PastPayment } from "@/lib/admin-api";
+import { AdminApiError, createBookingFor, type AdminStudent } from "@/lib/admin-api";
 import { forgetAvailability, formatMoneyCents, portoTimeToUtc } from "@/lib/booking-api";
 import { lessonProducts } from "@/lib/lesson-products";
 import { priceFor } from "@/components/teacher/StudentPrice";
@@ -22,8 +22,6 @@ const empty = {
 
 const trialPrice = lessonProducts.find((product) => product.id === "trial")?.priceCents ?? 0;
 const RUN_LENGTHS: [Repeat, string][] = [[4, "4 weeks"], [6, "6 weeks"], [8, "8 weeks"], ["open", "Until stopped"]];
-// Paid to her by hand is how a lesson already had has always been recorded.
-const PAYMENTS: [PastPayment, string][] = [["paid", "Paid"], ["unpaid", "Unpaid"], ["free", "Free"]];
 
 /** When the chosen time starts, or nothing while it is incomplete or one the clocks skip. */
 function startOf(date: string, time: string, startAt: string) {
@@ -42,15 +40,14 @@ function addedLine(
   repeat: Repeat,
   series: { booked: number; skipped: { key: string }[] } | undefined,
   emailed: boolean,
-  payment?: PastPayment,
+  recorded = false,
 ) {
   const when = `${dateLabel(date, { weekday: "short", day: "numeric", month: "short" })}, ${time}`;
   const often = series ? ` · weekly, ${repeat === "open" ? "until stopped" : `${series.booked} lessons`}` : "";
   const left = series?.skipped.length
     ? ` (${series.skipped.map((week) => dateLabel(week.key, { day: "numeric", month: "short" })).join(", ")} left out)`
     : "";
-  const paid = payment ? ` · ${PAYMENTS.find(([value]) => value === payment)?.[1].toLowerCase()}` : "";
-  return `${when}${often}${left}${paid}${emailed ? " · emailed" : ""}`;
+  return `${when}${often}${left}${recorded ? " · recorded" : ""}${emailed ? " · emailed" : ""}`;
 }
 
 /**
@@ -59,8 +56,8 @@ function addedLine(
  * loose lessons), so there is no address to type, and none is needed: a
  * student with no email yet has lessons like anyone else (14 October 2026,
  * Dan). Lessons for a student still awaiting their welcome are added quietly.
- * One already had is recorded, never announced or charged: she says only how
- * it was paid (15 October 2026, Dan).
+ * One already had is only recorded: date, time, length, add; never announced,
+ * charged or owed (15 October 2026, Dan).
  */
 export function LessonForm({
   token,
@@ -86,7 +83,6 @@ export function LessonForm({
   onCancel?: () => void;
 }) {
   const [lesson, setLesson] = useState({ ...empty, date, time });
-  const [payment, setPayment] = useState<PastPayment>("paid");
   const quiet = Boolean(student.awaitingWelcome);
   const [openedAt] = useState(() => Date.now());
   const startAt = startOf(lesson.date, lesson.time, lesson.startAt);
@@ -102,10 +98,30 @@ export function LessonForm({
     setBusyState(value);
     onBusy?.(value);
   };
+  const submit = (
+    <div className="teacher-manual-submit teacher-dialog-actions">
+      <button
+        className={`button button--${past ? "coral" : tone}`}
+        type="submit"
+        disabled={busy || !startAt}
+      >
+        {busy
+          ? "Adding…"
+          : past
+            ? "Add past lesson"
+            : `${weekly ? "Add weekly lessons" : "Add lesson"}${quiet ? "" : " and email student"}`}
+      </button>
+      {onCancel ? (
+        <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">
+          Cancel
+        </button>
+      ) : null}
+    </div>
+  );
   return (
     <>
       <form
-        className="teacher-form teacher-manual-form"
+        className={`teacher-form teacher-manual-form${past ? " teacher-manual-form--past" : ""}`}
         onSubmit={async (event) => {
           event.preventDefault();
           if (busy || !startAt) return;
@@ -119,14 +135,12 @@ export function LessonForm({
               location: lesson.location,
               notes: "",
               ...(weekly ? { repeat: lesson.repeat as Exclude<Repeat, "once"> } : {}),
-              ...(past ? { payment } : {}),
             });
             // Ready for their next lesson: the same choices, a new date.
             forgetAvailability();
             setAvailabilityRefresh(current => current + 1);
             setLesson((current) => ({ ...current, date: "", startAt: "" }));
-            setPayment("paid");
-            onCreated(addedLine(lesson.date, lesson.time, lesson.repeat, result.series, result.emailed !== false, past ? payment : undefined));
+            onCreated(addedLine(lesson.date, lesson.time, lesson.repeat, result.series, result.emailed !== false, past));
           } catch (caught) {
             if (caught instanceof AdminApiError && caught.status === 409 && lesson.startAt) {
               forgetAvailability();
@@ -172,9 +186,11 @@ export function LessonForm({
               ))}
             </div>
           </fieldset>
+          {/* A lesson already had needs only its length, then adding. */}
+          {past ? submit : null}
           {/* Online and In Porto carry the timetable's own marks (12 October
               2026, at Dan's request). */}
-          <fieldset className="teacher-manual-choice">
+          {past ? null : <fieldset className="teacher-manual-choice">
             <legend>Where</legend>
             <div className={`segmented segmented--${lesson.location}`}>
               <span aria-hidden="true" className="segmented__thumb" />
@@ -198,7 +214,7 @@ export function LessonForm({
                 </label>
               ))}
             </div>
-          </fieldset>
+          </fieldset>}
           {/* A student she sees every week is set up once, as a student books a
               weekly slot (12 October 2026, Dan). A trial is one first lesson. */}
           {lesson.lessonType !== "trial" && !past ? (
@@ -259,46 +275,7 @@ export function LessonForm({
           startAt={lesson.startAt}
           time={lesson.time}
         />
-        {/* A lesson already had: one decision left, as booking's time blobs. */}
-        {past ? (
-          <fieldset className="teacher-manual-choice teacher-past-payment">
-            <legend>Paid?</legend>
-            <div className="teacher-lesson-picker__slots" role="radiogroup" aria-label="How it was paid">
-              {PAYMENTS.map(([value, label]) => (
-                <button
-                  aria-checked={payment === value}
-                  className="teacher-lesson-picker__slot"
-                  data-past-payment={value}
-                  disabled={busy}
-                  key={value}
-                  onClick={() => setPayment(value)}
-                  role="radio"
-                  type="button"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-        ) : null}
-        <div className="teacher-manual-submit teacher-dialog-actions">
-          <button
-            className={`button button--${tone}`}
-            type="submit"
-            disabled={busy || !startAt}
-          >
-            {busy
-              ? "Adding…"
-              : past
-                ? "Add past lesson"
-                : `${weekly ? "Add weekly lessons" : "Add lesson"}${quiet ? "" : " and email student"}`}
-          </button>
-          {onCancel ? (
-            <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">
-              Cancel
-            </button>
-          ) : null}
-        </div>
+        {past ? null : submit}
       </form>
       {error ? (
         <p className="teacher-inline-error" role="alert">

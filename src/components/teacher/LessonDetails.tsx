@@ -79,12 +79,11 @@ export function LessonDetails({
     scheduled: "charged to their card after the lesson",
     pending: "waiting for their card",
     not_required: "paid to you by hand",
-    owed: "owed to you by hand",
-  }[booking.payment_status] ?? "";
+    recorded: "recorded",
+  }[booking.payment_status];
   const money = booking.status === "cancelled" && !["paid", "refunded"].includes(booking.payment_status)
     ? ""
-    : booking.amount_cents === 0 && booking.payment_status === "not_required" ? "Free"
-      : booking.amount_cents ? `${formatMoneyCents(booking.amount_cents)} · ${paid}` : paid.charAt(0).toUpperCase() + paid.slice(1);
+    : booking.amount_cents ? `${formatMoneyCents(booking.amount_cents)} · ${paid}` : paid.charAt(0).toUpperCase() + paid.slice(1);
   const backdropHandlers = useDialogBackdrop(() => { if (!busy) onClose(); });
 
   useLayoutEffect(() => {
@@ -219,7 +218,7 @@ export function LessonDetails({
             {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
             {awaiting ? <li>{noEmail ? "No email yet: add it under Edit details, then send their welcome" : "Not emailed yet: send their welcome from Students"}</li> : null}
           </ul>
-          {addedByTeacher(booking) && booking.status !== "cancelled" && (booking.payment_status === "scheduled" || booking.payment_status === "owed") ? (
+          {addedByTeacher(booking) && booking.status !== "cancelled" && booking.payment_status === "scheduled" ? (
             // One they already paid for by hand comes off before it is charged.
             <button
               className="text-action teacher-lesson-paid"
@@ -230,7 +229,7 @@ export function LessonDetails({
                 try {
                   await markPaidByHand(token, booking.id);
                   changed.current = true;
-                  onChanged(booking.payment_status === "owed" ? "Marked paid to you by hand." : "Taken off their card. This lesson stays paid to you by hand.");
+                  onChanged("Taken off their card. This lesson stays paid to you by hand.");
                 } catch (caught) {
                   setError(caught instanceof Error ? caught.message : "This lesson couldn’t be updated.");
                 } finally {
@@ -239,7 +238,7 @@ export function LessonDetails({
               }}
               type="button"
             >
-              {booking.payment_status === "owed" ? "Paid you? Mark it paid" : "Already paid you by hand? Take it off their card"}
+              Already paid you by hand? Take it off their card
             </button>
           ) : null}
         </>

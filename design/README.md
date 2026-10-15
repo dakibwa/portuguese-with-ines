@@ -528,10 +528,13 @@ usual lesson starts and days off; avoid a wall of administration forms.
   they stack on a phone. The lesson calendar opens on today and pages back a
   year for a lesson already had (15 October 2026, Dan). Past days read quieter
   but stay choosable; a past day's times are every quarter hour, as the same
-  time blobs, since weekly hours don't bind what has happened. A past time
-  hides How often and asks one thing, `Paid?`, as three blobs (`Paid` already
-  blue, `Unpaid`, `Free`), then one coral `Add past lesson`; it says nothing
-  about email because nothing is sent. Choose a time; there is no manual date
+  time blobs, since weekly hours don't bind what has happened. A past lesson
+  is purely a record (15 October 2026, Dan): date, time, length, add. A past
+  time hides Where and How often, and the length is followed at once by one
+  coral `Add past lesson` (beneath the times on a phone, under the length
+  beside the calendar on a wide row). There is no payment step and nothing is
+  said about email, because nothing is sent or charged; her history reads
+  `Recorded`. Choose a time; there is no manual date
   or time entry. Location, length and weekly repeat remain available. Welcomes are explicit:
   opening a step never sends email. First welcomes use `onlyIfWaiting: true`;
   `Send the link again` deliberately requests a fresh link without that guard.

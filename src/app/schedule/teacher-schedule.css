@@ -3000,8 +3000,7 @@
   .teacher-setup__body .teacher-price .teacher-form > .teacher-inline-error { grid-column: 1 / -1; }
   .teacher-setup__body .teacher-manual-form { grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 1.6fr); align-items: start; column-gap: 1.5rem; }
   .teacher-setup__body .teacher-lesson-picker { grid-column: 2; grid-row: 1; }
-  .teacher-setup__body .teacher-manual-submit,
-  .teacher-setup__body .teacher-past-payment { grid-column: 2; }
+  .teacher-setup__body .teacher-manual-submit { grid-column: 2; }
   .teacher-setup__body .teacher-manual-settings .segmented--three label { grid-auto-flow: row; gap: 0.05rem; line-height: 1.25; }
   .teacher-setup__body .teacher-manual-price::before { content: none; }
   .teacher-setup__body .teacher-manual-settings .segmented--four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -3051,10 +3050,9 @@
 /* Days and times already had: still chosen, read quieter, for a lesson she records. */
 .teacher-lesson-picker .teacher-month-day.is-past:not([aria-pressed="true"]) { background: transparent; color: var(--lavender-ink); }
 .teacher-lesson-picker__slot.is-past:not([aria-pressed="true"]) { background: var(--paper); }
-.teacher-past-payment .teacher-lesson-picker__slots { grid-template-columns: repeat(3, minmax(0, 6rem)); max-height: none; overflow: visible; }
-.teacher-past-payment .teacher-lesson-picker__slot { font-size: 0.85rem; }
-.teacher-past-payment .teacher-lesson-picker__slot:nth-child(even) { border-radius: var(--squiggle-button-alt); }
-.teacher-lesson-picker__slot[aria-checked="true"] { border-color: var(--blue-deep); background: var(--blue-deep); color: var(--paper-light); }
+/* A lesson already had: date and time, then its length and the one action beneath. */
+.teacher-manual-form--past .teacher-manual-settings { order: 2; }
+.teacher-setup__body .teacher-manual-settings .teacher-manual-submit { grid-column: 1 / -1; }
 @container (min-width: 34rem) {
   .teacher-lesson-picker__layout { grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 1.5rem; }
 }

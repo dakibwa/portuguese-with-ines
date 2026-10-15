@@ -42,8 +42,8 @@ Inês on /schedule                     (her own account, role=teacher)
                                                      (marked `added_by_teacher`, shown as
                                                      `Added by you`; charged to a card only
                                                      once the student saved one from their
-                                                     account); one already started is recorded
-                                                     quietly, with `payment` paid/unpaid/free
+                                                     account); one already started is only
+                                                     recorded (`payment_status = 'recorded'`)
   → POST /admin/students                             set a student up (details, optional prices); nothing emailed
   → POST /admin/students/:id/details                 their name, email, phone, NIF and splat; email only
                                                      until they first sign in
@@ -86,45 +86,39 @@ for 14 days, once) instead of the manage link, and it says how adding a card
 works; the invitation still carries the manage link. Her own copy says
 `You added a lesson`.
 
-**Recording a lesson already had** (15 October 2026, Dan). A `startAt` at or
-before now is a lesson she is recording, not booking. It is checked for
-clashes only, like any lesson she adds (weekly hours, time off and the notice
-window don't apply), and the same student at the same start answers 409 `They
-already have this lesson.` Nothing else a booking does happens: no email to the
-student or to her, so no calendar invitation; no sign-in link; no card, charge
-or payment link; no reminder (those look only ahead); and no Google Calendar
-event or Meet. One still running when she records it carries
-`meeting_retry_at = ends_at`, so the Meet sweep never reaches it. It cannot
-repeat weekly (400). The reply is `emailed: false`. Moving it to another past
-time, or cancelling it, is as quiet, since the student was never told of it: a
-row whose `created_at` is at or after its `starts_at` was recorded, never
-announced. Moved into the future, it becomes an ordinary lesson and its emails
-follow. It is the student's like any other lesson: in their Past lessons, her
-history of them, her timetable and Receipts, with homework on it as usual.
+**Recording a lesson already had** (15 October 2026, Dan: purely for the
+record). A `startAt` at or before now is a lesson she is recording, not
+booking. It is checked for clashes only, like any lesson she adds (weekly
+hours, time off and the notice window don't apply), and the same student at
+the same start answers 409 `They already have this lesson.` Nothing else a
+booking does happens: no email to the student or to her, so no calendar
+invitation; no sign-in link; no card, charge or payment link; no reminder
+(those look only ahead); and no Google Calendar event or Meet. One still
+running when she records it carries `meeting_retry_at = ends_at`, so the Meet
+sweep never reaches it. It cannot repeat weekly (400). The reply is
+`emailed: false`.
+
+It is stored as `payment_status = 'recorded'` with no `amount_cents` (no
+migration: the column has no CHECK constraint). No existing combination was
+neutral: `not_required` on an ended lesson is Receipts' `Paid by hand`, ready
+to issue, and saving a card turns a `not_required` lesson Inês added into a
+charge; `payment_due` sends a Stripe payment link. Every charge, recovery,
+repricing, card-transition and receipt query names the statuses it acts on,
+and none names `recorded`, so it is never charged, chased or put forward as
+paid or owed. It is **not in Receipts**: a record says nothing about money, so
+there is nothing to issue a fatura-recibo for; if she was paid for it, that is
+hers to note outside the site. Her history shows `Recorded`, as does the
+lesson's dialog; the student sees it in Past lessons as `Completed`, with no
+price, like any other past lesson. Homework is set on it as usual.
+
+Moving it to another past time, or cancelling it, is as quiet, since the
+student was never told of it. It cannot be moved into the future (409 `A
+recorded lesson stays in the past. Add a new lesson instead.`), so a record
+never becomes an unannounced lesson to come.
 An unproven account with a password is still reclaimed first (below), because
 the lesson and its homework must not reach whoever registered the address;
 with no confirmation sent, the mailbox's owner gets back in with Google or a
 password reset.
-
-She says how it was paid, as `payment`, mapped onto the fields the billing
-model already has, with no migration:
-
-- `paid` (the default): `payment_status = 'not_required'` with the
-  `paid-by-hand` mark, at the student's own price. A lesson she records after
-  the fact has always been paid to her by hand, and Receipts already reads an
-  ended `not_required` lesson as `Paid by hand`, ready to issue.
-- `unpaid`: `payment_status = 'owed'`, at the student's price. It is not
-  `payment_due`, which is a failed card charge and would send the student a
-  Stripe payment link; `owed` is never charged, chased or put on a card, and no
-  sweep reads it. Receipts shows it as `Payment due`, by hand, not ready; her
-  history says `Unpaid`; the lesson's dialog offers `Paid you? Mark it paid`
-  (`POST /admin/bookings/:id/paid-by-hand`, which now also takes an `owed`
-  lesson to `not_required`).
-- `free`: `not_required` at `amount_cents = 0`. Receipts has no line for it,
-  and her history and the lesson's dialog say `Free`.
-
-`payment` is refused for a lesson still to come (400), so a free lesson can
-never reach a card by mistake.
 
 `How often` adds a weekly slot instead (4, 6 or 8 weeks, or until stopped),
 one email for the run. The first date is the one she chose, so it is booked
@@ -136,7 +130,8 @@ named in both emails.
 
 **Paying for the lessons she adds** (migration 0023, 12 October 2026, Dan).
 A lesson Inês adds records its price and `added_by_teacher = 1`. One she
-records after it has happened is never charged. It is paid to
+records after it has happened is only a record (`recorded`, above) and is never
+charged. A lesson to come is paid to
 her as before (`payment_status = 'not_required'`) until the student saves a card
 from their own account (`POST /me/card`, Stripe's hosted setup page,
 `client_reference_id = student:<id>`, `metadata.purpose = student_card`). That
@@ -593,9 +588,9 @@ Her steps expand in the row, reusing the details, prices and lesson forms.
 Lesson creation includes a calendar and available start times from the existing
 availability read, refreshed for the chosen lesson length. Choosing a slot
 fills the date and Porto time. The calendar pages back twelve months: a past
-day (or today's earlier times) offers every quarter hour from 07:00 to 21:45,
-How often steps aside, and one `Paid?` choice (Paid, Unpaid, Free; Paid
-chosen) comes before `Add past lesson`. A past time in the timetable offers
+day (or today's earlier times) offers every quarter hour from 07:00 to 21:45;
+for a past time, Where and How often step aside and only the length and a
+coral `Add past lesson` follow. A past time in the timetable offers
 only `Add a lesson here`. There is no manual date or time entry in this form. The existing creation
 endpoint still checks clashes and validates a weekly run. A saved change
 refreshes the student list and timetable.
