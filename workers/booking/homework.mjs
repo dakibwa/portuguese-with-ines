@@ -99,7 +99,8 @@ async function ai(env, bookingId, system, content, schema, name) {
       headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
-        model: env.HOMEWORK_AI_MODEL || "gpt-4.1-mini-2025-04-14",
+        model: env.HOMEWORK_AI_MODEL || "gpt-6.1-sol",
+        service_tier: "default", reasoning: { effort: "low" },
         store: false, max_output_tokens: 6500,
         input: [{ role: "system", content: system }, { role: "user", content }],
         text: { format: { type: "json_schema", name, strict: true, schema } },

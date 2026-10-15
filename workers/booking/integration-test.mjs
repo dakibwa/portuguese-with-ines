@@ -2988,6 +2988,7 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     requests++;
     const input = JSON.parse(options.body);
     assert.equal(input.store, false);
+    assert.equal(input.service_tier, "default", "homework must not inherit a paid speed upgrade from project settings");
     assert.ok(input.max_output_tokens <= 6500);
     assert.equal(input.text.format.strict, true);
     if (broken) return Response.json({ error: "private provider diagnostic" }, { status: 500 });

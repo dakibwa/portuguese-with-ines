@@ -105,9 +105,10 @@ the new migration/release; install an approved project key as the Worker secret
 secret and explicit environment variables; it must not accidentally use live
 student material during testing.
 
-The prepared model is `gpt-4.1-mini-2025-04-14`, which supports image input and
-structured output. Calls use the Responses API with `store:false`, a 60-second
-timeout, a bounded response and no tools. Text in photos/notes is untrusted
+The prepared model is `gpt-6.1-sol`, which supports image input and structured
+output. Calls use the Responses API with standard
+processing (`service_tier: "default"`), low reasoning effort, `store:false`, a
+60-second timeout, a bounded response and no tools. Text in photos/notes is untrusted
 material, never instructions to perform other actions. The server validates
 provider output before saving. Unreadable handwriting is marked for review;
 transcription and teaching accuracy still need Inês's review.
@@ -118,17 +119,21 @@ and a generated draft use one request each. A submission containing written
 answers uses one additional request for marking; exact-answer checks and teacher
 approval do not use AI. Attempts, including errors, count;
 there are no automatic paid retries. The limit is an atomic database claim,
-not a browser control. Each response is capped at 6,500 output tokens. Manual
-authoring, saved homework and teacher marking remain usable when AI is off or at
+not a browser control. Each response is capped at 6,500 output tokens, including
+reasoning. Manual authoring, saved homework and teacher marking remain usable when AI is off or at
 its limit. Marking sends only the relevant questions and student answers, never
 the private lesson notes, student name, email or account identifier. Students
 are told about this processing beside Submit and in the privacy notice.
 
-[OpenAI's published GPT-4.1 mini rates](https://developers.openai.com/api/docs/pricing)
-checked on 15 October 2026 are $0.40 per million input tokens and $1.60 per
-million output tokens. Image inputs are billed too. Actual cost depends on
-photo/notes length, output and retries; the request ceiling is not a dollar
-budget for other activity in the OpenAI project.
+[OpenAI's published GPT-6.1 Sol standard rates](https://developers.openai.com/api/docs/pricing)
+checked on 15 October 2026 are $2 per million input tokens and $10 per million
+output tokens for short contexts. Image inputs and reasoning are billed too.
+For illustration, a full photo, worksheet and marking workflow totalling 10,000
+input tokens and 10,000 output tokens would cost $0.12 before tax, caching
+adjustments or any regional-processing surcharge. This is a token-budget
+example, not a measured bill. Actual cost depends on photo/notes length, output
+and retries; the request ceiling is not a dollar budget for other activity in
+the OpenAI project.
 
 `store:false` avoids storing Responses application state, but does not promise
 zero retention. [OpenAI's data controls](https://developers.openai.com/api/docs/guides/your-data)
