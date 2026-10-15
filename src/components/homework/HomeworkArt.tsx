@@ -8,9 +8,13 @@ import { STUDENT_MARKS } from "@/lib/student-marks";
  * and one coral rule, so a printed sheet costs almost no ink.
  */
 
-/** The brand splat a sheet or lesson always wears, chosen from its own text. */
-export function HomeworkSplat({ seed, className }: { seed: string; className?: string }) {
-  return <AssetMark asset={STUDENT_MARKS[hash(seed) % STUDENT_MARKS.length].src} className={className} />;
+/**
+ * One of the site's splats, as the student cards wear them: the same text
+ * always gives the same splat, and a list offsets each item by its place so
+ * neighbours never repeat.
+ */
+export function HomeworkSplat({ seed, offset = 0, className }: { seed: string; offset?: number; className?: string }) {
+  return <AssetMark asset={STUDENT_MARKS[(hash(seed) + offset) % STUDENT_MARKS.length].src} className={className} />;
 }
 
 /** The paper sheet’s hand-drawn rule across the full width: a pen line, never a hairline. */

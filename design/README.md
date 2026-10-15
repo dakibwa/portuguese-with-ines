@@ -46,20 +46,31 @@ level-appropriate European Portuguese instructions, recall and useful practice,
 with answers separate from questions. Offer Do online and Print worksheet.
 Online submission saves a fixed copy for automatic marking; only Inês sees
 those suggestions until she checks, edits and approves them. Homework to review
-belongs in the relevant student row, as a coral-edged prompt with its count.
+belongs in the relevant student row, as a coral prompt with its count.
 Inês marks each answer with the sliding `Correct` / `Try again` control and
 writes the feedback herself; an answer still waiting for her is edged in coral,
 and a placeholder is never approved as feedback. The print version uses black text, readable
 type and writing lines on white A4 pages, with optional answers on separate pages.
-Homework borrows the public pages' patterns rather than inventing its own: the
-student's list is rows between rules led by splats (the FAQ index and Approach
-list), the sheet is a Lessons-page card with its splat in the corner, an
-eyebrow, a Beth Ellen title and the short rule, and each section opens like an
-FAQ group (a small `01` and a Beth Ellen name), with what is read and written
-kept to a reading measure. State uses the price cards' duration chip; secondary
-actions are coral small-capital text. On paper it stays ink-light: Beth Ellen
-headings, the Bloom splat as a thin outline, grey rules and writing lines, and a
-single coral drawn rule; everything else is black or grey on white. See
+Homework speaks the booking journey's language and uses the room it has
+(15 October 2026, Dan: the space felt "underused and lifeless"). Every small
+button, tab and chip is a filled paint dab cut to the site's squiggle shapes:
+the sliding `Do online` / `Print worksheet` control, state (`Feedback from
+Inês` in blue), the way back, `Show answers`, Inês's editor links and the coral
+`Homework to review` with its count on a cream drop. The student's list is
+Lessons-page cards, three across where they fit, each hugging its content with
+its splat cropped into the corner and its title in Beth Ellen. The sheet's head
+is the Lessons hero in small: a lilac band, a large Beth Ellen title and a big
+splat cropping across its right edge, slimmed on a phone on its side. Each
+section opens with its own splat, a small `01` and its Beth Ellen name; on a
+wide card those take a rail on the left and the questions fill the rest, and
+sections are separated by space, not rules. Question numbers sit on the
+confirm step's paint dab, feedback reads as one of its facts (blue when right,
+coral to try again), and helpful lists use the same dabs. Neighbouring splats
+and dabs never repeat. On paper it stays ink-light: Beth Ellen headings, the
+Bloom splat as a thin outline, grey rules and writing lines, and a single coral
+drawn rule; everything else is black or grey on white. The name line is on the
+worksheet only; a printout that includes the answer key leaves it off.
+See
 [the homework contract and teaching sources](../docs/lesson-homework.md).
 
 ## Named failure patterns

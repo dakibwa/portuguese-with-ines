@@ -84,10 +84,12 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
           <h3>{sheet.title}</h3>
           {paper ? null : <span className="short-rule" aria-hidden="true" />}
           <p className="homework-sheet__objective">{sheet.objective}</p>
-          {paper ? <><p className="homework-sheet__name">Nome<span aria-hidden="true" /></p><DrawnRule className="homework-sheet__rule" /></> : null}
+          {/* The name line belongs to the worksheet alone; a printout with its answer key carries none. */}
+          {paper && !printAnswers ? <p className="homework-sheet__name">Nome<span aria-hidden="true" /></p> : null}
+          {paper ? <DrawnRule className="homework-sheet__rule" /> : null}
         </header>
         {sheet.sections.map((section, si) => <section className="homework-sheet__section" key={si}>
-          <h4><span aria-hidden="true">{String(si + 1).padStart(2, "0")}</span>{section.title}</h4>
+          <h4>{paper ? null : <HomeworkSplat seed={sheet.title} offset={si + 1} className="homework-section-mark" />}<span className="homework-num" aria-hidden="true">{String(si + 1).padStart(2, "0")}</span><span className="homework-section-title">{section.title}</span></h4>
           <p className="homework-sheet__instruction">{section.instruction}</p>
           {section.example ? <p className="homework-sheet__example"><strong>Exemplo</strong>{section.example}</p> : null}
           <ol className="homework-sheet__questions">
@@ -126,7 +128,7 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
             })}
           </ol>
         </section>)}
-        <p className="homework-sheet__reminder"><BookOpen size={19} aria-hidden="true" /><span>{sheet.reminder}</span></p>
+        <p className="homework-sheet__reminder">{paper ? <BookOpen size={19} aria-hidden="true" /> : <HomeworkSplat seed={sheet.reminder} className="homework-reminder-mark" />}<span>{sheet.reminder}</span></p>
         {/* Answers come after an attempt, so their switch sits at the sheet's foot. */}
         {paper ? null : <button type="button" className="homework-answers-toggle" aria-expanded={showAnswers} aria-controls={`${prefix}-key`} onClick={() => setShowAnswers(value => !value)}>
           {showAnswers ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}<span lang="en">{showAnswers ? "Hide answers" : "Show answers"}</span>
