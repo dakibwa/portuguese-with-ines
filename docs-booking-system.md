@@ -189,10 +189,17 @@ for the literal translation, two examples of up to 1,200 characters, and eight
 themes of up to 40 characters. Links are at most 2,048 characters; references
 accept only HTTPS without credentials. Images accept only local
 `/visuals/expressions/<name>.webp` paths, matching the site's security policy,
-and need a description. There is no upload service. Expression requests are
+and need a description. Expressions do not accept uploads. Expression requests are
 bounded to 128 KiB, including both ID lists when reordering up to 500 entries.
 Unknown fields, wrong types, empty list items and invalid publication values
 are rejected. Drafts may be incomplete; published entries must stay complete.
+
+Lesson homework has a private photo-to-notes flow and reviewed
+publication. Its student access, AI setup, limits and print format are described
+in [Lesson homework](docs/lesson-homework.md). Online submissions get automatic
+marking for Inês to check, edit and approve before returning feedback. A separate
+black-and-white worksheet can be printed. Migration 0029 adds its tables;
+it does not change expression storage or booking/payment state.
 
 Updates, publication and deletion compare `updatedAt` in the write itself.
 Stale requests receive HTTP 409. Reordering is one conditional SQLite statement

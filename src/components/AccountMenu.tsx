@@ -4,7 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { studentMark } from "@/lib/student-marks";
 
-export type AccountSection = "upcoming" | "history" | "profile";
+export type AccountSection = "upcoming" | "history" | "homework" | "profile";
 
 /**
  * The account's one menu, in the heading of whichever account card is showing
@@ -104,7 +104,7 @@ export function AccountMenu({
     onSelect(section);
   }
 
-  const place = current === "upcoming" ? 0 : current === "history" ? 1 : current === "profile" ? 2 : "none";
+  const place = current === "upcoming" ? 0 : current === "history" ? 1 : current === "homework" ? 2 : current === "profile" ? 3 : "none";
   const numericPlace = typeof place === "number" ? place : null;
   const [shownPlace, setShownPlace] = useState<number | "none">(() => lastPlace ?? place);
 
@@ -153,6 +153,9 @@ export function AccountMenu({
           </button>
           <button aria-current={current === "history" ? "true" : undefined} onClick={() => choose("history")} type="button">
             Past lessons
+          </button>
+          <button aria-current={current === "homework" ? "true" : undefined} onClick={() => choose("homework")} type="button">
+            Homework
           </button>
           <button aria-current={current === "profile" ? "true" : undefined} onClick={() => choose(current === "profile" ? "upcoming" : "profile")} type="button">
             {current === "profile" ? "Done editing" : "Edit details"}

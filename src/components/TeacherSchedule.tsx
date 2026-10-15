@@ -298,6 +298,9 @@ export function TeacherSchedule() {
   }, [token]);
   useEffect(() => {
     void reloadStudents();
+    const returned = () => { void reloadStudents(); };
+    window.addEventListener("homework-returned", returned);
+    return () => window.removeEventListener("homework-returned", returned);
   }, [reloadStudents]);
 
   // A quiet read is a background refresh: if it fails, the lessons already on

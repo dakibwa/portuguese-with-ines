@@ -19,6 +19,7 @@ import { MeetingLink } from "@/components/MeetingLink";
 import { restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { useDialogBackdrop } from "@/lib/dialog-backdrop";
+import { TeacherHomework } from "@/components/homework/TeacherHomework";
 
 type Props = {
   booking: AdminBooking;
@@ -39,7 +40,7 @@ export function LessonDetails({
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const changed = useRef(false);
-  const [action, setAction] = useState<"view" | "move" | "cancel" | "no-show">(
+  const [action, setAction] = useState<"view" | "move" | "cancel" | "no-show" | "homework">(
     "view",
   );
   const [date, setDate] = useState(dateKey(new Date(booking.starts_at)));
@@ -103,6 +104,7 @@ export function LessonDetails({
 
   const backToLesson = (
     <button
+      data-homework-exit
       className="button button--outline"
       type="button"
       disabled={busy}
@@ -155,7 +157,7 @@ export function LessonDetails({
 
   return (
     <dialog
-      className="teacher-lesson-dialog"
+      className={`teacher-lesson-dialog${action === "homework" ? " teacher-lesson-dialog--homework" : ""}`}
       ref={dialogRef}
       {...backdropHandlers}
       aria-labelledby="teacher-lesson-title"
@@ -169,6 +171,7 @@ export function LessonDetails({
           place beneath, and the actions side by side. */}
       <button
         className="teacher-dialog-close"
+        data-homework-exit
         type="button"
         aria-label="Close lesson details"
         disabled={busy}
@@ -262,6 +265,7 @@ export function LessonDetails({
       ) : null}
       {booking.status === "cancelled" ? <div className="teacher-dialog-actions"><button className="button button--outline" type="button" onClick={onClose}>Done</button></div> : action === "view" ? (
         <div className="teacher-dialog-actions">
+          {booking.student_id ? <button className="button button--lilac" type="button" onClick={() => setAction("homework")}>Homework</button> : null}
           <button
             className="button button--coral"
             type="button"
@@ -297,7 +301,10 @@ export function LessonDetails({
             </div>
           ) : null}
         </div>
-      ) : (
+      ) : action === "homework" ? <div className="teacher-dialog-homework">
+        {backToLesson}
+        <TeacherHomework bookingId={booking.id} token={token} onBusy={setBusy} />
+      </div> : (
         <div className="teacher-dialog-confirmation">
           {action === "move" ? (
             <>

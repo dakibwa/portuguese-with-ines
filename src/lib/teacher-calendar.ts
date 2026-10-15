@@ -501,6 +501,7 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
   const priority = (row: StudentWorkspaceRow) => {
     if (row.items.some(item => item.kind === "payment")) return 0;
     if (row.items.some(item => item.kind === "changed" || item.kind === "cancelled")) return 1;
+    if (row.student.homeworkToReview?.length) return 1.5;
     if (row.setup?.owner === "Yours") return 2;
     if (row.items.some(item => item.kind === "first")) return 3;
     return row.setup ? 4 : 5;
@@ -518,7 +519,7 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
   return {
     rows,
     general,
-    attentionCount: general.length + rows.filter(row => row.items.length || row.setup?.owner === "Yours").length,
+    attentionCount: general.length + rows.filter(row => row.items.length || row.setup?.owner === "Yours" || row.student.homeworkToReview?.length).length,
   };
 }
 

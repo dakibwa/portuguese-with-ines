@@ -68,6 +68,7 @@ import {
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
+import { HomeworkProblem, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing } from "./homework.mjs";
 import { closedExpressions, expressionsOpenToStudents, pickExpression, studentExpressions } from "./student-expressions.mjs";
 import { findRecurringCode, studentRates, studentLessonType, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
@@ -1799,7 +1800,9 @@ const worker = {
         if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
           return fail("Send a JSON request.", 415, request, env);
         }
-        const bodyLimit = path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
+        const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? 2801024
+          : /^\/(?:admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?|me\/homework\/[^/]+(?:\/submit)?)$/.test(path) ? 65536
+          : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
         if (Number(request.headers.get("Content-Length") || 0) > bodyLimit) return fail("Request too large.", 413, request, env);
         // Cloudflare supplies this trusted edge header. It cannot be replaced
         // with an arbitrary body/email key to bypass unauthenticated limits.
@@ -1869,6 +1872,12 @@ const worker = {
       if (request.method === "POST" && path === "/me/email/confirm") return await handleConfirmEmailChange(request, env);
       if (request.method === "POST" && path === "/me/card") return await handleStudentCard(request, env);
       if (request.method === "POST" && path === "/me/card/remove") return await handleRemoveStudentCard(request, env);
+      if (path === "/me/homework" || /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path)) {
+        const student = await currentStudent(request, env);
+        if (!student) return fail("Please sign in.", 401, request, env);
+        return await homeworkReply(request, env, async () => studentHomework(env, student, request.method, path.split("/")[3] ?? null,
+          request.method === "POST" ? await readJson(request, 65536) : {}, path.split("/")[4] ?? ""));
+      }
 
       // Preview before commit: a student is told which weeks are free, and
       // which are not, before anything is booked in their name.
@@ -5157,10 +5166,27 @@ async function isAdmin(request, env) {
   return null;
 }
 
+async function homeworkReply(request, env, operation) {
+  try { return json(await operation(), 200, request, env); }
+  catch (error) {
+    if (error instanceof HomeworkProblem) return fail(error.message, error.status, request, env);
+    if (homeworkTablesMissing(error)) {
+      return fail("Homework is not ready yet. Please try again after the website update.", 503, request, env);
+    }
+    throw error;
+  }
+}
+
 async function handleAdmin(request, env, ctx, url, path) {
   const admin = await isAdmin(request, env);
   if (admin === "throttled") return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
   if (!admin) return fail("Not authorised.", 401, request, env);
+
+  const homework = path.match(/^\/admin\/lessons\/([^/]+)\/homework(?:\/(transcribe|generate|publish|return))?$/);
+  if (homework) {
+    return homeworkReply(request, env, async () => teacherHomework(env, request.method, homework[1], homework[2] ?? "",
+      request.method === "POST" ? await readJson(request, homework[2] === "transcribe" ? 2801024 : 65536) : {}));
+  }
 
   if (path === "/admin/expressions" || path.startsWith("/admin/expressions/")) {
     try {
@@ -5369,7 +5395,9 @@ async function handleAdmin(request, env, ctx, url, path) {
 
   if (request.method === "GET" && path === "/admin/students") {
     const settings = await loadSettings(env);
-    return json({ students: await teacherStudentList(env), cardsAccepted: cardsTaken(env, settings) }, 200, request, env);
+    const students = await teacherStudentList(env);
+    const { submissions } = await homeworkReturns(env);
+    return json({ students: students.map(student => ({ ...student, homeworkToReview: submissions.filter(item => item.studentId === student.id) })), cardsAccepted: cardsTaken(env, settings) }, 200, request, env);
   }
 
   // Onboarding starts here (13 October 2026, Dan): she sets a student up with

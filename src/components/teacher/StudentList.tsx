@@ -45,7 +45,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
     <div className="teacher-students__bar">
       <label className="teacher-students__search">
         <span className="visually-hidden">Find a student</span>
-        <input disabled={Boolean(busyStudent)} onChange={event => setQuery(event.target.value)} placeholder="Find a student" type="search" value={query} />
+        <input data-homework-exit disabled={Boolean(busyStudent)} onChange={event => setQuery(event.target.value)} placeholder="Find a student" type="search" value={query} />
       </label>
       <button className="button button--coral" aria-label="Add a student" disabled={Boolean(busyStudent)} onClick={onAddStudent} type="button">
         <UserPlus size={16} aria-hidden="true" />
@@ -66,7 +66,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
           locked={Boolean(busyStudent)}
           onBusy={busy => setBusyStudent(busy ? student.id : "")}
           onChanged={onStudentsChanged}
-          onSelect={panel => setExpanded(panel ? { ...selected, studentId: student.id, panel } : null)}
+          onSelect={panel => setExpanded(panel ? { ...selected, studentId: student.id, panel, homeworkId: undefined } : null)}
+          onHomework={homeworkId => setExpanded(current => ({ studentId: student.id, panel: "history", homeworkId, homeworkRequestKey: (current?.homeworkRequestKey ?? 0) + 1 }))}
           onWelcome={onWelcome}
           sending={sending}
           student={student}
@@ -74,6 +75,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
           step={selected?.panel ?? null}
           date={selected?.date}
           time={selected?.time}
+          homeworkId={selected?.homeworkId}
+          homeworkRequestKey={selected?.homeworkRequestKey}
           token={token}
         />;
       })}

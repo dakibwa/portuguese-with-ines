@@ -862,7 +862,7 @@ function orientTo(id: string, focus = false, forceOnMobile = false) {
 export function BookingCalendar({ initialManageToken = "", initialLessonsView = false }: { initialManageToken?: string; initialLessonsView?: boolean } = {}) {
   const [step, setStep] = useState<Step>("day");
   const [intent, setIntent] = useState<BookingIntent>("choose");
-  const [accountView, setAccountView] = useState<"upcoming" | "history" | "profile">("upcoming");
+  const [accountView, setAccountView] = useState<AccountSection>("upcoming");
   /*
    * Seeded from the published lesson copy so the three cards are in the static
    * HTML and on screen at first paint. Before this the first step was an empty
@@ -1244,6 +1244,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   }, [refreshStudent, refreshStudentInBackground, student?.id]);
 
   useEffect(() => {
+    let active = true;
     const params = new URLSearchParams(window.location.search);
     const key = portoDateKey(new Date());
     setTodayKey(key);
@@ -1307,7 +1308,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     // is not a sign-out. Ask again for the session the page holds, and open on
     // that answer instead of on booking.
     const loadAccount = (): ReturnType<typeof refreshStudent> =>
-      refreshStudent().then((data) => (data || !readSession() ? data : loadAccount()));
+      refreshStudent().then((data) => (data || !readSession() || !active ? data : loadAccount()));
     // Opens on where the student was going for their next commitment.
     const openOnLessons = (data: Awaited<ReturnType<typeof refreshStudent>>) => {
       if (
@@ -1342,6 +1343,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     }
     loadAccount()
       .then((data) => {
+        if (!active) return;
         // Returning students came here for their next commitment, not for a
         // fork asking whether they want to see it. Explicit lesson, sign-in,
         // and emailed-management URLs retain their own destination.
@@ -1358,12 +1360,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         }
       })
       .catch(() => {
+        if (!active) return;
         // Still holding a session means the account could not be reached, not
         // that nobody is signed in. Say so instead of offering a sign-in form.
         if (readSession()) setAccountLoadError("We couldn’t reach your account just now. Please check your connection and try again.");
         else setIntent((current) => (current === "choose" ? "book" : current));
       })
-      .finally(() => setCheckingSession(false));
+      .finally(() => { if (active) setCheckingSession(false); });
+    return () => { active = false; };
   }, [applyAccount, initialLessonsView, refreshStudent]);
 
   // Link creation can finish just after booking confirmation. Refresh the
@@ -2100,7 +2104,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     orientTo("lesson-calendar");
   }
 
-  function openAccountShortcut(section: "upcoming" | "history" | "profile") {
+  function openAccountShortcut(section: AccountSection) {
     closeManagedLesson();
     setIntent("lessons");
     setAccountView(section);
@@ -3205,7 +3209,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     orientTo("account-controls");
     if (section !== "profile") {
       window.requestAnimationFrame(() =>
-        document.getElementById(section === "history" ? "account-past-lessons" : "upcoming-lessons-heading")?.focus({ preventScroll: true })
+        document.getElementById(section === "history" ? "account-past-lessons" : section === "homework" ? "account-homework" : "upcoming-lessons-heading")?.focus({ preventScroll: true })
       );
     }
   }

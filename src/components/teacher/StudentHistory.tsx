@@ -14,10 +14,11 @@ type History = {
 };
 
 /** All of this student's lessons, independent of the visible timetable week. */
-export function StudentHistory({ student, token, refresh = 0 }: {
+export function StudentHistory({ student, token, refresh = 0, homeworkId }: {
   student: AdminStudent;
   token: string;
   refresh?: number;
+  homeworkId?: string;
 }) {
   const [history, setHistory] = useState<History | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -53,6 +54,8 @@ export function StudentHistory({ student, token, refresh = 0 }: {
 
   return (
     <StudentLessons
+      token={token}
+      requestedHomeworkId={homeworkId}
       bookings={current?.bookings ?? null}
       error={current?.error ?? ""}
       now={now}

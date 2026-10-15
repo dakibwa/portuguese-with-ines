@@ -128,7 +128,7 @@ jobs:
       # The customer journeys, against the built export this release publishes.
       # They once ran only locally and rotted silently, so a broken journey
       # blocks the release. Kept lean (13 October 2026, Dan: "always be as lean
-      # as possible"): a dozen checks of what protects students and Inês
+      # as possible"): focused checks of what protects students and Inês
       # (booking, paying, signing in, her schedule), at desktop and phone
       # widths, about three minutes. Money, clashes and clock changes are
       # proven by the Worker and calendar unit tests, not repeated here.
@@ -143,7 +143,7 @@ jobs:
             curl -sf http://localhost:3000/ > /dev/null && break
             sleep 1
           done
-          for check in qa-flow qa-workspace-navigation qa-booking-selection qa-payment-recovery qa-teacher-calendar qa-transition-kit qa-meet-links qa-student-nif qa-profile-rates qa-request-recovery qa-auth-recovery qa-selection-calendar-recovery; do
+          for check in qa-flow qa-workspace-navigation qa-booking-selection qa-payment-recovery qa-teacher-calendar qa-homework qa-transition-kit qa-meet-links qa-student-nif qa-profile-rates qa-request-recovery qa-auth-recovery qa-selection-calendar-recovery; do
             echo "::group::$check"
             QA_BASE_URL=http://localhost:3000 node "scripts/$check.mjs"
             echo "::endgroup::"
