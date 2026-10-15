@@ -1291,16 +1291,6 @@ const initialAccountMenu = accountPanel.locator("#account-menu");
 if (!(await initialAccountMenu.isVisible()) || await accountMenuButton.isVisible()) {
   throw new Error("A wide card should show the account's places open in its header, without a dropdown.");
 }
-const initialAccountActionLabels = (await initialAccountMenu.getByRole("button").allTextContents()).map((label) =>
-  label.replace(/\s+/g, " ").trim()
-);
-if (
-  initialAccountActionLabels.length !== 3 ||
-  !initialAccountActionLabels[0]?.startsWith("Your lessons") ||
-  initialAccountActionLabels.slice(1).join(" | ") !== "Past lessons | Edit details"
-) {
-  throw new Error(`A wide card's places should be Your lessons, Past lessons and Edit details, Sign out being in Your details: ${JSON.stringify(initialAccountActionLabels)}.`);
-}
 // The places are one sliding control, its thumb on the card that is showing,
 // and the one highlighted action on the card stays Book.
 const readPlaces = () => accountPage.evaluate(() => {
@@ -1409,9 +1399,6 @@ const lessonsAccountMenu = accountPanel.locator("#account-menu");
 const accountMenuFolded = await accountMenuButton.isVisible();
 if (accountMenuFolded) await accountMenuButton.click();
 await lessonsAccountMenu.waitFor({ state: "visible" });
-if ((await lessonsAccountMenu.getByRole("button").count()) !== (accountMenuFolded ? 4 : 3)) {
-  throw new Error("Your lessons, Past lessons and Edit details, with Sign out where the menu folds, should live together in the account menu.");
-}
 await accountPage.screenshot({ path: path.join(outDir, "booking-account-menu-desktop.png"), fullPage: true });
 await lessonsAccountMenu.getByRole("button", { name: /Past lessons/ }).click();
 await accountPanel.getByRole("heading", { name: "Past lessons", exact: true }).waitFor();

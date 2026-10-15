@@ -9,6 +9,7 @@ import {
 import { shareImage } from "@/lib/page-metadata";
 import { publicAssetPath, publicAssetUrl } from "@/lib/paths";
 import "./globals.css";
+import "./homework.css";
 
 /*
  * Preloaded, reversing the earlier call to keep it lazy. Every page's largest

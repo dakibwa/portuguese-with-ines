@@ -3,6 +3,8 @@
 import { addedByTeacher, type AdminBooking } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
+import { useState } from "react";
+import { TeacherHomework } from "@/components/homework/TeacherHomework";
 
 function paymentLabel(booking: AdminBooking) {
   switch (booking.payment_status) {
@@ -28,13 +30,16 @@ export function upcomingLessons(bookings: AdminBooking[], now: number) {
  * and cancelled, reading the records from the start of time rather than the
  * visible week.
  */
-export function StudentLessons({ bookings, error, now, onRetry }: {
+export function StudentLessons({ bookings, error, now, onRetry, token }: {
+  token: string;
   /** Null until they have been read. */
   bookings: AdminBooking[] | null;
   error: string;
   now: number;
   onRetry: () => void;
 }) {
+  const [homeworkId, setHomeworkId] = useState<string | null>(null);
+  const [homeworkBusy, setHomeworkBusy] = useState(false);
   const upcoming = upcomingLessons(bookings ?? [], now);
   const past = (bookings ?? []).filter(booking => booking.status === "cancelled" || Date.parse(booking.ends_at) <= now)
     .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
@@ -81,6 +86,11 @@ export function StudentLessons({ bookings, error, now, onRetry }: {
         </ul>
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
         {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
+        {booking.student_id && !cancelled ? <button type="button" data-homework-exit className="text-action teacher-history-homework" disabled={homeworkBusy}
+          aria-expanded={homeworkId === booking.id} onClick={() => setHomeworkId(homeworkId === booking.id ? null : booking.id)}>
+          {homeworkId === booking.id ? "Close homework" : "Homework"}
+        </button> : null}
+        {homeworkId === booking.id ? <TeacherHomework key={`${booking.id}-${token}`} bookingId={booking.id} token={token} onBusy={setHomeworkBusy} /> : null}
       </li>
     );
   }

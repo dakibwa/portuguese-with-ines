@@ -30,6 +30,7 @@ import {
 } from "@/lib/booking-api";
 import { BOOKING_TIME_ZONE } from "@/lib/config";
 import { STUDENT_MARKS } from "@/lib/student-marks";
+import { StudentHomework } from "@/components/homework/StudentHomework";
 
 /** The two lengths a code from Inês can set a weekly price for. */
 const RATE_LENGTHS = [60, 90] as const;
@@ -99,6 +100,7 @@ export function MyLessons({
   section?: AccountSection;
 }) {
   const [student, setStudent] = useState<Student | null>(initialAccount?.student ?? null);
+  const homeworkLeave = useRef<(() => Promise<boolean>) | null>(null);
   const [bookings, setBookings] = useState<MyBooking[]>(initialAccount?.bookings ?? []);
   const [series, setSeries] = useState<LessonSeries[]>(initialAccount?.series ?? []);
   const [cardsAccepted, setCardsAccepted] = useState(Boolean(initialAccount?.cardsAccepted));
@@ -538,8 +540,8 @@ export function MyLessons({
       current={current}
       mark={student.mark}
       name={student.name}
-      onSelect={(next) => onSelectSection?.(next)}
-      onSignOut={() => onSignOut?.()}
+      onSelect={async (next) => { if (!homeworkLeave.current || await homeworkLeave.current()) onSelectSection?.(next); }}
+      onSignOut={async () => { if (!homeworkLeave.current || await homeworkLeave.current()) onSignOut?.(); }}
       upcomingCount={upcomingCount}
     />
   );
@@ -558,6 +560,14 @@ export function MyLessons({
       <p>{error || loadError}</p>
     </div>
   ) : null;
+
+  if (section === "homework") {
+    return <section className="account-card my-lessons__homework" id="account-homework" aria-labelledby="homework-heading" tabIndex={-1}>
+      {heading("homework-heading", "Homework", "homework")}
+      {alert}
+      <StudentHomework key={`${student.id}-${readSession()}`} leaveGuard={homeworkLeave} />
+    </section>;
+  }
 
   if (section === "history") {
     return (

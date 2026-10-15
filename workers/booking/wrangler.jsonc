@@ -49,6 +49,11 @@
     // them to students, set this to "1" and release the Worker. Anything else
     // keeps them closed.
     "EXPRESSIONS_FOR_STUDENTS": "0",
+    // Activate only after migration 0029 and an approved OpenAI project key.
+    // The shared ceiling counts transcription and generation attempts.
+    "HOMEWORK_AI_ENABLED": "0",
+    "HOMEWORK_AI_MODEL": "gpt-4.1-mini-2025-04-14",
+    "HOMEWORK_AI_MONTHLY_LIMIT": "200",
     // Google Sign-In. Public by design — it identifies the app, and the Worker
     // verifies every ID token's signature and audience against it. The client
     // *secret* is not needed: this is the ID-token flow, not the server-side
@@ -91,6 +96,9 @@
         "GOOGLE_CALENDAR_ENABLED": "1",
         "STRIPE_UI_MODE": "embedded",
         "STRIPE_EXPECTED_MODE": "test",
+        "HOMEWORK_AI_ENABLED": "0",
+        "HOMEWORK_AI_MODEL": "gpt-4.1-mini-2025-04-14",
+        "HOMEWORK_AI_MONTHLY_LIMIT": "200",
         "GOOGLE_CLIENT_ID": "174786285888-cq6vhf2jifpn5bdjutade6fe8an5i9ob.apps.googleusercontent.com",
         "TEACHER_EMAIL": "test@example.invalid"
       },

@@ -2897,6 +2897,107 @@ await test("her student list says who is in and who has a card, and she can send
     db.prepare("DELETE FROM sign_in_links WHERE student_id='alice'").run();
   }
 });
+await test("homework: private drafts, teacher review, lesson ownership and saved answers", async () => {
+  db.prepare("DELETE FROM request_limits WHERE key LIKE 'admin-fail:%'").run();
+  // Earlier auth tests deliberately revoke these accounts' original sessions.
+  for (const id of ["alice", "bob"]) {
+    db.prepare("UPDATE students SET session_version = session_version + 1 WHERE id = ?").run(id);
+    sessions[id] = await createSession(id, env.BOOKING_TOKEN_SECRET, db.prepare("SELECT session_version FROM students WHERE id = ?").get(id).session_version);
+  }
+  const id = linkedBooking("homework-private");
+  const route = `/admin/lessons/${id}/homework`;
+  const sheet = {
+    title: "No café", objective: "Pedir uma bebida com clareza.", reminder: "Amanhã, recorda o teu pedido sem olhar.",
+    sections: [{ title: "Pratica", instruction: "Completa o pedido.", example: "Um chá, por favor.",
+      questions: [{ prompt: "Pede um café de forma educada.", answer: "Queria um café, por favor.", explanation: "Há outras respostas possíveis." }] }],
+  };
+  const input = { notes: "Private teacher notes: café, chá, queria, por favor", level: "A1", minutes: 10, sheet, updatedAt: null };
+  assert.equal((await call(route, { user: "bob", body: input })).status, 401);
+  const created = await call(route, { user: "teacher", body: input });
+  assert.equal(created.status, 200, await created.clone().text());
+  const draft = await created.json();
+  assert.equal(draft.sheet.sections[0].questions[0].id, "q1");
+  assert.equal((await call(`/me/homework/${id}`, { method: "GET" })).status, 404);
+  assert.ok(!(await (await call("/me/homework", { method: "GET" })).json()).homework.some(item => item.bookingId === id));
+  assert.equal((await call(`${route}/publish`, { user: "teacher", body: { ...input, updatedAt: draft.updatedAt } })).status, 400, "review is required");
+  assert.equal((await call(route, { user: "teacher", body: input })).status, 409, "a stale draft cannot overwrite newer work");
+  const published = await call(`${route}/publish`, { user: "teacher", body: { ...input, updatedAt: draft.updatedAt, reviewed: true } });
+  assert.equal(published.status, 200, await published.clone().text());
+  const publicVersion = await (await call(`/me/homework/${id}`, { method: "GET" })).json();
+  assert.equal(publicVersion.sheet.title, "No café");
+  assert.ok(!JSON.stringify(publicVersion).includes("Private teacher notes"));
+  assert.equal((await call(`/me/homework/${id}`, { user: "bob", method: "GET" })).status, 404);
+  assert.equal((await call(`/me/homework/${id}`, { user: "bob", body: { answers: { q1: "Wrong account" }, updatedAt: null, completed: true } })).status, 404);
+  assert.equal((await call(`/me/homework/${id}`, { body: { answers: { q2: "Wrong question" }, updatedAt: null, completed: false } })).status, 400);
+  const answer = { answers: { q1: "Queria um café, por favor." }, updatedAt: null, completed: false };
+  const answered = await call(`/me/homework/${id}`, { body: answer });
+  assert.equal(answered.status, 200);
+  const progress = (await answered.json()).progress;
+  assert.equal((await call(`/me/homework/${id}`, { body: { ...answer, answers: { q1: "Stale tab" } } })).status, 409);
+  const completed = await call(`/me/homework/${id}`, { body: { ...answer, updatedAt: progress.updatedAt, completed: true } });
+  assert.equal(completed.status, 200);
+  assert.ok((await completed.json()).progress.completedAt);
+  const teacher = await (await call(route, { user: "teacher", method: "GET" })).json();
+  assert.equal(teacher.progress.answers.q1, answer.answers.q1);
+  assert.equal((await call(route, { user: "teacher", body: { ...input, updatedAt: teacher.updatedAt } })).status, 409, "published questions cannot invalidate saved answers");
+  // Old linkage must never expose homework after the booking changes owner.
+  db.prepare("UPDATE bookings SET student_id = 'bob' WHERE id = ?").run(id);
+  assert.equal((await call(`/me/homework/${id}`, { method: "GET" })).status, 404);
+  assert.equal((await call(`/me/homework/${id}`, { user: "bob", method: "GET" })).status, 404);
+  assert.equal((await call(route, { user: "teacher", method: "GET" })).status, 409);
+});
+
+await test("homework AI: bounded photo upload, reviewed notes, provider failure and shared usage ceiling", async () => {
+  const id = linkedBooking("homework-ai");
+  const route = `/admin/lessons/${id}/homework`;
+  const beforeFetch = globalThis.fetch;
+  let requests = 0, broken = false;
+  const image = `data:image/jpeg;base64,${btoa("\xff\xd8\xff" + "x".repeat(40000))}`;
+  env.HOMEWORK_AI_ENABLED = "1"; env.OPENAI_API_KEY = "isolated-ai-key"; env.HOMEWORK_AI_MONTHLY_LIMIT = "3";
+  db.prepare("DELETE FROM homework_ai_usage").run();
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "https://api.openai.com/v1/responses");
+    requests++;
+    const input = JSON.parse(options.body);
+    assert.equal(input.store, false);
+    assert.ok(input.max_output_tokens <= 6500);
+    assert.equal(input.text.format.strict, true);
+    if (broken) return Response.json({ error: "private provider diagnostic" }, { status: 500 });
+    const output = input.text.format.name === "lesson_transcription" ? { notes: "No café: queria um café, por favor.", uncertain: ["Last word is unclear."] } : {
+      title: "No café", objective: "Pedir no café.", reminder: "Recorda amanhã.",
+      sections: [{ title: "Pratica", instruction: "Faz um pedido.", example: "", questions: [{ prompt: "Pede um café.", answer: "Queria um café, por favor.", explanation: "" }] }],
+    };
+    return Response.json({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(output) }] }] });
+  };
+  try {
+    const raw = JSON.stringify({ image, updatedAt: null });
+    assert.equal((await call(`${route}/transcribe`, { user: "bob", raw, headers: { "Content-Length": String(raw.length) } })).status, 401);
+    assert.equal(requests, 0, "unauthorised uploads never call a paid provider");
+    assert.equal((await call(`${route}/transcribe`, { user: "teacher", body: { image: "https://private.example/photo", updatedAt: null } })).status, 400);
+    const read = await call(`${route}/transcribe`, { user: "teacher", raw, headers: { "Content-Length": String(raw.length) } });
+    assert.equal(read.status, 200, await read.clone().text());
+    assert.equal((await read.json()).uncertain.length, 1);
+    const input = { notes: "Queria um café, por favor. Pedidos no café.", level: "A1", minutes: 10, updatedAt: null };
+    const generated = await call(`${route}/generate`, { user: "teacher", body: input });
+    assert.equal(generated.status, 200, await generated.clone().text());
+    const draft = await generated.json();
+    assert.equal(draft.publishedAt, null);
+    assert.equal((await call(`/me/homework/${id}`, { method: "GET" })).status, 404);
+    broken = true;
+    const failed = await call(`${route}/generate`, { user: "teacher", body: { ...input, updatedAt: draft.updatedAt } });
+    assert.equal(failed.status, 503);
+    assert.ok(!(await failed.text()).includes("private provider diagnostic"));
+    assert.equal((await (await call(route, { user: "teacher", method: "GET" })).json()).updatedAt, draft.updatedAt, "a failed generation leaves the draft alone");
+    const secondLesson = linkedBooking("homework-ai-limit");
+    assert.equal((await call(`/admin/lessons/${secondLesson}/homework/generate`, { user: "teacher", body: input })).status, 429);
+    assert.equal(requests, 3, "the monthly ceiling covers different lessons and failed requests");
+    assert.equal((await call(`${route}/transcribe`, { user: "teacher", raw, headers: { "Content-Length": "3000000" } })).status, 413);
+  } finally {
+    globalThis.fetch = beforeFetch;
+    delete env.HOMEWORK_AI_ENABLED; delete env.OPENAI_API_KEY; delete env.HOMEWORK_AI_MONTHLY_LIMIT;
+  }
+});
+
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;

@@ -39,6 +39,14 @@ directly in a few plain sentences. Keep practical details that help a student
 prepare, book or understand a fee; leave out internal payment and attendance
 processes. Avoid blunt reassurance, sales language and unnecessary jargon.
 
+Lesson homework stays attached to its lesson, inside the student's existing
+profile/history for Inês and under Homework for the student. Photo notes and
+drafts stay private until Inês reviews and publishes the sheet. Use short,
+level-appropriate European Portuguese instructions, recall and useful practice,
+with answers separate from questions. The print view uses a quiet brand header,
+readable type and writing space on white A4 pages. See
+[the homework contract and teaching sources](../docs/lesson-homework.md).
+
 ## Named failure patterns
 
 Use these names in review so recurring problems are easy to recognise:

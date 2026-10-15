@@ -63,6 +63,7 @@ export function TeacherTabs({ current, hoursDirty, needsCount, onSelect }: {
             aria-controls="teacher-tools-panel"
             aria-selected={current === tab.id}
             id={`teacher-tab-${tab.id}`}
+            data-homework-exit
             key={tab.id}
             onClick={() => onSelect(tab.id)}
             onKeyDown={(event) => {

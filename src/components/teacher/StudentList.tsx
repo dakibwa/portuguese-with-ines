@@ -45,7 +45,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
     <div className="teacher-students__bar">
       <label className="teacher-students__search">
         <span className="visually-hidden">Find a student</span>
-        <input disabled={Boolean(busyStudent)} onChange={event => setQuery(event.target.value)} placeholder="Find a student" type="search" value={query} />
+        <input data-homework-exit disabled={Boolean(busyStudent)} onChange={event => setQuery(event.target.value)} placeholder="Find a student" type="search" value={query} />
       </label>
       <button className="button button--coral" aria-label="Add a student" disabled={Boolean(busyStudent)} onClick={onAddStudent} type="button">
         <UserPlus size={16} aria-hidden="true" />

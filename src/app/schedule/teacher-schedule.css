@@ -3076,8 +3076,8 @@
 .teacher-student__contact:has(ul:empty):not(:has(button)) { display: none; }
 .teacher-student__history { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); align-items: start; gap: 1rem; min-width: 0; }
 .teacher-student__history > section { min-width: 0; }
-.teacher-student__history h3 { margin: 0 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
-.teacher-student__history h3 span { color: var(--lavender-ink); font-weight: 500; }
+.teacher-student__history > section > h3 { margin: 0 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
+.teacher-student__history > section > h3 span { color: var(--lavender-ink); font-weight: 500; }
 @container setup-list (max-width: 32rem) {
   .teacher-student__controls { grid-column: 1 / -1; grid-row: 2; }
   .teacher-student__controls button { padding-inline: 0.25rem; font-size: 0.65rem; }

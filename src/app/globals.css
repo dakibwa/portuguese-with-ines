@@ -6609,7 +6609,7 @@ button.text-action {
     position: relative;
     display: grid;
     grid-area: nav;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     border-radius: var(--squiggle-tabs);
     padding: 4px;
     background: var(--raised);
@@ -6622,7 +6622,7 @@ button.text-action {
     bottom: 4px;
     left: 4px;
     display: block;
-    width: calc((100% - 16px) / 3);
+    width: calc((100% - 20px) / 4);
     border-radius: var(--squiggle-thumb);
     background: var(--green);
     transition: transform 260ms var(--motion-ease);
@@ -6634,6 +6634,10 @@ button.text-action {
 
   .account-menu:not(.account-menu--folded) .account-menu__places--at-2 .account-menu__thumb {
     transform: translateX(calc(200% + 8px));
+  }
+
+  .account-menu:not(.account-menu--folded) .account-menu__places--at-3 .account-menu__thumb {
+    transform: translateX(calc(300% + 12px));
   }
 
   .account-menu:not(.account-menu--folded) .account-menu__places button {

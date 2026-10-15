@@ -53,6 +53,7 @@ export function StudentHistory({ student, token, refresh = 0 }: {
 
   return (
     <StudentLessons
+      token={token}
       bookings={current?.bookings ?? null}
       error={current?.error ?? ""}
       now={now}

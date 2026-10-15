@@ -142,7 +142,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     .map(minutes => `${minutes} mins · ${formatMoneyCents(student.prices![minutes]!)}`).join(", ");
 
   return <li ref={row} className={`teacher-setup teacher-setup--inline${ready ? " teacher-student teacher-student--inline is-ready" : ""}${step ? " is-open" : ""}`}>
-    <div className="teacher-setup__header" ref={header}>
+    <div className="teacher-setup__header" ref={header} data-homework-exit>
       <button
         className="teacher-setup__profile"
         aria-controls={paneId}
