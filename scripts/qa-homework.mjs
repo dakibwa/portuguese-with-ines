@@ -35,8 +35,9 @@ try {
   for (const width of [1280, 390]) {
     const context = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: width < 600, reducedMotion: "reduce" });
     await context.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-homework-session"));
-    let studentView = false, photoCalls = 0, answerSaveFails = false;
-    let homework = { bookingId: lesson.id, studentName: student.name, lessonAt: lesson.starts_at, notes: "", level: "A1", minutes: 15,
+    let studentView = false, photoCalls = 0, answerSaveFails = false, generated = null, slow = false;
+    // The Worker starts a new sheet at the student's last level (A2 here) and 15 minutes.
+    let homework = { bookingId: lesson.id, studentName: student.name, lessonAt: lesson.starts_at, notes: "", level: "A2", minutes: 15,
       sheet: null, publishedAt: null, updatedAt: null, aiAvailable: true, progress: { answers: {}, completedAt: null, updatedAt: null, submission: null } };
     await context.route("**/*", async route => {
       const request = route.request();
@@ -55,8 +56,11 @@ try {
       if (url.pathname === "/admin/students") return json({ students: [{ ...student, signedIn: true, hasLessons: true, hasCard: true, prices: { 60: 2500 }, awaitingWelcome: false, upcoming: 0, homeworkToReview: homework.progress.submission && !homework.progress.submission.returnedAt ? [{ bookingId: lesson.id, submittedAt: homework.progress.submission.submittedAt }] : [] }] });
       if (url.pathname === "/admin/availability") return json({ rules: [{ id: 1, weekday: 3, start_minute: 540, last_start_minute: 1020 }], exceptions: [], settings: { slotIntervalMinutes: 30 } });
       if (url.pathname === "/admin/google-calendar") return json({ configured: false, connected: false });
+      // Slowed while the progress card is photographed.
+      if (slow && /\/homework\/(transcribe|generate)$/.test(url.pathname)) await new Promise(resolve => setTimeout(resolve, 1500));
       if (url.pathname === `/admin/lessons/${lesson.id}/homework/transcribe`) {
-        photoCalls++; assert.match(data.image, /^data:image\/jpeg;base64,/);
+        photoCalls++; assert.equal(data.images.length, 2, "both pages go in one request");
+        data.images.forEach(image => assert.match(image, /^data:image\/jpeg;base64,/));
         return json({ notes: "No café: queria, um café, uma água, um chá, por favor, obrigado/obrigada.", uncertain: [] });
       }
       if (url.pathname.startsWith(`/admin/lessons/${lesson.id}/homework`)) {
@@ -66,7 +70,7 @@ try {
           } };
         } else if (data) {
           homework = { ...homework, ...data, updatedAt: new Date().toISOString() };
-          if (url.pathname.endsWith("/generate")) homework.sheet = structuredClone(exampleSheet);
+          if (url.pathname.endsWith("/generate")) { generated = data; homework.sheet = structuredClone(exampleSheet); }
           if (url.pathname.endsWith("/publish")) homework.publishedAt = homework.updatedAt;
         }
         return json(homework);
@@ -97,30 +101,69 @@ try {
     await page.getByRole("button", { name: "Open Ana Martins’s profile", exact: true }).click();
     await page.getByRole("button", { name: "Homework", exact: true }).click();
     const editor = page.locator(".teacher-homework");
-    const photo = await page.evaluate(() => {
+    const shot = name => editor.screenshot({ path: `${output}/teacher-${name}-${width}.png` });
+    const heading = name => expect(editor.locator(".homework-step__head h4")).toHaveText(name);
+    // With AI on, Homework asks one thing: what did you work on? A photo, or type it.
+    await heading("What did you work on?");
+    const capture = editor.locator("label.homework-capture");
+    await expect(capture).toContainText("Take a photo");
+    assert.equal(await capture.locator('input[type="file"]').getAttribute("capture"), "environment");
+    await expect(editor.getByRole("button", { name: "Type it", exact: true })).toBeVisible();
+    await shot("01-what");
+    const pages = await page.evaluate(() => [["No café", "Queria um café, por favor."], ["uma água / um chá", "obrigado / obrigada"]].map(lines => {
       const canvas = document.createElement("canvas"); canvas.width = 800; canvas.height = 500;
       const ctx = canvas.getContext("2d"); ctx.fillStyle = "white"; ctx.fillRect(0, 0, 800, 500); ctx.fillStyle = "#203e82"; ctx.font = "32px sans-serif";
-      ["No café", "Queria um café, por favor.", "uma água / um chá", "obrigado / obrigada"].forEach((line, i) => ctx.fillText(line, 40, 70 + i * 70));
+      lines.forEach((line, i) => ctx.fillText(line, 40, 70 + i * 70));
       return canvas.toDataURL("image/jpeg").split(",")[1];
-    });
-    await editor.locator('input[type="file"]').setInputFiles({ name: "lesson-notes.jpg", mimeType: "image/jpeg", buffer: Buffer.from(photo, "base64") });
-    await editor.getByRole("button", { name: "Read photo", exact: true }).click();
-    await expect(editor.getByLabel("What did you work on?")).toContainText("No café");
-    await editor.screenshot({ path: `${output}/photo-notes-${width}.png` });
+    }));
+    await capture.locator('input[type="file"]').setInputFiles(pages.map((photo, i) => ({ name: `lesson-notes-${i + 1}.jpg`, mimeType: "image/jpeg", buffer: Buffer.from(photo, "base64") })));
+    // The photos answer the first step: on to the level, the student's last (A2), then the length (15).
+    await heading("Level");
+    await expect(editor.locator(".homework-summary")).toContainText("2 photos");
+    await expect(editor.getByRole("button", { name: "A2", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await shot("02-level");
+    await editor.getByRole("button", { name: "A2", exact: true }).click();
+    await heading("Length");
+    await expect(editor.getByRole("button", { name: "15 mins", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await shot("03-length");
+    // Back steps back one decision, keeping the choices made.
+    await editor.getByRole("button", { name: "Back", exact: true }).click();
+    await heading("Level");
+    await editor.getByRole("button", { name: "A2", exact: true }).click();
+    await editor.getByRole("button", { name: "15 mins", exact: true }).click();
+    await heading("Ready");
+    await expect(editor.locator(".homework-summary")).toHaveCount(3);
+    await shot("04-ready");
+    // Unread photos are unsaved work: leaving asks first.
     page.once("dialog", dialog => dialog.dismiss());
     await page.getByRole("button", { name: "Close homework", exact: true }).click();
-    await expect(editor.getByLabel("What did you work on?")).toContainText("No café");
-    await editor.getByRole("button", { name: "Make homework", exact: true }).click();
+    await expect(editor.locator(".homework-summary").first()).toContainText("2 photos");
+    // One press reads both pages and makes the draft, with gentle progress meanwhile.
+    slow = true;
+    await editor.getByRole("button", { name: "Generate homework", exact: true }).click();
+    await expect(editor.locator(".homework-working h4")).toHaveText("Reading your notes");
+    await shot("05-reading");
+    await expect(editor.locator(".homework-working h4")).toHaveText("Writing the homework");
+    await shot("06-writing");
+    slow = false;
     await expect(editor.locator(".homework-sheet")).toBeVisible();
-    await editor.getByRole("button", { name: "Edit sheet", exact: true }).click();
+    assert.equal(photoCalls, 1);
+    assert.match(generated.notes, /No café/);
+    assert.deepEqual([generated.level, generated.minutes], ["A2", 15]);
+    await expect(editor.locator(".homework-editor")).toHaveCount(0);
+    await shot("07-draft-preview");
+    await editor.getByRole("button", { name: "Fine-tune", exact: true }).click();
+    await expect(editor.getByRole("button", { name: "Fine-tune", exact: true })).toHaveAttribute("aria-pressed", "true");
     await editor.getByRole("textbox", { name: /^Instruction/ }).nth(2).fill("Imagina que estás num café no Porto.");
-    await editor.getByRole("button", { name: "Preview", exact: true }).click();
-    await editor.getByLabel("I checked the European Portuguese and the answers.").check();
+    await editor.locator(".homework-editor").screenshot({ path: `${output}/teacher-08-fine-tune-${width}.png` });
+    await editor.getByRole("button", { name: "Fine-tune", exact: true }).click();
+    await expect(editor.locator(".homework-sheet")).toContainText("Imagina que estás num café no Porto.");
+    await editor.getByLabel("I checked the Portuguese and the answers").check();
+    await editor.locator(".homework-publish").screenshot({ path: `${output}/teacher-09-publish-${width}.png` });
     await editor.getByRole("button", { name: "Publish for student", exact: true }).click();
     await expect(editor.locator(".homework-status")).toContainText("Published");
-    assert.equal(photoCalls, 1);
     assert.equal(homework.sheet.sections[2].instruction, "Imagina que estás num café no Porto.");
-    await editor.screenshot({ path: `${output}/teacher-${width}.png` });
+    await shot("10-published");
     if (width === 1280) {
       // The inline student editor remains mounted behind the timetable. Print
       // the lesson dialog alone, never a second worksheet hidden underneath it.
@@ -139,7 +182,7 @@ try {
     studentView = true;
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem("ines-student-session", "isolated-homework-session"); });
     await page.goto(`${base}/book/?view=lessons`);
-    async function openHomework() {
+    async function openHomework(beforeOpen) {
       await page.locator("#account-menu").waitFor({ state: "attached", timeout: 10000 }).catch(async error => {
         await page.screenshot({ path: `${output}/account-error-${width}.png`, fullPage: true });
         console.error(await page.locator("body").innerText(), errors);
@@ -148,6 +191,8 @@ try {
       const toggle = page.locator("#account-menu-button");
       if (await toggle.isVisible() && await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
       await page.locator("#account-menu").getByRole("button", { name: "Homework", exact: true }).click();
+      await page.locator(".homework-list").getByRole("button").waitFor();
+      await beforeOpen?.(page);
       await page.locator(".homework-list").getByRole("button").click();
     }
     await openHomework();
@@ -172,17 +217,30 @@ try {
     await page.getByRole("button", { name: /Homework to review/ }).click();
     await expect(editor.locator(".homework-review")).toBeVisible();
     await expect(editor.getByRole("button", { name: "Approve & send back", exact: true })).toBeDisabled();
-    await editor.getByRole("radio", { name: "Correct", exact: true }).nth(4).check();
-    await editor.getByLabel("Feedback", { exact: false }).nth(4).fill("Muito bem. O teu pedido está claro e educado.");
-    await editor.screenshot({ path: `${output}/teacher-review-${width}.png` });
+    // Settled answers fold to their mark and feedback; only the uncertain one is open.
+    await expect(editor.locator(".homework-review__question--folded")).toHaveCount(5);
+    await expect(editor.locator(".homework-review__tally")).toContainText("1 needs you");
+    await shot("11-review");
+    await editor.getByRole("radio", { name: "Correct", exact: true }).first().check();
+    await editor.getByLabel("Feedback", { exact: false }).first().fill("Muito bem. O teu pedido está claro e educado.");
+    // Still open after it is settled, so she can finish her sentence.
+    await expect(editor.locator(".homework-review__question--folded")).toHaveCount(5);
+    await editor.getByRole("button", { name: "Change mark for Pratica, question 1", exact: true }).click();
+    await expect(editor.locator(".homework-review__question--folded")).toHaveCount(4);
+    await shot("12-review-ready");
     await editor.getByRole("button", { name: "Approve & send back", exact: true }).click();
-    await expect(editor.getByRole("status")).toContainText("Approved and sent back");
+    // Approved reads as Done, plainly, on both sides.
+    await expect(editor.locator(".homework-status")).toHaveText("Done");
+    await expect(editor.locator(".homework-done")).toContainText("Done");
+    await shot("13-done");
     studentView = true;
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem("ines-student-session", "isolated-homework-session"); });
-    await page.goto(`${base}/book/?view=lessons`); await openHomework();
+    await page.goto(`${base}/book/?view=lessons`); await openHomework(page => page.locator(".homework-list").screenshot({ path: `${output}/student-list-done-${width}.png` }));
+    await expect(page.locator(".student-homework .homework-status")).toHaveText("Done");
+    await expect(page.locator(".student-homework .homework-done")).toContainText("Done");
     await expect(page.locator(".student-homework .homework-feedback")).toHaveCount(6);
     await expect(page.locator(".student-homework .homework-feedback").nth(4)).toContainText("O teu pedido está claro e educado.");
-    await page.locator(".my-lessons__homework").screenshot({ path: `${output}/student-${width}.png` });
+    await page.locator(".my-lessons__homework").screenshot({ path: `${output}/student-done-${width}.png` });
     await page.getByRole("button", { name: "Print worksheet", exact: true }).click();
     await expect(page.locator(".student-homework .homework-paper-preview")).toBeVisible();
     await page.locator(".my-lessons__homework").screenshot({ path: `${output}/print-preview-${width}.png` });
@@ -210,5 +268,5 @@ try {
     assert.deepEqual(errors, []);
     await context.close();
   }
-  console.log("Homework passed: teacher photo, transcription, draft correction and publication; student submission, private automatic marking, teacher correction/approval, returned feedback and black-and-white print; desktop and phone. AI responses are synthetic fixtures.");
+  console.log("Homework passed: teacher steps (photo, level, length, back, generate with progress), two pages read and drafted in one press, preview, fine-tune and publication; student submission, private automatic marking, teacher correction/approval, Done for both, returned feedback and black-and-white print; desktop and phone. AI responses are synthetic fixtures.");
 } finally { await browser.close(); }

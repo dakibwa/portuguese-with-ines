@@ -186,7 +186,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
     {student.homeworkToReview?.length ? <div className="teacher-homework-return">
       <button type="button" data-homework-exit disabled={disabled} onClick={() => onHomework?.(student.homeworkToReview![0].bookingId)}>
-        <span className="teacher-homework-return__dot" aria-hidden="true" />Homework to review
+        Homework to review
         <span className="teacher-homework-return__count" aria-label={`${student.homeworkToReview.length} waiting`}>{student.homeworkToReview.length}</span>
       </button>
     </div> : null}

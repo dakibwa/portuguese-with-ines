@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Printer, BookOpen, CheckCircle2, RotateCcw, CircleHelp, PencilLine, Eye, EyeOff } from "lucide-react";
 import type { HomeworkMark, HomeworkSheet } from "@/lib/homework-api";
+import { DrawnRule, HomeworkSplat, PaperBloom } from "./HomeworkArt";
 
 /** The site's sliding two-option control, for a choice of view rather than a form value. */
 export function HomeworkToggle<T extends string>({ label, value, options, onChange, controls, className = "" }: {
@@ -29,9 +30,11 @@ type Props = {
   marks?: Record<string, HomeworkMark>;
   markedAnswers?: Record<string, string>;
   onViewChange?: (view: "online" | "print") => void;
+  /** Inês's draft actions, sharing the format control's row rather than taking their own. */
+  tools?: ReactNode;
 };
 
-export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {}, onAnswer, disabled, preview = false, marks = {}, markedAnswers, onViewChange }: Props) {
+export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {}, onAnswer, disabled, preview = false, marks = {}, markedAnswers, onViewChange, tools }: Props) {
   const prefix = useId();
   const [view, setView] = useState<"online" | "print">("online");
   const [showAnswers, setShowAnswers] = useState(preview);
@@ -77,14 +80,18 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
     return <>
       <article className={`homework-sheet${paper ? " homework-sheet--paper" : ""}`} lang="pt-PT">
         <header className="homework-sheet__head">
-          <p className="homework-sheet__brand">Português com a Inês</p>
+          {paper ? <PaperBloom className="homework-sheet__motif" /> : <HomeworkSplat seed={sheet.title} className="homework-sheet__splat" />}
+          {paper ? <p className="homework-sheet__brand">Português com a Inês</p> : null}
           <div className="homework-sheet__meta"><span>Aula de {date}</span><span>{level} · {minutes} min</span></div>
           <h3>{sheet.title}</h3>
+          {paper ? null : <span className="short-rule" aria-hidden="true" />}
           <p className="homework-sheet__objective">{sheet.objective}</p>
-          {paper ? <p className="homework-sheet__name">Nome<span aria-hidden="true" /></p> : null}
+          {/* The name line belongs to the worksheet alone; a printout with its answer key carries none. */}
+          {paper && !printAnswers ? <p className="homework-sheet__name">Nome<span aria-hidden="true" /></p> : null}
+          {paper ? <DrawnRule className="homework-sheet__rule" /> : null}
         </header>
         {sheet.sections.map((section, si) => <section className="homework-sheet__section" key={si}>
-          <h4><span aria-hidden="true">{si + 1}</span>{section.title}</h4>
+          <h4>{paper ? null : <HomeworkSplat seed={sheet.title} offset={si + 1} className="homework-section-mark" />}<span className="homework-num" aria-hidden="true">{String(si + 1).padStart(2, "0")}</span><span className="homework-section-title">{section.title}</span></h4>
           <p className="homework-sheet__instruction">{section.instruction}</p>
           {section.example ? <p className="homework-sheet__example"><strong>Exemplo</strong>{section.example}</p> : null}
           <ol className="homework-sheet__questions">
@@ -123,7 +130,7 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
             })}
           </ol>
         </section>)}
-        <p className="homework-sheet__reminder"><BookOpen size={19} aria-hidden="true" /><span>{sheet.reminder}</span></p>
+        <p className="homework-sheet__reminder">{paper ? <BookOpen size={19} aria-hidden="true" /> : <HomeworkSplat seed={sheet.reminder} className="homework-reminder-mark" />}<span>{sheet.reminder}</span></p>
         {/* Answers come after an attempt, so their switch sits at the sheet's foot. */}
         {paper ? null : <button type="button" className="homework-answers-toggle" aria-expanded={showAnswers} aria-controls={`${prefix}-key`} onClick={() => setShowAnswers(value => !value)}>
           {showAnswers ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}<span lang="en">{showAnswers ? "Hide answers" : "Show answers"}</span>
@@ -132,9 +139,11 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
       </article>
       {paper && printAnswers ? <article className="homework-sheet homework-sheet--paper homework-sheet--answer-key" lang="pt-PT">
         <header className="homework-sheet__head">
+          <PaperBloom className="homework-sheet__motif" />
           <p className="homework-sheet__brand">Português com a Inês</p>
           <div className="homework-sheet__meta"><span>{sheet.title}</span><span>Aula de {date}</span></div>
           <h3>Respostas e exemplos</h3>
+          <DrawnRule className="homework-sheet__rule" />
         </header>
         {answerKey(true)}
       </article> : null}
@@ -142,8 +151,11 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
   }
 
   return <div className="homework-worksheet" ref={screen}>
-    <HomeworkToggle label="Worksheet format" value={view} controls={`${prefix}-view`} onChange={chooseView} className="homework-format-toggle"
-      options={[["online", preview ? "On screen" : "Do online"], ["print", "Print worksheet"]]} />
+    {(() => {
+      const toggle = <HomeworkToggle label="Worksheet format" value={view} controls={`${prefix}-view`} onChange={chooseView} className="homework-format-toggle"
+        options={[["online", preview ? "On screen" : "Do online"], ["print", "Print worksheet"]]} />;
+      return tools ? <div className="homework-toolbar homework-toolbar--format">{toggle}<div className="homework-toolbar__tools">{tools}</div></div> : toggle;
+    })()}
     {view === "print" ? <div className="homework-paper-tools">
       <p className="homework-help">Black-and-white pages with room to write. The answer key is optional and starts on a separate page.</p>
       <div className="homework-print-tools">

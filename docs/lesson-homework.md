@@ -1,10 +1,28 @@
 # Lesson homework
 
 Inês opens **Homework** on a lesson, either from the timetable or from the
-student's inline lesson history. She adds a photo from her phone or types notes,
-checks the transcription, chooses a CEFR level and 10, 15 or 20 minutes, then
-makes a draft. Every instruction, question, example and answer is editable.
-She reviews the European Portuguese and answers before publishing. Students
+student's inline lesson history. A new sheet is one decision per step, as in
+the booking journey (15 October 2026, Dan: far too much text). **What did you
+work on?** offers one big **Take a photo** blob, which opens the phone's rear
+camera (`capture="environment"`), with **Gallery** and **Type it** beneath.
+A photo moves straight on; typed notes take **Next**. **Level** offers A1–C2
+as blobs, starting at the student's latest earlier sheet (by lesson date),
+else A1. **Length** offers 10, 15 or 20 minutes, starting at 15. Each tap moves
+on; decisions already taken fold into summary rows with **Change**, and
+**Back** steps back one. The last step is **Generate homework** (with AI off,
+**Write the sheet**). While Claude works a progress card names the step in hand
+(**Reading your notes**, then **Writing the homework**) with a gently filling
+line. Up to three pages are read in one request and the draft is made straight
+away. If the reader was unsure of anything it stops at **Check the notes**; if
+it found no lesson text it returns to the first step to type them. The draft
+opens as a preview. **Fine-tune** opens the field-by-field editor, where every
+instruction, question, example, answer and marking rule is editable. She ticks
+**I checked the Portuguese and the answers** and presses **Publish for
+student**. The lesson notes, level and length stay folded above the draft,
+with **Make a new draft**. Privacy is one lock icon in the heading, its words
+("Private draft: only you can see it. Anthropic reads any photos; this site
+doesn't keep them.") on hover and for screen readers; the site privacy notice
+carries the full explanation. Students
 see only published sheets in **Homework**, grouped by lesson. They can save
 answers and resume them. **Do online** submits a fixed copy for marking.
 **Print worksheet** opens a black-and-white paper preview with writing lines;
@@ -15,8 +33,8 @@ Paper work is not marked automatically: students can enter their answers online.
 
 Short-answer questions declare their accepted answers. The server ignores case,
 spacing and final punctuation but preserves meaningful accents and internal
-punctuation. Written questions use a possible answer and receive an OpenAI
-suggestion. Natural, correct alternatives must be accepted; uncertain answers
+punctuation. Written questions use a possible answer and receive a suggestion
+from Anthropic's Claude. Natural, correct alternatives must be accepted; uncertain answers
 are flagged for Inês. Every question has a mark and a short pt-PT explanation.
 These are practice feedback, not a formal assessment of language ability.
 
@@ -24,10 +42,34 @@ These are practice feedback, not a formal assessment of language ability.
 stay private to Inês, including in API responses. The student sees **Sent to Inês**
 and cannot change that submitted copy while it is awaiting review. Inês sees
 **Homework to review** on the student's existing row; opening it goes to the
-specific lesson. She checks each answer, edits the mark and feedback, resolves
-any uncertain answers, then clicks **Approve & send back**. That explicit action
-makes her approved feedback visible in the student's Homework tab. No email is
-sent. Earlier, unapproved automatic suggestions are never sent to the student.
+specific lesson. A tally shows how many answers are correct, to try again and
+waiting for her. Answers that already have a mark and real feedback are folded
+to the student's words, the mark and the feedback, with **Change** to open one.
+Uncertain or unmarked answers stay open, edged in coral, until she resolves
+them. Then she clicks **Approve & send back**. That explicit action
+makes her approved feedback visible in the student's Homework tab, and the
+sheet then reads **Done** for both of them: a Done chip and band for Inês, and
+for the student a Done band on the sheet and **Done** on its card. Earlier,
+unapproved automatic suggestions are never sent to the student.
+
+## Telling Inês
+
+Each submission emails Inês once, through the Worker's booking email
+(`deliver`, Resend, `email_log`), styled like the other booking emails:
+**Homework to review**, the student's name, the sheet's title, the lesson's
+date and a **Review homework** button to
+`/schedule/?student=…&homework=…`, which opens that lesson's review once she is
+signed in. It never contains answers, the answer key or any automatic mark.
+It is sent after marking finishes, or, if marking was interrupted, by the
+every-minute cron after the 90-second hand-off. Before sending, the Worker
+claims `homework_progress.notified_submission_id` for that submission (migration
+0030) and the email log dedupes on `teacher:homework-submitted:<submission id>`,
+so retried submits and the sweep never send twice. A failed send releases the
+claim and the sweep retries it for up to three days. The email has no booking id
+so the failed-email sweep can never rebuild it as a lesson confirmation. A new
+attempt has a new submission id and is announced in its turn.
+`TEACHER_NOTIFICATIONS_ENABLED=0` pauses it with her other copies. Until
+migration 0030 is applied, submissions work as before and no notice is sent.
 
 Students can practise again after feedback. A new attempt replaces the previous
 submission, not the published questions. Changed answers are labelled as not yet
@@ -79,7 +121,8 @@ or replay older migrations on an existing database. This migration has not been
 applied remotely yet; its new progress table includes the submission JSON column.
 The schema is for new local databases only. Until the migration is applied, the
 Students list shows no homework to review and a student's Homework tab is empty,
-rather than either failing. This feature does not change bookings, fees, email or meetings.
+rather than either failing. Migration `0030-homework-notified.sql` adds the two
+notification columns; apply it after 0029. This feature does not change bookings, fees or meetings.
 
 - `/admin/lessons/:id/homework`: teacher read/save; `/transcribe`, `/generate`,
   `/publish` and `/return` are explicit POST actions. Existing teacher-session and admin
@@ -88,8 +131,11 @@ rather than either failing. This feature does not change bookings, fees, email o
   answers; `/submit` saves the attempt and requests marking. Both the homework
   owner and current booking owner must match the signed-in student. Manage links alone grant no homework access.
 - Private notes never enter student responses. Images are normalised in the
-  browser, bounded to 2 MB after conversion, and sent inline to OpenAI; the site
-  does not retain the original photo. No public uploads or file URLs are created.
+  browser, each bounded to 2 MB after conversion, and sent inline (base64) to
+Anthropic's Messages API.
+  Up to three photos (`images`) go in one transcription request, so the body
+  limit is three photos' worth. A single `image` from an older open tab is
+  still accepted. The site does not retain the original photos. No public uploads or file URLs are created.
 - Draft and answer saves use `updatedAt` in conditional writes. A stale tab gets
   409 instead of silently replacing newer work. Published sheets are immutable
   so answers remain attached to the questions the student actually saw.
@@ -99,51 +145,64 @@ rather than either failing. This feature does not change bookings, fees, email o
 
 ## AI activation
 
-AI is **off by default**. The deployed Worker currently has no OpenAI key.
+AI is **off by default**. The deployed Worker currently has no Anthropic key.
 Before activation, obtain the owner's approval for the provider, paid usage and
-the new migration/release; install an approved project key as the Worker secret
-`OPENAI_API_KEY`. Never put a key in a frontend variable or commit one. Then set
-`HOMEWORK_AI_ENABLED=1` for the approved environment. Staging uses its own
-secret and explicit environment variables; it must not accidentally use live
-student material during testing.
+the new migrations/release; install an approved Anthropic API key as the Worker
+secret `ANTHROPIC_API_KEY` (`wrangler secret put ANTHROPIC_API_KEY`). Never put
+a key in a frontend variable or commit one. Then set `HOMEWORK_AI_ENABLED=1` for
+the approved environment. Staging uses its own secret and explicit environment
+variables; it must not accidentally use live student material during testing.
 
-The prepared model is `gpt-6.1-sol`, which supports image input and structured
-output. Calls use the Responses API with standard
-processing (`service_tier: "default"`), low reasoning effort, `store:false`, a
-60-second timeout, a bounded response and no tools. Text in photos/notes is untrusted
-material, never instructions to perform other actions. The server validates
-provider output before saving. Unreadable handwriting is marked for review;
-transcription and teaching accuracy still need Inês's review.
+The default model is `claude-opus-5-5`; `HOMEWORK_AI_MODEL` overrides it. Calls
+use the Anthropic Messages API directly (`fetch`, no SDK dependency in the
+Worker) with `anthropic-version: 2023-06-01`, image input (up to three photos
+as base64 image blocks in one request), low effort (`output_config.effort:
+"low"`) and no extended thinking requested. Current Opus models cannot switch
+thinking off entirely, so low effort keeps it brief. The result comes back as
+the input to one strict tool (`strict: true`, `tool_choice: auto`, since
+current models reject forced tool choice) and the server validates it again
+before saving; text outside the tool, a refusal or a truncated reply is an
+error, never a sheet or a mark. Each call has a 60-second timeout,
+`max_tokens: 8000` (thinking included) and a 256 KB response bound. For the
+models that support it (Opus 5.5, Opus 5, Fable 5.1, Sonnet 5.5) the request
+opts into Anthropic's server-side refusal fallback (`fallbacks: "default"`,
+beta `server-side-fallback-2026-07-01`), which may re-run a declined request on
+another Claude model; remove it if the owner prefers a plain refusal. Text in
+photos/notes is untrusted material, never instructions to perform other actions.
+Unreadable handwriting is marked for review; transcription and teaching
+accuracy still need Inês's review.
 
 The default ceiling is **200 AI requests per calendar month**, shared across
 all teachers and lessons, and six per lesson per hour. A photo transcription
-and a generated draft use one request each. A submission containing written
+(of one to three photos) and a generated draft use one request each, so
+**Generate homework** from photos uses two. A submission containing written
 answers uses one additional request for marking; exact-answer checks and teacher
 approval do not use AI. Attempts, including errors, count;
 there are no automatic paid retries. The limit is an atomic database claim,
-not a browser control. Each response is capped at 6,500 output tokens, including
-reasoning. Manual authoring, saved homework and teacher marking remain usable when AI is off or at
-its limit. While AI is off, Inês's notes hide the photo and **Make homework** actions
-and offer **Write a sheet yourself**; written answers arrive marked for her review,
-and students are not told about OpenAI checks they will not get. Marking sends only the relevant questions and student answers, never
-the private lesson notes, student name, email or account identifier. Students
-are told about this processing beside Submit and in the privacy notice.
+not a browser control. Manual authoring, saved homework and teacher marking
+remain usable when AI is off or at its limit. While AI is off, the first step
+offers only typed notes and the last **Write the sheet**; written answers arrive
+marked for her review, and students are not told about AI checks they will not
+get. Marking sends only the relevant questions and student answers, never the
+private lesson notes, student name, email or account identifier. Students are
+told about this processing beside Submit and in the privacy notice.
 
-[OpenAI's published GPT-6.1 Sol standard rates](https://developers.openai.com/api/docs/pricing)
-checked on 15 October 2026 are $2 per million input tokens and $10 per million
-output tokens for short contexts. Image inputs and reasoning are billed too.
-For illustration, a full photo, worksheet and marking workflow totalling 10,000
-input tokens and 10,000 output tokens would cost $0.12 before tax, caching
-adjustments or any regional-processing surcharge. This is a token-budget
-example, not a measured bill. Actual cost depends on photo/notes length, output
-and retries; the request ceiling is not a dollar budget for other activity in
-the OpenAI project.
+Cost: the Claude API reference bundled with Claude Code (model table cached on
+6 October 2026) lists Claude Opus 5.5 at $4 per million input tokens and $20 per
+million output tokens. That is not a repository source, so **check
+[Anthropic's pricing page](https://www.anthropic.com/pricing#api) before
+activation**. Image inputs count as input tokens and thinking counts as output.
+For illustration only, at those rates a full photo, worksheet and marking
+workflow totalling 10,000 input and 10,000 output tokens would cost about
+$0.24 before tax. This is a token-budget example, not a measured bill. The
+request ceiling is not a dollar budget for other activity in the Anthropic
+workspace; set a spend limit there too.
 
-`store:false` avoids storing Responses application state, but does not promise
-zero retention. [OpenAI's data controls](https://developers.openai.com/api/docs/guides/your-data)
-say API content is not used to train models by default and abuse-monitoring
-logs can be retained for up to 30 days, with stated exceptions. The teacher's
-upload notice and site privacy notice identify this processing.
+Anthropic's commercial terms say API content is not used to train its models by
+default; it is retained for a limited period, longer where safety review or the
+law requires. Confirm the current retention period in
+[Anthropic's Privacy Center](https://privacy.anthropic.com/) before activation.
+The site privacy notice identifies this processing.
 
 ## Verification
 
@@ -151,10 +210,17 @@ The existing Worker integration suite covers owner isolation, teacher review,
 draft and automatic-mark invisibility, stale saves/reviews, immutable submitted
 answers, fixed published questions, bounded uploads, provider failures and shared
 usage limits. It also checks accepted-answer variants, Portuguese accents and
-duplicate submissions during an AI call. `scripts/qa-homework.mjs` exercises
-photo selection through teacher publication, student save/reload/submission,
-teacher correction and approval, returned feedback, and black-and-white print at
-one desktop and one phone width. Its AI replies and accounts are
+duplicate submissions during an AI call, the Messages API request shape
+(model, effort, strict tool, image blocks), refusals and replies without the
+tool call, and the submission notice: one email per submission, no answers or
+marks, a review link, a failed send retried by the sweep, and the 90-second
+hand-off. The defaults test checks the starting level and length.
+`scripts/qa-homework.mjs` exercises the AI-on steps: camera capture, auto-advance
+through the default level and length, Back, the progress card, two pages read and
+drafted in one press, the preview, Fine-tune and publication, student
+save/reload/submission, folded teacher review, correction and approval, Done for
+both, returned feedback, and black-and-white print at one desktop and one phone
+width. Its AI replies and accounts are
 synthetic fixtures; passing it is not evidence of live OCR or language quality.
 Before enabling the provider, test a synthetic lesson photo through the actual
 configured model and inspect its transcription, pt-PT worksheet and marking of
