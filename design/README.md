@@ -47,6 +47,15 @@ with answers separate from questions. Offer Do online and Print worksheet.
 Online submission saves a fixed copy for automatic marking; only Inês sees
 those suggestions until she checks, edits and approves them. Homework to review
 belongs in the relevant student row, as a coral prompt with its count.
+With AI on, Inês's new sheet opens on one large lilac blob, `Add a photo of
+your notes`, with a coral dab carrying the camera and a splat cropped into its
+corner. It opens the phone camera. Gallery and typed notes are small dabs
+beneath it, and level, length and `Read & make homework` share one row. The
+draft is a preview first, with `Fine-tune` (a dab that stays pressed blue)
+beside the format control. One tick and `Publish for student` close it (15
+October 2026: as easy as possible with AI on). In review, settled answers
+fold to the student's words, the mark and the feedback beside `Change`, under a
+tally of dabs.
 Inês marks each answer with the sliding `Correct` / `Try again` control and
 writes the feedback herself; an answer still waiting for her is edged in coral,
 and a placeholder is never approved as feedback. The print version uses black text, readable

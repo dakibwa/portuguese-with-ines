@@ -69,8 +69,10 @@ export async function teacherHomeworkRequest(token: string, id: string, action =
     (data.updatedAt !== null && typeof data.updatedAt !== "string") || (data.publishedAt !== null && typeof data.publishedAt !== "string")) throw invalid();
   return data;
 }
-export async function transcribeHomeworkPhoto(token: string, id: string, image: string, updatedAt: string | null, signal?: AbortSignal): Promise<{ notes: string; uncertain: string[] }> {
-  const data = await request(token, `/admin/lessons/${encodeURIComponent(id)}/homework/transcribe`, { image, updatedAt }, signal);
+/** The Worker reads up to this many photos in one request (HOMEWORK_PHOTO_LIMIT). */
+export const HOMEWORK_PHOTO_LIMIT = 3;
+export async function transcribeHomeworkPhotos(token: string, id: string, images: string[], updatedAt: string | null, signal?: AbortSignal): Promise<{ notes: string; uncertain: string[] }> {
+  const data = await request(token, `/admin/lessons/${encodeURIComponent(id)}/homework/transcribe`, { images, updatedAt }, signal);
   if (typeof data.notes !== "string" || !Array.isArray(data.uncertain) || !data.uncertain.every((s: unknown) => typeof s === "string")) throw invalid();
   return data;
 }

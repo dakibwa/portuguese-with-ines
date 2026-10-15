@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Printer, BookOpen, CheckCircle2, RotateCcw, CircleHelp, PencilLine, Eye, EyeOff } from "lucide-react";
 import type { HomeworkMark, HomeworkSheet } from "@/lib/homework-api";
@@ -30,9 +30,11 @@ type Props = {
   marks?: Record<string, HomeworkMark>;
   markedAnswers?: Record<string, string>;
   onViewChange?: (view: "online" | "print") => void;
+  /** Inês's draft actions, sharing the format control's row rather than taking their own. */
+  tools?: ReactNode;
 };
 
-export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {}, onAnswer, disabled, preview = false, marks = {}, markedAnswers, onViewChange }: Props) {
+export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {}, onAnswer, disabled, preview = false, marks = {}, markedAnswers, onViewChange, tools }: Props) {
   const prefix = useId();
   const [view, setView] = useState<"online" | "print">("online");
   const [showAnswers, setShowAnswers] = useState(preview);
@@ -149,8 +151,11 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
   }
 
   return <div className="homework-worksheet" ref={screen}>
-    <HomeworkToggle label="Worksheet format" value={view} controls={`${prefix}-view`} onChange={chooseView} className="homework-format-toggle"
-      options={[["online", preview ? "On screen" : "Do online"], ["print", "Print worksheet"]]} />
+    {(() => {
+      const toggle = <HomeworkToggle label="Worksheet format" value={view} controls={`${prefix}-view`} onChange={chooseView} className="homework-format-toggle"
+        options={[["online", preview ? "On screen" : "Do online"], ["print", "Print worksheet"]]} />;
+      return tools ? <div className="homework-toolbar homework-toolbar--format">{toggle}<div className="homework-toolbar__tools">{tools}</div></div> : toggle;
+    })()}
     {view === "print" ? <div className="homework-paper-tools">
       <p className="homework-help">Black-and-white pages with room to write. The answer key is optional and starts on a separate page.</p>
       <div className="homework-print-tools">

@@ -1,10 +1,20 @@
 # Lesson homework
 
 Inês opens **Homework** on a lesson, either from the timetable or from the
-student's inline lesson history. She adds a photo from her phone or types notes,
-checks the transcription, chooses a CEFR level and 10, 15 or 20 minutes, then
-makes a draft. Every instruction, question, example and answer is editable.
-She reviews the European Portuguese and answers before publishing. Students
+student's inline lesson history. With AI on, a new sheet opens on one step:
+**Add a photo of your notes**, which opens the phone's rear camera
+(`capture="environment"`). She can add up to three pages, from the camera or
+**From gallery**, or **Type notes** instead. Level starts at the student's
+latest earlier sheet (by lesson date), else A1, and length at 15 minutes; both
+stay changeable beside the button. **Read & make homework** reads all the
+photos in one request and makes the draft straight away. If the reader was
+unsure of anything, or found no lesson text, it stops after reading so she can
+check the notes first. The draft opens as a preview. **Fine-tune** opens the
+field-by-field editor, where every instruction, question, example, answer and
+marking rule is editable. She ticks **I checked the European Portuguese and the
+answers.** and presses **Publish for student**. The lesson notes, level and
+length stay folded above the draft, with **Make a new draft**. With AI off she
+types notes and chooses **Write a sheet yourself**, which opens the editor. Students
 see only published sheets in **Homework**, grouped by lesson. They can save
 answers and resume them. **Do online** submits a fixed copy for marking.
 **Print worksheet** opens a black-and-white paper preview with writing lines;
@@ -24,8 +34,11 @@ These are practice feedback, not a formal assessment of language ability.
 stay private to Inês, including in API responses. The student sees **Sent to Inês**
 and cannot change that submitted copy while it is awaiting review. Inês sees
 **Homework to review** on the student's existing row; opening it goes to the
-specific lesson. She checks each answer, edits the mark and feedback, resolves
-any uncertain answers, then clicks **Approve & send back**. That explicit action
+specific lesson. A tally shows how many answers are correct, to try again and
+waiting for her. Answers that already have a mark and real feedback are folded
+to the student's words, the mark and the feedback, with **Change** to open one.
+Uncertain or unmarked answers stay open, edged in coral, until she resolves
+them. Then she clicks **Approve & send back**. That explicit action
 makes her approved feedback visible in the student's Homework tab. No email is
 sent. Earlier, unapproved automatic suggestions are never sent to the student.
 
@@ -88,8 +101,10 @@ rather than either failing. This feature does not change bookings, fees, email o
   answers; `/submit` saves the attempt and requests marking. Both the homework
   owner and current booking owner must match the signed-in student. Manage links alone grant no homework access.
 - Private notes never enter student responses. Images are normalised in the
-  browser, bounded to 2 MB after conversion, and sent inline to OpenAI; the site
-  does not retain the original photo. No public uploads or file URLs are created.
+  browser, each bounded to 2 MB after conversion, and sent inline to OpenAI.
+  Up to three photos (`images`) go in one transcription request, so the body
+  limit is three photos' worth. A single `image` from an older open tab is
+  still accepted. The site does not retain the original photos. No public uploads or file URLs are created.
 - Draft and answer saves use `updatedAt` in conditional writes. A stale tab gets
   409 instead of silently replacing newer work. Published sheets are immutable
   so answers remain attached to the questions the student actually saw.
@@ -117,7 +132,8 @@ transcription and teaching accuracy still need Inês's review.
 
 The default ceiling is **200 AI requests per calendar month**, shared across
 all teachers and lessons, and six per lesson per hour. A photo transcription
-and a generated draft use one request each. A submission containing written
+(of one to three photos) and a generated draft use one request each, so
+**Read & make homework** uses two. A submission containing written
 answers uses one additional request for marking; exact-answer checks and teacher
 approval do not use AI. Attempts, including errors, count;
 there are no automatic paid retries. The limit is an atomic database claim,
@@ -151,9 +167,10 @@ The existing Worker integration suite covers owner isolation, teacher review,
 draft and automatic-mark invisibility, stale saves/reviews, immutable submitted
 answers, fixed published questions, bounded uploads, provider failures and shared
 usage limits. It also checks accepted-answer variants, Portuguese accents and
-duplicate submissions during an AI call. `scripts/qa-homework.mjs` exercises
-photo selection through teacher publication, student save/reload/submission,
-teacher correction and approval, returned feedback, and black-and-white print at
+duplicate submissions during an AI call. The defaults test checks the starting level and length. `scripts/qa-homework.mjs`
+exercises the AI-on photo step: camera capture, the default level and length,
+two pages read and drafted in one press, the preview, Fine-tune and publication, student save/reload/submission,
+folded teacher review, correction and approval, returned feedback, and black-and-white print at
 one desktop and one phone width. Its AI replies and accounts are
 synthetic fixtures; passing it is not evidence of live OCR or language quality.
 Before enabling the provider, test a synthetic lesson photo through the actual

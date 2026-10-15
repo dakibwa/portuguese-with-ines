@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Camera, Sparkles, CheckCircle2, ChevronDown, Lock, PenLine, Plus, Trash2 } from "lucide-react";
-import { prepareHomeworkPhoto, teacherHomeworkRequest, transcribeHomeworkPhoto, type HomeworkSheet, type TeacherHomeworkData, type HomeworkMark } from "@/lib/homework-api";
+import { Camera, Sparkles, CheckCircle2, ChevronDown, Image as ImageIcon, Lock, PenLine, Plus, RotateCcw, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { HOMEWORK_PHOTO_LIMIT, prepareHomeworkPhoto, teacherHomeworkRequest, transcribeHomeworkPhotos, type HomeworkSheet, type TeacherHomeworkData, type HomeworkMark } from "@/lib/homework-api";
 import { readSession } from "@/lib/auth-api";
 import { HomeworkSplat } from "./HomeworkArt";
-import { HomeworkToggle, HomeworkWorksheet } from "./HomeworkWorksheet";
+import { HomeworkWorksheet } from "./HomeworkWorksheet";
 
 const emptySheet = (): HomeworkSheet => ({
   title: "Vamos praticar", objective: "", reminder: "Amanhã, tenta recordar três coisas que praticaste, sem olhar para a ficha.",
@@ -19,8 +19,11 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [photo, setPhoto] = useState("");
-  const [showPhoto, setShowPhoto] = useState(false);
+  // Photos waiting to be read, and those already read (kept only in this tab, to compare).
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [read, setRead] = useState<string[]>([]);
+  const [showPhoto, setShowPhoto] = useState(-1);
+  const [writing, setWriting] = useState(false);
   const [uncertain, setUncertain] = useState<string[]>([]);
   const [mode, setMode] = useState<"edit" | "preview">("preview");
   const [reviewed, setReviewed] = useState(false);
@@ -31,6 +34,8 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
   const controller = useRef<AbortController | null>(null);
   const dirty = Boolean(draft && saved && (JSON.stringify(draft) !== JSON.stringify(saved) ||
     (reviewMarks && JSON.stringify(reviewMarks) !== JSON.stringify(saved.progress.submission?.marks))));
+  // Unread photos are work too: leaving would lose them.
+  const unsaved = dirty || photos.length > 0;
 
   useEffect(() => {
     active.current = true;
@@ -52,8 +57,8 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
   }, [bookingId, token, draft?.progress.submission?.state]);
   useEffect(() => { onBusy?.(Boolean(busy)); }, [busy, onBusy]);
   useEffect(() => {
-    if (!dirty && !busy) return;
-    const warn = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); };
+    if (!unsaved && !busy) return;
+    const warn = (event: BeforeUnloadEvent) => { if (unsaved) event.preventDefault(); };
     // Rows, tabs, the dialog backdrop and site links can all remove this editor
     // without a document unload. Guard those exits before their handlers run.
     const leave = (event: Event) => {
@@ -77,7 +82,7 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
       if (busy || !window.confirm("Leave without saving this homework draft?")) {
         event.preventDefault(); event.stopImmediatePropagation();
       } else {
-        setDraft(saved); setReviewMarks(null); setReviewed(false);
+        setDraft(saved); setReviewMarks(null); setReviewed(false); setPhotos([]);
       }
     };
     window.addEventListener("beforeunload", warn);
@@ -90,38 +95,101 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
       document.removeEventListener("cancel", leave, true);
       document.removeEventListener("beforeinput", leave, true);
     };
-  }, [dirty, busy, saved]);
+  }, [unsaved, busy, saved]);
 
   function edit(values: Partial<TeacherHomeworkData>) {
     if (!draft) return;
     setDraft({ ...draft, ...values }); setReviewed(false); setNotice("");
   }
-  async function run(action: "save" | "generate" | "publish" | "transcribe" | "return") {
-    if (!draft || busy) return;
-    setBusy(action); setError(""); setNotice("");
+  async function addPhotos(files: FileList | null) {
+    const chosen = [...(files ?? [])].slice(0, HOMEWORK_PHOTO_LIMIT - photos.length);
+    if (!chosen.length) { if (files?.length) setError(`Add up to ${HOMEWORK_PHOTO_LIMIT} photos at a time.`); return; }
+    setBusy("photo"); setError(""); setUncertain([]);
     try {
-      if (action === "transcribe") {
-        const result = await transcribeHomeworkPhoto(token, bookingId, photo, draft.updatedAt, controller.current?.signal);
-        if (!active.current || readSession() !== token) return;
-        const notes = [draft.notes, result.notes].filter(Boolean).join("\n\n");
-        if (notes.length > 10000) throw new Error("These notes are too long to add another photo. Shorten the notes, then read the photo again.");
-        edit({ notes });
-        setUncertain(result.uncertain);
-        setNotice(result.notes ? "Photo read. Check the notes before making the sheet." : "No lesson text was found. Try a clearer photo.");
-      } else {
-        const result = await teacherHomeworkRequest(token, bookingId, action === "save" ? "" : action,
-          action === "return" ? { submissionId: draft.progress.submission?.id, updatedAt: draft.progress.updatedAt,
-            marks: reviewMarks ?? draft.progress.submission?.marks, approved: true }
-            : { notes: draft.notes, level: draft.level, minutes: draft.minutes, sheet: draft.sheet, updatedAt: draft.updatedAt, reviewed }, controller.current?.signal);
-        if (!active.current || readSession() !== token) return;
-        setDraft(result); setSaved(result); setReviewMarks(null); setReviewed(false);
-        if (action !== "save") setMode("preview");
-        setNotice(action === "return" ? "Approved and sent back. The student can now see your feedback." : action === "publish" ? "Published. It is now in the student’s Homework tab." : action === "generate" ? "Draft ready. Check the Portuguese and answers." : "Draft saved.");
-        if (action === "return") window.dispatchEvent(new Event("homework-returned"));
-      }
+      const images = await Promise.all(chosen.map(prepareHomeworkPhoto));
+      if (active.current) setPhotos(current => [...current, ...images].slice(0, HOMEWORK_PHOTO_LIMIT));
     } catch (error) { if (active.current) setError((error as Error).message); }
     finally { if (active.current) setBusy(""); }
   }
+  // Saves, generates, publishes or returns `source`, the draft as it stands
+  // unless a step has just changed it (a transcription feeding a draft).
+  async function send(action: "save" | "generate" | "publish" | "return", source: TeacherHomeworkData) {
+    const result = await teacherHomeworkRequest(token, bookingId, action === "save" ? "" : action,
+      action === "return" ? { submissionId: source.progress.submission?.id, updatedAt: source.progress.updatedAt,
+        marks: reviewMarks ?? source.progress.submission?.marks, approved: true }
+        : { notes: source.notes, level: source.level, minutes: source.minutes, sheet: source.sheet, updatedAt: source.updatedAt, reviewed }, controller.current?.signal);
+    if (!active.current || readSession() !== token) return;
+    setDraft(result); setSaved(result); setReviewMarks(null); setReviewed(false);
+    if (action !== "save") setMode("preview");
+    setNotice(action === "return" ? "Approved and sent back. The student can now see your feedback." : action === "publish" ? "Published. It is now in the student’s Homework tab." : action === "generate" ? "Draft ready. Check the Portuguese and answers." : "Draft saved.");
+    if (action === "return") window.dispatchEvent(new Event("homework-returned"));
+  }
+  async function run(action: "save" | "generate" | "publish" | "return") {
+    if (!draft || busy) return;
+    setBusy(action); setError(""); setNotice("");
+    try { await send(action, draft); }
+    catch (error) { if (active.current) setError((error as Error).message); }
+    finally { if (active.current) setBusy(""); }
+  }
+  /** Photos are read, then the draft is made from what they say, in one press.
+   *  Anything the reader was unsure of stops it there so Inês can check first. */
+  async function make() {
+    if (!draft || busy) return;
+    if (draft.sheet && !window.confirm("Replace this draft with a new sheet? Your lesson notes will stay.")) return;
+    setError(""); setNotice("");
+    let source = draft;
+    try {
+      if (photos.length) {
+        setBusy("transcribe");
+        const result = await transcribeHomeworkPhotos(token, bookingId, photos, draft.updatedAt, controller.current?.signal);
+        if (!active.current || readSession() !== token) return;
+        const notes = [draft.notes, result.notes].filter(Boolean).join("\n\n");
+        if (notes.length > 10000) throw new Error("These notes are too long to add another photo. Shorten the notes, then read the photo again.");
+        source = { ...draft, notes };
+        setDraft(source); setRead(photos); setPhotos([]); setShowPhoto(-1); setUncertain(result.uncertain); setWriting(true);
+        if (!result.notes) { setNotice("No lesson text was found. Try a clearer photo."); return; }
+        if (result.uncertain.length) { setNotice("Photo read. Check the readings below, then make the homework."); return; }
+      }
+      if (source.notes.trim().length < 10) throw new Error("Add a few notes about what you worked on.");
+      setBusy("generate");
+      await send("generate", source);
+    } catch (error) { if (active.current) setError((error as Error).message); }
+    finally { if (active.current) setBusy(""); }
+  }
+
+  const photoInput = (camera: boolean) => <input type="file" accept="image/*" multiple className="visually-hidden" disabled={Boolean(busy) || photos.length >= HOMEWORK_PHOTO_LIMIT}
+    {...(camera ? { capture: "environment" as const } : {})} onChange={event => { const files = event.target.files; void addPhotos(files).finally(() => { event.target.value = ""; }); }} />;
+  const canMake = Boolean(photos.length) || (draft?.notes.trim().length ?? 0) >= 10;
+  const makeLabel = busy === "transcribe" ? "Reading photos…" : busy === "generate" ? "Making sheet…" : photos.length ? (draft?.sheet ? "Read & make a new draft" : "Read & make homework") : draft?.sheet ? "Make a new draft" : "Make homework";
+  const thumbs = (list: string[], pending: boolean) => list.length ? <ul className="homework-photos" aria-label={pending ? "Photos to read" : "Photos read"}>
+    {list.map((image, index) => <li key={index}>
+      <button type="button" className="homework-photo-thumb" aria-label={`${showPhoto === index && !pending ? "Hide" : "View"} photo ${index + 1}`} aria-expanded={pending ? undefined : showPhoto === index}
+        onClick={() => pending ? undefined : setShowPhoto(value => value === index ? -1 : index)} disabled={pending}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image} alt={`Lesson notes, photo ${index + 1}`} />
+      </button>
+      {pending ? <button type="button" className="homework-photo-remove" aria-label={`Remove photo ${index + 1}`} disabled={Boolean(busy)} onClick={() => setPhotos(current => current.filter((_, i) => i !== index))}><X size={15} aria-hidden="true" /></button> : null}
+    </li>)}
+  </ul> : null;
+  const settings = draft ? <>
+    <label htmlFor={`${inputId}-level`}>Level<select id={`${inputId}-level`} value={draft.level} onChange={event => edit({ level: event.target.value })}>{["A1", "A2", "B1", "B2", "C1", "C2"].map(level => <option key={level}>{level}</option>)}</select></label>
+    <label htmlFor={`${inputId}-minutes`}>Length<select id={`${inputId}-minutes`} value={draft.minutes} onChange={event => edit({ minutes: Number(event.target.value) })}>{[10, 15, 20].map(minutes => <option key={minutes} value={minutes}>{minutes} mins</option>)}</select></label>
+  </> : null;
+  const notesField = draft ? <label htmlFor={`${inputId}-notes`} className="homework-notes">What did you work on?
+    <textarea id={`${inputId}-notes`} value={draft.notes} rows={5} maxLength={10000} onChange={event => edit({ notes: event.target.value })} placeholder="Type the words, grammar and examples from this lesson." /></label> : null;
+  const uncertainList = uncertain.length ? <div className="homework-error"><strong>Check these readings</strong><ul>{uncertain.map((item, index) => <li key={index}>{item}</li>)}</ul></div> : null;
+  // eslint-disable-next-line @next/next/no-img-element
+  const fullPhoto = read[showPhoto] ? <img className="homework-photo-full" src={read[showPhoto]} alt="Lesson notes to compare with the transcription" /> : null;
+  const privacy = <ul className="homework-help booking-payment-facts"><li>OpenAI reads the photos. This site doesn’t store them.</li><li>Keep names and personal details out.</li></ul>;
+  // Fine-tune and Save draft: beside the format control under a preview, on their own row above the editor.
+  const draftTools = draft ? <>
+    {draft.sheet ? <button type="button" className="homework-link homework-finetune" aria-pressed={mode === "edit"} disabled={Boolean(busy)} onClick={() => setMode(value => value === "edit" ? "preview" : "edit")}>
+      <SlidersHorizontal size={15} aria-hidden="true" />Fine-tune</button>
+      : <button type="button" className="button button--lilac" disabled={Boolean(busy)} onClick={() => { edit({ sheet: emptySheet() }); setMode("edit"); }}><PenLine size={16} aria-hidden="true" />Write a sheet yourself</button>}
+    {/* As in Your details, saving appears once there is something to save. */}
+    {dirty || busy === "save" ? <button className="button button--outline" type="button" disabled={Boolean(busy)} onClick={() => void run("save")}>{busy === "save" ? "Saving…" : "Save draft"}</button> : null}
+  </> : null;
+  const start = Boolean(draft && draft.aiAvailable && !draft.sheet && !draft.publishedAt);
 
   return <section className="teacher-homework" ref={editor} aria-labelledby={`${inputId}-title`}>
     <div className="homework-toolbar homework-toolbar--head"><h3 id={`${inputId}-title`}><HomeworkSplat seed={bookingId} className="homework-heading-mark" />Homework</h3>
@@ -130,53 +198,47 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
     </div>
     {error ? <div className="homework-error" role="alert"><p>{error}</p>{!draft ? <button type="button" className="button button--outline" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button> : null}</div> : null}
     {!draft && !error ? <p className="homework-loading" role="status">Loading homework…</p> : null}
-    {draft && !draft.publishedAt ? <>
+    {draft && start ? <fieldset className="homework-start" disabled={Boolean(busy)}>
+      <legend className="visually-hidden">Make homework from this lesson</legend>
+      {/* The one big thing to press: a photo straight from the phone's camera. */}
+      {photos.length < HOMEWORK_PHOTO_LIMIT ? <label className={`homework-capture${photos.length ? " homework-capture--again" : ""}`}>
+        <HomeworkSplat seed={`${bookingId}-photo`} className="homework-capture__mark" />
+        <span className="homework-capture__icon" aria-hidden="true"><Camera size={26} /></span>
+        <span className="homework-capture__text"><strong>{photos.length ? "Add another page" : "Add a photo of your notes"}</strong>
+          <small>{photos.length ? `Up to ${HOMEWORK_PHOTO_LIMIT} photos, read together` : "Take a picture of the board or your notebook"}</small></span>
+        {photoInput(true)}
+      </label> : null}
+      <div className="homework-start__more">
+        {thumbs(photos, true)}
+        {photos.length < HOMEWORK_PHOTO_LIMIT ? <label className="homework-link homework-link--file"><ImageIcon size={15} aria-hidden="true" />From gallery{photoInput(false)}</label> : null}
+        <button type="button" className="homework-link" aria-expanded={writing} onClick={() => setWriting(value => !value)}><PenLine size={15} aria-hidden="true" />{writing ? "Hide notes" : "Type notes"}</button>
+      </div>
+      {writing ? <>{notesField}{thumbs(read, false)}{fullPhoto}{uncertainList}</> : null}
+      <div className="homework-settings">
+        {settings}
+        <button className="button button--coral homework-make" type="button" disabled={!canMake} onClick={() => void make()}><Sparkles size={17} aria-hidden="true" />{makeLabel}</button>
+      </div>
+      {privacy}
+    </fieldset> : null}
+    {draft && !start && !draft.publishedAt ? <>
       <details className="homework-source" open={!draft.sheet || undefined}>
-        <summary><ChevronDown size={18} aria-hidden="true" /><strong>Lesson notes</strong><span><Lock size={13} aria-hidden="true" />Only you can see these</span></summary>
+        <summary><ChevronDown size={18} aria-hidden="true" /><strong>Lesson notes</strong><span>{draft.level} · {draft.minutes} mins</span><span><Lock size={13} aria-hidden="true" />Only you can see these</span></summary>
         <fieldset disabled={Boolean(busy)}>
-          <label htmlFor={`${inputId}-notes`}>What did you work on?</label>
-          <textarea id={`${inputId}-notes`} value={draft.notes} rows={5} maxLength={10000} onChange={event => edit({ notes: event.target.value })} placeholder="Add a photo or type the words, grammar and examples from this lesson." />
+          {notesField}
           {draft.aiAvailable ? <><div className="homework-photo-tools">
-            <label className={`button button--outline${busy ? " is-disabled" : ""}`}><Camera size={17} aria-hidden="true" />Add a photo
-              <input type="file" accept="image/*" className="visually-hidden" onChange={async event => {
-                const file = event.target.files?.[0]; event.target.value = "";
-                if (!file) return;
-                setBusy("photo"); setError(""); setUncertain([]); setShowPhoto(false);
-                try { const image = await prepareHomeworkPhoto(file); if (active.current) setPhoto(image); }
-                catch (error) { if (active.current) setError((error as Error).message); }
-                finally { if (active.current) setBusy(""); }
-              }} />
-            </label>
-            {photo ? <>
-              <button type="button" className="homework-photo-thumb" aria-label={showPhoto ? "Hide photo" : "View photo"} aria-expanded={showPhoto} onClick={() => setShowPhoto(value => !value)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo} alt="Selected lesson notes" />
-              </button>
-              <button type="button" className="button button--lilac" disabled={!draft.aiAvailable} onClick={() => void run("transcribe")}>{busy === "transcribe" ? "Reading photo…" : "Read photo"}</button>
-              <button type="button" className="text-action" onClick={() => setPhoto("")}>Remove photo</button>
-            </> : null}
+            {photos.length < HOMEWORK_PHOTO_LIMIT ? <label className="button button--outline"><Camera size={17} aria-hidden="true" />Add a photo{photoInput(true)}</label> : null}
+            {thumbs(photos, true)}{thumbs(read, false)}
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {photo && showPhoto ? <img className="homework-photo-full" src={photo} alt="Lesson notes to compare with the transcription" /> : null}
-          <ul className="homework-help booking-payment-facts"><li>OpenAI reads the photo. This site doesn’t store it.</li><li>Keep names and personal details out.</li></ul>
-          {uncertain.length ? <div className="homework-error"><strong>Check these readings</strong><ul>{uncertain.map((item, index) => <li key={index}>{item}</li>)}</ul></div> : null}
-          </> : null}
+          {fullPhoto}
+          {privacy}{uncertainList}</> : null}
           <div className="homework-settings">
-            <label htmlFor={`${inputId}-level`}>Level<select id={`${inputId}-level`} value={draft.level} onChange={event => edit({ level: event.target.value })}>{["A1", "A2", "B1", "B2", "C1", "C2"].map(level => <option key={level}>{level}</option>)}</select></label>
-            <label htmlFor={`${inputId}-minutes`}>Length<select id={`${inputId}-minutes`} value={draft.minutes} onChange={event => edit({ minutes: Number(event.target.value) })}>{[10, 15, 20].map(minutes => <option key={minutes} value={minutes}>{minutes} mins</option>)}</select></label>
-            {draft.aiAvailable ? <button className="button button--coral" type="button" disabled={draft.notes.trim().length < 10} onClick={() => {
-              if (!draft.sheet || window.confirm("Replace this draft with a new sheet? Your lesson notes will stay.")) void run("generate");
-            }}><Sparkles size={17} aria-hidden="true" />{busy === "generate" ? "Making sheet…" : draft.sheet ? "Make a new draft" : "Make homework"}</button> : null}
+            {settings}
+            {draft.aiAvailable ? <button className="button button--coral" type="button" disabled={!canMake} onClick={() => void make()}><Sparkles size={17} aria-hidden="true" />{makeLabel}</button> : null}
           </div>
           {!draft.aiAvailable ? <p className="homework-help">Photo reading and automatic drafts aren’t switched on yet. Keep your notes here and write the sheet yourself.</p> : null}
         </fieldset>
       </details>
-      <div className="homework-toolbar homework-toolbar--actions">
-        {draft.sheet ? <HomeworkToggle label="Sheet view" value={mode} onChange={setMode} options={[["preview", "Preview"], ["edit", "Edit sheet"]]} />
-          : <button type="button" className="button button--lilac" disabled={Boolean(busy)} onClick={() => { edit({ sheet: emptySheet() }); setMode("edit"); }}><PenLine size={16} aria-hidden="true" />Write a sheet yourself</button>}
-        {/* As in Your details, saving appears once there is something to save. */}
-        {dirty || busy === "save" ? <button className="button button--outline" type="button" disabled={Boolean(busy)} onClick={() => void run("save")}>{busy === "save" ? "Saving…" : "Save draft"}</button> : null}
-      </div>
+      {draft.sheet && mode === "preview" ? null : <div className="homework-toolbar homework-toolbar--actions">{draftTools}</div>}
     </> : null}
     {draft?.sheet && draft.progress.submission && !draft.progress.submission.returnedAt ? <HomeworkReview
       sheet={draft.sheet} answers={draft.progress.submission.answers}
@@ -186,13 +248,13 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
       {!draft.publishedAt && mode === "edit" ? <SheetEditor sheet={draft.sheet} disabled={Boolean(busy)} ai={draft.aiAvailable} onChange={sheet => edit({ sheet })} />
         : <HomeworkWorksheet sheet={draft.sheet} level={draft.level} minutes={draft.minutes} lessonAt={draft.lessonAt}
           answers={draft.progress.submission?.answers ?? (draft.publishedAt ? draft.progress.answers : undefined)}
-          marks={draft.progress.submission?.marks} markedAnswers={draft.progress.submission?.answers} preview />}
+          marks={draft.progress.submission?.marks} markedAnswers={draft.progress.submission?.answers} preview tools={draft.publishedAt ? undefined : draftTools} />}
       {draft.publishedAt ? <p className="homework-help homework-help--state">{draft.progress.submission?.returnedAt ? "Approved feedback sent back to the student." : draft.progress.updatedAt ? "The student has started but has not submitted yet." : "The student has not submitted any answers yet."} Published questions stay fixed.</p> : <div className="homework-publish">
         <label><input type="checkbox" checked={reviewed} disabled={Boolean(busy)} onChange={event => setReviewed(event.target.checked)} />I checked the European Portuguese and the answers.</label>
         <button type="button" className="button button--coral" disabled={Boolean(busy) || !reviewed} onClick={() => void run("publish")}>{busy === "publish" ? "Publishing…" : "Publish for student"}</button>
       </div>}
     </> : null}
-    <p className="homework-notice" role="status">{busy === "photo" ? "Preparing photo…" : busy === "generate" ? "Making a draft from this lesson’s notes…" : notice || (dirty ? "Unsaved changes" : "")}</p>
+    <p className="homework-notice" role="status">{busy === "photo" ? "Preparing photo…" : busy === "transcribe" ? "Reading your notes…" : busy === "generate" ? "Making a draft from this lesson’s notes…" : notice || (dirty ? "Unsaved changes" : "")}</p>
   </section>;
 }
 
@@ -230,14 +292,24 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
   note?: string; busy: boolean; onChange: (marks: Record<string, HomeworkMark>) => void; onApprove: () => void;
 }) {
   const id = useId();
+  // Answers she has opened to change stay open until she sends the review back.
+  const [opened, setOpened] = useState<string[]>([]);
   const questions = sheet.sections.flatMap(section => section.questions);
   // A pending placeholder ("A Inês vai rever…") is not feedback; it must never be approved as hers.
   const feedbackOf = (mark?: HomeworkMark) => !mark || mark.source === "pending" ? "" : mark.feedback;
-  const open = questions.filter(question => !marks[question.id] || marks[question.id].status === "review" || !feedbackOf(marks[question.id]).trim()).length;
+  const unresolvedMark = (mark?: HomeworkMark) => !mark || mark.status === "review" || !feedbackOf(mark).trim();
+  const open = questions.filter(question => unresolvedMark(marks[question.id])).length;
+  const right = questions.filter(question => !unresolvedMark(marks[question.id]) && marks[question.id].status === "correct").length;
+  const retry = questions.length - open - right;
   return <div className="homework-review">
     <div className="homework-review__intro">
       <h4>Homework to review</h4>
-      <p>{marking ? "Checking answers…" : "Check each mark and its feedback. The student sees them only after you approve."}</p>
+      <p>{marking ? "Checking answers…" : "Settled answers are folded. Open any to change it. The student sees your marks only after you approve."}</p>
+      {marking ? null : <ul className="homework-review__tally" aria-label="Marks so far">
+        <li className="homework-review__count homework-review__count--correct">{right} correct</li>
+        <li className="homework-review__count homework-review__count--retry">{retry} to try again</li>
+        {open ? <li className="homework-review__count homework-review__count--open">{open} {open === 1 ? "needs" : "need"} you</li> : null}
+      </ul>}
       {note ? <p className="homework-review__note">{note}</p> : null}
     </div>
     <fieldset className="homework-review__sheet" disabled={busy || marking}>
@@ -247,13 +319,22 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
         {section.questions.map((question, qi) => {
           const mark = marks[question.id] ?? { status: "review", feedback: "", source: "pending" };
           const feedback = feedbackOf(mark);
-          const edit = (value: Partial<HomeworkMark>) => onChange({ ...marks, [question.id]: { ...mark, feedback, source: "teacher", ...value } });
+          const edit = (value: Partial<HomeworkMark>) => { setOpened(list => list.includes(question.id) ? list : [...list, question.id]); onChange({ ...marks, [question.id]: { ...mark, feedback, source: "teacher", ...value } }); };
           const name = `${id}-${question.id}`;
-          const unresolved = mark.status === "review" || !feedback.trim();
+          const unresolved = unresolvedMark(mark);
+          const prompt = <p className="homework-review__prompt" lang="pt-PT"><span className="homework-dab" aria-hidden="true">{qi + 1}</span><span className="visually-hidden">{qi + 1}. </span>{question.prompt}</p>;
+          const answer = <p className="homework-review__answer" lang="pt-PT">{answers[question.id] || <em lang="en">No answer</em>}</p>;
+          if (!unresolved && !opened.includes(question.id)) return <div className={`homework-review__question homework-review__question--folded homework-review__question--${mark.status}`} key={question.id}>
+            <div className="homework-review__work">{prompt}{answer}</div>
+            <div className="homework-review__verdict">
+              <span className="homework-review__status">{mark.status === "correct" ? <><CheckCircle2 size={15} aria-hidden="true" />Correct</> : <><RotateCcw size={15} aria-hidden="true" />Try again</>}</span>
+              <p lang="pt-PT">{feedback}</p>
+              <button type="button" className="homework-link" aria-label={`Change mark for ${section.title}, question ${qi + 1}`} onClick={() => setOpened(list => [...list, question.id])}>Change</button>
+            </div>
+          </div>;
           return <div className={`homework-review__question${unresolved ? " is-open" : ""}`} key={question.id}>
             <div className="homework-review__work">
-              <p className="homework-review__prompt" lang="pt-PT"><span className="homework-dab" aria-hidden="true">{qi + 1}</span><span className="visually-hidden">{qi + 1}. </span>{question.prompt}</p>
-              <p className="homework-review__answer" lang="pt-PT">{answers[question.id] || <em lang="en">No answer</em>}</p>
+              {prompt}{answer}
               <details><summary>Answer guide</summary><p lang="pt-PT">{question.answer}</p>{question.explanation ? <p lang="pt-PT">{question.explanation}</p> : null}</details>
             </div>
             <div className="homework-review__mark">
