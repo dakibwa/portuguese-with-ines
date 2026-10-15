@@ -3047,6 +3047,12 @@
 .teacher-lesson-picker__slot:focus-visible { border-color: var(--blue); }
 .teacher-lesson-picker__slot[aria-pressed="true"] { border-color: var(--blue-deep); background: var(--blue-deep); color: var(--paper-light); }
 .teacher-lesson-picker__times .teacher-lesson-picker__chosen { color: var(--ink); }
+/* Days and times already had: still chosen, read quieter, for a lesson she records. */
+.teacher-lesson-picker .teacher-month-day.is-past:not([aria-pressed="true"]) { background: transparent; color: var(--lavender-ink); }
+.teacher-lesson-picker__slot.is-past:not([aria-pressed="true"]) { background: var(--paper); }
+/* A lesson already had: date and time, then its length and the one action beneath. */
+.teacher-manual-form--past .teacher-manual-settings { order: 2; }
+.teacher-setup__body .teacher-manual-settings .teacher-manual-submit { grid-column: 1 / -1; }
 @container (min-width: 34rem) {
   .teacher-lesson-picker__layout { grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 1.5rem; }
 }

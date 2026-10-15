@@ -2288,7 +2288,7 @@ await test("a card saved from the account pays for the lessons Inês added from 
 
     const saved = db.prepare("SELECT * FROM students WHERE id=?").get(id);
     assert.deepEqual([saved.stripe_customer_id, saved.stripe_payment_method, Boolean(saved.card_consent_at)], ["cus_card_later", "pm_card_later", true]);
-    assert.equal(statusOf("2026-09-01T09:00:00.000Z"), "not_required", "a lesson already had is not charged");
+    assert.equal(statusOf("2026-09-01T09:00:00.000Z"), "recorded", "a lesson already had is not charged");
     assert.equal(statusOf("2026-10-05T02:00:00.000Z"), "not_required", "only lessons Inês added change");
     const future = db.prepare("SELECT * FROM bookings WHERE student_id=? AND added_by_teacher=1 AND starts_at > ?").all(id, new Date().toISOString());
     assert.ok(future.length > 2);
@@ -2312,7 +2312,7 @@ await test("a card saved from the account pays for the lessons Inês added from 
     assert.equal(later.status, 201);
     assert.equal(statusOf("2026-10-09T02:00:00.000Z"), "scheduled", "a lesson she adds now is on the card from the start");
     assert.equal((await add("2026-09-02T09:00:00.000Z")).status, 201);
-    assert.equal(statusOf("2026-09-02T09:00:00.000Z"), "not_required", "a lesson she records after it happened is never charged");
+    assert.equal(statusOf("2026-09-02T09:00:00.000Z"), "recorded", "a lesson she records after it happened is never charged");
 
     // One the student already paid her for comes off the card, and stays off.
     const handPaid = db.prepare("SELECT id FROM bookings WHERE student_id=? AND starts_at='2026-10-09T02:00:00.000Z'").get(id).id;
@@ -2540,7 +2540,7 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     const rows = () => db.prepare("SELECT student_email, amount_cents FROM bookings WHERE student_id=?").all(student.id);
     assert.equal(rows().length, 7);
     assert.deepEqual([...new Set(rows().map((row) => row.student_email))], [`no-email:${student.id}`], "the stand-in is the lessons' key and goes no further");
-    assert.deepEqual(rows().filter((row) => row.amount_cents !== 2000).map((row) => row.amount_cents), [3000], "her price, and 1.5 times it for 90 minutes");
+    assert.deepEqual(rows().filter((row) => row.amount_cents !== 2000).map((row) => row.amount_cents).sort(), [3000, null], "her price, 1.5 times it for 90 minutes, and none on the one recorded");
 
     // Nothing is addressed to it, nothing names it, no calendar file invites it. Her own copies read "No email yet".
     const everything = sentEmails.flatMap((sent) => [sent.to.join(), sent.reply_to?.join() ?? "", sent.subject, sent.text, sent.html,
@@ -2548,13 +2548,16 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     assert.ok(!everything.includes("no-email:"), "the placeholder appears in nothing she or a provider receives");
     assert.deepEqual(sentEmails.filter((sent) => sent.to[0] !== "ines@example.invalid"), [], "no one else is written to");
     const hers = sentEmails.filter((sent) => sent.to[0] === "ines@example.invalid");
-    assert.ok(hers.length >= 4 && hers.every((sent) => sent.text.includes("No email yet") && !sent.reply_to), "she still hears of each, with no one to reply to");
+    // The one already had is recorded, not announced, so three.
+    assert.ok(hers.length >= 3 && hers.every((sent) => sent.text.includes("No email yet") && !sent.reply_to), "she still hears of each, with no one to reply to");
 
     // What her screens and automation read.
     const listed = await (await call("/admin/bookings?from=2026-01-01T00:00:00.000Z", { method: "GET", user: "teacher" })).json();
     const theirs = listed.bookings.filter((entry) => entry.student_id === student.id);
     assert.equal(theirs.length, 7);
     assert.ok(theirs.every((entry) => entry.student_email === ""), "her list shows no address for them");
+    // A recorded lesson has no receipt; one paid by hand, as lessons before recording were, does.
+    db.prepare("UPDATE bookings SET payment_status='not_required', amount_cents=2000 WHERE student_id=? AND starts_at='2026-08-20T09:00:00.000Z'").run(student.id);
     const receipts = (await (await call("/admin/receipts?month=2026-08", { method: "GET", user: "teacher" })).json()).receipts.filter((line) => line.studentName === isolated);
     assert.deepEqual(receipts.map((line) => [line.studentEmail, line.amountCents, line.ready]), [["", 2000, true]], "a receipt line for them has no address");
     const marked = await call(`/admin/bookings/${theirs.find((entry) => entry.starts_at > "2026-10-01").id}/paid-by-hand`, { user: "teacher", body: {} });
@@ -2665,6 +2668,60 @@ await test("her price for a student prices their lessons, and only lessons nothi
     assert.equal(long(), 3500);
   } finally {
     forgetStudent("priced@example.invalid");
+  }
+});
+await test("a lesson Inês records after it happened is only a record: no one is told, nothing is charged or owed", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  captureEmail();
+  Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", TEACHER_NOTIFICATIONS_ENABLED: "1" });
+  const email = "recorded@example.invalid";
+  // Welcomed, with a card that pays for her lessons, so only the past decides.
+  db.prepare(`INSERT INTO students (id,email,name,password_hash,created_at,email_verified_at,stripe_customer_id,stripe_payment_method,card_consent_at)
+    VALUES ('recorded',?,'Rui Recorded','',?,?,'cus_recorded','pm_recorded',?)`).run(email, new Date().toISOString(), new Date().toISOString(), new Date().toISOString());
+  const add = (startAt, extra = {}) => call("/admin/bookings", { user: "teacher", body: { studentId: "recorded", lessonType: "single", startAt, ...extra } });
+  const row = (startAt) => db.prepare("SELECT * FROM bookings WHERE student_id='recorded' AND starts_at=?").get(startAt);
+  try {
+    const had = await add("2026-08-03T09:00:00.000Z");
+    assert.equal(had.status, 201, await had.clone().text());
+    assert.equal((await had.json()).emailed, false);
+    // Started ten minutes ago and still running.
+    assert.equal((await add("2026-09-05T09:50:00.000Z")).status, 201);
+    await drain();
+    assert.deepEqual(sentEmails, [], "no email to the student or to her, and so no invitation");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sign_in_links WHERE student_id='recorded'").get().n, 0, "no sign-in link is made");
+    const lesson = row("2026-08-03T09:00:00.000Z");
+    assert.deepEqual([lesson.payment_status, lesson.amount_cents, lesson.payment_consent_at, lesson.meeting_url], ["recorded", null, null, null], "a record, never on the card");
+    assert.equal(row("2026-09-05T09:50:00.000Z").meeting_retry_at, "2026-09-05T10:50:00.000Z", "the Meet sweep leaves a running one alone");
+
+    // Weekly hours don't apply, but the same lesson twice, an overlap or a weekly run are refused.
+    assert.deepEqual(await (await add("2026-08-03T09:00:00.000Z")).json(), { error: "They already have this lesson." });
+    assert.equal((await add("2026-08-03T09:30:00.000Z")).status, 409, "an overlap");
+    assert.equal((await add("2026-08-10T09:00:00.000Z", { repeat: 4 })).status, 400);
+
+    // Nothing charges, chases or receipts it.
+    await chargeDueLessons(env, new Date("2026-09-06T12:00:00.000Z"));
+    await retryPaymentRecovery(env);
+    assert.equal(charges.filter((charge) => charge.key.includes(lesson.id)).length, 0);
+    assert.equal(row("2026-08-03T09:00:00.000Z").payment_status, "recorded");
+    const receipts = (await (await call("/admin/receipts?month=2026-08", { method: "GET", user: "teacher" })).json()).receipts;
+    assert.ok(!receipts.some((line) => line.bookingId === lesson.id), "not put forward as paid or owed");
+
+    // It is theirs: in their past lessons, and homework can be set on it.
+    const me = await (await call("/me", { method: "GET", token: await createSession("recorded", env.BOOKING_TOKEN_SECRET) })).json();
+    assert.ok(me.bookings.some((entry) => entry.startAt === "2026-08-03T09:00:00.000Z" && entry.isPast));
+    assert.equal((await call(`/admin/lessons/${lesson.id}/homework`, { method: "GET", user: "teacher" })).status, 200);
+
+    // Corrected within the past, or cancelled, as quietly; never moved into the future.
+    assert.equal((await call(`/admin/bookings/${lesson.id}/reschedule`, { user: "teacher", body: { startAt: "2026-10-27T09:00:00.000Z" } })).status, 409);
+    assert.equal((await (await call(`/admin/bookings/${lesson.id}/reschedule`, { user: "teacher", body: { startAt: "2026-08-03T10:00:00.000Z" } })).json()).emailed, false);
+    assert.equal((await (await call(`/admin/bookings/${lesson.id}/cancel`, { user: "teacher", body: {} })).json()).emailed, false);
+    await drain();
+    // The sweeps above charge other tests' lessons; none of it is about Rui.
+    assert.ok(!sentEmails.some((sent) => sent.to.includes(email) || sent.text.includes("Rui")));
+  } finally {
+    releaseEmail();
+    Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0" });
+    forgetStudent(email);
   }
 });
 await test("her receipts list each amount paid or due for a month's lessons, with the NIF to issue to", async () => {

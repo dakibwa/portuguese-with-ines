@@ -15,6 +15,7 @@ function paymentLabel(booking: AdminBooking) {
     case "processing": return "Payment processing";
     case "scheduled": return "Payment scheduled";
     case "pending": return "Payment pending";
+    case "recorded": return "Recorded";
     case "not_required": return addedByTeacher(booking) && booking.status !== "cancelled" ? "Payment arranged directly" : "No lesson charge";
     default: return "";
   }

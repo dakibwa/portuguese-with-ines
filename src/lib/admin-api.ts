@@ -94,7 +94,9 @@ export type AdminBooking = {
     | "processing"
     | "paid"
     | "payment_due"
-    | "refunded";
+    | "refunded"
+    /** A lesson she recorded after it happened: for the record only. */
+    | "recorded";
   attendance_status: "expected" | "no_show";
   /** 1 when Inês added it herself (migration 0023). */
   added_by_teacher?: number;

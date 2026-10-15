@@ -79,6 +79,7 @@ export function LessonDetails({
     scheduled: "charged to their card after the lesson",
     pending: "waiting for their card",
     not_required: "paid to you by hand",
+    recorded: "recorded",
   }[booking.payment_status];
   const money = booking.status === "cancelled" && !["paid", "refunded"].includes(booking.payment_status)
     ? ""

@@ -23,6 +23,13 @@ const empty = {
 const trialPrice = lessonProducts.find((product) => product.id === "trial")?.priceCents ?? 0;
 const RUN_LENGTHS: [Repeat, string][] = [[4, "4 weeks"], [6, "6 weeks"], [8, "8 weeks"], ["open", "Until stopped"]];
 
+/** When the chosen time starts, or nothing while it is incomplete or one the clocks skip. */
+function startOf(date: string, time: string, startAt: string) {
+  if (startAt) return startAt;
+  if (!date || !time) return "";
+  try { return portoTimeToUtc(date, time); } catch { return ""; }
+}
+
 /**
  * One short line for the lessons just added: when, how often, and whether the
  * student was emailed. Weeks left out (her days off) are named.
@@ -33,13 +40,14 @@ function addedLine(
   repeat: Repeat,
   series: { booked: number; skipped: { key: string }[] } | undefined,
   emailed: boolean,
+  recorded = false,
 ) {
   const when = `${dateLabel(date, { weekday: "short", day: "numeric", month: "short" })}, ${time}`;
   const often = series ? ` · weekly, ${repeat === "open" ? "until stopped" : `${series.booked} lessons`}` : "";
   const left = series?.skipped.length
     ? ` (${series.skipped.map((week) => dateLabel(week.key, { day: "numeric", month: "short" })).join(", ")} left out)`
     : "";
-  return `${when}${often}${left}${emailed ? " · emailed" : ""}`;
+  return `${when}${often}${left}${recorded ? " · recorded" : ""}${emailed ? " · emailed" : ""}`;
 }
 
 /**
@@ -48,6 +56,8 @@ function addedLine(
  * loose lessons), so there is no address to type, and none is needed: a
  * student with no email yet has lessons like anyone else (14 October 2026,
  * Dan). Lessons for a student still awaiting their welcome are added quietly.
+ * One already had is only recorded: date, time, length, add; never announced,
+ * charged or owed (15 October 2026, Dan).
  */
 export function LessonForm({
   token,
@@ -74,8 +84,13 @@ export function LessonForm({
 }) {
   const [lesson, setLesson] = useState({ ...empty, date, time });
   const quiet = Boolean(student.awaitingWelcome);
-  // A trial is one first lesson, and choosing it puts How often back to once.
-  const weekly = lesson.repeat !== "once";
+  const [openedAt] = useState(() => Date.now());
+  const startAt = startOf(lesson.date, lesson.time, lesson.startAt);
+  // Gone by the time the form opened; the Worker judges by its own clock.
+  const past = Boolean(startAt) && Date.parse(startAt) <= openedAt;
+  // A trial is one first lesson, and choosing it puts How often back to once;
+  // a lesson already had is one too.
+  const weekly = lesson.repeat !== "once" && !past;
   const [busy, setBusyState] = useState(false);
   const [availabilityRefresh, setAvailabilityRefresh] = useState(0);
   const [error, setError] = useState("");
@@ -83,20 +98,40 @@ export function LessonForm({
     setBusyState(value);
     onBusy?.(value);
   };
+  const submit = (
+    <div className="teacher-manual-submit teacher-dialog-actions">
+      <button
+        className={`button button--${past ? "coral" : tone}`}
+        type="submit"
+        disabled={busy || !startAt}
+      >
+        {busy
+          ? "Adding…"
+          : past
+            ? "Add past lesson"
+            : `${weekly ? "Add weekly lessons" : "Add lesson"}${quiet ? "" : " and email student"}`}
+      </button>
+      {onCancel ? (
+        <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">
+          Cancel
+        </button>
+      ) : null}
+    </div>
+  );
   return (
     <>
       <form
-        className="teacher-form teacher-manual-form"
+        className={`teacher-form teacher-manual-form${past ? " teacher-manual-form--past" : ""}`}
         onSubmit={async (event) => {
           event.preventDefault();
-          if (busy || !lesson.date || !lesson.time) return;
+          if (busy || !startAt) return;
           setBusy(true);
           setError("");
           try {
             const result = await createBookingFor(token, {
               studentId: student.id,
               lessonType: lesson.lessonType,
-              startAt: lesson.startAt || portoTimeToUtc(lesson.date, lesson.time),
+              startAt,
               location: lesson.location,
               notes: "",
               ...(weekly ? { repeat: lesson.repeat as Exclude<Repeat, "once"> } : {}),
@@ -105,7 +140,7 @@ export function LessonForm({
             forgetAvailability();
             setAvailabilityRefresh(current => current + 1);
             setLesson((current) => ({ ...current, date: "", startAt: "" }));
-            onCreated(addedLine(lesson.date, lesson.time, lesson.repeat, result.series, result.emailed !== false));
+            onCreated(addedLine(lesson.date, lesson.time, lesson.repeat, result.series, result.emailed !== false, past));
           } catch (caught) {
             if (caught instanceof AdminApiError && caught.status === 409 && lesson.startAt) {
               forgetAvailability();
@@ -135,7 +170,7 @@ export function LessonForm({
               {([["trial", "Trial", trialPrice], ["single", "60 mins", priceFor(student, 60)], ["long", "90 mins", priceFor(student, 90)]] as const).map(([value, label, cents]) => (
                 <label className={lesson.lessonType === value ? "is-active" : ""} key={value}>
                   <input
-                    aria-label={`${label}, ${formatMoneyCents(cents)}`}
+                    aria-label={past ? label : `${label}, ${formatMoneyCents(cents)}`}
                     checked={lesson.lessonType === value}
                     disabled={busy}
                     name={`${idPrefix}-lesson`}
@@ -146,14 +181,17 @@ export function LessonForm({
                   {/* Named "60 mins, €20"; the dot between them is drawn,
                       and on a phone the price sits under the length. */}
                   <span>{label}</span>
-                  <span className="teacher-manual-price">{formatMoneyCents(cents)}</span>
+                  {/* A record carries no price (15 October 2026, Dan). */}
+                  {past ? null : <span className="teacher-manual-price">{formatMoneyCents(cents)}</span>}
                 </label>
               ))}
             </div>
           </fieldset>
+          {/* A lesson already had needs only its length, then adding. */}
+          {past ? submit : null}
           {/* Online and In Porto carry the timetable's own marks (12 October
               2026, at Dan's request). */}
-          <fieldset className="teacher-manual-choice">
+          {past ? null : <fieldset className="teacher-manual-choice">
             <legend>Where</legend>
             <div className={`segmented segmented--${lesson.location}`}>
               <span aria-hidden="true" className="segmented__thumb" />
@@ -177,10 +215,10 @@ export function LessonForm({
                 </label>
               ))}
             </div>
-          </fieldset>
+          </fieldset>}
           {/* A student she sees every week is set up once, as a student books a
               weekly slot (12 October 2026, Dan). A trial is one first lesson. */}
-          {lesson.lessonType !== "trial" ? (
+          {lesson.lessonType !== "trial" && !past ? (
             <fieldset className="teacher-manual-choice">
               <legend>How often</legend>
               <div className={`segmented${lesson.repeat === "once" ? "" : " segmented--second"}`}>
@@ -238,22 +276,7 @@ export function LessonForm({
           startAt={lesson.startAt}
           time={lesson.time}
         />
-        <div className="teacher-manual-submit teacher-dialog-actions">
-          <button
-            className={`button button--${tone}`}
-            type="submit"
-            disabled={busy || !lesson.date || !lesson.time}
-          >
-            {busy
-              ? "Adding…"
-              : `${weekly ? "Add weekly lessons" : "Add lesson"}${quiet ? "" : " and email student"}`}
-          </button>
-          {onCancel ? (
-            <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">
-              Cancel
-            </button>
-          ) : null}
-        </div>
+        {past ? null : submit}
       </form>
       {error ? (
         <p className="teacher-inline-error" role="alert">

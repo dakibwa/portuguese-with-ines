@@ -525,8 +525,16 @@ usual lesson starts and days off; avoid a wall of administration forms.
   controls keep details, prices, lessons and welcome editable there. Adding a
   lesson opens the calendar with available Porto start times. In a wide row,
   compact lesson settings sit beside the calendar and its available times;
-  they stack on a phone. The lesson calendar starts today, omitting past dates
-  and complete past weeks. Choose an available time; there is no manual date
+  they stack on a phone. The lesson calendar opens on today and pages back a
+  year for a lesson already had (15 October 2026, Dan). Past days read quieter
+  but stay choosable; a past day's times are every quarter hour, as the same
+  time blobs, since weekly hours don't bind what has happened. A past lesson
+  is purely a record (15 October 2026, Dan): date, time, length, add. A past
+  time hides Where and How often, and the length is followed at once by one
+  coral `Add past lesson` (beneath the times on a phone, under the length
+  beside the calendar on a wide row). There is no payment step and nothing is
+  said about email, because nothing is sent or charged; her history reads
+  `Recorded`. Choose a time; there is no manual date
   or time entry. Location, length and weekly repeat remain available. Welcomes are explicit:
   opening a step never sends email. First welcomes use `onlyIfWaiting: true`;
   `Send the link again` deliberately requests a fresh link without that guard.
@@ -606,7 +614,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - Add a student opens a short creation dialog with name, optional email,
     phone, NIF, prices and splat. Nothing is emailed. Next: their lessons closes
     the dialog and opens that student's lesson form in the Students list.
-  - A free timetable time opens a student chooser. Choosing or creating the
+  - A free timetable time opens a student chooser. A past time offers only
+    `Add a lesson here`, never time off. Choosing or creating the
     student closes the chooser, switches to Students and opens their lesson
     form with the same date and time. There is no second student profile dialog.
   - Sent from the profile or from the card, `Send welcome email` is one email

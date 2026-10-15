@@ -197,6 +197,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   cancellation_message TEXT,
   created_at        TEXT NOT NULL,
   updated_at        TEXT NOT NULL,
+  -- 'recorded' is a lesson Inês recorded after it happened, for the record
+  -- only: no price, never charged, chased or receipted (15 October 2026).
   payment_status    TEXT NOT NULL DEFAULT 'not_required',
   amount_cents      INTEGER,
   stripe_session_id TEXT,
