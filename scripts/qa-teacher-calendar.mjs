@@ -917,6 +917,9 @@ try {
   await picker.getByRole("button", { name: "09:30 Porto time, already past", exact: true }).click();
   await expect(setupForm.getByRole("radio", { name: "Weekly", exact: true })).toHaveCount(0);
   await expect(setupForm.getByRole("radio", { name: "In Porto", exact: true })).toHaveCount(0);
+  // A record shows only its lengths, never a price.
+  await expect(setupForm.getByRole("radio", { name: "60 mins", exact: true })).toBeVisible();
+  await expect(setupForm.locator(".teacher-manual-price")).toHaveCount(0);
   await setupForm.getByRole("button", { name: "Add past lesson", exact: true }).click();
   await expect(noraSetup.getByRole("status")).toContainText("27 Aug, 09:30 · recorded");
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/bookings").at(-1).data, {

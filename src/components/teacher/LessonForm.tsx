@@ -170,7 +170,7 @@ export function LessonForm({
               {([["trial", "Trial", trialPrice], ["single", "60 mins", priceFor(student, 60)], ["long", "90 mins", priceFor(student, 90)]] as const).map(([value, label, cents]) => (
                 <label className={lesson.lessonType === value ? "is-active" : ""} key={value}>
                   <input
-                    aria-label={`${label}, ${formatMoneyCents(cents)}`}
+                    aria-label={past ? label : `${label}, ${formatMoneyCents(cents)}`}
                     checked={lesson.lessonType === value}
                     disabled={busy}
                     name={`${idPrefix}-lesson`}
@@ -181,7 +181,8 @@ export function LessonForm({
                   {/* Named "60 mins, €20"; the dot between them is drawn,
                       and on a phone the price sits under the length. */}
                   <span>{label}</span>
-                  <span className="teacher-manual-price">{formatMoneyCents(cents)}</span>
+                  {/* A record carries no price (15 October 2026, Dan). */}
+                  {past ? null : <span className="teacher-manual-price">{formatMoneyCents(cents)}</span>}
                 </label>
               ))}
             </div>
