@@ -49,10 +49,10 @@
     // them to students, set this to "1" and release the Worker. Anything else
     // keeps them closed.
     "EXPRESSIONS_FOR_STUDENTS": "0",
-    // Activate only after migration 0029 and an approved Anthropic API key in
-    // the ANTHROPIC_API_KEY secret. The shared ceiling counts transcription,
+    // Live since 15 October 2026: migrations 0029/0030 applied and the
+    // ANTHROPIC_API_KEY secret set in the dashboard. The shared ceiling counts transcription,
     // generation and marking attempts.
-    "HOMEWORK_AI_ENABLED": "0",
+    "HOMEWORK_AI_ENABLED": "1",
     "HOMEWORK_AI_MODEL": "claude-opus-5-5",
     "HOMEWORK_AI_MONTHLY_LIMIT": "200",
     // Google Sign-In. Public by design — it identifies the app, and the Worker
