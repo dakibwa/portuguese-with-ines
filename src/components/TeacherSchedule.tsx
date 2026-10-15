@@ -724,20 +724,20 @@ export function TeacherSchedule() {
               </h2>
             </div>
           </div>
-          <button
-            className="teacher-text-button teacher-week-mode"
-            type="button"
-            onClick={() => setEditingHours(value => !value)}
-          >
-            {editing ? "View lessons" : "Edit weekly hours"}
-            {!editing && hoursDirty ? <span className="teacher-tab-dot" aria-label="unsaved changes" /> : null}
-          </button>
           {editing ? (
             <ul className="booking-payment-facts teacher-week-hint">
               <li>Tap or drag to mark when a lesson can <strong>start</strong></li>
               <li>Repeats every week</li>
             </ul>
           ) : null}
+          <button
+            className={`button ${editing ? "button--blue" : "button--lilac"} button--compact teacher-week-mode`}
+            type="button"
+            onClick={() => setEditingHours(value => !value)}
+          >
+            {editing ? "View lessons" : "Edit weekly hours"}
+            {!editing && hoursDirty ? <span className="teacher-tab-dot" aria-label="unsaved changes" /> : null}
+          </button>
           {!editing ? <div className="teacher-week-day-control" ref={setDayControlHost} /> : null}
           {!editing ? (
             <TeacherPager
