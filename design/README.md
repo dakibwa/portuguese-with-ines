@@ -50,7 +50,12 @@ belongs in the relevant student row, as a coral-edged prompt with its count.
 Inês marks each answer with the sliding `Correct` / `Try again` control and
 writes the feedback herself; an answer still waiting for her is edged in coral,
 and a placeholder is never approved as feedback. The print version uses black text, readable
-type and writing lines on white A4 pages, with optional answers on separate pages. See
+type and writing lines on white A4 pages, with optional answers on separate pages.
+On screen each sheet wears its own brand splat, its title in Beth Ellen over a
+painted lavender swash, and Beth Ellen section titles beside splat numbers. On
+paper it stays ink-light: Beth Ellen headings, the Bloom splat as a thin
+outline, pen-outlined numbers and examples, and a single coral drawn rule;
+everything else is black or grey on white, with no colour fills. See
 [the homework contract and teaching sources](../docs/lesson-homework.md).
 
 ## Named failure patterns

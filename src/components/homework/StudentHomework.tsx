@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Send } from "lucide-react";
 import { readSession } from "@/lib/auth-api";
 import { fetchHomework, fetchHomeworkSheet, saveHomeworkAnswers, type HomeworkProgress, type HomeworkSummary, type StudentHomeworkData } from "@/lib/homework-api";
+import { HomeworkSplat } from "./HomeworkArt";
 import { HomeworkWorksheet } from "./HomeworkWorksheet";
 
 export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => Promise<boolean>) | null> }) {
@@ -116,11 +117,12 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
     </> : <>
       {error ? <div className="homework-error" role="alert"><p>{error}</p><button className="button button--outline" type="button" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button></div> : null}
       {!list && !error ? <p className="homework-loading" role="status">Loading homework…</p> : null}
-      {list?.length === 0 ? <p className="homework-empty"><BookOpen size={20} aria-hidden="true" />When Inês shares homework, it will appear here with its lesson.</p> : null}
+      {list?.length === 0 ? <p className="homework-empty"><HomeworkSplat seed="homework" className="homework-empty__mark" />When Inês shares homework, it will appear here with its lesson.</p> : null}
       {list?.length ? <ul className="homework-list">{list.map(item => {
         const state = item.returnedAt ? "returned" : item.submittedAt ? "sent" : item.started ? "started" : "new";
         return <li key={item.bookingId}>
           <button type="button" className={`homework-list__item homework-list__item--${state}`} onClick={() => void open(item.bookingId)} disabled={busy}>
+            <HomeworkSplat seed={item.bookingId} className="homework-list__mark" />
             <span className="homework-list__text">
               <small>{new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Lisbon" }).format(new Date(item.lessonAt))} lesson · {item.minutes} mins</small>
               <strong lang="pt-PT">{item.title}</strong>

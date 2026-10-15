@@ -1,0 +1,80 @@
+"use client";
+
+import { useEffect, useState, type ReactNode } from "react";
+import { AssetMark } from "@/components/BrandMarks";
+import { blob, makeCanvas, paintStroke, rng } from "@/components/expressions/paint-art";
+import { PAINTS, hash, type PaintKey } from "@/lib/expression-paint";
+import { STUDENT_MARKS } from "@/lib/student-marks";
+
+/*
+ * Homework’s decoration, all aria-hidden: the words around it carry the meaning.
+ * On screen, a brand splat and a gouache swash from the expressions’ paint box;
+ * on paper, only thin black outlines, so a printed sheet costs almost no ink.
+ */
+
+/** The brand splat a sheet or lesson always wears, chosen from its own text. */
+export function HomeworkSplat({ seed, className }: { seed: string; className?: string }) {
+  return <AssetMark asset={STUDENT_MARKS[hash(seed) % STUDENT_MARKS.length].src} className={className} />;
+}
+
+const swashes = new Map<string, string>();
+
+/**
+ * One gouache stroke, with a drop of its accent flicked off the end, painted
+ * once per seed into an image. Without a canvas there is simply no stroke.
+ */
+function swash(seed: string, paint: PaintKey) {
+  const key = `${paint}:${seed}`;
+  if (!swashes.has(key)) {
+    let url = "";
+    try {
+      const w = 640, h = 44, reach = w - 26, B = h * 0.76;
+      const R = rng(hash(seed));
+      const { paint: colour, shade, streaks, accent } = PAINTS[paint];
+      const stroke = paintStroke(reach, h, B, reach - B * 3, colour, R, 2, { shade, streaks, flick: 0.5 });
+      const [canvas, g] = makeCanvas(w, h, 2);
+      g.drawImage(stroke, 0, 0, reach, h);
+      blob(g, w - 10, h * 0.3, 6, R, accent, { rim: false, lobes: 0.12 });
+      url = `url(${canvas.toDataURL("image/png")})`;
+    } catch {}
+    swashes.set(key, url);
+  }
+  return swashes.get(key)!;
+}
+
+/**
+ * Heading text over a painted swash. The stroke is the text's background,
+ * cloned per line, so a title that wraps gets a stroke under every line.
+ * Ink stays readable over the light lavender paint (5.4:1).
+ */
+export function PaintedText({ seed, paint = "lavender", children }: { seed: string; paint?: PaintKey; children: ReactNode }) {
+  const [image, setImage] = useState("");
+  useEffect(() => setImage(swash(seed, paint)), [seed, paint]);
+  return <span className="painted-text" style={image ? { backgroundImage: image } : undefined}>{children}</span>;
+}
+
+/** A hand-drawn rule across the full width: a pen line, never a hairline. */
+export function DrawnRule({ className }: { className?: string }) {
+  return <svg aria-hidden="true" className={className} viewBox="0 0 300 12" fill="none" preserveAspectRatio="none">
+    <path d="M1 7c12-5 24 3 37-1s25 4 37 0 25 3 37-1 25 4 37 0 25 3 37-1 25 4 37 0 25 3 37-1 25 4 37 0" stroke="currentColor" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+  </svg>;
+}
+
+// The Bloom splat (built-around-you-splat-v2.svg), traced as outlines for paper.
+const BLOOM = [
+  "M181.477 116.625c7.043 5.653 10.2 12.789 13.601 20.969l.984 2.344.786 2.027c3.115 5.502 7.337 7.837 13.09 10.035 7.182 2.888 12.596 5.703 16.062 13 2.06 7.116 1.245 13.473-2 20-2.263 3.765-4.7 7.394-7.465 10.809-3.558 4.465-4.883 8.43-4.535 14.191 2.303 7.045 7.632 10.254 13.75 13.75 11.252 6.643 19.677 15.486 23.25 28.25.811 7.605.864 14.779-4 21-4.507 4.671-8.12 7.117-14.75 7.313-4.899-.093-8.572-.956-12.25-4.313-4.29-4.91-7.152-10.064-9.5-16.125-2.662-6.759-6.261-12.66-13.062-15.812-5.091-1.574-8.975-2.176-14.25-1.5-8.348.924-14.256-1.024-21.075-5.852-2.03-1.644-3.77-3.365-5.55-5.274-6.4-6.573-13.814-8.624-22.563-10.375-8.84-1.786-16.384-4.237-22.062-11.687-3.348-5.832-4.024-11.899-2.43-18.469 2.065-5.374 5.448-9.445 9.055-13.844 7.474-9.237 8.5-16.68 8.97-28.31.567-11.517 4.059-20.638 12.467-28.752 13.207-10.228 28.988-12.882 43.477-3.375",
+  "M178.602 51.457c4.082 2.897 7.375 5.907 9.398 10.543 1.38 10.872-1.026 18.203-7.437 26.813-4.652 5.635-7.861 8.472-15.184 9.402-6.967-.63-10.86-5.505-15.137-10.473C136.173 70.536 136.173 70.536 137 59.687c1.482-5.465 3.516-8.543 8-12 10.617-5.972 23.605-1.828 33.602 3.77",
+  "M73 137c6.058 3.898 10.124 9.572 14.34 15.297 2.333 3.133 4.614 5.715 7.722 8.078C98 163 98 163 99.126 166.688 99 170 99 170 97.938 171.875c-3.988 2.315-8.143 2.148-12.626 2.063-3.717-.05-7.047.311-10.687 1.062-9.301 1.823-18.897 2.166-27.625-2-4.973-3.355-9.233-7.147-11-13-.866-6.232-.855-11.47 2.5-16.937 9.023-11.81 21.872-12.34 34.5-6.063M131 234c2.575.348 4.548.71 6.75 2.125 1.862 2.792 1.94 5.586 2.25 8.875l-2-1 .582 2.094c.503 3.499-.064 5.975-.894 9.406-1.11 4.753-1.972 9.406-2.563 14.25-.868 5.951-2.579 11.325-6.125 16.25l-3 1-1 3c-5.552 3.19-10.662 3.773-17 3-3.342-1.194-5.275-1.913-7.25-4.875L100 286l-1.125-2.75L98 281h-2v-8h2l.34-2.273c2.48-12.867 11.097-19.587 20.863-27.403C122 241 122 241 124.715 238.258c2.228-2.202 3.235-2.92 6.285-3.258zm5 7 1 2Zm-36 41 1 2Zm12 9v1h5v-1z",
+  "M279.05 195.25c5.07 3.821 7.542 8.607 8.95 14.75.386 6.017-1.029 10.367-5 15-4.33 3.693-9.477 4.124-15 4-12.174-2.1-21.565-11.62-30-20-1.57-3.139-1.352-5.539-1-9 3.792-4.834 7.61-6.283 13.313-7.812l2.185-.655c9.84-2.78 17.783-1.629 26.553 3.717",
+  "M103.313 77.25c2.65 1.726 3.992 3.123 5.687 5.75l2 2c6.768 7.827 7.016 20.756 7.328 30.668-.404 2.875-1.347 4.24-3.328 6.332h-2l-2.75.688c-4.106.394-5.727-.603-9.25-2.688l-3.297-1.773c-3.756-2.147-6.854-4.73-10.016-7.665l-1.587-1.408c-3.074-2.822-4.892-5.157-6.1-9.154l-1-3h-1c-.379-4.736-.442-8.1 1.688-12.437C82.066 81.927 83.617 80.94 87 80v-2c5.525-2.762 10.642-2.89 16.313-.75",
+  "M90 213c2.438 1.688 2.438 1.688 4 4 .627 3.608.261 5.477-1.375 8.75-2.904 3.958-6.598 7.244-10.102 10.66-2.286 2.347-4.255 4.717-6.21 7.34-5.084 6.68-9.384 10.921-17.95 12.195-4.776.11-7.34-1.978-10.675-5.132-2.17-3.615-3.101-6.643-2.688-10.813 2.265-7.013 5.977-11.874 12-16l2.11-1.484c5.09-3.314 10.445-5.736 16.078-7.953l2.015-.823C81.847 212 85.194 211.837 90 213",
+  "M273.25 120.188c3.568 2.351 5.842 4.996 7.75 8.812.405 5.263-.08 8.574-3 13-5.864 6.36-13.295 9.557-21.91 10.126-2.198.08-4.391.109-6.59.124l-2.262.063c-4.552.032-7.58-.299-11.238-3.313-1.187-3.187-1.187-3.187-1-7 1.538-3.088 3.683-5.464 6-8l2.242-2.555c8.04-8.655 17.94-15.667 30.008-11.257",
+  "M238.938 84.938c2.657 2.657 3.01 3.53 3.375 7.312-.364 4.36-1.347 6.666-4.313 9.75-2.598 2.173-5.253 4.26-7.922 6.344-4.074 3.349-7.455 7.39-10.754 11.49-2.659 3.107-3.93 4.117-8.054 4.627-3.27-.461-3.27-.461-5.333-1.898-2.418-6.612 2.305-15.474 4.75-21.688l.952-2.59c2.74-6.98 6.506-12.317 13.298-15.785 5.37-.877 9.407-.592 14 2.438M175 257c3.135 1.968 4.715 3.43 6.375 6.75 1.031 5.363.754 9.459-2.187 14.125-3.438 3.34-3.438 3.34-6.188 4.125-5.272-.192-8.258-1.258-12-5-1.738-5.215-1.583-10.148.063-15.375 3.445-4.668 8.405-6.809 13.937-4.625",
+];
+
+/** The Bloom splat in a thin pen line: the printed sheet’s one motif. */
+export function PaperBloom({ className }: { className?: string }) {
+  return <svg aria-hidden="true" className={className} viewBox="0 0 330 330" fill="none" stroke="currentColor" strokeLinejoin="round">
+    {BLOOM.map((path, index) => <path key={index} d={path} vectorEffect="non-scaling-stroke" />)}
+  </svg>;
+}
