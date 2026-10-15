@@ -22,6 +22,8 @@ export type HomeworkSummary = {
 };
 export type StudentHomeworkData = {
   bookingId: string; lessonAt: string; level: string; minutes: number; sheet: HomeworkSheet; progress: HomeworkProgress;
+  /** Whether a submission's written answers get an automatic suggestion. */
+  aiMarking?: boolean;
 };
 export type TeacherHomeworkData = Omit<StudentHomeworkData, "sheet"> & {
   studentName: string; notes: string; sheet: HomeworkSheet | null;

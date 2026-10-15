@@ -68,7 +68,7 @@ import {
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
-import { HomeworkProblem, teacherHomework, studentHomework, homeworkReturns } from "./homework.mjs";
+import { HomeworkProblem, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing } from "./homework.mjs";
 import { closedExpressions, expressionsOpenToStudents, pickExpression, studentExpressions } from "./student-expressions.mjs";
 import { findRecurringCode, studentRates, studentLessonType, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
@@ -5170,7 +5170,7 @@ async function homeworkReply(request, env, operation) {
   try { return json(await operation(), 200, request, env); }
   catch (error) {
     if (error instanceof HomeworkProblem) return fail(error.message, error.status, request, env);
-    if (/no such table: (lesson_homework|homework_progress|homework_ai_usage)/.test(String(error))) {
+    if (homeworkTablesMissing(error)) {
       return fail("Homework is not ready yet. Please try again after the website update.", 503, request, env);
     }
     throw error;

@@ -77,7 +77,9 @@ Migration `0029_lesson_homework.sql` adds only `lesson_homework`,
 staging, then production, after release authority. Do not apply the full schema
 or replay older migrations on an existing database. This migration has not been
 applied remotely yet; its new progress table includes the submission JSON column.
-The schema is for new local databases only. This feature does not change bookings, fees, email or meetings.
+The schema is for new local databases only. Until the migration is applied, the
+Students list shows no homework to review and a student's Homework tab is empty,
+rather than either failing. This feature does not change bookings, fees, email or meetings.
 
 - `/admin/lessons/:id/homework`: teacher read/save; `/transcribe`, `/generate`,
   `/publish` and `/return` are explicit POST actions. Existing teacher-session and admin
@@ -121,7 +123,9 @@ approval do not use AI. Attempts, including errors, count;
 there are no automatic paid retries. The limit is an atomic database claim,
 not a browser control. Each response is capped at 6,500 output tokens, including
 reasoning. Manual authoring, saved homework and teacher marking remain usable when AI is off or at
-its limit. Marking sends only the relevant questions and student answers, never
+its limit. While AI is off, Inês's notes hide the photo and **Make homework** actions
+and offer **Write a sheet yourself**; written answers arrive marked for her review,
+and students are not told about OpenAI checks they will not get. Marking sends only the relevant questions and student answers, never
 the private lesson notes, student name, email or account identifier. Students
 are told about this processing beside Submit and in the privacy notice.
 

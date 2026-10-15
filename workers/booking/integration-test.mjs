@@ -2928,6 +2928,7 @@ await test("homework: private drafts, teacher review, lesson ownership and saved
   assert.equal(published.status, 200, await published.clone().text());
   const publicVersion = await (await call(`/me/homework/${id}`, { method: "GET" })).json();
   assert.equal(publicVersion.sheet.title, "No café");
+  assert.equal(publicVersion.aiMarking, false, "students are not told OpenAI checks answers while AI is off");
   assert.ok(!JSON.stringify(publicVersion).includes("Private teacher notes"));
   assert.equal((await call(`/me/homework/${id}`, { user: "bob", method: "GET" })).status, 404);
   assert.equal((await call(`/me/homework/${id}`, { user: "bob", body: { answers: { q1: "Wrong account" }, updatedAt: null, completed: true } })).status, 404);
@@ -3055,6 +3056,21 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     globalThis.fetch = beforeFetch;
     delete env.HOMEWORK_AI_ENABLED; delete env.OPENAI_API_KEY; delete env.HOMEWORK_AI_MONTHLY_LIMIT;
   }
+});
+
+await test("homework before migration 0029: Inês's students and a student's Homework tab still load", async () => {
+  db.exec("ALTER TABLE homework_progress RENAME TO homework_progress_pending");
+  try {
+    const students = await call("/admin/students", { user: "teacher", method: "GET" });
+    assert.equal(students.status, 200, await students.clone().text());
+    assert.deepEqual((await students.json()).students.find(student => student.id === "alice").homeworkToReview, []);
+    db.exec("ALTER TABLE lesson_homework RENAME TO lesson_homework_pending");
+    try {
+      const list = await call("/me/homework", { method: "GET" });
+      assert.equal(list.status, 200);
+      assert.deepEqual((await list.json()).homework, []);
+    } finally { db.exec("ALTER TABLE lesson_homework_pending RENAME TO lesson_homework"); }
+  } finally { db.exec("ALTER TABLE homework_progress_pending RENAME TO homework_progress"); }
 });
 
 console.log(`${passed} booking integration tests passed.`);

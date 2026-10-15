@@ -234,14 +234,22 @@ Design for the requested minutes, normally 6–8 questions and NEVER more than 1
   throw new HomeworkProblem("Not found.", 404);
 }
 
+// Migration 0029 is applied by hand after the Worker ships. Until then the
+// Students list and a student's Homework tab read as empty, never as broken.
+export const homeworkTablesMissing = error => /no such table: (lesson_homework|homework_progress|homework_ai_usage)/.test(String(error));
+async function rowsOrNone(statement) {
+  try { return (await statement.all()).results ?? []; }
+  catch (error) { if (homeworkTablesMissing(error)) return []; throw error; }
+}
+
 export async function homeworkReturns(env) {
-  const { results } = await env.DB.prepare(`SELECT p.booking_id, p.student_id,
+  const results = await rowsOrNone(env.DB.prepare(`SELECT p.booking_id, p.student_id,
     json_extract(p.submission_json, '$.submittedAt') AS submitted_at
     FROM homework_progress p JOIN lesson_homework h ON h.booking_id = p.booking_id AND h.student_id = p.student_id
     JOIN bookings b ON b.id = p.booking_id AND b.student_id = p.student_id
     WHERE h.published_at IS NOT NULL AND p.submission_json IS NOT NULL
-      AND json_extract(p.submission_json, '$.returnedAt') IS NULL ORDER BY submitted_at ASC`).all();
-  return { submissions: (results ?? []).map(row => ({ bookingId: row.booking_id, studentId: row.student_id, submittedAt: row.submitted_at })) };
+      AND json_extract(p.submission_json, '$.returnedAt') IS NULL ORDER BY submitted_at ASC`));
+  return { submissions: results.map(row => ({ bookingId: row.booking_id, studentId: row.student_id, submittedAt: row.submitted_at })) };
 }
 
 async function approveHomework(env, booking, row, body) {
@@ -320,13 +328,13 @@ export async function studentHomework(env, student, method, bookingId, body, act
   if (student.role !== "student") throw new HomeworkProblem("Homework is in the student’s account. Open their lesson to prepare it.", 403);
   if (!bookingId && method !== "GET") throw new HomeworkProblem("Not found.", 404);
   if (method === "GET" && !bookingId) {
-    const { results } = await env.DB.prepare(`SELECT h.booking_id, b.starts_at, h.level, h.minutes,
+    const results = await rowsOrNone(env.DB.prepare(`SELECT h.booking_id, b.starts_at, h.level, h.minutes,
       json_extract(h.published_json, '$.title') AS title, h.published_at, p.completed_at, p.updated_at AS progress_at,
       json_extract(p.submission_json, '$.submittedAt') AS submitted_at, json_extract(p.submission_json, '$.returnedAt') AS returned_at
       FROM lesson_homework h JOIN bookings b ON b.id = h.booking_id AND b.student_id = h.student_id
       LEFT JOIN homework_progress p ON p.booking_id = h.booking_id AND p.student_id = h.student_id
-      WHERE h.student_id = ? AND h.published_at IS NOT NULL ORDER BY b.starts_at DESC`).bind(student.id).all();
-    return { homework: (results ?? []).map(row => ({ bookingId: row.booking_id, lessonAt: row.starts_at, title: row.title, level: row.level, minutes: row.minutes,
+      WHERE h.student_id = ? AND h.published_at IS NOT NULL ORDER BY b.starts_at DESC`).bind(student.id));
+    return { homework: results.map(row => ({ bookingId: row.booking_id, lessonAt: row.starts_at, title: row.title, level: row.level, minutes: row.minutes,
       publishedAt: row.published_at, completedAt: row.completed_at ?? null, submittedAt: row.submitted_at ?? null,
       returnedAt: row.returned_at ?? null, started: Boolean(row.progress_at) })) };
   }
@@ -335,7 +343,11 @@ export async function studentHomework(env, student, method, bookingId, body, act
   if (!row) throw new HomeworkProblem("Homework not found.", 404);
   const sheet = JSON.parse(row.published_json);
   const saved = await savedProgress(env.DB, bookingId, student.id);
-  if (method === "GET" && !action) return { bookingId, lessonAt: row.starts_at, title: sheet.title, level: row.level, minutes: row.minutes, sheet, progress: progress(saved) };
+  if (method === "GET" && !action) {
+    // The student is told about automatic checks only when a submission would use them.
+    const aiMarking = env.HOMEWORK_AI_ENABLED === "1" && Boolean(env.OPENAI_API_KEY) && sheet.sections.some(section => section.questions.some(question => question.marking !== "exact"));
+    return { bookingId, lessonAt: row.starts_at, title: sheet.title, level: row.level, minutes: row.minutes, sheet, aiMarking, progress: progress(saved) };
+  }
   if (method !== "POST") throw new HomeworkProblem("Not found.", 404);
   if (action && action !== "submit") throw new HomeworkProblem("Not found.", 404);
   if (!object(body.answers)) throw new HomeworkProblem("Check your answers.");
