@@ -1,157 +1,338 @@
-.teacher-homework, .student-homework { min-width: 0; }
+/* Lesson homework: the student's Homework tab, Inês's editor and review, and
+   the paper worksheet. Colours, type and controls come from globals.css. */
+
+.teacher-homework, .student-homework { min-width: 0; color: var(--ink); }
+.teacher-homework { container: homework / inline-size; }
 .teacher-student__history:has(.teacher-homework) { grid-template-columns: minmax(0, 1fr); }
-.teacher-homework { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--lilac, #aaa4e6); }
+.teacher-history-lesson .teacher-homework { margin-top: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--rule-soft); }
 .teacher-homework fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
-.homework-toolbar, .homework-sheet-tools, .homework-print-tools, .homework-photo-tools, .homework-publish, .homework-save {
-  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+.teacher-homework .button, .student-homework .button { gap: 0.5rem; white-space: nowrap; }
+
+/* Rows: a heading or way back on the left, its state or action on the right. */
+.homework-toolbar, .homework-print-tools, .homework-photo-tools, .homework-publish, .homework-save {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; flex-wrap: wrap;
 }
-.homework-toolbar { margin: .8rem 0; }
+.homework-toolbar { margin: 0 0 1rem; }
 .homework-toolbar h3, .homework-toolbar h4 { margin: 0; }
-.homework-toolbar h3 { font-size: 1.1rem; }
-.homework-toolbar .text-action, .homework-status, .homework-sheet-tools .text-action, .homework-editor .text-action { display: inline-flex; gap: .45rem; align-items: center; }
-.homework-status { font-size: .85rem; font-weight: 600; }
-.homework-source { padding: 1rem 1.2rem; border-radius: 1.4rem .9rem 1.5rem .7rem; background: var(--raised, #fff8e8); }
-.homework-source summary { cursor: pointer; font-weight: 700; }
-.homework-source summary span { display: inline-block; margin-left: .7rem; font-weight: 400; font-size: .82rem; }
-.homework-source fieldset { padding-top: 1rem; }
-.homework-source label, .homework-editor label { display: grid; gap: .4rem; font-size: .9rem; font-weight: 600; }
-.homework-source textarea, .homework-editor textarea, .homework-editor input, .homework-editor select, .homework-settings select, .homework-sheet textarea {
-  display: block; box-sizing: border-box; width: 100%; min-width: 0; padding: .75rem .9rem; border: 1px solid #aaa4e6;
-  border-radius: .9rem .6rem 1rem .65rem; background: #fffaf0; color: #1a3169; font: inherit; font-size: 1rem; line-height: 1.6;
+.homework-toolbar--head h3 { font: 700 1.05rem/1.4 var(--ui); }
+.homework-toolbar--actions { margin: 1rem 0; }
+
+/* Going back is the small coral arrow link, as everywhere else. */
+.homework-back {
+  display: inline-flex; align-items: center; gap: 0.4rem; min-height: 44px; padding: 0 0.15rem; border: 0; background: none;
+  color: var(--coral-action); cursor: pointer; font: 700 0.76rem/1 var(--ui); letter-spacing: 0.06em; text-transform: uppercase;
 }
-.homework-source textarea, .homework-editor textarea, .homework-sheet textarea { resize: vertical; }
-.homework-source textarea:focus-visible, .homework-editor input:focus-visible, .homework-editor textarea:focus-visible, .homework-settings select:focus-visible, .homework-sheet textarea:focus-visible { outline: 2px solid #203e82; outline-offset: 2px; }
-.homework-photo-tools { justify-content: flex-start; margin-top: .9rem; }
-.homework-photo-tools label.button { display: inline-flex; cursor: pointer; font-size: .8rem; }
-.homework-photo-tools label:focus-within { outline: 2px solid #203e82; outline-offset: 3px; }
-.homework-photo-tools img { width: 4rem; height: 4rem; object-fit: cover; border: 1px solid #aaa4e6; border-radius: .5rem; }
-.homework-photo-thumb { display: flex; padding: 0; border: 0; border-radius: .5rem; background: none; cursor: zoom-in; }
+.homework-back:hover:not(:disabled) svg { transform: translateX(-3px); }
+.homework-back svg { transition: transform 160ms var(--motion-ease); }
+.homework-back:disabled { opacity: 0.55; cursor: default; }
+
+/* State is a pill: lilac while it waits for someone, blue once it is done. */
+.homework-status {
+  display: inline-flex; align-items: center; gap: 0.4rem; min-height: 30px; padding: 0.25rem 0.75rem;
+  border-radius: var(--squiggle-chip); font: 600 0.78rem/1.3 var(--ui); white-space: nowrap;
+}
+.homework-status--sent, .homework-status--draft { background: var(--lavender-soft); color: var(--ink); }
+.homework-status--returned { background: var(--blue-deep); color: var(--paper); }
+.homework-status--quiet { padding-inline: 0; color: var(--lavender-ink); font-weight: 500; }
+
+.homework-help { margin: 0.75rem 0; color: var(--lavender-ink); font: 500 0.82rem/1.6 var(--ui); }
+ul.homework-help { padding-left: 1.1rem; }
+.homework-help--state { margin-top: 1rem; }
+.homework-loading { color: var(--lavender-ink); font-size: 0.9rem; }
+.homework-notice { min-height: 1.5em; margin: 0.75rem 0 0; color: var(--lavender-ink); font: 500 0.82rem/1.5 var(--ui); }
+.homework-notice:empty { display: none; }
+
+/* Anything to read before trying again: the site's one coral panel. */
+.homework-error {
+  margin: 1rem 0; padding: 0.85rem 1rem; border: 1px solid var(--coral); border-radius: var(--squiggle-panel);
+  background: rgba(239, 93, 60, 0.12); color: #862c21; font-size: 0.88rem; line-height: 1.55;
+}
+.homework-error p { margin: 0; }
+.homework-error ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+.homework-error .button { margin-top: 0.7rem; min-height: 40px; padding-block: 0.4rem; }
+
+/* The sliding two-option control, carried by buttons when it picks a view. */
+.segmented.homework-toggle { width: min(100%, 22rem); margin: 0; }
+.segmented.homework-toggle button {
+  position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0.55rem 0.75rem;
+  border: 0; border-radius: var(--squiggle-thumb); background: transparent; color: var(--ink); cursor: pointer;
+  font: 700 0.76rem/1.2 var(--ui); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; opacity: 0.72;
+  transition: color 260ms var(--motion-ease), opacity 260ms var(--motion-ease);
+}
+.segmented.homework-toggle button.is-active { color: var(--paper); opacity: 1; }
+.segmented.homework-toggle button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.segmented.homework-format-toggle { margin-bottom: 1.1rem; }
+
+/* Fields: the site's cream fields with one blue boundary on focus. */
+.homework-source textarea, .homework-editor textarea, .homework-editor input, .homework-editor select, .homework-settings select,
+.homework-sheet textarea, .homework-review textarea {
+  display: block; box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 0.65rem 0.85rem;
+  border: 1px solid var(--rule); border-radius: var(--squiggle-field); background: #fffaf0; color: var(--ink);
+  font: 400 1rem/1.55 var(--body); field-sizing: content;
+}
+.homework-source textarea, .homework-editor textarea, .homework-sheet textarea, .homework-review textarea { resize: vertical; min-height: 3rem; }
+.homework-review textarea { min-height: 4.6rem; }
+.homework-source textarea { min-height: 7.5rem; }
+.homework-editor select, .homework-settings select { padding: 0.55rem 2rem 0.55rem 0.8rem; font-size: 0.92rem; field-sizing: fixed; cursor: pointer; }
+.homework-source textarea::placeholder, .homework-review textarea::placeholder { color: #6e6aa0; }
+.homework-source :is(textarea, select):focus-visible, .homework-editor :is(input, textarea, select):focus-visible,
+.homework-settings select:focus-visible, .homework-sheet textarea:focus-visible, .homework-review textarea:focus-visible {
+  border-color: var(--blue-deep); outline: 0; box-shadow: inset 0 0 0 1px var(--blue-deep);
+}
+.homework-sheet textarea:disabled { background: transparent; border-style: dashed; color: var(--ink); opacity: 1; cursor: default; }
+
+/* Labels read above their field; a note such as Optional stays on the label's line. */
+.homework-source label, .homework-editor label, .homework-review__feedback {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 0.5rem; font: 600 0.84rem/1.4 var(--ui);
+}
+.homework-source label > :is(textarea, select), .homework-editor label > :is(input, textarea, select), .homework-review__feedback > textarea { flex: 1 0 100%; }
+.homework-editor small, .homework-review small { color: var(--lavender-ink); font-weight: 500; font-size: 0.76rem; }
+
+/* Lesson notes: Inês's private material, folded once a sheet exists. */
+.homework-source { border-radius: var(--squiggle-tile); background: rgba(170, 164, 230, 0.16); }
+.homework-source summary {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; min-height: 52px; padding: 0.55rem 1.1rem;
+  list-style: none; cursor: pointer;
+}
+.homework-source summary::-webkit-details-marker { display: none; }
+.homework-source summary > svg { flex-shrink: 0; transform: rotate(-90deg); transition: transform 190ms var(--motion-ease); color: var(--lavender-ink); }
+.homework-source[open] summary > svg { transform: none; }
+.homework-source summary strong { font: 700 0.95rem/1.4 var(--ui); }
+.homework-source summary span { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--lavender-ink); font: 500 0.78rem/1.4 var(--ui); }
+.homework-source summary:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; border-radius: var(--squiggle-tile); }
+.homework-source fieldset { padding: 0.25rem 1.1rem 1.1rem; }
+.homework-photo-tools { justify-content: flex-start; margin-top: 0.9rem; }
+.homework-photo-tools label.button { cursor: pointer; }
+.homework-photo-tools label:focus-within { outline: 2px solid var(--ink); outline-offset: 3px; }
+.homework-photo-tools img { width: 3.5rem; height: 3.5rem; object-fit: cover; border: 1px solid var(--rule); border-radius: 0.6rem; }
+.homework-photo-thumb { display: flex; padding: 0; border: 0; border-radius: 0.6rem; background: none; cursor: zoom-in; }
 .homework-photo-thumb[aria-expanded="true"] { cursor: zoom-out; }
-.homework-photo-full { display: block; max-width: 100%; max-height: 30rem; margin-top: 1rem; border: 1px solid #aaa4e6; object-fit: contain; }
-.homework-help { font-size: .83rem; line-height: 1.65; color: #554f91; margin: .8rem 0; }
-ul.homework-help { padding-left: 1.2rem; }
-.homework-settings { display: flex; align-items: end; gap: .8rem; flex-wrap: wrap; margin-top: 1rem; }
-.homework-settings label { flex: 1; min-width: 6rem; }
-.homework-settings .button { flex: 1.5; white-space: nowrap; }
-.homework-error { padding: .75rem 1rem; border-left: 3px solid #b83823; background: #fff2e7; border-radius: .3rem; margin: .8rem 0; color: #862c21; }
-.homework-error p { margin: .2rem 0; }
-.homework-error ul { padding-left: 1.2rem; }
-.homework-notice { font-size: .88rem; min-height: 1.6em; }
-.homework-view-toggle { display: flex; gap: .25rem; padding: .25rem; border-radius: 1rem; background: #e2dcf3; }
-.homework-view-toggle button { padding: .6rem .85rem; min-height: 44px; border: none; border-radius: .8rem; background: transparent; color: #203e82; font: inherit; font-weight: 600; cursor: pointer; }
-.homework-view-toggle button[aria-pressed="true"] { background: #203e82; color: #fff8e8; }
-.homework-publish { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #aaa4e6; }
-.homework-publish label, .homework-print-tools label { display: flex; align-items: center; gap: .5rem; font-size: .85rem; }
-.homework-publish input, .homework-print-tools input { width: 1.15rem; height: 1.15rem; accent-color: #203e82; flex-shrink: 0; }
+.homework-photo-full { display: block; max-width: 100%; max-height: 30rem; margin-top: 1rem; border: 1px solid var(--rule); border-radius: 0.6rem; object-fit: contain; }
+.homework-settings { display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+.homework-settings label { flex: 0 1 9rem; min-width: 7rem; }
+.homework-settings .button { margin-left: auto; }
+
+/* Inês's editor: one column of fields, each question on a raised tile. */
 .homework-editor { display: grid; gap: 1rem; }
-.homework-editor section { padding: 1rem 0; border-top: 1px solid #aaa4e6; display: grid; gap: .9rem; }
-.homework-editor__pair, .homework-editor__intro { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-.homework-editor__question { display: grid; gap: .75rem; padding: 1rem; background: #f8f3e8; border-radius: 1rem; }
-.homework-editor small { font-weight: 400; font-size: .8rem; }
-.homework-review__intro h4 { margin: 1rem 0 .4rem; font-size: 1.2rem; }
-.homework-review p { margin: 0; line-height: 1.65; }
-.homework-review .homework-review__answer { padding: .8rem 1rem; background: #fffaf0; border-left: 3px solid #203e82; white-space: pre-wrap; overflow-wrap: anywhere; }
-.homework-review details { font-size: .9rem; }
-.homework-review summary { cursor: pointer; }
-.homework-review details p { padding-top: .5rem; }
-.teacher-homework-return { grid-column: 1 / -1; margin: .3rem 0; }
-.teacher-homework-return .text-action { position: relative; z-index: 2; display: inline-flex; gap: .45rem; align-items: center; min-height: 44px; padding: .45rem .8rem; border-radius: .9rem .6rem 1rem .5rem; background: #e2dcf3; font-size: .85rem; font-weight: 600; }
-.homework-editor .text-action { justify-self: start; }
-.homework-sheet-tools { margin: 1rem 0; }
-.homework-print-tools { justify-content: flex-end; }
-.homework-format-toggle { width: fit-content; max-width: 100%; margin: 1rem 0; }
-.homework-format-toggle button { flex: 1; }
-.homework-format-toggle button:focus-visible { outline: 2px solid #203e82; outline-offset: 3px; }
-.homework-paper-tools { margin: 1rem 0 1.25rem; }
+.homework-editor section { display: grid; gap: 0.9rem; padding-top: 1.1rem; border-top: 1px solid var(--rule-soft); }
+.homework-editor section > .homework-toolbar { margin: 0; }
+.homework-editor section h4 { font: 700 0.95rem/1.4 var(--ui); }
+.homework-editor__pair, .homework-editor__intro { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem 1rem; align-items: start; }
+.homework-editor__question { display: grid; gap: 0.85rem; padding: 1rem; border-radius: var(--squiggle-tile); background: var(--raised); }
+.homework-editor__add { justify-self: start; }
+.homework-link {
+  display: inline-flex; align-items: center; gap: 0.35rem; justify-self: start; min-height: 40px; padding: 0 0.1rem; border: 0; background: none;
+  color: var(--coral-action); cursor: pointer; font: 600 0.8rem/1.3 var(--ui);
+}
+.homework-link:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 0.25em; }
+
+/* Publish: one confirmation and its action on one row. */
+.homework-publish { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--rule-soft); }
+.homework-publish label, .homework-print-tools label { display: flex; align-items: center; gap: 0.55rem; min-height: 44px; font: 600 0.85rem/1.4 var(--ui); cursor: pointer; }
+.homework-publish input, .homework-print-tools input { width: 1.15rem; height: 1.15rem; margin: 0; accent-color: var(--blue-deep); flex-shrink: 0; }
+.homework-publish .homework-help { margin: 0; }
+
+/* Review: the student's work beside Inês's mark where there is room. */
+.homework-review__intro h4 { margin: 0 0 0.3rem; font: 700 1.05rem/1.4 var(--ui); }
+.homework-review__intro p { margin: 0; font-size: 0.9rem; line-height: 1.6; }
+.homework-review__note { display: inline-block; margin-top: 0.6rem !important; padding: 0.35rem 0.7rem; border-radius: var(--squiggle-chip); background: var(--lavender-soft); font: 500 0.8rem/1.4 var(--ui); }
+.homework-review__sheet { display: grid; gap: 1.5rem; margin-top: 1.25rem !important; }
+.homework-review__sheet > section { display: grid; gap: 0.75rem; }
+.homework-review h5 { display: flex; align-items: center; gap: 0.6rem; margin: 0; font: 700 1rem/1.4 var(--ui); }
+.homework-review h5 > span, .homework-sheet__section h4 > span {
+  display: grid; place-items: center; flex-shrink: 0; width: 1.85rem; height: 1.85rem; font: 700 0.85rem/1 var(--ui);
+  color: var(--paper); background: var(--blue-deep); border-radius: 42% 58% 49% 51% / 63% 43% 57% 37%;
+}
+.homework-review__instruction { margin: -0.3rem 0 0; font-size: 0.9rem; line-height: 1.6; }
+.homework-review__question { display: grid; gap: 1rem; padding: 1rem; border-radius: var(--squiggle-tile); background: var(--raised); }
+.homework-review__question.is-open { box-shadow: inset 0 0 0 1px var(--coral); }
+.homework-review__work { display: grid; gap: 0.55rem; align-content: start; min-width: 0; }
+.homework-review__prompt { display: flex; gap: 0.45rem; margin: 0; font: 600 0.92rem/1.55 var(--ui); }
+.homework-review__prompt > span { color: var(--lavender-ink); }
+.homework-review__answer {
+  margin: 0; padding: 0.6rem 0.85rem; border-radius: var(--squiggle-field); background: var(--lavender-soft);
+  font-size: 0.98rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.homework-review__answer em { color: var(--lavender-ink); }
+.homework-review details { font-size: 0.85rem; line-height: 1.55; }
+.homework-review summary { display: inline-flex; align-items: center; min-height: 36px; color: var(--lavender-ink); font-weight: 600; cursor: pointer; }
+.homework-review details p { margin: 0.2rem 0 0; }
+.homework-review__mark { display: grid; gap: 0.75rem; align-content: start; min-width: 0; }
+.homework-review__choice legend { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; padding: 0; font: 600 0.84rem/1.4 var(--ui); }
+.homework-tag { padding: 0.1rem 0.5rem; border-radius: var(--squiggle-chip); background: rgba(239, 93, 60, 0.16); color: #862c21; font: 700 0.7rem/1.5 var(--ui); }
+.segmented.homework-mark { margin: 0; max-width: 20rem; }
+.segmented.homework-mark--unset .segmented__thumb { opacity: 0; }
+.segmented.homework-mark .segmented__thumb { transition: transform 260ms var(--motion-ease), opacity 160ms ease; }
+@container homework (min-width: 44rem) {
+  .homework-review__question { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1.5rem; padding: 1.1rem 1.25rem; }
+}
+@container homework (max-width: 30rem) {
+  .homework-editor__pair, .homework-editor__intro { grid-template-columns: 1fr; }
+}
+
+/* The Homework to review prompt on the student's row. */
+.teacher-homework-return { grid-column: 1 / -1; margin: 0.15rem 0 0.2rem; }
+.teacher-homework-return button {
+  position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 0.5rem; min-height: 40px; padding: 0.35rem 0.5rem 0.35rem 0.8rem;
+  border: 1px solid var(--coral); border-radius: var(--squiggle-pill); background: var(--raised); color: var(--ink);
+  cursor: pointer; font: 600 0.8rem/1.3 var(--ui); transition: background 160ms ease;
+}
+.teacher-homework-return button:hover:not(:disabled) { background: #fff; }
+.teacher-homework-return button:disabled { opacity: 0.55; cursor: default; }
+.teacher-homework-return__dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--coral); }
+.teacher-homework-return__count {
+  display: grid; place-items: center; min-width: 1.4rem; height: 1.4rem; padding: 0 0.3rem; border-radius: 999px;
+  background: var(--coral-action); color: #fff; font: 700 0.72rem/1 var(--ui);
+}
+.teacher-history-homework { margin-top: 0.35rem; }
+.teacher-history-homework svg { color: var(--lavender-ink); }
+.teacher-lesson-dialog.teacher-lesson-dialog--homework { width: min(64rem, calc(100vw - 2rem)); max-width: none; }
+.teacher-dialog-homework { display: grid; gap: 1rem; }
+.teacher-lesson-dialog .teacher-dialog-homework > .button { justify-self: start; width: auto; min-width: 0; }
+/* On Inês's cream lesson rows, raised cream would vanish: her tiles and tracks take the lilac wash. */
+.teacher-homework .segmented.homework-toggle, .teacher-homework .segmented.homework-mark { background: rgba(170, 164, 230, 0.22); }
+.teacher-homework :is(.homework-editor__question, .homework-review__question) { background: rgba(170, 164, 230, 0.13); }
+
+/* The student's list: each lesson's sheet as one raised row. */
+.homework-list { display: grid; gap: 0.7rem; margin: 0.25rem 0 0; padding: 0; list-style: none; }
+.homework-list li { min-width: 0; }
+.homework-list__item {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; flex-wrap: wrap; width: 100%; min-height: 72px;
+  padding: 0.9rem 1.15rem; border: 0; border-radius: var(--squiggle-tile); background: var(--raised); color: var(--ink);
+  font: inherit; text-align: left; cursor: pointer; transition: background 160ms ease, transform 160ms var(--motion-ease);
+}
+.homework-list__item:hover:not(:disabled) { background: #fff; transform: translateY(-1px); }
+.homework-list__item:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.homework-list__text { display: grid; gap: 0.2rem; min-width: 0; flex: 1 1 14rem; }
+.homework-list__text small { color: var(--lavender-ink); font: 600 0.75rem/1.4 var(--ui); letter-spacing: 0.02em; }
+.homework-list__text strong { font: 700 1rem/1.4 var(--ui); overflow-wrap: anywhere; }
+.homework-list__state {
+  display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0; min-height: 30px; padding: 0.2rem 0.7rem;
+  border-radius: var(--squiggle-chip); font: 700 0.76rem/1.2 var(--ui); letter-spacing: 0.04em; text-transform: uppercase;
+}
+.homework-list__item--new .homework-list__state, .homework-list__item--started .homework-list__state { padding-inline: 0.2rem; color: var(--coral-action); }
+.homework-list__item--sent .homework-list__state { background: var(--lavender-soft); }
+.homework-list__item--returned .homework-list__state { background: var(--blue-deep); color: var(--paper); }
+.homework-empty {
+  display: flex; align-items: center; gap: 0.7rem; margin: 0.25rem 0 0; padding: 1rem 1.15rem; border-radius: var(--squiggle-tile);
+  background: var(--raised); font-size: 0.92rem; line-height: 1.55;
+}
+.homework-empty svg { flex-shrink: 0; color: var(--lavender-ink); }
+
+/* Saving and sending: the note on the left, the two actions together. */
+.homework-save { margin-top: 1.1rem; }
+.homework-save p { flex: 1 1 18rem; margin: 0; color: var(--lavender-ink); font: 500 0.82rem/1.55 var(--ui); }
+.homework-save__actions { display: flex; gap: 0.6rem; flex: 0 1 auto; }
+
+/* The on-screen worksheet: cream paper, blue ink, splat section numbers. */
+.homework-sheet {
+  box-sizing: border-box; padding: clamp(1.1rem, 3.2vw, 2.4rem); border-radius: var(--squiggle-card); background: #fffbf2; color: var(--ink);
+  box-shadow: 0 1px 0 rgba(32, 62, 130, 0.06), 0 10px 30px -18px rgba(32, 62, 130, 0.35); overflow-wrap: anywhere;
+}
+.homework-sheet__head { padding-bottom: 1.2rem; border-bottom: 2px solid var(--blue-deep); }
+.homework-sheet__brand { margin: 0 0 0.9rem; color: var(--blue-deep); font: 400 1.05rem/1.3 var(--display); }
+.homework-sheet__meta { display: flex; justify-content: space-between; gap: 0.3rem 1rem; flex-wrap: wrap; color: var(--lavender-ink); font: 600 0.75rem/1.5 var(--ui); letter-spacing: 0.02em; }
+.homework-sheet__head h3 { margin: 0.6rem 0 0.4rem; font: 700 clamp(1.35rem, 2.4vw, 1.75rem)/1.3 var(--ui); }
+.homework-sheet__objective { margin: 0; font-size: 0.95rem; line-height: 1.65; }
+.homework-sheet__section { margin-top: 1.9rem; }
+.homework-sheet__section h4 { display: flex; align-items: center; gap: 0.65rem; margin: 0; font: 700 1.08rem/1.4 var(--ui); }
+.homework-sheet__section:nth-of-type(2) h4 > span { border-radius: 60% 40% 32% 68% / 40% 58% 42% 60%; background: var(--lavender-ink); }
+.homework-sheet__section:nth-of-type(3) h4 > span { border-radius: 48% 52% 62% 38% / 55% 38% 62% 45%; background: var(--coral-action); }
+.homework-sheet p { line-height: 1.65; white-space: pre-wrap; }
+.homework-sheet__instruction { margin: 0.45rem 0 0.9rem; }
+.homework-sheet__example { margin: 0 0 1rem; padding: 0.65rem 0.95rem; border-radius: var(--squiggle-field); background: var(--lavender-soft); }
+.homework-sheet__example strong { display: block; margin-bottom: 0.1rem; color: var(--lavender-ink); font: 700 0.72rem/1.4 var(--ui); letter-spacing: 0.08em; text-transform: uppercase; }
+.homework-sheet__questions { display: grid; gap: 1.2rem; margin: 0; padding-left: 1.6rem; }
+.homework-sheet__questions li { padding-left: 0.2rem; }
+.homework-sheet__questions li::marker { color: var(--lavender-ink); font-weight: 700; }
+.homework-sheet__questions label { display: block; margin-bottom: 0.5rem; line-height: 1.6; white-space: pre-wrap; }
+.homework-sheet__questions p { margin: 0 0 0.5rem; }
+.homework-sheet__writing { min-height: 3rem; border-bottom: 1px solid var(--rule); white-space: pre-wrap; line-height: 1.7; }
+.homework-sheet__writing.has-answer { padding: 0.6rem 0.85rem; border: 0; border-radius: var(--squiggle-field); background: var(--lavender-soft); }
+.homework-sheet__reminder { display: flex; align-items: flex-start; gap: 0.65rem; margin: 1.9rem 0 0; padding-top: 1rem; border-top: 1px solid var(--rule-soft); font-size: 0.9rem; }
+.homework-sheet__reminder svg { flex-shrink: 0; margin-top: 0.2rem; color: var(--lavender-ink); }
+.homework-answers-toggle {
+  display: inline-flex; align-items: center; gap: 0.45rem; min-height: 44px; margin-top: 0.75rem; padding: 0.4rem 0.95rem; border: 1px solid var(--rule);
+  border-radius: var(--squiggle-pill); background: transparent; color: var(--ink); cursor: pointer; font: 600 0.82rem/1.3 var(--ui);
+}
+.homework-answers-toggle:hover { background: var(--lavender-soft); }
+.homework-sheet__key { margin-top: 1.25rem; padding: 1.1rem 1.2rem; border-radius: var(--squiggle-tile); background: var(--lavender-soft); }
+.homework-sheet__key h4 { margin: 0 0 0.25rem; font: 700 1.05rem/1.4 var(--ui); }
+.homework-sheet__key > p { margin: 0; font-size: 0.88rem; }
+.homework-sheet__key h5 { margin: 1rem 0 0.35rem; font: 700 0.92rem/1.4 var(--ui); }
+.homework-sheet__key ol { display: grid; gap: 0.45rem; margin: 0; padding-left: 1.5rem; }
+.homework-sheet__key li p { margin: 0; }
+.homework-sheet__answer { font-weight: 600; }
+.homework-sheet__explanation { color: var(--lavender-ink); font-size: 0.88rem; }
+
+/* Approved feedback under each answer: lavender with a tick, coral to try again. */
+.homework-feedback {
+  display: flex; align-items: flex-start; gap: 0.55rem; margin-top: 0.5rem; padding: 0.6rem 0.85rem; border-radius: var(--squiggle-field);
+  background: rgba(170, 164, 230, 0.2); color: var(--ink); font-size: 0.88rem; line-height: 1.55;
+}
+.homework-feedback > svg { flex-shrink: 0; margin-top: 0.15rem; }
+.homework-feedback strong { display: block; font: 700 0.8rem/1.5 var(--ui); }
+.homework-feedback p { margin: 0.05rem 0 0; }
+.homework-feedback--correct > svg { color: var(--blue-deep); }
+.homework-feedback--retry { background: rgba(239, 93, 60, 0.13); color: #862c21; }
+.homework-feedback--edited { background: transparent; box-shadow: inset 0 0 0 1px var(--rule); color: var(--lavender-ink); }
+.homework-feedback--edited strong { color: var(--ink); }
+
+/* Paper: black text, Arial, writing lines, no fills, the size of A4. */
+.homework-paper-tools { margin: 0 0 1.25rem; }
 .homework-paper-tools .homework-help { margin-top: 0; }
-.homework-paper-tools .homework-print-tools { justify-content: flex-start; }
+.homework-paper-tools .homework-print-tools { justify-content: flex-start; gap: 0.25rem 1.25rem; }
 .homework-paper-tools .homework-print-tools .button { margin-left: auto; }
-.teacher-homework .button, .student-homework .button { gap: .5rem; }
-.homework-sheet { background: #fffbf2; color: #1a3169; padding: clamp(1.1rem, 3vw, 2.5rem); border: 1px solid #aaa4e6; border-radius: 1.8rem .8rem 2rem 1rem; overflow-wrap: anywhere; }
-.homework-sheet__head { padding-bottom: 1.3rem; border-bottom: 2px solid #203e82; }
-.homework-sheet__brand { font-family: var(--font-beth-ellen), cursive; font-size: 1rem; margin: 0 0 1rem; color: #203e82; }
-.homework-sheet__meta { display: flex; justify-content: space-between; gap: .5rem 1rem; flex-wrap: wrap; font-size: .8rem; color: #554f91; }
-.homework-sheet__head h3 { font-family: var(--font-montserrat), sans-serif; font-size: clamp(1.35rem, 2vw, 1.8rem); line-height: 1.35; margin: .8rem 0 .5rem; }
-.homework-sheet__objective { margin: 0; font-size: .95rem; line-height: 1.7; }
-.homework-sheet__section { margin-top: 1.75rem; }
-.homework-sheet__section h4 { display: flex; align-items: center; gap: .7rem; font-size: 1.1rem; margin: 0; }
-.homework-sheet__section h4 > span { display: grid; place-items: center; flex-shrink: 0; width: 2rem; height: 2rem; font-size: .95rem; color: #fffaf0; background: #203e82; border-radius: 42% 58% 49% 51% / 63% 43% 57% 37%; }
-.homework-sheet__section:nth-of-type(2) h4 > span { border-radius: 60% 40% 32% 68% / 40% 58% 42% 60%; background: #554f91; }
-.homework-sheet p { line-height: 1.7; white-space: pre-wrap; }
-.homework-sheet__example { background: #eee8f6; border-radius: .8rem; padding: .65rem .9rem; }
-.homework-sheet__example strong { display: block; font-size: .8rem; margin-bottom: .15rem; }
-.homework-sheet__questions { padding-left: 1.5rem; display: grid; gap: 1.25rem; }
-.homework-sheet__questions li { padding-left: .25rem; }
-.homework-sheet__questions li::marker { color: #554f91; font-weight: 600; }
-.homework-sheet__questions label { display: block; margin-bottom: .5rem; line-height: 1.65; white-space: pre-wrap; }
-.homework-sheet__questions p { margin: 0 0 .5rem; }
-.homework-sheet__writing { min-height: 3.5rem; border-bottom: 1px solid #aaa4e6; white-space: pre-wrap; line-height: 1.8; }
-.homework-sheet__writing.has-answer { padding: .7rem .9rem; background: #f2eefa; border: 0; border-radius: .6rem; }
-.homework-sheet__reminder { display: flex; align-items: flex-start; gap: .7rem; margin: 1.75rem 0 0; padding-top: 1rem; border-top: 1px solid #aaa4e6; font-size: .9rem; }
-.homework-sheet__reminder svg { flex-shrink: 0; margin-top: .2rem; }
-.homework-sheet__key { margin-top: 2rem; border-top: 2px solid #203e82; padding-top: 1rem; }
-.homework-sheet__key h4 { font-size: 1.2rem; margin: 0; }
-.homework-sheet__key h5 { font-size: 1rem; margin-bottom: .3rem; }
-.homework-sheet__explanation { color: #554f91; font-size: .9rem; }
-.homework-feedback { display: flex; align-items: flex-start; gap: .55rem; margin-top: .65rem; padding: .7rem .85rem; border-left: 3px solid #554f91; background: #eee8f6; border-radius: .3rem .7rem .7rem .3rem; color: #1a3169; font-size: .88rem; line-height: 1.6; }
-.homework-feedback > svg { flex-shrink: 0; margin-top: .15rem; }
-.homework-feedback strong { display: block; }
-.homework-feedback p { margin: .2rem 0 0; }
-.homework-feedback--correct { border-left-color: #203e82; }
-.homework-feedback--retry { border-left-color: #a73523; background: #fff2e7; color: #862c21; }
-.homework-feedback--edited { border-left-style: dashed; background: transparent; }
+.homework-help--paper { margin-top: 1rem; }
 .homework-paper-preview { display: grid; gap: 1.5rem; max-width: 210mm; margin-inline: auto; }
-.homework-sheet--paper { box-sizing: border-box; width: 100%; padding: clamp(1.1rem, 5vw, 16mm); border: 1px solid #aaa; border-radius: 0; background: #fff; color: #111; font: 12pt/1.5 Arial, sans-serif; box-shadow: 0 2px 7px #0000000d; }
+.homework-sheet--paper {
+  width: 100%; padding: clamp(1.1rem, 5vw, 16mm); border-radius: 0; background: #fff; color: #111; font: 12pt/1.5 Arial, sans-serif;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 8px 24px -14px rgba(0, 0, 0, 0.35);
+}
 .homework-sheet--paper .homework-sheet__head { border-color: #111; }
-.homework-sheet--paper .homework-sheet__brand { color: #111; font: 14pt/1.5 Arial, sans-serif; }
-.homework-sheet--paper .homework-sheet__head h3 { font: 700 20pt/1.35 Arial, sans-serif; }
-.homework-sheet--paper .homework-sheet__meta, .homework-sheet--paper .homework-sheet__objective, .homework-sheet--paper .homework-sheet__explanation, .homework-sheet--paper .homework-sheet__reminder { color: #111; font-size: 12pt; }
+.homework-sheet--paper .homework-sheet__brand { color: #111; font: 12pt/1.5 Arial, sans-serif; }
+.homework-sheet--paper .homework-sheet__head h3 { font: 700 20pt/1.3 Arial, sans-serif; }
+.homework-sheet--paper :is(.homework-sheet__meta, .homework-sheet__objective, .homework-sheet__explanation, .homework-sheet__reminder) { color: #111; font: 12pt/1.5 Arial, sans-serif; letter-spacing: 0; }
+.homework-sheet__name { display: flex; align-items: flex-end; gap: 0.5rem; margin: 5mm 0 0; }
+.homework-sheet__name span { flex: 1; max-width: 90mm; border-bottom: 1px solid #777; }
 .homework-sheet--paper p { line-height: 1.5; }
-.homework-sheet--paper .homework-sheet__section { margin-top: 7mm; }
-.homework-sheet--paper .homework-sheet__section h4, .homework-sheet--paper .homework-sheet__key h5 { font: 700 14pt/1.5 Arial, sans-serif; }
-.homework-sheet--paper .homework-sheet__section h4 > span { background: none; color: #111; border: 1px solid #111; border-radius: 50%; }
+.homework-sheet--paper .homework-sheet__section { margin-top: 8mm; }
+.homework-sheet--paper .homework-sheet__instruction { margin: 1.5mm 0 4mm; }
+.homework-sheet--paper :is(.homework-sheet__section h4, .homework-sheet__key h5) { font: 700 14pt/1.4 Arial, sans-serif; }
+.homework-sheet--paper .homework-sheet__section h4 > span { background: none !important; color: #111; border: 1px solid #111; border-radius: 50%; font: 700 11pt/1 Arial, sans-serif; }
+.homework-sheet--paper .homework-sheet__questions { gap: 5mm; }
 .homework-sheet--paper .homework-sheet__questions li::marker { color: #111; }
-.homework-sheet--paper .homework-sheet__example { background: none; border-left: 2px solid #111; border-radius: 0; }
-.homework-sheet--paper .homework-sheet__example strong { font-size: 12pt; }
+.homework-sheet--paper .homework-sheet__example { padding: 1mm 0 1mm 4mm; border-left: 2px solid #111; border-radius: 0; background: none; }
+.homework-sheet--paper .homework-sheet__example strong { color: #111; font: 700 11pt/1.4 Arial, sans-serif; letter-spacing: 0; text-transform: none; }
 .homework-sheet--paper .homework-sheet__writing { min-height: 27mm; border: 0; }
 .homework-sheet__writing-lines { display: grid; }
 .homework-sheet__writing-lines > span { display: block; height: 9mm; border-bottom: 1px solid #777; }
-.homework-sheet--paper .homework-sheet__writing.has-answer { padding: 2mm 0; background: none; border-bottom: 1px solid #777; border-radius: 0; }
+.homework-sheet--paper .homework-sheet__writing.has-answer { min-height: 0; padding: 2mm 0; background: none; border-bottom: 1px solid #777; border-radius: 0; }
 .homework-sheet--paper .homework-sheet__reminder { border-color: #777; }
-.homework-sheet--paper .homework-sheet__key { border: 0; margin-top: 6mm; padding-top: 0; }
-.homework-sheet--paper .homework-sheet__key > h4 { display: none; }
+.homework-sheet--paper .homework-sheet__reminder svg { color: #111; }
+.homework-sheet--paper .homework-sheet__key { margin-top: 6mm; padding: 0; border-radius: 0; background: none; }
+.homework-sheet--paper .homework-sheet__key > p { font-size: 12pt; }
+.homework-sheet--paper .homework-sheet__key ol { gap: 2.5mm; }
+.homework-sheet--paper .homework-sheet__answer { font-weight: 700; }
 .homework-sheet--answer-key { break-before: page; }
-.homework-list { list-style: none; margin: 1.25rem 0; padding: 0; display: grid; gap: .8rem; }
-.homework-list li { min-width: 0; }
-.homework-list button { width: 100%; display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: 1.15rem 1.3rem; border: 1px solid #aaa4e6; border-radius: 1.5rem .9rem 1.6rem .8rem; background: #fff8e8; color: #203e82; font: inherit; text-align: left; cursor: pointer; transition: background 160ms ease; }
-.homework-list button:hover { background: #eee8f6; }
-.homework-list strong, .homework-list small { display: block; }
-.homework-list strong { margin-top: .3rem; }
-.homework-list small { font-size: .8rem; color: #554f91; }
-.homework-list__state { display: inline-flex; align-items: center; gap: .5rem; font-size: .85rem; flex-shrink: 0; }
-.homework-save { margin-top: 1rem; }
-.homework-save p { flex: 1 1 16rem; font-size: .85rem; }
-.teacher-lesson-dialog.teacher-lesson-dialog--homework { width: min(64rem, calc(100vw - 2rem)); max-width: none; }
-.teacher-history-homework { margin-top: .5rem; }
 .homework-print { display: none; }
+
 @media (max-width: 600px) {
   .homework-editor__pair, .homework-editor__intro { grid-template-columns: 1fr; }
-  .homework-source { padding: .9rem; }
-  .homework-source summary span { margin-left: 0; display: block; margin-top: .3rem; }
-  .homework-print-tools { gap: .7rem; }
-  .homework-format-toggle { width: 100%; }
-  .homework-format-toggle button { padding-inline: .65rem; }
-  .homework-paper-tools .homework-print-tools { align-items: flex-start; gap: .8rem 1rem; }
+  .homework-source summary { padding-inline: 0.9rem; }
+  .homework-source fieldset { padding-inline: 0.9rem; }
+  .segmented.homework-toggle { width: 100%; }
   .homework-paper-tools .homework-print-tools .button { width: 100%; margin-left: 0; }
-  .homework-sheet-tools { gap: .75rem; }
-  .homework-settings .button { flex-basis: 100%; }
-  .homework-publish .button { width: 100%; }
-  .homework-save .button { flex: 1; }
-  .homework-list button { padding: .9rem; align-items: flex-start; }
-  .homework-list__state { font-size: .75rem; }
-  .homework-list__state svg { display: none; }
-  .homework-photo-tools { gap: .7rem; }
+  .homework-settings label { flex: 1 1 7rem; }
+  .homework-settings .button, .homework-publish .button { width: 100%; margin-left: 0; }
+  .homework-save__actions { width: 100%; }
+  .homework-save__actions .button { flex: 1; padding-inline: 0.6rem; }
+  .homework-list__item { padding: 0.85rem 1rem; }
+  .homework-sheet { padding: 1.1rem 1rem 1.25rem; }
+  .homework-sheet__questions { padding-left: 1.35rem; }
+  .homework-review__question { padding: 0.9rem; }
 }
+
 @media print {
   @page { size: A4; margin: 16mm; }
   body:has(> .homework-print[data-print-active]) > * { display: none !important; }

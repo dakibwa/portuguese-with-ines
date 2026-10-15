@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Send } from "lucide-react";
 import { readSession } from "@/lib/auth-api";
 import { fetchHomework, fetchHomeworkSheet, saveHomeworkAnswers, type HomeworkProgress, type HomeworkSummary, type StudentHomeworkData } from "@/lib/homework-api";
 import { HomeworkWorksheet } from "./HomeworkWorksheet";
@@ -88,11 +88,13 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
   return <div className="student-homework">
     {selected && draft ? <>
       <div className="homework-toolbar">
-        <button type="button" className="text-action" disabled={busy} onClick={async () => {
+        <button type="button" className="homework-back" disabled={busy} onClick={async () => {
           if (dirty && !await save()) return;
           setSelected(null); setDraft(null); setError(""); setNotice(""); setView("online");
-        }}><ArrowLeft size={17} aria-hidden="true" />All homework</button>
-        {submission ? <span className="homework-status"><CheckCircle2 size={17} aria-hidden="true" />{awaitingReview ? "Sent to Inês" : "Feedback from Inês"}</span> : <span>{dirty ? "Unsaved answers" : draft.updatedAt ? "Saved" : "Ready to start"}</span>}
+        }}><ArrowLeft size={16} aria-hidden="true" />All homework</button>
+        {submission ? <span className={`homework-status homework-status--${awaitingReview ? "sent" : "returned"}`}>
+          {awaitingReview ? <Send size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}{awaitingReview ? "Sent to Inês" : "Feedback from Inês"}
+        </span> : <span className="homework-status homework-status--quiet">{dirty ? "Unsaved answers" : draft.updatedAt ? "Saved" : "Ready to start"}</span>}
       </div>
       {error ? <p className="homework-error" role="alert">{error}</p> : null}
       <HomeworkWorksheet key={selected.bookingId} {...selected} answers={draft.answers} disabled={busy || awaitingReview}
@@ -101,23 +103,36 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
       {view === "online" ? <div className="homework-save">
         <p role="status">{busy ? "Saving your work and preparing it for Inês…" : notice || (awaitingReview
           ? "Inês is checking your work. Your answers are saved."
-          : submission?.returnedAt ? "Read Inês’s feedback below each answer. You can edit and submit another attempt."
-          : "Submit for automatic checks and Inês’s approval. OpenAI checks written answers. Keep personal details out.")}</p>
-        {awaitingReview ? <button type="button" className="button button--outline" disabled={busy} onClick={() => void open(selected.bookingId)}>Check for feedback</button> : <>
-          <button type="button" className="button button--outline" disabled={busy || !dirty} onClick={() => void save()}>Save answers</button>
-          <button type="button" className="button button--coral" disabled={busy || !answered || Boolean(submission && !changedSinceSubmission)} onClick={() => void save(true)}>{busy ? "Sending…" : submission ? "Submit new attempt" : "Submit to Inês"}</button>
-        </>}
-      </div> : <p className="homework-help">Paper answers are not marked automatically. Enter your answers in Do online to submit them.</p>}
+          : submission?.returnedAt ? "Read Inês’s feedback under each answer. You can change your answers and send them again."
+          : selected.aiMarking ? "Inês checks your answers before you see any feedback. OpenAI suggests marks for written answers, so keep personal details out."
+          : "Inês checks your answers and sends you feedback here.")}</p>
+        <div className="homework-save__actions">
+          {awaitingReview ? <button type="button" className="button button--outline" disabled={busy} onClick={() => void open(selected.bookingId)}>Check for feedback</button> : <>
+            <button type="button" className="button button--outline" disabled={busy || !dirty} onClick={() => void save()}>Save answers</button>
+            <button type="button" className="button button--coral" disabled={busy || !answered || Boolean(submission && !changedSinceSubmission)} onClick={() => void save(true)}>{busy ? "Sending…" : submission ? "Send again" : "Submit to Inês"}</button>
+          </>}
+        </div>
+      </div> : <p className="homework-help homework-help--paper">Paper answers aren’t marked automatically. To send them to Inês, type them in Do online.</p>}
     </> : <>
-      {error ? <div className="homework-error" role="alert"><p>{error}</p><button className="text-action" type="button" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button></div> : null}
-      {!list && !error ? <p role="status">Loading homework…</p> : null}
-      {list?.length === 0 ? <p>When Inês shares homework, it will appear here with its lesson.</p> : null}
-      <ul className="homework-list">{list?.map(item => <li key={item.bookingId}>
-        <button type="button" onClick={() => void open(item.bookingId)} disabled={busy}>
-          <span><small>{new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Lisbon" }).format(new Date(item.lessonAt))} · {item.minutes} min</small><strong>{item.title}</strong></span>
-          <span className="homework-list__state">{item.returnedAt ? "Feedback ready" : item.submittedAt ? "With Inês" : item.started ? "Continue" : "Start"}<ArrowRight size={18} aria-hidden="true" /></span>
-        </button>
-      </li>)}</ul>
+      {error ? <div className="homework-error" role="alert"><p>{error}</p><button className="button button--outline" type="button" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button></div> : null}
+      {!list && !error ? <p className="homework-loading" role="status">Loading homework…</p> : null}
+      {list?.length === 0 ? <p className="homework-empty"><BookOpen size={20} aria-hidden="true" />When Inês shares homework, it will appear here with its lesson.</p> : null}
+      {list?.length ? <ul className="homework-list">{list.map(item => {
+        const state = item.returnedAt ? "returned" : item.submittedAt ? "sent" : item.started ? "started" : "new";
+        return <li key={item.bookingId}>
+          <button type="button" className={`homework-list__item homework-list__item--${state}`} onClick={() => void open(item.bookingId)} disabled={busy}>
+            <span className="homework-list__text">
+              <small>{new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Lisbon" }).format(new Date(item.lessonAt))} lesson · {item.minutes} mins</small>
+              <strong lang="pt-PT">{item.title}</strong>
+            </span>
+            <span className="homework-list__state">
+              {state === "returned" ? <CheckCircle2 size={15} aria-hidden="true" /> : state === "sent" ? <Send size={14} aria-hidden="true" /> : null}
+              {state === "returned" ? "Feedback ready" : state === "sent" ? "With Inês" : state === "started" ? "Continue" : "Start"}
+              {state === "new" || state === "started" ? <ArrowRight size={16} aria-hidden="true" /> : null}
+            </span>
+          </button>
+        </li>;
+      })}</ul> : null}
     </>}
   </div>;
 }

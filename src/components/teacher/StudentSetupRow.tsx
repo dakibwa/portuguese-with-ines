@@ -185,8 +185,9 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     </ul> : null}
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
     {student.homeworkToReview?.length ? <div className="teacher-homework-return">
-      <button type="button" data-homework-exit className="text-action" disabled={disabled} onClick={() => onHomework?.(student.homeworkToReview![0].bookingId)}>
-        Homework to review <span>· {student.homeworkToReview.length}</span>
+      <button type="button" data-homework-exit disabled={disabled} onClick={() => onHomework?.(student.homeworkToReview![0].bookingId)}>
+        <span className="teacher-homework-return__dot" aria-hidden="true" />Homework to review
+        <span className="teacher-homework-return__count" aria-label={`${student.homeworkToReview.length} waiting`}>{student.homeworkToReview.length}</span>
       </button>
     </div> : null}
     {step ? <div className={`teacher-setup__body${statusStep ? " teacher-setup__body--status" : ""}`} id={paneId} aria-label={`${student.name}’s ${profilePanel ? "profile" : "setup"}`} role="region" ref={body} tabIndex={-1}>

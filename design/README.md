@@ -46,7 +46,10 @@ level-appropriate European Portuguese instructions, recall and useful practice,
 with answers separate from questions. Offer Do online and Print worksheet.
 Online submission saves a fixed copy for automatic marking; only Inês sees
 those suggestions until she checks, edits and approves them. Homework to review
-belongs in the relevant student row. The print version uses black text, readable
+belongs in the relevant student row, as a coral-edged prompt with its count.
+Inês marks each answer with the sliding `Correct` / `Try again` control and
+writes the feedback herself; an answer still waiting for her is edged in coral,
+and a placeholder is never approved as feedback. The print version uses black text, readable
 type and writing lines on white A4 pages, with optional answers on separate pages. See
 [the homework contract and teaching sources](../docs/lesson-homework.md).
 

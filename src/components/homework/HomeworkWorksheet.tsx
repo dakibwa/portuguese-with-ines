@@ -2,8 +2,20 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Printer, BookOpen, CheckCircle2, RotateCcw, CircleHelp, PencilLine } from "lucide-react";
+import { Printer, BookOpen, CheckCircle2, RotateCcw, CircleHelp, PencilLine, Eye, EyeOff } from "lucide-react";
 import type { HomeworkMark, HomeworkSheet } from "@/lib/homework-api";
+
+/** The site's sliding two-option control, for a choice of view rather than a form value. */
+export function HomeworkToggle<T extends string>({ label, value, options, onChange, controls, className = "" }: {
+  label: string; value: T; options: readonly (readonly [T, string])[]; onChange: (value: T) => void; controls?: string; className?: string;
+}) {
+  const second = options.findIndex(([option]) => option === value) === 1;
+  return <div className={`segmented homework-toggle${second ? " segmented--second" : ""}${className ? ` ${className}` : ""}`} role="group" aria-label={label}>
+    <span aria-hidden="true" className="segmented__thumb" />
+    {options.map(([option, text]) => <button type="button" key={option} className={option === value ? "is-active" : ""}
+      aria-pressed={option === value} aria-controls={controls} onClick={() => onChange(option)}>{text}</button>)}
+  </div>;
+}
 
 type Props = {
   sheet: HomeworkSheet;
@@ -50,13 +62,13 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
     onViewChange?.(next);
   }
 
-  function answerKey() {
+  function answerKey(paper = false) {
     return <section className="homework-sheet__key">
-      <h4>Respostas e exemplos</h4>
+      {paper ? null : <h4>Respostas e exemplos</h4>}
       <p>Compara as tuas respostas. Nas respostas pessoais, há várias possibilidades.</p>
       {sheet.sections.map((section, si) => <div key={si}>
         <h5>{si + 1}. {section.title}</h5>
-        <ol>{section.questions.map(question => <li key={question.id}><p>{question.answer}</p>{question.explanation ? <p className="homework-sheet__explanation">{question.explanation}</p> : null}</li>)}</ol>
+        <ol>{section.questions.map(question => <li key={question.id}><p className="homework-sheet__answer">{question.answer}</p>{question.explanation ? <p className="homework-sheet__explanation">{question.explanation}</p> : null}</li>)}</ol>
       </div>)}
     </section>;
   }
@@ -69,11 +81,12 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
           <div className="homework-sheet__meta"><span>Aula de {date}</span><span>{level} · {minutes} min</span></div>
           <h3>{sheet.title}</h3>
           <p className="homework-sheet__objective">{sheet.objective}</p>
+          {paper ? <p className="homework-sheet__name">Nome<span aria-hidden="true" /></p> : null}
         </header>
         {sheet.sections.map((section, si) => <section className="homework-sheet__section" key={si}>
           <h4><span aria-hidden="true">{si + 1}</span>{section.title}</h4>
-          <p>{section.instruction}</p>
-          {section.example ? <p className="homework-sheet__example"><strong>Exemplo</strong> {section.example}</p> : null}
+          <p className="homework-sheet__instruction">{section.instruction}</p>
+          {section.example ? <p className="homework-sheet__example"><strong>Exemplo</strong>{section.example}</p> : null}
           <ol className="homework-sheet__questions">
             {section.questions.map(question => {
               const answer = answers[question.id] ?? "";
@@ -111,7 +124,11 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
           </ol>
         </section>)}
         <p className="homework-sheet__reminder"><BookOpen size={19} aria-hidden="true" /><span>{sheet.reminder}</span></p>
-        {!paper && showAnswers ? answerKey() : null}
+        {/* Answers come after an attempt, so their switch sits at the sheet's foot. */}
+        {paper ? null : <button type="button" className="homework-answers-toggle" aria-expanded={showAnswers} aria-controls={`${prefix}-key`} onClick={() => setShowAnswers(value => !value)}>
+          {showAnswers ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}<span lang="en">{showAnswers ? "Hide answers" : "Show answers"}</span>
+        </button>}
+        {!paper && showAnswers ? <div id={`${prefix}-key`}>{answerKey()}</div> : null}
       </article>
       {paper && printAnswers ? <article className="homework-sheet homework-sheet--paper homework-sheet--answer-key" lang="pt-PT">
         <header className="homework-sheet__head">
@@ -119,19 +136,15 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
           <div className="homework-sheet__meta"><span>{sheet.title}</span><span>Aula de {date}</span></div>
           <h3>Respostas e exemplos</h3>
         </header>
-        {answerKey()}
+        {answerKey(true)}
       </article> : null}
     </>;
   }
 
   return <div className="homework-worksheet" ref={screen}>
-    <div className="homework-view-toggle homework-format-toggle" role="group" aria-label="Worksheet format">
-      <button type="button" aria-pressed={view === "online"} aria-controls={`${prefix}-view`} onClick={() => chooseView("online")}>{preview ? "Worksheet" : "Do online"}</button>
-      <button type="button" aria-pressed={view === "print"} aria-controls={`${prefix}-view`} onClick={() => chooseView("print")}>Print worksheet</button>
-    </div>
-    {view === "online" ? <div className="homework-sheet-tools">
-      <button type="button" className="text-action" aria-expanded={showAnswers} onClick={() => setShowAnswers(value => !value)}>{showAnswers ? "Hide answers" : "Show answers"}</button>
-    </div> : <div className="homework-paper-tools">
+    <HomeworkToggle label="Worksheet format" value={view} controls={`${prefix}-view`} onChange={chooseView} className="homework-format-toggle"
+      options={[["online", preview ? "On screen" : "Do online"], ["print", "Print worksheet"]]} />
+    {view === "print" ? <div className="homework-paper-tools">
       <p className="homework-help">Black-and-white pages with room to write. The answer key is optional and starts on a separate page.</p>
       <div className="homework-print-tools">
         {hasAnswers ? <label><input type="checkbox" checked={includeAnswers} onChange={event => setIncludeAnswers(event.target.checked)} />{preview ? "Include student answers" : "Include my answers"}</label> : null}
@@ -142,7 +155,7 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
           window.print();
         }}><Printer size={17} aria-hidden="true" />Print</button>
       </div>
-    </div>}
+    </div> : null}
     <div id={`${prefix}-view`}>
       {view === "online" ? body(false) : <div className="homework-paper-preview">{body(true)}</div>}
     </div>

@@ -4,6 +4,7 @@ import { addedByTeacher, type AdminBooking } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { useEffect, useState } from "react";
+import { BookOpen } from "lucide-react";
 import { TeacherHomework } from "@/components/homework/TeacherHomework";
 
 function paymentLabel(booking: AdminBooking) {
@@ -88,9 +89,9 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
         </ul>
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
         {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
-        {booking.student_id && !cancelled ? <button type="button" data-homework-exit className="text-action teacher-history-homework" disabled={homeworkBusy}
+        {booking.student_id && !cancelled ? <button type="button" data-homework-exit className="teacher-text-button teacher-history-homework" disabled={homeworkBusy}
           aria-expanded={homeworkId === booking.id} onClick={() => setHomeworkId(homeworkId === booking.id ? null : booking.id)}>
-          {homeworkId === booking.id ? "Close homework" : "Homework"}
+          <BookOpen size={15} aria-hidden="true" />{homeworkId === booking.id ? "Close homework" : "Homework"}
         </button> : null}
         {homeworkId === booking.id ? <TeacherHomework key={`${booking.id}-${token}`} bookingId={booking.id} token={token} onBusy={setHomeworkBusy} /> : null}
       </li>

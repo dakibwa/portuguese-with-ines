@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Camera, Sparkles, CheckCircle2, Plus, Trash2 } from "lucide-react";
+import { Camera, Sparkles, CheckCircle2, ChevronDown, Lock, PenLine, Plus, Trash2 } from "lucide-react";
 import { prepareHomeworkPhoto, teacherHomeworkRequest, transcribeHomeworkPhoto, type HomeworkSheet, type TeacherHomeworkData, type HomeworkMark } from "@/lib/homework-api";
 import { readSession } from "@/lib/auth-api";
-import { HomeworkWorksheet } from "./HomeworkWorksheet";
+import { HomeworkToggle, HomeworkWorksheet } from "./HomeworkWorksheet";
 
 const emptySheet = (): HomeworkSheet => ({
   title: "Vamos praticar", objective: "", reminder: "Amanhã, tenta recordar três coisas que praticaste, sem olhar para a ficha.",
@@ -123,18 +123,19 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
   }
 
   return <section className="teacher-homework" ref={editor} aria-labelledby={`${inputId}-title`}>
-    <div className="homework-toolbar"><h3 id={`${inputId}-title`}>Homework</h3>
-      <span className="homework-status">{draft?.publishedAt ? <><CheckCircle2 size={17} aria-hidden="true" />Published</> : "Private draft"}</span>
+    <div className="homework-toolbar homework-toolbar--head"><h3 id={`${inputId}-title`}>Homework</h3>
+      {draft ? <span className={`homework-status homework-status--${draft.publishedAt ? "returned" : "draft"}`}>{draft.publishedAt
+        ? <><CheckCircle2 size={15} aria-hidden="true" />Published</> : <><Lock size={14} aria-hidden="true" />Private draft</>}</span> : null}
     </div>
-    {error ? <div className="homework-error" role="alert"><p>{error}</p>{!draft ? <button type="button" className="text-action" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button> : null}</div> : null}
-    {!draft && !error ? <p role="status">Loading homework…</p> : null}
+    {error ? <div className="homework-error" role="alert"><p>{error}</p>{!draft ? <button type="button" className="button button--outline" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button> : null}</div> : null}
+    {!draft && !error ? <p className="homework-loading" role="status">Loading homework…</p> : null}
     {draft && !draft.publishedAt ? <>
       <details className="homework-source" open={!draft.sheet || undefined}>
-        <summary>Lesson notes <span>Only you can see these</span></summary>
+        <summary><ChevronDown size={18} aria-hidden="true" /><strong>Lesson notes</strong><span><Lock size={13} aria-hidden="true" />Only you can see these</span></summary>
         <fieldset disabled={Boolean(busy)}>
           <label htmlFor={`${inputId}-notes`}>What did you work on?</label>
           <textarea id={`${inputId}-notes`} value={draft.notes} rows={5} maxLength={10000} onChange={event => edit({ notes: event.target.value })} placeholder="Add a photo or type the words, grammar and examples from this lesson." />
-          <div className="homework-photo-tools">
+          {draft.aiAvailable ? <><div className="homework-photo-tools">
             <label className={`button button--outline${busy ? " is-disabled" : ""}`}><Camera size={17} aria-hidden="true" />Add a photo
               <input type="file" accept="image/*" className="visually-hidden" onChange={async event => {
                 const file = event.target.files?.[0]; event.target.value = "";
@@ -156,22 +157,24 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {photo && showPhoto ? <img className="homework-photo-full" src={photo} alt="Lesson notes to compare with the transcription" /> : null}
-          <ul className="homework-help"><li>OpenAI reads the photo. This site does not store it.</li><li>Keep names and personal details out.</li></ul>
+          <ul className="homework-help"><li>OpenAI reads the photo. This site doesn’t store it.</li><li>Keep names and personal details out.</li></ul>
           {uncertain.length ? <div className="homework-error"><strong>Check these readings</strong><ul>{uncertain.map((item, index) => <li key={index}>{item}</li>)}</ul></div> : null}
+          </> : null}
           <div className="homework-settings">
             <label htmlFor={`${inputId}-level`}>Level<select id={`${inputId}-level`} value={draft.level} onChange={event => edit({ level: event.target.value })}>{["A1", "A2", "B1", "B2", "C1", "C2"].map(level => <option key={level}>{level}</option>)}</select></label>
-            <label htmlFor={`${inputId}-minutes`}>Length<select id={`${inputId}-minutes`} value={draft.minutes} onChange={event => edit({ minutes: Number(event.target.value) })}>{[10, 15, 20].map(minutes => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></label>
-            <button className="button button--coral" type="button" disabled={!draft.aiAvailable || draft.notes.trim().length < 10} onClick={() => {
+            <label htmlFor={`${inputId}-minutes`}>Length<select id={`${inputId}-minutes`} value={draft.minutes} onChange={event => edit({ minutes: Number(event.target.value) })}>{[10, 15, 20].map(minutes => <option key={minutes} value={minutes}>{minutes} mins</option>)}</select></label>
+            {draft.aiAvailable ? <button className="button button--coral" type="button" disabled={draft.notes.trim().length < 10} onClick={() => {
               if (!draft.sheet || window.confirm("Replace this draft with a new sheet? Your lesson notes will stay.")) void run("generate");
-            }}><Sparkles size={17} aria-hidden="true" />{busy === "generate" ? "Making sheet…" : draft.sheet ? "Make a new draft" : "Make homework"}</button>
+            }}><Sparkles size={17} aria-hidden="true" />{busy === "generate" ? "Making sheet…" : draft.sheet ? "Make a new draft" : "Make homework"}</button> : null}
           </div>
-          {!draft.aiAvailable ? <p className="homework-help">AI setup is pending. You can save notes or write a sheet yourself.</p> : null}
+          {!draft.aiAvailable ? <p className="homework-help">Photo reading and automatic drafts aren’t switched on yet. Keep your notes here and write the sheet yourself.</p> : null}
         </fieldset>
       </details>
-      <div className="homework-toolbar">
-        {draft.sheet ? <div className="homework-view-toggle"><button type="button" aria-pressed={mode === "preview"} onClick={() => setMode("preview")}>Preview</button><button type="button" aria-pressed={mode === "edit"} onClick={() => setMode("edit")}>Edit sheet</button></div>
-          : <button type="button" className="text-action" disabled={Boolean(busy)} onClick={() => { edit({ sheet: emptySheet() }); setMode("edit"); }}>Write a sheet yourself</button>}
-        <button className="button button--outline" type="button" disabled={Boolean(busy) || !dirty} onClick={() => void run("save")}>{busy === "save" ? "Saving…" : "Save draft"}</button>
+      <div className="homework-toolbar homework-toolbar--actions">
+        {draft.sheet ? <HomeworkToggle label="Sheet view" value={mode} onChange={setMode} options={[["preview", "Preview"], ["edit", "Edit sheet"]]} />
+          : <button type="button" className="button button--lilac" disabled={Boolean(busy)} onClick={() => { edit({ sheet: emptySheet() }); setMode("edit"); }}><PenLine size={16} aria-hidden="true" />Write a sheet yourself</button>}
+        {/* As in Your details, saving appears once there is something to save. */}
+        {dirty || busy === "save" ? <button className="button button--outline" type="button" disabled={Boolean(busy)} onClick={() => void run("save")}>{busy === "save" ? "Saving…" : "Save draft"}</button> : null}
       </div>
     </> : null}
     {draft?.sheet && draft.progress.submission && !draft.progress.submission.returnedAt ? <HomeworkReview
@@ -179,11 +182,11 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
       marks={reviewMarks ?? draft.progress.submission.marks ?? {}}
       marking={draft.progress.submission.state === "marking"} note={draft.progress.submission.markingNote}
       busy={Boolean(busy)} onChange={setReviewMarks} onApprove={() => void run("return")} /> : draft?.sheet ? <>
-      {!draft.publishedAt && mode === "edit" ? <SheetEditor sheet={draft.sheet} disabled={Boolean(busy)} onChange={sheet => edit({ sheet })} />
+      {!draft.publishedAt && mode === "edit" ? <SheetEditor sheet={draft.sheet} disabled={Boolean(busy)} ai={draft.aiAvailable} onChange={sheet => edit({ sheet })} />
         : <HomeworkWorksheet sheet={draft.sheet} level={draft.level} minutes={draft.minutes} lessonAt={draft.lessonAt}
           answers={draft.progress.submission?.answers ?? (draft.publishedAt ? draft.progress.answers : undefined)}
           marks={draft.progress.submission?.marks} markedAnswers={draft.progress.submission?.answers} preview />}
-      {draft.publishedAt ? <p className="homework-help">{draft.progress.submission?.returnedAt ? "Approved feedback sent back to the student." : draft.progress.updatedAt ? "The student has started but has not submitted yet." : "The student has not submitted any answers yet."} Published questions stay fixed.</p> : <div className="homework-publish">
+      {draft.publishedAt ? <p className="homework-help homework-help--state">{draft.progress.submission?.returnedAt ? "Approved feedback sent back to the student." : draft.progress.updatedAt ? "The student has started but has not submitted yet." : "The student has not submitted any answers yet."} Published questions stay fixed.</p> : <div className="homework-publish">
         <label><input type="checkbox" checked={reviewed} disabled={Boolean(busy)} onChange={event => setReviewed(event.target.checked)} />I checked the European Portuguese and the answers.</label>
         <button type="button" className="button button--coral" disabled={Boolean(busy) || !reviewed} onClick={() => void run("publish")}>{busy === "publish" ? "Publishing…" : "Publish for student"}</button>
       </div>}
@@ -192,7 +195,7 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
   </section>;
 }
 
-function SheetEditor({ sheet, disabled, onChange }: { sheet: HomeworkSheet; disabled: boolean; onChange: (sheet: HomeworkSheet) => void }) {
+function SheetEditor({ sheet, disabled, ai, onChange }: { sheet: HomeworkSheet; disabled: boolean; ai: boolean; onChange: (sheet: HomeworkSheet) => void }) {
   function sectionChange(index: number, values: Partial<HomeworkSheet["sections"][number]>) {
     onChange({ ...sheet, sections: sheet.sections.map((section, si) => si === index ? { ...section, ...values } : section) });
   }
@@ -200,7 +203,7 @@ function SheetEditor({ sheet, disabled, onChange }: { sheet: HomeworkSheet; disa
     <div className="homework-editor__intro"><label>Title<input maxLength={160} value={sheet.title} onChange={e => onChange({ ...sheet, title: e.target.value })} /></label>
       <label>Learning goal<textarea maxLength={400} value={sheet.objective} onChange={e => onChange({ ...sheet, objective: e.target.value })} rows={2} /></label></div>
     {sheet.sections.map((section, si) => <section key={si}>
-      <div className="homework-toolbar"><h4>Section {si + 1}</h4>{sheet.sections.length > 1 ? <button className="text-action" type="button" onClick={() => onChange({ ...sheet, sections: sheet.sections.filter((_, i) => si !== i) })}>Remove section</button> : null}</div>
+      <div className="homework-toolbar"><h4>Section {si + 1}</h4>{sheet.sections.length > 1 ? <button className="homework-link" type="button" onClick={() => onChange({ ...sheet, sections: sheet.sections.filter((_, i) => si !== i) })}>Remove section</button> : null}</div>
       <label>Heading<input maxLength={120} value={section.title} onChange={e => sectionChange(si, { title: e.target.value })} /></label>
       <div className="homework-editor__pair"><label>Instruction<textarea maxLength={600} rows={2} value={section.instruction} onChange={e => sectionChange(si, { instruction: e.target.value })} /></label>
         <label>Worked example <small>Optional</small><textarea maxLength={800} rows={2} value={section.example} onChange={e => sectionChange(si, { example: e.target.value })} /></label></div>
@@ -209,14 +212,14 @@ function SheetEditor({ sheet, disabled, onChange }: { sheet: HomeworkSheet; disa
           <label>Answer or example answer<textarea rows={2} maxLength={1200} value={q.answer} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, answer: e.target.value } : item) })} /></label></div>
         <label>Explanation <small>Optional</small><textarea rows={2} maxLength={800} value={q.explanation} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, explanation: e.target.value } : item) })} /></label>
         <label>Marking<select value={q.marking ?? "written"} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, marking: e.target.value as "exact" | "written", acceptedAnswers: item.acceptedAnswers ?? [] } : item) })}>
-          <option value="written">Written answer · AI suggestion, then your approval</option><option value="exact">Short answer · check accepted answers</option>
+          <option value="written">{ai ? "Written answer · AI suggestion, then your approval" : "Written answer · you mark it"}</option><option value="exact">Short answer · checked against accepted answers</option>
         </select></label>
         {q.marking === "exact" ? <label>Accepted answers <small>One per line. Include every valid alternative.</small><textarea rows={3} maxLength={9600} value={(q.acceptedAnswers ?? []).join("\n")} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, acceptedAnswers: e.target.value.split("\n") } : item) })} /></label> : null}
-        {section.questions.length > 1 ? <button className="text-action" type="button" onClick={() => sectionChange(si, { questions: section.questions.filter((_, i) => i !== qi) })}><Trash2 size={15} aria-hidden="true" />Remove question {qi + 1}</button> : null}
+        {section.questions.length > 1 ? <button className="homework-link" type="button" onClick={() => sectionChange(si, { questions: section.questions.filter((_, i) => i !== qi) })}><Trash2 size={15} aria-hidden="true" />Remove question {qi + 1}</button> : null}
       </div>)}
-      {section.questions.length < 6 && sheet.sections.flatMap(s => s.questions).length < 12 ? <button className="text-action" type="button" onClick={() => sectionChange(si, { questions: [...section.questions, { id: `new-${Date.now()}`, prompt: "", answer: "", explanation: "" }] })}><Plus size={16} aria-hidden="true" />Add question</button> : null}
+      {section.questions.length < 6 && sheet.sections.flatMap(s => s.questions).length < 12 ? <button className="homework-link" type="button" onClick={() => sectionChange(si, { questions: [...section.questions, { id: `new-${Date.now()}`, prompt: "", answer: "", explanation: "" }] })}><Plus size={16} aria-hidden="true" />Add question</button> : null}
     </section>)}
-    {sheet.sections.length < 4 && sheet.sections.flatMap(s => s.questions).length < 12 ? <button type="button" className="button button--outline" onClick={() => onChange({ ...sheet, sections: [...sheet.sections, { title: "", instruction: "", example: "", questions: [{ id: `new-${Date.now()}`, prompt: "", answer: "", explanation: "" }] }] })}>Add section</button> : null}
+    {sheet.sections.length < 4 && sheet.sections.flatMap(s => s.questions).length < 12 ? <button type="button" className="button button--outline homework-editor__add" onClick={() => onChange({ ...sheet, sections: [...sheet.sections, { title: "", instruction: "", example: "", questions: [{ id: `new-${Date.now()}`, prompt: "", answer: "", explanation: "" }] }] })}>Add section</button> : null}
     <label>Review reminder<textarea maxLength={400} rows={2} value={sheet.reminder} onChange={e => onChange({ ...sheet, reminder: e.target.value })} /></label>
   </fieldset>;
 }
@@ -225,35 +228,53 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
   sheet: HomeworkSheet; answers: Record<string, string>; marks: Record<string, HomeworkMark>; marking: boolean;
   note?: string; busy: boolean; onChange: (marks: Record<string, HomeworkMark>) => void; onApprove: () => void;
 }) {
+  const id = useId();
   const questions = sheet.sections.flatMap(section => section.questions);
-  const unresolved = questions.some(question => !marks[question.id] || marks[question.id].status === "review" || !marks[question.id].feedback.trim());
+  // A pending placeholder ("A Inês vai rever…") is not feedback; it must never be approved as hers.
+  const feedbackOf = (mark?: HomeworkMark) => !mark || mark.source === "pending" ? "" : mark.feedback;
+  const open = questions.filter(question => !marks[question.id] || marks[question.id].status === "review" || !feedbackOf(marks[question.id]).trim()).length;
   return <div className="homework-review">
-    <div className="homework-review__intro"><h4>Homework to review</h4>
-      <p>{marking ? "Checking answers…" : "Check the marks and feedback. The student sees them only after you approve."}</p>
-      {note ? <p className="homework-help">{note}</p> : null}
+    <div className="homework-review__intro">
+      <h4>Homework to review</h4>
+      <p>{marking ? "Checking answers…" : "Check each mark and its feedback. The student sees them only after you approve."}</p>
+      {note ? <p className="homework-review__note">{note}</p> : null}
     </div>
-    <fieldset className="homework-editor" disabled={busy || marking}>
+    <fieldset className="homework-review__sheet" disabled={busy || marking}>
       {sheet.sections.map((section, index) => <section key={index}>
-        <h4 lang="pt-PT">{section.title}</h4><p lang="pt-PT">{section.instruction}</p>
-        {section.questions.map(question => {
+        <h5 lang="pt-PT"><span aria-hidden="true">{index + 1}</span>{section.title}</h5>
+        <p className="homework-review__instruction" lang="pt-PT">{section.instruction}</p>
+        {section.questions.map((question, qi) => {
           const mark = marks[question.id] ?? { status: "review", feedback: "", source: "pending" };
-          const edit = (value: Partial<HomeworkMark>) => onChange({ ...marks, [question.id]: { ...mark, ...value } });
-          return <div className="homework-editor__question" key={question.id}>
-            <strong lang="pt-PT">{question.prompt}</strong>
-            <p className="homework-review__answer" lang="pt-PT">{answers[question.id] || "Sem resposta."}</p>
-            <details><summary>Answer guide</summary><p lang="pt-PT">{question.answer}</p>{question.explanation ? <p lang="pt-PT">{question.explanation}</p> : null}</details>
-            <div className="homework-editor__pair">
-              <label>Mark<select value={mark.status} onChange={event => edit({ status: event.target.value as HomeworkMark["status"] })}>
-                <option value="review">Needs your review</option><option value="correct">Correct</option><option value="retry">Try again</option>
-              </select></label>
-              <label>Feedback <small>European Portuguese</small><textarea lang="pt-PT" rows={2} maxLength={800} value={mark.feedback} onChange={event => edit({ feedback: event.target.value })} /></label>
+          const feedback = feedbackOf(mark);
+          const edit = (value: Partial<HomeworkMark>) => onChange({ ...marks, [question.id]: { ...mark, feedback, source: "teacher", ...value } });
+          const name = `${id}-${question.id}`;
+          const unresolved = mark.status === "review" || !feedback.trim();
+          return <div className={`homework-review__question${unresolved ? " is-open" : ""}`} key={question.id}>
+            <div className="homework-review__work">
+              <p className="homework-review__prompt" lang="pt-PT"><span>{qi + 1}.</span>{question.prompt}</p>
+              <p className="homework-review__answer" lang="pt-PT">{answers[question.id] || <em lang="en">No answer</em>}</p>
+              <details><summary>Answer guide</summary><p lang="pt-PT">{question.answer}</p>{question.explanation ? <p lang="pt-PT">{question.explanation}</p> : null}</details>
+            </div>
+            <div className="homework-review__mark">
+              <fieldset className="homework-review__choice">
+                <legend>Mark {unresolved ? <span className="homework-tag">Needs you</span> : null}</legend>
+                <div className={`segmented homework-mark${mark.status === "retry" ? " segmented--second" : ""}${mark.status === "review" ? " homework-mark--unset" : ""}`}>
+                  <span aria-hidden="true" className="segmented__thumb" />
+                  {([["correct", "Correct"], ["retry", "Try again"]] as const).map(([value, label]) => <label key={value} className={mark.status === value ? "is-active" : ""}>
+                    <input type="radio" name={name} value={value} checked={mark.status === value} onChange={() => edit({ status: value })} />{label}
+                  </label>)}
+                </div>
+              </fieldset>
+              <label className="homework-review__feedback">Feedback <small>In European Portuguese</small>
+                <textarea lang="pt-PT" rows={2} maxLength={800} value={feedback} placeholder="Ex.: Muito bem! O teu pedido está claro." onChange={event => edit({ feedback: event.target.value })} /></label>
             </div>
           </div>;
         })}
       </section>)}
     </fieldset>
-    <div className="homework-publish"><p className="homework-help">{unresolved ? "Resolve the answers marked for review." : "Ready to send back to the student."}</p>
-      <button type="button" className="button button--coral" disabled={busy || marking || unresolved} onClick={onApprove}>{busy ? "Sending…" : "Approve & send back"}</button>
+    <div className="homework-publish homework-publish--review">
+      <p className="homework-help">{marking ? "Automatic marking is still running." : open ? `${open === 1 ? "1 answer needs" : `${open} answers need`} a mark and feedback.` : "Ready to send back to the student."}</p>
+      <button type="button" className="button button--coral" disabled={busy || marking || Boolean(open)} onClick={onApprove}>{busy ? "Sending…" : "Approve & send back"}</button>
     </div>
   </div>;
 }

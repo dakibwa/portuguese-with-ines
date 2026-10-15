@@ -172,7 +172,7 @@ try {
     await page.getByRole("button", { name: /Homework to review/ }).click();
     await expect(editor.locator(".homework-review")).toBeVisible();
     await expect(editor.getByRole("button", { name: "Approve & send back", exact: true })).toBeDisabled();
-    await editor.getByRole("combobox", { name: /^Mark/ }).nth(4).selectOption("correct");
+    await editor.getByRole("radio", { name: "Correct", exact: true }).nth(4).check();
     await editor.getByLabel("Feedback", { exact: false }).nth(4).fill("Muito bem. O teu pedido está claro e educado.");
     await editor.screenshot({ path: `${output}/teacher-review-${width}.png` });
     await editor.getByRole("button", { name: "Approve & send back", exact: true }).click();
