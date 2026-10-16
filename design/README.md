@@ -1850,6 +1850,20 @@ window, the lesson is charged once it closes, and a no-show means only €5 is
 taken instead of the full price. Confirmations keep a `Back to lesson` button
 beside the confirming one.
 
+## Transactional emails — 16 October 2026
+
+The site's forty emails are sixteen templates
+(`workers/booking/email-templates.mjs`), all drawn by one layout in
+`workers/booking/email.mjs`: the banner, a heading and one-line introduction,
+the date panel, a coral-dab note, the dab list of facts, numbered steps, one
+coral blob button and, rarely, one quiet underlined link, then dab footer facts
+and the site's link. Variants of an event (who made the change, one lesson or a
+run, how it is paid) change lines, never the structure. Emails declare
+`light dark`: in dark mode they sit on the site's dark blue with cream text,
+lilac labels and lighter dabs; under 480px the margins tighten and the button
+fills the width. Inês's card-declined and card-added notices are Needs you
+cards, not emails. Previews of every variant: `scripts/render-email-previews-v2.mjs`.
+
 ## Superseded work
 
 Old green/editorial website directions, generated concept boards, mockup

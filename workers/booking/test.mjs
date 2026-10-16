@@ -8,6 +8,7 @@
 
 import assert from "node:assert/strict";
 import { renderEmail, splitWhen } from "./email.mjs";
+import * as templates from "./email-templates.mjs";
 import { candidateStartMinutes, computeAvailability, DEFAULT_BOOKING_HORIZON_DAYS, isSlotBookable } from "./availability.mjs";
 import {
   chargeSavedCard,
@@ -1562,6 +1563,50 @@ await test("an email's time reads as its date, then its time and clock, without 
   // A date, a time and its clock, and a number and its word never break inside.
   assert.ok(lesson.html.includes("Wed&nbsp;14&nbsp;Oct,&nbsp;19:00."));
   assert.ok(lesson.html.includes("14&nbsp;October&nbsp;2026"));
+});
+
+await test("sixteen templates cover every email, each in both colour schemes and at phone width, with nothing left blank", () => {
+  const lesson = { lesson: "60-minute lesson", lessonName: "60-minute lesson", place: "Online", reference: "PT-ONE", when: "Tuesday, 13 October 2026 at 17:00, Porto time", shortWhen: "Tue 13 Oct, 17:00" };
+  const student = { name: "Ana Silva", email: "ana@example.invalid", phone: "", nif: "", notes: "" };
+  const run = { oneOff: false, fixed: false, count: 2, skippedNote: "", repeats: { label: "Repeats", value: "Every week" }, lastShort: "Tue 20 Oct, 17:00",
+    occurrences: [{ short: "Tue 13 Oct, 17:00", long: "Tuesday 13 October 2026 at 17:00", meetingUrl: "", online: true, place: "Online" }] };
+  const money = { amount: "€5", noticeHours: 14, nif: "123456789", longWhen: "Tuesday, 13 October 2026 at 17:00", studentName: "Ana Silva" };
+  const each = [
+    templates.studentBooked({ ...lesson, first: "Ana", price: "€25", policy: "card", notice: "14 hours", fee: "€5", manageUrl: "https://x.invalid/m" }),
+    templates.studentBooked({ ...lesson, first: "Ana", byInes: true, price: "€25", policy: "unpaid", notice: "14 hours", fee: "€5", lessonsUrl: "https://x.invalid/l", run }),
+    templates.lessonBookedTeacher({ ...lesson, student, run, extended: true }),
+    templates.lessonReminder({ ...lesson, first: "Ana", manageUrl: "https://x.invalid/m", cutoff: "Tue 13 Oct, 03:00", fee: "€5" }),
+    templates.lessonReminder({ ...lesson, first: "Ana", linkOnly: true, meetingUrl: "https://meet.google.com/abc-defg-hij" }),
+    templates.studentMoved({ ...lesson, first: "Ana", price: "€25", policy: "again", notice: "14 hours", fee: "€5" }),
+    templates.lessonMovedTeacher({ ...lesson, student, notice: "14 hours", run }),
+    templates.studentCancelled({ ...lesson, first: "Ana", byInes: true }),
+    templates.lessonCancelledTeacher({ student, run: { count: "2 lessons", dates: "Tuesday 13 October 2026 at 17:00" } }),
+    templates.paymentReceipt({ ...lesson, ...money, first: "Ana", item: "fee" }),
+    templates.paymentReceivedTeacher({ ...lesson, ...money, item: "fee" }),
+    templates.paymentFailed({ ...lesson, ...money, first: "Ana", item: "no-show", payUrl: "https://x.invalid/p" }),
+    templates.welcome({ first: "Ana", welcome: { url: "https://x.invalid/w", card: true }, book: true, card: true, free: false, rows: [] }),
+    templates.signInLink({ first: "Ana", url: "https://x.invalid/s" }),
+    templates.passwordReset({ first: "Ana", url: "https://x.invalid/r" }),
+    templates.emailChangeConfirm({ first: "Ana", email: "new@example.invalid", url: "https://x.invalid/c" }),
+    templates.emailChangeNotice({ first: "Ana", email: "new@example.invalid" }),
+    templates.homeworkSubmitted({ name: "Ana Silva", url: "https://x.invalid/h" })
+  ];
+  for (const { subject, content } of each) {
+    const { html, text } = renderEmail(content);
+    for (const part of [subject, html, text]) assert.doesNotMatch(part, /undefined|NaN|\[object Object\]|>null</, subject);
+    assert.match(html, /<meta name="color-scheme" content="light dark">/);
+    assert.match(html, /@media \(prefers-color-scheme:dark\)/);
+    assert.match(html, /\[data-ogsc\] \.pwi-text/, "Outlook.com's dark mode is steered too");
+    assert.match(html, /@media only screen and \(max-width:480px\)/);
+    // Every text that sits on the card has an explicit colour, never an inherited one.
+    assert.ok(!/<p class="[^"]*" style="(?![^"]*color:)/.test(html), subject);
+  }
+  // Her receipt automation reads these words: kept exactly.
+  const fee = templates.paymentReceivedTeacher({ ...lesson, ...money, item: "fee" });
+  assert.equal(fee.subject, "Payment received — Ana Silva, €5 same-day fee");
+  assert.equal(fee.content.heading, "A same-day fee was paid");
+  assert.equal(fee.content.preheader, "Ana Silva · same-day fee · €5");
+  assert.match(renderEmail(fee.content).text, /^NIF: 123456789$/m);
 });
 
 await test("a welcome tells a weekly run as one line, its gaps and a changed lesson as their own, and says how many it leaves out", () => {
