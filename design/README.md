@@ -508,14 +508,18 @@ usual lesson starts and days off; avoid a wall of administration forms.
   Incomplete students have compact, distinct steps: Price, Lessons, Email,
   Welcome, Sign in and Card. Later unfinished steps stay locked until
   the preceding steps are complete; completed steps remain editable. A lock
-  gives the missing prerequisite. Checks mark completion, the next action has an
+  gives the missing prerequisite. Lessons are suggested, never required
+  (16 October 2026, Inês: some students have none yet and book their own):
+  Lessons never locks Email or Welcome, and once the welcome has gone an
+  empty Lessons step holds nothing open. Checks mark completion, the next action has an
   outline, and a clock marks waiting on the student. The steps are the controls;
   do not repeat the next action as a top-right button or status beside the name.
   Explain what is outstanding inside the selected step, without vague ownership
   labels such as Yours or Theirs.
   Completed onboarding becomes a normal row labelled Student, with their
   details, next lesson and price. Its controls become Details, Price, Add a lesson
-  and Lesson history. No duplicate To do list or separate student profile popup.
+  and Lesson history, and, with an email, `Sign-in link`, whose panel holds
+  `Send the link again`. No duplicate To do list or separate student profile popup.
   The name and journey share one band where they fit. On small phones the steps
   wrap beneath the name without horizontal scrolling. Opening a step keeps the
   student's name visible and places one X close control at the top right.
@@ -620,9 +624,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
     into place, and scrolling keeps the student's name visible. Reduced-motion
     users get the same result without animation.
   - Details contains full name, email, phone and NIF, with one Save details
-    action. A student who has signed in changes their own email. Before their
-    first lesson, the email field remains locked even when Details is opened
-    from their history. Price uses the same editable rate form as onboarding.
+    action. A student who has signed in changes their own email. A missing
+    lesson never locks the email field (16 October 2026, Inês). Price uses the same editable rate form as onboarding.
   - Add a lesson opens the calendar in the row. Length, location, weekly repeat
     and available times use the full row width as described above. A successful
     addition closes the form and leaves a short confirmation in that row.
@@ -633,7 +636,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
     stretched name-button hit area; its section controls keep their own actions.
   - Add a student opens a short creation dialog with name, optional email,
     phone, NIF, prices and splat. Nothing is emailed. Next: their lessons closes
-    the dialog and opens that student's lesson form in the Students list.
+    the dialog and opens that student's lesson form in the Students list; the
+    lilac `No lessons yet` beside it opens their Welcome step instead (their
+    Email step when none was given), where she still presses `Send welcome
+    email` herself. A dialog opened from a timetable time offers only the lesson.
   - A free timetable time opens a student chooser. A past time offers only
     `Add a lesson here`, never time off. Choosing or creating the
     student closes the chooser, switches to Students and opens their lesson
@@ -654,7 +660,13 @@ usual lesson starts and days off; avoid a wall of administration forms.
     a lesson) and `60 minutes · €22 a lesson`. A lesson moved, lengthened or put
     elsewhere reads as the lesson it now is. Past twelve lines an `And more` dab
     says how many lessons are left to the website. Its subject and preheader do
-    not change.
+    not change. With no lesson to come (16 October 2026, Inês) it is an
+    invitation instead: `Book your next lesson with Inês`, the price dabs, no
+    lesson list, and steps ending `Choose a day and time for your next
+    lesson.` behind `Sign in and book` (or `Sign in and add card` when a card
+    is asked for). A student free at every length is told there is no card to
+    add and nothing to pay. The Welcome and Sign-in panels say in their dabs
+    which of these the email will be before she sends it.
 - `Receipts`, a tab of its own beside `Students` (13 October 2026, Dan: "make
   her automation as easy as possible"), shows a month at a time with the
   Time off month's pager (the one pager above): two dabs for what there is to

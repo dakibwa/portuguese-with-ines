@@ -64,6 +64,13 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     returnFocus.current = null;
   }, [step, disabled]);
   const waitingOnStudent = next === "sign-in" || next === "card";
+  // What the email she is about to send says (16 October 2026, Inês): with no
+  // lesson to come it asks them to book one; a free student is asked for no card.
+  const free = student.prices?.[60] === 0 && student.prices?.[90] === 0;
+  const emailSays = student.email ? [
+    student.nextLessonAt ? "Lists their lessons to come." : "No lessons yet: it asks them to book one.",
+    free ? "Free lessons: no card asked." : steps.some(entry => entry.id === "card") && !student.cardForAllLessons ? "Asks them to add a card." : "",
+  ].filter(Boolean) : [];
   const help: string[] = step === "price"
     ? [Object.keys(student.ownPrices ?? student.prices ?? {}).length ? "Custom lesson price set." : "Standard lesson price applies."]
     : step === "lessons" ? [
@@ -76,6 +83,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
           ? student.signedIn ? "Sign-in is set up." : "Student hasn’t signed in yet."
           : student.hasCard ? "Student has saved a card." : "Student hasn’t added a card yet.",
       ...(!student.email ? ["Email address needed."] : step === "card" && !student.hasCard && !student.signedIn ? ["Student needs to sign in first."] : []),
+      ...emailSays,
     ] : [];
 
   useEffect(() => {
@@ -140,6 +148,8 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   const profilePanel = ready || step === "history" || step === "details";
   const controls = [
     ["details", "Details"], ["price", "Price"], ["lessons", "Add a lesson"], ["history", "Lesson history"],
+    // A fresh way in for someone already set up, sent only by her press inside it.
+    ...(student.email ? [["sign-in", "Sign-in link"] as const] : []),
   ] as const;
   const prices = ([60, 90] as const).filter(minutes => student.prices?.[minutes] !== undefined)
     .map(minutes => `${minutes} mins · ${formatPriceCents(student.prices![minutes]!)}`).join(", ");

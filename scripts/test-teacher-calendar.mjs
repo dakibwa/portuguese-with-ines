@@ -415,7 +415,7 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
 });
 
 
-test("setup follows lessons before email and student steps, while completed steps stay editable", () => {
+test("setup suggests lessons before email and student steps without requiring them, while completed steps stay editable", () => {
   const student = (id, extra) => ({ id, name: id, email: `${id}@example.invalid`, signedIn: false, hasCard: false, hasLessons: true, awaitingWelcome: true, ...extra });
   const students = [
     student("email", { email: "" }),
@@ -440,15 +440,20 @@ test("setup follows lessons before email and student steps, while completed step
   ]);
   const by = (row, id) => row.steps.find(step => step.id === id);
   const nameOnly = gettingStarted([student("name-only", { email: "", hasLessons: false })])[0];
-  assert.equal(nameOnly.next, "lessons", "standard prices are ready, so the first lesson comes before the email");
+  assert.equal(nameOnly.next, "lessons", "standard prices are ready, so the first lesson is suggested before the email");
   assert.equal(by(nameOnly, "lessons").lockedReason, undefined);
-  assert.ok(nameOnly.steps.filter(step => ["email", "welcome", "sign-in", "card"].includes(step.id)).every(step => Boolean(step.lockedReason)));
+  // A lesson is never required (16 October 2026, Inês): the email is open, and only it holds the welcome.
+  assert.equal(by(nameOnly, "email").lockedReason, undefined);
+  assert.ok(nameOnly.steps.filter(step => ["welcome", "sign-in", "card"].includes(step.id)).every(step => step.lockedReason === "Add an email first."));
+  assert.equal(by(setup[1], "welcome").lockedReason, undefined, "a student with an email and no lessons can be welcomed");
+  assert.equal(by(setup[1], "sign-in").lockedReason, "Send the welcome email first.");
   assert.ok(by(setup[0], "welcome").lockedReason);
   assert.ok(by(setup[2], "sign-in").lockedReason);
   assert.ok(by(setup[4], "card").lockedReason);
-  const legacy = gettingStarted([student("legacy", { hasLessons: false, awaitingWelcome: undefined, signedIn: true, hasCard: true })])[0];
-  assert.equal(legacy.next, "lessons");
-  assert.ok(legacy.steps.filter(step => step.done).every(step => !step.lockedReason), "existing email, sign-in and card remain accessible despite an earlier missing lesson");
+  // Once welcomed, booking is theirs: no lessons holds nothing open.
+  const welcomedNoLessons = gettingStarted([student("welcomed", { hasLessons: false, awaitingWelcome: false })])[0];
+  assert.equal(welcomedNoLessons.next, "sign-in");
+  assert.deepEqual(gettingStarted([student("legacy", { hasLessons: false, awaitingWelcome: undefined, signedIn: true, hasCard: true })]), [], "signed in with a card and no lessons is a student, not setup");
   const tasks = needsYou({ now: new Date("2026-10-14T10:00:00Z"), meet: null, payments: [], students, lessons: [], cancellations: [] });
   assert.deepEqual(new Set(tasks.map(item => item.key)), new Set(["welcome:far", "email:email", "lessons:lessons", "welcome:lessons", "welcome:welcome"]));
   assert.ok(tasks.every(item => setup.some(row => row.student.id === item.student.id && row.owner === "Yours")), "the tab count excludes waiting on them");

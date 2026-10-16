@@ -201,7 +201,10 @@ card and the standing agreement, their next lesson, how many lessons to come are
 still paid by hand, and any weekly slot. `Students` on `/schedule` puts
 those who still need to sign in or add a card first, each with
 `Send welcome email` (`POST /admin/students/:id/welcome`, three an hour per
-student). Accounts the opt-in live check registers
+student). It is only ever sent by her press: nothing sends it on its own.
+A student needs no lesson to be welcomed (16 October 2026, Inês); with no
+lesson to come the email invites them to sign in and book their next one,
+with no lesson list, and a student free at every length is asked for no card. Accounts the opt-in live check registers
 (`launch-check-…@example.invalid`, from `scripts/qa-recurring-rates.mjs`) are
 left out of the list; the four made on 5 September 2026 were deleted from
 production on 13 October 2026 at Dan's request.

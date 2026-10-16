@@ -20,7 +20,7 @@ export function StudentPicker({ token, known, start, onSelect, onClose }: {
   token: string;
   known: AdminStudent[];
   start: StudentPickerStart;
-  onSelect: (student: AdminStudent, slot?: { date: string; time: string }) => void;
+  onSelect: (student: AdminStudent, slot?: { date: string; time: string }, next?: "lessons" | "welcome") => void;
   onClose: () => void;
 }) {
   const [adding, setAdding] = useState(start.step === "new");
@@ -40,15 +40,15 @@ export function StudentPicker({ token, known, start, onSelect, onClose }: {
       if (!selected.current) restoreDialogFocus(previous);
     };
   }, []);
-  const choose = (student: AdminStudent) => {
+  const choose = (student: AdminStudent, next?: "lessons" | "welcome") => {
     if (readSession() !== token) return;
     selected.current = true;
-    onSelect(student, slot);
+    onSelect(student, slot, next);
   };
   return <dialog className="teacher-lesson-dialog teacher-profile" ref={dialog} {...backdrop} aria-labelledby="teacher-student-picker-title" onKeyDown={keepDialogFocus} onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
     <button className="teacher-dialog-close" aria-label="Close" disabled={busy} onClick={onClose} type="button"><X size={20} aria-hidden="true" /></button>
     <h2 id="teacher-student-picker-title">{adding ? "Add a student" : "Add a lesson"}</h2>
-    {adding ? <NewStudentForm token={token} onBusy={setBusy} onAdded={choose} cancelLabel={start.step === "pick" ? "Back" : "Cancel"} onCancel={start.step === "pick" ? () => setAdding(false) : onClose} /> : <>
+    {adding ? <NewStudentForm token={token} onBusy={setBusy} onAdded={choose} offerNoLessons={start.step === "new"} cancelLabel={start.step === "pick" ? "Back" : "Cancel"} onCancel={start.step === "pick" ? () => setAdding(false) : onClose} /> : <>
       {slot ? <p className="teacher-profile__when lesson-when"><span>{dateLabel(slot.date, { weekday: "long", day: "numeric", month: "long" })}</span><span className="lesson-when__time">{slot.time}</span></p> : null}
       <div className="teacher-profile__pick">
         <p className="teacher-eyebrow">Whose lesson?</p>

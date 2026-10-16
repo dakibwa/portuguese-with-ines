@@ -3143,7 +3143,7 @@
 
 /* The onboarding row becomes an ordinary student profile, without a popup. */
 .teacher-student--inline { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; gap: 0.4rem; padding: 0.55rem 0.8rem; }
-.teacher-student__controls { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem; min-width: 0; }
+.teacher-student__controls { position: relative; z-index: 2; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.35rem; min-width: 0; }
 .teacher-student__controls button { border: 0; border-radius: var(--squiggle-field); min-height: 44px; padding: 0.3rem 0.45rem; background: transparent; color: var(--ink); font: 600 0.7rem/1.4 var(--ui); cursor: pointer; }
 .teacher-student__controls button:hover:not(:disabled), .teacher-student__controls button[aria-expanded="true"] { background: var(--lavender-soft); }
 .teacher-student--inline .teacher-student__facts { display: flex; flex-wrap: wrap; gap: 0.25rem 1.1rem; margin: 0; font-size: 0.72rem; overflow-wrap: anywhere; }
