@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
 
 // All account and calendar endpoints are isolated fixtures. No provider writes.
 const base = process.env.QA_BASE_URL;
@@ -289,7 +290,7 @@ async function fixture(width, options = {}) {
       if (studentRoute[2] === "prices") {
         target.ownPrices = Object.fromEntries(Object.entries(data.prices).filter(([, cents]) => cents !== null));
         const sixty = target.ownPrices[60];
-        target.prices = sixty ? { 60: sixty, 90: target.ownPrices[90] ?? Math.round(sixty * 1.5) } : { ...target.ownPrices };
+        target.prices = sixty !== undefined ? { 60: sixty, 90: target.ownPrices[90] ?? Math.round(sixty * 1.5) } : { ...target.ownPrices };
       }
       if (studentRoute[2] === "welcome") {
         target.awaitingWelcome = false;
@@ -1144,6 +1145,31 @@ try {
   assert.equal(mobile.state.writes.filter(entry => entry.path.endsWith("/cancel")).at(-1).data.message, longMessage);
   assert.deepEqual(mobile.state.errors, []);
   await mobile.page.close();
+
+  // A free price (16 October 2026): she types 0, and each length reads Free.
+  await mkdir("tmp/qa/free-price", { recursive: true });
+  for (const width of [1280, 390]) {
+    const { page, state } = await fixture(width);
+    await page.getByRole("tab", { name: /^Students/ }).click();
+    const alex = studentRow(page, "Alex");
+    await alex.getByRole("button", { name: "Price for Alex", exact: true }).click();
+    const pane = alex.getByRole("region", { name: "Alex’s profile", exact: true });
+    await pane.getByLabel("Price for 60 minutes, in euros", { exact: true }).fill("0");
+    await expect(pane.getByLabel("Price for 90 minutes, in euros", { exact: true })).toHaveAttribute("placeholder", "0");
+    await expect(pane).toContainText("0: free, with no card needed.");
+    await pane.screenshot({ path: `tmp/qa/free-price/teacher-price-${width}.png` });
+    await pane.getByRole("button", { name: "Save price", exact: true }).click();
+    await expect.poll(() => state.writes.at(-1)?.data).toEqual({ prices: { 60: 0, 90: null } });
+    await expect(pane).toContainText("60 mins · Free");
+    await expect(pane).toContainText("90 mins · Free · as their 60");
+    await pane.screenshot({ path: `tmp/qa/free-price/teacher-price-saved-${width}.png` });
+    await alex.getByRole("button", { name: "Add a lesson for Alex", exact: true }).click();
+    await expect(pane.getByRole("radio", { name: "60 mins, Free", exact: true })).toBeVisible();
+    await expect(pane.getByRole("radio", { name: "90 mins, Free", exact: true })).toBeVisible();
+    await pane.screenshot({ path: `tmp/qa/free-price/teacher-add-lesson-${width}.png` });
+    assert.deepEqual(state.errors, []);
+    await page.close();
+  }
 
   for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);

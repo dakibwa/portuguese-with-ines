@@ -58,10 +58,14 @@ export async function priceForMove(env, row, lessonType) {
   return (await studentLessonType(env, row.student_id, lessonType)).price_cents;
 }
 
-/** Inês's price for one length: whole euro cents in the same bounds as a code's. */
+/**
+ * Inês's price for one length: whole euro cents in the same bounds as a code's,
+ * or 0, which makes that length free (16 October 2026, Dan). A code is never
+ * free; only she can make a lesson cost nothing.
+ */
 export function teacherRate(value) {
   if (value === null || value === "") return null;
-  return Number.isInteger(value) && value >= 100 && value <= 10000 ? value : undefined;
+  return Number.isInteger(value) && (value === 0 || (value >= 100 && value <= 10000)) ? value : undefined;
 }
 
 /**

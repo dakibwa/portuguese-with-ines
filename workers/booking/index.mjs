@@ -380,7 +380,10 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const isPaid = row.payment_status === "paid";
   const wasRefunded = row.payment_status === "refunded";
   const isOnCard = row.payment_status === "scheduled" || row.payment_status === "payment_due";
-  const priceValue = isPaid
+  const isFree = row.payment_status === FREE;
+  const priceValue = isFree
+    ? FREE_LABEL
+    : isPaid
     ? `${formatEuros(lessonType.price_cents)} · paid`
     : isOnCard
       ? `${formatEuros(lessonType.price_cents)} · charged to your saved card after the lesson`
@@ -435,6 +438,8 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const paidChangeFooter = [`Move or cancel free until ${notice} before the lesson.`, "After that, it can't be changed or refunded."];
   const savedCardChangeFooter = [`Move or cancel free until ${notice} before the lesson.`, `After that, moving or cancelling costs ${fee}.`, `A no-show costs ${fee} instead of the lesson price.`];
   const unpaidChangeFooter = ["Need to change it? Use the link above.", `It's free until ${notice} before the lesson; after that it costs ${fee}.`];
+  // A free lesson has no fee to warn of, only the notice she would like.
+  const freeChangeFooter = ["Need to change it? Use the link above.", `Please give Inês at least ${notice}' notice.`];
   const refundNote = wasRefunded
     ? `Refunded in full: your ${formatEuros(row.amount_cents ?? lessonType.price_cents)} is on its way back to your card and usually shows within a few days.`
     : "";
@@ -453,8 +458,8 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
             : `Olá ${row.student_name.split(" ")[0]}, Inês has booked this lesson for you. A calendar invitation is attached.`,
           callout: "",
           footer: welcome
-            ? [`It's free to change until ${notice} before the lesson; after that it costs ${fee}.`, ...WELCOME_FOOTER]
-            : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
+            ? [isFree ? `Please give Inês at least ${notice}' notice to change it.` : `It's free to change until ${notice} before the lesson; after that it costs ${fee}.`, ...WELCOME_FOOTER]
+            : isFree ? freeChangeFooter : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
         }
       : {
       subject: `Your Portuguese lesson is booked — ${studentShortWhen}`,
@@ -463,7 +468,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         isPaid ? "paid and confirmed" : "confirmed"
       }. A calendar invitation is attached.`,
       callout: "",
-      footer: isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
+      footer: isFree ? freeChangeFooter : isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
     },
     rescheduled: byTeacher
       ? {
@@ -695,11 +700,13 @@ function reminderEmail({ row, lessonType, settings, manageUrl, meetingLink, meet
   const cutoff = formatShort(new Date(start.getTime() - settings.minimumNoticeHours * 3600000), zone);
   // The cut-off is where the change policy starts charging, so it is always the
   // moment that is true; no "today" or "tomorrow" anywhere.
-  const footer = [`Free to change or cancel until ${cutoff}.`,
-    row.payment_status === "paid"
-      ? "After that, it can’t be changed or refunded."
-      : `After that, there’s a ${formatEuros(settings.sameDayChangeFeeCents)} late change fee.`
-  ];
+  const footer = row.payment_status === FREE
+    ? [`If you need to change or cancel it, please do so by ${cutoff}.`]
+    : [`Free to change or cancel until ${cutoff}.`,
+      row.payment_status === "paid"
+        ? "After that, it can’t be changed or refunded."
+        : `After that, there’s a ${formatEuros(settings.sameDayChangeFeeCents)} late change fee.`
+    ];
   const manage = { label: "Change or cancel this lesson", url: manageUrl };
 
   return {
@@ -915,11 +922,14 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   // prices repeated to her. Current runs charge each lesson separately after
   // it ends; an older run keeps the pay-on-the-day terms it was booked under.
   const seriesOnCard = rows.some((row) => row.payment_status === "paid" || row.payment_status === "scheduled");
+  const seriesFree = rows.every((row) => row.payment_status === FREE);
   const studentSeriesRows = [
     ...studentRowsOn.slice(0, 2),
     {
       label: "Price",
-      value: seriesOnCard
+      value: seriesFree
+        ? FREE_LABEL
+        : seriesOnCard
         ? `${formatEuros(lessonType.price_cents)} a lesson · charged to your saved card after each lesson`
         : welcome?.card
           ? `${formatEuros(lessonType.price_cents)} a lesson · ${PAID_BY_HAND}`
@@ -943,7 +953,9 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     });
   }
   const seriesFee = formatEuros(settings.sameDayChangeFeeCents);
-  const seriesFooter = seriesOnCard
+  const seriesFooter = seriesFree
+    ? [`Please give Inês at least ${settings.minimumNoticeHours} hours' notice to move or cancel a lesson.`]
+    : seriesOnCard
     ? [`Move or cancel any single lesson free until ${settings.minimumNoticeHours} hours before it.`, `After that, moving or cancelling costs ${seriesFee}.`, `A no-show costs ${seriesFee} instead of the lesson price.`]
     : [`Moving or cancelling a lesson is free until ${settings.minimumNoticeHours} hours before it; after that it costs ${seriesFee}.`];
   const moved = reason === "moved";
@@ -1287,7 +1299,7 @@ async function issueSignInLink(env, student, minutes) {
 async function issueWelcome(env, settings, student, { always = false } = {}) {
   // Nothing to send a way in to until she has given their address.
   if (student.role === "teacher" || isNoEmailYet(student.email)) return null;
-  const card = cardsTaken(env, settings) && !student.card_consent_at;
+  const card = cardsTaken(env, settings) && !student.card_consent_at && !await paysNothing(env, student.id);
   const neverIn = !student.password_hash && !student.google_sub && !student.last_login_at;
   if (!always && !card && !neverIn) return null;
   return { ...await issueSignInLink(env, student, WELCOME_LINK_MINUTES), card, neverIn };
@@ -1312,6 +1324,45 @@ const PAID_BY_HAND_MARK = "paid-by-hand";
  * that charges, chases, reprices, reminds or issues receipts reads it.
  */
 const RECORDED = "recorded";
+
+/**
+ * A lesson at a price Inês set to €0 (16 October 2026, Dan: "can Inês set a
+ * student's price to €0 so that student never needs to add a card?"):
+ * `payment_status = 'free'`, `amount_cents = 0`. It is a real lesson, emailed,
+ * reminded and given its Meet like any other, but nothing that charges,
+ * chases, issues receipts, takes a late fee or moves lessons onto a card reads
+ * it. A lesson becomes free when it is born at €0 or when its price is set to
+ * €0 before anything is settled on it; once free, it stays free.
+ */
+const FREE = "free";
+
+/** What a free lesson says where a price would be. */
+const FREE_LABEL = "Free";
+
+/**
+ * The SET clauses that make a lesson free when its new amount is 0, as a
+ * change of length onto a free length does; a priced lesson keeps its status.
+ * `amount` is SQL, bound or read three times.
+ */
+const FREE_ON_ZERO = (amount) => `payment_status = CASE WHEN ${amount} = 0 THEN '${FREE}' ELSE payment_status END,
+       payment_consent_at = CASE WHEN ${amount} = 0 THEN NULL ELSE payment_consent_at END,
+       payment_consent_version = CASE WHEN ${amount} = 0 THEN NULL ELSE payment_consent_version END`;
+
+/**
+ * A free lesson changes length only onto another free one: it was booked with
+ * no card and no agreement to pay, so a priced length is a new booking.
+ */
+function freeLengthProblem(row, amountCents) {
+  return row.payment_status === FREE && amountCents !== 0
+    ? "This lesson is free. To have the other length, cancel it and book that length instead."
+    : "";
+}
+
+/** A student whose every lesson length costs nothing has no card to add. */
+async function paysNothing(env, studentId) {
+  const rates = await studentRates(env, studentId).catch(() => ({}));
+  return rates[60] === 0 && rates[90] === 0;
+}
 
 /** What a lesson Inês added costs until the student's card pays for it. */
 const PAID_BY_HAND = "pay Inês as usual until you add your card";
@@ -1343,7 +1394,7 @@ const WELCOME_LESSON_LINES = 12;
 export function welcomeLessonLines(student, lessons, limit = WELCOME_LESSON_LINES) {
   const onTheirClock = (lesson) => lessonZone({ ...lesson, student_timezone: student.timezone });
   const when = (lesson) => splitWhen(lessonWhen(new Date(lesson.starts_at), onTheirClock(lesson)));
-  const price = (lesson) => formatEuros(lesson.amount_cents ?? 0);
+  const price = (lesson) => lesson.payment_status === FREE ? FREE_LABEL : formatEuros(lesson.amount_cents ?? 0);
   const length = (lesson) => `${lesson.duration_minutes} minutes`;
   // The weekday is already said by "Every Tuesday".
   const dayOnly = (lesson) => when(lesson).date.replace(/^\S+ /, "");
@@ -1397,7 +1448,7 @@ export function welcomeLessonLines(student, lessons, limit = WELCOME_LESSON_LINE
     // The price still open is the one the run is on; a lesson already paid, or
     // one she marked paid by hand, keeps the amount it was settled at.
     const priced = item.lessons.find((lesson) =>
-      (lesson.payment_status === "not_required" || lesson.payment_status === "scheduled") &&
+      (lesson.payment_status === "not_required" || lesson.payment_status === "scheduled" || lesson.payment_status === FREE) &&
       lesson.payment_consent_version !== PAID_BY_HAND_MARK
     ) ?? first;
     const last = item.lessons[item.lessons.length - 1];
@@ -1417,7 +1468,7 @@ export function welcomeLessonLines(student, lessons, limit = WELCOME_LESSON_LINE
         `Every ${date.split(" ")[0]}, ${time}`,
         item.goesOn ? `From ${dayOnly(first)}, until you stop it` : `From ${dayOnly(first)} until ${dayOnly(last)}`,
         ...(missing.length ? [`No lesson on ${days(missing)}`] : []),
-        `${length(priced)} · ${price(priced)} a lesson`
+        `${length(priced)} · ${price(priced)}${priced.payment_status === FREE ? "" : " a lesson"}`
       ].join("\n")
     };
   });
@@ -1453,9 +1504,9 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
   // Already on the price Inês agreed with them, with no code to type
   // (13 October 2026, Dan).
   const prices = await studentRates(env, student.id).catch(() => ({}));
-  rows.unshift(...[60, 90].filter((minutes) => prices[minutes]).map((minutes) => ({
+  rows.unshift(...[60, 90].filter((minutes) => prices[minutes] !== undefined).map((minutes) => ({
     label: `Your price · ${minutes} minutes`,
-    value: `${formatEuros(prices[minutes])} a lesson`
+    value: prices[minutes] === 0 ? FREE_LABEL : `${formatEuros(prices[minutes])} a lesson`
   })));
   return deliver(env, {
     to: student.email,
@@ -2788,7 +2839,9 @@ async function handleCreate(request, env, ctx) {
   if (settings.paymentMode === "prepay") {
     return fail("Online payment is being updated. Please try again shortly.", 503, request, env);
   }
-  const paymentRequired = settings.paymentMode === "postpay";
+  // A lesson at €0 asks for no agreement, no card and nothing from Stripe.
+  const free = lessonType.price_cents === 0;
+  const paymentRequired = settings.paymentMode === "postpay" && !free;
   const stripeIsReady = stripeReady(env);
   const paymentProblem = bookingPaymentProblem({
     paymentRequired,
@@ -2855,7 +2908,7 @@ async function handleCreate(request, env, ctx) {
       0,
       timestamp,
       timestamp,
-      needsCardSetup ? "pending" : postpay ? "scheduled" : "not_required",
+      needsCardSetup ? "pending" : postpay ? "scheduled" : free ? FREE : "not_required",
       lessonType.price_cents,
       needsCardSetup ? holdExpiresAt : null,
       postpay ? timestamp : null,
@@ -3084,7 +3137,8 @@ async function handleCreateSelection(request, env, ctx, {
       student_name: student.name, student_email: student.email, student_phone: student.phone,
       student_timezone: timezone, location, notes, starts_at: occurrence.startAt.toISOString(),
       ends_at: occurrence.endAt.toISOString(), status: needsCardSetup ? "pending_payment" : "confirmed", sequence: 0,
-      created_at: timestamp, updated_at: timestamp, payment_status: needsCardSetup ? "pending" : postpay ? "scheduled" : "not_required",
+      created_at: timestamp, updated_at: timestamp,
+      payment_status: needsCardSetup ? "pending" : postpay ? "scheduled" : lessonType.price_cents === 0 ? FREE : "not_required",
       amount_cents: lessonType.price_cents, hold_expires_at: holdExpiresAt, series_id: seriesId,
       payment_consent_at: postpay ? timestamp : null, payment_consent_version: postpay ? PAYMENT_CONSENT_VERSION : null
     });
@@ -3186,6 +3240,9 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
   const timestamp = now.toISOString();
   const startsAt = new Date(startAt).toISOString();
   const endsAt = new Date(endAt).toISOString();
+  // A week born while the student's price is €0 is free whatever the run
+  // agreed; one born after the price rises follows the run's own terms.
+  const free = paymentState !== "hold" && lessonType.price_cents === 0;
 
   const claim = prepareSlotClaim(env, {
     columns: [
@@ -3211,12 +3268,12 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
       0,
       timestamp,
       timestamp,
-      paymentState === "hold" ? "pending" : paymentState === "scheduled" ? "scheduled" : "not_required",
+      paymentState === "hold" ? "pending" : free ? FREE : paymentState === "scheduled" ? "scheduled" : "not_required",
       lessonType.price_cents,
       paymentState === "hold" ? holdExpiresAt : null,
       series.id,
-      paymentConsentAt,
-      paymentConsentVersion,
+      free ? null : paymentConsentAt,
+      free ? null : paymentConsentVersion,
       teacher ? 1 : 0
     ],
     startAt: startsAt,
@@ -3546,6 +3603,8 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
       );
     }
     const amountCents = await priceForMove(env, row, lessonType);
+    const freeProblem = freeLengthProblem(row, amountCents);
+    if (freeProblem) return fail(freeProblem, 409, request, env);
     if (row.lesson_type_id !== lessonType.id && body.expectedPriceCents !== amountCents) {
       return fail("Please reload and review the changed lesson price. If this run has different lesson lengths or rates, move those lessons individually.", 409, request, env);
     }
@@ -3587,6 +3646,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
          starts_at = (SELECT new_start FROM proposed WHERE id = bookings.id),
          ends_at = (SELECT new_end FROM proposed WHERE id = bookings.id),
          amount_cents = (SELECT new_amount FROM proposed WHERE id = bookings.id),
+         ${FREE_ON_ZERO("(SELECT new_amount FROM proposed WHERE id = bookings.id)")},
          sequence = sequence + 1, reschedule_count = reschedule_count + 1,
          same_day_change = 0, updated_at = ?
      WHERE series_id = ? AND status = 'confirmed' AND starts_at > ?
@@ -3799,10 +3859,13 @@ async function handleReschedule(request, env, ctx, token) {
 
   // The fee is for changing inside the 14-hour window, judged against the
   // lesson they are moving away from. `same_day_change` keeps its column name.
-  const sameDay = policy.late ? 1 : 0;
+  // A free lesson is never charged one.
+  const sameDay = policy.feeApplies ? 1 : 0;
   const startsAt = new Date(body.startAt).toISOString();
   const endsAt = check.endAt.toISOString();
   const amountCents = await priceForMove(env, row, lessonType);
+  const freeProblem = freeLengthProblem(row, amountCents);
+  if (freeProblem) return fail(freeProblem, 409, request, env);
   if (body.expectedPriceCents !== undefined && body.expectedPriceCents !== amountCents) {
     return fail("Please reload and review the lesson price before confirming.", 409, request, env);
   }
@@ -3827,6 +3890,7 @@ async function handleReschedule(request, env, ctx, token) {
   const moved = await env.DB.prepare(
     `UPDATE bookings SET lesson_type_id = ?, location = ?, starts_at = ?, ends_at = ?, previous_starts_at = ?,
        amount_cents = ?, sequence = sequence + 1, reschedule_count = reschedule_count + 1,
+       ${FREE_ON_ZERO("?")},
        same_day_change = ?,
        same_day_fee_status = CASE
          WHEN ? = 1 AND payment_status = 'scheduled' AND same_day_fee_status = 'not_required' THEN 'scheduled'
@@ -3854,6 +3918,7 @@ async function handleReschedule(request, env, ctx, token) {
       endsAt,
       row.starts_at,
       amountCents,
+      amountCents, amountCents, amountCents,
       sameDay,
       sameDay,
       sameDay,
@@ -5064,7 +5129,7 @@ function studentPrices(value) {
   for (const minutes of [60, 90]) {
     if (!(String(minutes) in value)) continue;
     const cents = teacherRate(value[minutes]);
-    if (cents === undefined) return { problem: "Each price needs to be between €1 and €100." };
+    if (cents === undefined) return { problem: "Each price needs to be €0 (free) or between €1 and €100." };
     prices[minutes] = cents;
   }
   return { prices };
@@ -5076,7 +5141,10 @@ function studentPrices(value) {
  * something has already been charged, paid or settled by hand. A lesson they
  * agreed to at checkout follows only a lower price: that agreement was to the
  * amount it showed. A card saved from their account agreed to every lesson's
- * price, so those follow either way. Returns how many lessons changed.
+ * price, so those follow either way. A price of €0 makes those lessons free
+ * (16 October 2026); a price raised from €0 leaves lessons already free as
+ * they are, and applies to lessons booked from then on. Returns how many
+ * lessons changed, or null while migration 0031 has yet to allow €0.
  */
 async function setStudentPrices(env, studentId, prices) {
   const now = new Date().toISOString();
@@ -5087,8 +5155,26 @@ async function setStudentPrices(env, studentId, prices) {
        ON CONFLICT(student_id, duration_minutes) DO UPDATE SET amount_cents = excluded.amount_cents, redeemed_at = excluded.redeemed_at`
     ).bind(studentId, Number(minutes), cents, now));
   if (!statements.length) return 0;
-  await env.DB.batch(statements);
+  try {
+    await env.DB.batch(statements);
+  } catch (error) {
+    if (Object.values(prices).includes(0) && /CHECK constraint/i.test(String(error?.message ?? error))) return null;
+    throw error;
+  }
   return repriceStudent(env, studentId, now);
+}
+
+/** Their lessons still to come that stay free at a length that is no longer free. */
+async function lessonsStayingFree(env, studentId) {
+  const rates = await studentRates(env, studentId);
+  const priced = [60, 90].filter((minutes) => rates[minutes] !== 0);
+  if (!priced.length) return 0;
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
+     WHERE b.student_id = ? AND b.status = 'confirmed' AND b.starts_at > ? AND b.payment_status = '${FREE}'
+       AND l.duration_minutes IN (SELECT value FROM json_each(?))`
+  ).bind(studentId, new Date().toISOString(), JSON.stringify(priced)).first();
+  return Number(row?.n ?? 0);
 }
 
 /**
@@ -5102,11 +5188,15 @@ async function repriceStudent(env, studentId, now = new Date().toISOString()) {
   return results.reduce((total, result) => total + (result?.meta?.changes ?? 0), 0);
 }
 
-/** Their lessons still to come at one length, moved to a price (null: the standard one). */
+/**
+ * Their lessons still to come at one length, moved to a price (null: the
+ * standard one). At €0 they become free, and no agreement to pay is left on
+ * them. A free lesson is never in this set, so a raised price passes it by.
+ */
 function repriceLessons(env, studentId, minutes, cents, now) {
   const standard = "(SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)";
   return env.DB.prepare(
-    `UPDATE bookings SET amount_cents = COALESCE(?, ${standard}), updated_at = ?
+    `UPDATE bookings SET amount_cents = COALESCE(?, ${standard}), ${FREE_ON_ZERO("?")}, updated_at = ?
      WHERE student_id = ? AND status = 'confirmed' AND starts_at > ? AND charge_started_at IS NULL
        AND lesson_type_id IN (SELECT id FROM lesson_types WHERE duration_minutes = ? AND id != 'trial')
        AND payment_status IN ('scheduled', 'not_required')
@@ -5114,7 +5204,7 @@ function repriceLessons(env, studentId, minutes, cents, now) {
        AND COALESCE(amount_cents, -1) != COALESCE(?, ${standard})
        AND (payment_consent_version IS NULL OR payment_consent_version = ?
          OR COALESCE(?, ${standard}) < COALESCE(amount_cents, ${standard}))`
-  ).bind(cents, now, studentId, now, minutes, cents, STUDENT_CARD_CONSENT_VERSION, cents);
+  ).bind(cents, cents, cents, cents, now, studentId, now, minutes, cents, STUDENT_CARD_CONSENT_VERSION, cents);
 }
 
 async function handleUpdateMe(request, env) {
@@ -5446,7 +5536,10 @@ async function handleAdmin(request, env, ctx, url, path) {
       .bind(id, email || `${NO_EMAIL_YET}${id}`, name, details.phone, details.nif, details.mark, PORTO, new Date().toISOString())
       .run();
     if (!(added?.meta?.changes > 0)) return fail("Someone with that email is already on the site.", 409, request, env);
-    await setStudentPrices(env, id, priced.prices);
+    if (await setStudentPrices(env, id, priced.prices) === null) {
+      // The student stays; only the free price waits for the update.
+      return fail("Free lessons need a database update first. The student was added on the standard price.", 503, request, env);
+    }
     const list = await teacherStudentList(env);
     return json({ student: list.find((entry) => entry.id === id) }, 201, request, env);
   }
@@ -5517,8 +5610,9 @@ async function handleAdmin(request, env, ctx, url, path) {
     const priced = studentPrices((await readJson(request)).prices);
     if (priced.problem) return fail(priced.problem, 400, request, env);
     const updated = await setStudentPrices(env, student.id, priced.prices);
+    if (updated === null) return fail("Free lessons need a database update first. Nothing was changed.", 503, request, env);
     const list = await teacherStudentList(env);
-    return json({ student: list.find((entry) => entry.id === student.id), updated }, 200, request, env);
+    return json({ student: list.find((entry) => entry.id === student.id), updated, stayFree: await lessonsStayingFree(env, student.id) }, 200, request, env);
   }
 
   // Her welcome for a student: their one-click way in and the lessons she has
@@ -5645,9 +5739,11 @@ async function handleAdmin(request, env, ctx, url, path) {
      * was, and becomes automatic from the moment they add one.
      */
     const cardPays = cardPaysFor(env, settings, student);
+    // A lesson at a price she set to €0 is free, card or none.
+    const free = !past && lessonType.price_cents === 0;
     // A lesson already had is never charged: she is recording it.
-    const onCard = cardPays && !past;
-    const paymentStatus = past ? RECORDED : onCard ? "scheduled" : "not_required";
+    const onCard = cardPays && !past && !free;
+    const paymentStatus = past ? RECORDED : free ? FREE : onCard ? "scheduled" : "not_required";
     const location = body.location === "porto" ? "porto" : "online";
     const notes = cleanText(body.notes, 1000);
 

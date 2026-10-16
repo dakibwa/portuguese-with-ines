@@ -96,7 +96,9 @@ export type AdminBooking = {
     | "payment_due"
     | "refunded"
     /** A lesson she recorded after it happened: for the record only. */
-    | "recorded";
+    | "recorded"
+    /** A lesson at a price she set to €0: never charged, chased or receipted. */
+    | "free";
   attendance_status: "expected" | "no_show";
   /** 1 when Inês added it herself (migration 0023). */
   added_by_teacher?: number;
@@ -368,9 +370,10 @@ export function updateStudentDetails(token: string, studentId: string, input: St
 /**
  * Her price for a student. It prices every lesson of theirs at that length, and
  * their lessons to come that nothing is settled on follow it; `updated` counts them.
+ * `stayFree` counts lessons to come booked free at a length that no longer is.
  */
 export function setStudentPrices(token: string, studentId: string, prices: StudentPrices) {
-  return adminRequest<{ student: AdminStudent; updated: number }>(token, `/admin/students/${encodeURIComponent(studentId)}/prices`, {
+  return adminRequest<{ student: AdminStudent; updated: number; stayFree?: number }>(token, `/admin/students/${encodeURIComponent(studentId)}/prices`, {
     method: "POST",
     body: JSON.stringify({ prices }),
   });

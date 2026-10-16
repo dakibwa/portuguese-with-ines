@@ -142,7 +142,10 @@ lessons of that length, including ones already booked.
 Students can continue editing while a save is pending; a reply preserves newer
 drafts, and independent name/NIF saves cannot undo one another.
 They get an accessible status message and see that saved price on return.
-Duration changes show their actual price before submission. No valid-code
+Duration changes show their actual price before submission. A price Inês
+sets to €0 reads `Free` wherever a price would show, never `€0` (`60 mins ·
+Free`, and on her Price tab `90 mins · Free · as their 60`), and a free lesson's own line adds
+`· Free` beside its length and place (16 October 2026, Dan). No valid-code
 suggestions, catalogue, countdown or expiry pressure belong in this flow. Only
 some students have a code, so nothing may suggest most should: sign-up carries
 no code field, and Edit details keeps the small disclosure, listing saved
@@ -296,6 +299,10 @@ the same identity or action:
   number of lessons and says `agree to pay`, even though no money is taken
   at booking. A payment configuration failure replaces action with a
   visible inline error instead of confirming without a usable payment method.
+  A free lesson (a price Inês set to €0) has no agreement control, no card
+  step and no €5 line: its summary says it is free with no card needed and
+  asks for the usual notice, the action is plain `Book lesson`, and paused
+  card payments do not stop it.
 
 ## Public polish — 22 September 2026
 

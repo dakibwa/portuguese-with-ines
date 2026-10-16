@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { addStudent, type AdminStudent } from "@/lib/admin-api";
 import { STUDENT_MARKS } from "@/lib/student-marks";
-import { PriceFields, pricesFromDraft, type PriceDraft } from "@/components/teacher/StudentPrice";
+import { PRICE_RANGE_ERROR, PriceFields, pricesFromDraft, type PriceDraft } from "@/components/teacher/StudentPrice";
 
 /**
  * A new student's details, in the profile's own form: a name is enough to
@@ -43,7 +43,7 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel }
           if (busy) return;
           const agreed = pricesFromDraft(prices, { keepEmpty: false });
           if (!agreed) {
-            setError("Each price needs to be between €1 and €100.");
+            setError(PRICE_RANGE_ERROR);
             return;
           }
           setBusy(true);

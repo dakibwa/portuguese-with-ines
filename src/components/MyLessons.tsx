@@ -24,6 +24,7 @@ import {
   formatBookedLessonLabel,
   formatLongDate,
   formatMoneyCents,
+  formatPriceCents,
   formatSlotTime,
   formatTimeIn,
   redeemRecurringRate
@@ -732,8 +733,10 @@ export function MyLessons({
           </div>
 
           {/* Only where the booking system can take a card, and only once it
-              says which kind is saved (12 October 2026, Dan). */}
-          {cardsAccepted && student.role !== "teacher" ? (
+              says which kind is saved (12 October 2026, Dan). A student Inês
+              made free at every length has nothing to add one for, unless one
+              is already saved (16 October 2026). */}
+          {cardsAccepted && student.role !== "teacher" && !(rates?.[60] === 0 && rates?.[90] === 0 && !student.hasCard) ? (
             <div className="my-lessons__fact" data-field="card">
               <span className="my-lessons__fact-label">Card</span>
               {openField === "card" ? (
@@ -828,7 +831,7 @@ export function MyLessons({
               {RATE_LENGTHS.filter((minutes) => rates[minutes] !== undefined).map((minutes) => (
                 <li key={minutes}>
                   <span>{minutes}-minute lessons</span>
-                  <strong>{formatMoneyCents(rates[minutes])} each</strong>
+                  <strong>{rates[minutes] === 0 ? formatPriceCents(0) : `${formatMoneyCents(rates[minutes])} each`}</strong>
                 </li>
               ))}
             </ul>

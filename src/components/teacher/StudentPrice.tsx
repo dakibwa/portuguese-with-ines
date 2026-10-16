@@ -3,12 +3,15 @@
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { setStudentPrices, type AdminStudent, type StudentPrices } from "@/lib/admin-api";
-import { formatMoneyCents } from "@/lib/booking-api";
+import { formatPriceCents } from "@/lib/booking-api";
 import { lessonProducts } from "@/lib/lesson-products";
 
 const LENGTHS = [60, 90] as const;
 type Length = (typeof LENGTHS)[number];
 export type PriceDraft = Record<Length, string>;
+
+/** What a price that can't be read is told, wherever she types one. */
+export const PRICE_RANGE_ERROR = "Each price needs to be €0 (free) or between €1 and €100.";
 
 /** The price anyone pays for a length unless Inês has set them their own. */
 export function standardPrice(minutes: Length) {
@@ -30,7 +33,8 @@ export function priceDraft(student?: Pick<AdminStudent, "prices" | "ownPrices"> 
 
 /**
  * Euros as typed ("20", "22,50") to cents per length; an empty field is the
- * standard price. `null` when a field cannot be read.
+ * standard price and 0 is free (16 October 2026). `null` when a field cannot
+ * be read.
  */
 export function pricesFromDraft(draft: PriceDraft, { keepEmpty }: { keepEmpty: boolean }): StudentPrices | null {
   const prices: StudentPrices = {};
@@ -42,7 +46,7 @@ export function pricesFromDraft(draft: PriceDraft, { keepEmpty }: { keepEmpty: b
     }
     if (!/^\d{1,3}(\.\d{1,2})?$/.test(text)) return null;
     const cents = Math.round(Number(text) * 100);
-    if (cents < 100 || cents > 10000) return null;
+    if (cents !== 0 && (cents < 100 || cents > 10000)) return null;
     prices[minutes] = cents;
   }
   return prices;
@@ -81,7 +85,7 @@ export function PriceFields({ draft, disabled, idPrefix, onChange }: {
               id={`${idPrefix}-${minutes}`}
               inputMode="decimal"
               onChange={(event) => onChange({ ...draft, [minutes]: event.target.value })}
-              placeholder={minutes === 90 && typedCents(draft[60]) ? euroText(Math.round(typedCents(draft[60])! * 1.5)) : euroText(standardPrice(minutes))}
+              placeholder={minutes === 90 && typedCents(draft[60]) !== null ? euroText(Math.round(typedCents(draft[60])! * 1.5)) : euroText(standardPrice(minutes))}
               type="text"
               value={draft[minutes]}
             />
@@ -118,7 +122,7 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
     if (busy) return;
     const prices = pricesFromDraft(draft, { keepEmpty: true });
     if (!prices) {
-      setError("Each price needs to be between €1 and €100.");
+      setError(PRICE_RANGE_ERROR);
       return;
     }
     setBusy(true);
@@ -128,9 +132,13 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
       const result = await setStudentPrices(token, student.id, prices);
       onChanged(result.student);
       setEditing(false);
-      setSaved(result.updated
-        ? `Saved. ${result.updated} ${result.updated === 1 ? "lesson" : "lessons"} to come ${result.updated === 1 ? "is" : "are"} on the new price.`
-        : "Saved.");
+      const lessons = (count: number) => `${count} ${count === 1 ? "lesson" : "lessons"}`;
+      setSaved([
+        "Saved.",
+        result.updated ? `${lessons(result.updated)} to come ${result.updated === 1 ? "is" : "are"} on the new price.` : "",
+        // A price raised from free reaches lessons booked from now on only.
+        result.stayFree ? `${lessons(result.stayFree)} already booked free ${result.stayFree === 1 ? "stays" : "stay"} free.` : "",
+      ].filter(Boolean).join(" "));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The price couldn’t be saved.");
     } finally {
@@ -148,6 +156,7 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
           <ul className="booking-payment-facts teacher-price__hint">
             <li>90 mins empty: 1.5× the 60-minute price.</li>
             <li>Both empty: standard prices.</li>
+            <li>0: free, with no card needed.</li>
           </ul>
           <div className="teacher-dialog-actions">
             <button className="button button--coral button--compact" disabled={busy} type="submit">{busy ? "Saving…" : "Save price"}</button>
@@ -159,10 +168,12 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
           <ul className="booking-payment-facts teacher-price__facts">
             {LENGTHS.map((minutes) => (
               <li key={minutes}>
-                {minutes} mins · <strong>{formatMoneyCents(priceFor(student, minutes))}</strong>
+                {minutes} mins · <strong>{formatPriceCents(priceFor(student, minutes))}</strong>
                 {student.prices?.[minutes] === undefined
                   ? " · standard"
-                  : minutes === 90 && student.ownPrices && student.ownPrices[90] === undefined ? " · 1.5× their 60" : ""}
+                  : minutes === 90 && student.ownPrices && student.ownPrices[90] === undefined
+                    ? student.prices[90] === 0 ? " · as their 60" : " · 1.5× their 60"
+                    : ""}
               </li>
             ))}
           </ul>

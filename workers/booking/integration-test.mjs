@@ -2724,6 +2724,91 @@ await test("a lesson Inês records after it happened is only a record: no one is
     forgetStudent(email);
   }
 });
+await test("a student Inês made free books and is booked with no card, no Stripe and no money owed, until the price rises", async () => {
+  const user = await selectionFixture({ savedCard: false });
+  const price = (prices) => call(`/admin/students/${user}/prices`, { user: "teacher", body: { prices } });
+  const mine = () => db.prepare("SELECT * FROM bookings WHERE student_id=? ORDER BY starts_at").all(user);
+  const stripeCalls = () => checkoutRequests.length + charges.length;
+  try {
+    // A lesson she added before making them free is paid by hand; €0 makes it free.
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { studentId: user, lessonType: "single", startAt: "2026-09-16T16:00:00.000Z" } })).status, 201);
+    assert.equal(mine()[0].payment_status, "not_required");
+    assert.equal((await price({ 60: 50 })).status, 400, "between €0 and €1 is still refused");
+    const freed = await price({ 60: 0 });
+    assert.equal(freed.status, 200, await freed.clone().text());
+    const { student, updated } = await freed.json();
+    assert.deepEqual([student.prices, updated], [{ 60: 0, 90: 0 }, 1], "a free 60 makes the 90 free too");
+    assert.deepEqual([mine()[0].payment_status, mine()[0].amount_cents], ["free", 0]);
+    assert.equal((await (await call(`/admin/students/${user}/welcome`, { user: "teacher", body: {} })).json()).card, false, "their welcome asks for no card");
+
+    // Self-serve, no agreement, no card: a lesson, two dates and a weekly run.
+    const before = stripeCalls();
+    captureEmail();
+    try {
+      const single = await call("/bookings", { user, body: { lessonType: "single", startAt: "2026-09-08T09:00:00.000Z", expectedPriceCents: 0 } });
+      assert.equal(single.status, 201, await single.clone().text());
+      const reply = await single.json();
+      assert.ok(!reply.checkoutUrl && !reply.checkoutClientSecret, "no card step");
+      await drain();
+      const confirmation = sentEmails.find((mail) => mail.to[0] === `${user}@example.invalid`);
+      assert.match(confirmation.text, /Free/, "a real lesson, emailed, its price Free");
+      assert.doesNotMatch(confirmation.text, /card|€5/);
+    } finally {
+      releaseEmail();
+    }
+    assert.equal((await call("/bookings", { user, body: selectionBody({ paymentConsent: undefined, expectedPriceCents: 0 }) })).status, 201);
+    assert.equal((await call("/bookings", { user, body: { lessonType: "long", startAt: "2026-09-21T09:00:00.000Z", repeat: 4 } })).status, 201);
+    // Hers too, card or not: a weekly run with no end.
+    db.prepare("UPDATE students SET email_verified_at=?, card_consent_at=?, stripe_customer_id='cus_free', stripe_payment_method='pm_free' WHERE id=?")
+      .run(new Date().toISOString(), new Date().toISOString(), user);
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { studentId: user, lessonType: "single", startAt: "2026-09-17T16:00:00.000Z", repeat: "open" } })).status, 201);
+    assert.equal(stripeCalls(), before, "nothing reached Stripe");
+    const lessons = mine();
+    assert.ok(lessons.length > 15);
+    assert.ok(lessons.every((row) => row.status === "confirmed" && row.payment_status === "free" && row.amount_cents === 0 && !row.payment_consent_at),
+      JSON.stringify(lessons.map((row) => [row.starts_at, row.payment_status, row.amount_cents])));
+    assert.ok(db.prepare("SELECT automatic_payment FROM booking_series WHERE student_id=? AND added_by_teacher=0").all(user).every((run) => !run.automatic_payment));
+
+    // Late changes cost nothing; nothing charges, chases or receipts them.
+    const late = linkedBooking("free-late", { owner: user, payment: "free", start: "2026-09-05T20:00:00.000Z", end: "2026-09-05T21:00:00.000Z" });
+    db.prepare("UPDATE bookings SET amount_cents=0 WHERE id=?").run(late);
+    const cancelled = await call(`/bookings/${await token(late)}/cancel`, { user: null, body: {} });
+    assert.equal((await cancelled.json()).sameDayFeeApplied, false);
+    assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id=?").get(late).same_day_fee_status, "not_required");
+    await chargeDueLessons(env, new Date("2026-10-20T00:00:00.000Z"));
+    await retryPaymentRecovery(env);
+    assert.equal(stripeCalls(), before);
+    assert.ok(mine().every((row) => row.payment_status === "free"));
+    const receipts = (await (await call("/admin/receipts?month=2026-09", { method: "GET", user: "teacher" })).json()).receipts;
+    assert.ok(!receipts.some((line) => line.studentEmail === `${user}@example.invalid`), "not Paid by hand, not owed");
+
+    // A higher price is for lessons booked from now on; those already free stay free.
+    const raised = await price({ 60: 2000 });
+    assert.equal((await raised.json()).stayFree, mine().filter((row) => row.status === "confirmed").length);
+    assert.ok(mine().every((row) => row.payment_status === "free" && row.amount_cents === 0));
+    // Clear of the hourly booking bound, so only the price decides.
+    db.prepare("UPDATE bookings SET created_at='2026-09-01T00:00:00.000Z' WHERE student_id=?").run(user);
+    db.prepare("UPDATE booking_series SET created_at='2026-09-01T00:00:00.000Z' WHERE student_id=?").run(user);
+    assert.equal((await call("/bookings", { user, body: { lessonType: "single", startAt: "2026-09-29T09:00:00.000Z" } })).status, 400, "the card agreement is back");
+    const free60 = mine().find((row) => row.lesson_type_id === "single" && row.starts_at > "2026-09-10" && !row.series_id);
+    const lengthened = await call(`/bookings/${await token(free60.id)}/reschedule`, { user: null, body: { startAt: free60.starts_at, lessonType: "long", expectedPriceCents: 3000 } });
+    assert.equal(lengthened.status, 409, "a free lesson never turns into a priced one");
+    // Her open run's next week is born on the new price, on the card she has.
+    const run = db.prepare("SELECT series_id FROM bookings WHERE student_id=? AND added_by_teacher=1 AND series_id IS NOT NULL LIMIT 1").get(user).series_id;
+    // Its last two weeks taken back; the earlier is inside the twelve-week horizon.
+    const [, last] = db.prepare("SELECT id, starts_at FROM bookings WHERE series_id=? ORDER BY starts_at DESC LIMIT 2").all(run);
+    db.prepare("DELETE FROM bookings WHERE series_id=? AND starts_at>=?").run(run, last.starts_at);
+    const filledTo = db.prepare("SELECT filled_to FROM booking_series WHERE id=?").get(run).filled_to;
+    db.prepare("UPDATE booking_series SET filled_to=? WHERE id=?").run(new Date(Date.parse(`${filledTo}T00:00:00Z`) - 14 * 86400000).toISOString().slice(0, 10), run);
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.parse("2026-09-06T03:10:00.000Z") }, env, ctx);
+    await drain();
+    const regrown = db.prepare("SELECT payment_status, amount_cents FROM bookings WHERE series_id=? AND starts_at=?").get(run, last.starts_at);
+    assert.deepEqual({ ...regrown }, { payment_status: "scheduled", amount_cents: 2000 });
+  } finally {
+    db.exec("DELETE FROM bookings; DELETE FROM booking_series;");
+    db.prepare("DELETE FROM student_recurring_rates WHERE student_id=?").run(user);
+  }
+});
 await test("her receipts list each amount paid or due for a month's lessons, with the NIF to issue to", async () => {
   await enrol("receipts");
   db.prepare("UPDATE students SET nif = '123456789', name = 'Rita Receipts' WHERE id = 'receipts'").run();

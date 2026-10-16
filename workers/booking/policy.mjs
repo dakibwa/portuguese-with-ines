@@ -49,6 +49,9 @@ export function isLateChange(row, now = new Date(), noticeHours = DEFAULT_MINIMU
 export function changePolicy(row, now = new Date(), noticeHours = DEFAULT_MINIMUM_NOTICE_HOURS) {
   const paid = row.payment_status === "paid";
   const scheduled = row.payment_status === "scheduled" || row.payment_status === "processing";
+  // A free lesson has nothing to take a fee from and no card behind it
+  // (16 October 2026): it can change as late as any other, with no fee.
+  const free = row.payment_status === "free";
   const late = isLateChange(row, now, noticeHours);
 
   return {
@@ -58,7 +61,7 @@ export function changePolicy(row, now = new Date(), noticeHours = DEFAULT_MINIMU
     // A saved-card lesson can still move or cancel inside the window: that
     // action is what triggers the EUR 5 charge. Older already-paid lessons
     // retain their lock instead. Inês herself never consults this policy.
-    feeApplies: !paid && late,
+    feeApplies: !paid && !free && late,
     locked: paid && late,
     // Only money actually taken comes back.
     refundOnCancel: paid && !late
@@ -97,6 +100,8 @@ export function lessonTypeChangeProblem(row, currentLessonType, nextLessonType) 
   }
 
   if (row.payment_status === "not_required" || row.payment_status === "scheduled") return "";
+  // Allowed only onto another free length; the caller knows the new price.
+  if (row.payment_status === "free") return "";
   if (row.payment_status === "paid") {
     return "This lesson is already paid. To change its length, cancel it for a refund and book the other length.";
   }

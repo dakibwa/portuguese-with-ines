@@ -47,7 +47,7 @@ Inês on /schedule                     (her own account, role=teacher)
   → POST /admin/students                             set a student up (details, optional prices); nothing emailed
   → POST /admin/students/:id/details                 their name, email, phone, NIF and splat; email only
                                                      until they first sign in
-  → POST /admin/students/:id/prices                  her price for a student per length; null is standard
+  → POST /admin/students/:id/prices                  her price for a student per length; null is standard, 0 is free
   → GET  /admin/receipts?month=YYYY-MM               every amount paid or due for a Porto month's lessons,
                                                      with the NIF to issue to (her Receipts tab and automation)
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
@@ -1617,7 +1617,7 @@ price of its own was set or redeemed, which always wins (`withDerived` in
 simply takes over). The trial keeps its own
 price and €5 fees never change. Inês sets it when she adds a student or later
 from their profile (`POST /admin/students/:id/prices`, `{ prices: { 60: cents
-| null, 90: cents | null } }`, €1–€100, null for the standard price again), and
+| null, 90: cents | null } }`, €1–€100 or 0 for free, null for the standard price again), and
 can change it at any time: her price replaces a code's. Their welcome email
 lists their price, so they are on it with no code to type.
 
@@ -1630,6 +1630,63 @@ lessons keep their amount. A lesson the student agreed to at checkout
 was to the amount it showed; a card saved from their account
 (`STUDENT_CARD_CONSENT_VERSION`) agreed to every lesson's price, so those
 follow either way. The reply says how many lessons moved.
+
+**Free lessons: a price of €0 (16 October 2026, Dan: "can Inês set a
+student's price to €0 so that student never needs to add a card?").** Before
+this, €0 was refused three times over (her form, `teacherRate`, and the rates
+table's `CHECK (amount_cents > 0)`), and nothing in booking asked whether a
+lesson cost anything: a €0 lesson would still have asked for the card
+agreement and a card, been charged €0 after it (Stripe refuses that, so it
+fell into `payment_due` and a recovery link retried every minute), shown in
+Receipts as `Paid by hand` once it happened, and been moved onto a card the
+day one was saved. Now:
+
+- Inês may type `0` for either length, here or when she adds a student.
+  Migration 0031 rebuilds `student_recurring_rates` with `CHECK (amount_cents
+  >= 0)`; until it is applied, saving €0 answers 503 (`Free lessons need a
+  database update first`) and changes nothing. A free 60 makes the 90 free
+  too, as 1.5 × 0, unless she gives the 90 a price of its own. Codes are never
+  free (`findRecurringCode` still requires €1 or more). The trial is never
+  per-student, so it keeps its standard price and its card step; it is only
+  for someone with no lesson yet, so a student she has added a lesson for
+  cannot book it.
+- A lesson born at €0 is stored as **`payment_status = 'free'`,
+  `amount_cents = 0`**, with no consent: a student's own booking (one lesson,
+  several dates or a weekly run), a lesson or weekly run Inês adds (card on
+  file or not), and every week a run adds while the price is €0. No existing
+  status was neutral: `not_required` is Receipts' `Paid by hand` and a card
+  saved later charges it; `recorded` is a past-only record nobody is told of.
+  `bookings.payment_status` has no CHECK constraint, so `free` needs no
+  migration.
+- Booking at €0 asks for no agreement and opens no card setup; the Worker
+  takes it even while Stripe is not ready or card payments are paused, and the
+  page does not block it either. Nothing reaches Stripe.
+- Nothing that charges, recovers, chases, reprices, issues receipts or moves
+  lessons onto or off a card names `free`, so it is never charged, sent a
+  payment link, marked paid by hand, listed in Receipts or counted among her
+  `paid by hand` lessons. It carries no late change or no-show fee
+  (`changePolicy` reports `feeApplies: false`; there is no card to take it
+  from), so emails and the reminder ask for the usual 14 hours' notice instead
+  of naming €5. It is a real lesson: the booking, calendar, Meet and day-before
+  reminder emails go as for any other, their price row reading `Free`.
+- Her welcome to a student free at both lengths asks for no card (`card:
+  false`, one step), lists `Your price · 60 minutes: Free`, and her setup
+  checklist drops its Card step. Their account hides the Card row unless a card
+  is already saved, and lists their prices as `Free`.
+- Setting a length to €0 makes their lessons still to come at that length free,
+  under the same rule as any lower price (nothing settled, no charge started,
+  not marked paid by hand); their agreement to pay is cleared from them.
+- **When the price rises again**, it is for lessons booked from then on.
+  Lessons already free stay free: they were booked, or agreed, with nothing to
+  pay, and a student with no card has nothing to charge. The reply says how
+  many stay free (`stayFree`), and her form says so. New bookings ask for the
+  card agreement again, and a weekly run's later weeks are born on the new
+  price under the run's own terms: on the card for a run whose student saved
+  one from their account, otherwise paid to her by hand (`not_required`), the
+  same as any lesson she adds for someone without a card.
+- A free lesson changes length only onto another free length; a priced length
+  is refused (409, cancel it and book that length instead). A priced lesson
+  moved onto a free length becomes free.
 
 
 
@@ -1849,6 +1906,11 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
   afterwards. Existing rows stay NULL; changes after release can appear in
   Needs you. The migration file was executed directly, without replaying the
   empty migration ledger.
+- **Migration 0031** (`workers/booking/migrations/0031-free-prices.sql`) is
+  written but not yet applied. It rebuilds `student_recurring_rates` so a
+  price may be €0, copying every row. Apply it by hand to staging, then
+  production D1, before or after the Worker: until then saving €0 is refused
+  and everything else works as before.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
 ## Google Calendar and Meet setup

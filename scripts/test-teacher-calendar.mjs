@@ -453,6 +453,7 @@ test("setup follows lessons before email and student steps, while completed step
   assert.deepEqual(new Set(tasks.map(item => item.key)), new Set(["welcome:far", "email:email", "lessons:lessons", "welcome:lessons", "welcome:welcome"]));
   assert.ok(tasks.every(item => setup.some(row => row.student.id === item.student.id && row.owner === "Yours")), "the tab count excludes waiting on them");
   assert.deepEqual(gettingStarted([student("cards-off", { awaitingWelcome: false, signedIn: true })], false), [], "cards switched off do not hold setup open");
+  assert.deepEqual(gettingStarted([student("free", { awaitingWelcome: false, signedIn: true, prices: { 60: 0, 90: 0 } })]), [], "a student free at every length has no card to add");
 
   const ready = (id, extra = {}) => student(id, { awaitingWelcome: false, signedIn: true, hasCard: true, ...extra });
   const workspaceStudents = [

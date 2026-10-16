@@ -59,6 +59,7 @@ import {
   formatBookedLessonLabel,
   formatLongDate,
   formatMoneyCents,
+  formatPriceCents,
   formatSlotTime,
   listLessonTypes,
   clockDiffersFromPorto,
@@ -99,6 +100,9 @@ const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const weekdayNames = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
 
 type Step = "day" | "time" | "details";
+
+/** A lesson at a price Inês set to €0 says so beside its length and place (16 October 2026). */
+const freeMark = (paymentStatus?: string) => (paymentStatus === "free" ? " · Free" : "");
 type BookingIntent = "choose" | "book" | "lessons";
 type BookingKind = "" | "trial" | "once" | "recurring";
 /** One selected week, or the paged view of four weeks at a time. */
@@ -1143,7 +1147,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     [studentClockDiffers]
   );
   const canChangeManagedDuration =
-    managedDurationChoices.length > 1 && ["not_required", "scheduled"].includes(managedPaymentStatus);
+    managedDurationChoices.length > 1 && ["not_required", "scheduled", "free"].includes(managedPaymentStatus);
 
   const applyAccount = useCallback((data: Awaited<ReturnType<typeof fetchMe>>) => {
     setLoadedAccount(data);
@@ -1913,14 +1917,17 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   useEffect(() => { setPaymentConsent(false); }, [choiceKey, lessonType?.id, lessonType?.price_cents, form.location, form.repeat]);
 
-  const needsPaymentConsent = postpay;
+  // A lesson at a price Inês set to €0 asks for no card and no agreement to pay.
+  const freeLesson = lessonType?.price_cents === 0;
+  const needsPaymentConsent = postpay && !freeLesson;
   const canSubmit =
     Boolean(chosen && lessonType && student) &&
     !submitting &&
     (lessonType?.id === "trial" || ratesReady) &&
     !previewing &&
     !loadingSlots &&
-    !paymentConfigurationError &&
+    // Paused card payments never stand in the way of a free lesson.
+    (freeLesson || !paymentConfigurationError) &&
     (!needsPaymentConsent || paymentConsent);
 
   useEffect(() => {
@@ -2780,7 +2787,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         <h2 id="lesson-manage-heading">Manage this lesson</h2>
         <div className="lesson-manage-dialog__lesson">
           <strong className="lesson-when"><span>{formatLongDate(preview.startAt, zoneOf(preview))}</span><span className="visually-hidden">, </span><span className="lesson-when__time">{lessonTime(preview.startAt, zoneOf(preview))}</span></strong>
-          <span>{formatBookedLessonLabel(preview.lessonType)} · {preview.location === "porto" ? "In Porto" : "Online"}</span>
+          <span>{formatBookedLessonLabel(preview.lessonType)} · {preview.location === "porto" ? "In Porto" : "Online"}{freeMark(preview.paymentStatus)}</span>
           {manageMode === "view" ? <MeetingLink meetingUrl={preview.meetingUrl} location={preview.location} status={preview.status} /> : null}
         </div>
         {preview.changeLocked && preview.status === "confirmed" ? (
@@ -2948,14 +2955,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 <span aria-hidden="true" className="segmented__thumb" />
                 <label className="is-active">
                   <input
-                    aria-label={`${formatLessonDuration(lessonType.duration_minutes)} lesson · ${formatMoneyCents(lessonType.price_cents)}`}
+                    aria-label={`${formatLessonDuration(lessonType.duration_minutes)} lesson · ${formatPriceCents(lessonType.price_cents)}`}
                     checked
                     name="booking-duration"
                     readOnly
                     type="radio"
                     value={lessonType.id}
                   />
-                  {lessonType.duration_minutes} mins · {formatMoneyCents(lessonType.price_cents)}
+                  {lessonType.duration_minutes} mins · {formatPriceCents(lessonType.price_cents)}
                 </label>
               </div>
             </fieldset>
@@ -2971,14 +2978,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   return (
                     <label className={lessonTypeId === type.id ? "is-active" : ""} key={type.id}>
                       <input
-                        aria-label={`${formatLessonDuration(type.duration_minutes)} lesson · ${formatMoneyCents(price)}`}
+                        aria-label={`${formatLessonDuration(type.duration_minutes)} lesson · ${formatPriceCents(price)}`}
                         checked={lessonTypeId === type.id}
                         name="booking-duration"
                         onChange={() => chooseLessonLength(type.id)}
                         type="radio"
                         value={type.id}
                       />
-                      {type.duration_minutes} mins · {formatMoneyCents(price)}
+                      {type.duration_minutes} mins · {formatPriceCents(price)}
                     </label>
                   );
                 })}
@@ -3183,8 +3190,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             </dl>
             {/* The fee rule as the confirm step's dabs, said once. */}
             <ul className="booking-payment-facts booking-success__note">
-              <li>Free to change or cancel until {NOTICE_HOURS} hours before</li>
-              <li><strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> after that</li>
+              {lessonType?.price_cents === 0 ? (
+                <li>Please give Inês {NOTICE_HOURS} hours&rsquo; notice to move or cancel</li>
+              ) : (
+                <>
+                  <li>Free to change or cancel until {NOTICE_HOURS} hours before</li>
+                  <li><strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> after that</li>
+                </>
+              )}
             </ul>
           </div>
         </section>
@@ -3255,7 +3268,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           lessons={(bookingsByDate[bookingPromptDate] ?? []).map((booking) => ({
             key: booking.reference,
             title: lessonTime(booking.startAt, zoneOf(booking)),
-            detail: `${formatBookedLessonLabel(booking.lessonType)} · ${booking.location === "porto" ? "In Porto" : "Online"}${isWeeklyLesson(booking) ? " · Weekly" : ""}`,
+            detail: `${formatBookedLessonLabel(booking.lessonType)} · ${booking.location === "porto" ? "In Porto" : "Online"}${isWeeklyLesson(booking) ? " · Weekly" : ""}${freeMark(booking.paymentStatus)}`,
             mark: (
               <LessonMark
                 className="lesson-calendar__mark"
@@ -3410,7 +3423,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
                   <div className="lesson-manage-dialog__lesson">
                     <strong className="lesson-when"><span>{formatLongDate(managed.booking.startAt, zoneOf(managed.booking))}</span><span className="visually-hidden">, </span><span className="lesson-when__time">{lessonTime(managed.booking.startAt, zoneOf(managed.booking))}</span></strong>
-                    <span>{formatBookedLessonLabel(managed.booking.lessonType)} · {managed.booking.location === "porto" ? "In Porto" : "Online"}</span>
+                    <span>{formatBookedLessonLabel(managed.booking.lessonType)} · {managed.booking.location === "porto" ? "In Porto" : "Online"}{freeMark(managed.booking.paymentStatus)}</span>
                     {/* Joining belongs to the lesson itself, not to a decision about it. */}
                     {manageMode === "view" ? (
                       <MeetingLink meetingUrl={managed.booking.meetingUrl} location={managed.booking.location} status={managed.booking.status} />
@@ -3821,7 +3834,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         />
                       </strong>
                       <span>
-                        {formatBookedLessonLabel(nextLesson.lessonType)} · {nextLesson.location === "porto" ? "In Porto" : "Online"}
+                        {formatBookedLessonLabel(nextLesson.lessonType)} · {nextLesson.location === "porto" ? "In Porto" : "Online"}{freeMark(nextLesson.paymentStatus)}
                         {isWeeklyLesson(nextLesson) ? " · Weekly" : ""}
                       </span>
                     </button>
@@ -4069,7 +4082,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                                 ) : null}
                                 <strong>{formatLongDate(booking.startAt, zoneOf(booking))}, {lessonTime(booking.startAt, zoneOf(booking))}</strong>
                                 <span>
-                                  {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}
+                                  {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}{freeMark(booking.paymentStatus)}
                                   {isWeeklyLesson(booking) ? " · Weekly" : ""}
                                 </span>
                               </span>
@@ -4149,7 +4162,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           key={type.id}
                         >
                           <input
-                            aria-label={`${type.duration_minutes} minutes · ${formatMoneyCents(managedPriceOf(type))}`}
+                            aria-label={`${type.duration_minutes} minutes · ${formatPriceCents(managedPriceOf(type))}`}
                             checked={managedLessonTypeId === type.id}
                             disabled={manageWorking}
                             name="managed-lesson-duration"
@@ -4169,7 +4182,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           />
                           {/* The price rides in the choice rather than on a
                               line of its own (13 October 2026, Dan). */}
-                          {type.duration_minutes} mins · {formatMoneyCents(managedPriceOf(type))}
+                          {type.duration_minutes} mins · {formatPriceCents(managedPriceOf(type))}
                         </label>
                       ))}
                     </div>
@@ -4341,7 +4354,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           </span>
                           <strong>{formatTimeIn(booking.startAt, zoneOf(booking))}</strong>
                           <span>
-                            {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}
+                            {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}{freeMark(booking.paymentStatus)}
                           </span>
                         </span>
                         <ChevronRight aria-hidden="true" size={20} />
@@ -4495,7 +4508,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           </div>
                         ) : null}
 
-                        {paymentConfigurationError ? (
+                        {paymentConfigurationError && !freeLesson ? (
                           <div className="booking-alert" role="alert">
                             <AlertCircle size={18} aria-hidden="true" />
                             <p>{paymentConfigurationError}</p>
@@ -4506,7 +4519,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             splat, so each fee reads at a glance. It also describes
                             the agreement control. */}
                         <ul className="booking-payment-facts" id="booking-payment-summary">
-                          {postpay ? (
+                          {freeLesson ? (
+                            <>
+                              <li>Free, with nothing to pay and no card needed</li>
+                              <li>Please give Inês {NOTICE_HOURS} hours&rsquo; notice to move or cancel</li>
+                            </>
+                          ) : postpay ? (
                             <>
                               <li>No payment is taken now</li>
                               <li>Your card is charged after each lesson</li>
@@ -4563,11 +4581,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         <button className="button button--coral booking-confirm-button" disabled={!canSubmit} type="submit">
                           {submitting
                             ? "Booking…"
-                            : form.repeat === "once"
-                              ? bookingChoices.length > 1 ? `Book ${bookingChoices.length} lessons & agree to pay` : "Book lesson & agree to pay"
+                            : `${form.repeat === "once"
+                              ? bookingChoices.length > 1 ? `Book ${bookingChoices.length} lessons` : "Book lesson"
                               : seriesPreview
-                                ? `Book ${seriesPreview.bookable.length === 1 ? "lesson" : `${seriesPreview.bookable.length} lessons`} & agree to pay`
-                                : "Book lessons & agree to pay"}
+                                ? `Book ${seriesPreview.bookable.length === 1 ? "lesson" : `${seriesPreview.bookable.length} lessons`}`
+                                : "Book lessons"}${freeLesson ? "" : " & agree to pay"}`}
                         </button>
                       </div>
                     </div>
