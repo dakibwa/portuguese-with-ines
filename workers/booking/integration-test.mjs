@@ -2465,6 +2465,41 @@ await test("she sets a student up and adds their lessons without emailing them, 
     forgetStudent("quiet@example.invalid");
   }
 });
+await test("she welcomes a student with no lessons: they are asked to book their next one, and a free one is asked for no card", async () => {
+  captureEmail();
+  const welcomeOf = async (email, prices) => {
+    const created = await call("/admin/students", { user: "teacher", body: { email, name: "Rita Sousa", prices } });
+    assert.equal(created.status, 201, await created.clone().text());
+    const { student } = await created.json();
+    assert.equal(student.hasLessons, false);
+    const sent = await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: { onlyIfWaiting: true } });
+    assert.equal(sent.status, 200, await sent.clone().text());
+    await drain();
+    const emails = sentEmails.filter((entry) => entry.to[0] === email);
+    assert.equal(emails.length, 1, "her press sends one welcome, and nothing else");
+    return { reply: await sent.json(), email: emails[0] };
+  };
+  try {
+    const priced = await welcomeOf("booker@example.invalid", { 60: 2500 });
+    assert.equal(priced.email.subject, "Book your next lesson with Inês");
+    assert.ok(priced.email.text.includes("choose a time for your next lesson"), priced.email.text);
+    assert.ok(priced.email.text.includes("Choose a day and time for your next lesson."));
+    assert.ok(!/Lesson · |Weekly · |And more/.test(priced.email.text), "no lesson list");
+    assert.ok(priced.email.text.includes("€25 a lesson"), "their own price still shows");
+    assert.equal(priced.email.text.includes("Add your card."), priced.reply.card, "a card is asked for only when one is taken");
+
+    const free = await welcomeOf("free-booker@example.invalid", { 60: 0 });
+    assert.equal(free.reply.card, false);
+    assert.equal(free.email.subject, "Book your next lesson with Inês");
+    assert.ok(free.email.text.includes("no card to add and nothing to pay"));
+    assert.ok(!/add your card|add card/i.test(free.email.text), "no card step");
+    assert.ok(free.email.text.includes("Sign in and book"));
+  } finally {
+    releaseEmail();
+    forgetStudent("booker@example.invalid");
+    forgetStudent("free-booker@example.invalid");
+  }
+});
 await test("she can set a student up from a name alone and give their email later, until they sign in", async () => {
   captureEmail();
   const to = (email) => sentEmails.filter((sent) => sent.to[0] === email);
@@ -3102,7 +3137,9 @@ await test("her student list says who is in and who has a card, and she can send
     assert.equal(sent.status, 200, await sent.clone().text());
     assert.equal((await sent.json()).card, true);
     const [mail] = sentEmails.filter((entry) => entry.to[0] === "alice@example.invalid");
-    assert.equal(mail.subject, "Your lessons with Inês: add your card");
+    // With no lesson to come, they are asked to book one, card first.
+    assert.equal(mail.subject, "Book your next lesson with Inês");
+    assert.ok(["Three quick steps", "2. Add your card.", "Sign in and add card"].every((line) => mail.text.includes(line)), mail.text);
     assert.ok(signInLinkIn(mail));
     assert.equal((await call("/admin/students/alice/welcome", { user: "teacher" })).status, 200);
     assert.equal((await call("/admin/students/alice/welcome", { user: "teacher" })).status, 200);

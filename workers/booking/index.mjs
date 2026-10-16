@@ -1312,7 +1312,12 @@ async function issueWelcome(env, settings, student, { always = false } = {}) {
  * The way in, as numbered steps right above the button that takes it. With
  * no card to add there is one step, and the button says it on its own.
  */
-function welcomeSteps(welcome) {
+function welcomeSteps(welcome, { book = false } = {}) {
+  // With no lesson yet, the last step is theirs: choosing one (16 October 2026, Inês).
+  if (book) {
+    const items = ["Press the button below to sign in.", ...(welcome.card ? ["Add your card."] : []), "Choose a day and time for your next lesson."];
+    return { title: items.length === 3 ? "Three quick steps" : "Two quick steps", items };
+  }
   return welcome.card
     ? { title: "Two quick steps", items: ["Press the button below to sign in.", "Add your card. That’s it."] }
     : null;
@@ -1412,8 +1417,8 @@ function welcomeNote(welcome) {
   return welcome?.card ? ", with a link to sign in and add their card" : welcome ? ", with a link to sign in" : "";
 }
 
-function welcomeAction(welcome) {
-  return { label: welcome.card ? "Sign in and add card" : "Sign in, no password needed", url: welcome.url };
+function welcomeAction(welcome, { book = false } = {}) {
+  return { label: welcome.card ? "Sign in and add card" : book ? "Sign in and book" : "Sign in, no password needed", url: welcome.url };
 }
 
 const WELCOME_FOOTER = ["The button lasts 14 days.", "Later, press Sign in on the website, then “Email me a sign-in link”."];
@@ -1533,13 +1538,17 @@ async function welcomeLessons(env, studentId) {
 /**
  * Her welcome, sent from her list of students: their lessons so far and
  * prices, each on its own clock, and the one-click way in. For someone she set
- * up it is the first email the site sends them (13 October 2026, Dan).
+ * up it is the first email the site sends them (13 October 2026, Dan). With
+ * no lesson to come it invites them to book their next one instead, with no
+ * lesson list (16 October 2026, Inês). A student free at every length is told
+ * there is no card and nothing to pay.
  */
 async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
   // Never to a placeholder: there is no one to send it to until she gives their address.
   if (isNoEmailYet(student.email)) return { ok: false, error: "no-email-yet" };
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
   const first = student.name.split(" ")[0];
+  const book = lessons.length === 0;
   const rows = welcomeLessonLines(student, lessons);
   // Already on the price Inês agreed with them, with no code to type
   // (13 October 2026, Dan).
@@ -1548,22 +1557,25 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
     label: `Your price · ${minutes} minutes`,
     value: prices[minutes] === 0 ? FREE_LABEL : `${formatEuros(prices[minutes])} a lesson`
   })));
+  const free = prices[60] === 0 && prices[90] === 0;
   return deliver(env, {
     to: student.email,
-    subject: welcome.card ? "Your lessons with Inês: add your card" : "Your lessons with Inês, in one place",
+    subject: book
+      ? "Book your next lesson with Inês"
+      : welcome.card ? "Your lessons with Inês: add your card" : "Your lessons with Inês, in one place",
     kind: "student_welcome",
     dedupeKey: `welcome:${welcome.nonce}`,
     replyTo: settings.replyToEmail || teacherEmail || undefined,
     content: {
-      heading: "Your lessons, in one place",
-      preheader: "Sign in with one click, no password needed.",
-      intro: rows.length
-        ? `Olá ${first}, Inês has set up your lessons on her website. Here they are; sign in to see or change them.`
-        : `Olá ${first}, your lessons with Inês are now on her website, where you can see and change them.`,
-      callout: "",
+      heading: book ? "Book your next lesson" : "Your lessons, in one place",
+      preheader: book ? "Sign in with one click, then choose a time." : "Sign in with one click, no password needed.",
+      intro: book
+        ? `Olá ${first}, Inês has set you up on her website. Sign in with one click, no password needed, and choose a time for your next lesson.`
+        : `Olá ${first}, Inês has set up your lessons on her website. Here they are; sign in to see or change them.`,
+      callout: free ? "Your lessons with Inês are free: there’s no card to add and nothing to pay." : "",
       rows,
-      steps: welcomeSteps(welcome),
-      action: welcomeAction(welcome),
+      steps: welcomeSteps(welcome, { book }),
+      action: welcomeAction(welcome, { book }),
       footer: WELCOME_FOOTER
     }
   });
