@@ -33,6 +33,10 @@ export type AdminStudent = {
   /** The prices set for them (by her or a code), which is what she edits. */
   ownPrices?: Partial<Record<60 | 90, number>>;
   homeworkToReview?: { bookingId: string; submittedAt: string }[];
+  /** Saved-card charges that were declined and are still to pay; the student has a secure payment link. */
+  cardDeclined?: { bookingId: string; reference: string; startsAt: string; amountCents: number | null; part: "lesson" | "no-show" | "fee" }[];
+  /** A card added in the last week, and the lessons she added that it now pays for. */
+  cardAdded?: { at: string; lessons: { bookingId: string; startsAt: string }[] } | null;
 };
 
 /** A length mapped to cents, or to null for the standard price again. */

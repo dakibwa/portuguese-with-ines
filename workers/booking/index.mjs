@@ -1264,6 +1264,9 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
 }
 
 /** Her students at a glance: who is in, who has a card, what comes next. */
+/** How long her Needs you shows that a student has just added a card. */
+const CARD_ADDED_NOTICE_DAYS = 7;
+
 async function teacherStudentList(env) {
   const now = new Date().toISOString();
   const { results } = await env.DB.prepare(
@@ -1286,6 +1289,37 @@ async function teacherStudentList(env) {
   )
     .bind(now, now)
     .all();
+  /*
+   * Two things that used to be emails to her and are now cards in Needs you
+   * (16 October 2026, Dan): a saved card that was declined, until it is paid,
+   * and a card just added, for a week, with the lessons she added that it now
+   * pays for, so one already paid by hand can be taken off it.
+   */
+  const { results: declinedRows } = await env.DB.prepare(
+    `SELECT id, student_id, reference, starts_at, attendance_status, payment_status, same_day_fee_status,
+       COALESCE(charged_cents, amount_cents) AS lesson_cents, same_day_fee_cents
+     FROM bookings WHERE student_id IS NOT NULL AND (payment_status = 'payment_due' OR same_day_fee_status = 'payment_due')
+     ORDER BY starts_at`
+  ).all();
+  const declined = {};
+  for (const row of declinedRows ?? []) {
+    const list = (declined[row.student_id] ??= []);
+    if (row.payment_status === "payment_due") {
+      list.push({ bookingId: row.id, reference: row.reference, startsAt: row.starts_at, amountCents: row.lesson_cents ?? null,
+        part: row.attendance_status === "no_show" ? "no-show" : "lesson" });
+    }
+    if (row.same_day_fee_status === "payment_due") {
+      list.push({ bookingId: row.id, reference: row.reference, startsAt: row.starts_at, amountCents: row.same_day_fee_cents ?? null, part: "fee" });
+    }
+  }
+  const noticeFrom = new Date(Date.now() - CARD_ADDED_NOTICE_DAYS * 86400000).toISOString();
+  const { results: onCardRows } = await env.DB.prepare(
+    `SELECT b.id, b.student_id, b.starts_at FROM bookings b JOIN students s ON s.id = b.student_id
+     WHERE s.card_consent_at > ? AND b.added_by_teacher = 1 AND b.status = 'confirmed' AND b.payment_status = 'scheduled'
+       AND b.payment_consent_at = s.card_consent_at AND b.starts_at > ? ORDER BY b.starts_at`
+  ).bind(noticeFrom, now).all();
+  const onCard = {};
+  for (const row of onCardRows ?? []) (onCard[row.student_id] ??= []).push({ bookingId: row.id, startsAt: row.starts_at });
   const { results: rates } = await env.DB.prepare("SELECT student_id, duration_minutes, amount_cents FROM student_recurring_rates").all();
   const own = {};
   for (const rate of rates ?? []) (own[rate.student_id] ??= {})[rate.duration_minutes] = rate.amount_cents;
@@ -1307,7 +1341,11 @@ async function teacherStudentList(env) {
     // What they pay, a 90-minute price derived from a 60-minute one included,
     // and the prices set for them, which is what she edits.
     prices: withDerived(own[row.id] ?? {}),
-    ownPrices: own[row.id] ?? {}
+    ownPrices: own[row.id] ?? {},
+    cardDeclined: declined[row.id] ?? [],
+    cardAdded: row.has_card && row.card_consent_at && row.card_consent_at > noticeFrom
+      ? { at: row.card_consent_at, lessons: (onCard[row.id] ?? []).slice(0, 30) }
+      : null
   }));
 }
 

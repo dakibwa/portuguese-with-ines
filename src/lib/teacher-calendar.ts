@@ -410,7 +410,11 @@ export type NeedsYouItem =
   | { kind: "welcome"; key: string; student: AdminStudent; at?: string | null }
   | { kind: "changed"; key: string; booking: AdminBooking; count: number; first: boolean }
   | { kind: "cancelled"; key: string; booking: AdminBooking; count: number }
-  | { kind: "first"; key: string; booking: AdminBooking };
+  | { kind: "first"; key: string; booking: AdminBooking }
+  /** A saved card was declined; clears once the student pays (16 October 2026: no longer emailed to her). */
+  | { kind: "declined"; key: string; student: AdminStudent; payment: NonNullable<AdminStudent["cardDeclined"]>[number] }
+  /** A student added a card in the last week; lists the lessons she added that it now pays for. */
+  | { kind: "card"; key: string; student: AdminStudent; added: NonNullable<AdminStudent["cardAdded"]> };
 
 /** Students she set up with no email hold this in place of one; nothing is ever shown or sent to it. */
 const NO_EMAIL_YET = "no-email:";
@@ -497,7 +501,8 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
     // These are the row's setup steps, rather than duplicate task cards.
     if (item.kind === "email" || item.kind === "lessons" || item.kind === "welcome") continue;
     const booking = item.kind === "payment" ? byBooking.get(item.review.id) : "booking" in item ? item.booking : undefined;
-    const row = booking && (booking.student_id ? byId.get(booking.student_id) : byEmail.get(realEmail(booking.student_email)));
+    const row = "student" in item ? byId.get(item.student.id)
+      : booking && (booking.student_id ? byId.get(booking.student_id) : byEmail.get(realEmail(booking.student_email)));
     if (row) row.items.push(item);
     else general.push(item);
   }
@@ -507,11 +512,11 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
     return Number.isFinite(time) ? time : fallback;
   };
   const priority = (row: StudentWorkspaceRow) => {
-    if (row.items.some(item => item.kind === "payment")) return 0;
+    if (row.items.some(item => item.kind === "payment" || item.kind === "declined")) return 0;
     if (row.items.some(item => item.kind === "changed" || item.kind === "cancelled")) return 1;
     if (row.student.homeworkToReview?.length) return 1.5;
     if (row.setup?.owner === "Yours") return 2;
-    if (row.items.some(item => item.kind === "first")) return 3;
+    if (row.items.some(item => item.kind === "first" || item.kind === "card")) return 3;
     return row.setup ? 4 : 5;
   };
   const latestChange = (row: StudentWorkspaceRow) => Math.max(0, ...row.items.map(item =>
@@ -575,6 +580,10 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
     const part = review.payment_status === "processing" ? "lesson" : review.same_day_fee_status === "processing" ? "fee" : "refund";
     first.push({ kind: "payment", key: `payment:${review.id}`, review, part });
   }
+  for (const student of students) {
+    for (const payment of student.cardDeclined ?? [])
+      first.push({ kind: "declined", key: `declined:${payment.bookingId}:${payment.part}`, student, payment });
+  }
 
   const timed: { time: number; changed: number; item: NeedsYouItem }[] = [];
   for (const student of students) {
@@ -586,6 +595,8 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
       timed.push({ time, changed: 0, item: { kind: "welcome", key: `welcome:${student.id}`, student, at: student.nextLessonAt } });
     if (!hasLessons(student))
       timed.push({ time, changed: 0, item: { kind: "lessons", key: `lessons:${student.id}`, student } });
+    if (student.cardAdded && student.hasCard)
+      timed.push({ time, changed: Date.parse(student.cardAdded.at) || 0, item: { kind: "card", key: `card:${student.id}`, student, added: student.cardAdded } });
   }
 
   const confirmed = lessons.filter((row) => row.status === "confirmed" && real(row));

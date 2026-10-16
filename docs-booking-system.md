@@ -599,8 +599,13 @@ older-by-email check in `first_lesson` is written `+legacy.status` so SQLite
 stays on `idx_bookings_student`; without the plus it scans every earlier
 booking for each row returned. A lesson appears
 once. The internal `no-email:` placeholder never appears; their email reads
-as empty and the action opens their details, never sends. Declined
-cards stay with the student and in Receipts. Nothing is dismissed: items clear
+as empty and the action opens their details, never sends. Two notices that
+used to be emails to her (16 October 2026, Dan) come from `GET /admin/students`:
+`cardDeclined` (each saved-card lesson payment, no-show fee or late change fee
+still `payment_due`, listed with the payments until it is paid, `Open` going to
+the student) and `cardAdded` (for `CARD_ADDED_NOTICE_DAYS`, 7, after a card is
+saved: the lessons she added that it now pays for, so one already paid by hand
+can be ticked `Already paid`). Declined cards also stay in Receipts. Nothing is dismissed: items clear
 when done, after 72 hours, or once the lesson begins; the windows are
 `NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. `studentWorkspace()` groups operational notices by student ID, or an
 unambiguous real email for legacy bookings. Payments match through their
@@ -966,8 +971,9 @@ lessons, so its cancellation set includes every occurrence committed first.
   occurrence becomes `scheduled`. The minute cron charges an occurrence
   only once its no-show window has closed, six hours after `ends_at` (see
   *The no-show policy*). Open-ended top-ups inherit the same consent
-  and scheduled state. A declined charge marks the row `payment_due`, emails
-  the student a hosted pay-now link, and tells Inês.
+  and scheduled state. A declined charge marks the row `payment_due` and emails
+  the student a hosted pay-now link; Inês sees it as a Needs you card until it
+  is paid (16 October 2026: no longer emailed to her).
 
 ### Changing your name or email
 
@@ -1098,7 +1104,7 @@ lessons, so its cancellation set includes every occurrence committed first.
   `id` it has issued. The rules live in `workers/booking/receipts.mjs`.
 - **Where it appears.** Inês's fatura-recibo automation reads her booking
   emails and schedule, so every email she gets about a student's lessons
-  (bookings, weekly runs, moves, cancellations, declined cards and payments)
+  (bookings, weekly runs, moves, cancellations and payments)
   carries a `NIF` row beside the student, with the number or
   `Not given (consumidor final)`, read when the email is sent. Her Receipts
   tab and her student profiles state it the same way; her lesson details are
@@ -1164,6 +1170,24 @@ different students were confirmed into the same lesson in testing.
 
 ### Notes on the email and calendar output
 
+- **Sixteen templates.** `workers/booking/email-templates.mjs` owns every
+  email's words and structure; callers pass formatted facts. Student booked
+  (one lesson or a run, by them or by Inês, with or without her welcome
+  steps), Inês's booked copy (including a run carried forward), reminder and
+  Meet link, student and teacher moved, student and teacher cancelled, the
+  student's receipt (lesson, no-show or late change fee), Inês's payment
+  received, the student's declined card, welcome, sign-in link, password
+  reset, email-change confirmation and notice, and homework to review.
+  Subjects, and the subject, heading and preheader of her payment emails, are
+  unchanged because her filters and receipt automation read them.
+  `node scripts/render-email-previews-v2.mjs [dir]` writes every variant as
+  HTML and text with a manifest of the old emails each covers.
+- **Dark mode and phones.** The layout declares `color-scheme: light dark`
+  and carries one `<style>` block: `prefers-color-scheme: dark` (and
+  Outlook.com's `[data-ogsc]`) recolours the page, card, panels, text and
+  amounts; under 480px margins tighten and the button fills the width. Inline
+  styles alone still give the full light design, and every text has an
+  explicit colour so a client that inverts backgrounds cannot leave it unreadable.
 - Customer emails use short introductions and one action button. HTML keeps
   the complete action link in that button; the plain-text alternative includes
   the URL. The price row carries payment timing and the footer keeps the

@@ -2,7 +2,7 @@
 
 import { type ReactNode } from "react";
 import type { AdminBooking, AdminStudent } from "@/lib/admin-api";
-import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
+import { formatBookedLessonLabel, formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel, type NeedsYouItem, type StudentSetup } from "@/lib/teacher-calendar";
 
 const SHOWN = 3;
@@ -104,6 +104,30 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
           Open in Stripe<span className="visually-hidden"> for {review.reference}</span>
         </a>
       );
+    } else if (item.kind === "declined") {
+      // Was an email to her until 16 October 2026; the student has their secure payment link.
+      const { student, payment } = item;
+      const what = payment.part === "fee" ? "late change fee" : payment.part === "no-show" ? "no-show fee" : "lesson payment";
+      who = `${student.name}’s card didn’t go through`;
+      detail = <>{facts(
+        payment.amountCents != null && `${formatMoneyCents(payment.amountCents)} ${what}`,
+        Number.isFinite(Date.parse(payment.startsAt)) && `lesson on ${day(payment.startsAt)}, ${formatSlotTime(payment.startsAt)}`,
+        "they’ve been sent a payment link",
+      )} · <span className="teacher-needs-you__keep">{payment.reference}</span></>;
+      action = <button className="button button--lilac button--compact" type="button" onClick={() => onStudent(student)}>
+        Open<span className="visually-hidden"> {student.name}</span>
+      </button>;
+    } else if (item.kind === "card") {
+      // Never charge twice (12 October 2026): a lesson already paid by hand comes off the card from its details.
+      const { student, added } = item;
+      const count = added.lessons.length;
+      who = `${student.name} added a card`;
+      detail = count
+        ? `${count} ${count === 1 ? "lesson" : "lessons"} you added ${count === 1 ? "is" : "are"} now charged after each one. Paid by hand? Open it and tick “Already paid”`
+        : "Lessons you add for them are now charged to their card after each one";
+      action = <button className="button button--lilac button--compact" type="button" onClick={() => onStudent(student)}>
+        {count ? "See lessons" : "Open"}<span className="visually-hidden"> for {student.name}</span>
+      </button>;
     } else if (item.kind === "email") {
       who = `${item.student.name} needs an email address`;
       detail = "Their welcome waits for their email";
