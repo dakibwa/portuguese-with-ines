@@ -9,7 +9,7 @@ import { StudentHistory } from "@/components/teacher/StudentHistory";
 import { StudentPrice } from "@/components/teacher/StudentPrice";
 import type { AdminStudent } from "@/lib/admin-api";
 import { dateKey, dateLabel, type StudentSetup, type StudentSetupStep } from "@/lib/teacher-calendar";
-import { formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
+import { formatPriceCents, formatSlotTime } from "@/lib/booking-api";
 import { defaultStudentMark } from "@/lib/student-marks";
 
 export type StudentPanel = StudentSetupStep | "history" | "details";
@@ -142,7 +142,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     ["details", "Details"], ["price", "Price"], ["lessons", "Add a lesson"], ["history", "Lesson history"],
   ] as const;
   const prices = ([60, 90] as const).filter(minutes => student.prices?.[minutes] !== undefined)
-    .map(minutes => `${minutes} mins · ${formatMoneyCents(student.prices![minutes]!)}`).join(", ");
+    .map(minutes => `${minutes} mins · ${formatPriceCents(student.prices![minutes]!)}`).join(", ");
 
   return <li ref={row} className={`teacher-setup teacher-setup--inline${ready ? " teacher-student teacher-student--inline is-ready" : ""}${step ? " is-open" : ""}`}>
     <div className="teacher-setup__header" ref={header} data-homework-exit>

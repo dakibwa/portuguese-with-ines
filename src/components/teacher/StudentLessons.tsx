@@ -1,6 +1,6 @@
 "use client";
 
-import { addedByTeacher, type AdminBooking } from "@/lib/admin-api";
+import { addedByTeacher, paidByHand, type AdminBooking } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { useEffect, useState } from "react";
@@ -8,6 +8,7 @@ import { BookOpen } from "lucide-react";
 import { TeacherHomework } from "@/components/homework/TeacherHomework";
 
 function paymentLabel(booking: AdminBooking) {
+  if (paidByHand(booking)) return "Paid by hand";
   switch (booking.payment_status) {
     case "paid": return "Paid";
     case "refunded": return "Refunded";
@@ -16,6 +17,7 @@ function paymentLabel(booking: AdminBooking) {
     case "scheduled": return "Payment scheduled";
     case "pending": return "Payment pending";
     case "recorded": return "Recorded";
+    case "free": return "Free";
     case "not_required": return addedByTeacher(booking) && booking.status !== "cancelled" ? "Payment arranged directly" : "No lesson charge";
     default: return "";
   }

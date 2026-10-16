@@ -21,12 +21,12 @@ try {
     const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce", timezoneId: "Europe/Lisbon" });
     const student = { id: "selection-preview", name: "Preview Student", email: "preview@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "student" };
     const requests = [];
-    let bookings = [], series = [], rejectNext = false;
+    let bookings = [], series = [], rejectNext = false, rates = { 60: 1500 };
     const json = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     await context.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-selection-fixture"));
     await context.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
-    await context.route("**/me", route => json(route, { student, bookings, series, sameDayFeeCents: 500 }));
-    await context.route("**/me/recurring-rates", route => json(route, { rates: { 60: 1500 } }));
+    await context.route("**/me", route => json(route, { student, bookings, series, sameDayFeeCents: 500, cardsAccepted: true }));
+    await context.route("**/me/recurring-rates", route => json(route, { rates }));
     await context.route("**/lesson-types", route => json(route, { lessonTypes: types, paymentMode: "postpay", postpay: true, paymentReady: true }));
     await context.route("**/availability?*", route => {
       const url = new URL(route.request().url());
@@ -64,12 +64,19 @@ try {
         endAt: new Date(Date.parse(addWeeks(start, i)) + type.duration_minutes * 60000).toISOString(),
         lessonType: { id: type.id, name: type.name, durationMinutes: type.duration_minutes, priceCents: body.expectedPriceCents },
         location: body.location, notes: "", studentName: student.name, studentEmail: student.email, studentTimezone: student.timezone,
-        paymentStatus: "scheduled", amountCents: body.expectedPriceCents, isPast: false,
+        paymentStatus: body.expectedPriceCents === 0 ? "free" : "scheduled", amountCents: body.expectedPriceCents, isPast: false,
         seriesId: repeating ? `series-${index}` : null, manageToken: `fixture-${index}-${i}`, sameDayFeeApplies: false
       }))).sort((a, b) => a.startAt.localeCompare(b.startAt));
       return json(route, { booking: bookings[0], selection: {
         booked: bookings.map(row => row.startAt), skipped: [], recurring: repeating, weeks: body.repeat ?? null, weeklyTimes: series.length
       } }, 201);
+    });
+    // A lesson's own details, as its manage link reads them.
+    await context.route("**/bookings/fixture-*", route => {
+      const booking = bookings.find(row => route.request().url().endsWith(row.manageToken));
+      return json(route, { booking: { ...booking, rescheduleCount: 0, sameDayFeeCents: 500, sameDayFeeAutomatic: false }, isPast: false,
+        sameDayFeeApplies: false, sameDayFeeAutomatic: false, changeLocked: false, refundOnCancel: false, recurring: false,
+        durationPrices: rates, paymentsDue: { lesson: null, sameDayFee: null } });
     });
     const page = await context.newPage();
     const errors = [];
@@ -189,6 +196,31 @@ try {
       assert.equal(await page.locator(`#lesson-calendar button[data-date-key="${day}"].has-weekly-booking`).count(), 1, `Weekly time on ${day} is marked`);
     }
     assert.equal(await page.locator(".unified-calendar__legend").getByText("Weekly lesson", { exact: true }).count(), 1);
+
+    // A student Inês made free (16 October 2026): no agreement, no card step.
+    rates = { 60: 0, 90: 0 }; bookings = []; series = [];
+    await start();
+    await page.locator(".booking-bar").getByText("60 mins · Free", { exact: true }).waitFor();
+    await choose("2026-09-14");
+    const freeBook = page.getByRole("button", { name: "Book lesson", exact: true });
+    assert.equal(await freeBook.isEnabled(), true, "Nothing to agree to");
+    assert.equal(await page.locator(".booking-agreement").count(), 0);
+    assert.match(await page.locator("#booking-payment-summary").innerText(), /nothing to pay and no card needed/);
+    await checkOverflow();
+    await page.screenshot({ path: `${out}/free-confirm-${width}.png` });
+    await freeBook.click();
+    await page.getByRole("heading", { name: "You’re booked in.", exact: true }).waitFor();
+    assert.equal(requests.at(-1).expectedPriceCents, 0);
+    assert.equal(requests.at(-1).paymentConsent, false);
+    await page.getByRole("button", { name: "Back to your lessons", exact: true }).click();
+    await page.locator("#upcoming-lessons-heading").waitFor();
+    // Its own dialog says it is free, beside its length and place.
+    await page.locator('#lesson-calendar button[data-date-key="2026-09-14"]').click();
+    const lessonDialog = page.getByRole("dialog");
+    await lessonDialog.getByRole("button", { name: "Change", exact: true }).waitFor();
+    await lessonDialog.getByText("60 mins · Online · Free", { exact: true }).waitFor();
+    assert.doesNotMatch(await lessonDialog.innerText(), /€|card/i, "Nothing about money on a free lesson");
+    await page.screenshot({ path: `${out}/free-lessons-${width}.png` });
     assert.deepEqual(errors, []);
     await context.close();
   }

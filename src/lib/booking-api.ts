@@ -42,7 +42,7 @@ export type Booking = {
   sameDayFeeCents: number;
   sameDayFeeAutomatic?: boolean;
   /** Automatic-payment states appear once Stripe is on; older bookings say 'not_required'. */
-  paymentStatus?: "not_required" | "pending" | "scheduled" | "processing" | "paid" | "payment_due" | "refunded" | "recorded";
+  paymentStatus?: "not_required" | "pending" | "scheduled" | "processing" | "paid" | "payment_due" | "refunded" | "recorded" | "free";
   amountCents?: number | null;
 };
 
@@ -634,6 +634,14 @@ export function portoTimeToUtc(dateKey: string, time: string, originalInstant?: 
 
 export function formatMoneyCents(cents: number) {
   return formatMoney(cents, "EUR");
+}
+
+/**
+ * A lesson's price as the site says it: "Free" for a price Inês set to €0
+ * (16 October 2026), never "€0".
+ */
+export function formatPriceCents(cents: number) {
+  return cents === 0 ? "Free" : formatMoneyCents(cents);
 }
 
 /**

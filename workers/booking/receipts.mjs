@@ -12,6 +12,7 @@
  */
 
 import { realEmail } from "./no-email.mjs";
+import { PAID_BY_HAND_MARK } from "./policy.mjs";
 
 const LESSON_STATES = {
   paid: "paid",
@@ -48,8 +49,15 @@ export function receiptLines(rows, now = new Date()) {
     const noShow = row.attendance_status === "no_show";
     let state = LESSON_STATES[row.payment_status] ?? null;
     let method = "card";
+    // Ticked "Already paid": the money is in, whether or not it has happened
+    // yet. A free lesson ('free') or an unticked record ('recorded') has no line.
+    const ticked = row.payment_consent_version === PAID_BY_HAND_MARK &&
+      (row.payment_status === "not_required" || row.payment_status === "recorded");
+    if (ticked && row.status === "confirmed") {
+      state = "paid";
+      method = "by hand";
     // Nothing on a card: a lesson that happened was paid to her by hand.
-    if (row.payment_status === "not_required" && row.status === "confirmed" && ended && !noShow) {
+    } else if (row.payment_status === "not_required" && row.status === "confirmed" && ended && !noShow) {
       state = "paid";
       method = "by hand";
     }

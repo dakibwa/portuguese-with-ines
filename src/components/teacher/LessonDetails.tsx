@@ -6,7 +6,8 @@ import {
   addedByTeacher,
   cancelBookingAs,
   rescheduleBookingAs,
-  markPaidByHand,
+  paidByHand,
+  setLessonPaid,
   setNoShow,
   type AdminBooking,
 } from "@/lib/admin-api";
@@ -20,6 +21,7 @@ import { restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 import { TeacherHomework } from "@/components/homework/TeacherHomework";
+import { PaidTick } from "@/components/teacher/PaidTick";
 
 type Props = {
   booking: AdminBooking;
@@ -69,18 +71,26 @@ export function LessonDetails({
     booking.payment_status === "processing" ||
     booking.same_day_fee_status === "processing";
   const minutes = Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60_000);
-  // Its price and how it is paid, one dab: "€25 · paid to you by hand". A
+  // Its price and how it is paid, one dab: "€25 · paid by card". A
   // cancelled lesson's money matters only if some moved.
-  const paid = {
-    paid: "paid",
+  const ticked = paidByHand(booking);
+  const paid = ticked ? "paid to you by hand" : {
+    paid: "paid by card",
     refunded: "refunded",
     payment_due: "payment due",
     processing: "payment processing",
     scheduled: "charged to their card after the lesson",
     pending: "waiting for their card",
-    not_required: "paid to you by hand",
+    not_required: "to pay you directly",
     recorded: "recorded",
+    // Its price is €0, so "Free" alone says it.
+    free: "free",
   }[booking.payment_status];
+  // "Already paid" is offered wherever nothing has been charged or settled by
+  // card: a lesson to come not yet charging, or one she recorded. Not on a free
+  // lesson, which has nothing to pay, nor on one paid, due or charging by card.
+  const tickable = booking.status === "confirmed" && (ticked || booking.payment_status === "recorded" ||
+    (["scheduled", "not_required"].includes(booking.payment_status) && !booking.charge_started_at));
   const money = booking.status === "cancelled" && !["paid", "refunded"].includes(booking.payment_status)
     ? ""
     : booking.amount_cents ? `${formatMoneyCents(booking.amount_cents)} · ${paid}` : paid.charAt(0).toUpperCase() + paid.slice(1);
@@ -218,28 +228,32 @@ export function LessonDetails({
             {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
             {awaiting ? <li>{noEmail ? "No email yet: add it under Edit details, then send their welcome" : "Not emailed yet: send their welcome from Students"}</li> : null}
           </ul>
-          {addedByTeacher(booking) && booking.status !== "cancelled" && booking.payment_status === "scheduled" ? (
-            // One they already paid for by hand comes off before it is charged.
-            <button
-              className="text-action teacher-lesson-paid"
-              disabled={busy}
-              onClick={async () => {
+          {tickable ? (
+            <PaidTick
+              checked={ticked}
+              disabled={busy || locked}
+              onChange={async (next) => {
                 setBusy(true);
                 setError("");
                 try {
-                  await markPaidByHand(token, booking.id);
+                  const { booking: updated } = await setLessonPaid(token, booking.id, next);
                   changed.current = true;
-                  onChanged("Taken off their card. This lesson stays paid to you by hand.");
+                  onChanged(next
+                    ? "Marked as already paid. It won’t be charged, and it’s in Receipts as paid by hand."
+                    : updated.payment_status === "scheduled"
+                      ? "No longer marked paid. It’s charged to their card after the lesson."
+                      : updated.payment_status === "recorded"
+                        ? "No longer marked paid. It stays as a record only."
+                        : updated.payment_status === "free"
+                          ? "No longer marked paid. It’s free."
+                          : "No longer marked paid. It’s to be paid to you directly.");
                 } catch (caught) {
                   setError(caught instanceof Error ? caught.message : "This lesson couldn’t be updated.");
                 } finally {
                   setBusy(false);
                 }
               }}
-              type="button"
-            >
-              Already paid you by hand? Take it off their card
-            </button>
+            />
           ) : null}
         </>
       ) : null}

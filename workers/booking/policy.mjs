@@ -29,6 +29,14 @@ export const PAYMENT_CONSENT_VERSION = "2026-09-21-fourteen-hours-v1";
 export const STUDENT_CARD_CONSENT_VERSION = "2026-10-12-card-on-file-v1";
 
 /**
+ * Marks a lesson Inês has been paid for by hand (`payment_consent_version`):
+ * never charged, never moved onto a card, never repriced, and in Receipts as
+ * paid by hand. On a lesson to come it sits on `not_required`; on one she
+ * recorded after it happened, on `recorded` (16 October 2026, "Already paid").
+ */
+export const PAID_BY_HAND_MARK = "paid-by-hand";
+
+/**
  * How long after a lesson's scheduled end Inês can still record or undo a
  * no-show (Dan, 23 September 2026). A no-show turns the lesson price into the
  * EUR 5 fee, so the lesson's own charge waits until this has closed.
@@ -49,6 +57,9 @@ export function isLateChange(row, now = new Date(), noticeHours = DEFAULT_MINIMU
 export function changePolicy(row, now = new Date(), noticeHours = DEFAULT_MINIMUM_NOTICE_HOURS) {
   const paid = row.payment_status === "paid";
   const scheduled = row.payment_status === "scheduled" || row.payment_status === "processing";
+  // A free lesson has nothing to take a fee from and no card behind it
+  // (16 October 2026): it can change as late as any other, with no fee.
+  const free = row.payment_status === "free";
   const late = isLateChange(row, now, noticeHours);
 
   return {
@@ -58,7 +69,7 @@ export function changePolicy(row, now = new Date(), noticeHours = DEFAULT_MINIMU
     // A saved-card lesson can still move or cancel inside the window: that
     // action is what triggers the EUR 5 charge. Older already-paid lessons
     // retain their lock instead. Inês herself never consults this policy.
-    feeApplies: !paid && late,
+    feeApplies: !paid && !free && late,
     locked: paid && late,
     // Only money actually taken comes back.
     refundOnCancel: paid && !late
@@ -96,7 +107,13 @@ export function lessonTypeChangeProblem(row, currentLessonType, nextLessonType) 
     return "A trial lesson can't be changed into another lesson length. Choose a new date and time, or cancel it and book another lesson.";
   }
 
+  // Paid to Inês by hand for this length: another length is hers to arrange.
+  if (row.payment_consent_version === PAID_BY_HAND_MARK) {
+    return "This lesson is already paid. To change its length, reply to your confirmation email and Inês will help.";
+  }
   if (row.payment_status === "not_required" || row.payment_status === "scheduled") return "";
+  // Allowed only onto another free length; the caller knows the new price.
+  if (row.payment_status === "free") return "";
   if (row.payment_status === "paid") {
     return "This lesson is already paid. To change its length, cancel it for a refund and book the other length.";
   }

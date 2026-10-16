@@ -2724,6 +2724,160 @@ await test("a lesson Inês records after it happened is only a record: no one is
     forgetStudent(email);
   }
 });
+await test("a student Inês made free books and is booked with no card, no Stripe and no money owed, until the price rises", async () => {
+  const user = await selectionFixture({ savedCard: false });
+  const price = (prices) => call(`/admin/students/${user}/prices`, { user: "teacher", body: { prices } });
+  const mine = () => db.prepare("SELECT * FROM bookings WHERE student_id=? ORDER BY starts_at").all(user);
+  const stripeCalls = () => checkoutRequests.length + charges.length;
+  try {
+    // A lesson she added before making them free is paid by hand; €0 makes it free.
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { studentId: user, lessonType: "single", startAt: "2026-09-16T16:00:00.000Z" } })).status, 201);
+    assert.equal(mine()[0].payment_status, "not_required");
+    assert.equal((await price({ 60: 50 })).status, 400, "between €0 and €1 is still refused");
+    const freed = await price({ 60: 0 });
+    assert.equal(freed.status, 200, await freed.clone().text());
+    const { student, updated } = await freed.json();
+    assert.deepEqual([student.prices, updated], [{ 60: 0, 90: 0 }, 1], "a free 60 makes the 90 free too");
+    assert.deepEqual([mine()[0].payment_status, mine()[0].amount_cents], ["free", 0]);
+    assert.equal((await (await call(`/admin/students/${user}/welcome`, { user: "teacher", body: {} })).json()).card, false, "their welcome asks for no card");
+
+    // Self-serve, no agreement, no card: a lesson, two dates and a weekly run.
+    const before = stripeCalls();
+    captureEmail();
+    try {
+      const single = await call("/bookings", { user, body: { lessonType: "single", startAt: "2026-09-08T09:00:00.000Z", expectedPriceCents: 0 } });
+      assert.equal(single.status, 201, await single.clone().text());
+      const reply = await single.json();
+      assert.ok(!reply.checkoutUrl && !reply.checkoutClientSecret, "no card step");
+      await drain();
+      const confirmation = sentEmails.find((mail) => mail.to[0] === `${user}@example.invalid`);
+      assert.match(confirmation.text, /Free/, "a real lesson, emailed, its price Free");
+      assert.doesNotMatch(confirmation.text, /card|€5/);
+    } finally {
+      releaseEmail();
+    }
+    assert.equal((await call("/bookings", { user, body: selectionBody({ paymentConsent: undefined, expectedPriceCents: 0 }) })).status, 201);
+    assert.equal((await call("/bookings", { user, body: { lessonType: "long", startAt: "2026-09-21T09:00:00.000Z", repeat: 4 } })).status, 201);
+    // Hers too, card or not: a weekly run with no end.
+    db.prepare("UPDATE students SET email_verified_at=?, card_consent_at=?, stripe_customer_id='cus_free', stripe_payment_method='pm_free' WHERE id=?")
+      .run(new Date().toISOString(), new Date().toISOString(), user);
+    assert.equal((await call("/admin/bookings", { user: "teacher", body: { studentId: user, lessonType: "single", startAt: "2026-09-17T16:00:00.000Z", repeat: "open" } })).status, 201);
+    assert.equal(stripeCalls(), before, "nothing reached Stripe");
+    const lessons = mine();
+    assert.ok(lessons.length > 15);
+    assert.ok(lessons.every((row) => row.status === "confirmed" && row.payment_status === "free" && row.amount_cents === 0 && !row.payment_consent_at),
+      JSON.stringify(lessons.map((row) => [row.starts_at, row.payment_status, row.amount_cents])));
+    assert.ok(db.prepare("SELECT automatic_payment FROM booking_series WHERE student_id=? AND added_by_teacher=0").all(user).every((run) => !run.automatic_payment));
+
+    // Late changes cost nothing; nothing charges, chases or receipts them.
+    const late = linkedBooking("free-late", { owner: user, payment: "free", start: "2026-09-05T20:00:00.000Z", end: "2026-09-05T21:00:00.000Z" });
+    db.prepare("UPDATE bookings SET amount_cents=0 WHERE id=?").run(late);
+    const cancelled = await call(`/bookings/${await token(late)}/cancel`, { user: null, body: {} });
+    assert.equal((await cancelled.json()).sameDayFeeApplied, false);
+    assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id=?").get(late).same_day_fee_status, "not_required");
+    await chargeDueLessons(env, new Date("2026-10-20T00:00:00.000Z"));
+    await retryPaymentRecovery(env);
+    assert.equal(stripeCalls(), before);
+    assert.ok(mine().every((row) => row.payment_status === "free"));
+    const receipts = (await (await call("/admin/receipts?month=2026-09", { method: "GET", user: "teacher" })).json()).receipts;
+    assert.ok(!receipts.some((line) => line.studentEmail === `${user}@example.invalid`), "not Paid by hand, not owed");
+
+    // A higher price is for lessons booked from now on; those already free stay free.
+    const raised = await price({ 60: 2000 });
+    assert.equal((await raised.json()).stayFree, mine().filter((row) => row.status === "confirmed").length);
+    assert.ok(mine().every((row) => row.payment_status === "free" && row.amount_cents === 0));
+    // Clear of the hourly booking bound, so only the price decides.
+    db.prepare("UPDATE bookings SET created_at='2026-09-01T00:00:00.000Z' WHERE student_id=?").run(user);
+    db.prepare("UPDATE booking_series SET created_at='2026-09-01T00:00:00.000Z' WHERE student_id=?").run(user);
+    assert.equal((await call("/bookings", { user, body: { lessonType: "single", startAt: "2026-09-29T09:00:00.000Z" } })).status, 400, "the card agreement is back");
+    const free60 = mine().find((row) => row.lesson_type_id === "single" && row.starts_at > "2026-09-10" && !row.series_id);
+    const lengthened = await call(`/bookings/${await token(free60.id)}/reschedule`, { user: null, body: { startAt: free60.starts_at, lessonType: "long", expectedPriceCents: 3000 } });
+    assert.equal(lengthened.status, 409, "a free lesson never turns into a priced one");
+    // Her open run's next week is born on the new price, on the card she has.
+    const run = db.prepare("SELECT series_id FROM bookings WHERE student_id=? AND added_by_teacher=1 AND series_id IS NOT NULL LIMIT 1").get(user).series_id;
+    // Its last two weeks taken back; the earlier is inside the twelve-week horizon.
+    const [, last] = db.prepare("SELECT id, starts_at FROM bookings WHERE series_id=? ORDER BY starts_at DESC LIMIT 2").all(run);
+    db.prepare("DELETE FROM bookings WHERE series_id=? AND starts_at>=?").run(run, last.starts_at);
+    const filledTo = db.prepare("SELECT filled_to FROM booking_series WHERE id=?").get(run).filled_to;
+    db.prepare("UPDATE booking_series SET filled_to=? WHERE id=?").run(new Date(Date.parse(`${filledTo}T00:00:00Z`) - 14 * 86400000).toISOString().slice(0, 10), run);
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.parse("2026-09-06T03:10:00.000Z") }, env, ctx);
+    await drain();
+    const regrown = db.prepare("SELECT payment_status, amount_cents FROM bookings WHERE series_id=? AND starts_at=?").get(run, last.starts_at);
+    assert.deepEqual({ ...regrown }, { payment_status: "scheduled", amount_cents: 2000 });
+  } finally {
+    db.exec("DELETE FROM bookings; DELETE FROM booking_series;");
+    db.prepare("DELETE FROM student_recurring_rates WHERE student_id=?").run(user);
+  }
+});
+await test("Already paid: ticked lessons are never billed or put on a card, show in Receipts by hand, and untick back to normal billing", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const id = "paid-tick";
+  db.prepare("INSERT INTO students (id,email,name,password_hash,created_at,email_verified_at) VALUES (?,?,'Paula Paid','',?,?)")
+    .run(id, "paid-tick@example.invalid", new Date().toISOString(), new Date().toISOString());
+  const add = (startAt, extra = {}) => call("/admin/bookings", { user: "teacher", body: { studentId: id, lessonType: "single", startAt, ...extra } });
+  const row = (startAt) => db.prepare("SELECT * FROM bookings WHERE student_id=? AND starts_at=?").get(id, startAt);
+  const tick = (startAt, paid) => call(`/admin/bookings/${row(startAt).id}/paid`, { user: "teacher", body: { paid } });
+  const terms = (startAt) => { const r = row(startAt); return [r.payment_status, r.amount_cents, r.payment_consent_version]; };
+  const [future, unticked, pastPaid, pastPlain] = ["2026-10-06T16:00:00.000Z", "2026-10-07T16:00:00.000Z", "2026-08-04T09:00:00.000Z", "2026-08-05T09:00:00.000Z"];
+  try {
+    // Ticked as she adds it; a weekly run is ticked lesson by lesson.
+    assert.equal((await add(future, { paid: true })).status, 201);
+    assert.deepEqual(terms(future), ["not_required", 2500, "paid-by-hand"]);
+    assert.equal((await add("2026-10-08T16:00:00.000Z", { paid: true, repeat: 4 })).status, 400);
+    assert.equal((await add(unticked)).status, 201);
+    // Past lessons keep the place she chose, with no Meet; ticked, they are paid by hand.
+    assert.equal((await add(pastPaid, { paid: true, location: "porto" })).status, 201);
+    assert.equal((await add(pastPlain, { location: "porto" })).status, 201);
+    assert.deepEqual([...terms(pastPaid), row(pastPaid).location, row(pastPaid).meeting_url], ["recorded", 2500, "paid-by-hand", "porto", null]);
+    assert.deepEqual([...terms(pastPlain), row(pastPlain).location], ["recorded", null, null, "porto"]);
+
+    // Ticked and unticked from her lesson (an /admin/ route, behind her sign-in).
+    assert.equal((await tick(unticked, true)).status, 200);
+    assert.deepEqual(terms(unticked), ["not_required", 2500, "paid-by-hand"]);
+    assert.equal((await tick(pastPlain, true)).status, 200);
+    assert.equal((await tick(pastPlain, false)).status, 200);
+    assert.deepEqual(terms(pastPlain), ["recorded", null, null], "unticked, a record is only a record");
+    booking("paid-tick-card", { owner: id, payment: "paid", start: "2026-10-09T16:00:00.000Z", end: "2026-10-09T17:00:00.000Z" });
+    assert.equal((await tick("2026-10-09T16:00:00.000Z", true)).status, 409, "already paid by card");
+    booking("paid-tick-free", { owner: id, payment: "free", start: "2026-10-10T16:00:00.000Z", end: "2026-10-10T17:00:00.000Z" });
+    assert.equal((await tick("2026-10-10T16:00:00.000Z", true)).status, 409, "nothing to pay");
+
+    // A card saved later never takes over a ticked lesson.
+    const plain = "2026-10-13T16:00:00.000Z";
+    assert.equal((await add(plain)).status, 201);
+    setupIntents.set("seti_paid_tick", { status: "succeeded", customer: "cus_paid_tick", payment_method: "pm_paid_tick" });
+    const session = { id: "cs_paid_tick", mode: "setup", status: "complete", client_reference_id: `student:${id}`, created: Math.floor(Date.now() / 1000),
+      customer: "cus_paid_tick", setup_intent: "seti_paid_tick", metadata: { purpose: "student_card", student_id: id } };
+    assert.equal((await webhook({ id: "evt_paid_tick", type: "checkout.session.completed", livemode: false, data: { object: session } })).status, 200);
+    assert.equal(row(plain).payment_status, "scheduled", "the unticked one goes on the card");
+    assert.deepEqual(terms(future), ["not_required", 2500, "paid-by-hand"]);
+    assert.deepEqual(terms(unticked), ["not_required", 2500, "paid-by-hand"]);
+
+    // Nothing charges, links or chases a ticked lesson.
+    const charged = charges.length;
+    await chargeDueLessons(env, new Date("2026-10-20T00:00:00.000Z"));
+    await retryPaymentRecovery(env);
+    assert.ok(!charges.slice(charged).some((charge) => [row(future).id, row(unticked).id].some((lesson) => charge.key.includes(lesson))));
+    assert.equal(row(future).payment_status, "not_required");
+
+    // Receipts: ticked lessons are paid by hand, ready; free and plain records have no line.
+    const lines = async (month) => (await (await call(`/admin/receipts?month=${month}`, { method: "GET", user: "teacher" })).json()).receipts
+      .filter((line) => line.studentEmail === "paid-tick@example.invalid");
+    assert.deepEqual((await lines("2026-08")).map((line) => [line.lessonStartsAt, line.method, line.state, line.ready, line.amountCents]),
+      [[pastPaid, "by hand", "paid", true, 2500]]);
+    const october = await lines("2026-10");
+    assert.ok(october.some((line) => line.lessonStartsAt === future && line.method === "by hand" && line.ready), "the money is in before the lesson");
+    assert.ok(!october.some((line) => line.bookingId === "paid-tick-free"), "a free lesson is never in Receipts");
+
+    // Unticked before it is charged, it is billed as it would be now: on the card.
+    assert.equal((await tick(future, false)).status, 200);
+    assert.deepEqual(terms(future), ["scheduled", 2500, "2026-10-12-card-on-file-v1"]);
+    assert.ok(!(await lines("2026-10")).some((line) => line.lessonStartsAt === future));
+  } finally {
+    db.prepare("DELETE FROM bookings WHERE student_id=?").run(id);
+    db.prepare("DELETE FROM students WHERE id=?").run(id);
+  }
+});
 await test("her receipts list each amount paid or due for a month's lessons, with the NIF to issue to", async () => {
   await enrol("receipts");
   db.prepare("UPDATE students SET nif = '123456789', name = 'Rita Receipts' WHERE id = 'receipts'").run();
@@ -2737,6 +2891,10 @@ await test("her receipts list each amount paid or due for a month's lessons, wit
   db.prepare("UPDATE bookings SET status = 'cancelled', same_day_fee_status = 'paid', same_day_fee_cents = 500, same_day_fee_payment_intent = 'pi_fee' WHERE id = 'r-fee'").run();
   booking("r-due", { owner: "receipts", payment: "payment_due", ...at("07", "09") });
   booking("r-cancelled", { owner: "receipts", payment: "not_required", ...at("10", "09") });
+  // A free lesson that happened, and a record: nothing to issue for either.
+  booking("r-free", { owner: "receipts", payment: "free", ...at("11", "09") });
+  db.prepare("UPDATE bookings SET amount_cents = 0 WHERE id = 'r-free'").run();
+  booking("r-recorded", { owner: "receipts", payment: "recorded", ...at("12", "09") });
   db.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = 'r-cancelled'").run();
   try {
     assert.equal((await call("/admin/receipts?month=2026-08", { method: "GET", user: "alice" })).status, 401);
@@ -2752,7 +2910,7 @@ await test("her receipts list each amount paid or due for a month's lessons, wit
       ["r-noshow:lesson", "No-show", 500, "card", "paid", true],
       ["r-fee:fee", "Late change fee", 500, "card", "paid", true],
       ["r-due:lesson", "60-minute lesson", 1500, "card", "due", false]
-    ], "a cancelled lesson with no money moved has no line");
+    ], "a cancelled lesson with no money moved, a free lesson and a record have no line");
     assert.ok(mine.every((line) => line.nif === "123456789" && line.studentName === "Test Student"));
     assert.equal(mine.find((line) => line.id === "r-card:lesson").stripePaymentIntent, "pi_card");
     assert.equal(mine.find((line) => line.id === "r-fee:fee").stripePaymentIntent, "pi_fee");

@@ -44,11 +44,13 @@ export type MyBooking = {
   sameDayFeeAutomatic?: boolean;
   /** Only a legacy lesson already paid under the old policy is locked. */
   changeLocked?: boolean;
-  paymentStatus?: "not_required" | "pending" | "scheduled" | "processing" | "paid" | "payment_due" | "refunded" | "recorded";
+  paymentStatus?: "not_required" | "pending" | "scheduled" | "processing" | "paid" | "payment_due" | "refunded" | "recorded" | "free";
   /** Set when this lesson is one occurrence of a weekly series. */
   seriesId: string | null;
   /** Inês added it herself rather than the student booking it. */
   addedByTeacher?: boolean;
+  /** Inês has been paid for it by hand, so no card is asked for it. */
+  paidByHand?: boolean;
   manageToken: string;
 };
 

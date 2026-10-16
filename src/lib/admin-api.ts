@@ -96,12 +96,18 @@ export type AdminBooking = {
     | "payment_due"
     | "refunded"
     /** A lesson she recorded after it happened: for the record only. */
-    | "recorded";
+    | "recorded"
+    /** A lesson at a price she set to €0: never charged, chased or receipted. */
+    | "free";
   attendance_status: "expected" | "no_show";
   /** 1 when Inês added it herself (migration 0023). */
   added_by_teacher?: number;
   /** The lesson's own price, as booked. */
   amount_cents?: number | null;
+  /** "paid-by-hand" once she has ticked it Already paid; otherwise the payment agreement it carries. */
+  payment_consent_version?: string | null;
+  /** Set once its card charge has begun; it can no longer be ticked paid. */
+  charge_started_at?: string | null;
   /** 1 when no confirmed lesson of the student's comes before this one. */
   first_lesson?: number;
   /** When the student last changed the lesson themselves; empty after she moves it (migration 0028). */
@@ -368,9 +374,10 @@ export function updateStudentDetails(token: string, studentId: string, input: St
 /**
  * Her price for a student. It prices every lesson of theirs at that length, and
  * their lessons to come that nothing is settled on follow it; `updated` counts them.
+ * `stayFree` counts lessons to come booked free at a length that no longer is.
  */
 export function setStudentPrices(token: string, studentId: string, prices: StudentPrices) {
-  return adminRequest<{ student: AdminStudent; updated: number }>(token, `/admin/students/${encodeURIComponent(studentId)}/prices`, {
+  return adminRequest<{ student: AdminStudent; updated: number; stayFree?: number }>(token, `/admin/students/${encodeURIComponent(studentId)}/prices`, {
     method: "POST",
     body: JSON.stringify({ prices }),
   });
@@ -402,6 +409,8 @@ export function createBookingFor(
     notes: string;
     /** Weekly: 4, 6 or 8 weeks, or "open" until stopped. Left out, one lesson. */
     repeat?: 4 | 6 | 8 | "open";
+    /** Ticked "Already paid": never billed, in Receipts as paid by hand. One lesson only. */
+    paid?: boolean;
   },
 ) {
   return adminRequest<{
@@ -449,12 +458,21 @@ export function cancelBookingAs(token: string, bookingId: string, message?: stri
  * A lesson she added that the student already paid her for by hand comes off
  * their card before it is charged.
  */
-export function markPaidByHand(token: string, bookingId: string) {
-  return adminRequest<{ booking: AdminBooking }>(token, `/admin/bookings/${bookingId}/paid-by-hand`, {
+/** True once she has ticked a lesson "Already paid" (paid to her by hand). */
+export function paidByHand(booking: Pick<AdminBooking, "payment_consent_version">) {
+  return booking.payment_consent_version === "paid-by-hand";
+}
+
+/**
+ * Ticks or unticks "Already paid" on one lesson. Ticked, it is never billed
+ * and is in Receipts as paid by hand; unticked, it is billed as it would be now.
+ */
+export function setLessonPaid(token: string, bookingId: string, paid: boolean) {
+  return adminRequest<{ booking: AdminBooking }>(token, `/admin/bookings/${bookingId}/paid`, {
     method: "POST",
-    body: "{}",
+    body: JSON.stringify({ paid }),
   }).then((data) => {
-    if (!isApiRecord(data.booking) || data.booking.id !== bookingId || data.booking.payment_status !== "not_required") {
+    if (!isApiRecord(data.booking) || data.booking.id !== bookingId || paidByHand(data.booking) !== paid) {
       throw new Error(BOOKING_REPLY_ERROR);
     }
     return data;

@@ -437,7 +437,9 @@ export function gettingStarted(students: AdminStudent[], cardsAccepted = true): 
       { id: "email", label: "Email", done: email },
       { id: "welcome", label: "Welcome", done: email && !student.awaitingWelcome },
       { id: "sign-in", label: "Sign in", done: Boolean(student.signedIn) },
-      ...(cardsAccepted ? [{ id: "card" as const, label: "Card", done: Boolean(student.hasCard) }] : []),
+      // A student whose every length is free has no card to add (16 October 2026).
+      ...(cardsAccepted && !(student.prices?.[60] === 0 && student.prices?.[90] === 0)
+        ? [{ id: "card" as const, label: "Card", done: Boolean(student.hasCard) }] : []),
     ];
     const index = steps.findIndex((step) => !step.done);
     if (index < 0) return [];
