@@ -926,11 +926,12 @@ export function TeacherSchedule() {
         token={token}
         known={students?.list ?? []}
         start={studentPicker}
-        onSelect={(student, slot) => {
+        onSelect={(student, slot, next) => {
           if (readSession() !== token) return;
           setStudents(current => current ? { ...current, list: [...current.list.filter(entry => entry.id !== student.id), student] } : { list: [student], cardsAccepted: false });
           setStudentPicker(null);
-          openStudent(student, "lessons", slot);
+          // With no lessons yet she goes to their welcome, which needs an email first.
+          openStudent(student, next === "welcome" ? student.email ? "welcome" : "email" : "lessons", slot);
           void reloadStudents();
         }}
         onClose={() => setStudentPicker(null)}

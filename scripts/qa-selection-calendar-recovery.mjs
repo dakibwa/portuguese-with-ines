@@ -530,7 +530,7 @@ try {
       let writes = 0;
       const state = await fixture(width, async (path, request) => {
         if (path === "/admin/bookings" && request.method() === "POST") { writes += 1; return { json: {} }; }
-        if (path === "/admin/students") return { json: { students: [{ id: "rui", name: "Rui", email: "rui@example.invalid", phone: "", signedIn: true }], cardsAccepted: false } };
+        if (path === "/admin/students") return { json: { students: [{ id: "rui", name: "Rui", email: "rui@example.invalid", phone: "", signedIn: false, awaitingWelcome: true }], cardsAccepted: false } };
         if (path === "/availability") return bookingDefaults(path);
         return teacherDefaults(path);
       });

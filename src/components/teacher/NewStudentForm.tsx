@@ -10,12 +10,16 @@ import { PRICE_RANGE_ERROR, PriceFields, pricesFromDraft, type PriceDraft } from
  * A new student's details, in the profile's own form: a name is enough to
  * start, the rest can follow (13 October 2026, Dan). Nothing is emailed by
  * this; their price is set from the start so their welcome finds them on it
- * with no code to type. Saving lands on their profile, ready for lessons.
+ * with no code to type. Saving lands on their profile, ready for lessons, or,
+ * for someone with none yet, on their welcome (16 October 2026, Inês), which
+ * still waits for her to press Send.
  */
-export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel }: {
+export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, offerNoLessons = false }: {
   token: string;
+  /** From a time on her timetable the lesson is the point, so only Add a student offers none. */
+  offerNoLessons?: boolean;
   onBusy: (busy: boolean) => void;
-  onAdded: (student: AdminStudent) => void;
+  onAdded: (student: AdminStudent, next: "lessons" | "welcome") => void;
   onCancel: () => void;
   cancelLabel: string;
 }) {
@@ -33,7 +37,7 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel }
   return (
     <>
       <ul className="booking-payment-facts teacher-profile__facts">
-        <li>Their details now, their lessons next</li>
+        <li>Their details now, any lessons next</li>
         <li>Nothing is emailed until you send their welcome</li>
       </ul>
       <form
@@ -41,6 +45,7 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel }
         onSubmit={async (event) => {
           event.preventDefault();
           if (busy) return;
+          const next = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "welcome" ? "welcome" : "lessons";
           const agreed = pricesFromDraft(prices, { keepEmpty: false });
           if (!agreed) {
             setError(PRICE_RANGE_ERROR);
@@ -57,7 +62,7 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel }
               mark: details.mark,
               prices: agreed,
             });
-            onAdded(result.student);
+            onAdded(result.student, next);
           } catch (caught) {
             setError(caught instanceof Error ? caught.message : "The student couldn’t be added.");
           } finally {
@@ -105,7 +110,9 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel }
           </div>
         </div>
         <div className="teacher-dialog-actions">
-          <button className="button button--coral" disabled={busy} type="submit">{busy ? "Adding…" : "Next: their lessons"}</button>
+          <button className="button button--coral" disabled={busy} type="submit" value="lessons">{busy ? "Adding…" : "Next: their lessons"}</button>
+          {/* No lessons yet: their welcome asks them to book one (16 October 2026, Inês). */}
+          {offerNoLessons ? <button className="button button--lilac" disabled={busy} type="submit" value="welcome">No lessons yet</button> : null}
           <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">{cancelLabel}</button>
         </div>
         {error ? <p className="teacher-inline-error" role="alert">{error}</p> : null}
