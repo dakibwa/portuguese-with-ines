@@ -885,7 +885,7 @@ export function MyLessons({
   // On Your lessons the calendar card carries the account; only a failure to
   // read it, or lessons Inês added that no card covers yet, need saying here.
   const unpaidAdded = bookings.filter((booking) =>
-    !booking.isPast && booking.status === "confirmed" && booking.addedByTeacher && booking.paymentStatus === "not_required"
+    !booking.isPast && booking.status === "confirmed" && booking.addedByTeacher && booking.paymentStatus === "not_required" && !booking.paidByHand
   ).length;
   const cardNote = cardAdded ? (
     <div className="booking-outcome card-added" role="status">

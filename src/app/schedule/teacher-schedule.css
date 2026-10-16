@@ -1894,17 +1894,77 @@
   background: var(--lavender-soft);
   color: var(--ink);
 }
-/* A quiet way out for a lesson already paid by hand, not a call to action. */
-.teacher-lesson-paid.text-action {
+/* "Already paid": one tick in the booking agreement's squiggle capsule, its
+   box a paint dab. Quiet lavender until ticked; ticked, blue with a coral dab. */
+.paid-tick {
+  display: inline-flex;
+  align-items: center;
   justify-self: start;
-  margin-top: -0.25rem;
-  border-bottom: 0;
-  padding: 0;
-  color: var(--blue-deep);
-  font: 600 0.78rem/1.5 var(--ui);
+  min-height: 44px;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-field);
+  padding: 0.5rem 1.05rem 0.5rem 0.7rem;
+  background: rgba(170, 164, 230, 0.1);
+  color: var(--ink);
+  cursor: pointer;
+  gap: 0.55rem;
+  font: 600 0.82rem/1.3 var(--ui);
   letter-spacing: 0;
-  text-align: left;
   text-transform: none;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.paid-tick__dab {
+  position: relative;
+  display: grid;
+  flex: 0 0 1.45rem;
+  width: 1.45rem;
+  aspect-ratio: 1;
+  place-items: center;
+  color: var(--paper);
+}
+.paid-tick__dab::before {
+  position: absolute;
+  inset: 0;
+  background: var(--lavender);
+  content: "";
+  opacity: 0.6;
+  -webkit-mask: var(--payment-dab) center / contain no-repeat;
+  mask: var(--payment-dab) center / contain no-repeat;
+  transform: rotate(-14deg);
+}
+.paid-tick__dab svg {
+  position: relative;
+}
+.paid-tick:hover:not(:disabled) {
+  border-color: var(--blue);
+}
+.paid-tick.is-checked {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: var(--paper);
+}
+.paid-tick.is-checked .paid-tick__dab::before {
+  background: var(--coral);
+  opacity: 1;
+}
+.paid-tick:focus-visible {
+  outline: 2px solid var(--coral-action);
+  outline-offset: 3px;
+}
+.paid-tick:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .paid-tick { transition: none; }
+}
+/* In her lesson form the tick sits just above the action it goes with. */
+.teacher-manual-form > .paid-tick,
+.teacher-manual-settings > .paid-tick {
+  grid-column: 1 / -1;
+}
+@container setup-list (min-width: 58rem) {
+  .teacher-setup__body .teacher-manual-form > .paid-tick { grid-column: 2; }
 }
 .teacher-lesson-place {
   display: inline-flex;

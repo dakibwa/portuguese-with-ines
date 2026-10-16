@@ -49,6 +49,8 @@ export type MyBooking = {
   seriesId: string | null;
   /** Inês added it herself rather than the student booking it. */
   addedByTeacher?: boolean;
+  /** Inês has been paid for it by hand, so no card is asked for it. */
+  paidByHand?: boolean;
   manageToken: string;
 };
 

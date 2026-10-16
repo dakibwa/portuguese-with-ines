@@ -536,12 +536,25 @@ usual lesson starts and days off; avoid a wall of administration forms.
   year for a lesson already had (15 October 2026, Dan). Past days read quieter
   but stay choosable; a past day's times are every quarter hour, as the same
   time blobs, since weekly hours don't bind what has happened. A past lesson
-  is purely a record (15 October 2026, Dan): date, time, length, add. A past
-  time hides Where and How often, and the length is followed at once by one
-  coral `Add past lesson` (beneath the times on a phone, under the length
-  beside the calendar on a wide row). There is no payment step and nothing is
-  said about email, because nothing is sent or charged; her history reads
-  `Recorded`. Choose a time; there is no manual date
+  is purely a record (15 October 2026, Dan): date, time, length, place, add.
+  A past time hides How often but keeps Where, Online or In Porto, for her
+  records (16 October 2026, Dan); the place is followed by the `Already paid`
+  tick and one coral `Add past lesson` (beneath the times on a phone, under
+  the settings beside the calendar on a wide row). Nothing is said about
+  email, because nothing is sent or charged; her history reads `Recorded`, or
+  `Paid by hand` once ticked.
+  `Already paid` (16 October 2026, Dan) is one tick, the booking agreement's
+  squiggle capsule with a paint dab for its box: pale lavender dab on the
+  lilac wash until ticked, then the blue capsule with a coral dab and a cream
+  check, as the agreement turns blue once agreed. It sits just above the
+  action it goes with: above `Add lesson` for a single lesson with something
+  to pay (not a weekly run, which is ticked lesson by lesson, and never a free
+  length), and under the lesson's dabs in its dialog wherever nothing has been
+  charged by card; there it saves at once, and the dab beside it reads `paid
+  to you by hand`. A lesson paid, due or charging by card shows that in its
+  dab instead (`€25 · paid by card`), with no tick; a lesson still to be paid
+  to her reads `to pay you directly`. The old `Already paid you by hand? Take
+  it off their card` link is gone; the tick covers it. Choose a time; there is no manual date
   or time entry. Location, length and weekly repeat remain available. Welcomes are explicit:
   opening a step never sends email. First welcomes use `onlyIfWaiting: true`;
   `Send the link again` deliberately requests a fresh link without that guard.
@@ -1247,8 +1260,8 @@ Preserve these desktop and mobile states:
   there and offers `Email me a new link`. The card terms add `Your upcoming
   lessons with Inês are charged to it, each after it ends` and `Already paid
   Inês for some? Tell her and she’ll take them off`; an open Card row also
-  offers `Remove card`. In Inês's lesson dialog a lesson she added that a card
-  now pays for offers `Already paid you by hand? Take it off their card`. The sign-in panel's quiet links read `Email me a sign-in link` and
+  offers `Remove card`. In Inês's lesson dialog a lesson a card now pays for
+  offers the `Already paid` tick (below). The sign-in panel's quiet links read `Email me a sign-in link` and
   `I’ve forgotten my password` side by side; asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.
   Text fields are 44 px tall, the usual touch height. The change dialog is

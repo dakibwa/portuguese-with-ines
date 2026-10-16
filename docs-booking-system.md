@@ -96,7 +96,9 @@ invitation; no sign-in link; no card, charge or payment link; no reminder
 (those look only ahead); and no Google Calendar event or Meet. One still
 running when she records it carries `meeting_retry_at = ends_at`, so the Meet
 sweep never reaches it. It cannot repeat weekly (400). The reply is
-`emailed: false`.
+`emailed: false`. Its place, `online` or `porto`, is hers to give (16 October
+2026, Dan) and is stored for the record only: a past lesson never has a Meet,
+a calendar event or an email, whichever it is.
 
 It is stored as `payment_status = 'recorded'` with no `amount_cents` (no
 migration: the column has no CHECK constraint). No existing combination was
@@ -153,11 +155,46 @@ the calendar, while a lesson she added is still unpaid; `Your details` has a
 still to come back to being paid by hand and stops her weekly slots charging.
 
 Inês is emailed which of her lessons a newly saved card now pays for. One the
-student already paid her for by hand comes off the card from its dialog
-(`Already paid you by hand? Take it off their card`,
-`POST /admin/bookings/:id/paid-by-hand`) before it is charged, and is marked so
-that no later card takes it back. A lesson she records after it has happened is
-never put on a card.
+student already paid her for by hand is ticked `Already paid` (below) before it
+is charged, and no later card takes it back. A lesson she records after it has
+happened is never put on a card.
+
+**Already paid** (16 October 2026, Dan). Any lesson, past or to come, can be
+ticked as paid to her by hand: as she adds it (`paid: true` on `POST
+/admin/bookings`) or later from its dialog (`POST /admin/bookings/:id/paid`,
+`{ paid: true | false }`, teacher only like every `/admin/` route; nothing is
+emailed). It reuses the existing paid-by-hand mark, `payment_consent_version =
+'paid-by-hand'` (`PAID_BY_HAND_MARK` in `policy.mjs`), rather than a new
+status:
+
+- A lesson to come is `not_required` with the mark. Card saving, card removal,
+  charging, recovery, chasers and repricing all skip the mark, so it is never
+  charged, linked, chased or moved onto a card (the `not_required` pitfall
+  does not reach it), and a student cannot change its length (409). The
+  agreement it carried stays on it, so unticking can restore it.
+- A lesson she records after it happened stays `recorded`, with the mark and
+  its price in `amount_cents`, so it keeps every record rule (no email, no
+  Meet, no move into the future). Unticked, it is a plain record again: no
+  price, not in Receipts.
+- Ticked lessons are in **Receipts as paid by hand, ready**, from the moment
+  they are ticked (the money is in), until cancelled. Untick a lesson to come
+  before it is charged and it is billed as it would be booked now: her lesson
+  goes on the card if the student's standing agreement covers it, otherwise
+  it is to be paid to her directly (`not_required`, unmarked); a lesson the
+  student booked goes back on their card only if it was on one when ticked
+  (under `PAYMENT_CONSENT_VERSION`). Its price is the student's current one,
+  never above what they agreed at checkout, and €0 makes it free.
+- Offered only where nothing is settled by card: `scheduled` or
+  `not_required` with no charge started, or `recorded`. A free lesson has
+  nothing to pay (409, and no tick); `paid`, `payment_due` and `processing`
+  are refused (409) and show their card state instead.
+- Per lesson: a weekly run can't be added ticked (400); each lesson of it is
+  ticked from its own dialog, and new weeks are born unticked.
+- The tick covers the lesson price only, not a late change fee.
+- The older `POST /admin/bookings/:id/paid-by-hand` (her lesson on a card,
+  ticked) still answers for any open page, but the site no longer calls it.
+- Her student list's `paid by hand` count and the student's `Pay by card`
+  prompt leave ticked lessons out; emails show their price as `paid`.
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
@@ -1050,6 +1087,9 @@ lessons, so its cancellation set includes every occurrence committed first.
   for card payments, and `ready`, true once the money is in. A lesson with
   nothing on a card counts as paid by hand once it has happened; a cancelled
   lesson appears only if money moved; a lesson still to come only once paid.
+  One ticked `Already paid` is paid by hand, ready, past or to come. A free
+  lesson (`free`, €0) and an unticked record (`recorded`) never have a line:
+  there is nothing to issue for either (16 October 2026, Dan).
   Her Receipts tab shows the same lines and downloads them as CSV, so her
   automation can work from the JSON, the CSV or the table and remember each
   `id` it has issued. The rules live in `workers/booking/receipts.mjs`.

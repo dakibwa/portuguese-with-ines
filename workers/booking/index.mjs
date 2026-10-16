@@ -32,6 +32,7 @@ import {
 } from "./stripe.mjs";
 import {
   NO_SHOW_WINDOW_HOURS,
+  PAID_BY_HAND_MARK,
   PAYMENT_CONSENT_VERSION,
   STUDENT_CARD_CONSENT_VERSION,
   changePolicy,
@@ -381,9 +382,11 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const wasRefunded = row.payment_status === "refunded";
   const isOnCard = row.payment_status === "scheduled" || row.payment_status === "payment_due";
   const isFree = row.payment_status === FREE;
+  // Ticked "Already paid": paid to Inês by hand, so nothing is owed.
+  const isPaidByHand = row.payment_consent_version === PAID_BY_HAND_MARK;
   const priceValue = isFree
     ? FREE_LABEL
-    : isPaid
+    : isPaid || isPaidByHand
     ? `${formatEuros(lessonType.price_cents)} · paid`
     : isOnCard
       ? `${formatEuros(lessonType.price_cents)} · charged to your saved card after the lesson`
@@ -1315,8 +1318,6 @@ function welcomeSteps(welcome) {
     : null;
 }
 
-/** Marks a lesson she added that was paid to her by hand; no card takes it over. */
-const PAID_BY_HAND_MARK = "paid-by-hand";
 
 /**
  * A lesson Inês records after it happened is kept for the record only
@@ -1356,6 +1357,45 @@ function freeLengthProblem(row, amountCents) {
   return row.payment_status === FREE && amountCents !== 0
     ? "This lesson is free. To have the other length, cancel it and book that length instead."
     : "";
+}
+
+/** Why a lesson can't be ticked or unticked "Already paid", or "". */
+function paidTickProblem(row) {
+  if (row.status !== "confirmed") return "Only a lesson still on the calendar can be marked paid.";
+  if (row.payment_consent_version === PAID_BY_HAND_MARK) return "";
+  if (row.payment_status === FREE) return "A free lesson has nothing to pay.";
+  if (row.payment_status === RECORDED) return "";
+  if (["scheduled", "not_required"].includes(row.payment_status) && !row.charge_started_at) return "";
+  if (row.payment_status === "paid") return "This lesson is already paid by card.";
+  if (row.payment_status === "payment_due") return "This lesson's card payment is due, with a payment link sent. It can't be marked paid by hand.";
+  return "This lesson's payment is being processed, so it can't be marked paid by hand.";
+}
+
+/**
+ * How a lesson to come is paid once "Already paid" is unticked: as it would
+ * be booked now. Her lesson goes on the card if the student's standing
+ * agreement covers it, otherwise it is paid to her by hand; a lesson the
+ * student booked goes back on their card only if it was on one when ticked.
+ * Its price is the student's current one (no higher than they agreed at
+ * checkout), and a price of €0 makes it free.
+ */
+async function untickedTerms(env, row) {
+  const [student, lessonType, settings] = await Promise.all([
+    env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(row.student_id).first(),
+    env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first(),
+    loadSettings(env)
+  ]);
+  const current = (await studentLessonType(env, row.student_id, lessonType)).price_cents;
+  const teacher = Boolean(row.added_by_teacher);
+  const amount = teacher ? current : Math.min(current, row.amount_cents ?? current);
+  if (amount === 0) return { status: FREE, amount: 0, consentAt: null, version: null };
+  if (teacher && student && cardPaysFor(env, settings, student)) {
+    return { status: "scheduled", amount, consentAt: student.card_consent_at, version: STUDENT_CARD_CONSENT_VERSION };
+  }
+  if (!teacher && row.payment_consent_at && student?.stripe_customer_id && student?.stripe_payment_method && cardsTaken(env, settings)) {
+    return { status: "scheduled", amount, consentAt: row.payment_consent_at, version: PAYMENT_CONSENT_VERSION };
+  }
+  return { status: "not_required", amount, consentAt: null, version: null };
 }
 
 /** A student whose every lesson length costs nothing has no card to add. */
@@ -1442,7 +1482,7 @@ export function welcomeLessonLines(student, lessons, limit = WELCOME_LESSON_LINE
     if (!item.run) {
       return {
         label: `${first.lesson_type_id === "trial" ? "Trial lesson" : "Lesson"} · ${placeLabel(first)}`,
-        value: [`${date}, ${time}`, `${length(first)} · ${first.payment_status === "paid" ? `${price(first)} paid` : price(first)}`].join("\n")
+        value: [`${date}, ${time}`, `${length(first)} · ${first.payment_status === "paid" || first.payment_consent_version === PAID_BY_HAND_MARK ? `${price(first)} paid` : price(first)}`].join("\n")
       };
     }
     // The price still open is the one the run is on; a lesson already paid, or
@@ -1541,7 +1581,8 @@ async function teacherStudentList(env) {
          OR (s.email NOT LIKE 'no-email:%' AND EXISTS (SELECT 1 FROM bookings b WHERE b.student_id IS NULL AND b.student_email = s.email AND b.status = 'confirmed'))) AS has_lessons,
        (SELECT MIN(b.starts_at) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?) AS next_lesson_at,
        (SELECT COUNT(*) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?
-          AND b.added_by_teacher = 1 AND b.payment_status = 'not_required') AS unpaid_upcoming,
+          AND b.added_by_teacher = 1 AND b.payment_status = 'not_required'
+          AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}') AS unpaid_upcoming,
        (SELECT COUNT(*) FROM booking_series bs WHERE bs.student_id = s.id AND bs.status = 'active') AS weekly
      FROM students s WHERE s.role = 'student'
        -- The opt-in live check's throwaway accounts (scripts/qa-recurring-rates)
@@ -4904,6 +4945,8 @@ async function handleMe(request, env) {
       seriesId: row.series_id ?? null,
       // Inês added it; until a card covers it, it is paid to her as before.
       addedByTeacher: Boolean(row.added_by_teacher),
+      // She has been paid for it by hand, so no card is asked for it.
+      paidByHand: row.payment_consent_version === PAID_BY_HAND_MARK,
       manageToken: await createManageToken(row.id, env.BOOKING_TOKEN_SECRET)
     }))
   );
@@ -5681,6 +5724,10 @@ async function handleAdmin(request, env, ctx, url, path) {
      */
     const past = start <= new Date();
     if (past && wantsRepeat) return fail("A weekly run starts today or later.", 400, request, env);
+    // "Already paid" is per lesson (16 October 2026): a weekly run's lessons
+    // are ticked one at a time, from each lesson.
+    const paid = body.paid === true;
+    if (paid && wantsRepeat) return fail("Tick weekly lessons as paid one at a time, from each lesson.", 400, request, env);
 
     /*
      * Her own bookings are checked for clashes only — not against her published
@@ -5741,8 +5788,10 @@ async function handleAdmin(request, env, ctx, url, path) {
     const cardPays = cardPaysFor(env, settings, student);
     // A lesson at a price she set to €0 is free, card or none.
     const free = !past && lessonType.price_cents === 0;
+    // Ticked "Already paid": never charged or owed, in Receipts as paid by hand.
+    const paidByHand = paid && lessonType.price_cents > 0;
     // A lesson already had is never charged: she is recording it.
-    const onCard = cardPays && !past && !free;
+    const onCard = cardPays && !past && !free && !paidByHand;
     const paymentStatus = past ? RECORDED : free ? FREE : onCard ? "scheduled" : "not_required";
     const location = body.location === "porto" ? "porto" : "online";
     const notes = cleanText(body.notes, 1000);
@@ -5771,9 +5820,9 @@ async function handleAdmin(request, env, ctx, url, path) {
         now,
         now,
         paymentStatus,
-        past ? null : lessonType.price_cents,
+        past && !paidByHand ? null : lessonType.price_cents,
         onCard ? student.card_consent_at : null,
-        onCard ? STUDENT_CARD_CONSENT_VERSION : null,
+        onCard ? STUDENT_CARD_CONSENT_VERSION : paidByHand ? PAID_BY_HAND_MARK : null,
         1,
         // One still running is left out of the Meet sweep until it is over.
         past ? endsAt.toISOString() : null
@@ -6002,6 +6051,53 @@ async function handleAdmin(request, env, ctx, url, path) {
       return fail("That lesson's payment has just started, so its attendance can no longer be changed.", 409, request, env);
     }
 
+    const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
+    return json({ booking: withRealEmail(updated) }, 200, request, env);
+  }
+
+  /*
+   * "Already paid" on any lesson (16 October 2026, Dan). Ticked, it is never
+   * charged, linked or chased, never moved onto a card, and is in Receipts as
+   * paid by hand. Unticked, a lesson to come goes back to how it would be paid
+   * now (see `untickedTerms`); a record goes back to being only a record.
+   * Nothing is emailed either way.
+   */
+  const adminPaid = path.match(/^\/admin\/bookings\/([^/]+)\/paid$/);
+  if (adminPaid && request.method === "POST") {
+    const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(adminPaid[1]).first();
+    if (!row) return fail("That booking could not be found.", 404, request, env);
+    const body = await readJson(request);
+    if (typeof body.paid !== "boolean") return fail("Say whether it is paid.", 400, request, env);
+    const problem = paidTickProblem(row);
+    if (problem) return fail(problem, 409, request, env);
+    const ticked = row.payment_consent_version === PAID_BY_HAND_MARK;
+    const now = new Date().toISOString();
+    let changed = { meta: { changes: 1 } };
+    if (body.paid && !ticked) {
+      const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
+      const price = row.payment_status === RECORDED
+        ? (await studentLessonType(env, row.student_id, lessonType)).price_cents
+        : row.amount_cents ?? lessonType.price_cents;
+      if (!price) return fail("A free lesson has nothing to pay.", 409, request, env);
+      // The agreement it had stays on it, so unticking can restore it.
+      changed = await env.DB.prepare(
+        `UPDATE bookings SET payment_status = CASE WHEN payment_status = '${RECORDED}' THEN '${RECORDED}' ELSE 'not_required' END,
+           amount_cents = ?, payment_consent_version = ?, updated_at = ?
+         WHERE id = ? AND status = 'confirmed' AND charge_started_at IS NULL AND sequence = ?
+           AND payment_status IN ('scheduled', 'not_required', '${RECORDED}')
+           AND COALESCE(payment_consent_version, '') != ?`
+      ).bind(price, PAID_BY_HAND_MARK, now, row.id, row.sequence, PAID_BY_HAND_MARK).run();
+    } else if (!body.paid && ticked) {
+      const terms = row.payment_status === RECORDED
+        ? { status: RECORDED, amount: null, consentAt: null, version: null }
+        : await untickedTerms(env, row);
+      changed = await env.DB.prepare(
+        `UPDATE bookings SET payment_status = ?, amount_cents = ?, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
+         WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status IN ('not_required', '${RECORDED}')
+           AND payment_consent_version = ?`
+      ).bind(terms.status, terms.amount, terms.consentAt, terms.version, now, row.id, row.sequence, PAID_BY_HAND_MARK).run();
+    }
+    if (!(changed?.meta?.changes > 0)) return fail("That lesson has just changed. Please reload.", 409, request, env);
     const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
     return json({ booking: withRealEmail(updated) }, 200, request, env);
   }

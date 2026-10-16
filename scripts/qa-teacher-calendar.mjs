@@ -261,7 +261,9 @@ async function fixture(width, options = {}) {
         ...lesson(`manual-${state.bookings.length}`, owner?.name ?? "Sam Known", data.startAt, data.location, data.lessonType === "long" ? 90 : data.lessonType === "trial" ? 30 : 60),
         student_id: owner?.id,
         payment_status: past ? "recorded" : "not_required",
-        amount_cents: past ? null : 2400,
+        amount_cents: past && !data.paid ? null : 2400,
+        // Ticked "Already paid" as she adds it.
+        ...(data.paid ? { payment_consent_version: "paid-by-hand" } : {}),
         ...(past ? { meeting_url: null } : {}),
         added_by_teacher: 1,
       });
@@ -306,12 +308,26 @@ async function fixture(width, options = {}) {
       if (gate) await gate;
       return route.fulfill({ json });
     }
+    // Her receipts: as the Worker lists them, a ticked lesson is paid by hand.
+    if (path === "/admin/receipts") {
+      const month = new URL(request.url()).searchParams.get("month");
+      const receipts = state.bookings.filter((entry) => entry.status === "confirmed" && entry.payment_consent_version === "paid-by-hand" && entry.starts_at.startsWith(month))
+        .map((entry) => ({ id: `${entry.id}:lesson`, reference: entry.reference, lessonStartsAt: entry.starts_at, studentName: entry.student_name,
+          studentEmail: entry.student_email, nif: entry.student_nif ?? "", bookingId: entry.id, kind: "lesson", label: "60-minute lesson",
+          amountCents: entry.amount_cents, method: "by hand", state: "paid", ready: true, stripePaymentIntent: "" }));
+      return route.fulfill({ json: { month, receipts,
+        totals: { ready: receipts.length, readyCents: receipts.reduce((sum, line) => sum + line.amountCents, 0) } } });
+    }
     const match = path.match(
-      /^\/admin\/bookings\/([^/]+)\/(reschedule|cancel|no-show)$/,
+      /^\/admin\/bookings\/([^/]+)\/(reschedule|cancel|no-show|paid)$/,
     );
     if (match) {
       const booking = state.bookings.find((entry) => entry.id === match[1]);
-      if (match[2] === "reschedule") {
+      if (match[2] === "paid") {
+        booking.payment_consent_version = data.paid ? "paid-by-hand" : null;
+        // As the Worker does: off the card while ticked, and back on it after.
+        if (booking.payment_status !== "recorded") booking.payment_status = data.paid ? "not_required" : "scheduled";
+      } else if (match[2] === "reschedule") {
         if (state.failMove-- > 0)
           return fail("That time is unavailable. Choose another time.");
         const duration =
@@ -917,14 +933,19 @@ try {
   // Any quarter hour, weekly hours or not; then only its length and adding it.
   await picker.getByRole("button", { name: "09:30 Porto time, already past", exact: true }).click();
   await expect(setupForm.getByRole("radio", { name: "Weekly", exact: true })).toHaveCount(0);
-  await expect(setupForm.getByRole("radio", { name: "In Porto", exact: true })).toHaveCount(0);
-  // A record shows only its lengths, never a price.
+  // A record shows only its lengths, never a price; where it was, and whether
+  // it is already paid, are hers to say (16 October 2026).
   await expect(setupForm.getByRole("radio", { name: "60 mins", exact: true })).toBeVisible();
   await expect(setupForm.locator(".teacher-manual-price")).toHaveCount(0);
+  await setupForm.getByRole("radio", { name: "In Porto", exact: true }).check();
+  const pastTick = setupForm.getByRole("checkbox", { name: "Already paid", exact: true });
+  await expect(pastTick).toHaveAttribute("aria-checked", "false");
+  await pastTick.click();
+  await expect(pastTick).toHaveAttribute("aria-checked", "true");
   await setupForm.getByRole("button", { name: "Add past lesson", exact: true }).click();
-  await expect(noraSetup.getByRole("status")).toContainText("27 Aug, 09:30 · recorded");
+  await expect(noraSetup.getByRole("status")).toContainText("27 Aug, 09:30 · recorded · paid");
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/bookings").at(-1).data, {
-    studentId: "nora", lessonType: "single", startAt: "2026-08-27T08:30:00.000Z", location: "online", notes: "",
+    studentId: "nora", lessonType: "single", startAt: "2026-08-27T08:30:00.000Z", location: "porto", notes: "", paid: true,
   });
   await noraSetup.getByRole("button", { name: "Lessons for Nora Lima", exact: true }).click();
   await picker.getByRole("button", { name: "Next month", exact: true }).click();
@@ -1010,9 +1031,10 @@ try {
   const noraReady = studentRow(page, "Nora Lima");
   await noraReady.getByRole("button", { name: "Lesson history for Nora Lima", exact: true }).click();
   const readyProfile = noraReady.getByRole("region", { name: "Nora Lima’s profile", exact: true });
-  // The 30 September lesson, and the one she recorded as had.
+  // The 30 September lesson, and the one she recorded as had, in Porto and paid.
   await expect(readyProfile.locator(".teacher-history-lesson")).toHaveCount(2);
-  await expect(readyProfile.getByRole("region", { name: /^Past/ }).locator(".teacher-history-lesson")).toContainText("Recorded");
+  await expect(readyProfile.getByRole("region", { name: /^Past/ }).locator(".teacher-history-lesson")).toContainText("In Porto");
+  await expect(readyProfile.getByRole("region", { name: /^Past/ }).locator(".teacher-history-lesson")).toContainText("Paid by hand");
   await noraReady.getByRole("button", { name: "Details for Nora Lima", exact: true }).click();
   await expect(readyProfile.getByLabel(/^Email/)).toHaveValue("nora@example.invalid");
   await noraReady.getByRole("button", { name: "Close", exact: true }).click();
@@ -1166,7 +1188,67 @@ try {
     await alex.getByRole("button", { name: "Add a lesson for Alex", exact: true }).click();
     await expect(pane.getByRole("radio", { name: "60 mins, Free", exact: true })).toBeVisible();
     await expect(pane.getByRole("radio", { name: "90 mins, Free", exact: true })).toBeVisible();
+    // A free lesson has nothing to pay, so no tick.
+    await expect(pane.getByRole("checkbox", { name: "Already paid", exact: true })).toHaveCount(0);
     await pane.screenshot({ path: `tmp/qa/free-price/teacher-add-lesson-${width}.png` });
+    await alex.getByRole("button", { name: "Close", exact: true }).click();
+
+    // A past lesson keeps its place, In Porto here, and can be ticked paid.
+    const samRow = studentRow(page, "Sam Known");
+    await samRow.getByRole("button", { name: "Lessons for Sam Known", exact: true }).click();
+    const samPane = samRow.getByRole("region", { name: "Sam Known’s setup", exact: true });
+    const picker = samPane.getByRole("group", { name: "Choose a date and time", exact: true });
+    await picker.getByRole("button", { name: "Previous month", exact: true }).click();
+    await picker.getByRole("button", { name: "Thursday 27 August", exact: true }).click();
+    await picker.getByRole("button", { name: "09:30 Porto time, already past", exact: true }).click();
+    await samPane.getByRole("radio", { name: "In Porto", exact: true }).check();
+    await samPane.getByRole("checkbox", { name: "Already paid", exact: true }).click();
+    await page.waitForTimeout(300); // the tick's colour change settles
+    await samPane.screenshot({ path: `tmp/qa/free-price/teacher-past-lesson-${width}.png` });
+    await samPane.getByRole("button", { name: "Add past lesson", exact: true }).click();
+    await expect.poll(() => state.writes.at(-1)?.data).toMatchObject({ location: "porto", paid: true });
+    assert.equal(state.bookings.at(-1).meeting_url, null, "no Meet for a lesson already had");
+    // One to come, ticked as she adds it.
+    await samRow.getByRole("button", { name: "Lessons for Sam Known", exact: true }).click();
+    await picker.getByRole("button", { name: "Wednesday 30 September", exact: true }).click();
+    await picker.getByRole("button", { name: "17:00 Porto time", exact: true }).click();
+    const addTick = samPane.getByRole("checkbox", { name: "Already paid", exact: true });
+    await addTick.click();
+    await expect(addTick).toHaveAttribute("aria-checked", "true");
+    await page.waitForTimeout(300);
+    await samPane.screenshot({ path: `tmp/qa/free-price/teacher-add-paid-${width}.png` });
+    // A weekly run is ticked lesson by lesson, so the tick steps aside.
+    await samPane.getByRole("radio", { name: "Weekly", exact: true }).check();
+    await expect(addTick).toHaveCount(0);
+    await samPane.getByRole("radio", { name: "Once", exact: true }).check();
+    await samPane.getByRole("button", { name: /^Add lesson/ }).click();
+    await expect.poll(() => state.writes.at(-1)?.data).toMatchObject({ startAt: "2026-09-30T16:00:00.000Z", paid: true });
+
+    // On a lesson's details: ticked, it is paid to her by hand.
+    await showLessons(page);
+    // A phone shows a day at a time.
+    const openSam = async () => {
+      if (width < 741) await page.getByRole("button", { name: "Tuesday 8 September, show lessons" }).click();
+      await page.getByRole("button", { name: /^Sam,.*View lesson$/ }).click();
+    };
+    await openSam();
+    const details = page.getByRole("dialog");
+    const detailTick = details.getByRole("checkbox", { name: "Already paid", exact: true });
+    await expect(detailTick).toHaveAttribute("aria-checked", "false");
+    await detailTick.click();
+    await expect.poll(() => state.writes.at(-1)).toEqual({ path: "/admin/bookings/next/paid", data: { paid: true } });
+    await expect(details).toHaveCount(0);
+    await openSam();
+    await expect(detailTick).toHaveAttribute("aria-checked", "true");
+    await expect(details).toContainText(/paid to you by hand/i);
+    await expect(details.getByRole("button", { name: "Mark no-show", exact: true })).toHaveCount(0);
+    await details.screenshot({ path: `tmp/qa/free-price/teacher-details-paid-${width}.png` });
+    await page.keyboard.press("Escape");
+
+    // Receipts: the ticked lessons, paid by hand.
+    await page.getByRole("tab", { name: "Receipts", exact: true }).click();
+    await expect(page.locator(".teacher-receipts")).toContainText("Paid by hand");
+    if (width === 1280) await page.locator(".teacher-receipts").screenshot({ path: "tmp/qa/free-price/teacher-receipts-paid-by-hand.png" });
     assert.deepEqual(state.errors, []);
     await page.close();
   }

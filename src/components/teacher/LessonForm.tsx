@@ -8,6 +8,7 @@ import { lessonProducts } from "@/lib/lesson-products";
 import { priceFor } from "@/components/teacher/StudentPrice";
 import { dateLabel } from "@/lib/teacher-calendar";
 import { LessonDatePicker } from "@/components/teacher/LessonDatePicker";
+import { PaidTick } from "@/components/teacher/PaidTick";
 
 type Repeat = "once" | 4 | 6 | 8 | "open";
 
@@ -41,13 +42,14 @@ function addedLine(
   series: { booked: number; skipped: { key: string }[] } | undefined,
   emailed: boolean,
   recorded = false,
+  paid = false,
 ) {
   const when = `${dateLabel(date, { weekday: "short", day: "numeric", month: "short" })}, ${time}`;
   const often = series ? ` · weekly, ${repeat === "open" ? "until stopped" : `${series.booked} lessons`}` : "";
   const left = series?.skipped.length
     ? ` (${series.skipped.map((week) => dateLabel(week.key, { day: "numeric", month: "short" })).join(", ")} left out)`
     : "";
-  return `${when}${often}${left}${recorded ? " · recorded" : ""}${emailed ? " · emailed" : ""}`;
+  return `${when}${often}${left}${recorded ? " · recorded" : ""}${paid ? " · paid" : ""}${emailed ? " · emailed" : ""}`;
 }
 
 /**
@@ -56,8 +58,9 @@ function addedLine(
  * loose lessons), so there is no address to type, and none is needed: a
  * student with no email yet has lessons like anyone else (14 October 2026,
  * Dan). Lessons for a student still awaiting their welcome are added quietly.
- * One already had is only recorded: date, time, length, add; never announced,
- * charged or owed (15 October 2026, Dan).
+ * One already had is only recorded: date, time, length, place, add; never
+ * announced, charged or owed (15 October 2026, Dan). "Already paid" marks one
+ * lesson, past or to come, as paid to her by hand (16 October 2026, Dan).
  */
 export function LessonForm({
   token,
@@ -91,9 +94,14 @@ export function LessonForm({
   // A trial is one first lesson, and choosing it puts How often back to once;
   // a lesson already had is one too.
   const weekly = lesson.repeat !== "once" && !past;
+  const [paid, setPaid] = useState(false);
+  const cents = lesson.lessonType === "trial" ? trialPrice : priceFor(student, lesson.lessonType === "long" ? 90 : 60);
+  // One lesson with something to pay; a weekly run is ticked lesson by lesson.
+  const tickable = !weekly && cents > 0;
   const [busy, setBusyState] = useState(false);
   const [availabilityRefresh, setAvailabilityRefresh] = useState(0);
   const [error, setError] = useState("");
+  const tick = tickable ? <PaidTick checked={paid} disabled={busy} onChange={setPaid} /> : null;
   const setBusy = (value: boolean) => {
     setBusyState(value);
     onBusy?.(value);
@@ -135,12 +143,14 @@ export function LessonForm({
               location: lesson.location,
               notes: "",
               ...(weekly ? { repeat: lesson.repeat as Exclude<Repeat, "once"> } : {}),
+              ...(tickable && paid ? { paid: true } : {}),
             });
             // Ready for their next lesson: the same choices, a new date.
             forgetAvailability();
             setAvailabilityRefresh(current => current + 1);
             setLesson((current) => ({ ...current, date: "", startAt: "" }));
-            onCreated(addedLine(lesson.date, lesson.time, lesson.repeat, result.series, result.emailed !== false, past));
+            setPaid(false);
+            onCreated(addedLine(lesson.date, lesson.time, lesson.repeat, result.series, result.emailed !== false, past, tickable && paid));
           } catch (caught) {
             if (caught instanceof AdminApiError && caught.status === 409 && lesson.startAt) {
               forgetAvailability();
@@ -187,11 +197,10 @@ export function LessonForm({
               ))}
             </div>
           </fieldset>
-          {/* A lesson already had needs only its length, then adding. */}
-          {past ? submit : null}
           {/* Online and In Porto carry the timetable's own marks (12 October
-              2026, at Dan's request). */}
-          {past ? null : <fieldset className="teacher-manual-choice">
+              2026, at Dan's request); a lesson already had keeps where it
+              was, for her records only (16 October 2026, Dan). */}
+          <fieldset className="teacher-manual-choice">
             <legend>Where</legend>
             <div className={`segmented segmented--${lesson.location}`}>
               <span aria-hidden="true" className="segmented__thumb" />
@@ -215,7 +224,9 @@ export function LessonForm({
                 </label>
               ))}
             </div>
-          </fieldset>}
+          </fieldset>
+          {/* A lesson already had needs only its length and place, then adding. */}
+          {past ? <>{tick}{submit}</> : null}
           {/* A student she sees every week is set up once, as a student books a
               weekly slot (12 October 2026, Dan). A trial is one first lesson. */}
           {lesson.lessonType !== "trial" && !past ? (
@@ -276,7 +287,7 @@ export function LessonForm({
           startAt={lesson.startAt}
           time={lesson.time}
         />
-        {past ? null : submit}
+        {past ? null : <>{tick}{submit}</>}
       </form>
       {error ? (
         <p className="teacher-inline-error" role="alert">
