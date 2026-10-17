@@ -19,6 +19,8 @@ export type Student = {
   timezone: string;
   /** "teacher" unlocks the schedule page's admin tools. */
   role: "student" | "teacher";
+  /** A teacher Inês has also added as a student: Your lessons opens for them too. */
+  alsoStudent?: boolean;
   /** A card is saved at Stripe, from a booking or from the account. */
   hasCard?: boolean;
   /**

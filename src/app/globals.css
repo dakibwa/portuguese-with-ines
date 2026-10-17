@@ -5133,6 +5133,14 @@ p.lesson-when > span {
   font-size: 0.92rem;
 }
 
+/* A teacher who is also a student, on Your lessons: the way back to the
+   schedule, at the right above their account. */
+.booking-schedule-return {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
 .calendar-weekdays,
 .calendar-week {
   display: grid;

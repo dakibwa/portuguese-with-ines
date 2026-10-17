@@ -3479,6 +3479,64 @@ await test("homework before migration 0029: Inês's students and a student's Hom
   } finally { db.exec("ALTER TABLE homework_progress_pending RENAME TO homework_progress"); }
 });
 
+await test("a teacher Inês adds as a student stays a teacher, is sent nothing, and gets the student side too", async () => {
+  const email = "dual-teacher@example.invalid";
+  db.prepare("INSERT INTO students (id,email,name,password_hash,created_at,role,email_verified_at) VALUES ('dual',?,'Daniel Dual','',?,'teacher',?)")
+    .run(email, new Date().toISOString(), new Date().toISOString());
+  sessions.dual = await createSession("dual", env.BOOKING_TOKEN_SECRET);
+  const ip = { "CF-Connecting-IP": "203.0.113.82" };
+  captureEmail();
+  try {
+    // Plain teachers have no student side until she adds them.
+    for (const user of ["teacher", "dual"]) {
+      assert.equal((await call("/me/card", { user, body: {} })).status, 403);
+      assert.equal((await call("/me/homework", { user, method: "GET" })).status, 403);
+      assert.equal((await call("/me/expressions", { user, method: "GET" })).status, 403);
+    }
+    const added = await call("/admin/students", { user: "teacher", body: { email: "DUAL-teacher@example.invalid", name: "Not His Name", prices: { 60: 1800 } } });
+    assert.equal(added.status, 201, await added.clone().text());
+    assert.equal((await added.json()).student.id, "dual");
+    assert.deepEqual({ ...db.prepare("SELECT name, role, also_student, awaiting_welcome FROM students WHERE email=?").get(email) },
+      { name: "Daniel Dual", role: "teacher", also_student: 1, awaiting_welcome: 0 });
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM students WHERE email=?").get(email).n, 1, "never a second account");
+    assert.equal(db.prepare("SELECT amount_cents FROM student_recurring_rates WHERE student_id='dual'").get().amount_cents, 1800);
+    assert.equal((await call("/admin/students", { user: "teacher", body: { email, name: "Again" } })).status, 409, "once is enough");
+    assert.equal((await call("/admin/students", { user: "teacher", body: { email: "alice@example.invalid", name: "Again" } })).status, 409);
+
+    // Still an admin, now with Your lessons as well.
+    assert.equal((await call("/admin/students", { user: "dual", method: "GET" })).status, 200);
+    const me = await (await call("/me", { user: "dual", method: "GET" })).json();
+    assert.deepEqual([me.student.role, me.student.alsoStudent], ["teacher", true]);
+    assert.equal((await (await call("/me", { user: "teacher", method: "GET" })).json()).student.alsoStudent, false);
+    assert.equal((await call("/me/card", { user: "dual", body: {} })).status, 400, "past the gate: only the terms are missing");
+    assert.equal((await call("/me/card", { user: "teacher", body: {} })).status, 403);
+    assert.equal((await call("/me/homework", { user: "dual", method: "GET" })).status, 200);
+    assert.equal((await call("/me/expressions", { user: "dual", method: "GET" })).status, 200);
+
+    // Her Students tools work for them; the welcome is not theirs to receive.
+    assert.ok((await (await call("/admin/students", { user: "teacher", method: "GET" })).json()).students.some((row) => row.id === "dual"));
+    assert.equal((await call("/admin/students/dual/details", { user: "teacher", body: { name: "Daniel Dual", email, phone: "+351 912 000 000" } })).status, 200);
+    assert.equal((await call("/admin/students/dual/prices", { user: "teacher", body: { prices: { 90: 2600 } } })).status, 200);
+    assert.equal((await call("/admin/students/dual/welcome", { user: "teacher", body: {} })).status, 409);
+    await drain();
+    assert.equal(sentEmails.length, 0, "nothing is sent by adding them");
+    const lesson = await call("/admin/bookings", { user: "teacher", body: { studentId: "dual", lessonType: "single", startAt: "2026-11-03T10:00:00.000Z" } });
+    assert.equal(lesson.status, 201, await lesson.clone().text());
+    await drain();
+
+    // An emailed sign-in link is still a student's way in only.
+    sentEmails.length = 0;
+    assert.equal((await call("/auth/email-link", { user: null, headers: ip, body: { email } })).status, 200);
+    await drain();
+    assert.equal(sentEmails.length, 0);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sign_in_links WHERE student_id='dual'").get().n, 0);
+  } finally {
+    releaseEmail();
+    delete sessions.dual;
+    forgetStudent(email);
+  }
+});
+
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;
