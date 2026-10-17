@@ -10,6 +10,11 @@ import {
 } from "./series.mjs";
 import { buildCalendarInvite, buildCalendarSeriesInvite, calendarUid } from "./ics.mjs";
 import { deliver as sendEmail, splitWhen } from "./email.mjs";
+import {
+  FREE_LABEL, emailChangeConfirm, emailChangeNotice, lessonBookedTeacher, lessonCancelledTeacher, lessonMovedTeacher, lessonReminder,
+  passwordReset, paymentFailed, paymentReceipt, paymentReceivedTeacher, priceValue, signInLink, studentBooked,
+  studentCancelled, studentMoved, welcome as welcomeTemplate
+} from "./email-templates.mjs";
 import { NO_EMAIL_YET, isNoEmailYet, realEmail, withRealEmail } from "./no-email.mjs";
 import {
   chargeSavedCard,
@@ -363,15 +368,6 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const cancellationMessage = event === "cancelled" && byTeacher && !held
     ? row.cancellation_message?.trim() : "";
 
-  // A cancelled lesson has no call to join, so its place is named, not linked.
-  const baseRows = [
-    { label: "Lesson", value: lessonLine(lessonType) },
-    event === "cancelled"
-      ? { label: "Where", value: placeLabel(row) }
-      : { label: "Where", value: meetingUrl(row) ? "Join Google Meet" : placeLabel(row), url: meetingUrl(row) },
-    { label: "Reference", value: row.reference }
-  ];
-
   // The student's copy also says what it costs and how paying works — the
   // confirmation is the one email everyone reads, and payment shouldn't be a
   // surprise at the door. Not on a cancellation, where a price is just noise,
@@ -384,22 +380,8 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const isFree = row.payment_status === FREE;
   // Ticked "Already paid": paid to Inês by hand, so nothing is owed.
   const isPaidByHand = row.payment_consent_version === PAID_BY_HAND_MARK;
-  const priceValue = isFree
-    ? FREE_LABEL
-    : isPaid || isPaidByHand
-    ? `${formatEuros(lessonType.price_cents)} · paid`
-    : isOnCard
-      ? `${formatEuros(lessonType.price_cents)} · charged to your saved card after the lesson`
-      : welcome?.card
-        ? `${formatEuros(lessonType.price_cents)} · ${PAID_BY_HAND}`
-        : byTeacher
-          ? `${formatEuros(lessonType.price_cents)} · pay Inês as usual`
-          : `${formatEuros(lessonType.price_cents)} · pay on the day, in person`;
-  const studentRows =
-    event === "cancelled"
-      ? baseRows
-      : [...baseRows.slice(0, 2), { label: "Price", value: priceValue }, ...baseRows.slice(2)];
-
+  const priceTerms = isFree ? "free" : isPaid || isPaidByHand ? "paid" : isOnCard ? "card" : welcome?.card ? "untilCard" : byTeacher ? "asUsual" : "onTheDay";
+  const price = event === "cancelled" ? null : priceValue({ terms: priceTerms, amount: formatEuros(lessonType.price_cents) });
   const uid = calendarUid(row.id);
   const method = event === "cancelled" ? "CANCEL" : "REQUEST";
   // The manage link is the student's own credential to this booking, so it
@@ -435,158 +417,59 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const shortWhen = formatShort(start, PORTO);
   const studentShortWhen = formatShort(start, studentClock);
   const lessonTypeChanged = Boolean(previousLessonType && previousLessonType.id !== lessonType.id);
-
-  // Older already-paid bookings lock inside the window instead of paying.
-  // Current saved-card bookings stay changeable there for EUR 5.
-  const paidChangeFooter = [`Move or cancel free until ${notice} before the lesson.`, "After that, it can't be changed or refunded."];
-  const savedCardChangeFooter = [`Move or cancel free until ${notice} before the lesson.`, `After that, moving or cancelling costs ${fee}.`, `A no-show costs ${fee} instead of the lesson price.`];
-  const unpaidChangeFooter = ["Need to change it? Use the link above.", `It's free until ${notice} before the lesson; after that it costs ${fee}.`];
-  // A free lesson has no fee to warn of, only the notice she would like.
-  const freeChangeFooter = ["Need to change it? Use the link above.", `Please give Inês at least ${notice}' notice.`];
   const refundNote = wasRefunded
     ? `Refunded in full: your ${formatEuros(row.amount_cents ?? lessonType.price_cents)} is on its way back to your card and usually shows within a few days.`
     : "";
-  // A late move on a saved card already states its fee in the note above, so
-  // the footer adds only what the note doesn't say.
-  const lateOnCardFooter = row.same_day_change && isOnCard ? "This fee applies once per lesson." : "";
+  const first = row.student_name.split(" ")[0];
+  const facts = {
+    lesson: lessonLine(lessonType), lessonName: lessonName(lessonType), place: placeLabel(row),
+    meetingUrl: meetingUrl(row), reference: row.reference
+  };
+  const policyArgs = { notice, fee, manageUrl: event === "cancelled" ? "" : manageUrl };
 
-  const student = {
-    booked: byTeacher
-      ? {
-          // Written for someone who did not book it: Inês did.
-          subject: `Inês has booked your Portuguese lesson — ${studentShortWhen}`,
-          heading: "Inês has booked your lesson",
-          intro: welcome?.neverIn
-            ? `Olá ${row.student_name.split(" ")[0]}, here is your next lesson. From now on you can see and change your lessons on Inês's website.`
-            : `Olá ${row.student_name.split(" ")[0]}, Inês has booked this lesson for you. A calendar invitation is attached.`,
-          callout: "",
-          footer: welcome
-            ? [isFree ? `Please give Inês at least ${notice}' notice to change it.` : `It's free to change until ${notice} before the lesson; after that it costs ${fee}.`, ...WELCOME_FOOTER]
-            : isFree ? freeChangeFooter : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
-        }
-      : {
-      subject: `Your Portuguese lesson is booked — ${studentShortWhen}`,
-      heading: "You're booked",
-      intro: `Olá ${row.student_name.split(" ")[0]}, your lesson with Inês is ${
-        isPaid ? "paid and confirmed" : "confirmed"
-      }. A calendar invitation is attached.`,
-      callout: "",
-      footer: isFree ? freeChangeFooter : isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : unpaidChangeFooter
-    },
-    rescheduled: byTeacher
-      ? {
-          // Written for someone who did not ask for this. The old copy said
-          // "that's done", which reads as a confirmation of something you did
-          // — a strange thing to receive when Inês moved your lesson.
-          subject: `Inês has moved your lesson — now ${studentShortWhen}`,
-          heading: "Inês has moved your lesson",
-          intro: `Olá ${row.student_name.split(" ")[0]}, Inês has moved your lesson to the time below. An updated calendar invitation is attached. If the new time doesn't suit, choose another time or reply to this email.`,
-          callout: "",
-          footer: "No charge for a change she makes."
-        }
-      : lessonTypeChanged
-        ? {
-            subject: `Your lesson has changed — ${studentShortWhen}`,
-            heading: "Your lesson has changed",
-            intro: `Olá ${row.student_name.split(" ")[0]}, your lesson is now ${lessonType.duration_minutes} minutes at the time below. An updated calendar invitation is attached.`,
-            callout: sameDayNotice,
-            footer: lateOnCardFooter || (isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : "You can change or cancel it again from the same link.")
-          }
-        : {
-          subject: `Your lesson has moved — ${studentShortWhen}`,
-          heading: "Your lesson has moved",
-          intro: `Olá ${row.student_name.split(" ")[0]}, your new lesson time is below. An updated calendar invitation is attached.`,
-          callout: sameDayNotice,
-          footer: lateOnCardFooter || (isPaid ? paidChangeFooter : isOnCard ? savedCardChangeFooter : "You can move or cancel it again from the same link.")
-        },
-    cancelled: byTeacher
-      ? {
-          subject: `Inês has cancelled your lesson on ${studentShortWhen}`,
-          heading: "Inês has cancelled this lesson",
-          intro: cancellationMessage
-            ? `Olá ${row.student_name.split(" ")[0]}, Inês has left you a message below. A cancellation update for your calendar is attached.`
-            : `Olá ${row.student_name.split(" ")[0]}, Inês has cancelled this lesson. Sorry about that — reply to arrange another time. A cancellation update for your calendar is attached.`,
-          callout: refundNote,
-          footer: "A cancellation Inês makes never costs you anything."
-        }
-      : {
-          subject: `Your lesson on ${studentShortWhen} is cancelled`,
-          heading: "Your lesson is cancelled",
-          intro: `Olá ${row.student_name.split(" ")[0]}, your lesson has been cancelled and removed from your calendar.`,
-          callout: wasRefunded
-            ? refundNote
-            : row.same_day_change
-              ? sameDayNotice
-              : isOnCard
-                ? "The lesson price will not be charged."
-                : "",
-          footer: "You're welcome back any time — booking is always open on the website."
-        }
-  }[event];
+  const student = event === "booked"
+    ? studentBooked({
+        ...facts, ...policyArgs, first, byInes: byTeacher, welcome, when: studentWhen, shortWhen: studentShortWhen, price, paid: isPaid,
+        // Older already-paid bookings lock inside the window; saved-card ones stay changeable for the fee.
+        policy: isFree ? "free" : isPaid && !byTeacher ? "paid" : isOnCard ? "card" : "unpaid"
+      })
+    : event === "rescheduled"
+      ? studentMoved({
+          ...facts, ...policyArgs, first, byInes: byTeacher, lengthChanged: lessonTypeChanged, minutes: lessonType.duration_minutes,
+          when: studentWhen, shortWhen: studentShortWhen, price, lateNote: sameDayNotice,
+          policy: row.same_day_change && isOnCard ? "late" : isPaid ? "paid" : isOnCard ? "card" : "again"
+        })
+      : studentCancelled({
+          ...facts, first, byInes: byTeacher, message: cancellationMessage, when: studentWhen, shortWhen: studentShortWhen,
+          note: byTeacher ? refundNote : wasRefunded ? refundNote : row.same_day_change ? sameDayNotice : isOnCard ? "The lesson price will not be charged." : ""
+        });
 
-  const teacher = {
-    booked: byTeacher ? {
-      subject: `You added a lesson — ${row.student_name}, ${shortWhen}`,
-      heading: "You added a lesson",
-      intro: held
-        ? `You added a lesson for ${row.student_name}. They haven't been emailed: ${isNoEmailYet(row.student_email) ? "add their email under Edit details, then send their welcome." : "send their welcome from Students when you're ready."}`
-        : `You added a lesson for ${row.student_name}. They have been emailed the details${welcomeNote(welcome)}.`,
-      callout: ""
-    } : {
-      subject: `New booking — ${row.student_name}, ${shortWhen}`,
-      heading: "New booking",
-      // The invitation carries PARTSTAT=ACCEPTED, so there is nothing for her
-      // to accept — telling her to was instructing a step that doesn't exist.
-      intro: `${row.student_name} has booked a lesson. The attached invitation goes straight into your calendar.`,
-      callout: isPaid
-        ? `Stripe received ${formatEuros(row.amount_cents ?? lessonType.price_cents)} today. Issue the appropriate Portal das Finanças document for this payment today.`
-        : ""
-    },
-    rescheduled: {
-      subject: byTeacher
-        ? `You moved ${row.student_name}'s lesson — ${shortWhen}`
-        : lessonTypeChanged
-          ? `Lesson changed — ${row.student_name}, ${shortWhen}`
-          : `${row.same_day_change ? "Late change" : "Lesson moved"} — ${row.student_name}, ${shortWhen}`,
-      heading: byTeacher
-        ? "You moved this lesson"
-        : lessonTypeChanged
-          ? "Lesson changed"
-          : row.same_day_change
-            ? `Moved less than ${notice} before`
-            : "Lesson moved",
-      intro: byTeacher
-        ? `You moved ${row.student_name}'s lesson${
-            previousStartsAt ? ` from ${formatInZone(new Date(previousStartsAt), PORTO)}` : ""
-          }. ${held ? "They haven't been emailed yet" : "They have been told"}, and your calendar has been updated.`
-        : lessonTypeChanged
-          ? `${row.student_name} changed their lesson from ${previousLessonType.duration_minutes} to ${lessonType.duration_minutes} minutes${
-              previousStartsAt ? ` and moved it from ${formatInZone(new Date(previousStartsAt), PORTO)}` : ""
-            }. Your calendar has been updated.`
-          : `${row.student_name} moved their lesson${
-              previousStartsAt ? ` from ${formatInZone(new Date(previousStartsAt), PORTO)}` : ""
-            }. Your calendar has been updated.`,
-      callout: row.same_day_change
-        ? `This was changed less than ${notice} before the lesson, so the ${fee} fee ${
-            automaticSameDayFee ? "is charged automatically to the student's saved card" : "is due"
-          }.`
-        : ""
-    },
-    cancelled: {
-      subject: byTeacher
-        ? `You cancelled ${row.student_name}'s lesson — ${shortWhen}`
-        : `${row.same_day_change ? "Late cancellation" : "Cancellation"} — ${row.student_name}, ${shortWhen}`,
-      heading: byTeacher ? "You cancelled this lesson" : row.same_day_change ? `Cancelled less than ${notice} before` : "Lesson cancelled",
-      intro: byTeacher
-        ? `You cancelled ${row.student_name}'s lesson on ${formatInZone(start, PORTO)}. ${held ? "They hadn't been emailed about it" : "They have been told"}, and it is off your calendar.`
-        : `${row.student_name} cancelled their lesson on ${formatInZone(start, PORTO)}. It has been removed from your calendar.`,
-      callout: wasRefunded
-        ? `${formatEuros(row.amount_cents ?? lessonType.price_cents)} was refunded automatically — nothing to sort out.`
-        : row.same_day_change
-          ? `This was cancelled less than ${notice} before the lesson, so the ${fee} fee applies.`
-          : ""
-    }
-  }[event];
+  const nif = await studentNif(env, row.student_id);
+  const calendarAttached = !(await calendarOwnsTeacherInvites(env));
+  const who = {
+    name: row.student_name, email: shownEmail(row.student_email), phone: row.student_phone, nif, notes: row.notes
+  };
+  const teacherFacts = { ...facts, student: who, byInes: byTeacher, held, when: hero, heroNote: teacherHeroNote, shortWhen, notice };
+  const teacher = event === "booked"
+    ? lessonBookedTeacher({
+        ...teacherFacts, noEmailYet: isNoEmailYet(row.student_email), welcome, calendarAttached,
+        paidAmount: isPaid ? formatEuros(row.amount_cents ?? lessonType.price_cents) : ""
+      })
+    : event === "rescheduled"
+      ? lessonMovedTeacher({
+          ...teacherFacts, lengthChanged: !byTeacher && lessonTypeChanged, fromMinutes: previousLessonType?.duration_minutes,
+          minutes: lessonType.duration_minutes, late: Boolean(row.same_day_change),
+          previousWhen: previousStartsAt ? formatInZone(new Date(previousStartsAt), PORTO) : "",
+          lateNote: row.same_day_change
+            ? `This was changed less than ${notice} before the lesson, so the ${fee} fee ${automaticSameDayFee ? "is charged automatically to the student's saved card" : "is due"}.`
+            : ""
+        })
+      : lessonCancelledTeacher({
+          ...teacherFacts, late: Boolean(row.same_day_change), message: cancellationMessage, longWhen: formatInZone(start, PORTO),
+          note: wasRefunded
+            ? `${formatEuros(row.amount_cents ?? lessonType.price_cents)} was refunded automatically — nothing to sort out.`
+            : row.same_day_change ? `This was cancelled less than ${notice} before the lesson, so the ${fee} fee applies.` : ""
+        });
 
   const sends = [
     deliver(env, {
@@ -597,23 +480,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       dedupeKey: `student:${event}:${row.id}:${row.sequence}`,
       replyTo,
       calendar: { body: invite([{ name: row.student_name, email: row.student_email }], true), method },
-      content: {
-        heading: student.heading,
-        intro: student.intro,
-        message: cancellationMessage ? { label: "Message from Inês", body: cancellationMessage } : null,
-        callout: student.callout,
-        hero: studentWhen,
-        heroNote: "",
-        preheader: event === "booked" && welcome
-          ? "Inês has booked your lesson. Sign in with one click to see it."
-          : `${lessonName(lessonType)} · ${studentWhen}`,
-        rows: studentRows,
-        steps: event === "booked" && welcome ? welcomeSteps(welcome) : null,
-        action: event === "booked" && welcome
-          ? welcomeAction(welcome)
-          : manageUrl && event !== "cancelled" ? { label: "Change or cancel this lesson", url: manageUrl } : null,
-        footer: student.footer
-      }
+      content: student.content
     }).then(async result => {
       if (result.ok && !result.skipped && event !== "cancelled") await markMeetingNotified(env, row);
       return result;
@@ -622,7 +489,6 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
 
   if (teacherNotificationsEnabled(env) && teacherEmail) {
     // Her receipt automation reads these emails, so every copy carries the NIF.
-    const nifRow = receiptNifRow(await studentNif(env, row.student_id));
     sends.push(
       deliver(env, {
         to: teacherEmail,
@@ -631,50 +497,31 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         bookingId: row.id,
         dedupeKey: `teacher:${event}:${row.id}:${row.sequence}`,
         replyTo: row.student_email,
-        calendar: await calendarOwnsTeacherInvites(env) ? null : { body: invite([{ name: settings.teacherName, email: teacherEmail }]), method },
-        content: {
-          heading: teacher.heading,
-          intro: teacher.intro,
-          message: cancellationMessage ? { label: "Your message to the student", body: cancellationMessage } : null,
-          callout: teacher.callout,
-          hero,
-          heroNote: teacherHeroNote,
-          preheader: `${row.student_name} · ${lessonName(lessonType)} · ${portoTime}`,
-          rows: [
-            ...baseRows,
-            { label: "Student", value: `${row.student_name}\n${shownEmail(row.student_email)}${row.student_phone ? `\n${row.student_phone}` : ""}` },
-            nifRow,
-            ...(row.notes ? [{ label: "Notes", value: row.notes }] : [])
-          ],
-          action: null,
-          footer: "Sent automatically by the booking system."
-        }
+        calendar: calendarAttached ? { body: invite([{ name: settings.teacherName, email: teacherEmail }]), method } : null,
+        content: teacher.content
       })
     );
   }
 
   return Promise.allSettled(sends);
 }
-
 /** A link that was not ready for the confirmation gets its own short email. */
 async function notifyMeetingReady(env, input) {
   const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(input.id).first();
   const url = meetingUrl(row);
   if (!url || row.ends_at <= new Date().toISOString()) return false;
   const settings = await loadSettings(env);
+  const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first().catch(() => null);
+  const { subject, content } = lessonReminder({
+    linkOnly: true, first: row.student_name.split(" ")[0], reference: row.reference, meetingUrl: url,
+    lesson: lessonType ? lessonLine(lessonType) : "", when: lessonWhen(new Date(row.starts_at), lessonZone(row)),
+    manageUrl: studentManageUrl(env, await createManageToken(row.id, env.BOOKING_TOKEN_SECRET))
+  });
   const result = await deliver(env, {
-    to: row.student_email, subject: "Your online lesson link", kind: "student_meeting_ready",
+    to: row.student_email, subject, kind: "student_meeting_ready",
     bookingId: row.id, dedupeKey: `student:meeting:${row.id}:${url}`,
     replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail,
-    content: {
-      heading: "Your online lesson link",
-      intro: `Olá ${row.student_name.split(" ")[0]}, here’s the Google Meet link for your lesson with Inês.`,
-      hero: lessonWhen(new Date(row.starts_at), lessonZone(row)),
-      preheader: "Join your lesson from your email or booking.",
-      rows: [{ label: "Reference", value: row.reference }],
-      action: { label: "Join Google Meet", url },
-      footer: "You can also find this link in your booking. See you soon!"
-    }
+    content
   });
   return result.ok;
 }
@@ -699,44 +546,13 @@ const REMINDER_RETRY_MINUTES = 5;
 function reminderEmail({ row, lessonType, settings, manageUrl, meetingLink, meetComing }) {
   const start = new Date(row.starts_at);
   const zone = lessonZone(row);
-  const first = row.student_name.split(" ")[0];
-  const cutoff = formatShort(new Date(start.getTime() - settings.minimumNoticeHours * 3600000), zone);
-  // The cut-off is where the change policy starts charging, so it is always the
-  // moment that is true; no "today" or "tomorrow" anywhere.
-  const footer = row.payment_status === FREE
-    ? [`If you need to change or cancel it, please do so by ${cutoff}.`]
-    : [`Free to change or cancel until ${cutoff}.`,
-      row.payment_status === "paid"
-        ? "After that, it can’t be changed or refunded."
-        : `After that, there’s a ${formatEuros(settings.sameDayChangeFeeCents)} late change fee.`
-    ];
-  const manage = { label: "Change or cancel this lesson", url: manageUrl };
-
-  return {
-    subject: `Your lesson is coming up — ${formatShort(start, zone)}`,
-    content: {
-      heading: "Your lesson is coming up",
-      preheader: `${lessonName(lessonType)} · ${meetingLink ? "Your Google Meet link is in this email." : placeLabel(row)}`,
-      intro: meetingLink
-        ? `Olá ${first}, your lesson with Inês is coming up. Here’s the Google Meet link to join it.`
-        : meetComing
-          ? `Olá ${first}, your lesson with Inês is coming up. Its Google Meet link isn’t ready yet; we’ll email it to you as soon as it is.`
-          : `Olá ${first}, your lesson with Inês is coming up.`,
-      hero: lessonWhen(start, zone),
-      heroNote: "",
-      callout: "",
-      rows: [
-        { label: "Lesson", value: lessonLine(lessonType) },
-        { label: "Where", value: placeLabel(row) },
-        { label: "Reference", value: row.reference }
-      ],
-      // The coral button marks the one thing still to do: join, when there is a
-      // link. Changing is the rare action, so it drops to a quiet link then.
-      action: meetingLink ? { label: "Join Google Meet", url: meetingLink } : manage,
-      ...(meetingLink ? { link: manage } : {}),
-      footer
-    }
-  };
+  return lessonReminder({
+    first: row.student_name.split(" ")[0], lessonName: lessonName(lessonType), lesson: lessonLine(lessonType), place: placeLabel(row),
+    reference: row.reference, when: lessonWhen(start, zone), shortWhen: formatShort(start, zone), meetingUrl: meetingLink || "", meetComing, manageUrl,
+    cutoff: formatShort(new Date(start.getTime() - settings.minimumNoticeHours * 3600000), zone),
+    policy: row.payment_status === FREE ? "free" : row.payment_status === "paid" ? "paid" : "card",
+    fee: formatEuros(settings.sameDayChangeFeeCents)
+  });
 }
 
 /**
@@ -886,7 +702,6 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
 
   const cadence = series.occurrences ? `${rows.length} lessons` : "Every week, until you stop it";
   const multipleWeeklyTimes = (series.weeklyTimes ?? 1) > 1;
-  const weeklyTimeCopy = multipleWeeklyTimes ? "both times are" : "the same time is";
   // A nonexistent spring wall time cannot be represented by an instant.
   // Skipped values also travel through older card-setup metadata, so show
   // dates here rather than interpreting that placeholder as a real time.
@@ -902,66 +717,39 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     : "";
 
   // Each copy lists the dates on its reader's clock.
-  const rowsOn = (zone, forTeacher = false) => [
-    { label: "Lesson", value: lessonLine(lessonType) },
-    { label: "Where", value: placeLabel(first) },
-    { label: series.oneOff ? "Booking" : "Repeats", value: forTeacher && !series.occurrences ? "Every week, until stopped" : cadence },
-    ...(rows.some(row => meetingUrl(row))
-      ? rows.map(row => ({ label: formatShort(new Date(row.starts_at), zone),
-          value: meetingUrl(row)
-            ? "Join Google Meet"
-            : row.location === "online"
-              ? (forTeacher ? "Meet link not ready yet" : "Online link will appear in your booking")
-              : placeLabel(row),
-          url: meetingUrl(row),
-          lesson: true,
-          quiet: !meetingUrl(row) && row.location === "online" }))
-      : [{ label: "Dates", value: rows.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n"), dates: true }])
-  ];
-  const studentRowsOn = rowsOn(studentClock);
-  const teacherRows = rowsOn(PORTO, true);
+  const runOn = (zone, forTeacher = false) => ({
+    oneOff: Boolean(series.oneOff), fixed: Boolean(series.occurrences), twoTimes: multipleWeeklyTimes, count: rows.length, skippedNote,
+    repeats: { label: series.oneOff ? "Booking" : "Repeats", value: forTeacher && !series.occurrences ? "Every week, until stopped" : cadence },
+    occurrences: rows.map((row) => ({
+      short: formatShort(new Date(row.starts_at), zone), long: formatInZone(new Date(row.starts_at), zone),
+      meetingUrl: meetingUrl(row), online: row.location === "online", place: placeLabel(row)
+    })),
+    lastShort: formatShort(new Date(rows[rows.length - 1].starts_at), PORTO)
+  });
 
-  // Price on the student's copy only, per lesson — Inês doesn't need her own
-  // prices repeated to her. Current runs charge each lesson separately after
-  // it ends; an older run keeps the pay-on-the-day terms it was booked under.
+  // Price on the student's copy only, per lesson. Current runs charge each
+  // lesson separately after it ends; an older run keeps its pay-on-the-day terms.
   const seriesOnCard = rows.some((row) => row.payment_status === "paid" || row.payment_status === "scheduled");
   const seriesFree = rows.every((row) => row.payment_status === FREE);
-  const studentSeriesRows = [
-    ...studentRowsOn.slice(0, 2),
-    {
-      label: "Price",
-      value: seriesFree
-        ? FREE_LABEL
-        : seriesOnCard
-        ? `${formatEuros(lessonType.price_cents)} a lesson · charged to your saved card after each lesson`
-        : welcome?.card
-          ? `${formatEuros(lessonType.price_cents)} a lesson · ${PAID_BY_HAND}`
-          : byTeacher
-            ? `${formatEuros(lessonType.price_cents)} a lesson · pay Inês as usual`
-            : `${formatEuros(lessonType.price_cents)} a lesson · pay on the day, in person`
-    },
-    ...studentRowsOn.slice(2)
-  ];
-  // A slot Inês set up reads as one line, its day and time, rather than a
-  // long list of dates: they are in the attachment and on the website
-  // (12 October 2026, Dan: simple to understand).
+  const price = priceValue({
+    run: true, amount: formatEuros(lessonType.price_cents),
+    terms: seriesFree ? "free" : seriesOnCard ? "card" : welcome?.card ? "untilCard" : byTeacher ? "asUsual" : "onTheDay"
+  });
   const slotWeekday = new Intl.DateTimeFormat("en-GB", { timeZone: studentClock, weekday: "long" }).format(new Date(first.starts_at));
   const slotTime = new Intl.DateTimeFormat("en-GB", { timeZone: studentClock, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
     .format(new Date(first.starts_at));
-  const plainSlot = byTeacher && reason === "booked" && !series.oneOff;
-  if (plainSlot) {
-    studentSeriesRows.splice(3, studentSeriesRows.length, {
-      label: "When",
-      value: `Every ${slotWeekday}, ${slotTime}${series.occurrences ? ` · ${rows.length} lessons` : ""}`
-    });
-  }
-  const seriesFee = formatEuros(settings.sameDayChangeFeeCents);
-  const seriesFooter = seriesFree
-    ? [`Please give Inês at least ${settings.minimumNoticeHours} hours' notice to move or cancel a lesson.`]
-    : seriesOnCard
-    ? [`Move or cancel any single lesson free until ${settings.minimumNoticeHours} hours before it.`, `After that, moving or cancelling costs ${seriesFee}.`, `A no-show costs ${seriesFee} instead of the lesson price.`]
-    : [`Moving or cancelling a lesson is free until ${settings.minimumNoticeHours} hours before it; after that it costs ${seriesFee}.`];
   const moved = reason === "moved";
+  const common = {
+    lesson: lessonLine(lessonType), lessonName: lessonName(lessonType), place: placeLabel(first),
+    notice: `${settings.minimumNoticeHours} hours`, fee: formatEuros(settings.sameDayChangeFeeCents)
+  };
+  const studentFacts = {
+    ...common, first: first.student_name.split(" ")[0], byInes: byTeacher, welcome, price,
+    when: lessonWhen(new Date(first.starts_at), studentClock), shortWhen: formatShort(new Date(first.starts_at), studentClock),
+    policy: seriesFree ? "free" : seriesOnCard ? "card" : "unpaid",
+    lessonsUrl: siteUrl(env, "/book/?view=lessons"),
+    run: { ...runOn(studentClock), slot: reason === "booked" ? { weekday: slotWeekday, time: slotTime } : null }
+  };
 
   const sends = [];
 
@@ -971,14 +759,11 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   // stream of confirmations. A move, cancellation or payment remains a real
   // lifecycle event and continues through its own notification path.
   if (reason !== "extended") {
+    const { subject, content } = moved ? studentMoved(studentFacts) : studentBooked(studentFacts);
     sends.push(
       deliver(env, {
         to: first.student_email,
-        subject: moved
-          ? `Your weekly Portuguese lessons have moved — from ${formatShort(new Date(first.starts_at), studentClock)}`
-          : byTeacher
-            ? `Inês has booked your weekly Portuguese lessons — from ${formatShort(new Date(first.starts_at), studentClock)}`
-            : `Your ${series.oneOff ? "" : "weekly "}Portuguese lessons are booked — from ${formatShort(new Date(first.starts_at), studentClock)}`,
+        subject,
         kind: moved ? "student_series_moved" : "student_series_booked",
         bookingId: first.id,
         dedupeKey: moved
@@ -986,28 +771,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
           : `student:series:${series.id}:${rows[0].id}`,
         replyTo,
         calendar: { body: invite({ name: first.student_name, email: first.student_email }, true), method: "REQUEST" },
-        content: {
-          heading: moved ? "Your weekly lessons have moved" : series.oneOff ? "Your lessons are booked" : multipleWeeklyTimes ? "Your weekly times are booked" : "Your weekly slot is booked",
-          intro: plainSlot
-            ? `Olá ${first.student_name.split(" ")[0]}, Inês has kept ${slotWeekday}s at ${slotTime} for you. ${
-                series.occurrences ? "Every lesson is in your calendar attachment." : "New weeks appear on their own until the slot is stopped."
-              }${welcome?.neverIn ? " You can see and change them on Inês's website." : ""}`
-            : moved
-            ? `Olá ${first.student_name.split(" ")[0]}, your upcoming weekly lessons now use this new time. The updated dates are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`
-            : series.oneOff
-              ? `Olá ${first.student_name.split(" ")[0]}, your selected lessons are booked. Every date is in the calendar attachment, and you can move or cancel each lesson from your lesson calendar.`
-              : series.occurrences
-                ? `Olá ${first.student_name.split(" ")[0]}, ${weeklyTimeCopy} now held for you each week. Every lesson is in the calendar attachment, and you can move or cancel any one of them on your lesson calendar.`
-                : `Olá ${first.student_name.split(" ")[0]}, ${weeklyTimeCopy} now held for you each week. Your current lessons are in the calendar attachment, and new weeks will appear automatically on your lesson calendar without extra confirmation emails.`,
-          callout: skippedNote,
-          hero: lessonWhen(new Date(first.starts_at), studentClock),
-          heroNote: "",
-          preheader: `${lessonName(lessonType)} · ${cadence}`,
-          rows: studentSeriesRows,
-          steps: welcome && !moved ? welcomeSteps(welcome) : null,
-          action: welcome ? welcomeAction(welcome) : { label: "See all your lessons", url: siteUrl(env, "/book/?view=lessons") },
-          footer: welcome ? [...seriesFooter, ...WELCOME_FOOTER] : seriesFooter
-        }
+        content
       }).then(async result => {
         if (result.ok && !result.skipped) await Promise.all(rows.map(row => markMeetingNotified(env, row)));
         return result;
@@ -1016,18 +780,17 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   }
 
   if (teacherNotificationsEnabled(env) && teacherEmail) {
-    const nifRow = receiptNifRow(await studentNif(env, first.student_id));
+    const teacherFacts = {
+      ...common, byInes: byTeacher, held, noEmailYet: isNoEmailYet(first.student_email), welcome,
+      student: { name: first.student_name, email: shownEmail(first.student_email), phone: first.student_phone, nif: await studentNif(env, first.student_id), notes: first.notes },
+      when: `${formatInZone(new Date(first.starts_at), PORTO)}, Porto time`, shortWhen: formatShort(new Date(first.starts_at), PORTO),
+      run: runOn(PORTO, true), extended: reason === "extended"
+    };
+    const { subject, content } = moved ? lessonMovedTeacher(teacherFacts) : lessonBookedTeacher(teacherFacts);
     sends.push(
       deliver(env, {
         to: teacherEmail,
-        subject:
-          reason === "extended"
-            ? `Weekly slot extended — ${first.student_name}, to ${formatShort(new Date(rows[rows.length - 1].starts_at), PORTO)}`
-            : moved
-              ? `Weekly slot moved — ${first.student_name}, from ${formatShort(new Date(first.starts_at), PORTO)}`
-            : byTeacher
-              ? `You added a weekly slot — ${first.student_name}, from ${formatShort(new Date(first.starts_at), PORTO)}`
-            : `${series.oneOff ? "Lesson bookings" : "Weekly booking"} — ${first.student_name}, from ${formatShort(new Date(first.starts_at), PORTO)}`,
+        subject,
         kind: reason === "extended" ? "teacher_series_extended" : moved ? "teacher_series_moved" : "teacher_series_booked",
         bookingId: first.id,
         dedupeKey: moved
@@ -1035,30 +798,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
           : `teacher:series:${series.id}:${rows[0].id}`,
         replyTo: first.student_email,
         calendar: await calendarOwnsTeacherInvites(env) ? null : { body: invite({ name: settings.teacherName, email: teacherEmail }), method: "REQUEST" },
-        content: {
-          heading: reason === "extended" ? "A weekly slot was extended" : moved ? "A weekly slot was moved" : byTeacher ? "You added a weekly slot" : series.oneOff ? "Lessons were booked" : multipleWeeklyTimes ? "Two weekly times were booked" : "A weekly slot was booked",
-          intro:
-            reason === "extended"
-              ? `${first.student_name}'s open-ended weekly slot has been carried forward. The new lessons will appear in your calendar.`
-              : moved
-                ? `${first.student_name}'s upcoming weekly lessons have moved. The updated events will appear in your calendar.`
-              : byTeacher
-                ? `You added a weekly slot for ${first.student_name}. ${held ? `They haven't been emailed: ${isNoEmailYet(first.student_email) ? "add their email under Edit details, then send their welcome" : "send their welcome from Students when you're ready"}` : `They have been emailed the details${welcomeNote(welcome)}`}, and every lesson will appear in your calendar.`
-              : `${first.student_name} booked ${series.oneOff ? "these individual lessons" : multipleWeeklyTimes ? "two times each week" : "the same slot each week"}. Every lesson will appear in your calendar.`,
-          callout:
-            skippedNote,
-          hero: `${formatInZone(new Date(first.starts_at), PORTO)}, Porto time`,
-          heroNote: "",
-          preheader: `${first.student_name} · ${cadence}`,
-          rows: [
-            ...teacherRows,
-            { label: "Student", value: `${first.student_name}\n${shownEmail(first.student_email)}${first.student_phone ? `\n${first.student_phone}` : ""}` },
-            nifRow,
-            ...(first.notes ? [{ label: "Notes", value: first.notes }] : [])
-          ],
-          action: null,
-          footer: "Sent automatically by the booking system."
-        }
+        content
       })
     );
   }
@@ -1160,55 +900,38 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
   const studentClock = lessonZone(first);
   const count = `${rows.length} ${rows.length === 1 ? "lesson" : "lessons"}`;
 
+  const studentCopy = studentCancelled({
+    first: first.student_name.split(" ")[0],
+    run: { count, zone: zoneName(studentClock, new Date(first.starts_at)), dates: datesOn(studentClock) }
+  });
   const sends = [
     deliver(env, {
       to: first.student_email,
-      subject: `Your weekly lessons are cancelled — ${count}`,
+      subject: studentCopy.subject,
       kind: "student_series_cancelled",
       bookingId: first.id,
       dedupeKey: `student:series-cancel:${first.id}:${rows.length}`,
       replyTo,
       calendar: { body: invite({ name: first.student_name, email: first.student_email }), method: "CANCEL" },
-      content: {
-        heading: "Your weekly lessons are cancelled",
-        preheader: `${count} removed from your calendar.`,
-        intro: `Olá ${first.student_name.split(" ")[0]}, the rest of your weekly run has been cancelled and removed from your calendar. You're welcome back any time — booking is always open on the website.`,
-        callout: "",
-        hero: "",
-        heroNote: "",
-        rows: [{ label: `Cancelled, ${zoneName(studentClock, new Date(first.starts_at))}`, value: datesOn(studentClock), dates: true }],
-        action: null,
-        footer: "Booking is always open on portuguesewithines.com."
-      }
+      content: studentCopy.content
     })
   ];
 
   if (teacherNotificationsEnabled(env) && teacherEmail) {
-    const nifRow = receiptNifRow(await studentNif(env, first.student_id));
+    const teacherCopy = lessonCancelledTeacher({
+      student: { name: first.student_name, email: shownEmail(first.student_email), nif: await studentNif(env, first.student_id) },
+      run: { count, dates: datesOn(PORTO) }
+    });
     sends.push(
       deliver(env, {
         to: teacherEmail,
-        subject: `Weekly run cancelled — ${first.student_name}, ${count}`,
+        subject: teacherCopy.subject,
         kind: "teacher_series_cancelled",
         bookingId: first.id,
         dedupeKey: `teacher:series-cancel:${first.id}:${rows.length}`,
         replyTo: first.student_email,
         calendar: await calendarOwnsTeacherInvites(env) ? null : { body: invite({ name: settings.teacherName, email: teacherEmail }), method: "CANCEL" },
-        content: {
-          heading: "A weekly run was cancelled",
-          preheader: `${first.student_name} · ${count}`,
-          intro: `${first.student_name} cancelled the rest of their weekly lessons. They are off your calendar.`,
-          callout: "",
-          hero: "",
-          heroNote: "",
-          rows: [
-            { label: "Student", value: `${first.student_name}\n${shownEmail(first.student_email)}` },
-            nifRow,
-            { label: "Cancelled", value: datesOn(PORTO), dates: true }
-          ],
-          action: null,
-          footer: "Sent automatically by the booking system."
-        }
+        content: teacherCopy.content
       })
     );
   }
@@ -1308,20 +1031,6 @@ async function issueWelcome(env, settings, student, { always = false } = {}) {
   return { ...await issueSignInLink(env, student, WELCOME_LINK_MINUTES), card, neverIn };
 }
 
-/**
- * The way in, as numbered steps right above the button that takes it. With
- * no card to add there is one step, and the button says it on its own.
- */
-function welcomeSteps(welcome, { book = false } = {}) {
-  // With no lesson yet, the last step is theirs: choosing one (16 October 2026, Inês).
-  if (book) {
-    const items = ["Press the button below to sign in.", ...(welcome.card ? ["Add your card."] : []), "Choose a day and time for your next lesson."];
-    return { title: items.length === 3 ? "Three quick steps" : "Two quick steps", items };
-  }
-  return welcome.card
-    ? { title: "Two quick steps", items: ["Press the button below to sign in.", "Add your card. That’s it."] }
-    : null;
-}
 
 
 /**
@@ -1342,8 +1051,6 @@ const RECORDED = "recorded";
  */
 const FREE = "free";
 
-/** What a free lesson says where a price would be. */
-const FREE_LABEL = "Free";
 
 /**
  * The SET clauses that make a lesson free when its new amount is 0, as a
@@ -1409,19 +1116,6 @@ async function paysNothing(env, studentId) {
   return rates[60] === 0 && rates[90] === 0;
 }
 
-/** What a lesson Inês added costs until the student's card pays for it. */
-const PAID_BY_HAND = "pay Inês as usual until you add your card";
-
-/** How her own email says the student was brought in. */
-function welcomeNote(welcome) {
-  return welcome?.card ? ", with a link to sign in and add their card" : welcome ? ", with a link to sign in" : "";
-}
-
-function welcomeAction(welcome, { book = false } = {}) {
-  return { label: welcome.card ? "Sign in and add card" : book ? "Sign in and book" : "Sign in, no password needed", url: welcome.url };
-}
-
-const WELCOME_FOOTER = ["The button lasts 14 days.", "Later, press Sign in on the website, then “Email me a sign-in link”."];
 
 /** How many lines of lessons a welcome carries before the rest are left to the website. */
 const WELCOME_LESSON_LINES = 12;
@@ -1558,30 +1252,21 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
     value: prices[minutes] === 0 ? FREE_LABEL : `${formatEuros(prices[minutes])} a lesson`
   })));
   const free = prices[60] === 0 && prices[90] === 0;
+  const { subject, content } = welcomeTemplate({ first, welcome, book, card: welcome.card, free, rows });
   return deliver(env, {
     to: student.email,
-    subject: book
-      ? "Book your next lesson with Inês"
-      : welcome.card ? "Your lessons with Inês: add your card" : "Your lessons with Inês, in one place",
+    subject,
     kind: "student_welcome",
     dedupeKey: `welcome:${welcome.nonce}`,
     replyTo: settings.replyToEmail || teacherEmail || undefined,
-    content: {
-      heading: book ? "Book your next lesson" : "Your lessons, in one place",
-      preheader: book ? "Sign in with one click, then choose a time." : "Sign in with one click, no password needed.",
-      intro: book
-        ? `Olá ${first}, Inês has set you up on her website. Sign in with one click, no password needed, and choose a time for your next lesson.`
-        : `Olá ${first}, Inês has set up your lessons on her website. Here they are; sign in to see or change them.`,
-      callout: free ? "Your lessons with Inês are free: there’s no card to add and nothing to pay." : "",
-      rows,
-      steps: welcomeSteps(welcome, { book }),
-      action: welcomeAction(welcome, { book }),
-      footer: WELCOME_FOOTER
-    }
+    content
   });
 }
 
 /** Her students at a glance: who is in, who has a card, what comes next. */
+/** How long her Needs you shows that a student has just added a card. */
+const CARD_ADDED_NOTICE_DAYS = 7;
+
 async function teacherStudentList(env) {
   const now = new Date().toISOString();
   const { results } = await env.DB.prepare(
@@ -1604,6 +1289,37 @@ async function teacherStudentList(env) {
   )
     .bind(now, now)
     .all();
+  /*
+   * Two things that used to be emails to her and are now cards in Needs you
+   * (16 October 2026, Dan): a saved card that was declined, until it is paid,
+   * and a card just added, for a week, with the lessons she added that it now
+   * pays for, so one already paid by hand can be taken off it.
+   */
+  const { results: declinedRows } = await env.DB.prepare(
+    `SELECT id, student_id, reference, starts_at, attendance_status, payment_status, same_day_fee_status,
+       COALESCE(charged_cents, amount_cents) AS lesson_cents, same_day_fee_cents
+     FROM bookings WHERE student_id IS NOT NULL AND (payment_status = 'payment_due' OR same_day_fee_status = 'payment_due')
+     ORDER BY starts_at`
+  ).all();
+  const declined = {};
+  for (const row of declinedRows ?? []) {
+    const list = (declined[row.student_id] ??= []);
+    if (row.payment_status === "payment_due") {
+      list.push({ bookingId: row.id, reference: row.reference, startsAt: row.starts_at, amountCents: row.lesson_cents ?? null,
+        part: row.attendance_status === "no_show" ? "no-show" : "lesson" });
+    }
+    if (row.same_day_fee_status === "payment_due") {
+      list.push({ bookingId: row.id, reference: row.reference, startsAt: row.starts_at, amountCents: row.same_day_fee_cents ?? null, part: "fee" });
+    }
+  }
+  const noticeFrom = new Date(Date.now() - CARD_ADDED_NOTICE_DAYS * 86400000).toISOString();
+  const { results: onCardRows } = await env.DB.prepare(
+    `SELECT b.id, b.student_id, b.starts_at FROM bookings b JOIN students s ON s.id = b.student_id
+     WHERE s.card_consent_at > ? AND b.added_by_teacher = 1 AND b.status = 'confirmed' AND b.payment_status = 'scheduled'
+       AND b.payment_consent_at = s.card_consent_at AND b.starts_at > ? ORDER BY b.starts_at`
+  ).bind(noticeFrom, now).all();
+  const onCard = {};
+  for (const row of onCardRows ?? []) (onCard[row.student_id] ??= []).push({ bookingId: row.id, startsAt: row.starts_at });
   const { results: rates } = await env.DB.prepare("SELECT student_id, duration_minutes, amount_cents FROM student_recurring_rates").all();
   const own = {};
   for (const rate of rates ?? []) (own[rate.student_id] ??= {})[rate.duration_minutes] = rate.amount_cents;
@@ -1625,7 +1341,11 @@ async function teacherStudentList(env) {
     // What they pay, a 90-minute price derived from a 60-minute one included,
     // and the prices set for them, which is what she edits.
     prices: withDerived(own[row.id] ?? {}),
-    ownPrices: own[row.id] ?? {}
+    ownPrices: own[row.id] ?? {},
+    cardDeclined: declined[row.id] ?? [],
+    cardAdded: row.has_card && row.card_consent_at && row.card_consent_at > noticeFrom
+      ? { at: row.card_consent_at, lessons: (onCard[row.id] ?? []).slice(0, 30) }
+      : null
   }));
 }
 
@@ -1752,40 +1472,11 @@ async function confirmStudentCard(env, session) {
   }
 
   /*
-   * Inês is told which of her lessons the card now pays for, so one a
-   * student already paid her for by hand can be cancelled from the card
-   * before it ends (12 October 2026: never charge twice).
+   * Inês sees which of her lessons the card now pays for in Needs you
+   * (`cardAdded` on GET /admin/students), so one a student already paid her
+   * for by hand can be taken off the card before it ends (12 October 2026:
+   * never charge twice). It is no longer emailed (16 October 2026, Dan).
    */
-  const { results: onCard } = await env.DB.prepare(
-    `SELECT starts_at FROM bookings WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed'
-       AND payment_status = 'scheduled' AND payment_consent_at = ? AND starts_at > ? ORDER BY starts_at LIMIT 30`
-  )
-    .bind(student.id, consentedAt, now)
-    .all();
-  const settings = await loadSettings(env);
-  const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
-  if (teacherNotificationsEnabled(env) && teacherEmail) {
-    await deliver(env, {
-      to: teacherEmail,
-      subject: `${student.name} added a card`,
-      kind: "teacher_student_card",
-      dedupeKey: `teacher:student-card:${student.id}:${consentedAt}`,
-      replyTo: student.email,
-      content: {
-        heading: `${student.name} added a card`,
-        preheader: "Their lessons with you are now paid after each one.",
-        intro: onCard?.length
-          ? `These lessons you added are now charged to their card after each one. If they already paid you for one by hand, open it on your schedule and choose “Take it off their card”.`
-          : "Lessons you add for them from now on are charged to their card after each one.",
-        callout: "",
-        rows: onCard?.length
-          ? [{ label: "Now on their card", value: onCard.map((row) => formatInZone(new Date(row.starts_at), PORTO)).join("\n"), dates: true }]
-          : [],
-        action: { label: "Open your schedule", url: siteUrl(env, "/schedule/") },
-        footer: "Sent automatically by the booking system."
-      }
-    });
-  }
   return new Response("ok", { status: 200 });
 }
 
@@ -1806,22 +1497,15 @@ async function handleEmailLink(request, env, ctx) {
     if (!await takeRateLimit(env, `signin:${student.id}`, 3, 3600)) return;
     const link = await issueSignInLink(env, student, SIGN_IN_LINK_MINUTES);
     const settings = await loadSettings(env);
+    const { subject, content } = signInLink({ first: student.name.split(" ")[0], url: link.url });
     await deliver(env, {
-        to: student.email,
-        subject: "Your sign-in link — Português com a Inês",
-        kind: "sign_in_link",
-        dedupeKey: `signin:${link.nonce}`,
-        replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined,
-        content: {
-          heading: "Sign in",
-          preheader: "One click and you're in. The link works for 30 minutes.",
-          intro: `Olá ${student.name.split(" ")[0]}, use the button below to sign in. It works for 30 minutes, and only once.`,
-          callout: "",
-          rows: [],
-          action: { label: "Sign in", url: link.url },
-          footer: "If you didn't ask for this, you can ignore it."
-        }
-      });
+      to: student.email,
+      subject,
+      kind: "sign_in_link",
+      dedupeKey: `signin:${link.nonce}`,
+      replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined,
+      content
+    });
   })());
 
   return json({ ok: true }, 200, request, env);
@@ -2284,135 +1968,51 @@ async function studentNif(env, studentId) {
   return student?.nif ?? "";
 }
 
-/** The row beside every reminder to issue a fiscal document. */
-function receiptNifRow(nif) {
-  return { label: "NIF", value: nif || "Not given (consumidor final)" };
-}
 
 async function notifyLessonCharged(env, { row, lessonType, amountCents, noShow = false }) {
   const settings = await loadSettings(env);
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
-  const start = new Date(row.starts_at);
-  const amount = formatEuros(amountCents);
-  const heading = noShow ? "Your no-show fee is paid" : "Your lesson is paid";
-  const nif = await studentNif(env, row.student_id);
-
-  const sends = [
-    deliver(env, {
-      to: row.student_email,
-      subject: `${heading} — ${formatShort(start, lessonZone(row))}`,
-      kind: "student_lesson_charged",
-      bookingId: row.id,
-      dedupeKey: `charged:${row.id}`,
-      replyTo: settings.replyToEmail || teacherEmail || undefined,
-      content: {
-        heading,
-        preheader: `${lessonName(lessonType)} · ${amount} charged to your saved card`,
-        intro: noShow
-          ? `Olá ${row.student_name.split(" ")[0]}, Inês marked this lesson as a no-show. Your saved card was charged ${amount} instead of the lesson price.`
-          : `Olá ${row.student_name.split(" ")[0]}, your lesson is finished. ${amount} was charged to your saved card.`,
-        callout: "",
-        rows: [
-          { label: "Lesson", value: lessonLine(lessonType) },
-          { label: "Reference", value: row.reference },
-          // Lets the student check the number before Inês issues the receipt.
-          ...(nif ? [{ label: "NIF", value: `${nif} · on your receipt from Inês` }] : [])
-        ],
-        action: null,
-        footer: "Sent automatically by the booking system."
-      }
-    })
-  ];
-
-  if (teacherEmail) {
-    const nifRow = receiptNifRow(nif);
-    sends.push(
-      deliver(env, {
-        to: teacherEmail,
-        subject: `Payment received — ${row.student_name}, ${formatShort(start, PORTO)}`,
-        kind: "teacher_lesson_charged",
-        bookingId: row.id,
-        dedupeKey: `charged-teacher:${row.id}`,
-        replyTo: row.student_email,
-        content: {
-          heading: noShow ? "A no-show fee was paid" : "A lesson was paid",
-          preheader: `${row.student_name} · ${lessonName(lessonType)} · ${amount}`,
-          intro: `${amount} for ${row.student_name}'s ${noShow ? "no-show" : "lesson"} was charged successfully after the scheduled end time.`,
-          callout: "Issue the appropriate Portal das Finanças document for this payment today.",
-          rows: [
-            { label: "Lesson", value: `${lessonName(lessonType)} · ${formatInZone(start, PORTO)}` },
-            { label: "Reference", value: row.reference },
-            nifRow
-          ],
-          action: null,
-          footer: "Sent automatically by the booking system."
-        }
-      })
-    );
-  }
-
-  return Promise.allSettled(sends);
+  return notifyPaid(env, { row, lessonType, settings, teacherEmail, amountCents, item: noShow ? "no-show" : "lesson",
+    student: { kind: "student_lesson_charged", dedupeKey: `charged:${row.id}` },
+    teacher: { kind: "teacher_lesson_charged", dedupeKey: `charged-teacher:${row.id}` } });
 }
 
 async function notifySameDayFeeCharged(env, { row, lessonType, amountCents }) {
   const settings = await loadSettings(env);
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
+  return notifyPaid(env, { row, lessonType, settings, teacherEmail, amountCents, item: "fee",
+    student: { kind: "student_same_day_fee_paid", dedupeKey: `same-day-paid:${row.id}` },
+    teacher: { kind: "teacher_same_day_fee_paid", dedupeKey: `same-day-paid-teacher:${row.id}` } });
+}
+
+/**
+ * A charge that went through: the student's receipt and Inês's reminder to
+ * issue its fiscal document, which goes even while her other copies are
+ * paused. A fee is a payment like any other, so it gets the same reminder.
+ */
+async function notifyPaid(env, { row, lessonType, settings, teacherEmail, amountCents, item, student, teacher }) {
+  const start = new Date(row.starts_at);
   const amount = formatEuros(amountCents);
   const nif = await studentNif(env, row.student_id);
-
+  const receipt = paymentReceipt({
+    first: row.student_name.split(" ")[0], item, amount, lesson: lessonLine(lessonType), lessonName: lessonName(lessonType),
+    shortWhen: formatShort(start, lessonZone(row)), reference: row.reference, nif, noticeHours: settings.minimumNoticeHours
+  });
   const sends = [
     deliver(env, {
-      to: row.student_email,
-      subject: `Late change fee paid — ${row.reference}`,
-      kind: "student_same_day_fee_paid",
-      bookingId: row.id,
-      dedupeKey: `same-day-paid:${row.id}`,
-      replyTo: settings.replyToEmail || teacherEmail || undefined,
-      content: {
-        heading: "Your late change fee is paid",
-        preheader: `${lessonName(lessonType)} · ${amount}`,
-        intro: `Olá ${row.student_name.split(" ")[0]}, your saved card was charged ${amount} for moving or cancelling this lesson less than ${settings.minimumNoticeHours} hours before it.`,
-        callout: "You will not be charged this fee again for the same lesson.",
-        rows: [
-          { label: "Reference", value: row.reference },
-          ...(nif ? [{ label: "NIF", value: `${nif} · on your receipt from Inês` }] : [])
-        ],
-        action: null,
-        footer: "Sent automatically by the booking system."
-      }
+      to: row.student_email, subject: receipt.subject, ...student, bookingId: row.id,
+      replyTo: settings.replyToEmail || teacherEmail || undefined, content: receipt.content
     })
   ];
-
-  // A fee is a payment like any other, so it gets the same fiscal reminder.
-  // Its subject, heading and preheader still say "same-day fee": Inês's
-  // receipt automation classifies payments by those words. Change them only
-  // together with that automation.
   if (teacherEmail) {
-    sends.push(
-      deliver(env, {
-        to: teacherEmail,
-        subject: `Payment received — ${row.student_name}, ${amount} same-day fee`,
-        kind: "teacher_same_day_fee_paid",
-        bookingId: row.id,
-        dedupeKey: `same-day-paid-teacher:${row.id}`,
-        replyTo: row.student_email,
-        content: {
-          heading: "A same-day fee was paid",
-          preheader: `${row.student_name} · same-day fee · ${amount}`,
-          intro: `The ${amount} fee for ${row.student_name} moving or cancelling less than ${settings.minimumNoticeHours} hours before their lesson was charged successfully.`,
-          callout: "Issue the appropriate Portal das Finanças document for this payment today.",
-          rows: [
-            { label: "Lesson", value: `${lessonName(lessonType)} · ${formatInZone(new Date(row.starts_at), PORTO)}` },
-            { label: "Reference", value: row.reference },
-            receiptNifRow(nif)
-          ],
-          action: null,
-          footer: "Sent automatically by the booking system."
-        }
-      })
-    );
+    const received = paymentReceivedTeacher({
+      studentName: row.student_name, item, amount, lessonName: lessonName(lessonType), longWhen: formatInZone(start, PORTO),
+      shortWhen: formatShort(start, PORTO), reference: row.reference, nif, noticeHours: settings.minimumNoticeHours
+    });
+    sends.push(deliver(env, {
+      to: teacherEmail, subject: received.subject, ...teacher, bookingId: row.id, replyTo: row.student_email, content: received.content
+    }));
   }
-
   return Promise.allSettled(sends);
 }
 
@@ -2487,52 +2087,22 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
   // dedupe key on an email which promises a secure button but has no payment link.
   if (!payUrl) return;
 
+  const { subject, content } = paymentFailed({
+    first: row.student_name.split(" ")[0], item: isSameDayFee ? "fee" : isNoShow ? "no-show" : "lesson", amount,
+    lesson: lessonLine(lessonType), lessonName: lessonName(lessonType), shortWhen: formatShort(start, lessonZone(row)),
+    reference: row.reference, payUrl
+  });
   await deliver(env, {
     to: row.student_email,
-    subject: `${isSameDayFee ? "Late change fee" : isNoShow ? "No-show fee" : "Lesson payment"} — the card didn't go through`,
+    subject,
     kind: isSameDayFee ? "student_same_day_fee_due" : "student_payment_due",
     bookingId: row.id,
     dedupeKey: `payment-due:${purpose}:${row.id}`,
     replyTo: settings.replyToEmail || teacherEmail || undefined,
-    content: {
-      heading: "The card didn't go through",
-      preheader: `${lessonName(lessonType)} · ${amount} still to pay`,
-      intro: `Olá ${row.student_name.split(" ")[0]}, we couldn't charge the ${amount} ${isSameDayFee ? "late change fee" : isNoShow ? "no-show fee" : "lesson payment"} to your saved card. Please use the secure payment link below.`,
-      callout: "",
-      rows: [
-        { label: "Lesson", value: lessonLine(lessonType) },
-        { label: "Price", value: amount },
-        { label: "Reference", value: row.reference }
-      ],
-      action: payUrl ? { label: `Pay ${amount}`, url: payUrl } : null,
-      footer: "Sent automatically by the booking system."
-    }
+    content
   });
-
-  if (teacherNotificationsEnabled(env) && teacherEmail) {
-    const nifRow = receiptNifRow(await studentNif(env, row.student_id));
-    await deliver(env, {
-      to: teacherEmail,
-      subject: `Card declined — ${row.student_name}, ${formatShort(start, PORTO)}`,
-      kind: "teacher_payment_due",
-      bookingId: row.id,
-      dedupeKey: `payment-due-teacher:${purpose}:${row.id}`,
-      replyTo: row.student_email,
-      content: {
-        heading: "A card didn't go through",
-        preheader: `${row.student_name} · ${lessonName(lessonType)} · ${amount}`,
-        intro: `${row.student_name}'s ${amount} ${isSameDayFee ? "late change fee" : isNoShow ? "no-show fee" : "lesson payment"} couldn't be charged automatically. They've been sent a secure payment link.`,
-        callout: "",
-        rows: [
-          { label: "Student", value: `${row.student_name}\n${shownEmail(row.student_email)}` },
-          nifRow,
-          { label: "Reference", value: row.reference }
-        ],
-        action: null,
-        footer: "Sent automatically by the booking system."
-      }
-    });
-  }
+  // Inês is no longer emailed (16 October 2026, Dan): the declined payment is
+  // a card in her Needs you until it is paid (`cardDeclined` on GET /admin/students).
 }
 
 /**
@@ -4770,19 +4340,10 @@ async function handleForgot(request, env, ctx) {
     ctx.waitUntil(
       deliver(env, {
         to: student.email,
-        subject: "Reset your password — Português com a Inês",
+        ...passwordReset({ first: student.name.split(" ")[0], url: resetUrl }),
         kind: "password_reset",
         dedupeKey: `reset:${nonce}`,
-        replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined,
-        content: {
-          heading: "Reset your password",
-          preheader: "Choose a new password — the link works for one hour.",
-          intro: `Olá ${student.name.split(" ")[0]}, use the button below to choose a new password. The link works for one hour, and only once.`,
-          callout: "",
-          rows: [],
-          action: { label: "Choose a new password", url: resetUrl },
-          footer: "If you didn't ask for this, you can ignore it — your password has not changed."
-        }
+        replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined
       })
     );
   }
@@ -5034,19 +4595,10 @@ async function handleRequestEmailChange(request, env, ctx) {
     ctx.waitUntil(
       deliver(env, {
         to: email,
-        subject: "Confirm your new email — Português com a Inês",
+        ...emailChangeConfirm({ first: student.name.split(" ")[0], email, url: confirmUrl }),
         kind: "email_change",
         dedupeKey: `email-change:${nonce}`,
-        replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined,
-        content: {
-          heading: "Confirm this address",
-          preheader: "One click, and this becomes the address you sign in with.",
-          intro: `Olá ${student.name.split(" ")[0]}, confirm this address and it becomes the one you sign in with and receive lesson emails at. The link works for one hour, and only once.`,
-          callout: "",
-          rows: [{ label: "New address", value: email }],
-          action: { label: "Confirm this address", url: confirmUrl },
-          footer: "If you didn't ask for this, ignore it — nothing has changed."
-        }
+        replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined
       })
     );
 
@@ -5055,19 +4607,10 @@ async function handleRequestEmailChange(request, env, ctx) {
     ctx.waitUntil(
       deliver(env, {
         to: student.email,
-        subject: "Someone asked to change your email — Português com a Inês",
+        ...emailChangeNotice({ first: student.name.split(" ")[0], email }),
         kind: "email_change_notice",
         dedupeKey: `email-change-notice:${nonce}`,
-        replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined,
-        content: {
-          heading: "A change was requested",
-          preheader: "Your address has not changed yet.",
-          intro: `Olá ${student.name.split(" ")[0]}, someone signed in to your account and asked to move it to ${email}. Nothing has changed yet — it only takes effect if that address confirms.`,
-          callout: "If this wasn't you, change your password now and tell Inês.",
-          rows: [],
-          action: null,
-          footer: "Sent automatically by the booking system."
-        }
+        replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined
       })
     );
   }

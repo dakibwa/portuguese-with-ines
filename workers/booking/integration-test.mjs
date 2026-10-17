@@ -476,9 +476,15 @@ await test("decline recovery-link outage retries without charging again or sendi
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM email_log WHERE booking_id='declined'").get().count, 0);
   const attempts = charges.length;
   decline = false; checkoutUnavailable = false;
-  await retryPaymentRecovery(env);
+  // With her copies on, Inês is still not emailed: the decline is a card in her Needs you.
+  Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "1", TEACHER_EMAIL: "ines@example.invalid" });
+  try { await retryPaymentRecovery(env); } finally { Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0", TEACHER_EMAIL: undefined }); }
   assert.equal(db.prepare("SELECT stripe_session_id FROM bookings WHERE id='declined'").get().stripe_session_id, "cs_recovery");
   assert.equal(charges.length, attempts);
+  assert.deepEqual(db.prepare("SELECT kind FROM email_log WHERE booking_id='declined'").all().map((row) => row.kind), ["student_payment_due"]);
+  const { students } = await (await call("/admin/students", { method: "GET", user: "teacher" })).json();
+  assert.deepEqual(students.find((row) => row.id === "alice").cardDeclined,
+    [{ bookingId: "declined", reference: "declined", startsAt: "2026-01-03T12:00:00.000Z", amountCents: 1500, part: "lesson" }]);
 });
 await test("signed webhook validates money and customer, settles once under replay", async () => {
   const session = { id: "cs_recovery", mode: "payment", payment_status: "paid", currency: "eur", amount_total: 1500,
@@ -492,6 +498,8 @@ await test("signed webhook validates money and customer, settles once under repl
   assert.deepEqual(responses.map((response) => response.status), [200, 200]);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM stripe_events WHERE id='evt_recovery'").get().count, 1);
   assert.equal(db.prepare("SELECT charged_cents FROM bookings WHERE id='declined'").get().charged_cents, 1500);
+  const { students } = await (await call("/admin/students", { method: "GET", user: "teacher" })).json();
+  assert.deepEqual(students.find((row) => row.id === "alice").cardDeclined, [], "paid, so nothing waits on her");
 });
 await test("expired setup cannot confirm a released slot", async () => {
   booking("expired-setup");
@@ -2283,8 +2291,15 @@ await test("a card saved from the account pays for the lessons Inês added from 
     assert.equal((await webhook({ ...event, id: "evt_card_other", data: { object: { ...session, client_reference_id: "student:alice" } } })).status, 400);
     assert.equal((await webhook({ ...event, id: "evt_card_open", data: { object: { ...session, status: "open" } } })).status, 400);
     assert.equal(db.prepare("SELECT card_consent_at FROM students WHERE id=?").get(id).card_consent_at, null);
-    assert.equal((await webhook(event)).status, 200);
+    Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "1", TEACHER_EMAIL: "ines@example.invalid" });
+    try { assert.equal((await webhook(event)).status, 200); } finally { Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0", TEACHER_EMAIL: undefined }); }
     assert.equal((await webhook(event)).status, 200, "a replay is harmless");
+    // Inês is not emailed; her Needs you lists the lessons the card now pays for.
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE kind='teacher_student_card'").get().n, 0);
+    const { students: listed } = await (await call("/admin/students", { method: "GET", user: "teacher" })).json();
+    const added = listed.find((row) => row.id === id).cardAdded;
+    assert.ok(added?.at, JSON.stringify(added));
+    assert.deepEqual(added.lessons.map((lesson) => lesson.startsAt).slice(0, 2), ["2026-10-02T02:00:00.000Z", "2026-10-03T02:00:00.000Z"]);
 
     const saved = db.prepare("SELECT * FROM students WHERE id=?").get(id);
     assert.deepEqual([saved.stripe_customer_id, saved.stripe_payment_method, Boolean(saved.card_consent_at)], ["cus_card_later", "pm_card_later", true]);

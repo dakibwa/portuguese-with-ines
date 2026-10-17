@@ -415,6 +415,24 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
 });
 
 
+test("a declined card and a card just added are Needs you cards on the student's row, not emails to Inês", () => {
+  const now = new Date("2026-09-08T10:00:00Z");
+  const base = { email: "x@example.invalid", signedIn: true, hasLessons: true, awaitingWelcome: false };
+  const students = [
+    { ...base, id: "ana", name: "Ana", hasCard: true,
+      cardDeclined: [{ bookingId: "b1", reference: "PT-ONE", startsAt: "2026-09-05T15:00:00Z", amountCents: 1500, part: "lesson" },
+        { bookingId: "b1", reference: "PT-ONE", startsAt: "2026-09-05T15:00:00Z", amountCents: 500, part: "fee" }] },
+    { ...base, id: "kai", name: "Kai", hasCard: true, cardAdded: { at: "2026-09-07T09:00:00Z", lessons: [{ bookingId: "b2", startsAt: "2026-09-10T10:00:00Z" }] } },
+    // A card since removed says nothing, and a student who has paid has nothing to chase.
+    { ...base, id: "dot", name: "Dot", hasCard: false, cardAdded: { at: "2026-09-07T09:00:00Z", lessons: [] }, cardDeclined: [] },
+  ];
+  const items = needsYou({ now, meet: null, payments: [], students, lessons: [], cancellations: [] });
+  assert.deepEqual(items.map((item) => item.key), ["declined:b1:lesson", "declined:b1:fee", "card:kai"], "money first, as payments are");
+  const workspace = studentWorkspace(students, items, true, []);
+  assert.equal(workspace.general.length, 0);
+  assert.deepEqual(workspace.rows.map((row) => [row.student.id, row.items.length]), [["ana", 2], ["kai", 1], ["dot", 0]]);
+});
+
 test("setup suggests lessons before email and student steps without requiring them, while completed steps stay editable", () => {
   const student = (id, extra) => ({ id, name: id, email: `${id}@example.invalid`, signedIn: false, hasCard: false, hasLessons: true, awaitingWelcome: true, ...extra });
   const students = [

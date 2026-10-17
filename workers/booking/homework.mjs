@@ -1,4 +1,5 @@
 import { takeRateLimit } from "./rates.mjs";
+import { homeworkSubmitted } from "./email-templates.mjs";
 import { formatInZone } from "./time.mjs";
 import { initialMarks, markingInstructions, validateAutomaticMarks } from "./homework-marking.mjs";
 
@@ -343,19 +344,7 @@ export async function notifyHomeworkSubmissions(env, { to, send, link, bookingId
       // confirmations. This notice retries through its own claim instead.
       bookingId: null, dedupeKey: `teacher:homework-submitted:${submission.id}`,
       replyTo: lesson?.student_email || undefined,
-      subject: `${name} sent you their homework`,
-      content: {
-        heading: "Homework to review",
-        preheader: `${name.split(" ")[0]}’s answers are ready for you to check.`,
-        intro: `${name} has sent you their homework. Check the marks and send your feedback back when you’re ready.`,
-        callout: "",
-        rows: [
-          ...(lesson?.title ? [{ label: "Sheet", value: lesson.title }] : []),
-          ...(when ? [{ label: "Lesson", value: `${when}, Porto time` }] : []),
-        ],
-        action: { label: "Review homework", url: link(lessonId, studentId) },
-        footer: "Sent automatically by the booking system.",
-      },
+      ...homeworkSubmitted({ name, title: lesson?.title ?? "", when: when ? `${when}, Porto time` : "", url: link(lessonId, studentId) }),
     }).catch(error => ({ ok: false, error }));
     if (result?.ok) { sent++; continue; }
     await env.DB.prepare(`UPDATE homework_progress SET notified_submission_id = NULL, notified_at = NULL

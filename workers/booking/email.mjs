@@ -122,20 +122,73 @@ function richTogether(value, mode = "text") {
 
 /** A fee in a footer fact reads in coral, as the site's payment facts do. */
 function coralAmounts(html) {
-  return html.replace(/€\d+(?:[.,]\d{2})?/g, (amount) => `<span style="font-weight:700;color:${BRAND.coralAction};white-space:nowrap">${amount}</span>`);
+  return html.replace(/€\d+(?:[.,]\d{2})?/g, (amount) => `<span class="pwi-amount" style="font-weight:700;color:${BRAND.coralAction};white-space:nowrap">${amount}</span>`);
 }
+
+/*
+ * Dark mode (16 October 2026). The emails declare both schemes, so a client
+ * that honours `prefers-color-scheme` (Apple Mail, iOS Mail, Outlook for Mac,
+ * Thunderbird, Samsung) draws them on the site's dark blue with cream text
+ * rather than inverting them by guesswork; Outlook.com's own dark mode is
+ * steered through its `data-ogsc`/`data-ogsb` attributes. Gmail, which
+ * ignores both, inverts on its own, so every coloured cell also carries a
+ * `bgcolor` and every text an explicit colour: nothing inherits a background
+ * that a client might change without changing the text on it.
+ *
+ * Phones (16 October 2026): under 480px the side margins and heading shrink
+ * and the button fills the width. Clients without media queries keep the
+ * fluid 560px card, which already fits a 390px screen.
+ */
+const DARK = {
+  page: "#0f1a38",
+  card: "#16264f",
+  panel: "#223a73",
+  text: "#f3ead7",
+  heading: "#fbf4e5",
+  label: "#c7c2f2",
+  rule: "#34477d",
+  amount: "#ff9d86"
+};
+const darkRules = `.pwi-page{background:${DARK.page}!important}
+.pwi-card{background:${DARK.card}!important}
+.pwi-panel{background:${DARK.panel}!important}
+.pwi-text{color:${DARK.text}!important}
+.pwi-h1,.pwi-date{color:${DARK.heading}!important}
+.pwi-label,.pwi-quiet{color:${DARK.label}!important}
+.pwi-link{color:${DARK.label}!important}
+.pwi-rule{border-color:${DARK.rule}!important}
+.pwi-amount{color:${DARK.amount}!important}
+.pwi-step{background:${BRAND.lavender}!important;color:${DARK.card}!important}
+.pwi-dab{filter:brightness(1.3) saturate(1.1)}`;
+const STYLE = `<style>
+:root{color-scheme:light dark;supported-color-schemes:light dark}
+@media (prefers-color-scheme:dark){
+${darkRules}
+}
+${darkRules.split("\n").filter((rule) => !rule.startsWith(".pwi-dab")).map((rule) => `[data-ogsc] ${rule.replace(/,/g, ",[data-ogsc] ")}`).join("\n")}
+@media only screen and (max-width:480px){
+.pwi-outer{padding:16px 8px 28px!important}
+.pwi-pad{padding-left:22px!important;padding-right:22px!important}
+.pwi-h1{font-size:22px!important}
+.pwi-panel-pad{padding:16px 18px!important}
+.pwi-btn-wrap{width:100%!important}
+.pwi-btn{padding:15px 18px!important}
+}
+</style>`;
+
+const dab = (index) => `<img class="pwi-dab" src="${DABS[index % DABS.length]}" width="14" height="14" alt="" style="display:block;border:0">`;
 
 /**
  * Short facts, one per row beside a dab and without a label, as the confirm
  * step's payment facts are. A table row each (never a padded div) so Outlook's
  * Word engine keeps the spacing; `dabTop` centres the 14px dab on the first line.
  */
-function dabLines(lines, { font, dabTop, gap, first = 0 }) {
+function dabLines(lines, { font, colourClass = "pwi-text", dabTop, gap, first = 0 }) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${lines
     .map((html, index) => `
           <tr>
-            <td width="28" valign="top" style="width:28px;padding:${(index ? gap : 0) + dabTop}px 0 0;line-height:0"><img src="${DABS[(first + index) % DABS.length]}" width="14" height="14" alt="" style="display:block;border:0"></td>
-            <td valign="top" style="padding:${index ? gap : 0}px 0 0;font:${font};overflow-wrap:anywhere">${html}</td>
+            <td width="28" valign="top" style="width:28px;padding:${(index ? gap : 0) + dabTop}px 0 0;line-height:0">${dab(first + index)}</td>
+            <td class="${colourClass}" valign="top" style="padding:${index ? gap : 0}px 0 0;font:${font};overflow-wrap:anywhere">${html}</td>
           </tr>`)
     .join("")}</table>`;
 }
@@ -151,16 +204,25 @@ function base64(text) {
   return btoa(binary);
 }
 
+/** One section of the card: the same side margins everywhere, 24px between. */
+const section = (html, { top = 24, align = "" } = {}) =>
+  `<tr><td class="pwi-pad"${align ? ` align="${align}"` : ""} style="padding:${top}px 32px 0">${html}</td></tr>`;
+
 /**
- * One email layout, built to the constraints that actually bite:
+ * One email layout for every template, built to the constraints that bite:
  *
- * - Tables and inline styles only. No flexbox, no grid, no <style> block.
+ * - Tables and inline styles carry the light design on their own. The one
+ *   <style> block only adds dark mode and phone widths, so a client that
+ *   strips it loses nothing it needs.
  * - Images are blocked by default in most clients, so the banner sits on a
  *   `bgcolor` that carries the brand on its own and has real alt text.
  * - A preheader controls the grey preview line in the inbox list. Without one,
  *   clients scrape the first visible text, which is usually the greeting.
+ *
+ * Sections, in order: heading and introduction, a message, the date panel, one
+ * note, the facts, numbered steps, one button, one quiet link, the footer.
  */
-function layout({ heading, preheader, intro, hero, heroNote, rows, callout, message, steps, action, link, footer }) {
+function layout({ heading, preheader, intro, hero, heroNote, rows = [], callout, message, steps, action, link, footer }) {
   // Each fact is a line beside one of the confirm step's dabs, its label small
   // above it: a list to glance down rather than a ruled table.
   //   lesson  the label is the lesson's own short date, bold and sentence case
@@ -174,22 +236,23 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
           const meeting = safeMeetingLink(url);
           const valueFont = lesson || dates ? "400 14px/1.5" : "400 15px/1.5";
           const valueColour = quiet ? BRAND.lavenderInk : BRAND.ink;
-          const above = index ? 12 : 0;
+          const valueClass = quiet ? "pwi-quiet" : "pwi-text";
+          const above = index ? 14 : 0;
           const content = dates
             ? String(value ?? "")
                 .split(/\r?\n/)
-                .map((line, i) => `<p style="margin:${i ? 4 : 2}px 0 0;font:${valueFont} ${SANS};color:${valueColour};overflow-wrap:anywhere">${richTogether(line, "row")}</p>`)
+                .map((line, i) => `<p class="${valueClass}" style="margin:${i ? 4 : 2}px 0 0;font:${valueFont} ${SANS};color:${valueColour};overflow-wrap:anywhere">${richTogether(line, "row")}</p>`)
                 .join("")
-            : `<p style="margin:2px 0 0;font:${valueFont} ${SANS};color:${valueColour};overflow-wrap:anywhere">${
+            : `<p class="${valueClass}" style="margin:2px 0 0;font:${valueFont} ${SANS};color:${valueColour};overflow-wrap:anywhere">${
                 meeting
-                  ? `<a href="${escapeHtml(url)}" style="color:${BRAND.blue};font-weight:700;text-decoration:underline">${meetMark()}${escapeRich(value)}</a>`
+                  ? `<a class="pwi-link" href="${escapeHtml(url)}" style="color:${BRAND.blue};font-weight:700;text-decoration:underline">${meetMark()}${escapeRich(value)}</a>`
                   : richTogether(value, "row")
               }</p>`;
           return `
         <tr>
-          <td width="28" valign="top" style="width:28px;padding:${above + (lesson ? 3 : 1)}px 0 0;line-height:0"><img src="${DABS[index % DABS.length]}" width="14" height="14" alt="" style="display:block;border:0"></td>
+          <td width="28" valign="top" style="width:28px;padding:${above + (lesson ? 3 : 1)}px 0 0;line-height:0">${dab(index)}</td>
           <td valign="top" style="padding:${above}px 0 0">
-            <p style="margin:0;${lesson ? `font:600 15px/20px ${SANS};color:${BRAND.ink}` : LABEL}">${escapeHtml(label)}</p>
+            <p class="${lesson ? "pwi-text" : "pwi-label"}" style="margin:0;${lesson ? `font:600 15px/20px ${SANS};color:${BRAND.ink}` : LABEL}">${escapeHtml(label)}</p>
             ${content}
           </td>
         </tr>`;
@@ -198,87 +261,76 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
     : "";
   const when = hero ? splitWhen(hero) : null;
   const meetingAction = action && safeMeetingLink(action.url);
+  const footerFont = `400 13px/1.6 ${SANS};color:${BRAND.lavenderInk}`;
 
   return `<!doctype html>
-<html lang="en"><head>
+<html lang="en" dir="ltr" xmlns="http://www.w3.org/1999/xhtml"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light only">
-<meta name="supported-color-schemes" content="light only">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>${escapeHtml(heading)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+${STYLE}
 </head>
-<body style="margin:0;padding:0;background:${BRAND.paper};-webkit-text-size-adjust:100%">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;font-size:1px;line-height:1px">${escapeHtml(
+<body class="pwi-page" style="margin:0;padding:0;background:${BRAND.paper};-webkit-text-size-adjust:100%;text-size-adjust:100%">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;font-size:1px;line-height:1px;mso-hide:all">${escapeHtml(
     preheader ?? ""
   )}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${
-    BRAND.paper
-  };border-collapse:collapse">
-  <tr><td align="center" style="padding:28px 14px 40px">
-    <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;border-collapse:collapse;background:${
-      BRAND.paperLight
-    };border-radius:16px;overflow:hidden">
+<table class="pwi-page" role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${BRAND.paper}" style="background:${BRAND.paper};border-collapse:collapse">
+  <tr><td class="pwi-outer" align="center" style="padding:28px 14px 40px">
+    <table class="pwi-card" role="article" aria-label="${escapeHtml(heading)}" width="560" cellpadding="0" cellspacing="0" bgcolor="${BRAND.paperLight}" style="width:100%;max-width:560px;border-collapse:collapse;background:${BRAND.paperLight};border-radius:16px;overflow:hidden">
 
       <tr><td bgcolor="${BRAND.blue}" style="background:${BRAND.blue};line-height:0">
-        <img src="${BANNER_URL}" width="560" alt="Português com a Inês" style="display:block;width:100%;max-width:560px;height:auto;border:0">
+        <img src="${BANNER_URL}" width="560" alt="Português com a Inês" style="display:block;width:100%;max-width:560px;height:auto;border:0;color:#ffffff;font:600 18px/1.4 ${SANS}">
       </td></tr>
 
-      <tr><td style="padding:30px 32px 0">
-        <h1 style="margin:0;font:600 24px/1.25 ${SANS};letter-spacing:-.01em;color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(heading)}</h1>
-        <p style="margin:12px 0 0;font:400 15px/1.65 ${SANS};color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(intro)}</p>
-      </td></tr>
+      ${section(`<h1 class="pwi-h1" style="margin:0;font:600 24px/1.25 ${SANS};letter-spacing:-.01em;color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(heading)}</h1>
+        <p class="pwi-text" style="margin:12px 0 0;font:400 15px/1.65 ${SANS};color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(intro)}</p>`, { top: 30 })}
 
       ${message?.body?.trim()
-        ? `<tr><td style="padding:24px 32px 0">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+        ? section(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
           <tr><td style="border-left:4px solid ${BRAND.lavender};padding:2px 0 2px 18px;overflow-wrap:anywhere;word-break:break-word">
-            <p style="margin:0;${LABEL}">${escapeHtml(message.label)}</p>
-            <p style="margin:8px 0 0;font:400 15px/1.65 ${SANS};color:${BRAND.ink}">${escapeRich(message.body)}</p>
+            <p class="pwi-label" style="margin:0;${LABEL}">${escapeHtml(message.label)}</p>
+            <p class="pwi-text" style="margin:8px 0 0;font:400 15px/1.65 ${SANS};color:${BRAND.ink}">${escapeRich(message.body)}</p>
           </td></tr>
-        </table>
-      </td></tr>` : ""}
+        </table>`) : ""}
 
       ${
         when
-          ? `<tr><td style="padding:24px 32px 0">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${PANEL}">
-          <tr><td style="padding:18px 22px;overflow-wrap:anywhere">
-            <p style="margin:0;font:600 19px/1.35 ${SANS};color:${BRAND.blue}">${richTogether(when.date, "date")}</p>
-            ${when.time ? `<p style="margin:3px 0 0;font:400 16px/1.45 ${SANS};color:${BRAND.ink}">${richTogether(when.time, "date")}</p>` : ""}
+          ? section(`<table class="pwi-panel" role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${BRAND.lavenderWash}" style="${PANEL}">
+          <tr><td class="pwi-panel-pad" style="padding:18px 22px;overflow-wrap:anywhere">
+            <p class="pwi-date" style="margin:0;font:600 19px/1.35 ${SANS};color:${BRAND.blue}">${richTogether(when.date, "date")}</p>
+            ${when.time ? `<p class="pwi-text" style="margin:3px 0 0;font:400 16px/1.45 ${SANS};color:${BRAND.ink}">${richTogether(when.time, "date")}</p>` : ""}
             ${
               // The student's own time, a labelled fact inside the panel (Inês's copies).
               heroNote
-                ? `<p style="margin:14px 0 0;${LABEL}">${escapeHtml(heroNote.label)}</p>
-            <p style="margin:2px 0 0;font:400 14px/1.5 ${SANS};color:${BRAND.ink}">${richTogether(heroNote.value, "date")}</p>`
+                ? `<p class="pwi-label" style="margin:14px 0 0;${LABEL}">${escapeHtml(heroNote.label)}</p>
+            <p class="pwi-text" style="margin:2px 0 0;font:400 14px/1.5 ${SANS};color:${BRAND.ink}">${richTogether(heroNote.value, "date")}</p>`
                 : ""
             }
           </td></tr>
-        </table>
-      </td></tr>`
+        </table>`)
           : ""
       }
 
       ${
-        callout
-          ? `<tr><td style="padding:24px 32px 0">${
-              // One note is one coral dab, not a second panel: the lesson's date is the panel.
-              dabLines([richTogether(callout)], { font: `400 15px/1.6 ${SANS};color:${BRAND.ink}`, dabTop: 5, gap: 0, first: 2 })
-            }</td></tr>`
-          : ""
+        // One note is one coral dab, not a second panel: the lesson's date is the panel.
+        callout ? section(dabLines([richTogether(callout)], { font: `400 15px/1.6 ${SANS};color:${BRAND.ink}`, dabTop: 5, gap: 0, first: 2 })) : ""
       }
 
-      ${rowsHtml ? `<tr><td style="padding:24px 32px 0">${rowsHtml}</td></tr>` : ""}
+      ${rowsHtml ? section(rowsHtml) : ""}
 
       ${
         // What to do next, numbered, right above the one button that does it
         // (12 October 2026, Dan: the first email a student Inês brings gets
         // should be beautiful and simple to understand).
         steps?.items?.length
-          ? `<tr><td style="padding:24px 32px 0">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${PANEL}">
-          <tr><td style="padding:18px 22px 6px">
-            <p style="margin:0;font:600 16px/1.4 ${SANS};color:${BRAND.blue}">${escapeHtml(steps.title)}</p>
+          ? section(`<table class="pwi-panel" role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${BRAND.lavenderWash}" style="${PANEL}">
+          <tr><td class="pwi-panel-pad" style="padding:18px 22px 6px">
+            <p class="pwi-date" style="margin:0;font:600 16px/1.4 ${SANS};color:${BRAND.blue}">${escapeHtml(steps.title)}</p>
           </td></tr>
           ${steps.items
             .map(
@@ -286,34 +338,29 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
             <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>
               <td width="26" valign="top" style="width:26px;padding-top:1px">
                 <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate"><tr>
-                  <td width="22" height="22" align="center" bgcolor="${BRAND.blue}" style="width:22px;height:22px;background:${
+                  <td class="pwi-step" width="22" height="22" align="center" bgcolor="${BRAND.blue}" style="width:22px;height:22px;background:${
                     BRAND.blue
                   };border-radius:11px;font:700 12px/22px ${SANS};color:#ffffff">${index + 1}</td>
                 </tr></table>
               </td>
-              <td valign="top" style="padding-left:10px;font:400 15px/1.55 ${SANS};color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(item)}</td>
+              <td class="pwi-text" valign="top" style="padding-left:10px;font:400 15px/1.55 ${SANS};color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(item)}</td>
             </tr></table>
           </td></tr>`
             )
             .join("")}
-        </table>
-      </td></tr>`
+        </table>`)
           : ""
       }
 
       ${
         action
-          ? `<tr><td align="center" style="padding:32px 32px 0">
-        <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate">
-          <tr><td bgcolor="${BRAND.coralAction}" style="background:${
-            BRAND.coralAction
-          };border-radius:24px 16px 22px 18px" align="center">
-            <a href="${escapeHtml(action.url)}" style="display:block;padding:15px 30px;font:700 15px/1.2 ${SANS};letter-spacing:.02em;color:#ffffff;text-decoration:none;border-radius:24px 16px 22px 18px">${
+          ? section(`<table class="pwi-btn-wrap" role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate">
+          <tr><td bgcolor="${BRAND.coralAction}" style="background:${BRAND.coralAction};border-radius:24px 16px 22px 18px" align="center">
+            <a class="pwi-btn" href="${escapeHtml(action.url)}" style="display:block;padding:15px 30px;font:700 15px/1.2 ${SANS};letter-spacing:.02em;color:#ffffff;text-decoration:none;border-radius:24px 16px 22px 18px">${
               meetingAction ? `<span style="display:inline-block;background:#ffffff;border-radius:6px;padding:3px 4px 2px;margin-right:9px;vertical-align:middle;line-height:0">${meetMark(18).replace("margin-right:7px", "margin:0")}</span>` : ""
             }${escapeHtml(action.label)}</a>
           </td></tr>
-        </table>
-      </td></tr>`
+        </table>`, { top: 30, align: "center" })
           : ""
       }
 
@@ -322,23 +369,23 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
         // 2026): the day-before reminder's "Change or cancel this lesson" when
         // its button is Join Google Meet. The padding makes a 45px tap target.
         link
-          ? `<tr><td align="center" style="padding:12px 32px 0"><a href="${escapeHtml(link.url)}" style="display:inline-block;padding:12px 8px;font:600 14px/1.5 ${SANS};color:${BRAND.blue};text-decoration:underline">${escapeHtml(link.label)}</a></td></tr>`
+          ? section(`<a class="pwi-link" href="${escapeHtml(link.url)}" style="display:inline-block;padding:12px 8px;font:600 14px/1.5 ${SANS};color:${BRAND.blue};text-decoration:underline">${escapeHtml(link.label)}</a>`, { top: 10, align: "center" })
           : ""
       }
 
-      <tr><td style="padding:32px 32px 30px">
+      <tr><td class="pwi-pad" style="padding:32px 32px 30px">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
-          <tr><td style="border-top:1px solid ${BRAND.rule};padding-top:18px">
+          <tr><td class="pwi-rule" style="border-top:1px solid ${BRAND.rule};padding-top:18px">
             ${
               // Short facts are the confirm step's dabs; a sign-off stays a sentence.
               Array.isArray(footer)
-                ? dabLines(footer.filter(Boolean).map((fact) => coralAmounts(richTogether(fact))), { font: `400 13px/1.6 ${SANS};color:${BRAND.lavenderInk}`, dabTop: 3, gap: 8 })
-                : `<p style="margin:0;font:400 13px/1.65 ${SANS};color:${BRAND.lavenderInk};overflow-wrap:anywhere">${richTogether(footer)}</p>`
+                ? dabLines(footer.filter(Boolean).map((fact) => coralAmounts(richTogether(fact))), { font: footerFont, colourClass: "pwi-quiet", dabTop: 3, gap: 8 })
+                : footer
+                  ? `<p class="pwi-quiet" style="margin:0;font:${footerFont};overflow-wrap:anywhere">${richTogether(footer)}</p>`
+                  : ""
             }
-            <p style="margin:10px 0 0;font:400 13px/1.65 ${SANS};color:${BRAND.lavenderInk}">
-              <a href="https://portuguesewithines.com" style="color:${
-                BRAND.lavenderInk
-              };text-decoration:underline">portuguesewithines.com</a>
+            <p class="pwi-quiet" style="margin:${footer && footer.length ? 10 : 0}px 0 0;font:${footerFont}">
+              <a class="pwi-link" href="https://portuguesewithines.com" style="color:${BRAND.lavenderInk};text-decoration:underline">portuguesewithines.com</a>
             </p>
           </td></tr>
         </table>
@@ -356,7 +403,7 @@ function layout({ heading, preheader, intro, hero, heroNote, rows, callout, mess
  * deleted anything a student had written between angle brackets, including part
  * of an address, from the text part while the HTML part showed it correctly.
  */
-function plainText({ heading, intro, hero, heroNote, rows, callout, message, steps, action, link, footer }) {
+function plainText({ heading, intro, hero, heroNote, rows = [], callout, message, steps, action, link, footer }) {
   const clean = (value) => String(value ?? "").trim();
   const lines = [heading, "", clean(intro)];
   if (message?.body?.trim()) lines.push("", clean(message.label), clean(message.body));
