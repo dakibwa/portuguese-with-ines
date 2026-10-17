@@ -43,6 +43,7 @@ import { clearSession, confirmSignInLink, fetchMe, isReturningDevice, readSessio
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { SITE_BASE_PATH } from "@/lib/paths";
+import { hasStudentSide, opensSchedule } from "@/lib/account-workspace";
 import {
   addDaysToKey,
   browserTimeZone,
@@ -981,12 +982,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   useEffect(() => {
     if (student && intent === "lessons") document.documentElement.setAttribute("data-booking-account", "");
   }, [student, intent]);
-  const isTeacher = student?.role === "teacher";
+  // Set once on arrival from the address, so a teacher who is also a student
+  // stays on Your lessons when that is what they opened.
+  const [askedForLessons, setAskedForLessons] = useState(false);
+  const toSchedule = opensSchedule(student, askedForLessons);
 
   useEffect(() => {
     // The verified account role selects the workspace, including sign-in
     // halfway through booking. Keep one teacher dashboard and one URL for it.
-    if (isTeacher) {
+    if (toSchedule) {
       const destination = new URL(`${SITE_BASE_PATH}/schedule/`, window.location.origin);
       const emailToken = new URLSearchParams(window.location.search).get("emailToken");
       if (emailToken) destination.searchParams.set("emailToken", emailToken);
@@ -995,7 +999,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       window.addEventListener("pageswap", event => event.viewTransition?.skipTransition(), { once: true });
       window.location.replace(`${destination.pathname}${destination.search}`);
     }
-  }, [isTeacher]);
+  }, [toSchedule]);
   const [recurringRates, setRecurringRates] = useState<Record<number, number>>({});
   const recurringRatesVersion = useRef(0);
   const [ratesError, setRatesError] = useState("");
@@ -1273,7 +1277,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       params.delete("manage");
       window.history.replaceState({}, "", `/book/${params.toString() ? `?${params}` : ""}`);
     }
-    if (initialLessonsView || returningFromCard || params.get("view") === "lessons") {
+    const lessonsByAddress = Boolean(initialLessonsView || returningFromCard || params.get("view") === "lessons");
+    setAskedForLessons(lessonsByAddress);
+    if (lessonsByAddress) {
       setIntent("lessons");
       setUpcomingRequestKey((current) => current + 1);
       if (!readSession() && !signInToken) setShowAccountSignIn(true);
@@ -1335,7 +1341,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     // last read it, at once, and the reply below replaces it moments later.
     // Booking and emailed links wait for the reply as before.
     const remembered = rememberedAccount(readSession());
-    const lessonsByAddress = Boolean(initialLessonsView || returningFromCard || params.get("view") === "lessons");
     let openedFromMemory = false;
     if (remembered && (lessonsByAddress || (
       !params.get("view") && !params.get("lesson") && !params.has("manage") && !params.has("token") && !params.has("emailToken")
@@ -3017,7 +3022,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     );
   }
 
-  if (isTeacher) {
+  if (toSchedule) {
     return <p className="booking-state-note" role="status">Opening your schedule…</p>;
   }
 
@@ -3262,6 +3267,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   return (
     <section className="booking-steps" aria-label="Book a Portuguese lesson">
+      {/* A teacher who is also a student keeps a way back to the schedule. */}
+      {intent === "lessons" && student?.role === "teacher" && student.alsoStudent ? (
+        <div className="booking-schedule-return">
+          <a className="button button--outline button--compact" href={`${SITE_BASE_PATH}/schedule/`}>Your schedule</a>
+        </div>
+      ) : null}
       {bookingPromptDate ? (
         <CalendarBookingPrompt
           date={bookingPromptDate}
@@ -4597,7 +4608,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         ) : null}
       </StageElement>
 
-      {isLessonsCalendarOverview && student?.role === "student" ? (
+      {isLessonsCalendarOverview && student && hasStudentSide(student) ? (
         <StudentExpressions key={`${student.id}:${readSession()}`} studentId={student.id} token={readSession()} />
       ) : null}
 

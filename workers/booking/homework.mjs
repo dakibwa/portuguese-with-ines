@@ -2,6 +2,7 @@ import { takeRateLimit } from "./rates.mjs";
 import { homeworkSubmitted } from "./email-templates.mjs";
 import { formatInZone } from "./time.mjs";
 import { initialMarks, markingInstructions, validateAutomaticMarks } from "./homework-marking.mjs";
+import { isStudentLike } from "./student-like.mjs";
 
 export class HomeworkProblem extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -426,7 +427,7 @@ async function submitHomework(env, studentId, bookingId, row, saved, answers) {
 
 /** Only the current owner of a lesson can read its sheet, save or submit answers. */
 export async function studentHomework(env, student, method, bookingId, body, action = "") {
-  if (student.role !== "student") throw new HomeworkProblem("Homework is in the student’s account. Open their lesson to prepare it.", 403);
+  if (!isStudentLike(student)) throw new HomeworkProblem("Homework is in the student’s account. Open their lesson to prepare it.", 403);
   if (!bookingId && method !== "GET") throw new HomeworkProblem("Not found.", 404);
   if (method === "GET" && !bookingId) {
     const results = await rowsOrNone(env.DB.prepare(`SELECT h.booking_id, b.starts_at, h.level, h.minutes,

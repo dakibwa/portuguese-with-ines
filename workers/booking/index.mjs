@@ -16,6 +16,7 @@ import {
   studentCancelled, studentMoved, welcome as welcomeTemplate
 } from "./email-templates.mjs";
 import { NO_EMAIL_YET, isNoEmailYet, realEmail, withRealEmail } from "./no-email.mjs";
+import { isStudentLike, studentLikeSql } from "./student-like.mjs";
 import {
   chargeSavedCard,
   checkoutSessionProblem,
@@ -965,6 +966,9 @@ function publicStudent(row) {
     nif: row.nif ?? "",
     timezone: row.timezone,
     role: row.role ?? "student",
+    // A teacher Inês has also added as a student (migration 0032): their
+    // account opens Your lessons as well as her schedule.
+    alsoStudent: row.role === "teacher" && Number(row.also_student) === 1,
     // Only once migration 0022 has added the column, so the site offers the
     // choice of splat only where it can be saved.
     ...("mark" in row ? { mark: row.mark ?? "" } : {}),
@@ -1281,7 +1285,7 @@ async function teacherStudentList(env) {
           AND b.added_by_teacher = 1 AND b.payment_status = 'not_required'
           AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}') AS unpaid_upcoming,
        (SELECT COUNT(*) FROM booking_series bs WHERE bs.student_id = s.id AND bs.status = 'active') AS weekly
-     FROM students s WHERE s.role = 'student'
+     FROM students s WHERE ${studentLikeSql("s")}
        -- The opt-in live check's throwaway accounts (scripts/qa-recurring-rates)
        -- can never be a student of hers.
        AND s.email NOT LIKE 'launch-check-%@example.invalid'
@@ -1357,7 +1361,7 @@ async function teacherStudentList(env) {
 async function handleStudentCard(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in to add a card.", 401, request, env);
-  if (student.role === "teacher") return fail("Cards are for student accounts.", 403, request, env);
+  if (!isStudentLike(student)) return fail("Cards are for student accounts.", 403, request, env);
   // Registering proves nothing about an address; a card that pays for the
   // lessons Inês adds belongs to whoever receives her emails.
   if (!student.email_verified_at) {
@@ -4443,7 +4447,7 @@ async function handleRecurringRates(request, env) {
 async function handleStudentExpressions(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
-  if (student.role !== "student") return fail("The picker is for student accounts. Use the preview in Expressions.", 403, request, env);
+  if (!isStudentLike(student)) return fail("The picker is for student accounts. Use the preview in Expressions.", 403, request, env);
   // Closed to students (the default): they read an empty collection, so Your
   // lessons shows no card, and a pick is refused before anything is written.
   if (!expressionsOpenToStudents(env)) {
@@ -5133,13 +5137,27 @@ async function handleAdmin(request, env, ctx, url, path) {
     )
       .bind(id, email || `${NO_EMAIL_YET}${id}`, name, details.phone, details.nif, details.mark, PORTO, new Date().toISOString())
       .run();
-    if (!(added?.meta?.changes > 0)) return fail("Someone with that email is already on the site.", 409, request, env);
-    if (await setStudentPrices(env, id, priced.prices) === null) {
+    let studentId = id;
+    if (!(added?.meta?.changes > 0)) {
+      /*
+       * A teacher's email makes their account a student's too (17 October
+       * 2026, Dan): they stay a teacher, keep their name and their way in,
+       * and are sent nothing, for they already sign in as themselves. Once
+       * they are, adding them again is a duplicate like any other.
+       */
+      const teacher = email
+        ? await env.DB.prepare("UPDATE students SET also_student = 1 WHERE email = ? AND role = 'teacher' AND also_student = 0 RETURNING id")
+          .bind(email).first()
+        : null;
+      if (!teacher) return fail("Someone with that email is already on the site.", 409, request, env);
+      studentId = teacher.id;
+    }
+    if (await setStudentPrices(env, studentId, priced.prices) === null) {
       // The student stays; only the free price waits for the update.
       return fail("Free lessons need a database update first. The student was added on the standard price.", 503, request, env);
     }
     const list = await teacherStudentList(env);
-    return json({ student: list.find((entry) => entry.id === id) }, 201, request, env);
+    return json({ student: list.find((entry) => entry.id === studentId) }, 201, request, env);
   }
 
   // Their details, filled in or corrected later. Their email is how they sign
@@ -5147,7 +5165,7 @@ async function handleAdmin(request, env, ctx, url, path) {
   // they change it from their account, where the new address proves itself.
   const detailedStudent = path.match(/^\/admin\/students\/([^/]+)\/details$/);
   if (detailedStudent && request.method === "POST") {
-    const student = await env.DB.prepare("SELECT * FROM students WHERE id = ? AND role = 'student'").bind(detailedStudent[1]).first();
+    const student = await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(detailedStudent[1]).first();
     if (!student) return fail("That student could not be found.", 404, request, env);
     const body = await readJson(request);
     const name = cleanText(body.name, 120);
@@ -5203,7 +5221,7 @@ async function handleAdmin(request, env, ctx, url, path) {
   // Her price for a student, per length; null is the standard price again.
   const pricedStudent = path.match(/^\/admin\/students\/([^/]+)\/prices$/);
   if (pricedStudent && request.method === "POST") {
-    const student = await env.DB.prepare("SELECT id FROM students WHERE id = ? AND role = 'student'").bind(pricedStudent[1]).first();
+    const student = await env.DB.prepare(`SELECT id FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(pricedStudent[1]).first();
     if (!student) return fail("That student could not be found.", 404, request, env);
     const priced = studentPrices((await readJson(request)).prices);
     if (priced.problem) return fail(priced.problem, 400, request, env);
@@ -5218,10 +5236,13 @@ async function handleAdmin(request, env, ctx, url, path) {
   // link for someone who lost theirs (12 October 2026, Dan).
   const welcomeStudent = path.match(/^\/admin\/students\/([^/]+)\/welcome$/);
   if (welcomeStudent && request.method === "POST") {
-    const student = await env.DB.prepare("SELECT * FROM students WHERE id = ? AND role = 'student'")
+    const student = await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`)
       .bind(welcomeStudent[1])
       .first();
     if (!student) return fail("That student could not be found.", 404, request, env);
+    // A teacher who is also a student already signs in as themselves, and a
+    // welcome's link is a student's way in, which they are never sent.
+    if (student.role === "teacher") return fail("They already sign in as a teacher, so there is no welcome to send.", 409, request, env);
     if (!hasEmail(student)) return fail("Add their email first, so the welcome has somewhere to go.", 400, request, env);
     // Needs you asks for the welcome only while it is still owed. A second
     // device pressing a moment later would otherwise send a second welcome
@@ -5303,7 +5324,7 @@ async function handleAdmin(request, env, ctx, url, path) {
     if (clash) return fail(`That overlaps an existing lesson (${clash.reference}).`, 409, request, env);
 
     let student = studentId
-      ? await env.DB.prepare("SELECT * FROM students WHERE id = ? AND role = 'student'").bind(studentId).first()
+      ? await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(studentId).first()
       : await env.DB.prepare("SELECT * FROM students WHERE email = ?").bind(email).first();
     const now = new Date().toISOString();
 

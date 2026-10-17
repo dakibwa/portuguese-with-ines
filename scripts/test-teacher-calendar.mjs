@@ -4,6 +4,7 @@ import { candidateStartMinutes } from "../workers/booking/availability.mjs";
 import { wallTimeToUtc } from "../src/lib/wall-time.ts";
 import { tryOutExpressions } from "../src/lib/expression-try-out.ts";
 import { timetableBounds } from "../src/lib/timetable-bounds.ts";
+import { hasStudentSide, opensSchedule } from "../src/lib/account-workspace.ts";
 import {
   addSpan,
   bookingSegments,
@@ -515,4 +516,15 @@ test("setup suggests lessons before email and student steps without requiring th
   assert.equal(workspace.attentionCount, 8, "count each actionable student once, plus general warnings; waiting on the student does not count");
   assert.equal(workspace.rows.find(row => row.student.id === "regular").setup, undefined, "a past confirmed lesson and standard prices remain complete");
   assert.equal(studentWorkspace([ready("cards-off", { hasCard: false })], [], false, []).attentionCount, 0);
+});
+
+test("a teacher who is also a student opens Your lessons only when asked; every other teacher opens the schedule", () => {
+  const teacher = { role: "teacher", alsoStudent: false };
+  const dual = { role: "teacher", alsoStudent: true };
+  assert.equal(opensSchedule(teacher, true), true);
+  assert.equal(opensSchedule(dual, true), false, "/book/?view=lessons stays on their lessons");
+  assert.equal(opensSchedule(dual, false), true, "booking and a plain /book/ still go to the schedule");
+  assert.equal(opensSchedule({ role: "student" }, false), false);
+  assert.equal(opensSchedule(null, false), false);
+  assert.deepEqual([teacher, dual, { role: "student" }].map(hasStudentSide), [false, true, true]);
 });

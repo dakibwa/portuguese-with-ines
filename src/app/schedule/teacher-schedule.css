@@ -35,6 +35,10 @@
   gap: 1.25rem;
   margin-bottom: 1rem;
 }
+/* A teacher who is also a student: their own lessons beside her tools. */
+.teacher-my-lessons {
+  flex: none;
+}
 .teacher-tabs-scroll {
   flex: 1 1 auto;
   min-width: 0;

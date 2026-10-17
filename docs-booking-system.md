@@ -73,6 +73,21 @@ When that teacher account opens `/book/` or signs in there, it goes straight to
 the same `/schedule/` dashboard. This is a navigation choice based on the verified
 account role; admin endpoints still check teacher permissions on every request.
 
+A teacher can also be one of Inês's students (17 October 2026, Dan). Adding a
+teacher's email from Add student sets `also_student = 1` on their account
+(migration `0032-also-student.sql`) instead of refusing it; `role` stays
+`'teacher'`, so they remain an admin everywhere. Their name, password and
+Google sign-in are untouched, any prices given are saved, the reply is the
+usual 201, and nothing is emailed. From then on they appear in her Students
+list, her details, prices and lesson forms accept them, and their own account
+can save a card, open homework and pick expressions
+(`workers/booking/student-like.mjs` is the one definition). Emailed sign-in
+links and the welcome stay for `role = 'student'`: a welcome for them is
+refused with 409, since its link is a way in they are never given. `GET /me`
+returns `alsoStudent`; `/book/?view=lessons` then opens their lessons, with
+`Your schedule` to go back, and the schedule shows them `My lessons`. Plain
+`/book/` and booking still go to the schedule. Adding them again is 409.
+
 Her own bookings are checked for clashes only, not against her published hours
 or the notice window. Those exist to shape what students may choose; she is the
 one deciding, and fitting a lesson in outside them is a normal thing for her to
@@ -1978,6 +1993,9 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
   price may be €0, copying every row. Apply it by hand to staging, then
   production D1, before or after the Worker: until then saving €0 is refused
   and everything else works as before.
+- **Migration 0032** (`workers/booking/migrations/0032-also-student.sql`) is
+  applied by hand to staging, then production D1, on 17 October 2026, before
+  the Worker that reads it. It adds `students.also_student`, default 0.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
 ## Google Calendar and Meet setup

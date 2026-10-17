@@ -99,7 +99,11 @@ CREATE TABLE IF NOT EXISTS students (
   -- 1 for a student Inês set up who hasn't been emailed by the site yet
   -- (migration 0025). Until she sends their welcome, and while they have
   -- never signed in, emails about their lessons are held.
-  awaiting_welcome INTEGER NOT NULL DEFAULT 0
+  awaiting_welcome INTEGER NOT NULL DEFAULT 0,
+  -- 1 for a teacher who is also one of Inês's students (migration 0032): she
+  -- added their email from Add student. They stay a teacher everywhere and
+  -- also have lessons, a card and homework like any student.
+  also_student INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_students_role ON students (role);

@@ -680,6 +680,10 @@ export function TeacherSchedule() {
     <div className="teacher-workspace">
       <div className="teacher-tools-header">
         <TeacherTabs current={activeTab} hoursDirty={hoursDirty} needsCount={studentWork.attentionCount} onSelect={setActiveTab} />
+        {/* Only for a teacher Inês has also added as a student (17 October 2026, Dan). */}
+        {me?.alsoStudent ? (
+          <a className="button button--outline button--compact teacher-my-lessons" href={`${SITE_BASE_PATH}/book/?view=lessons`}>My lessons</a>
+        ) : null}
       </div>
       {error ? (
         <div className="teacher-inline-error" role="alert">

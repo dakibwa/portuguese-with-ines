@@ -31,6 +31,7 @@ import {
 } from "@/lib/booking-api";
 import { BOOKING_TIME_ZONE } from "@/lib/config";
 import { STUDENT_MARKS } from "@/lib/student-marks";
+import { hasStudentSide } from "@/lib/account-workspace";
 import { StudentHomework } from "@/components/homework/StudentHomework";
 
 /** The two lengths a code from Inês can set a weekly price for. */
@@ -736,7 +737,7 @@ export function MyLessons({
               says which kind is saved (12 October 2026, Dan). A student Inês
               made free at every length has nothing to add one for, unless one
               is already saved (16 October 2026). */}
-          {cardsAccepted && student.role !== "teacher" && !(rates?.[60] === 0 && rates?.[90] === 0 && !student.hasCard) ? (
+          {cardsAccepted && hasStudentSide(student) && !(rates?.[60] === 0 && rates?.[90] === 0 && !student.hasCard) ? (
             <div className="my-lessons__fact" data-field="card">
               <span className="my-lessons__fact-label">Card</span>
               {openField === "card" ? (
@@ -893,7 +894,7 @@ export function MyLessons({
       <p>Card saved. You&rsquo;re all set.</p>
     </div>
   ) : null;
-  const askForCard = !cardAdded && cardsAccepted && student.role !== "teacher" &&
+  const askForCard = !cardAdded && cardsAccepted && hasStudentSide(student) &&
     student.cardForAllLessons === false && unpaidAdded > 0;
   return (
     <>
