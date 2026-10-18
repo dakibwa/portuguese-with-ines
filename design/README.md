@@ -435,11 +435,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
   connection and Sign out, keeping account controls away from daily work.
 - One pager turns the Timetable's week and the Time off and Receipts months
   (14 October 2026, Dan: "there feels inconsistencies here"): two solid blue
-  arrows that never move, and `This week` / `This month` as a quiet text
-  button to their left only while she is away from the current one, because
-  the heading already names where she is. Its place is held while it is out of
-  sight, so the arrows, the heading and the grid beneath never shift between
-  states, and a narrow screen lays heading and pager out the same either way.
+  arrows that never move, and `This week` / `This month` as a compact lilac
+  site button, matching `Edit weekly hours`, to their left only while she is
+  away from the current one, because the heading already names where she is.
+  Its place is held while it is out of sight, so the arrows, the heading and
+  the grid beneath never shift between states, and a narrow screen lays
+  heading and pager out the same either way.
   Using it returns to the current period and puts focus on the heading, since
   the button has just gone. It is never shown, or dead, on the current period.
 - Keep help short (13 October 2026, Dan: "remove all the redundant text"). The
