@@ -77,6 +77,7 @@ export async function finishCalendarConnection(env, url) {
   try {
     const response = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, signal: AbortSignal.timeout(10000),
+      redirect: "manual",
       body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: callback(env),
         client_id: env.GOOGLE_CALENDAR_CLIENT_ID, client_secret: env.GOOGLE_CALENDAR_CLIENT_SECRET,
         code_verifier: await decryptCalendarToken(env, stored.verifier_encrypted) }),

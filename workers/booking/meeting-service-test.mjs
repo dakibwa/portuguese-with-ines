@@ -61,8 +61,9 @@ globalThis.fetch = async (input, options = {}) => {
   requests.push({ url: url.href, method, body: options.body });
   if (url.href === "https://www.googleapis.com/oauth2/v3/certs") return Response.json({ keys: [jwk] });
   if (url.href === "https://oauth2.googleapis.com/token") {
+    assert.equal(options.redirect, "manual", "OAuth credentials stay at the configured token endpoint");
     const body = new URLSearchParams(options.body);
-    if (tokenError) return Response.json({ error: "invalid_grant" }, { status: 400 });
+    if (tokenError) return Response.json({ error: "invalid_grant" }, { status: tokenError === true ? 400 : tokenError });
     if (body.get("grant_type") === "authorization_code") { await duringCodeExchange?.(); return Response.json({ refresh_token: "isolated-refresh-only", id_token: await idToken(), scope: oauthScope }); }
     assert.equal(body.get("grant_type"), "refresh_token");
     return Response.json({ access_token: "isolated-access-only", expires_in: 0 });
@@ -477,10 +478,16 @@ try {
     assert.equal(await finishCalendarConnection(env, callback), "error");
     assert.equal(db.prepare("SELECT email FROM google_calendar_connections").get().email, "ines@example.invalid");
   });
-  await test("OAuth cancellation consumes state and missing calendar scope is rejected", async () => {
+  await test("OAuth cancellation consumes state; redirects and missing calendar scope are rejected", async () => {
     let { callback } = await begin(); callback.searchParams.set("error", "access_denied");
     assert.equal(await finishCalendarConnection(env, callback), "cancelled");
     assert.equal(await finishCalendarConnection(env, callback), "error");
+    ({ callback } = await begin()); tokenError = 307;
+    const previousRequests = requests.length;
+    assert.equal(await finishCalendarConnection(env, callback), "error");
+    assert.equal(requests.length, previousRequests + 1, "A redirect makes no follow-up provider request");
+    assert.equal(await decryptCalendarToken(env, db.prepare("SELECT refresh_token_encrypted FROM google_calendar_connections").get().refresh_token_encrypted), "fixture-refresh");
+    tokenError = false;
     ({ callback } = await begin()); oauthScope = "openid email";
     assert.equal(await finishCalendarConnection(env, callback), "error");
     await assert.rejects(startCalendarConnection(env, db.prepare("SELECT * FROM students WHERE id='other-teacher'").get(), "other-session"), /another teacher/);

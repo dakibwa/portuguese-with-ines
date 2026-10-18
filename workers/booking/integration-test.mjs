@@ -3557,6 +3557,7 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     content: [{ type: "thinking", thinking: "", signature: "isolated" }, { type: "tool_use", id: "toolu_isolated", name, input }] });
   globalThis.fetch = async (url, options) => {
     assert.equal(url, "https://api.anthropic.com/v1/messages");
+    assert.equal(options.redirect, "manual", "the API key and lesson material never follow a redirect");
     requests++;
     const input = JSON.parse(options.body);
     assert.equal(options.headers["x-api-key"], "isolated-ai-key");
@@ -3647,20 +3648,29 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
   }
 });
 
-await test("homework AI: a refusal or a reply without the tool call never becomes a draft", async () => {
+await test("homework AI: a refusal, redirect or reply without the tool call never becomes a draft", async () => {
   const id = linkedBooking("homework-ai-refusal");
   const route = `/admin/lessons/${id}/homework`;
   const beforeFetch = globalThis.fetch;
-  let refusal = true;
+  let refusal = true, redirected = false;
   env.HOMEWORK_AI_ENABLED = "1"; env.ANTHROPIC_API_KEY = "isolated-ai-key";
   db.prepare("DELETE FROM homework_ai_usage").run();
-  globalThis.fetch = async () => Response.json(refusal ? { type: "message", stop_reason: "refusal", content: [] }
-    : { type: "message", stop_reason: "end_turn", content: [{ type: "text", text: "{\"title\": \"Not a tool call\"}" }] });
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "https://api.anthropic.com/v1/messages");
+    assert.equal(options.redirect, "manual");
+    if (redirected) return new Response("private redirect diagnostic", { status: 307, headers: { Location: "https://provider-redirect.example/messages" } });
+    return Response.json(refusal ? { type: "message", stop_reason: "refusal", content: [] }
+      : { type: "message", stop_reason: "end_turn", content: [{ type: "text", text: "{\"title\": \"Not a tool call\"}" }] });
+  };
   try {
     const input = { notes: "Queria um café, por favor. Pedidos no café.", level: "A1", minutes: 10, updatedAt: null };
     assert.equal((await call(`${route}/generate`, { user: "teacher", body: input })).status, 422);
     refusal = false;
     assert.equal((await call(`${route}/generate`, { user: "teacher", body: input })).status, 502, "text outside the tool is not parsed as a sheet");
+    redirected = true;
+    const redirect = await call(`${route}/generate`, { user: "teacher", body: input });
+    assert.equal(redirect.status, 503, "a provider redirect fails without forwarding credentials or lesson material");
+    assert.ok(!(await redirect.text()).includes("private redirect diagnostic"));
     assert.equal((await (await call(route, { user: "teacher", method: "GET" })).json()).sheet, null);
   } finally {
     globalThis.fetch = beforeFetch;
