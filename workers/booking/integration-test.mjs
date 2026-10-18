@@ -2076,6 +2076,31 @@ await test("settings reject a slot interval that would hang availability, and ma
     assert.equal((await save({ minimum_notice_hours: value, same_day_change_fee_cents: value })).status, 400, JSON.stringify(value));
     assert.deepEqual(db.prepare("SELECT * FROM settings ORDER BY key").all(), original, "invalid settings never poison the notice or fee calculation");
   }
+  const previousFee = db.prepare("SELECT value FROM settings WHERE key='same_day_change_fee_cents'").get().value;
+  const previousNotice = db.prepare("SELECT value FROM settings WHERE key='minimum_notice_hours'").get().value;
+  const savePolicy = settings => call("/admin/settings", { user: "teacher", body: { settings } });
+  try {
+    for (const valid of [0, 50]) {
+      const notice = valid === 0 ? 0 : 14;
+      assert.equal((await savePolicy({ same_day_change_fee_cents: valid, minimum_notice_hours: notice })).status, 200);
+      assert.equal(db.prepare("SELECT value FROM settings WHERE key='same_day_change_fee_cents'").get().value, String(valid));
+      assert.equal(db.prepare("SELECT value FROM settings WHERE key='minimum_notice_hours'").get().value, String(notice));
+      const saved = db.prepare("SELECT * FROM settings ORDER BY key").all();
+      for (const tooSmall of [1, 49]) {
+        assert.equal((await savePolicy({ same_day_change_fee_cents: tooSmall })).status, 400, "a positive fee must be payable by EUR card");
+        assert.deepEqual(db.prepare("SELECT * FROM settings ORDER BY key").all(), saved, "a rejected fee preserves the last saved value and revision");
+      }
+    }
+    assert.equal((await savePolicy({ same_day_change_fee_cents: 500 })).status, 200);
+    const promised = db.prepare("SELECT * FROM settings ORDER BY key").all();
+    for (const settings of [{ same_day_change_fee_cents: 501 }, { minimum_notice_hours: 15 }]) {
+      assert.equal((await savePolicy(settings)).status, 400, "configuration cannot exceed the fee or notice the student accepted");
+      assert.deepEqual(db.prepare("SELECT * FROM settings ORDER BY key").all(), promised);
+    }
+  } finally {
+    db.prepare("UPDATE settings SET value=? WHERE key='same_day_change_fee_cents'").run(previousFee);
+    db.prepare("UPDATE settings SET value=? WHERE key='minimum_notice_hours'").run(previousNotice);
+  }
   assert.equal((await save({ slot_interval_minutes: 30 })).status, 200);
 });
 await test("weekly hours refuse malformed replacements without erasing or partly saving the timetable", async () => {

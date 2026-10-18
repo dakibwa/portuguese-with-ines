@@ -6452,18 +6452,25 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     ]);
     // A zero or negative slot interval makes the availability loop never end,
     // so numbers are range-checked and addresses validated before they land.
+    // Fee and notice settings may relax the published €5 / 14-hour agreement,
+    // but cannot make existing consent authorize a higher fee or earlier lock.
     const ranges = {
-      minimum_notice_hours: [0, 336],
+      minimum_notice_hours: [0, 14],
       booking_horizon_days: [1, 365],
       slot_interval_minutes: [5, 240],
       lesson_buffer_minutes: [0, 120],
-      same_day_change_fee_cents: [0, 10000]
+      same_day_change_fee_cents: [0, 500]
     };
     for (const [key, value] of Object.entries(body.settings ?? {})) {
       if (ranges[key]) {
         const [min, max] = ranges[key];
         if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
           return fail(`${key} must be a whole number from ${min} to ${max}.`, 400, request, env);
+        }
+        // Positive EUR card charges must meet Stripe's €0.50 minimum. Zero
+        // deliberately disables the fee and never reaches the payment API.
+        if (key === "same_day_change_fee_cents" && value > 0 && value < 50) {
+          return fail("The change fee must be €0 or at least €0.50.", 400, request, env);
         }
       }
       if ((key === "teacher_email" || key === "reply_to_email") && String(value) !== "" && !isEmail(normaliseEmail(value))) {
