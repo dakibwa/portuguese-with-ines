@@ -501,6 +501,18 @@ export function cancelBookingAs(token: string, bookingId: string, message?: stri
   ).then(validateBookingAcknowledgment);
 }
 
+/** Record a refund already made directly, without sending money or email. */
+export function recordRefundByHand(token: string, bookingId: string) {
+  return adminRequest<{ booking: AdminBooking }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/refund-by-hand`, {
+    method: "POST",
+    body: JSON.stringify({ refunded: true }),
+  }).then(data => {
+    if (!isApiRecord(data.booking) || data.booking.id !== bookingId || data.booking.status !== "cancelled" ||
+      data.booking.payment_status !== "refunded" || !paidByHand(data.booking)) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
+}
+
 /**
  * A lesson she added that the student already paid her for by hand comes off
  * their card before it is charged.

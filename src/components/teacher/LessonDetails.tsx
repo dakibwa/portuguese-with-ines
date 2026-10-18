@@ -7,6 +7,7 @@ import {
   cancelBookingAs,
   rescheduleBookingAs,
   paidByHand,
+  recordRefundByHand,
   setLessonPaid,
   setNoShow,
   type AdminBooking,
@@ -30,6 +31,7 @@ type Props = {
   afterChangeFocusRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onChanged: (message: string) => void;
+  initialAction?: "view" | "refund";
 };
 
 export function LessonDetails({
@@ -39,11 +41,12 @@ export function LessonDetails({
   afterChangeFocusRef,
   onClose,
   onChanged,
+  initialAction = "view",
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const changed = useRef(false);
-  const [action, setAction] = useState<"view" | "move" | "cancel" | "no-show" | "homework">(
-    "view",
+  const [action, setAction] = useState<"view" | "move" | "cancel" | "no-show" | "homework" | "refund">(
+    initialAction,
   );
   const [date, setDate] = useState(dateKey(new Date(booking.starts_at)));
   const [time, setTime] = useState(formatSlotTime(booking.starts_at));
@@ -75,7 +78,8 @@ export function LessonDetails({
   // Its price and how it is paid, one dab: "€25 · paid by card". A
   // cancelled lesson's money matters only if some moved.
   const ticked = paidByHand(booking);
-  const paid = ticked ? "paid to you by hand" : {
+  const canRecordRefund = booking.status === "cancelled" && ticked && booking.payment_status !== "refunded";
+  const paid = ticked && booking.payment_status !== "refunded" ? "paid to you by hand" : {
     paid: "paid by card",
     refunded: "refunded",
     payment_due: "payment due",
@@ -92,7 +96,7 @@ export function LessonDetails({
   // lesson, which has nothing to pay, nor on one paid, due or charging by card.
   const tickable = booking.status === "confirmed" && (ticked || booking.payment_status === "recorded" ||
     (["scheduled", "not_required"].includes(booking.payment_status) && !booking.charge_started_at));
-  const money = booking.status === "cancelled" && !["paid", "refunded"].includes(booking.payment_status)
+  const money = booking.status === "cancelled" && !ticked && !["paid", "refunded"].includes(booking.payment_status)
     ? ""
     : booking.amount_cents ? `${formatMoneyCents(booking.amount_cents)} · ${paid}` : paid.charAt(0).toUpperCase() + paid.slice(1);
   const backdropHandlers = useDialogBackdrop(() => { if (!busy) onClose(); });
@@ -155,6 +159,10 @@ export function LessonDetails({
             ? "No-show removed. The lesson price will be charged as normal."
             : `Marked as a no-show. Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the lesson price.`,
         );
+      } else if (action === "refund") {
+        await recordRefundByHand(token, booking.id);
+        changed.current = true;
+        onChanged("Refund recorded. No payment or email was sent.");
       }
     } catch (caught) {
       setError(
@@ -279,7 +287,10 @@ export function LessonDetails({
           A payment is being processed. Try making changes once it finishes.
         </p>
       ) : null}
-      {booking.status === "cancelled" ? <div className="teacher-dialog-actions"><button className="button button--outline" type="button" onClick={onClose}>Done</button></div> : action === "view" ? (
+      {booking.status === "cancelled" && action === "view" ? <div className="teacher-dialog-actions">
+        {canRecordRefund ? <button className="button button--coral" type="button" onClick={() => setAction("refund")}>Record refund</button> : null}
+        <button className="button button--outline" type="button" onClick={onClose}>Done</button>
+      </div> : action === "view" ? (
         <div className="teacher-dialog-actions">
           {booking.student_id ? <button className="button button--lilac" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null}
           <button
@@ -371,14 +382,17 @@ export function LessonDetails({
           ) : (
             <>
               <h3>
-                {action === "cancel"
+                {action === "refund" ? "Record a refund made by hand?" : action === "cancel"
                   ? "Cancel this lesson?"
                   : noShow
                     ? "Remove the no-show?"
                     : "Mark as a no-show?"}
               </h3>
               <ul className="booking-payment-facts teacher-confirm-facts">
-                {action === "cancel" ? (
+                {action === "refund" ? <>
+                  <li>You have already refunded {firstName} directly</li>
+                  <li>Recording it sends no payment or email</li>
+                </> : action === "cancel" ? (
                   <>
                     <li>
                       {recorded
@@ -431,7 +445,7 @@ export function LessonDetails({
                 >
                   {busy
                     ? "Saving…"
-                    : action === "cancel"
+                    : action === "refund" ? "Yes, record refund" : action === "cancel"
                       ? "Yes, cancel lesson"
                       : noShow
                         ? "Undo no-show"

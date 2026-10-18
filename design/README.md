@@ -1717,6 +1717,10 @@ as a form:
   cancellation that sends an email, `Message for Alex
   (optional)` with an example in the box, its count appearing only near
   the 1,000-character limit;
+  a cancelled lesson paid by hand stays visible in history and Receipts.
+  `Record refund` asks Inês to confirm she already returned it directly;
+  it records that fact, sends no money or email, and keeps the receipt labelled
+  `Refunded`;
 - emails read as the site does: Montserrat (falling back to Arial) rather
   than a serif, the lesson's date on one line and its time and clock beneath
   with no `at`, each fact beside one of the confirm step's dabs with its label

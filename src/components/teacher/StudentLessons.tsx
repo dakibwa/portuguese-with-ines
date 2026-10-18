@@ -8,10 +8,10 @@ import { BookOpen } from "lucide-react";
 import { TeacherHomework } from "@/components/homework/TeacherHomework";
 
 function paymentLabel(booking: AdminBooking) {
+  if (booking.payment_status === "refunded") return "Refunded";
   if (paidByHand(booking)) return "Paid by hand";
   switch (booking.payment_status) {
     case "paid": return "Paid";
-    case "refunded": return "Refunded";
     case "payment_due": return "Payment due";
     case "processing": return "Payment processing";
     case "scheduled": return "Payment scheduled";
@@ -34,7 +34,7 @@ export function upcomingLessons(bookings: AdminBooking[], now: number) {
  * and cancelled, reading the records from the start of time rather than the
  * visible week.
  */
-export function StudentLessons({ bookings, error, now, onRetry, token, requestedHomeworkId }: {
+export function StudentLessons({ bookings, error, now, onRetry, token, requestedHomeworkId, onRecordRefund }: {
   token: string;
   requestedHomeworkId?: string;
   /** Null until they have been read. */
@@ -42,6 +42,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
   error: string;
   now: number;
   onRetry: () => void;
+  onRecordRefund: (booking: AdminBooking) => void;
 }) {
   const [homeworkId, setHomeworkId] = useState<string | null>(null);
   const [homeworkBusy, setHomeworkBusy] = useState(false);
@@ -69,7 +70,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
         : booking.same_day_fee_status === "scheduled" ? "Change fee scheduled"
           : booking.same_day_fee_status === "processing" ? "Change fee processing" : "";
     // A cancelled lesson's money only matters if some moved.
-    const payment = cancelled && !["paid", "refunded"].includes(booking.payment_status) ? "" : paymentLabel(booking);
+    const payment = cancelled && !paidByHand(booking) && !["paid", "refunded"].includes(booking.payment_status) ? "" : paymentLabel(booking);
     const facts = [
       formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000) }),
       payment,
@@ -92,6 +93,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
         </ul>
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
         {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
+        {cancelled && paidByHand(booking) && booking.payment_status !== "refunded" ? <button className="teacher-text-button" type="button" disabled={homeworkBusy} onClick={() => onRecordRefund(booking)}>Record refund</button> : null}
         {booking.student_id && !cancelled ? <button type="button" data-homework-exit className="teacher-text-button teacher-history-homework" disabled={homeworkBusy}
           aria-expanded={homeworkId === booking.id} onClick={() => setHomeworkId(homeworkId === booking.id ? null : booking.id)}>
           <BookOpen size={15} aria-hidden="true" />{homeworkId === booking.id ? "Close homework" : "Homework"}

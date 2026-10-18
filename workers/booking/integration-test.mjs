@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import worker, { chargeDueLessons, chargeDueSameDayFees, notifySeries, resendFailedEmails, retryPaymentRecovery, retryRefunds, sendLessonReminders } from "./index.mjs";
-import { createSession, createResetToken, hashPassword, sessionVersion } from "./auth.mjs";
+import { createSession, createResetToken, createSignInToken, hashPassword, sessionVersion } from "./auth.mjs";
 import { createManageToken, readManageToken } from "./tokens.mjs";
 import { findRecurringCode, studentLessonType, priceForMove } from "./rates.mjs";
 import { bookingSelection, portoWeekOf } from "./selection.mjs";
@@ -595,16 +595,142 @@ await test("logout revokes only the presented session and reset invalidates prev
   assert.equal((await call("/me/recurring-rates", { user: "bob", method: "GET" })).status, 401);
   const reset = await createResetToken("alice", env.BOOKING_TOKEN_SECRET);
   db.prepare("INSERT INTO password_resets (nonce,student_id,created_at) VALUES (?,'alice',?)").run(reset.split(".")[2], new Date().toISOString());
+  db.prepare("INSERT INTO email_changes (nonce,student_id,new_email,created_at) VALUES ('reset-pending','alice','pending@example.invalid',?)").run(new Date().toISOString());
   const response = await call("/auth/reset", { user: null, body: { token: reset, password: "isolated-password-only" } });
   assert.equal(response.status, 200);
   const result = await response.json();
   assert.equal(sessionVersion(result.session), 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_changes WHERE student_id='alice'").get().n, 0, "reset retires pending address changes");
   assert.equal((await call("/me/recurring-rates", { method: "GET" })).status, 401);
   assert.equal((await call("/me/recurring-rates", { method: "GET", token: result.session })).status, 200);
   sessions.alice = result.session;
   assert.equal((await call("/auth/reset", { user: null, body: { token: reset, password: "second-isolated-password" } })).status, 400);
 });
 
+await test("account reads and profile saves refuse sessions revoked while a request is running", async () => {
+  const originalPrepare = DB.prepare;
+  for (const change of ["version", "logout", "profile", "email", "admin-details"]) {
+    const id = `snapshot-${change}`;
+    student(id);
+    const bearer = await createSession(id, env.BOOKING_TOKEN_SECRET);
+    const options = { token: bearer, headers: { "CF-Connecting-IP": "198.51.100.96" } };
+    try {
+      if (change === "admin-details") {
+        beforeRun = sql => {
+          if (!sql.startsWith("UPDATE students SET name = ?, email = ?")) return;
+          beforeRun = null;
+          db.prepare("UPDATE students SET email=?, session_version=session_version+1 WHERE id=?").run(`current-${id}@example.invalid`, id);
+          db.prepare("INSERT INTO password_resets(nonce,student_id,created_at) VALUES ('newer-admin-reset',?,?)").run(id, new Date().toISOString());
+        };
+        assert.equal((await call(`/admin/students/${id}/details`, { user: "teacher", body: { name: "Stale details", email: "stale-admin@example.invalid" } })).status, 409);
+        assert.equal(db.prepare("SELECT email FROM students WHERE id=?").get(id).email, `current-${id}@example.invalid`);
+        assert.equal(db.prepare("SELECT COUNT(*) AS n FROM password_resets WHERE student_id=?").get(id).n, 1);
+      } else if (change === "email") {
+        beforeRun = sql => {
+          if (!sql.startsWith("INSERT INTO email_changes")) return;
+          beforeRun = null;
+          db.prepare("UPDATE students SET session_version=session_version+1 WHERE id=?").run(id);
+        };
+        assert.equal((await call("/me/email", { ...options, body: { email: "new-snapshot@example.invalid" } })).status, 401);
+        assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_changes WHERE student_id=?").get(id).n, 0);
+      } else if (change === "profile") {
+        beforeRun = sql => {
+          if (!sql.startsWith("UPDATE students SET name = ?")) return;
+          beforeRun = null;
+          db.prepare("UPDATE students SET session_version=session_version+1 WHERE id=?").run(id);
+        };
+        assert.equal((await call("/me", { ...options, body: { name: "Stale profile", phone: "changed" } })).status, 401);
+        assert.equal(db.prepare("SELECT name FROM students WHERE id=?").get(id).name, "Test Student");
+      } else {
+        let changed = false;
+        DB.prepare = sql => {
+          const statement = originalPrepare(sql);
+          if (sql.includes("WHERE b.student_id = ? ORDER BY") || sql.includes("WHERE b.student_id = ? AND EXISTS")) {
+            const all = statement.all;
+            statement.all = async () => {
+              if (!changed) {
+                changed = true;
+                if (change === "logout") assert.equal((await call("/auth/logout", options)).status, 200);
+                else db.prepare("UPDATE students SET session_version=session_version+1 WHERE id=?").run(id);
+                linkedBooking(`private-${change}`, { owner: id });
+              }
+              return all();
+            };
+          }
+          return statement;
+        };
+        const response = await call("/me", { ...options, method: "GET" });
+        assert.equal(response.status, 401);
+        assert.equal((await response.json()).bookings, undefined, "no lesson data or management links leave the stale request");
+      }
+    } finally {
+      DB.prepare = originalPrepare;
+      beforeRun = null;
+      db.prepare("DELETE FROM bookings WHERE student_id=?").run(id);
+      db.prepare("DELETE FROM password_resets WHERE student_id=?").run(id);
+      db.prepare("DELETE FROM students WHERE id=?").run(id);
+    }
+  }
+});
+await test("sign-in links and Google first links cannot cross an intervening account transition or clear newer links", async () => {
+  for (const mode of ["address", "version"]) for (const method of ["link", "link-password", "google"]) {
+    const id = `auth-snapshot-${method}-${mode}`;
+    student(id);
+    if (method === "link-password") db.prepare("UPDATE students SET password_hash='previous-password' WHERE id=?").run(id);
+    let path, body;
+    if (method === "google") {
+      path = "/auth/google";
+      body = { credential: await googleCredential({ sub: `sub-${id}`, email: `${id}@example.invalid` }) };
+    } else {
+      path = "/auth/email-link/confirm";
+      const link = await createSignInToken(id, env.BOOKING_TOKEN_SECRET, 30);
+      db.prepare("INSERT INTO sign_in_links(nonce,student_id,email,expires_at,created_at) VALUES (?,?,?,?,?)")
+        .run(link.nonce, id, `${id}@example.invalid`, link.expiresAt, new Date().toISOString());
+      body = { token: link.token };
+    }
+    beforeRun = sql => {
+      if (!(sql.startsWith("UPDATE students SET google_sub = ?") || sql.startsWith("UPDATE students SET email_verified_at =") || sql.startsWith("UPDATE students SET password_hash = ''"))) return;
+      beforeRun = null;
+      db.prepare("UPDATE students SET email=?, session_version=session_version+1 WHERE id=?")
+        .run(mode === "address" ? `updated-${id}@example.invalid` : `${id}@example.invalid`, id);
+      db.prepare("INSERT INTO password_resets(nonce,student_id,created_at) VALUES (?,?,?)").run(`fresh-${id}`, id, new Date().toISOString());
+      db.prepare("INSERT INTO email_changes(nonce,student_id,new_email,created_at) VALUES (?,?,?,?)")
+        .run(`fresh-${id}`, id, `fresh-${id}@example.invalid`, new Date().toISOString());
+    };
+    try {
+      const response = await call(path, { user: null, body, headers: { "CF-Connecting-IP": "198.51.100.97" } });
+      assert.equal(response.status, 409, await response.clone().text());
+      assert.equal((await response.json()).session, undefined);
+      assert.equal(db.prepare("SELECT google_sub FROM students WHERE id=?").get(id).google_sub, null);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM password_resets WHERE student_id=?").get(id).n, 1, "losing transition preserves newer reset links");
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_changes WHERE student_id=?").get(id).n, 1, "losing transition preserves newer address changes");
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM request_limits WHERE key LIKE 'auth-cleanup:%'").get().n, 0, "transaction markers never persist");
+    } finally {
+      beforeRun = null;
+      db.prepare("DELETE FROM sign_in_links WHERE student_id=?").run(id);
+      db.prepare("DELETE FROM password_resets WHERE student_id=?").run(id);
+      db.prepare("DELETE FROM email_changes WHERE student_id=?").run(id);
+      db.prepare("DELETE FROM students WHERE id=?").run(id);
+    }
+  }
+});
+await test("a password-reset request cannot issue a link after the account address changes", async () => {
+  const id = "reset-address-snapshot";
+  student(id);
+  beforeRun = sql => {
+    if (!sql.startsWith("INSERT OR REPLACE INTO password_resets")) return;
+    beforeRun = null;
+    db.prepare("UPDATE students SET email=?, session_version=session_version+1 WHERE id=?").run("updated-reset@example.invalid", id);
+  };
+  try {
+    assert.equal((await call("/auth/forgot", { user: null, body: { email: `${id}@example.invalid` }, headers: { "CF-Connecting-IP": "198.51.100.98" } })).status, 200);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM password_resets WHERE student_id=?").get(id).n, 0);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE recipient=?").get(`${id}@example.invalid`).n, 0);
+  } finally {
+    beforeRun = null;
+    db.prepare("DELETE FROM students WHERE id=?").run(id);
+  }
+});
 await test("teacher creation atomically loses to a concurrent student claim", async () => {
   beforeRun = (sql) => {
     if (sql.startsWith("INSERT INTO bookings")) {
@@ -2410,7 +2536,54 @@ await test("a card saved from the account pays for the lessons Inês added from 
     assert.match(charge.body, /customer=cus_card_later/);
     assert.match(charge.body, /payment_method=pm_card_back/);
     assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(single).payment_status, "paid");
+
+    // Commit the same withdrawal as /me/card/remove between an old read and
+    // its write, as the database interleaving does in production.
+    const withdraw = () => {
+      db.prepare("UPDATE students SET card_consent_at=NULL, card_setup_version=card_setup_version+1 WHERE id=?").run(id);
+      db.prepare(`UPDATE bookings SET payment_status='not_required',payment_consent_at=NULL,payment_consent_version=NULL
+        WHERE student_id=? AND added_by_teacher=1 AND status='confirmed' AND payment_status='scheduled'
+          AND payment_consent_version='2026-10-12-card-on-file-v1'`).run(id);
+      db.prepare(`UPDATE booking_series SET automatic_payment=0,payment_consent_at=NULL,payment_consent_version=NULL
+        WHERE student_id=? AND added_by_teacher=1 AND status='active'`).run(id);
+    };
+    const restoreConsent = () => db.prepare("UPDATE students SET card_consent_at=? WHERE id=?").run(new Date().toISOString(), id);
+    beforeRun = (sql) => {
+      if (sql.startsWith("INSERT INTO bookings")) { beforeRun = null; withdraw(); }
+    };
+    assert.equal((await add("2026-10-06T02:00:00.000Z")).status, 409, "a stale teacher read cannot schedule a charge after withdrawal");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND starts_at='2026-10-06T02:00:00.000Z'").get(id).n, 0);
+
+    // Unticking an earlier hand payment cannot restore withdrawn consent.
+    restoreConsent();
+    beforeRun = (sql, values) => {
+      if (sql.startsWith("UPDATE bookings SET payment_status = ?,") && values[5] === handPaid) { beforeRun = null; withdraw(); }
+    };
+    assert.equal((await call(`/admin/bookings/${handPaid}/paid`, { user: "teacher", body: { paid: false } })).status, 409);
+    assert.equal(db.prepare("SELECT payment_consent_version FROM bookings WHERE id=?").get(handPaid).payment_consent_version, "paid-by-hand");
+
+    // The first lesson can exist when withdrawal wins before its new weekly
+    // recipe is created. That recipe and its later weeks stay off the card.
+    restoreConsent();
+    beforeRun = (sql) => {
+      if (sql.startsWith("WITH card(authorized)")) { beforeRun = null; withdraw(); }
+    };
+    const stoppedCardRun = await add("2026-10-06T02:00:00.000Z", { repeat: 4 });
+    assert.equal(stoppedCardRun.status, 201, await stoppedCardRun.clone().text());
+    const stoppedCardSeries = (await stoppedCardRun.json()).series.id;
+    assert.equal(db.prepare("SELECT automatic_payment FROM booking_series WHERE id=?").get(stoppedCardSeries).automatic_payment, 0);
+    assert.ok(db.prepare("SELECT payment_status FROM bookings WHERE series_id=?").all(stoppedCardSeries).every((row) => row.payment_status === "not_required"));
+
+    // A stale scheduled row left by an older Worker is repaired before it can
+    // reach Stripe, even though Stripe still holds the saved payment method.
+    const stale = db.prepare("SELECT id FROM bookings WHERE series_id=? ORDER BY starts_at LIMIT 1").get(stoppedCardSeries).id;
+    db.prepare(`UPDATE bookings SET payment_status='scheduled',payment_consent_at=?,payment_consent_version='2026-10-12-card-on-file-v1',
+      starts_at='2026-09-04T04:00:00.000Z',ends_at='2026-09-04T05:00:00.000Z' WHERE id=?`).run(new Date().toISOString(), stale);
+    await chargeDueLessons(env);
+    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(stale).payment_status, "not_required");
+    assert.ok(!charges.some((entry) => entry.key === `ines:charge:${stale}:lesson`), "withdrawn consent cannot charge a saved card");
   } finally {
+    beforeRun = null;
     db.prepare("DELETE FROM bookings WHERE id='card-later-own'").run();
     forgetStudent(email);
   }
@@ -2975,6 +3148,25 @@ await test("Already paid: ticked lessons are never billed or put on a card, show
     assert.equal((await tick(future, false)).status, 200);
     assert.deepEqual(terms(future), ["scheduled", 2500, "2026-10-12-card-on-file-v1"]);
     assert.ok(!(await lines("2026-10")).some((line) => line.lessonStartsAt === future));
+
+    // A cancellation is not a cash refund. Its payment stays visible until
+    // Inês records the money she returned directly, without touching Stripe.
+    const manual = row(unticked).id;
+    const refundPath = `/admin/bookings/${manual}/refund-by-hand`;
+    const countBefore = [charges.length, refunds.length];
+    const ip = { "CF-Connecting-IP": "198.51.100.89" };
+    assert.equal((await call(refundPath, { user: "alice", body: { refunded: true }, headers: ip })).status, 401);
+    assert.equal((await call(refundPath, { user: "teacher", body: { refunded: true } })).status, 409, "cancel it first");
+    assert.equal((await call(`/admin/bookings/${manual}/cancel`, { user: "teacher" })).status, 200);
+    const retained = (await lines("2026-10")).find(line => line.bookingId === manual);
+    assert.deepEqual([retained.method, retained.state, retained.ready, retained.amountCents], ["by hand", "paid", true, 2500]);
+    assert.equal((await call(refundPath, { user: "teacher" })).status, 400, "explicit confirmation required");
+    assert.equal((await call(refundPath, { user: "teacher", body: { refunded: true } })).status, 200);
+    assert.equal((await call(refundPath, { token: env.ADMIN_TOKEN, body: { refunded: true }, headers: ip })).status, 200, "fallback teacher access and retry");
+    const refunded = (await lines("2026-10")).find(line => line.bookingId === manual);
+    assert.deepEqual([refunded.method, refunded.state, refunded.ready, refunded.amountCents], ["by hand", "refunded", false, 2500]);
+    assert.deepEqual([charges.length, refunds.length], countBefore, "only a record, never another payment or refund");
+    assert.equal((await call("/admin/bookings/paid-tick-card/refund-by-hand", { user: "teacher", body: { refunded: true } })).status, 409, "card payments use their existing refund path");
   } finally {
     db.prepare("DELETE FROM bookings WHERE student_id=?").run(id);
     db.prepare("DELETE FROM students WHERE id=?").run(id);

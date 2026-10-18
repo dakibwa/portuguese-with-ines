@@ -52,9 +52,11 @@ export function receiptLines(rows, now = new Date()) {
     // Ticked "Already paid": the money is in, whether or not it has happened
     // yet. A free lesson ('free') or an unticked record ('recorded') has no line.
     const ticked = row.payment_consent_version === PAID_BY_HAND_MARK &&
-      (row.payment_status === "not_required" || row.payment_status === "recorded");
-    if (ticked && row.status === "confirmed") {
-      state = "paid";
+      ["not_required", "recorded", "refunded"].includes(row.payment_status);
+    if (ticked) {
+      // Cancelling does not return a direct payment. Keep its receipt until
+      // Inês explicitly records that she refunded it herself.
+      state = row.payment_status === "refunded" ? "refunded" : "paid";
       method = "by hand";
     // Nothing on a card: a lesson that happened was paid to her by hand.
     } else if (row.payment_status === "not_required" && row.status === "confirmed" && ended && !noShow) {

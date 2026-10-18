@@ -47,6 +47,9 @@ function formEncode(values, prefix = "") {
 async function stripeRequest(env, path, body, { idempotencyKey = "" } = {}) {
   const response = await fetch(`${API}${path}`, {
     method: "POST",
+    // Workers forwards Authorization even across hostnames when following a
+    // redirect. Stripe credentials must only reach the fixed API origin.
+    redirect: "manual",
     headers: stripeHeaders(env, { contentType: true, idempotencyKey }),
     body: formEncode(body)
   });
@@ -68,11 +71,13 @@ async function stripeRequest(env, path, body, { idempotencyKey = "" } = {}) {
  */
 export function stripeProblemIsRetryable(error) {
   const status = Number(error?.stripeStatus ?? 0);
-  return error?.stripeType === "idempotency_error" || status === 0 || status === 409 || status === 429 || status >= 500;
+  return error?.stripeType === "idempotency_error" || status === 0 || (status >= 300 && status < 400) ||
+    status === 409 || status === 429 || status >= 500;
 }
 
 async function stripeGet(env, path) {
   const response = await fetch(`${API}${path}`, {
+    redirect: "manual",
     headers: stripeHeaders(env)
   });
   const payload = await response.json().catch(() => ({}));

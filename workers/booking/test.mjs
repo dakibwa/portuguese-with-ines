@@ -18,6 +18,7 @@ import {
   expireCheckoutSession,
   isTestMode,
   refundPayment,
+  retrieveCheckoutSession,
   setupSessionProblem,
   stripeMode,
   stripeProblemIsRetryable,
@@ -930,6 +931,26 @@ await test("a refund is idempotent for one booking", async () => {
   const body = new URLSearchParams(request.options.body);
   assert.equal(body.get("payment_intent"), "pi_test_paid");
   assert.equal(body.get("amount"), "2500");
+});
+
+await test("Stripe redirects never receive the API key or open a second payment path", async () => {
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async (url, options) => {
+    requests += 1;
+    assert.equal(new URL(url).origin, "https://api.stripe.com");
+    assert.equal(options.redirect, "manual", "Workers must not forward Authorization to the redirect destination");
+    return new Response(null, { status: 307, headers: { Location: "https://redirect.example.invalid/collect" } });
+  };
+  try {
+    await assert.rejects(chargeSavedCard({ STRIPE_SECRET_KEY: "rk_test_example" }, {
+      bookingId: "redirected-charge", customer: "cus_test", paymentMethod: "pm_test", amountCents: 2500
+    }), (error) => error.stripeStatus === 307 && stripeProblemIsRetryable(error));
+    await assert.rejects(retrieveCheckoutSession({ STRIPE_SECRET_KEY: "rk_test_example" }, "cs_test"), /Stripe returned 307/);
+    assert.equal(requests, 2, "each API call stops at its original redirect response");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 // --- Password hashing --------------------------------------------------------

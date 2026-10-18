@@ -315,15 +315,16 @@ async function fixture(width, options = {}) {
     if (path === "/admin/receipts") {
       if (state.receiptReply !== undefined) return route.fulfill({ json: state.receiptReply });
       const month = new URL(request.url()).searchParams.get("month");
-      const receipts = state.bookings.filter((entry) => entry.status === "confirmed" && entry.payment_consent_version === "paid-by-hand" && entry.starts_at.startsWith(month))
+      const receipts = state.bookings.filter((entry) => entry.payment_consent_version === "paid-by-hand" && entry.starts_at.startsWith(month))
         .map((entry) => ({ id: `${entry.id}:lesson`, reference: entry.reference, lessonStartsAt: entry.starts_at, studentName: entry.student_name,
           studentEmail: entry.student_email, nif: entry.student_nif ?? "", bookingId: entry.id, kind: "lesson", label: "60-minute lesson",
-          amountCents: entry.amount_cents, method: "by hand", state: "paid", ready: true, stripePaymentIntent: "" }));
+          amountCents: entry.amount_cents, method: "by hand", state: entry.payment_status === "refunded" ? "refunded" : "paid", ready: entry.payment_status !== "refunded", stripePaymentIntent: "" }));
+      const ready = receipts.filter(line => line.ready);
       return route.fulfill({ json: { month, receipts,
-        totals: { ready: receipts.length, readyCents: receipts.reduce((sum, line) => sum + line.amountCents, 0) } } });
+        totals: { ready: ready.length, readyCents: ready.reduce((sum, line) => sum + line.amountCents, 0) } } });
     }
     const match = path.match(
-      /^\/admin\/bookings\/([^/]+)\/(reschedule|cancel|no-show|paid)$/,
+      /^\/admin\/bookings\/([^/]+)\/(reschedule|cancel|no-show|paid|refund-by-hand)$/,
     );
     if (match) {
       const booking = state.bookings.find((entry) => entry.id === match[1]);
@@ -344,6 +345,8 @@ async function fixture(width, options = {}) {
       } else if (match[2] === "cancel") {
         if (state.failCancel-- > 0) return fail("The booking system is busy. Please try again.");
         booking.status = "cancelled";
+      } else if (match[2] === "refund-by-hand") {
+        booking.payment_status = "refunded";
       }
       else booking.attendance_status = data.noShow ? "no_show" : "expected";
       return route.fulfill({ json: { booking } });
@@ -1223,6 +1226,7 @@ try {
   await mkdir("tmp/qa/free-price", { recursive: true });
   for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
+    state.bookings.find(entry => entry.id === "next").student_id = "sam";
     await page.getByRole("tab", { name: /^Students/ }).click();
     const alex = studentRow(page, "Alex");
     await alex.getByRole("button", { name: "Price for Alex", exact: true }).click();
@@ -1297,13 +1301,33 @@ try {
     await details.getByRole("button", { name: "Cancel lesson", exact: true }).click();
     await expect(details).toContainText("Refund Sam directly for the payment made by hand");
     await expect(details).not.toContainText("refunded in full, automatically");
-    await details.getByRole("button", { name: "Back to lesson", exact: true }).click();
-    await page.keyboard.press("Escape");
+    await details.getByRole("button", { name: "Yes, cancel lesson", exact: true }).click();
+    await expect(details).toHaveCount(0);
 
     // Receipts: the ticked lessons, paid by hand.
     await page.getByRole("tab", { name: "Receipts", exact: true }).click();
     await expect(page.locator(".teacher-receipts")).toContainText("Paid by hand");
+    const paidReceipt = page.locator('[data-receipt-id="next:lesson"]');
+    await expect(paidReceipt).toHaveAttribute("data-ready", "true");
     if (width === 1280) await page.locator(".teacher-receipts").screenshot({ path: "tmp/qa/free-price/teacher-receipts-paid-by-hand.png" });
+    await page.getByRole("tab", { name: /^Students/ }).click();
+    await samRow.getByRole("button", { name: "Open Sam Known’s profile", exact: true }).click();
+    const cancelledLesson = samRow.locator(".teacher-history-lesson").filter({ hasText: "Tue 8 Sept" });
+    await expect(cancelledLesson).toContainText("Paid by hand");
+    const beforeRefund = state.writes.length;
+    await cancelledLesson.getByRole("button", { name: "Record refund", exact: true }).click();
+    await expect(details).toContainText("You have already refunded Sam directly");
+    await expect(details).toContainText("Recording it sends no payment or email");
+    await expect(details.getByRole("button", { name: "Yes, record refund", exact: true })).toBeVisible();
+    assert.equal(state.writes.length, beforeRefund, "Opening the confirmation does not record a refund");
+    await details.getByRole("button", { name: "Yes, record refund", exact: true }).click();
+    await expect(details).toHaveCount(0);
+    await expect(cancelledLesson).toContainText("Refunded");
+    await expect(cancelledLesson.getByRole("button", { name: "Record refund", exact: true })).toHaveCount(0);
+    assert.deepEqual(state.writes.at(-1), { path: "/admin/bookings/next/refund-by-hand", data: { refunded: true } });
+    await page.getByRole("tab", { name: "Receipts", exact: true }).click();
+    await expect(paidReceipt).toContainText("Refunded");
+    await expect(paidReceipt).toHaveAttribute("data-ready", "false");
     assert.deepEqual(state.errors, []);
     await page.close();
   }

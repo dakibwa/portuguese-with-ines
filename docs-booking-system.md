@@ -173,6 +173,10 @@ setup already open at Stripe cannot restore the agreement, even if no card had
 yet been confirmed. Each setup records that generation and the account's
 `session_version`; confirmation checks both again in the transaction, together
 with verified student access. Identity changes also retire older setups.
+Teacher lesson/series creation and unticking a direct payment check the same
+current agreement inside their writes. Charge initiation checks it again;
+withdrawn agreements cannot leave stale scheduled charges. Charges already
+processing retain their original idempotent retry, since money may have moved.
 
 Inês sees which lessons a newly saved card now pays for in Needs you. One the
 student already paid her for by hand is ticked `Already paid` (below) before it
@@ -197,7 +201,7 @@ status:
   Meet, no move into the future). Unticked, it is a plain record again: no
   price, not in Receipts.
 - Ticked lessons are in **Receipts as paid by hand, ready**, from the moment
-  they are ticked (the money is in), until cancelled. Untick a lesson to come
+  they are ticked (the money is in), including after cancellation. Untick a lesson to come
   before it is charged and it is billed as it would be booked now: her lesson
   goes on the card if the student's standing agreement covers it, otherwise
   it is to be paid to her directly (`not_required`, unmarked); a lesson the
@@ -216,11 +220,14 @@ status:
 - Her student list's `paid by hand` count and the student's `Pay by card`
   prompt leave ticked lessons out; emails show their price as `paid`.
 
-Receipt policy awaiting clarification: the ticked-lesson rule above removes a
-cancelled payment made by hand from Receipts, while the general receipts rule
-says cancellations retain money actually received. Cancellation records no
-manual refund. This bug-fix pass preserves the explicit ticked-lesson rule;
-the confirmation now reminds Inês to refund the student directly.
+Cancelling a lesson never records a refund of money paid by hand. In Student
+history, `Record refund` opens an explicit confirmation that Inês already
+returned the money directly. `POST /admin/bookings/:id/refund-by-hand` requires
+`{ refunded: true }`, teacher access, a cancelled paid-by-hand lesson and no
+Stripe payment or charge in progress. It records `payment_status = 'refunded'`
+and retains the receipt as `by hand / refunded`, no longer ready to issue.
+Repeated acknowledgments are harmless. It sends no email and makes no payment
+provider call. This is Dan's confirmed receipt rule (18 October 2026).
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
@@ -688,10 +695,18 @@ before it is applied simply never show. The fee-detection SQL is not touched.
 Booking requires an account, so a student's lessons persist together rather than
 depending on them having kept the right confirmation email.
 
+Sign-in links, Google first links, reset issuance/completion and email changes
+bind the address and session version they verified. Pending-access cleanup is
+part of the identity write's D1 transaction and runs only when that write wins;
+a losing request cannot delete newer recovery links. The ephemeral
+`auth-cleanup:` request-limit marker is removed in the same transaction.
+
 - **Opening quickly.** `/book/` asks for `/me` from its HTML, before its code
   loads. `/me` reads the session's student and its revocation together, then
-  the settings, lessons and weekly runs together: two database round trips
-  rather than five. The browser keeps the account as its session last read it
+  the settings, lessons and weekly runs together, then rechecks revocation
+  before returning private data. Lesson reads and profile writes also bind
+  the original account version, so a request that overlaps recovery cannot
+  expose newly added lessons or overwrite the recovered account. The browser keeps the account as its session last read it
   (`ines-account-snapshot` in localStorage, a week at most, removed on signing
   out or when the session is refused) and opens Your lessons on it at once on a
   return visit while it asks again; booking and emailed links still wait for
@@ -1913,8 +1928,10 @@ amount and currency; expired card-setup holds cannot reclaim a slot.
 
 For an existing database, apply `migrations/0033-card-setup-version.sql` before
 releasing this Worker. It adds the card-setup revocation generation only; do
-not replay the full schema or older migrations. The site and Worker changes
-in this bug-fix pass have not been published by the local verification.
+not replay the full schema or older migrations. This migration was applied
+and its type, NOT NULL constraint and default verified in staging and
+production on 18 October 2026, using the connected Cloudflare app. The local
+runtime's Cloudflare token did not grant D1 query access.
 
 ```bash
 npx wrangler d1 create ines-booking          # put the id in wrangler.jsonc
