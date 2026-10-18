@@ -7,6 +7,7 @@ import { TeacherPager } from "@/components/teacher/TeacherPager";
 import { readSession } from "@/lib/auth-api";
 import { formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
+import { csvCell } from "@/lib/csv";
 
 function shiftMonth(month: string, amount: number) {
   const date = new Date(`${month}-01T12:00:00Z`);
@@ -28,10 +29,6 @@ function paidLabel(line: ReceiptLine) {
 
 /** One row per amount, in the order her automation can issue them. */
 function csv(lines: ReceiptLine[]) {
-  const cell = (value: string | number) => {
-    const text = String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
   const rows = [
     ["id", "lesson_date", "lesson_time", "student", "email", "nif", "item", "amount_eur", "paid", "ready", "stripe_payment"],
     ...lines.map((line) => [
@@ -48,7 +45,7 @@ function csv(lines: ReceiptLine[]) {
       line.stripePaymentIntent,
     ]),
   ];
-  return rows.map((row) => row.map(cell).join(",")).join("\n");
+  return rows.map((row) => row.map(csvCell).join(",")).join("\n");
 }
 
 /**

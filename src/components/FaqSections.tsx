@@ -20,7 +20,9 @@ export function FaqSections({ sections, indexMark }: { sections: FaqSection[]; i
 
   useEffect(() => {
     const fromAddress = (bringIntoView: boolean) => {
-      const id = window.location.hash.replace(/^#faq-/, "");
+      // Back to the original, unfragmented address restores its first section
+      // just as opening that address directly does.
+      const id = window.location.hash ? window.location.hash.replace(/^#faq-/, "") : sections[0]?.id ?? "";
       if (!sections.some((section) => section.id === id)) return;
       setActive(id);
       // Arriving from a link, a phone shows the index first, so bring the

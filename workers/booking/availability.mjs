@@ -4,6 +4,7 @@ import {
   dateKey,
   dayBounds,
   eachDateKey,
+  offsetMinutes,
   parseDateKey,
   weekdayOf,
   zonedParts,
@@ -26,22 +27,6 @@ function overlaps(startA, endA, startB, endB) {
 
 export const DEFAULT_BOOKING_HORIZON_DAYS = 84;
 export const DEFAULT_MINIMUM_NOTICE_HOURS = 14;
-
-function mergeStartRanges(ranges) {
-  const sorted = [...ranges].sort((a, b) => a.start - b.start);
-  const merged = [];
-
-  for (const range of sorted) {
-    const last = merged[merged.length - 1];
-    if (last && range.start <= last.lastStart) {
-      last.lastStart = Math.max(last.lastStart, range.lastStart);
-    } else {
-      merged.push({ ...range });
-    }
-  }
-
-  return merged;
-}
 
 /**
  * One date's blocked spans as the teacher calendar sends them: whole minutes in
@@ -77,16 +62,42 @@ export function normaliseBlockedSpans(blocks) {
  * merely when it begins inside one.
  */
 export function candidateStartMinutes({ startRanges, blockedSpans = [], duration, interval }) {
-  const starts = [];
+  const starts = new Set();
 
-  for (const range of mergeStartRanges(startRanges)) {
+  // Each window owns its starting grid. Merging a 10:15 extra window into
+  // 10:00 weekly hours would erase 10:15 when the interval is 30 minutes.
+  for (const range of startRanges) {
     for (let minute = range.start; minute <= range.lastStart; minute += interval) {
       if (blockedSpans.some((span) => overlaps(minute, minute + duration, span.start, span.end))) continue;
-      starts.push(minute);
+      starts.add(minute);
     }
   }
 
-  return starts;
+  return [...starts].sort((a, b) => a - b);
+}
+
+/** Time off covers actual instants, including both copies of a repeated hour. */
+function blockedInstantSpans(key, spans) {
+  if (!spans.length) return [];
+  const { start, end } = dayBounds(key);
+  const startMs = start.getTime(), endMs = end.getTime();
+  if (spans.some(span => span.start === 0 && span.end === 1440)) return [{ start: startMs, end: endMs }];
+  if (offsetMinutes(start) === offsetMinutes(new Date(endMs - 60000))) {
+    return spans.map(span => ({ start: startMs + span.start * 60000, end: startMs + span.end * 60000 }));
+  }
+
+  // Only Porto's two clock-change dates need this bounded minute walk. Using
+  // wall-clock endpoints alone loses either a missing or a repeated hour.
+  const intervals = [];
+  for (let instant = startMs; instant < endMs; instant += 60000) {
+    const wall = zonedParts(new Date(instant));
+    const minute = wall.hour * 60 + wall.minute;
+    if (!spans.some(span => minute >= span.start && minute < span.end)) continue;
+    const last = intervals.at(-1);
+    if (last?.end === instant) last.end += 60000;
+    else intervals.push({ start: instant, end: instant + 60000 });
+  }
+  return intervals;
 }
 
 export async function loadSettings(env) {
@@ -161,6 +172,7 @@ export async function computeAvailability(
 
   const windowStart = dayBounds(start).start.toISOString();
   const windowEnd = dayBounds(end).end.toISOString();
+  const exceptionsEnd = addDaysToKey(end, Math.ceil(duration / 1440));
 
   const [rules, exceptions, booked] = await Promise.all([
     env.DB.prepare("SELECT weekday, start_minute, last_start_minute FROM availability_rules WHERE active = 1").all(),
@@ -169,7 +181,7 @@ export async function computeAvailability(
       `SELECT date, weekday, kind, start_minute, end_minute FROM availability_exceptions
        WHERE (date BETWEEN ? AND ?) OR weekday IS NOT NULL`
     )
-      .bind(start, end)
+      .bind(start, exceptionsEnd)
       .all(),
     // A slot is busy when it is confirmed, and also while it is held for a
     // checkout that has not been abandoned yet — otherwise two students could
@@ -181,7 +193,9 @@ export async function computeAvailability(
     )
       .bind(
         new Date(Date.parse(windowStart) - bufferMs).toISOString(),
-        new Date(Date.parse(windowEnd) + bufferMs).toISOString(),
+        // A final start can finish the next day. Include bookings throughout
+        // that lesson, rather than stopping the conflict read at midnight.
+        new Date(Date.parse(windowEnd) + duration * 60000 + bufferMs).toISOString(),
         now.toISOString()
       )
       .all()
@@ -215,6 +229,12 @@ export async function computeAvailability(
       && !(ignoreHoldsOf && row.status === "pending_payment" && row.student_id === ignoreHoldsOf))
     .map((row) => ({ start: new Date(row.starts_at).getTime(), end: new Date(row.ends_at).getTime() + bufferMs }));
 
+  const blocked = eachDateKey(start, exceptionsEnd).flatMap(key => blockedInstantSpans(key, [
+    ...(recurringByWeekday.get(weekdayOf(key)) ?? []),
+    ...(exceptionsByDate.get(key) ?? [])
+  ].filter(exception => exception.kind === "blocked")
+    .map(exception => ({ start: exception.start_minute ?? 0, end: exception.end_minute ?? 1440 }))));
+
   const slotsByDate = {};
 
   for (const key of eachDateKey(start, end)) {
@@ -226,24 +246,17 @@ export async function computeAvailability(
     // Bookable *start* ranges: first start .. last start. The last start is a
     // start time, not a finishing time, so "last lesson at 19:00" holds for a
     // 90-minute lesson exactly as it does for a 60-minute one.
-    const startRanges = mergeStartRanges([
+    const startRanges = [
       ...(rulesByWeekday.get(weekdayOf(key)) ?? []),
       ...dayExceptions
         .filter((exception) => exception.kind === "extra")
         .map((exception) => ({ start: exception.start_minute ?? 0, lastStart: exception.end_minute ?? 1440 }))
-    ]);
-
-    // Blocked exceptions are real spans of time, not start ranges: a lesson is
-    // withheld when it would *overlap* one, not merely when it starts inside it.
-    // A blocked row with no window means the whole day is off.
-    const blockedSpans = dayExceptions
-      .filter((exception) => exception.kind === "blocked")
-      .map((exception) => ({ start: exception.start_minute ?? 0, end: exception.end_minute ?? 1440 }));
+    ];
 
     const { year, month, day } = parseDateKey(key);
     const daySlots = [];
 
-    for (const minute of candidateStartMinutes({ startRanges, blockedSpans, duration, interval })) {
+    for (const minute of candidateStartMinutes({ startRanges, duration, interval })) {
       const slotStart = zonedToUtc(year, month, day, minute, PORTO);
       const wall = zonedParts(slotStart, PORTO);
       // The missing spring hour must not reappear as a duplicate, shifted
@@ -252,6 +265,7 @@ export async function computeAvailability(
       const slotEnd = new Date(slotStart.getTime() + duration * 60000);
 
       if (slotStart < earliest) continue;
+      if (blocked.some(span => overlaps(slotStart.getTime(), slotEnd.getTime(), span.start, span.end))) continue;
       if (busy.some((entry) => overlaps(slotStart.getTime(), slotEnd.getTime() + bufferMs, entry.start, entry.end))) continue;
 
       daySlots.push({ startAt: slotStart.toISOString(), endAt: slotEnd.toISOString() });

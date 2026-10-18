@@ -38,8 +38,9 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
 
   const positionMenu = useCallback(() => {
     const header = toggleRef.current?.closest(".site-header")?.getBoundingClientRect();
-    // Match a visible header exactly; a footer opener uses the viewport top.
-    setMenuTop(header && header.bottom > 0 ? header.top : 0);
+    // Keep a visible header aligned, but never put the menu's close button
+    // above the viewport when the header has been partly scrolled away.
+    setMenuTop(header && header.bottom > 0 ? Math.max(0, header.top) : 0);
   }, []);
 
   // Navigating away must close the panel, or it stays open over the new page.

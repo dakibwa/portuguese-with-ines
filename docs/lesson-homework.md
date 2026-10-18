@@ -81,6 +81,10 @@ call. Provider failure, a missing key, exhausted allowance or invalid output
 leaves written answers for Inês to mark herself; it never fabricates a mark.
 Interrupted marking is handed to teacher review after 90 seconds. Teacher
 approval uses a conditional write so a stale tab cannot overwrite another review.
+Teacher marking reads do not overlap, and a late read cannot replace a review
+already being edited. Reopening approved feedback updates the student's list
+card to Done immediately. Draft writes check the lesson's current owner and
+confirmed status when saving, including after an AI request has been waiting.
 
 The sheet has recall, focused practice with a worked example, and a small
 practical communication task. Answers are separate and can be shown after an
@@ -139,6 +143,9 @@ Anthropic's Messages API.
 - Draft and answer saves use `updatedAt` in conditional writes. A stale tab gets
   409 instead of silently replacing newer work. Published sheets are immutable
   so answers remain attached to the questions the student actually saw.
+  Non-photo teacher requests allow 1 MiB and student answers 256 KiB, enough
+  for twelve maximum-length questions and their accepted answers, including
+  UTF-8 and JSON escaping; the field and question limits still apply.
 - Notes, sheets and saved answers remain with the account until deletion is
   requested. Foreign keys cascade when the corresponding lesson/account is
   deleted. Account deletion remains the existing assisted process with Inês.

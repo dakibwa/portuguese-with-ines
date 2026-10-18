@@ -67,8 +67,9 @@ export async function hashPassword(password) {
 }
 
 export async function verifyPassword(password, stored) {
-  const [scheme, cost, salt, hash] = String(stored ?? "").split("$");
-  if (scheme !== "pbkdf2" || !cost || !salt || !hash) return false;
+  const parts = String(stored ?? "").split("$");
+  const [scheme, cost, salt, hash] = parts;
+  if (parts.length !== 4 || scheme !== "pbkdf2" || !cost || !salt || !hash) return false;
 
   // "<rounds>x<iterations>", or a bare iteration count from the single-round
   // form. Reading the cost from the record is what lets it be raised later
@@ -79,8 +80,17 @@ export async function verifyPassword(password, stored) {
   if (!Number.isInteger(rounds) || !Number.isInteger(iterations)) return false;
   if (rounds < 1 || rounds > 8 || iterations < 1 || iterations > PBKDF2_ITERATIONS) return false;
 
-  const candidate = await derive(password, fromBase64Url(salt), iterations, rounds);
-  return constantTimeEqual(candidate, fromBase64Url(hash));
+  let saltBytes;
+  let hashBytes;
+  try {
+    saltBytes = fromBase64Url(salt);
+    hashBytes = fromBase64Url(hash);
+  } catch {
+    return false;
+  }
+  if (!saltBytes.length || hashBytes.length !== 32) return false;
+  const candidate = await derive(password, saltBytes, iterations, rounds);
+  return constantTimeEqual(candidate, hashBytes);
 }
 
 /**

@@ -170,6 +170,14 @@ development server at `QA_BASE_URL` (default `http://localhost:3000`); all but
 `qa-flow`'s booking use isolated API replies. A new check earns its place only
 by protecting a student, Inês or money in a way these don't already.
 
+## Security maintenance
+
+As of 18 October 2026, Next and its ESLint configuration are
+patched to 16.3.8, with compatible Sharp and source-map-js fixes in the lockfile.
+`npm audit --omit=dev` reports zero known vulnerabilities. The full audit still
+reports the development-only Braces/ESLint chain; Braces has no published fix.
+It is not shipped in the static Cloudflare export.
+
 ## Accessibility
 
 Every route renders the site header and footer outside `<main>`, so `banner`,

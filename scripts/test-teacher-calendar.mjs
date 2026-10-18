@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { candidateStartMinutes } from "../workers/booking/availability.mjs";
 import { wallTimeToUtc } from "../src/lib/wall-time.ts";
+import { csvCell } from "../src/lib/csv.ts";
 import { tryOutExpressions } from "../src/lib/expression-try-out.ts";
 import { timetableBounds } from "../src/lib/timetable-bounds.ts";
 import { hasStudentSide, opensSchedule } from "../src/lib/account-workspace.ts";
@@ -120,7 +121,7 @@ test("paint and erase preserve the actual bookable starts at inclusive last-star
   ]);
 });
 
-test("precise windows are preserved and use the same range merge semantics as the Worker", () => {
+test("precise windows preserve each first-start-anchored grid, matching the Worker", () => {
   const precise = [
     { start: 615, lastStart: 700 },
     { start: 680, lastStart: 760 },
@@ -131,6 +132,7 @@ test("precise windows are preserved and use the same range merge semantics as th
     lessonStarts(precise),
     candidateStartMinutes({ startRanges: precise, duration: 60, interval: 30 }),
   );
+  assert.deepEqual(lessonStarts(precise), [615, 645, 675, 680, 710, 740]);
   const week = hoursFromRules([
     { id: 1, weekday: 1, start_minute: 615, last_start_minute: 700, active: 1 },
     { id: 2, weekday: 2, start_minute: 600, last_start_minute: 690, active: 0 },
@@ -146,6 +148,23 @@ test("precise windows are preserved and use the same range merge semantics as th
     hoursProblem({ ...week, 2: [{ start: 900, lastStart: 800 }] }),
     /Tuesday/,
   );
+});
+
+test("receipt CSV treats student-entered formulas as text and preserves quoted data", () => {
+  for (const [value, expected] of [
+    ['=HYPERLINK("https://example.invalid")', '"\'=HYPERLINK(""https://example.invalid"")"'],
+    ["+SUM(1,2)", '"\'+SUM(1,2)"'],
+    ["-1+2", "'-1+2"],
+    ["@SUM(1)", "'@SUM(1)"],
+    ["\t=1+1", "'\t=1+1"],
+    [" \r=1+1", '"\' \r=1+1"'],
+  ]) {
+    assert.equal(csvCell(value), expected);
+  }
+  assert.equal(csvCell('Inês, "teacher"'), '"Inês, ""teacher"""');
+  assert.equal(csvCell("first\rsecond"), '"first\rsecond"');
+  assert.equal(csvCell(20.5), "20.5");
+  assert.equal(csvCell("123456789"), "123456789");
 });
 
 test("whole-day editing does not turn partial blocks, extras or recurring exceptions into days off", () => {

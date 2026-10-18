@@ -556,6 +556,26 @@ if ((await page.locator(".faq-group:not([hidden])").count()) !== 1) {
   throw new Error("A link to a FAQ section should open that section alone.");
 }
 
+// The browser's Back button must restore the fragment-free page's default,
+// rather than leaving the category from the address it just left visible.
+await page.goto(`${base}/faq/`, { waitUntil: "domcontentloaded" });
+await page.locator('.faq-index[data-ready="true"]').waitFor();
+await page.evaluate(() => { window.location.hash = "faq-payment"; });
+await page.locator("#faq-payment:not([hidden])").waitFor();
+await page.goBack();
+await page.locator(".faq-group:not([hidden])").first().waitFor();
+await page.waitForFunction(() => !window.location.hash && document.querySelector(".faq-group")?.hidden === false);
+
+// Public navigation and FAQ answers remain usable before any enhancement.
+const plainPage = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
+await plainPage.goto(`${base}/faq/`, { waitUntil: "domcontentloaded" });
+if (!await plainPage.getByRole("navigation", { name: "Main navigation", exact: true }).isVisible() ||
+    !await plainPage.locator(".faq-group").count() ||
+    await plainPage.locator(".faq-group[hidden]").count()) {
+  throw new Error("Without JavaScript, phone navigation and every FAQ category must remain available.");
+}
+await plainPage.close();
+
 await page.goto(`${base}/book`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector(".booking-provider", { timeout: 10_000 });
 const bookingCalendar = (await page.locator(".booking-steps").count()) > 0;

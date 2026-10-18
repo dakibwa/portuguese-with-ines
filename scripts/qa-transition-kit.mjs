@@ -24,6 +24,12 @@ const added = {
 };
 await mkdir("tmp/qa/transition-kit", { recursive: true });
 
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
+}
+
 async function open(width, path, { session = "", me = student, bookings = [added], reply = () => null } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width < 741 });
   const errors = [];
@@ -39,7 +45,7 @@ async function open(width, path, { session = "", me = student, bookings = [added
     const body = request.method() === "POST" ? request.postDataJSON() : null;
     if (body) posts.push({ endpoint, body });
     else reads.push(endpoint);
-    const fixture = reply(endpoint, body);
+    const fixture = await reply(endpoint, body);
     if (fixture) return route.fulfill(fixture);
     if (endpoint === "/me" && !body) return route.fulfill({ json: { student: me, bookings, series: [], sameDayFeeCents: 500, cardsAccepted: true } });
     if (endpoint === "/me/recurring-rates") return route.fulfill({ json: { rates: {} } });
@@ -97,6 +103,55 @@ try {
     assert.deepEqual(linked.errors, []);
     await linked.page.close();
 
+    // A link may finish after another tab has signed in. Its one-time reply
+    // must preserve that newer session; leaving a card request behind must
+    // also leave the visitor on the page they chose, rather than Stripe.
+    const linkWaiting = deferred(), linkStarted = deferred();
+    const cardWaiting = deferred(), cardStarted = deferred();
+    const interrupted = await open(width, "/book/?signin=qa-delayed-link", {
+      reply: async endpoint => {
+        if (endpoint === "/auth/email-link/confirm") {
+          linkStarted.resolve(); await linkWaiting.promise;
+          return { json: { student, session: "qa-obsolete-link-session" } };
+        }
+        if (endpoint === "/me/card") {
+          cardStarted.resolve(); await cardWaiting.promise;
+          return { json: { checkoutUrl: "https://checkout.stripe.com/c/pay/qa-obsolete" } };
+        }
+        return null;
+      },
+    });
+    try {
+      await interrupted.page.getByRole("button", { name: "Sign in", exact: true }).click({ timeout: 15000 });
+      await linkStarted.promise;
+      await interrupted.page.evaluate(() => {
+        localStorage.setItem("ines-student-session", "qa-newer-session");
+        window.dispatchEvent(new Event("ines:student-session-change"));
+      });
+      const linkResponse = interrupted.page.waitForResponse("**/auth/email-link/confirm");
+      linkWaiting.resolve(); await linkResponse;
+      await expect(interrupted.page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
+      assert.equal(await interrupted.page.evaluate(() => localStorage.getItem("ines-student-session")), "qa-newer-session");
+
+      // Remove the welcome surface by returning to the account in a fresh
+      // document. The newer session is retained by this tab.
+      await interrupted.page.goto(`${base}/book/?view=lessons`);
+      const interruptedPrompt = interrupted.page.locator(".card-prompt");
+      await interruptedPrompt.getByRole("button", { name: "Add card", exact: true }).click({ timeout: 15000 });
+      await interruptedPrompt.getByRole("button", { name: "Agree & add card", exact: true }).click();
+      await cardStarted.promise;
+      await interrupted.page.locator(".site-header__brand").click();
+      await expect.poll(() => new URL(interrupted.page.url()).pathname).toBe("/");
+      const cardResponse = interrupted.page.waitForResponse("**/me/card");
+      cardWaiting.resolve(); await cardResponse;
+      await interrupted.page.waitForLoadState("networkidle");
+      assert.equal(new URL(interrupted.page.url()).pathname, "/");
+      assert.deepEqual(interrupted.errors, []);
+    } finally {
+      linkWaiting.resolve(); cardWaiting.resolve();
+      await interrupted.page.close();
+    }
+
     // A spent link says so and opens on asking for a new one.
     const spent = await open(width, "/book/?signin=qa-spent-link", {
       reply: (endpoint) => {
@@ -124,11 +179,42 @@ try {
     assert.deepEqual(spent.errors, []);
     await spent.page.close();
 
+    if (width === 390) {
+      // Confirming a link consumes it even when this browser refuses to save
+      // the session. Explain that outcome and offer a fresh link.
+      const blocked = await open(width, "/book/?signin=qa-storage-link", {
+        reply: endpoint => endpoint === "/auth/email-link/confirm"
+          ? { json: { student, session: "qa-unsaved-link-session" } } : null,
+      });
+      await blocked.page.evaluate(() => {
+        const nativeSet = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (key, value) {
+          if (key === "ines-student-session") throw new DOMException("Isolated storage refusal", "QuotaExceededError");
+          return nativeSet.call(this, key, value);
+        };
+      });
+      await blocked.page.getByRole("button", { name: "Sign in", exact: true }).click({ timeout: 15000 });
+      await expect(blocked.page.locator(".sign-in-link [role=alert]")).toContainText("This link has been used");
+      await expect(blocked.page.getByRole("button", { name: "Email me a new link", exact: true })).toBeVisible();
+      assert.equal(await blocked.page.evaluate(() => localStorage.getItem("ines-student-session")), null);
+      assert.deepEqual(blocked.errors, []);
+      await blocked.page.close();
+    }
+
     // Back from Stripe: a short thank-you, no ask, and the card in Your details.
+    const removeWaiting = deferred(), removeStarted = deferred();
     const saved = await open(width, "/book/?view=lessons&card=added", {
       session: "qa-link-session",
       me: { ...student, hasCard: true, cardForAllLessons: true },
       bookings: [{ ...added, paymentStatus: "scheduled" }],
+      reply: async (endpoint, body) => {
+        if (endpoint === "/me/card/remove") {
+          removeStarted.resolve(); await removeWaiting.promise;
+          return { json: { student: { ...student, hasCard: false, cardForAllLessons: false } } };
+        }
+        if (endpoint === "/me" && body) return { json: { student: { ...student, ...body, hasCard: true, cardForAllLessons: true } } };
+        return null;
+      },
     });
     await expect(saved.page.locator(".card-added")).toContainText("Card saved", { timeout: 15000 });
     await expect(saved.page.locator(".card-prompt")).toHaveCount(0);
@@ -143,6 +229,22 @@ try {
     await cardRow.scrollIntoViewIfNeeded();
     assert.ok(await cardRow.evaluate((row) => row.scrollHeight <= row.clientHeight + 1), "the open row shows all of its terms");
     await saved.page.screenshot({ path: `tmp/qa/transition-kit/details-${width}.png`, fullPage: false });
+    // Removing a card must not undo an independently saved name or close a
+    // newer editor opened while that card request was in flight.
+    await cardRow.getByRole("button", { name: "Remove card", exact: true }).click();
+    await removeStarted.promise;
+    const nameRow = saved.page.locator('.my-lessons__fact[data-field="name"]');
+    await nameRow.getByRole("button", { name: "Change name", exact: true }).click();
+    await nameRow.getByLabel("Your name", { exact: true }).fill("Rita Updated");
+    await nameRow.getByRole("button", { name: "Save name", exact: true }).click();
+    await expect(nameRow).toContainText("Rita Updated");
+    const emailRow = saved.page.locator('.my-lessons__fact[data-field="email"]');
+    await emailRow.getByRole("button", { name: "Change email", exact: true }).click();
+    const removeResponse = saved.page.waitForResponse("**/me/card/remove");
+    removeWaiting.resolve(); await removeResponse;
+    await expect(cardRow).toContainText("Not added");
+    await expect(nameRow).toContainText("Rita Updated");
+    await expect(emailRow.getByLabel("Email", { exact: true })).toBeVisible();
     assert.ok(await noOverflow(saved.page), `no sideways scroll at ${width}px`);
     assert.deepEqual(saved.errors, []);
     await saved.page.close();
@@ -204,7 +306,7 @@ try {
   assert.deepEqual(signedOut.errors, []);
   await signedOut.page.close();
 
-  console.log("Transition kit: sign-in links, card setup and authenticated idioms pass at desktop and phone widths.");
+  console.log("Transition kit: sign-in links, interrupted sign-in/card requests, independent profile saves, storage recovery, card setup and authenticated idioms pass at desktop and phone widths.");
 } finally {
   await browser.close();
 }

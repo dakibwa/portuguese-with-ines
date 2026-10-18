@@ -168,8 +168,17 @@ unproven account back clears its agreement. `Your lessons` asks once, above
 the calendar, while a lesson she added is still unpaid; `Your details` has a
 `Card` row with `Remove card` (`POST /me/card/remove`), which puts her lessons
 still to come back to being paid by hand and stops her weekly slots charging.
+Removal also increments `students.card_setup_version` (migration 0033), so a
+setup already open at Stripe cannot restore the agreement, even if no card had
+yet been confirmed. Each setup records that generation and the account's
+`session_version`; confirmation checks both again in the transaction, together
+with verified student access. Identity changes also retire older setups.
+Teacher lesson/series creation and unticking a direct payment check the same
+current agreement inside their writes. Charge initiation checks it again;
+withdrawn agreements cannot leave stale scheduled charges. Charges already
+processing retain their original idempotent retry, since money may have moved.
 
-Inês is emailed which of her lessons a newly saved card now pays for. One the
+Inês sees which lessons a newly saved card now pays for in Needs you. One the
 student already paid her for by hand is ticked `Already paid` (below) before it
 is charged, and no later card takes it back. A lesson she records after it has
 happened is never put on a card.
@@ -192,7 +201,7 @@ status:
   Meet, no move into the future). Unticked, it is a plain record again: no
   price, not in Receipts.
 - Ticked lessons are in **Receipts as paid by hand, ready**, from the moment
-  they are ticked (the money is in), until cancelled. Untick a lesson to come
+  they are ticked (the money is in), including after cancellation. Untick a lesson to come
   before it is charged and it is billed as it would be booked now: her lesson
   goes on the card if the student's standing agreement covers it, otherwise
   it is to be paid to her directly (`not_required`, unmarked); a lesson the
@@ -210,6 +219,15 @@ status:
   ticked) still answers for any open page, but the site no longer calls it.
 - Her student list's `paid by hand` count and the student's `Pay by card`
   prompt leave ticked lessons out; emails show their price as `paid`.
+
+Cancelling a lesson never records a refund of money paid by hand. In Student
+history, `Record refund` opens an explicit confirmation that Inês already
+returned the money directly. `POST /admin/bookings/:id/refund-by-hand` requires
+`{ refunded: true }`, teacher access, a cancelled paid-by-hand lesson and no
+Stripe payment or charge in progress. It records `payment_status = 'refunded'`
+and retains the receipt as `by hand / refunded`, no longer ready to issue.
+Repeated acknowledgments are harmless. It sends no email and makes no payment
+provider call. This is Dan's confirmed receipt rule (18 October 2026).
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
@@ -453,6 +471,9 @@ extra hours are never touched there. Malformed or whole-day `blocks`, and past
 dates, are refused rather than partly saved. `GET /admin/availability` returns
 weekly blocks alongside the upcoming one-off rows so the calendar shows every
 time students cannot book.
+`POST /admin/availability` validates every weekly range before replacing any
+hours. Invalid ranges or more than 100 ranges return 400 without changing the
+timetable; an explicitly empty array closes the usual weekly hours.
 
 The Timetable's `Edit weekly hours` control edits the usual weekly pattern in
 the same calendar with click/drag, touch or keyboard input. `View lessons`
@@ -674,10 +695,18 @@ before it is applied simply never show. The fee-detection SQL is not touched.
 Booking requires an account, so a student's lessons persist together rather than
 depending on them having kept the right confirmation email.
 
+Sign-in links, Google first links, reset issuance/completion and email changes
+bind the address and session version they verified. Pending-access cleanup is
+part of the identity write's D1 transaction and runs only when that write wins;
+a losing request cannot delete newer recovery links. The ephemeral
+`auth-cleanup:` request-limit marker is removed in the same transaction.
+
 - **Opening quickly.** `/book/` asks for `/me` from its HTML, before its code
   loads. `/me` reads the session's student and its revocation together, then
-  the settings, lessons and weekly runs together: two database round trips
-  rather than five. The browser keeps the account as its session last read it
+  the settings, lessons and weekly runs together, then rechecks revocation
+  before returning private data. Lesson reads and profile writes also bind
+  the original account version, so a request that overlaps recovery cannot
+  expose newly added lessons or overwrite the recovered account. The browser keeps the account as its session last read it
   (`ines-account-snapshot` in localStorage, a week at most, removed on signing
   out or when the session is refused) and opens Your lessons on it at once on a
   return visit while it asks again; booking and emailed links still wait for
@@ -1375,6 +1404,10 @@ starts.
 Blocked exceptions are real spans of time, so a lesson is withheld when it would
 **overlap** one rather than only when it starts inside it — which correctly
 withholds a 90-minute lesson earlier than a 60-minute one.
+This includes the next Porto date when a late lesson crosses midnight and
+both occurrences of repeated autumn minutes; nonexistent spring minutes do
+not create artificial time off. Overlapping weekly and extra-hour windows
+keep each window's own start grid rather than dropping an extra precise start.
 
 A lesson being changed may reuse the time it already holds. `GET /availability`
 takes `manage=<manage token>`, which ignores that one booking once the token
@@ -1820,6 +1853,11 @@ typed again. **Sign-up deliberately has no code field** (decided 28 September
 2026): only some students have a code, and a field there would suggest most new
 students should have one.
 
+If Stripe's idempotent charge response still says processing, the Worker reads
+that same PaymentIntent to observe its current state. A later success settles
+the original charge; an ambiguous result keeps the existing processing claim
+and cannot open a second payment.
+
 The charge claim rechecks current status and end time atomically. A successful
 cancel or move wins against a previously selected charge, while already
 processing payments reject concurrent changes. Student and teacher moves use
@@ -1887,6 +1925,13 @@ hash verification. Webhooks check signature, environment, session, customer,
 amount and currency; expired card-setup holds cannot reclaim a slot.
 
 ## Deploying the Worker
+
+For an existing database, apply `migrations/0033-card-setup-version.sql` before
+releasing this Worker. It adds the card-setup revocation generation only; do
+not replay the full schema or older migrations. This migration was applied
+and its type, NOT NULL constraint and default verified in staging and
+production on 18 October 2026, using the connected Cloudflare app. The local
+runtime's Cloudflare token did not grant D1 query access.
 
 ```bash
 npx wrangler d1 create ines-booking          # put the id in wrangler.jsonc

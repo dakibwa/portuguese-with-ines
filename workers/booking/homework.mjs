@@ -199,9 +199,11 @@ async function savedProgress(db, bookingId, studentId) {
   if (submission?.state === "marking" && Date.now() - Date.parse(submission.submittedAt) > 90000) {
     submission.state = "submitted";
     submission.markingNote = "Automatic marking did not finish. Check the remaining answers.";
-    const changed = await db.prepare("UPDATE homework_progress SET submission_json = ?, updated_at = ? WHERE booking_id = ? AND student_id = ? AND updated_at = ?")
+    await db.prepare("UPDATE homework_progress SET submission_json = ?, updated_at = ? WHERE booking_id = ? AND student_id = ? AND updated_at = ?")
       .bind(JSON.stringify(submission), stamp(row.updated_at), bookingId, studentId, row.updated_at).run();
-    if (changed.meta.changes) row = await db.prepare("SELECT * FROM homework_progress WHERE booking_id = ? AND student_id = ?").bind(bookingId, studentId).first();
+    // If another request completed the marks or handed them to Inês first,
+    // return that current row rather than the stale 'marking' copy we read.
+    row = await db.prepare("SELECT * FROM homework_progress WHERE booking_id = ? AND student_id = ?").bind(bookingId, studentId).first();
   }
   return row;
 }
@@ -235,11 +237,14 @@ async function saveDraft(env, booking, row, body, sheet, publish = false) {
   if (publish && (!sheetJson || body.reviewed !== true)) throw new HomeworkProblem("Review the sheet and its answers before publishing.");
   const result = row
     ? await env.DB.prepare(`UPDATE lesson_homework SET notes = ?, level = ?, minutes = ?, draft_json = ?,
-      published_json = ?, published_at = ?, updated_at = ? WHERE booking_id = ? AND updated_at = ? AND published_at IS NULL`)
-      .bind(values.notes, values.level, values.minutes, sheetJson, publish ? sheetJson : null, publish ? time : null, time, booking.id, row.updated_at).run()
+      published_json = ?, published_at = ?, updated_at = ? WHERE booking_id = ? AND updated_at = ? AND published_at IS NULL
+      AND EXISTS (SELECT 1 FROM bookings b WHERE b.id = lesson_homework.booking_id AND b.student_id = ? AND b.status = 'confirmed')`)
+      .bind(values.notes, values.level, values.minutes, sheetJson, publish ? sheetJson : null, publish ? time : null, time, booking.id, row.updated_at, booking.student_id).run()
     : await env.DB.prepare(`INSERT INTO lesson_homework(booking_id, student_id, notes, level, minutes, draft_json, published_json, published_at, updated_at)
-      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(booking_id) DO NOTHING`)
-      .bind(booking.id, booking.student_id, values.notes, values.level, values.minutes, sheetJson, publish ? sheetJson : null, publish ? time : null, time).run();
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE EXISTS (SELECT 1 FROM bookings b WHERE b.id = ? AND b.student_id = ? AND b.status = 'confirmed')
+      ON CONFLICT(booking_id) DO NOTHING`)
+      .bind(booking.id, booking.student_id, values.notes, values.level, values.minutes, sheetJson, publish ? sheetJson : null, publish ? time : null, time, booking.id, booking.student_id).run();
   if (!result.meta.changes) throw conflict();
   return teacherView(env, booking, await stored(env.DB, booking.id));
 }

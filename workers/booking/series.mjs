@@ -140,10 +140,14 @@ export function outstandingFor(series, { bookedCount, now }) {
   const startKey = series.filled_to ? addDaysToKey(series.filled_to, 7) : todayKey;
 
   if (series.occurrences === null || series.occurrences === undefined) {
+    // After a long interruption, old unbookable dates must not use all sixteen
+    // attempts and leave the student's coming weeks empty for more sweeps.
+    const missedWeeks = Math.max(0, Math.ceil((Date.parse(todayKey) - Date.parse(startKey)) / (7 * 86400000)));
+    const fromKey = addDaysToKey(startKey, missedWeeks * 7);
     const horizonKey = addDaysToKey(todayKey, OPEN_ENDED_HORIZON_WEEKS * 7);
-    if (startKey > horizonKey) return null;
-    const weeks = Math.ceil((Date.parse(horizonKey) - Date.parse(startKey)) / (7 * 86400000)) + 1;
-    return { fromKey: startKey, count: Math.max(0, Math.min(weeks, MAX_OCCURRENCES_PER_RUN)) };
+    if (fromKey > horizonKey) return null;
+    const weeks = Math.floor((Date.parse(horizonKey) - Date.parse(fromKey)) / (7 * 86400000)) + 1;
+    return { fromKey, count: Math.max(0, Math.min(weeks, MAX_OCCURRENCES_PER_RUN)) };
   }
 
   const remaining = series.occurrences - bookedCount;

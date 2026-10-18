@@ -18,6 +18,7 @@ import {
   expireCheckoutSession,
   isTestMode,
   refundPayment,
+  retrieveCheckoutSession,
   setupSessionProblem,
   stripeMode,
   stripeProblemIsRetryable,
@@ -194,6 +195,55 @@ await test("moving a recurrence ignores only that sequence's existing lessons", 
   assert.equal(moving.slotsByDate["2026-09-07"]?.[0]?.startAt, "2026-09-07T09:00:00.000Z");
 });
 
+await test("a late lesson checks bookings after midnight before offering its start", async () => {
+  const occupied = { id: "next-day", starts_at: "2026-11-03T00:15:00.000Z", ends_at: "2026-11-03T01:15:00.000Z" };
+  const env = { DB: { prepare(sql) {
+    let values = [];
+    return {
+      bind(...args) { values = args; return this; },
+      async all() {
+        if (sql.includes("FROM availability_rules")) return { results: [{ weekday: 1, start_minute: 1380, last_start_minute: 1410 }] };
+        if (sql.includes("FROM bookings")) return { results: occupied.ends_at > values[0] && occupied.starts_at < values[1] ? [occupied] : [] };
+        return { results: [] };
+      }
+    };
+  } } };
+  const input = { fromKey: "2026-11-02", toKey: "2026-11-02", lessonType: { duration_minutes: 60 }, now: new Date("2026-11-01T08:00:00Z") };
+  const { slotsByDate } = await computeAvailability(env, input);
+  assert.deepEqual(slotsByDate["2026-11-02"].map(slot => slot.startAt), ["2026-11-02T23:00:00.000Z"]);
+});
+
+await test("time off follows elapsed lessons across midnight and both clock changes", async () => {
+  for (const scenario of [
+    { day: "2026-11-02", minute: 1410, duration: 60, blockedDay: "2026-11-03", blockedStart: null, blockedEnd: null, free: false },
+    { day: "2027-03-28", minute: 30, duration: 60, blockedStart: 120, blockedEnd: 180, free: false },
+    { day: "2027-03-28", minute: 30, duration: 60, blockedStart: 60, blockedEnd: 120, free: true },
+    { day: "2027-03-28", minute: 30, duration: 60, blockedStart: 90, blockedEnd: 150, free: false },
+    { day: "2026-10-25", minute: 45, duration: 90, blockedStart: 120, blockedEnd: 180, free: true },
+    { day: "2026-10-25", minute: 45, duration: 60, blockedStart: 60, blockedEnd: 90, free: false },
+    { day: "2026-10-25", minute: 75, duration: 60, blockedStart: 60, blockedEnd: 90, free: false },
+    { day: "2026-10-25", minute: 90, duration: 60, blockedStart: 60, blockedEnd: 90, free: true }
+  ]) {
+    const blockedDay = scenario.blockedDay ?? scenario.day;
+    const env = { DB: { prepare(sql) {
+      let values = [];
+      return {
+        bind(...args) { values = args; return this; },
+        async all() {
+          if (sql.includes("FROM availability_rules")) return { results: [{ weekday: weekdayOf(scenario.day), start_minute: scenario.minute, last_start_minute: scenario.minute }] };
+          if (sql.includes("FROM availability_exceptions") && blockedDay >= values[0] && blockedDay <= values[1]) return { results: [{ date: blockedDay, kind: "blocked", start_minute: scenario.blockedStart, end_minute: scenario.blockedEnd }] };
+          return { results: [] };
+        }
+      };
+    } } };
+    const { slotsByDate } = await computeAvailability(env, {
+      fromKey: scenario.day, toKey: scenario.day, lessonType: { duration_minutes: scenario.duration },
+      now: new Date(`${addDaysToKey(scenario.day, -2)}T08:00:00Z`)
+    });
+    assert.equal(Boolean(slotsByDate[scenario.day]?.length), scenario.free, scenario.day);
+  }
+});
+
 await test("spring's missing starts neither duplicate availability nor shift a weekly lesson", async () => {
   const env = { DB: { prepare(sql) { return {
     bind() { return this; },
@@ -355,6 +405,10 @@ await test("overlapping rules merge instead of double-offering a time", () => {
   assert.equal(new Set(starts).size, starts.length, "a time was offered twice");
   assert.equal(asTime(starts[0]), "10:00");
   assert.equal(asTime(starts.at(-1)), "13:00");
+  assert.deepEqual(candidateStartMinutes({
+    startRanges: [{ start: 600, lastStart: 660 }, { start: 615, lastStart: 645 }],
+    duration: 60, interval: 30
+  }), [600, 615, 630, 645, 660], "an extra window keeps its own first start when it overlaps weekly hours");
 });
 
 await test("a whole-day block leaves nothing bookable", () => {
@@ -799,8 +853,18 @@ await test("an automatic charge is idempotent and only returns a succeeded Payme
   assert.equal(body.get("payment_method_types[0]"), "card");
 });
 
-await test("an automatic charge that still requires customer action is not treated as paid", async () => {
+await test("a nonterminal automatic charge checks the same intent's current state before settling", async () => {
   const originalFetch = globalThis.fetch;
+  const charge = () => chargeSavedCard(
+    { STRIPE_SECRET_KEY: "rk_test_example" },
+    {
+      bookingId: "booking_3",
+      customer: "cus_test",
+      paymentMethod: "pm_test",
+      amountCents: 2500,
+      description: "60-minute lesson · PT-ABC234"
+    }
+  );
   globalThis.fetch = async () =>
     new Response(JSON.stringify({ id: "pi_test_action", status: "requires_action" }), {
       headers: { "Content-Type": "application/json" }
@@ -808,18 +872,20 @@ await test("an automatic charge that still requires customer action is not treat
 
   try {
     await assert.rejects(
-      chargeSavedCard(
-        { STRIPE_SECRET_KEY: "rk_test_example" },
-        {
-          bookingId: "booking_3",
-          customer: "cus_test",
-          paymentMethod: "pm_test",
-          amountCents: 2500,
-          description: "60-minute lesson · PT-ABC234"
-        }
-      ),
-      /did not succeed \(requires_action\)/
+      charge(),
+      (error) => /did not succeed \(requires_action\)/.test(error.message) && stripeProblemIsRetryable(error)
     );
+    const requests = [];
+    globalThis.fetch = async (url, options) => {
+      requests.push({ url, options });
+      return Response.json({ id: "pi_test_processing", status: options.method === "POST" ? "processing" : "succeeded" });
+    };
+    assert.equal((await charge()).status, "succeeded");
+    assert.deepEqual(requests.map(({ url }) => url), [
+      "https://api.stripe.com/v1/payment_intents",
+      "https://api.stripe.com/v1/payment_intents/pi_test_processing"
+    ], "a cached processing response is reconciled without another payment intent");
+    assert.equal(requests.filter(({ options }) => options.method === "POST").length, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -835,7 +901,9 @@ await test("ambiguous Stripe failures retry the same idempotency key instead of 
 await test("a refund is idempotent for one booking", async () => {
   const originalFetch = globalThis.fetch;
   let request;
+  let requests = 0;
   globalThis.fetch = async (url, options) => {
+    requests += 1;
     request = { url, options };
     return new Response(JSON.stringify({ id: "re_test_refund" }), {
       headers: { "Content-Type": "application/json" }
@@ -843,6 +911,13 @@ await test("a refund is idempotent for one booking", async () => {
   };
 
   try {
+    for (const amountCents of [0, -1, 12.5, NaN, null]) {
+      assert.throws(() => refundPayment(
+        { STRIPE_SECRET_KEY: "rk_test_example" },
+        { bookingId: "booking_4", paymentIntent: "pi_test_paid", amountCents }
+      ), /positive whole number/);
+    }
+    assert.equal(requests, 0, "an invalid bounded refund must never reach Stripe as a full refund");
     await refundPayment(
       { STRIPE_SECRET_KEY: "rk_test_example" },
       { bookingId: "booking_4", paymentIntent: "pi_test_paid", amountCents: 2500 }
@@ -856,6 +931,26 @@ await test("a refund is idempotent for one booking", async () => {
   const body = new URLSearchParams(request.options.body);
   assert.equal(body.get("payment_intent"), "pi_test_paid");
   assert.equal(body.get("amount"), "2500");
+});
+
+await test("Stripe redirects never receive the API key or open a second payment path", async () => {
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async (url, options) => {
+    requests += 1;
+    assert.equal(new URL(url).origin, "https://api.stripe.com");
+    assert.equal(options.redirect, "manual", "Workers must not forward Authorization to the redirect destination");
+    return new Response(null, { status: 307, headers: { Location: "https://redirect.example.invalid/collect" } });
+  };
+  try {
+    await assert.rejects(chargeSavedCard({ STRIPE_SECRET_KEY: "rk_test_example" }, {
+      bookingId: "redirected-charge", customer: "cus_test", paymentMethod: "pm_test", amountCents: 2500
+    }), (error) => error.stripeStatus === 307 && stripeProblemIsRetryable(error));
+    await assert.rejects(retrieveCheckoutSession({ STRIPE_SECRET_KEY: "rk_test_example" }, "cs_test"), /Stripe returned 307/);
+    assert.equal(requests, 2, "each API call stops at its original redirect response");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 // --- Password hashing --------------------------------------------------------
@@ -896,7 +991,8 @@ await test("a stored hash carries its own cost, so it survives a change of cost"
 });
 
 await test("malformed hash records are rejected rather than throwing", async () => {
-  for (const stored of ["", "nonsense", "pbkdf2$$$", "bcrypt$10$abc$def", "pbkdf2$0x0$YQ$YQ", null, undefined]) {
+  for (const stored of ["", "nonsense", "pbkdf2$$$", "bcrypt$10$abc$def", "pbkdf2$0x0$YQ$YQ",
+    "pbkdf2$1x1$!$AA", "pbkdf2$1x1$YQ$!", "pbkdf2$1x1$YQ$YQ", null, undefined]) {
     assert.equal(await verifyPassword("anything", stored), false, `accepted: ${stored}`);
   }
 });
@@ -983,6 +1079,7 @@ await test("a token from the wrong issuer is rejected", async () => {
 await test("an expired token is rejected", async () => {
   const past = Math.floor(Date.now() / 1000) - 7200;
   assert.equal(await verifyGoogleIdToken(await makeIdToken({ iat: past, exp: past + 3600 }), CLIENT_ID), null);
+  assert.equal(await verifyGoogleIdToken(await makeIdToken({ exp: Math.floor(Date.now() / 1000) }), CLIENT_ID), null);
 });
 
 await test("a token signed by someone else is rejected", async () => {
@@ -1008,12 +1105,27 @@ await test("an unsigned token is rejected", async () => {
   assert.equal(await verifyGoogleIdToken(`${header}.${payload}.`, CLIENT_ID), null);
 });
 
-await test("a token referencing an unknown key is rejected", async () => {
+await test("an unknown Google key is refreshed once so a rotated key can sign in", async () => {
   assert.equal(await verifyGoogleIdToken(await makeIdToken({}, { kid: "not-a-real-key" }), CLIENT_ID), null);
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async () => {
+    requests += 1;
+    return Response.json({ keys: [{ ...publicJwk, kid: "rotated-key", alg: "RS256", use: "sig" }] });
+  };
+  try {
+    assert.equal((await verifyGoogleIdToken(await makeIdToken({}, { kid: "rotated-key" }), CLIENT_ID))?.email, "joana@example.com");
+    assert.equal(requests, 1, "refreshes the cached key set on an unfamiliar signing key");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 await test("malformed tokens are rejected", async () => {
-  for (const token of ["", "a.b", "a.b.c", "not-a-token", null, undefined]) {
+  const header = encodePart({ alg: "RS256", kid: "test-key" });
+  for (const token of ["", "a.b", "a.b.c", "not-a-token", null, undefined,
+    `${encodePart(null)}.${encodePart({})}.x`, `${header}.${encodePart(null)}.x`,
+    `${header}.${encodePart({})}.!`, await makeIdToken({ sub: null }), await makeIdToken({ exp: "tomorrow" })]) {
     assert.equal(await verifyGoogleIdToken(token, CLIENT_ID), null, `accepted: ${token}`);
   }
 });
@@ -1089,6 +1201,12 @@ await test("an open-ended series is pulled forward to the horizon and no further
   // Already filled beyond the horizon: nothing to do.
   const ahead = outstandingFor({ occurrences: null, filled_to: "2027-06-01" }, { bookedCount: 40, now });
   assert.equal(ahead, null);
+  const thursday = outstandingFor({ occurrences: null, filled_to: "2026-09-03" }, { bookedCount: 1, now });
+  const last = addDaysToKey(thursday.fromKey, (thursday.count - 1) * 7);
+  assert.ok(last <= addDaysToKey(dateKey(now), 84), `offered ${last} beyond the twelve-week horizon`);
+  const overdue = outstandingFor({ occurrences: null, filled_to: "2025-01-02" }, { bookedCount: 1, now });
+  assert.equal(overdue.fromKey, "2026-09-10", "a long-paused sweep resumes at the next real weekly date");
+  assert.ok(overdue.count >= 12, "old skipped dates must not consume the per-run limit");
 });
 
 await test("one calendar file carries every lesson, each under its own booking's UID", () => {

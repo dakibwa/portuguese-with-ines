@@ -108,6 +108,7 @@ export function MyLessons({
   const [cardsAccepted, setCardsAccepted] = useState(Boolean(initialAccount?.cardsAccepted));
   // Back from Stripe with a card saved; the account may take a moment to say so.
   const [cardAdded, setCardAdded] = useState(false);
+  const [removingCard, setRemovingCard] = useState(false);
   const editing = section === "profile";
   const [details, setDetails] = useState(() => accountDetails(initialAccount?.student));
   // What each open row holds now, read when a save returns: a row closes only
@@ -746,16 +747,23 @@ export function MyLessons({
                   {student.cardForAllLessons ? (
                     <button
                       className="text-action"
+                      disabled={removingCard}
                       onClick={async () => {
+                        const session = readSession();
+                        setRemovingCard(true);
                         setError("");
                         try {
-                          const result = await removeStudentCard(readSession());
+                          const result = await removeStudentCard(session);
+                          if (readSession() !== session) return;
                           profileVersion.current += 1;
-                          setStudent((current) => current && { ...current, ...result.student });
-                          setOpenField(null);
+                          setStudent((current) => current && { ...current, hasCard: result.student.hasCard, cardForAllLessons: result.student.cardForAllLessons });
+                          setOpenField((field) => field === "card" ? null : field);
                           setDetailsNote("Card removed. Lessons Inês adds are paid to her by hand again.");
                         } catch (caught) {
+                          if (readSession() !== session) return;
                           setError(caught instanceof Error ? caught.message : "Your card couldn’t be removed.");
+                        } finally {
+                          setRemovingCard(false);
                         }
                       }}
                       type="button"

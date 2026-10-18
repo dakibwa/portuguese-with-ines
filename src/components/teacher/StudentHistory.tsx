@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StudentLessons } from "@/components/teacher/StudentLessons";
+import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { fetchBookings, type AdminBooking, type AdminStudent } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
 
@@ -22,6 +23,9 @@ export function StudentHistory({ student, token, refresh = 0, homeworkId }: {
 }) {
   const [history, setHistory] = useState<History | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [refund, setRefund] = useState<AdminBooking | null>(null);
+  const [notice, setNotice] = useState("");
+  const historyRef = useRef<HTMLDivElement>(null);
   const [now] = useState(() => Date.now());
   const studentId = student.id;
   const email = student.email?.trim().toLowerCase() ?? "";
@@ -52,7 +56,8 @@ export function StudentHistory({ student, token, refresh = 0, homeworkId }: {
   const current = history?.token === token && history.studentId === studentId && history.email === email
     ? history : null;
 
-  return (
+  return <div ref={historyRef} tabIndex={-1}>
+    {notice ? <p className="teacher-inline-success" role="status">{notice}</p> : null}
     <StudentLessons
       token={token}
       requestedHomeworkId={homeworkId}
@@ -60,6 +65,15 @@ export function StudentHistory({ student, token, refresh = 0, homeworkId }: {
       error={current?.error ?? ""}
       now={now}
       onRetry={() => { setHistory(null); setAttempt(value => value + 1); }}
+      onRecordRefund={booking => { setNotice(""); setRefund(booking); }}
     />
-  );
+    {refund ? <LessonDetails booking={refund} token={token} now={new Date(now)} initialAction="refund" afterChangeFocusRef={historyRef}
+      onClose={() => setRefund(null)} onChanged={message => {
+        if (readSession() !== token) return;
+        setRefund(null);
+        setNotice(message);
+        setHistory(null);
+        setAttempt(value => value + 1);
+      }} /> : null}
+  </div>;
 }

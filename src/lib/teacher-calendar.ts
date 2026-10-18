@@ -110,32 +110,15 @@ export function hoursProblem(week: WeekHours) {
   return null;
 }
 
-/** Match the Worker's range merging before stepping, including precise times. */
+/** Each teaching window retains the same first-start-anchored grid as the Worker. */
 export function lessonStarts(windows: TeachingWindow[], interval = 30) {
-  const ranges: TeachingWindow[] = [];
-  for (const window of [...windows].sort((a, b) => a.start - b.start)) {
-    const last = ranges.at(-1);
-    if (last && window.start <= last.lastStart)
-      last.lastStart = Math.max(last.lastStart, window.lastStart);
-    else ranges.push({ ...window });
+  if (!Number.isFinite(interval) || interval < 1) return [];
+  const starts = new Set<number>();
+  for (const window of windows) {
+    if (!Number.isFinite(window.start) || !Number.isFinite(window.lastStart)) continue;
+    for (let minute = window.start; minute <= window.lastStart; minute += interval) starts.add(minute);
   }
-  return ranges.flatMap((range) => {
-    if (
-      !Number.isFinite(range.start) ||
-      !Number.isFinite(range.lastStart) ||
-      interval < 1
-    )
-      return [];
-    return Array.from(
-      {
-        length: Math.max(
-          0,
-          Math.floor((range.lastStart - range.start) / interval) + 1,
-        ),
-      },
-      (_, index) => range.start + index * interval,
-    );
-  });
+  return [...starts].sort((a, b) => a - b);
 }
 
 /** Booked lessons touched by a changed weekly start time still stay booked. */

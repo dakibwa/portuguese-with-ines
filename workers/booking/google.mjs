@@ -29,8 +29,8 @@ function base64UrlToJson(value) {
 }
 
 /** Google rotates these; the cache follows the Cache-Control it sends back. */
-async function googleKeys() {
-  if (cachedKeys && Date.now() < cachedUntil) return cachedKeys;
+async function googleKeys(refresh = false) {
+  if (!refresh && cachedKeys && Date.now() < cachedUntil) return cachedKeys;
 
   const response = await fetch(CERTS_URL);
   if (!response.ok) throw new Error("Could not fetch Google's signing keys.");
@@ -56,16 +56,28 @@ export async function verifyGoogleIdToken(token, clientId) {
 
   let header;
   let payload;
+  let signature;
   try {
     header = base64UrlToJson(parts[0]);
     payload = base64UrlToJson(parts[1]);
+    signature = base64UrlToBytes(parts[2]);
   } catch {
     return null;
   }
 
-  if (header.alg !== "RS256") return null;
+  if (!header || typeof header !== "object" || Array.isArray(header) || header.alg !== "RS256") return null;
+  if (typeof header.kid !== "string" || !header.kid) return null;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  if (typeof payload.sub !== "string" || !payload.sub) return null;
+  if (typeof payload.email !== "string" || !payload.email.trim()) return null;
+  if (!Number.isFinite(payload.exp)) return null;
+  if (payload.iat !== undefined && !Number.isFinite(payload.iat)) return null;
 
-  const jwk = (await googleKeys()).find((candidate) => candidate.kid === header.kid);
+  let jwk = (await googleKeys()).find((candidate) => candidate.kid === header.kid);
+  // A token can be signed with a key published after this isolate's cache was
+  // filled. Refresh once on a miss rather than refusing Google sign-in until
+  // the old cache expires.
+  if (!jwk) jwk = (await googleKeys(true)).find((candidate) => candidate.kid === header.kid);
   if (!jwk) return null;
 
   const key = await crypto.subtle.importKey(
@@ -79,7 +91,7 @@ export async function verifyGoogleIdToken(token, clientId) {
   const verified = await crypto.subtle.verify(
     "RSASSA-PKCS1-v1_5",
     key,
-    base64UrlToBytes(parts[2]),
+    signature,
     new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
   );
   if (!verified) return null;
@@ -88,18 +100,16 @@ export async function verifyGoogleIdToken(token, clientId) {
   if (payload.aud !== clientId) return null;
 
   const now = Math.floor(Date.now() / 1000);
-  if (!payload.exp || payload.exp < now) return null;
+  if (payload.exp <= now) return null;
   // A little tolerance for clock skew, but a token from the future is wrong.
   if (payload.iat && payload.iat > now + 300) return null;
 
   // An unverified address must not be trusted: it would let someone claim an
   // account belonging to a real address they do not control.
   if (payload.email_verified !== true && payload.email_verified !== "true") return null;
-  if (!payload.email) return null;
-
   return {
-    sub: String(payload.sub),
-    email: String(payload.email).toLowerCase(),
+    sub: payload.sub,
+    email: payload.email.trim().toLowerCase(),
     name: String(payload.name ?? "").trim(),
     emailVerified: true
   };

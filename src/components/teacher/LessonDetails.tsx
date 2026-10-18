@@ -7,6 +7,7 @@ import {
   cancelBookingAs,
   rescheduleBookingAs,
   paidByHand,
+  recordRefundByHand,
   setLessonPaid,
   setNoShow,
   type AdminBooking,
@@ -30,6 +31,7 @@ type Props = {
   afterChangeFocusRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onChanged: (message: string) => void;
+  initialAction?: "view" | "refund";
 };
 
 export function LessonDetails({
@@ -39,11 +41,12 @@ export function LessonDetails({
   afterChangeFocusRef,
   onClose,
   onChanged,
+  initialAction = "view",
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const changed = useRef(false);
-  const [action, setAction] = useState<"view" | "move" | "cancel" | "no-show" | "homework">(
-    "view",
+  const [action, setAction] = useState<"view" | "move" | "cancel" | "no-show" | "homework" | "refund">(
+    initialAction,
   );
   const [date, setDate] = useState(dateKey(new Date(booking.starts_at)));
   const [time, setTime] = useState(formatSlotTime(booking.starts_at));
@@ -53,6 +56,7 @@ export function LessonDetails({
   const awaiting = Boolean(booking.student_awaiting_welcome);
   // Added by name alone: there is no address to welcome until she gives one.
   const noEmail = !booking.student_email;
+  const recorded = booking.payment_status === "recorded";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const noShowCloses = new Date(new Date(booking.ends_at).getTime() + NO_SHOW_WINDOW_HOURS_AFTER * 3_600_000);
@@ -74,7 +78,8 @@ export function LessonDetails({
   // Its price and how it is paid, one dab: "€25 · paid by card". A
   // cancelled lesson's money matters only if some moved.
   const ticked = paidByHand(booking);
-  const paid = ticked ? "paid to you by hand" : {
+  const canRecordRefund = booking.status === "cancelled" && ticked && booking.payment_status !== "refunded";
+  const paid = ticked && booking.payment_status !== "refunded" ? "paid to you by hand" : {
     paid: "paid by card",
     refunded: "refunded",
     payment_due: "payment due",
@@ -91,7 +96,7 @@ export function LessonDetails({
   // lesson, which has nothing to pay, nor on one paid, due or charging by card.
   const tickable = booking.status === "confirmed" && (ticked || booking.payment_status === "recorded" ||
     (["scheduled", "not_required"].includes(booking.payment_status) && !booking.charge_started_at));
-  const money = booking.status === "cancelled" && !["paid", "refunded"].includes(booking.payment_status)
+  const money = booking.status === "cancelled" && !ticked && !["paid", "refunded"].includes(booking.payment_status)
     ? ""
     : booking.amount_cents ? `${formatMoneyCents(booking.amount_cents)} · ${paid}` : paid.charAt(0).toUpperCase() + paid.slice(1);
   const backdropHandlers = useDialogBackdrop(() => { if (!busy) onClose(); });
@@ -154,6 +159,10 @@ export function LessonDetails({
             ? "No-show removed. The lesson price will be charged as normal."
             : `Marked as a no-show. Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the lesson price.`,
         );
+      } else if (action === "refund") {
+        await recordRefundByHand(token, booking.id);
+        changed.current = true;
+        onChanged("Refund recorded. No payment or email was sent.");
       }
     } catch (caught) {
       setError(
@@ -278,13 +287,16 @@ export function LessonDetails({
           A payment is being processed. Try making changes once it finishes.
         </p>
       ) : null}
-      {booking.status === "cancelled" ? <div className="teacher-dialog-actions"><button className="button button--outline" type="button" onClick={onClose}>Done</button></div> : action === "view" ? (
+      {booking.status === "cancelled" && action === "view" ? <div className="teacher-dialog-actions">
+        {canRecordRefund ? <button className="button button--coral" type="button" onClick={() => setAction("refund")}>Record refund</button> : null}
+        <button className="button button--outline" type="button" onClick={onClose}>Done</button>
+      </div> : action === "view" ? (
         <div className="teacher-dialog-actions">
-          {booking.student_id ? <button className="button button--lilac" type="button" onClick={() => setAction("homework")}>Homework</button> : null}
+          {booking.student_id ? <button className="button button--lilac" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null}
           <button
             className="button button--coral"
             type="button"
-            disabled={locked}
+            disabled={busy || locked}
             onClick={() => setAction("move")}
           >
             Move lesson
@@ -292,7 +304,7 @@ export function LessonDetails({
           <button
             className="button button--outline"
             type="button"
-            disabled={locked}
+            disabled={busy || locked}
             onClick={() => setAction("cancel")}
           >
             Cancel lesson
@@ -303,7 +315,7 @@ export function LessonDetails({
                 aria-describedby={noShowLater ? "teacher-no-show-hint" : undefined}
                 className="text-action"
                 type="button"
-                disabled={!canMarkAttendance}
+                disabled={busy || !canMarkAttendance || locked}
                 onClick={() => setAction("no-show")}
               >
                 {noShow ? "Undo no-show" : "Mark no-show"}
@@ -353,7 +365,7 @@ export function LessonDetails({
                   />
                 </label>
                 <ul className="booking-payment-facts teacher-confirm-facts">
-                  <li>{awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets an email with the new time`}</li>
+                  <li>{recorded ? "This past lesson stays a record only; no email is sent" : awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets an email with the new time`}</li>
                 </ul>
                 <div className="teacher-dialog-actions">
                   <button
@@ -370,21 +382,28 @@ export function LessonDetails({
           ) : (
             <>
               <h3>
-                {action === "cancel"
+                {action === "refund" ? "Record a refund made by hand?" : action === "cancel"
                   ? "Cancel this lesson?"
                   : noShow
                     ? "Remove the no-show?"
                     : "Mark as a no-show?"}
               </h3>
               <ul className="booking-payment-facts teacher-confirm-facts">
-                {action === "cancel" ? (
+                {action === "refund" ? <>
+                  <li>You have already refunded {firstName} directly</li>
+                  <li>Recording it sends no payment or email</li>
+                </> : action === "cancel" ? (
                   <>
                     <li>
-                      {awaiting
+                      {recorded
+                        ? "This past lesson stays a record only; no email is sent"
+                        : awaiting
                         ? `${firstName} isn’t emailed: they haven’t had their welcome yet`
                         : `${firstName} gets an email saying you’ve cancelled, with an update for their calendar`}
                     </li>
-                    {booking.payment_status === "paid" ? (
+                    {ticked ? (
+                      <li>Refund {firstName} directly for the payment made by hand</li>
+                    ) : booking.payment_status === "paid" ? (
                       <li>{firstName} is refunded in full, automatically</li>
                     ) : booking.payment_status === "scheduled" ? (
                       <li>Nothing is charged to {firstName}’s card</li>
@@ -397,7 +416,7 @@ export function LessonDetails({
                   <li>{firstName} is charged only {SAME_DAY_FEE_LABEL}, instead of the lesson price</li>
                 )}
               </ul>
-              {action === "cancel" && !awaiting ? (
+              {action === "cancel" && !awaiting && !recorded ? (
                 <div className="teacher-form teacher-cancel-message">
                   <label htmlFor="teacher-cancel-message">
                     <span>Add a message to the email <span className="teacher-field-optional">(optional)</span></span>
@@ -426,7 +445,7 @@ export function LessonDetails({
                 >
                   {busy
                     ? "Saving…"
-                    : action === "cancel"
+                    : action === "refund" ? "Yes, record refund" : action === "cancel"
                       ? "Yes, cancel lesson"
                       : noShow
                         ? "Undo no-show"
