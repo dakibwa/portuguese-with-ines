@@ -203,7 +203,9 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
   }
 
   const data: unknown = await response.json().catch(() => null);
-  if (response.status === 401 && token) forgetSession(token);
+  // Google rejects an invalid Google credential with 401; its optional site
+  // bearer is separate proof for linking and has not been refused by that reply.
+  if (response.status === 401 && token && path !== "/auth/google") forgetSession(token);
   if (!response.ok) {
     const error = isApiRecord(data) && typeof data.error === "string" ? data.error : "";
     throw new AuthApiError(error || "Something went wrong. Please try again.", response.status);
@@ -246,7 +248,7 @@ export function login(input: { email: string; password: string }) {
 }
 
 export function signInWithGoogle(credential: string, timezone: string) {
-  return post<{ student: Student; session: string }>("/auth/google", { credential, timezone }).then(validateSignInReply);
+  return post<{ student: Student; session: string }>("/auth/google", { credential, timezone }, readSession() || undefined).then(validateSignInReply);
 }
 
 export function requestPasswordReset(email: string) {

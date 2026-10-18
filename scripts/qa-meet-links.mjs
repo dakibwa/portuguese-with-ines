@@ -25,12 +25,19 @@ const bookings = cases.map((entry, index) => ({
   studentTimezone: student.timezone, rescheduleCount: 0, sameDayFeeCents: 500,
 }));
 await mkdir("tmp/qa/meet", { recursive: true });
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
+}
 try {
-  for (const width of [390]) {
-    const page = await browser.newPage({ viewport: { width, height: 1000 } });
+  for (const width of [1280, 390]) {
+    const page = await browser.newPage({ viewport: { width, height: 1000 }, reducedMotion: "reduce", timezoneId: "Europe/Lisbon" });
     const errors = [];
     let lateReady = false;
     let lateReads = 0;
+    let pending = bookings.find(entry => entry.reference === "PENDING"), pendingReads = 0, lateFee = false, cancelAttempts = 0;
+    const oldPollStarted = deferred(), oldPollWaiting = deferred();
     page.on("pageerror", error => errors.push(error.message));
     await page.clock.setFixedTime(new Date("2026-09-14T10:00:00Z"));
     await page.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-meet-fixture"));
@@ -40,9 +47,30 @@ try {
       if (path === "/me") return route.fulfill({ json: { student, bookings, series: [], sameDayFeeCents: 500 } });
       if (path === "/me/recurring-rates") return route.fulfill({ json: { rates: {} } });
       if (path === "/lesson-types") return route.fulfill({ json: { lessonTypes: [{ id: "single-60", name: "Single lesson", duration_minutes: 60, price_cents: 2500 }], postpay: false } });
-      if (path === "/availability") return route.fulfill({ json: { slotsByDate: {}, horizonDays: 84 } });
+      if (path === "/availability") return route.fulfill({ json: { slotsByDate: { "2026-09-18": [{ startAt: "2026-09-18T14:00:00Z", endAt: "2026-09-18T15:00:00Z" }] }, horizonDays: 84 } });
       if (path.startsWith("/bookings/")) {
+        if (path === "/bookings/PENDING/reschedule") {
+          const body = route.request().postDataJSON();
+          assert.equal(body.expectedLateFeeCents, 0, "The move carries the accepted free-change quote");
+          pending = { ...pending, startAt: body.startAt, endAt: "2026-09-18T15:00:00Z" };
+          return route.fulfill({ json: { booking: pending, sameDayFeeApplied: false } });
+        }
+        if (path === "/bookings/PENDING/cancel") {
+          const body = route.request().postDataJSON();
+          assert.equal(body.expectedLateFeeCents, cancelAttempts ? 500 : 0, "Cancellation carries the fee the student just accepted");
+          if (!cancelAttempts++) {
+            lateFee = true;
+            return route.fulfill({ status: 409, json: { error: "The change fee has changed. Please review it before confirming." } });
+          }
+          pending = { ...pending, status: "cancelled" };
+          return route.fulfill({ json: { booking: pending, sameDayFeeApplied: true } });
+        }
         const booking = bookings.find(entry => entry.manageToken === path.split("/")[2]);
+        if (booking.reference === "PENDING") {
+          const snapshot = pending;
+          if (++pendingReads === 2) { oldPollStarted.resolve(); await oldPollWaiting.promise; }
+          return route.fulfill({ json: { booking: snapshot, isPast: false, sameDayFeeApplies: lateFee } });
+        }
         if (booking.reference === "LATE") lateReads++;
         const current = booking.reference === "LATE" && lateReady ? { ...booking, meetingUrl } : booking;
         return route.fulfill({ json: { booking: current, isPast: false, sameDayFeeApplies: false } });
@@ -81,6 +109,30 @@ try {
         await expect(join).toHaveAttribute("href", meetingUrl);
         await expect(join).toHaveAttribute("target", "_blank");
         await dialog.screenshot({ path: `tmp/qa/meet/details-${width}.png` });
+      }
+      if (booking.reference === "PENDING") {
+        // Hold a missing-link poll across an accepted online move. Its older
+        // booking snapshot must not put the lesson back on the original date.
+        await oldPollStarted.promise;
+        await dialog.getByRole("button", { name: "Change", exact: true }).click();
+        const change = page.getByRole("dialog", { name: "Choose a new date and time", exact: true });
+        await change.locator('button[data-date-key="2026-09-18"]').click();
+        await change.getByRole("button", { name: "15:00", exact: true }).click();
+        await change.getByRole("button", { name: "Change to 15:00", exact: true }).click();
+        await expect(page.getByRole("dialog").locator(".lesson-manage-dialog__lesson")).toContainText("Friday, 18 September");
+        const oldPollResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/bookings/PENDING");
+        oldPollWaiting.resolve(); await oldPollResponse;
+        await expect(page.getByRole("dialog").locator(".lesson-manage-dialog__lesson")).toContainText("Friday, 18 September");
+        await page.getByRole("button", { name: "Close lesson management", exact: true }).click();
+        await page.goto(`${base}/book/?manage=PENDING`);
+        const currentDialog = page.getByRole("dialog");
+        await currentDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+        await currentDialog.getByRole("button", { name: "Yes, cancel it", exact: true }).click();
+        await expect(currentDialog.getByRole("alert")).toContainText("change fee has changed");
+        await expect(currentDialog.locator(".lesson-manage-dialog__decision")).toContainText("€5");
+        await currentDialog.getByRole("button", { name: "Yes, cancel it", exact: true }).click();
+        await expect(currentDialog.locator(".booking-outcome")).toContainText("cancelled");
+        assert.equal(cancelAttempts, 2, "A changed quote needs a second confirmation");
       }
     }
     assert.deepEqual(errors, []);

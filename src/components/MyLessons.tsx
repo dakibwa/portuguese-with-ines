@@ -87,6 +87,7 @@ function HistoryLessonCard({ booking, named, zone }: { booking: MyBooking; named
 export function MyLessons({
   initialAccount = null,
   onRatesChange,
+  onStudentChange,
   onSelectSection,
   onSignOut,
   openUpcomingRequest = 0,
@@ -96,6 +97,8 @@ export function MyLessons({
   initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; cardsAccepted?: boolean } | null;
   /** The account's own prices, as last read or changed here, so booking prices with them. */
   onRatesChange?: (rates: Record<number, number>) => void;
+  /** Saved fields update the account name and splat on the surrounding calendar too. */
+  onStudentChange?: (fields: Partial<Student>) => void;
   onSelectSection?: (section: AccountSection) => void;
   onSignOut?: () => void;
   openUpcomingRequest?: number;
@@ -108,6 +111,8 @@ export function MyLessons({
   const [cardsAccepted, setCardsAccepted] = useState(Boolean(initialAccount?.cardsAccepted));
   // Back from Stripe with a card saved; the account may take a moment to say so.
   const [cardAdded, setCardAdded] = useState(false);
+  const [cardChecking, setCardChecking] = useState(false);
+  const returningCard = useRef(false);
   const [removingCard, setRemovingCard] = useState(false);
   const editing = section === "profile";
   const [details, setDetails] = useState(() => accountDetails(initialAccount?.student));
@@ -159,6 +164,11 @@ export function MyLessons({
     setBookings(initialAccount.bookings);
     setSeries(initialAccount.series ?? []);
     setCardsAccepted(Boolean(initialAccount.cardsAccepted));
+    setStudent((current) => current && {
+      ...current,
+      hasCard: initialAccount.student.hasCard,
+      cardForAllLessons: initialAccount.student.cardForAllLessons
+    });
     setLoading(false);
     setLoadError("");
   }, [initialAccount, student?.id]);
@@ -335,11 +345,17 @@ export function MyLessons({
    */
   useEffect(() => {
     const url = new URL(window.location.href);
-    if (url.searchParams.get("card") !== "added") return;
-    url.searchParams.delete("card");
-    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    if (url.searchParams.get("card") === "added") {
+      returningCard.current = true;
+      url.searchParams.delete("card");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+    if (!returningCard.current) return;
     setCardAdded(true);
-    const timers = [2500, 8000].map((delay) => window.setTimeout(() => void load(), delay));
+    setCardChecking(true);
+    const timers = [2500, 8000].map((delay) => window.setTimeout(() => {
+      void load().finally(() => { if (delay === 8000) setCardChecking(false); });
+    }, delay));
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [load]);
 
@@ -355,6 +371,7 @@ export function MyLessons({
       profileVersion.current += 1;
       // Other fields may have been saved since this response was prepared.
       setStudent((current) => current && { ...current, name: result.student.name });
+      onStudentChange?.({ name: result.student.name });
       if (latestDetails.current.name === submittedName) setOpenField((field) => field === "name" ? null : field);
       setDetailsNote("Saved.");
     } catch (caught) {
@@ -378,6 +395,7 @@ export function MyLessons({
       profileVersion.current += 1;
       const savedNif = result.student.nif ?? "";
       setStudent((current) => current && { ...current, nif: savedNif });
+      onStudentChange?.({ nif: savedNif });
       setDetails((current) => current.nif === submittedNif ? { ...current, nif: savedNif } : current);
       if (latestDetails.current.nif === submittedNif) setOpenField((field) => field === "nif" ? null : field);
       setDetailsNote(result.student.nif ? "Saved. Your receipts will show this NIF." : "Saved. Your receipts won’t show a NIF.");
@@ -400,6 +418,7 @@ export function MyLessons({
       if (readSession() !== session) return;
       profileVersion.current += 1;
       setStudent((current) => current && { ...current, mark: result.student.mark ?? "" });
+      onStudentChange?.({ mark: result.student.mark ?? "" });
       setMarkLanding(true);
       setOpenField((field) => field === "mark" ? null : field);
     } catch (caught) {
@@ -757,8 +776,13 @@ export function MyLessons({
                           if (readSession() !== session) return;
                           profileVersion.current += 1;
                           setStudent((current) => current && { ...current, hasCard: result.student.hasCard, cardForAllLessons: result.student.cardForAllLessons });
+                          onStudentChange?.({ hasCard: result.student.hasCard, cardForAllLessons: result.student.cardForAllLessons });
+                          setCardAdded(false);
+                          setCardChecking(false);
+                          returningCard.current = false;
                           setOpenField((field) => field === "card" ? null : field);
                           setDetailsNote("Card removed. Lessons Inês adds are paid to her by hand again.");
+                          void load();
                         } catch (caught) {
                           if (readSession() !== session) return;
                           setError(caught instanceof Error ? caught.message : "Your card couldn’t be removed.");
@@ -896,13 +920,14 @@ export function MyLessons({
   const unpaidAdded = bookings.filter((booking) =>
     !booking.isPast && booking.status === "confirmed" && booking.addedByTeacher && booking.paymentStatus === "not_required" && !booking.paidByHand
   ).length;
+  const cardSaved = cardAdded && student.hasCard === true && student.cardForAllLessons === true;
   const cardNote = cardAdded ? (
     <div className="booking-outcome card-added" role="status">
-      <CheckCircle2 size={20} aria-hidden="true" />
-      <p>Card saved. You&rsquo;re all set.</p>
+      {cardSaved ? <CheckCircle2 size={20} aria-hidden="true" /> : <AlertCircle size={20} aria-hidden="true" />}
+      <p>{cardSaved ? <>Card saved. You&rsquo;re all set.</> : cardChecking ? "We’re confirming your saved card…" : "Your card hasn’t been confirmed yet. You can try adding it again."}</p>
     </div>
   ) : null;
-  const askForCard = !cardAdded && cardsAccepted && hasStudentSide(student) &&
+  const askForCard = !cardSaved && !cardChecking && cardsAccepted && hasStudentSide(student) &&
     student.cardForAllLessons === false && unpaidAdded > 0;
   return (
     <>

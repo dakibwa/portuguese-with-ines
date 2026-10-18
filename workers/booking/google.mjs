@@ -44,7 +44,7 @@ async function googleKeys(refresh = false) {
 }
 
 /**
- * Returns { sub, email, name, emailVerified } or null.
+ * Returns the verified identity and whether Google owns its email domain, or null.
  *
  * @param clientId the OAuth client id this token must have been issued for.
  *        Without checking it, a token minted for any other Google app would be
@@ -107,10 +107,17 @@ export async function verifyGoogleIdToken(token, clientId) {
   // An unverified address must not be trusted: it would let someone claim an
   // account belonging to a real address they do not control.
   if (payload.email_verified !== true && payload.email_verified !== "true") return null;
+  const email = payload.email.trim().toLowerCase();
+  // Google is authoritative for Gmail and verified Workspace accounts only.
+  // An external address may have changed hands since Google first verified it.
+  // https://developers.google.com/identity/gsi/web/guides/verify-google-id-token
+  const hostedDomain = typeof payload.hd === "string" ? payload.hd : "";
+  const workspace = hostedDomain.length <= 253 && /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(hostedDomain);
   return {
     sub: payload.sub,
-    email: payload.email.trim().toLowerCase(),
+    email,
     name: String(payload.name ?? "").trim(),
-    emailVerified: true
+    emailVerified: true,
+    emailAuthoritative: email.endsWith("@gmail.com") || workspace
   };
 }

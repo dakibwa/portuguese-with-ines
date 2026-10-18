@@ -223,6 +223,38 @@ try {
     await page.screenshot({ path: `${out}/free-lessons-${width}.png` });
     assert.deepEqual(errors, []);
     await context.close();
+
+    // A Porto Monday morning is still Sunday in Honolulu. The second weekly
+    // anchor can be in the following local week while sharing Porto's week.
+    const distant = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce", timezoneId: "Pacific/Honolulu" });
+    await distant.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-selection-fixture"));
+    await distant.route(url => /^\/(me(?:\/|$)|lesson-types$|availability$|bookings(?:\/|$))/.test(url.pathname), route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === "/me") return json(route, { student, bookings: [], series: [], sameDayFeeCents: 500 });
+      if (path === "/me/recurring-rates") return json(route, { rates: {} });
+      if (path === "/me/expressions") return json(route, { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] });
+      if (path === "/lesson-types") return json(route, { lessonTypes: types, postpay: false, paymentReady: true });
+      if (path === "/availability") return json(route, { horizonDays: 84, slotsByDate: {
+        "2026-09-14": [{ startAt: "2026-09-14T09:00:00Z", endAt: "2026-09-14T10:00:00Z" }],
+        "2026-09-15": [{ startAt: "2026-09-15T09:00:00Z", endAt: "2026-09-15T10:00:00Z" }]
+      } });
+      if (path === "/bookings/series/preview") {
+        const body = route.request().postDataJSON();
+        return json(route, { bookable: Array.from({ length: 4 }, (_, index) => addWeeks(body.startAt, index)), skipped: [] });
+      }
+      return route.abort();
+    });
+    const distantPage = await distant.newPage();
+    await distantPage.clock.setFixedTime(new Date("2026-09-11T12:00:00Z"));
+    await distantPage.goto(`${base}/book/?view=book`);
+    await distantPage.getByRole("radio", { name: "Weekly", exact: true }).check();
+    await distantPage.locator('button[data-date-key="2026-09-13"]').click();
+    await distantPage.getByRole("button", { name: "23:00", exact: true }).click();
+    await distantPage.getByRole("button", { name: "Add a second weekly time", exact: true }).click();
+    await distantPage.locator('button[data-date-key="2026-09-14"]').click();
+    await distantPage.getByRole("button", { name: "23:00", exact: true }).click();
+    assert.equal(await distantPage.locator(".booking-chosen-lessons li").count(), 2, "Both local weeks can supply weekly times from one Porto week");
+    await distant.close();
   }
 console.log("Booking selection, agreement and combined terms checks passed at 320px, 390px and 1280px.");
 } finally { await browser.close(); }

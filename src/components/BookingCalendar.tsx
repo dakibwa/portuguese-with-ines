@@ -48,6 +48,7 @@ import {
   addDaysToKey,
   browserTimeZone,
   buildBookingWeeks,
+  BookingApiError,
   cancelBooking,
   createBooking,
   stripePaymentUrl,
@@ -1390,15 +1391,26 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   useEffect(() => {
     if (!awaitingMeetToken) return;
     let active = true;
+    let refreshing = false;
     async function refreshMeeting() {
+      if (refreshing) return;
+      refreshing = true;
+      const request = managedRequest.current;
       try {
         const result = await fetchBooking(awaitingMeetToken);
-        if (!active) return;
-        setConfirmation(current => current?.manageToken === awaitingMeetToken
+        if (!active || request !== managedRequest.current) return;
+        setConfirmation(current => current?.manageToken === awaitingMeetToken &&
+          current.startAt === result.booking.startAt && current.location === result.booking.location
           ? { ...current, meetingUrl: result.booking.meetingUrl, location: result.booking.location } : current);
-        setManaged(current => current?.booking.reference === result.booking.reference ? result : current);
+        // This lookup only fills the missing link. Its older account, payment
+        // or time snapshot must never replace an accepted move or cancellation.
+        setManaged(current => current?.booking.reference === result.booking.reference &&
+          current.booking.startAt === result.booking.startAt && current.booking.endAt === result.booking.endAt &&
+          current.booking.status === result.booking.status && current.booking.location === result.booking.location
+          ? { ...current, booking: { ...current.booking, meetingUrl: result.booking.meetingUrl } } : current);
         if (result.booking.meetingUrl) refreshStudentInBackground();
       } catch { /* The existing booking remains usable during a network delay. */ }
+      finally { refreshing = false; }
     }
     const timers = [3000, 10000, 30000, 65000, 125000].map(delay => window.setTimeout(() => void refreshMeeting(), delay));
     return () => { active = false; timers.forEach(timer => window.clearTimeout(timer)); };
@@ -1730,12 +1742,16 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     ? rangeWeeks.find((week) => week.cells.some((cell) => cell.key === selectedDate))
     : undefined;
   const visibleCalendarWeekCount = calendarWeekCount === 1 && !selectedCalendarWeek ? CALENDAR_PAGE_WEEKS : calendarWeekCount;
-  // A second weekly time is chosen in the first one's week, shown on the
-  // calendar's clock. (Which times qualify is Porto's week: see selectionWeek.)
-  const restrictedWeek = !managed && bookingKind === "recurring" && savedChoices.length
-    ? weekKeyOf(dateKeyIn(new Date(savedChoices[0].startAt), viewZone)) : "";
-  const displayedCalendarWeeks = restrictedWeek
-    ? rangeWeeks.filter((week) => week.key === restrictedWeek)
+  // A Porto week can cross two local calendar weeks. Keep both reachable for
+  // a second weekly time; selectableSlots still enforces the Porto week.
+  const restrictedPortoWeek = !managed && bookingKind === "recurring" && savedChoices.length
+    ? portoWeekKey(savedChoices[0].startAt) : "";
+  const restrictedWeeks = restrictedPortoWeek ? new Set([
+    weekKeyOf(dateKeyIn(new Date(portoTimeToUtc(restrictedPortoWeek, "00:00")), viewZone)),
+    weekKeyOf(dateKeyIn(new Date(Date.parse(portoTimeToUtc(addDaysToKey(restrictedPortoWeek, 7), "00:00")) - 1), viewZone))
+  ]) : null;
+  const displayedCalendarWeeks = restrictedWeeks
+    ? rangeWeeks.filter((week) => restrictedWeeks.has(week.key))
     : visibleCalendarWeekCount === 1 && selectedCalendarWeek
       ? [selectedCalendarWeek]
       : pagedCalendarWeeks;
@@ -1772,7 +1788,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // nothing free says so on the calendar itself.
   // A failed lookup says nothing about the weeks: its own alert shows instead.
   const noFreeTimes = intent === "book" && !managed && !selectedDate && !loadingSlots && !availabilityError && Boolean(lessonType) &&
-    !(restrictedWeek ? displayedCalendarWeeks : rangeWeeks).some((week) => week.cells.some((cell) => selectableSlots(cell.key).length));
+    !(restrictedWeeks ? displayedCalendarWeeks : rangeWeeks).some((week) => week.cells.some((cell) => selectableSlots(cell.key).length));
   const managedDate = managed ? dateKeyIn(new Date(managed.booking.startAt), viewZone) : "";
   const shouldShowCurrentManagedSlot = Boolean(
     managed &&
@@ -2243,9 +2259,17 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       : ` A ${formatMoneyCents(cents)} late change fee applies.`;
   }
 
+  async function refreshChangedFee(caught: unknown, request: number) {
+    if (!(caught instanceof BookingApiError) || caught.status !== 409 || !/change fee has changed/i.test(caught.message)) return;
+    try {
+      const fresh = await fetchBooking(managedToken);
+      if (request === managedRequest.current) setManaged(fresh);
+    } catch { /* Keep the refused quote visible until a fresh read succeeds. */ }
+  }
+
   async function moveManagedLesson() {
-    if (!managedToken || !selectedSlot || !managed) return;
-    const request = managedRequest.current;
+    if (!managedToken || !selectedSlot || !managed || manageWorking) return;
+    const request = ++managedRequest.current;
     setManageWorking(true);
     setManageError("");
     try {
@@ -2275,7 +2299,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           selectedSlot,
           managedLessonTypeId || previousLessonTypeId,
           managedLocation,
-          managedPrice
+          managedPrice,
+          managed.sameDayFeeApplies ? managed.booking.sameDayFeeCents : 0
         );
         sameDayFeeApplied = result.sameDayFeeApplied;
         updatedBooking = result.booking;
@@ -2305,6 +2330,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       });
       refreshStudentInBackground();
     } catch (caught) {
+      await refreshChangedFee(caught, request);
       if (request !== managedRequest.current) return;
       setManageError(caught instanceof Error ? caught.message : "That lesson couldn’t be changed.");
       loadAvailability();
@@ -2314,8 +2340,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   }
 
   async function cancelManagedLesson() {
-    if (!managedToken || !managed) return;
-    const request = managedRequest.current;
+    if (!managedToken || !managed || manageWorking) return;
+    const request = ++managedRequest.current;
     setManageWorking(true);
     setManageError("");
     try {
@@ -2323,7 +2349,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         setManageMode("view");
         return;
       }
-      const result = await cancelBooking(managedToken);
+      const result = await cancelBooking(managedToken, managed.sameDayFeeApplies ? managed.booking.sameDayFeeCents : 0);
       if (request !== managedRequest.current) return;
       transitionBooking(() => {
         setManaged({ ...managed, booking: result.booking });
@@ -2336,6 +2362,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       });
       refreshStudentInBackground();
     } catch (caught) {
+      await refreshChangedFee(caught, request);
       if (request !== managedRequest.current) return;
       setManageError(caught instanceof Error ? caught.message : "That lesson couldn’t be cancelled.");
     } finally {
@@ -2344,8 +2371,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   }
 
   async function stopManagedSequence(cancelRemaining = false) {
-    if (!resolvedManagedSeriesId) return;
-    const request = managedRequest.current;
+    if (!resolvedManagedSeriesId || manageWorking) return;
+    const request = ++managedRequest.current;
     setManageWorking(true);
     setManageError("");
     try {
@@ -3343,6 +3370,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 setRatesReady(true);
                 setRatesError("");
               }}
+              onStudentChange={(fields) => {
+                accountRequest.current += 1;
+                setStudent((current) => current ? { ...current, ...fields } : current);
+              }}
               onSelectSection={openAccountView}
               onSignOut={signOut}
               openUpcomingRequest={upcomingRequestKey}
@@ -3918,7 +3949,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 ) : null}
               </div>
               <div className="unified-calendar__range-actions">
-                {!restrictedWeek && visibleCalendarWeekCount !== 1 && calendarPages.length > 1 ? (
+                {!restrictedWeeks && visibleCalendarWeekCount !== 1 && calendarPages.length > 1 ? (
                   <div className="calendar-pager">
                     <button
                       aria-controls="booking-calendar-weeks"
@@ -3943,7 +3974,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     </button>
                   </div>
                 ) : null}
-                {returnCalendarWeekCount && !restrictedWeek ? (
+                {returnCalendarWeekCount && !restrictedWeeks ? (
                   <button
                     aria-controls="booking-calendar-weeks"
                     className="text-action unified-calendar__expand"

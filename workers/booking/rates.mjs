@@ -52,6 +52,20 @@ export async function studentLessonType(env, studentId, lessonType) {
   return { ...lessonType, price_cents: rates[lessonType.duration_minutes] ?? lessonType.price_cents };
 }
 
+/** A new lesson may use its quote only while that effective price still holds. */
+export function lessonPriceSnapshotSql() {
+  return `EXISTS (SELECT 1 FROM lesson_types quoted_type WHERE quoted_type.id = ?
+    AND (CASE WHEN quoted_type.id = 'trial' THEN quoted_type.price_cents ELSE COALESCE(
+      (SELECT amount_cents FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = quoted_type.duration_minutes),
+      CASE WHEN quoted_type.duration_minutes = 90 THEN
+        (SELECT ROUND(amount_cents * 1.5) FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = 60)
+      END, quoted_type.price_cents) END) = ?)`;
+}
+
+export function lessonPriceSnapshot(studentId, lessonType) {
+  return [lessonType.id, studentId, studentId, lessonType.price_cents];
+}
+
 /** A move of the same duration preserves the price already agreed for that row. */
 export async function priceForMove(env, row, lessonType) {
   if (row.lesson_type_id === lessonType.id) return row.amount_cents ?? lessonType.price_cents;
