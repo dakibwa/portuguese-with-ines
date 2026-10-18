@@ -172,7 +172,12 @@ try {
       const dialog = page.getByRole("dialog");
       await dialog.getByRole("button", { name: "Homework", exact: true }).click();
       await expect(dialog.locator(".homework-sheet")).toBeVisible();
-      await page.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
+      const printTitles = await page.evaluate(() => {
+        window.dispatchEvent(new Event("beforeprint"));
+        return [...document.querySelectorAll("body > .homework-print[data-print-active]")]
+          .map(sheet => sheet.querySelector(".homework-sheet__head h3")?.textContent);
+      });
+      assert.deepEqual(printTitles, [homework.sheet.title], "The visible lesson is ready for native printing immediately");
       await page.emulateMedia({ media: "print" });
       assert.equal(await page.locator("body > .homework-print:visible").count(), 1, "Print only the requested lesson");
       await page.emulateMedia({ media: "screen" });

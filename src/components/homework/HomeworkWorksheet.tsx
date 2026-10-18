@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Printer, BookOpen, CheckCircle2, RotateCcw, CircleHelp, PencilLine, Eye, EyeOff } from "lucide-react";
 import type { HomeworkMark, HomeworkSheet } from "@/lib/homework-api";
@@ -43,8 +43,10 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
   const [mounted, setMounted] = useState(false);
   const screen = useRef<HTMLDivElement>(null);
   const printed = useRef<HTMLDivElement>(null);
-  useEffect(() => setMounted(true), []);
-  useEffect(() => {
+  // Native print can open as soon as the sheet is painted. Prepare its portal
+  // and listeners before that first paint, including inside a lesson dialog.
+  useLayoutEffect(() => {
+    setMounted(true);
     const beforePrint = () => {
       if (document.querySelector(".homework-print[data-print-active]")) return;
       const visible = screen.current?.getClientRects().length;
