@@ -243,6 +243,62 @@ await test("codes require authenticated account and cannot reveal catalogue", as
   const response = await call("/me/recurring-rates", { method: "GET" });
   assert.equal(response.headers.get("Cache-Control"), "no-store");
   assert.deepEqual(await response.json(), { rates: {} });
+  // Recovery or logout after initial authentication must neither reveal the
+  // owner's new prices nor add a grant or raise an existing lesson's price.
+  for (const phase of ["read", "grant", "reprice"]) for (const invalidation of ["recovery", "logout"]) {
+    const user = `rate-${phase}-${invalidation}`;
+    await enrol(user);
+    const tokenHash = await sessionHash(sessions[user]);
+    const prepare = DB.prepare;
+    let raced = false;
+    const invalidate = () => {
+      raced = true;
+      if (invalidation === "recovery") db.prepare("UPDATE students SET session_version = session_version + 1 WHERE id = ?").run(user);
+      else db.prepare("INSERT INTO revoked_sessions (token_hash, expires_at) VALUES (?, ?)").run(tokenHash, Math.floor(Date.now() / 1000) + 3600);
+    };
+    try {
+      db.prepare("INSERT INTO student_recurring_rates VALUES (?, 60, 1500, ?)").run(user, new Date().toISOString());
+      booking(`${user}-lesson`, { owner: user, payment: "not_required" });
+      db.prepare("UPDATE bookings SET lesson_type_id = 'long', amount_cents = 2250 WHERE id = ?").run(`${user}-lesson`);
+      if (phase === "read") {
+        DB.prepare = (sql) => {
+          const statement = prepare(sql);
+          if (sql === "SELECT duration_minutes, amount_cents FROM student_recurring_rates WHERE student_id = ?") {
+            const all = statement.all;
+            statement.all = () => {
+              DB.prepare = prepare;
+              invalidate();
+              db.prepare("INSERT INTO student_recurring_rates VALUES (?, 90, 2900, ?)").run(user, new Date().toISOString());
+              return all();
+            };
+          }
+          return statement;
+        };
+      } else {
+        beforeRun = (sql) => {
+          const target = phase === "grant" ? "INSERT INTO student_recurring_rates" : "UPDATE bookings SET amount_cents = COALESCE(";
+          if (!sql.startsWith(target)) return;
+          beforeRun = null;
+          invalidate();
+        };
+      }
+      const result = await call("/me/recurring-rates", { user, method: phase === "read" ? "GET" : "POST", body: { code: "DEMO27" } });
+      assert.equal(raced, true, `${phase}: ${invalidation} interleaves`);
+      assert.equal(result.status, 401, `${phase}: ${invalidation}`);
+      assert.deepEqual(await result.json(), { error: "Please sign in." });
+      assert.equal(db.prepare("SELECT amount_cents FROM bookings WHERE id = ?").get(`${user}-lesson`).amount_cents, 2250, "a stale request cannot reprice the lesson");
+      const ninety = db.prepare("SELECT amount_cents FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = 90").get(user)?.amount_cents;
+      assert.equal(ninety, phase === "read" ? 2900 : phase === "grant" ? undefined : 2700, "only a grant completed before invalidation may remain");
+    } finally {
+      beforeRun = null;
+      DB.prepare = prepare;
+      db.prepare("DELETE FROM bookings WHERE student_id = ?").run(user);
+      db.prepare("DELETE FROM student_recurring_rates WHERE student_id = ?").run(user);
+      db.prepare("DELETE FROM students WHERE id = ?").run(user);
+      db.prepare("DELETE FROM revoked_sessions WHERE token_hash = ?").run(tokenHash);
+      delete sessions[user];
+    }
+  }
 });
 await test("reusable code grants same rate to two accounts and independent durations", async () => {
   for (const user of ["alice", "bob"]) assert.equal((await call("/me/recurring-rates", { user, body: { code: "test15", durationMinutes: 60 } })).status, 200);
@@ -883,6 +939,58 @@ await test("whole-series duration changes require the displayed rate while uncha
   const newLength = await call("/series/mixed-series/reschedule", { body: { ...payload, expectedPriceCents: 2700 } });
   assert.equal(newLength.status, 200, await newLength.clone().text());
   assert.deepEqual(db.prepare("SELECT amount_cents FROM bookings WHERE series_id='mixed-series' ORDER BY id").all().map((row) => row.amount_cents), [2700, 2700]);
+  const settledSnapshot = db.prepare("SELECT id,lesson_type_id,starts_at,amount_cents FROM bookings WHERE series_id='mixed-series' ORDER BY id").all();
+  beforeRun = sql => {
+    if (!sql.startsWith("WITH proposed")) return;
+    beforeRun = null;
+    // The production Already paid action changes payment terms without
+    // changing the calendar sequence. A stale move must preserve those terms.
+    db.prepare("UPDATE bookings SET payment_status='not_required',payment_consent_version='paid-by-hand' WHERE id='mixed-b'").run();
+  };
+  assert.equal((await call("/series/mixed-series/reschedule", { body: { lessonType: "single", startAt: "2026-10-05T13:00:00.000Z", expectedPriceCents: 1500 } })).status, 409);
+  assert.deepEqual(db.prepare("SELECT id,lesson_type_id,starts_at,amount_cents FROM bookings WHERE series_id='mixed-series' ORDER BY id").all(), settledSnapshot,
+    "no part of a run moves or reprices after its payment terms change");
+
+  const originalPrepare = DB.prepare;
+  for (const stage of ["version", "logout", "reply"]) {
+    const user = `move-identity-${stage}`;
+    const run = `run-${user}`;
+    student(user); sessions[user] = await createSession(user, env.BOOKING_TOKEN_SECRET);
+    const hash = await sessionHash(sessions[user]);
+    db.prepare("INSERT INTO booking_series(id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES (?,?,'single',1,540,?,?)")
+      .run(run, user, new Date().toISOString(), new Date().toISOString());
+    for (const day of ["09", "16"]) booking(`${user}-${day}`, { owner: user, series: run, start: `2026-11-${day}T09:00:00.000Z`, end: `2026-11-${day}T10:00:00.000Z` });
+    const recover = () => stage === "logout"
+      ? db.prepare("INSERT INTO revoked_sessions(token_hash,expires_at) VALUES (?,?)").run(hash, Number(sessions[user].split(".")[1]))
+      : db.prepare("UPDATE students SET session_version=session_version+1 WHERE id=?").run(user);
+    if (stage === "reply") {
+      DB.prepare = sql => {
+        const statement = originalPrepare(sql);
+        if (sql.startsWith("SELECT * FROM bookings WHERE id IN (")) {
+          const all = statement.all;
+          statement.all = () => { DB.prepare = originalPrepare; recover(); return all(); };
+        }
+        return statement;
+      };
+    } else {
+      beforeRun = sql => { if (sql.startsWith("WITH proposed")) { beforeRun = null; recover(); } };
+    }
+    try {
+      const response = await call(`/series/${run}/reschedule`, { user, body: { lessonType: "long", startAt: "2026-11-09T11:00:00.000Z", expectedPriceCents: 3500 } });
+      assert.equal(response.status, 401, await response.clone().text());
+      assert.equal((await response.json()).bookings, undefined, "a recovered account's fresh lesson reply stays private");
+      const current = db.prepare("SELECT lesson_type_id,amount_cents FROM bookings WHERE series_id=?").all(run);
+      assert.ok(current.every(row => row.lesson_type_id === (stage === "reply" ? "long" : "single") && row.amount_cents === (stage === "reply" ? 3500 : 1500)),
+        "committed moves remain, but the old identity cannot add a price increase after recovery");
+    } finally {
+      DB.prepare = originalPrepare; beforeRun = null;
+      db.prepare("DELETE FROM bookings WHERE student_id=?").run(user);
+      db.prepare("DELETE FROM booking_series WHERE id=?").run(run);
+      db.prepare("DELETE FROM revoked_sessions WHERE token_hash=?").run(hash);
+      db.prepare("DELETE FROM students WHERE id=?").run(user);
+      delete sessions[user];
+    }
+  }
 });
 await test("series cancellation locks paid occurrences before refunding and reports actual outcomes", async () => {
   const seriesId = db.prepare("SELECT id FROM booking_series LIMIT 1").get().id;
@@ -1090,6 +1198,64 @@ await test("a slot taken between preview and the atomic claim leaves no partial 
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=?").get(user).n, 0);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM booking_series WHERE student_id=?").get(user).n, 0);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, 0);
+
+  // Student financial claims keep the original account identity even when
+  // recovery or logout lands between authentication and the final write/read.
+  const originalPrepare = DB.prepare;
+  for (const stage of ["slot", "selection", "recipe", "recipe-setup", "occurrence", "reply", "selection-reply", "setup"]) {
+    const user = await selectionFixture({ savedCard: !stage.endsWith("setup") });
+    const bearer = sessions[user];
+    const hash = await sessionHash(bearer);
+    const revoked = ["selection", "occurrence", "selection-reply"].includes(stage);
+    const recover = () => revoked
+      ? db.prepare("INSERT INTO revoked_sessions(token_hash,expires_at) VALUES (?,?)").run(hash, Number(bearer.split(".")[1]))
+      : db.prepare("UPDATE students SET session_version=session_version+1 WHERE id=?").run(user);
+    const multiple = stage.startsWith("selection");
+    const repeat = ["recipe", "recipe-setup", "occurrence", "selection"].includes(stage);
+    const payload = multiple ? selectionBody({ ...(repeat ? { repeat: 4 } : {}) })
+      : { lessonType: "single", startAt: selectedStarts[0], paymentConsent: true, ...(repeat ? { repeat: 4 } : {}) };
+    if (["reply", "selection-reply", "setup"].includes(stage)) {
+      DB.prepare = sql => {
+        const statement = originalPrepare(sql);
+        const method = multiple ? "all" : "first";
+        if (sql.startsWith(multiple ? "SELECT * FROM bookings WHERE id IN" : "SELECT * FROM bookings WHERE id = ?")) {
+          const read = statement[method];
+          statement[method] = () => {
+            DB.prepare = originalPrepare;
+            recover();
+            db.prepare("UPDATE bookings SET student_email='recovered-private@example.invalid' WHERE student_id=?").run(user);
+            return read();
+          };
+        }
+        return statement;
+      };
+    } else {
+      let slots = 0;
+      beforeRun = sql => {
+        if (sql.startsWith("INSERT INTO bookings")) slots++;
+        const atClaim = stage === "slot" ? slots === 1 : stage === "occurrence" ? slots === 2
+          : stage.startsWith("recipe") ? sql.startsWith("INSERT INTO booking_series") : sql.startsWith("WITH candidates");
+        if (atClaim) { beforeRun = null; recover(); }
+      };
+    }
+    const checkoutCount = checkoutRequests.length;
+    try {
+      const response = await call("/bookings", { user, body: payload });
+      assert.equal(response.status, 401, `${stage}: ${await response.clone().text()}`);
+      const reply = await response.json();
+      assert.equal(reply.manageToken, undefined);
+      assert.equal(reply.booking, undefined, "a changed account cannot read freshly addressed lesson data");
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, 0, "no new manage links are mailed from a stale account snapshot");
+      const rows = db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=?").get(user).n;
+      assert.equal(rows, stage === "selection-reply" ? 2 : ["recipe", "occurrence", "reply"].includes(stage) ? 1 : 0,
+        "committed lessons remain, but no new lesson can claim after recovery");
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM booking_series WHERE student_id=?").get(user).n, stage === "occurrence" ? 1 : 0);
+      assert.equal(checkoutRequests.length, checkoutCount, "recovery before provider initiation cannot open another card setup");
+    } finally {
+      DB.prepare = originalPrepare; beforeRun = null;
+      db.prepare("DELETE FROM revoked_sessions WHERE token_hash=?").run(hash);
+    }
+  }
 });
 await test("a shared card setup holds both runs, saves once and confirms all occurrences on a signed webhook", async () => {
   const user = await selectionFixture({ savedCard: false });
@@ -1581,6 +1747,59 @@ await test("a new booking replaces the student's own unfinished card setup inste
   assert.equal(late.status, 200);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND status='confirmed'").get(user).n, 0);
   assert.equal(db.prepare("SELECT stripe_payment_method FROM students WHERE id=?").get(user).stripe_payment_method, null);
+
+  const originalPrepare = DB.prepare;
+  for (const stage of ["read", "provider", "delete", "accepted"]) {
+    const owner = await unsavedCardStudent(`hold-recovery-${stage}`);
+    const oldId = `${owner}-old`;
+    const newId = `${owner}-new`;
+    const oldSession = `cs_${oldId}`;
+    const newSession = `cs_${newId}`;
+    const hold = (id, session) => {
+      booking(id, { owner, payment: "pending", start: "2026-11-12T17:00:00.000Z", end: "2026-11-12T18:00:00.000Z" });
+      db.prepare("UPDATE bookings SET status='pending_payment',hold_expires_at='2026-09-05T10:20:00.000Z',stripe_session_id=? WHERE id=?").run(session, id);
+    };
+    hold(oldId, oldSession);
+    const recover = () => {
+      db.prepare("UPDATE students SET session_version=session_version+1 WHERE id=?").run(owner);
+      hold(newId, newSession);
+      if (["provider", "delete"].includes(stage)) {
+        db.prepare("UPDATE bookings SET stripe_session_id=? WHERE id=?").run(`${newSession}_replacement`, oldId);
+      }
+    };
+    if (["read", "provider"].includes(stage)) {
+      DB.prepare = sql => {
+        const statement = originalPrepare(sql);
+        const prefix = stage === "read" ? "SELECT id, series_id, stripe_session_id, hold_expires_at FROM bookings"
+          : "SELECT COUNT(*) AS n FROM bookings b WHERE b.student_id";
+        if (sql.startsWith(prefix)) {
+          const method = stage === "read" ? "all" : "first";
+          const read = statement[method];
+          statement[method] = () => { DB.prepare = originalPrepare; recover(); return read(); };
+        }
+        return statement;
+      };
+    } else {
+      beforeRun = sql => {
+        if (sql.startsWith("DELETE FROM bookings WHERE student_id = ? AND status = 'pending_payment'")) {
+          beforeRun = null; recover();
+        }
+      };
+    }
+    try {
+      assert.equal((await call("/bookings", { user: owner, body: backedOutTrial })).status, 401);
+      assert.equal(db.prepare("SELECT status FROM bookings WHERE id=?").get(newId).status, "pending_payment", "a recovered owner's new checkout is retained");
+      assert.ok(!expiredSessions.includes(newSession) && !expiredSessions.includes(`${newSession}_replacement`), "a stale request cannot expire a fresh checkout");
+      assert.equal(expiredSessions.includes(oldSession), ["delete", "accepted"].includes(stage), "only expiry authorized before recovery can start");
+      assert.equal(Boolean(db.prepare("SELECT id FROM bookings WHERE id=?").get(oldId)), stage !== "accepted",
+        "accepted expiry finishes, but deletion never follows a changed checkout snapshot");
+    } finally {
+      DB.prepare = originalPrepare; beforeRun = null;
+      db.prepare("DELETE FROM bookings WHERE student_id=?").run(owner);
+      db.prepare("DELETE FROM students WHERE id=?").run(owner);
+      delete sessions[owner];
+    }
+  }
 });
 await test("a card setup Stripe already completed keeps its hold, its trial claim and its webhook confirmation", async () => {
   const [finished] = db.prepare("SELECT id, stripe_session_id FROM bookings WHERE student_id='backs-out'").all();
@@ -3073,7 +3292,41 @@ await test("her price for a student prices their lessons, and only lessons nothi
     assert.deepEqual((await reset.json()).student.prices, {});
     assert.deepEqual(amounts(), [1800, 2000, 2000, ...rest(2500)]);
     assert.equal(long(), 3500);
+
+    // An older reprice must not undo a newer save after reading its source
+    // prices. Exercise explicit, derived, free and public-price snapshots in
+    // the same real UPDATEs used by code redemption and teacher price saves.
+    booking("price-snapshot-sixty", { owner: student.id, payment: "not_required" });
+    booking("price-snapshot-ninety", { owner: student.id, payment: "not_required" });
+    db.prepare("UPDATE bookings SET lesson_type_id = 'long' WHERE id = 'price-snapshot-ninety'").run();
+    for (const [label, captured, newer, target, expected] of [
+      ["stored", { 60: 2000, 90: 3000 }, { 60: 1500, 90: 2250 }, 60, [1500, 2250]],
+      ["derived", { 60: 2001, 90: null }, { 60: 1801 }, 90, [1801, 2702]],
+      ["explicit becomes derived", { 60: 2000, 90: 2500 }, { 60: 2000 }, 90, [2000, 3000]],
+      ["free", { 60: 0, 90: null }, { 60: 1800 }, 60, [1800, 2700]],
+      ["public becomes personal", { 60: null, 90: null }, { 60: 1800 }, 60, [1800, 2700]],
+      ["personal becomes public", { 60: 2000, 90: 3000 }, {}, 60, [2500, 3500]]
+    ]) {
+      db.prepare("UPDATE bookings SET amount_cents = 2500, payment_status = 'not_required', payment_consent_version = NULL WHERE id IN ('price-snapshot-sixty', 'price-snapshot-ninety')").run();
+      let raced = false;
+      beforeRun = (sql, values) => {
+        if (!sql.startsWith("UPDATE bookings SET amount_cents = COALESCE(") || values[5] !== student.id || values[7] !== target) return;
+        beforeRun = null;
+        raced = true;
+        db.prepare("DELETE FROM student_recurring_rates WHERE student_id = ?").run(student.id);
+        for (const [minutes, cents] of Object.entries(newer)) {
+          db.prepare("INSERT INTO student_recurring_rates VALUES (?, ?, ?, ?)").run(student.id, Number(minutes), cents, new Date().toISOString());
+        }
+        db.prepare("UPDATE bookings SET amount_cents = ? WHERE id = 'price-snapshot-sixty'").run(expected[0]);
+        db.prepare("UPDATE bookings SET amount_cents = ? WHERE id = 'price-snapshot-ninety'").run(expected[1]);
+      };
+      const changed = await price(captured);
+      assert.equal(changed.status, 200, await changed.clone().text());
+      assert.equal(raced, true, label);
+      assert.deepEqual(db.prepare("SELECT amount_cents, payment_status FROM bookings WHERE id IN ('price-snapshot-sixty', 'price-snapshot-ninety') ORDER BY lesson_type_id DESC").all().map((row) => [row.amount_cents, row.payment_status]), expected.map((cents) => [cents, "not_required"]), label);
+    }
   } finally {
+    beforeRun = null;
     forgetStudent("priced@example.invalid");
   }
 });
