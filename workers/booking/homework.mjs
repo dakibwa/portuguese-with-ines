@@ -116,6 +116,8 @@ async function ai(env, bookingId, system, content, schema, name) {
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
+      // Keep the API key and lesson material on the fixed provider origin.
+      redirect: "manual",
       headers: {
         "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json",
         ...(fallback ? { "anthropic-beta": "server-side-fallback-2026-07-01" } : {}),

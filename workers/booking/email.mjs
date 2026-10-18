@@ -503,6 +503,7 @@ export async function deliver(env, { to, subject, content, calendar, dedupeKey, 
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
+      redirect: "manual",
       headers: {
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
         "Content-Type": "application/json"

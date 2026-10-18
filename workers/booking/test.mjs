@@ -7,7 +7,7 @@
  */
 
 import assert from "node:assert/strict";
-import { renderEmail, splitWhen } from "./email.mjs";
+import { deliver, renderEmail, splitWhen } from "./email.mjs";
 import * as templates from "./email-templates.mjs";
 import { candidateStartMinutes, computeAvailability, DEFAULT_BOOKING_HORIZON_DAYS, isSlotBookable } from "./availability.mjs";
 import {
@@ -1347,6 +1347,34 @@ await test("a repeating booking sends one consolidated email to the client", asy
       { kind: "teacher_series_booked", recipient: "ines@example.com" }
     ]
   );
+
+  // A provider redirect is a failed send; never forward its bearer key or
+  // the student's email/calendar content to a redirect destination.
+  const originalFetch = globalThis.fetch;
+  const prepare = fixture.env.DB.prepare;
+  const writes = [];
+  let calls = 0;
+  fixture.env.RESEND_API_KEY = "isolated-email-key";
+  fixture.env.EMAIL_DRY_RUN = "0";
+  fixture.env.DB.prepare = sql => { writes.push(sql); return prepare(sql); };
+  globalThis.fetch = async (url, options) => {
+    calls += 1;
+    assert.equal(String(url), "https://api.resend.com/emails");
+    assert.equal(options.redirect, "manual");
+    return new Response(null, { status: 307, headers: { Location: "https://redirect.example.invalid/emails" } });
+  };
+  try {
+    const result = await deliver(fixture.env, {
+      to: "ana@example.com", subject: "Lesson", content: { heading: "Lesson", intro: "Hi" },
+      dedupeKey: "isolated-provider-redirect", kind: "student_series_booked"
+    });
+    assert.deepEqual(result, { ok: false, error: "HTTP 307" });
+    assert.equal(calls, 1, "redirect destinations are never requested");
+    assert.ok(writes.some(sql => sql.startsWith("UPDATE email_log SET status = 'failed'")));
+  } finally {
+    globalThis.fetch = originalFetch;
+    fixture.env.DB.prepare = prepare;
+  }
 });
 
 // The student reads a run on the lesson's own clock, as the site shows it:
