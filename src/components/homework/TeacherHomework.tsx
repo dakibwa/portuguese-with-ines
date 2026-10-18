@@ -52,12 +52,17 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
   }, [bookingId, token, attempt]);
   useEffect(() => {
     if (draft?.progress.submission?.state !== "marking") return;
+    const abort = new AbortController();
+    let pending = false;
     const interval = window.setInterval(() => {
-      void teacherHomeworkRequest(token, bookingId, "", undefined, controller.current?.signal).then(result => {
-        if (active.current && readSession() === token) { setDraft(result); setSaved(result); }
-      }).catch(() => {});
+      if (pending) return;
+      pending = true;
+      void teacherHomeworkRequest(token, bookingId, "", undefined, abort.signal).then(result => {
+        if (!abort.signal.aborted && active.current && readSession() === token) { setDraft(result); setSaved(result); }
+      }).catch(() => {}).finally(() => { pending = false; });
     }, 5000);
-    return () => window.clearInterval(interval);
+    // A late marking read must not replace the review Inês has begun editing.
+    return () => { window.clearInterval(interval); abort.abort(); };
   }, [bookingId, token, draft?.progress.submission?.state]);
   useEffect(() => { onBusy?.(Boolean(busy)); }, [busy, onBusy]);
   // Each step's question takes focus as it arrives, never on first opening.

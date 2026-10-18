@@ -10,7 +10,7 @@ import type { studentWorkspace } from "@/lib/teacher-calendar";
 export type StudentOpenRequest = StudentRowSelection & { key: number };
 
 /** One student, one row: setup becomes their regular profile when complete. */
-export function StudentList({ token, students, workspace, error, sending, request, onAddStudent, onStudentsChanged, onWelcome, onMeet, onView }: {
+export function StudentList({ token, students, workspace, error, sending, request, onAddStudent, onStudentsChanged, onWelcome, onMeet, onView, onRetry }: {
   token: string;
   students: AdminStudent[] | null;
   workspace: ReturnType<typeof studentWorkspace>;
@@ -22,6 +22,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
   onWelcome: (student: AdminStudent, again?: boolean) => void;
   onMeet: () => void;
   onView: (booking: AdminBooking) => void;
+  onRetry: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<StudentRowSelection | null>(null);
@@ -54,7 +55,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
       </button>
     </div>
     <NeedsYou {...noticeProps} heading="Check first" items={workspace.general} />
-    {error ? <p className="teacher-inline-error" role="alert">{error}</p> : null}
+    {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={onRetry} type="button">Try again</button></div> : null}
     {!students && !error ? <p role="status">Loading your students…</p> : null}
     {students && !students.length ? <p>No students yet.</p> : students && !shown.length ? <p>No students match.</p> : null}
     <ul className="teacher-setup-list teacher-students__unified">

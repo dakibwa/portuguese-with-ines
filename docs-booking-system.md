@@ -168,8 +168,13 @@ unproven account back clears its agreement. `Your lessons` asks once, above
 the calendar, while a lesson she added is still unpaid; `Your details` has a
 `Card` row with `Remove card` (`POST /me/card/remove`), which puts her lessons
 still to come back to being paid by hand and stops her weekly slots charging.
+Removal also increments `students.card_setup_version` (migration 0033), so a
+setup already open at Stripe cannot restore the agreement, even if no card had
+yet been confirmed. Each setup records that generation and the account's
+`session_version`; confirmation checks both again in the transaction, together
+with verified student access. Identity changes also retire older setups.
 
-Inês is emailed which of her lessons a newly saved card now pays for. One the
+Inês sees which lessons a newly saved card now pays for in Needs you. One the
 student already paid her for by hand is ticked `Already paid` (below) before it
 is charged, and no later card takes it back. A lesson she records after it has
 happened is never put on a card.
@@ -210,6 +215,12 @@ status:
   ticked) still answers for any open page, but the site no longer calls it.
 - Her student list's `paid by hand` count and the student's `Pay by card`
   prompt leave ticked lessons out; emails show their price as `paid`.
+
+Receipt policy awaiting clarification: the ticked-lesson rule above removes a
+cancelled payment made by hand from Receipts, while the general receipts rule
+says cancellations retain money actually received. Cancellation records no
+manual refund. This bug-fix pass preserves the explicit ticked-lesson rule;
+the confirmation now reminds Inês to refund the student directly.
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
@@ -453,6 +464,9 @@ extra hours are never touched there. Malformed or whole-day `blocks`, and past
 dates, are refused rather than partly saved. `GET /admin/availability` returns
 weekly blocks alongside the upcoming one-off rows so the calendar shows every
 time students cannot book.
+`POST /admin/availability` validates every weekly range before replacing any
+hours. Invalid ranges or more than 100 ranges return 400 without changing the
+timetable; an explicitly empty array closes the usual weekly hours.
 
 The Timetable's `Edit weekly hours` control edits the usual weekly pattern in
 the same calendar with click/drag, touch or keyboard input. `View lessons`
@@ -1375,6 +1389,10 @@ starts.
 Blocked exceptions are real spans of time, so a lesson is withheld when it would
 **overlap** one rather than only when it starts inside it — which correctly
 withholds a 90-minute lesson earlier than a 60-minute one.
+This includes the next Porto date when a late lesson crosses midnight and
+both occurrences of repeated autumn minutes; nonexistent spring minutes do
+not create artificial time off. Overlapping weekly and extra-hour windows
+keep each window's own start grid rather than dropping an extra precise start.
 
 A lesson being changed may reuse the time it already holds. `GET /availability`
 takes `manage=<manage token>`, which ignores that one booking once the token
@@ -1820,6 +1838,11 @@ typed again. **Sign-up deliberately has no code field** (decided 28 September
 2026): only some students have a code, and a field there would suggest most new
 students should have one.
 
+If Stripe's idempotent charge response still says processing, the Worker reads
+that same PaymentIntent to observe its current state. A later success settles
+the original charge; an ambiguous result keeps the existing processing claim
+and cannot open a second payment.
+
 The charge claim rechecks current status and end time atomically. A successful
 cancel or move wins against a previously selected charge, while already
 processing payments reject concurrent changes. Student and teacher moves use
@@ -1887,6 +1910,11 @@ hash verification. Webhooks check signature, environment, session, customer,
 amount and currency; expired card-setup holds cannot reclaim a slot.
 
 ## Deploying the Worker
+
+For an existing database, apply `migrations/0033-card-setup-version.sql` before
+releasing this Worker. It adds the card-setup revocation generation only; do
+not replay the full schema or older migrations. The site and Worker changes
+in this bug-fix pass have not been published by the local verification.
 
 ```bash
 npx wrangler d1 create ines-booking          # put the id in wrangler.jsonc

@@ -1712,7 +1712,9 @@ as a form:
   Confirming a change keeps to who and when (the Meet button, address and
   NIF step aside until `Back to lesson`): the question under a quiet rule,
   what it does as dabs (`Alex is emailed`, `It comes off your calendar`,
-  `Refunded in full` when paid), and for a cancellation `Message for Alex
+  `Refunded in full` for a card payment, or a reminder to refund a payment by
+  hand directly). A recorded past lesson explicitly sends no email. For a
+  cancellation that sends an email, `Message for Alex
   (optional)` with an example in the box, its count appearing only near
   the 1,000-character limit;
 - emails read as the site does: Montserrat (falling back to Arial) rather

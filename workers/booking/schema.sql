@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS students (
   -- lets lessons Inês adds be charged to it after each one (migration 0023).
   -- A card saved at one booking's checkout leaves this empty.
   card_consent_at TEXT,
+  -- Removing a card retires every setup already open, even before the first
+  -- card has been confirmed (migration 0033).
+  card_setup_version INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL,
   last_login_at TEXT,
   -- 1 for a student Inês set up who hasn't been emailed by the site yet

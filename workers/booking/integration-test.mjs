@@ -1191,6 +1191,32 @@ await test("settings reject a slot interval that would hang availability, and ma
   assert.equal((await save({ teacher_email: "not-an-address" })).status, 400);
   assert.equal((await save({ slot_interval_minutes: 30 })).status, 200);
 });
+await test("weekly hours refuse malformed replacements without erasing or partly saving the timetable", async () => {
+  const original = db.prepare("SELECT * FROM availability_rules ORDER BY id").all();
+  const valid = { weekday: 1, startMinute: 600, lastStartMinute: 1140 };
+  const save = (rules, user = "teacher") => call("/admin/availability", { user, body: { rules }, headers: { "CF-Connecting-IP": "198.51.100.88" } });
+  assert.equal((await save([valid], "alice")).status, 401);
+  for (const rules of [
+    null, [null], [valid, { ...valid, weekday: 7 }],
+    [{ ...valid, startMinute: null }], [{ ...valid, weekday: "1" }],
+    [{ ...valid, lastStartMinute: 599 }], [{ ...valid, lastStartMinute: 1441 }],
+    Array.from({ length: 101 }, () => valid)
+  ]) {
+    assert.equal((await save(rules)).status, 400, JSON.stringify(rules));
+    assert.deepEqual(db.prepare("SELECT * FROM availability_rules ORDER BY id").all(), original);
+  }
+  try {
+    const saved = await save([valid]);
+    assert.equal(saved.status, 200);
+    assert.equal((await saved.json()).count, 1);
+    assert.equal((await save([])).status, 200, "an intentional empty timetable is allowed");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM availability_rules").get().n, 0);
+  } finally {
+    db.exec("DELETE FROM availability_rules");
+    for (const row of original) db.prepare("INSERT INTO availability_rules (id,weekday,start_minute,last_start_minute,active) VALUES (?,?,?,?,?)")
+      .run(row.id, row.weekday, row.start_minute, row.last_start_minute, row.active);
+  }
+});
 await test("the teacher calendar replaces one date's time off without touching weekly blocks, extra hours or the day off", async () => {
   const at = new Date().toISOString();
   const lunch = db.prepare("INSERT INTO availability_exceptions (weekday,kind,start_minute,end_minute,note,created_at) VALUES (1,'blocked',750,810,'Lunch',?)").run(at).lastInsertRowid;
@@ -2345,9 +2371,35 @@ await test("a card saved from the account pays for the lessons Inês added from 
     assert.equal((await removed.json()).student.cardForAllLessons, false);
     assert.equal(statusOf("2026-10-03T02:00:00.000Z"), "not_required");
     assert.equal(db.prepare("SELECT automatic_payment FROM booking_series WHERE student_id=?").get(id).automatic_payment, 0);
+    assert.equal((await webhook(replaced("evt_card_after_removal", "seti_card_older", created + 800))).status, 200);
+    assert.equal(db.prepare("SELECT card_consent_at FROM students WHERE id=?").get(id).card_consent_at, null,
+      "a delayed setup cannot restore removed consent");
+    assert.equal(statusOf("2026-10-03T02:00:00.000Z"), "not_required");
+
+    // Removal while Stripe is being checked must win atomically, even with
+    // no current card consent (a first setup can still be open).
+    assert.equal((await call("/me/card", { token, body: { consent: true } })).status, 200);
+    const pendingMetadata = new URLSearchParams(checkoutRequests.at(-1).body);
+    assert.equal(pendingMetadata.get("metadata[card_setup_version]"), "1");
+    assert.equal(pendingMetadata.get("metadata[session_version]"), "0");
+    duringSetupRead = async () => {
+      duringSetupRead = null;
+      assert.equal((await call("/me/card/remove", { token })).status, 200);
+    };
+    try {
+      assert.equal((await webhook({ ...event, id: "evt_card_removed_during_setup", data: { object: {
+        ...session, metadata: { ...session.metadata, card_setup_version: "1", session_version: "0" }
+      } } })).status, 200);
+    } finally { duringSetupRead = null; }
+    assert.equal(db.prepare("SELECT card_consent_at FROM students WHERE id=?").get(id).card_consent_at, null);
+    assert.equal(statusOf("2026-10-03T02:00:00.000Z"), "not_required");
+
     // Saved again, so the charge below runs as it would for a card on file.
+    assert.equal((await call("/me/card", { token, body: { consent: true } })).status, 200);
+    assert.equal(new URLSearchParams(checkoutRequests.at(-1).body).get("metadata[card_setup_version]"), "2");
     setupIntents.set("seti_card_back", { status: "succeeded", customer: "cus_card_later", payment_method: "pm_card_back" });
-    assert.equal((await webhook({ ...event, id: "evt_card_back", data: { object: { ...session, id: "cs_back", setup_intent: "seti_card_back", created: Math.floor(Date.now() / 1000) + 900 } } })).status, 200);
+    assert.equal((await webhook({ ...event, id: "evt_card_back", data: { object: { ...session, id: "cs_back", setup_intent: "seti_card_back",
+      metadata: { ...session.metadata, card_setup_version: "2", session_version: "0" }, created: Math.floor(Date.now() / 1000) + 900 } } })).status, 200);
 
     // And it is charged after it ends, like any lesson on a card.
     const single = db.prepare("SELECT id FROM bookings WHERE student_id=? AND starts_at='2026-10-02T02:00:00.000Z'").get(id).id;
@@ -3243,6 +3295,48 @@ await test("homework: private drafts, teacher review, lesson ownership and saved
   assert.equal((await call(route, { user: "teacher", method: "GET" })).status, 409);
 });
 
+await test("homework accepts valid large sheets and answers and refuses writes after concurrent cancellation", async () => {
+  const id = linkedBooking("homework-large");
+  const route = `/admin/lessons/${id}/homework`;
+  const sheet = { title: "Ficha grande", objective: "Praticar", reminder: "Recorda amanhã",
+    sections: Array.from({ length: 2 }, () => ({ title: "Secção", instruction: "Responde", example: "",
+      questions: Array.from({ length: 6 }, () => ({ prompt: "Completa", answer: "á".repeat(1200), explanation: "", marking: "exact",
+        acceptedAnswers: Array.from({ length: 8 }, (_, i) => String(i) + "á".repeat(1199)) })) })) };
+  const body = { notes: "Notas da aula", level: "A1", minutes: 15, sheet, updatedAt: null };
+  const raw = JSON.stringify(body);
+  assert.ok(Buffer.byteLength(raw) > 65536);
+  const saved = await call(route, { user: "teacher", raw, headers: { "Content-Length": String(Buffer.byteLength(raw)) } });
+  assert.equal(saved.status, 200, await saved.clone().text());
+  const draft = await saved.json();
+  assert.equal((await call(`${route}/publish`, { user: "teacher", body: { ...body, updatedAt: draft.updatedAt, reviewed: true } })).status, 200);
+  const answers = { answers: Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`q${i + 1}`, "á".repeat(3000)])), updatedAt: null };
+  assert.ok(Buffer.byteLength(JSON.stringify(answers)) > 65536);
+  assert.equal((await call(`/me/homework/${id}`, { body: answers })).status, 200);
+  assert.equal((await call(route, { user: "teacher", headers: { "Content-Length": "1048577" } })).status, 413);
+  assert.equal((await call(`/me/homework/${id}`, { body: answers, headers: { "Content-Length": "262145" } })).status, 413);
+
+  const changed = linkedBooking("homework-concurrent-cancel");
+  const changedRoute = `/admin/lessons/${changed}/homework`;
+  let previous = null;
+  for (const existing of [false, true]) {
+    db.prepare("UPDATE bookings SET status='confirmed' WHERE id=?").run(changed);
+    if (existing) {
+      const response = await call(changedRoute, { user: "teacher", body });
+      assert.equal(response.status, 200);
+      previous = (await response.json()).updatedAt;
+    }
+    beforeRun = sql => {
+      if (!/^(?:INSERT INTO|UPDATE) lesson_homework/.test(sql)) return;
+      beforeRun = null;
+      db.prepare("UPDATE bookings SET status='cancelled' WHERE id=?").run(changed);
+    };
+    try {
+      const response = await call(changedRoute, { user: "teacher", body: { ...body, notes: "Must not be saved", updatedAt: previous } });
+      assert.equal(response.status, 409, await response.clone().text());
+      assert.equal(db.prepare("SELECT notes FROM lesson_homework WHERE booking_id=?").get(changed)?.notes, existing ? body.notes : undefined);
+    } finally { beforeRun = null; }
+  }
+});
 await test("homework defaults: a new sheet starts at the student's latest earlier level and 15 minutes", async () => {
   const at = day => ({ start: `2026-${day}T09:00:00.000Z`, end: `2026-${day}T10:00:00.000Z` });
   const earlier = linkedBooking("homework-level-earlier", at("09-20"));
@@ -3447,6 +3541,23 @@ await test("homework notice: Inês is emailed once per submission, with a link a
     await drain();
     assert.equal(notices().length, 3);
     assert.equal(JSON.parse(db.prepare("SELECT submission_json FROM homework_progress WHERE booking_id = ?").get(stalled).submission_json).state, "submitted");
+
+    // If another review wins while a stale marking attempt is handed off,
+    // return that review rather than the original marking snapshot.
+    db.prepare("UPDATE homework_progress SET submission_json = ? WHERE booking_id = ?").run(attempt({ ago: 120000 }), stalled);
+    beforeRun = sql => {
+      if (!sql.startsWith("UPDATE homework_progress SET submission_json = ?, updated_at = ?")) return;
+      beforeRun = null;
+      const review = JSON.parse(db.prepare("SELECT submission_json FROM homework_progress WHERE booking_id=?").get(stalled).submission_json);
+      review.state = "returned";
+      review.returnedAt = new Date().toISOString();
+      db.prepare("UPDATE homework_progress SET submission_json=?, updated_at=? WHERE booking_id=?")
+        .run(JSON.stringify(review), new Date(Date.now() + 1000).toISOString(), stalled);
+    };
+    try {
+      const latest = await (await call(`/admin/lessons/${stalled}/homework`, { user: "teacher", method: "GET" })).json();
+      assert.equal(latest.progress.submission.state, "returned");
+    } finally { beforeRun = null; }
   } finally {
     globalThis.fetch = beforeFetch;
     Object.assign(env, { EMAIL_DRY_RUN: "1", TEACHER_NOTIFICATIONS_ENABLED: "0" });

@@ -213,6 +213,8 @@ export function fetchBookings(token: string, from?: string) {
     if (!Array.isArray(data.bookings) || !data.bookings.every((row) =>
       isApiRecord(row) && typeof row.id === "string" && typeof row.reference === "string" &&
       typeof row.student_name === "string" && typeof row.student_email === "string" && typeof row.lesson_name === "string" &&
+      ["confirmed", "cancelled", "pending_payment"].includes(row.status as string) && ["online", "porto"].includes(row.location as string) &&
+      ["not_required", "pending", "scheduled", "processing", "paid", "payment_due", "refunded", "recorded", "free"].includes(row.payment_status as string) &&
       (row.notes === undefined || typeof row.notes === "string") &&
       isApiInstant(row.starts_at) && isApiInstant(row.ends_at) && Date.parse(row.ends_at) > Date.parse(row.starts_at)
     ) || (data.manualPaymentReconciliation !== undefined && (!Array.isArray(data.manualPaymentReconciliation) || !data.manualPaymentReconciliation.every((row) =>
@@ -279,8 +281,38 @@ function validateBookingAcknowledgment<T extends { booking: { reference: string 
   return data;
 }
 
+function validStudent(value: unknown): value is AdminStudent {
+  if (!isApiRecord(value) || !["id", "name", "email", "phone"].every(key => typeof value[key] === "string") || !value.id) return false;
+  if (!["nif", "mark"].every(key => value[key] === undefined || typeof value[key] === "string") ||
+    !["signedIn", "awaitingWelcome", "hasCard", "hasLessons", "cardForAllLessons"].every(key => value[key] === undefined || typeof value[key] === "boolean") ||
+    !["upcoming", "unpaidUpcoming", "weekly"].every(key => value[key] === undefined || (Number.isInteger(value[key]) && Number(value[key]) >= 0)) ||
+    !(value.nextLessonAt == null || isApiInstant(value.nextLessonAt))) return false;
+  for (const key of ["prices", "ownPrices"]) {
+    const prices = value[key];
+    if (prices !== undefined && (!isApiRecord(prices) || !Object.values(prices).every(amount => Number.isInteger(amount) && Number(amount) >= 0))) return false;
+  }
+  const lesson = (row: unknown) => isApiRecord(row) && typeof row.bookingId === "string" && isApiInstant(row.startsAt);
+  return (value.homeworkToReview === undefined || (Array.isArray(value.homeworkToReview) && value.homeworkToReview.every(row =>
+    isApiRecord(row) && typeof row.bookingId === "string" && isApiInstant(row.submittedAt)))) &&
+    (value.cardDeclined === undefined || (Array.isArray(value.cardDeclined) && value.cardDeclined.every(row =>
+      lesson(row) && isApiRecord(row) && typeof row.reference === "string" && ["lesson", "no-show", "fee"].includes(row.part as string) &&
+      (row.amountCents === null || (Number.isInteger(row.amountCents) && Number(row.amountCents) >= 0))))) &&
+    (value.cardAdded == null || (isApiRecord(value.cardAdded) && isApiInstant(value.cardAdded.at) &&
+      Array.isArray(value.cardAdded.lessons) && value.cardAdded.lessons.every(lesson)));
+}
+
+function studentReply<T extends { student: AdminStudent }>(data: T, studentId?: string) {
+  if (!validStudent(data.student) || (studentId !== undefined && data.student.id !== studentId)) throw new Error(BOOKING_REPLY_ERROR);
+  return data;
+}
+
 export function fetchStudents(token: string) {
-  return adminRequest<{ students: AdminStudent[]; cardsAccepted?: boolean }>(token, "/admin/students");
+  return adminRequest<{ students: AdminStudent[]; cardsAccepted?: boolean }>(token, "/admin/students").then(data => {
+    if (!Array.isArray(data.students) || !data.students.every(validStudent) ||
+      new Set(data.students.map(student => student.id)).size !== data.students.length ||
+      (data.cardsAccepted !== undefined && typeof data.cardsAccepted !== "boolean")) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
 }
 
 /**
@@ -311,7 +343,15 @@ export function fetchReceipts(token: string, month: string) {
   return adminRequest<{ month: string; receipts: ReceiptLine[]; totals: { ready: number; readyCents: number } }>(
     token,
     `/admin/receipts?month=${encodeURIComponent(month)}`,
-  );
+  ).then(data => {
+    if (data.month !== month || !Array.isArray(data.receipts) || !data.receipts.every(line =>
+      isApiRecord(line) && (["id", "bookingId", "reference", "studentName", "studentEmail", "nif", "label", "stripePaymentIntent"] as const).every(key => typeof line[key] === "string") &&
+      isApiInstant(line.lessonStartsAt) && ["lesson", "no-show", "late-change-fee"].includes(line.kind as string) &&
+      ["card", "by hand"].includes(line.method as string) && ["paid", "refunded", "due", "charging"].includes(line.state as string) &&
+      typeof line.ready === "boolean" && (line.amountCents === null || (Number.isInteger(line.amountCents) && Number(line.amountCents) >= 0))
+    )) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
 }
 
 function expressionReply(data: { expression: Expression }) {
@@ -364,7 +404,7 @@ export function addStudent(token: string, input: StudentDetailsInput & { prices?
   return adminRequest<{ student: AdminStudent }>(token, "/admin/students", {
     method: "POST",
     body: JSON.stringify(input),
-  });
+  }).then(data => studentReply(data));
 }
 
 /** Their details, all at once. Their email can change only until they first sign in. */
@@ -372,7 +412,7 @@ export function updateStudentDetails(token: string, studentId: string, input: St
   return adminRequest<{ student: AdminStudent }>(token, `/admin/students/${encodeURIComponent(studentId)}/details`, {
     method: "POST",
     body: JSON.stringify(input),
-  });
+  }).then(data => studentReply(data, studentId));
 }
 
 /**
@@ -384,7 +424,7 @@ export function setStudentPrices(token: string, studentId: string, prices: Stude
   return adminRequest<{ student: AdminStudent; updated: number; stayFree?: number }>(token, `/admin/students/${encodeURIComponent(studentId)}/prices`, {
     method: "POST",
     body: JSON.stringify({ prices }),
-  });
+  }).then(data => studentReply(data, studentId));
 }
 
 /**
@@ -396,6 +436,9 @@ export function sendStudentWelcome(token: string, studentId: string, options?: {
   return adminRequest<{ ok: true; card?: boolean }>(token, `/admin/students/${encodeURIComponent(studentId)}/welcome`, {
     method: "POST",
     body: JSON.stringify(options?.onlyIfWaiting ? { onlyIfWaiting: true } : {}),
+  }).then(data => {
+    if (data.ok !== true) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
   });
 }
 

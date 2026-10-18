@@ -106,6 +106,8 @@ async function fixture(width, options = {}) {
     failHistory: false,
     studentsReads: 0,
     studentsGate: null,
+    studentsReply: options.studentsReply,
+    receiptReply: options.receiptReply,
   };
   page.on("pageerror", (error) => state.errors.push(error.message));
   await page.route("**/lesson-types", (route) => route.fulfill({
@@ -302,6 +304,7 @@ async function fixture(width, options = {}) {
     }
     if (path === "/admin/students") {
       state.studentsReads++;
+      if (state.studentsReply !== undefined) return route.fulfill({ json: state.studentsReply });
       const json = structuredClone({ cardsAccepted: true, students: [...state.students, ...(state.added ? [state.added] : [])] });
       const gate = state.studentsGate;
       state.studentsGate = null;
@@ -310,6 +313,7 @@ async function fixture(width, options = {}) {
     }
     // Her receipts: as the Worker lists them, a ticked lesson is paid by hand.
     if (path === "/admin/receipts") {
+      if (state.receiptReply !== undefined) return route.fulfill({ json: state.receiptReply });
       const month = new URL(request.url()).searchParams.get("month");
       const receipts = state.bookings.filter((entry) => entry.status === "confirmed" && entry.payment_consent_version === "paid-by-hand" && entry.starts_at.startsWith(month))
         .map((entry) => ({ id: `${entry.id}:lesson`, reference: entry.reference, lessonStartsAt: entry.starts_at, studentName: entry.student_name,
@@ -325,6 +329,7 @@ async function fixture(width, options = {}) {
       const booking = state.bookings.find((entry) => entry.id === match[1]);
       if (match[2] === "paid") {
         booking.payment_consent_version = data.paid ? "paid-by-hand" : null;
+        if (data.paid) booking.amount_cents ??= 2400;
         // As the Worker does: off the card while ticked, and back on it after.
         if (booking.payment_status !== "recorded") booking.payment_status = data.paid ? "not_required" : "scheduled";
       } else if (match[2] === "reschedule") {
@@ -428,6 +433,31 @@ async function lessonLocation(page, name, location) {
 }
 
 try {
+  // Incomplete successful replies must leave a retryable screen, including
+  // malformed individual rows, rather than crashing her students or receipts.
+  for (const width of [1280, 390]) {
+    const { page, state } = await fixture(width, {
+      studentsReply: width === 1280 ? {} : { students: [{ id: "broken" }] },
+      receiptReply: width === 1280 ? { month: "2026-09" } : { month: "2026-09", receipts: [{ lessonStartsAt: "invalid" }] },
+    });
+    await page.getByRole("tab", { name: /^Students/ }).click();
+    const students = page.locator(".teacher-students");
+    await expect(students.getByRole("alert")).toContainText("couldn’t read the booking system’s reply");
+    state.studentsReply = undefined;
+    await students.getByRole("button", { name: "Try again", exact: true }).click();
+    await expect(students.getByRole("alert")).toHaveCount(0);
+    await expect(studentRow(page, "Alex")).toBeVisible();
+    await page.getByRole("tab", { name: "Receipts", exact: true }).click();
+    const receipts = page.locator(".teacher-receipts");
+    await expect(receipts.getByRole("alert")).toContainText("couldn’t read the booking system’s reply");
+    state.receiptReply = undefined;
+    await receipts.getByRole("button", { name: "Try again", exact: true }).click();
+    await expect(receipts.getByRole("alert")).toHaveCount(0);
+    await expect(receipts).toContainText("Nothing paid or due");
+    assert.deepEqual(state.errors, []);
+    assert.deepEqual(state.writes, []);
+    await page.close();
+  }
   for (const [width, entry] of [
     [1440, "/book/"],
     [390, "/book/?view=book"],
@@ -1264,6 +1294,10 @@ try {
     await expect(details).toContainText(/paid to you by hand/i);
     await expect(details.getByRole("button", { name: "Mark no-show", exact: true })).toHaveCount(0);
     await details.screenshot({ path: `tmp/qa/free-price/teacher-details-paid-${width}.png` });
+    await details.getByRole("button", { name: "Cancel lesson", exact: true }).click();
+    await expect(details).toContainText("Refund Sam directly for the payment made by hand");
+    await expect(details).not.toContainText("refunded in full, automatically");
+    await details.getByRole("button", { name: "Back to lesson", exact: true }).click();
     await page.keyboard.press("Escape");
 
     // Receipts: the ticked lessons, paid by hand.

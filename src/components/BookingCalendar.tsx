@@ -39,7 +39,7 @@ const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/c
 const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons));
 if (typeof window !== "undefined" && readSession()) void loadAccountControls();
 import { LessonMark } from "@/components/LessonMarks";
-import { clearSession, confirmSignInLink, fetchMe, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
+import { clearSession, confirmSignInLink, fetchMe, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, SessionStorageError, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { SITE_BASE_PATH } from "@/lib/paths";
@@ -1057,11 +1057,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const managedRequest = useRef(0);
   const accountRequest = useRef(0);
   const bookingRequest = useRef(0);
+  const signInLinkRequest = useRef(0);
   const availabilityVersion = useRef(0);
   useEffect(() => () => {
     managedRequest.current += 1;
     accountRequest.current += 1;
     bookingRequest.current += 1;
+    signInLinkRequest.current += 1;
     availabilityVersion.current += 1;
   }, []);
   const [manageWorking, setManageWorking] = useState(false);
@@ -3707,16 +3709,24 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   className="button button--coral booking-confirm-button"
                   disabled={usingSignInLink}
                   onClick={async () => {
+                    const request = ++signInLinkRequest.current;
+                    const session = readSession();
+                    const page = window.location.pathname;
+                    const current = () => request === signInLinkRequest.current && readSession() === session && window.location.pathname === page;
                     setUsingSignInLink(true);
                     try {
                       const result = await confirmSignInLink(pendingSignIn);
+                      if (!current()) return;
                       storeSession(result.session);
                       setPendingSignIn("");
                       enterLessons(result.student);
                     } catch (caught) {
-                      setSignInLinkError(caught instanceof Error ? caught.message : "That sign-in link couldn’t be used. Enter your email for a new one.");
+                      if (!current()) return;
+                      setSignInLinkError(caught instanceof SessionStorageError
+                        ? `${caught.message} This link has been used; request a new one to sign in.`
+                        : caught instanceof Error ? caught.message : "That sign-in link couldn’t be used. Enter your email for a new one.");
                     } finally {
-                      setUsingSignInLink(false);
+                      if (request === signInLinkRequest.current) setUsingSignInLink(false);
                     }
                   }}
                   type="button"

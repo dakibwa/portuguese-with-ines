@@ -53,6 +53,7 @@ export function LessonDetails({
   const awaiting = Boolean(booking.student_awaiting_welcome);
   // Added by name alone: there is no address to welcome until she gives one.
   const noEmail = !booking.student_email;
+  const recorded = booking.payment_status === "recorded";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const noShowCloses = new Date(new Date(booking.ends_at).getTime() + NO_SHOW_WINDOW_HOURS_AFTER * 3_600_000);
@@ -280,11 +281,11 @@ export function LessonDetails({
       ) : null}
       {booking.status === "cancelled" ? <div className="teacher-dialog-actions"><button className="button button--outline" type="button" onClick={onClose}>Done</button></div> : action === "view" ? (
         <div className="teacher-dialog-actions">
-          {booking.student_id ? <button className="button button--lilac" type="button" onClick={() => setAction("homework")}>Homework</button> : null}
+          {booking.student_id ? <button className="button button--lilac" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null}
           <button
             className="button button--coral"
             type="button"
-            disabled={locked}
+            disabled={busy || locked}
             onClick={() => setAction("move")}
           >
             Move lesson
@@ -292,7 +293,7 @@ export function LessonDetails({
           <button
             className="button button--outline"
             type="button"
-            disabled={locked}
+            disabled={busy || locked}
             onClick={() => setAction("cancel")}
           >
             Cancel lesson
@@ -303,7 +304,7 @@ export function LessonDetails({
                 aria-describedby={noShowLater ? "teacher-no-show-hint" : undefined}
                 className="text-action"
                 type="button"
-                disabled={!canMarkAttendance}
+                disabled={busy || !canMarkAttendance || locked}
                 onClick={() => setAction("no-show")}
               >
                 {noShow ? "Undo no-show" : "Mark no-show"}
@@ -353,7 +354,7 @@ export function LessonDetails({
                   />
                 </label>
                 <ul className="booking-payment-facts teacher-confirm-facts">
-                  <li>{awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets an email with the new time`}</li>
+                  <li>{recorded ? "This past lesson stays a record only; no email is sent" : awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets an email with the new time`}</li>
                 </ul>
                 <div className="teacher-dialog-actions">
                   <button
@@ -380,11 +381,15 @@ export function LessonDetails({
                 {action === "cancel" ? (
                   <>
                     <li>
-                      {awaiting
+                      {recorded
+                        ? "This past lesson stays a record only; no email is sent"
+                        : awaiting
                         ? `${firstName} isn’t emailed: they haven’t had their welcome yet`
                         : `${firstName} gets an email saying you’ve cancelled, with an update for their calendar`}
                     </li>
-                    {booking.payment_status === "paid" ? (
+                    {ticked ? (
+                      <li>Refund {firstName} directly for the payment made by hand</li>
+                    ) : booking.payment_status === "paid" ? (
                       <li>{firstName} is refunded in full, automatically</li>
                     ) : booking.payment_status === "scheduled" ? (
                       <li>Nothing is charged to {firstName}’s card</li>
@@ -397,7 +402,7 @@ export function LessonDetails({
                   <li>{firstName} is charged only {SAME_DAY_FEE_LABEL}, instead of the lesson price</li>
                 )}
               </ul>
-              {action === "cancel" && !awaiting ? (
+              {action === "cancel" && !awaiting && !recorded ? (
                 <div className="teacher-form teacher-cancel-message">
                   <label htmlFor="teacher-cancel-message">
                     <span>Add a message to the email <span className="teacher-field-optional">(optional)</span></span>

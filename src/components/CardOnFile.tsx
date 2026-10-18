@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CreditCard } from "lucide-react";
 import { openCardPage, readSession } from "@/lib/auth-api";
 import { NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS } from "@/lib/config";
@@ -15,15 +15,26 @@ import { formatMoneyCents } from "@/lib/booking-api";
 export function CardTerms({ change = false, onCancel }: { change?: boolean; onCancel?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const cardRequest = useRef(0);
+  useLayoutEffect(() => () => { cardRequest.current += 1; }, []);
 
   async function open() {
+    if (busy) return;
+    const request = ++cardRequest.current;
+    const session = readSession();
+    const page = window.location.pathname;
+    const current = () => request === cardRequest.current && readSession() === session && window.location.pathname === page;
     setBusy(true);
     setError("");
     try {
-      window.location.assign(await openCardPage(readSession()));
+      const checkoutUrl = await openCardPage(session);
+      if (!current()) return;
+      window.location.assign(checkoutUrl);
     } catch (caught) {
+      if (!current()) return;
       setError(caught instanceof Error ? caught.message : "We couldn’t open the card form just now. Please try again.");
-      setBusy(false);
+    } finally {
+      if (request === cardRequest.current) setBusy(false);
     }
   }
 

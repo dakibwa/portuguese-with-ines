@@ -114,7 +114,7 @@ export async function chargeSavedCard(
   env,
   { bookingId, purpose = "lesson", customer, paymentMethod, amountCents, description, metadata }
 ) {
-  const intent = await stripeRequest(env, "/payment_intents", {
+  let intent = await stripeRequest(env, "/payment_intents", {
     amount: amountCents,
     currency: "eur",
     customer,
@@ -130,9 +130,14 @@ export async function chargeSavedCard(
     ...(metadata ? { metadata } : {})
   }, { idempotencyKey: `ines:charge:${bookingId}:${purpose}` });
 
-  // `confirm=true` can still answer with a non-terminal PaymentIntent. Money
-  // only moved when Stripe says `succeeded`; every other state follows the
-  // ordinary payment-due recovery path.
+  // Stripe replays the original POST response for this idempotency key. If
+  // that response was still processing, only a fresh GET can observe that
+  // the same payment later succeeded. Never create a second payment for it.
+  if (intent?.status !== "succeeded" && typeof intent?.id === "string" && intent.id) {
+    intent = await retrievePaymentIntent(env, intent.id);
+  }
+  // A nonterminal state remains ambiguous: the caller keeps its processing
+  // claim and retries this same payment rather than opening hosted recovery.
   if (intent?.status !== "succeeded") {
     throw new Error(`Stripe payment did not succeed (${intent?.status ?? "unknown status"})`);
   }
@@ -202,7 +207,12 @@ export function createStudentCardSession(env, { student, successUrl, cancelUrl }
         : { customer_creation: "always", customer_email: realEmail(student.email) || undefined }),
       setup_intent_data: { metadata: { student_id: student.id } },
       ...uiModeFields(env, { successUrl, cancelUrl, forceHosted: true }),
-      metadata: { purpose: "student_card", student_id: student.id }
+      metadata: {
+        purpose: "student_card",
+        student_id: student.id,
+        session_version: student.session_version ?? 0,
+        card_setup_version: student.card_setup_version ?? 0
+      }
     },
     // Each press is its own attempt; nothing is held while it is open.
     { idempotencyKey: `ines:student-card:${student.id}:${crypto.randomUUID()}` }
@@ -326,9 +336,14 @@ export function createCheckoutSession(
  * omitting it refunds whatever remains refundable on that PaymentIntent.
  */
 export function refundPayment(env, { bookingId, paymentIntent, amountCents }) {
+  // Omitting Stripe's amount means a full refund. Never let a supplied zero
+  // (or another invalid bounded amount) silently become a full refund.
+  if (amountCents !== undefined && (!Number.isSafeInteger(amountCents) || amountCents <= 0)) {
+    throw new RangeError("A refund amount must be a positive whole number of cents.");
+  }
   return stripeRequest(env, "/refunds", {
     payment_intent: paymentIntent,
-    ...(amountCents ? { amount: amountCents } : {})
+    ...(amountCents !== undefined ? { amount: amountCents } : {})
   }, { idempotencyKey: `ines:refund:${bookingId}` });
 }
 

@@ -35,7 +35,7 @@ try {
   for (const width of [1280, 390]) {
     const context = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: width < 600, reducedMotion: "reduce" });
     await context.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-homework-session"));
-    let studentView = false, photoCalls = 0, answerSaveFails = false, generated = null, slow = false;
+    let studentView = false, photoCalls = 0, answerSaveFails = false, generated = null, slow = false, staleHomeworkList = false;
     // The Worker starts a new sheet at the student's last level (A2 here) and 15 minutes.
     let homework = { bookingId: lesson.id, studentName: student.name, lessonAt: lesson.starts_at, notes: "", level: "A2", minutes: 15,
       sheet: null, publishedAt: null, updatedAt: null, aiAvailable: true, progress: { answers: {}, completedAt: null, updatedAt: null, submission: null } };
@@ -75,7 +75,7 @@ try {
         }
         return json(homework);
       }
-      if (url.pathname === "/me/homework") return json({ homework: homework.publishedAt ? [{ bookingId: lesson.id, lessonAt: lesson.starts_at, title: homework.sheet.title, level: homework.level, minutes: homework.minutes, completedAt: homework.progress.completedAt, submittedAt: homework.progress.submission?.submittedAt ?? null, returnedAt: homework.progress.submission?.returnedAt ?? null, started: Boolean(homework.progress.updatedAt) }] : [] });
+      if (url.pathname === "/me/homework") return json({ homework: homework.publishedAt ? [{ bookingId: lesson.id, lessonAt: lesson.starts_at, title: homework.sheet.title, level: homework.level, minutes: homework.minutes, completedAt: homework.progress.completedAt, submittedAt: homework.progress.submission?.submittedAt ?? null, returnedAt: staleHomeworkList ? null : homework.progress.submission?.returnedAt ?? null, started: Boolean(homework.progress.updatedAt) }] : [] });
       if (url.pathname === `/me/homework/${lesson.id}` || url.pathname === `/me/homework/${lesson.id}/submit`) {
         if (data && answerSaveFails) return json({ error: "Answers could not be saved. Try again." }, 503);
         if (data) homework.progress = { ...homework.progress, answers: data.answers, updatedAt: new Date().toISOString() };
@@ -234,12 +234,17 @@ try {
     await expect(editor.locator(".homework-done")).toContainText("Done");
     await shot("13-done");
     studentView = true;
+    staleHomeworkList = true; // Inês returns the work after this list was read.
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem("ines-student-session", "isolated-homework-session"); });
-    await page.goto(`${base}/book/?view=lessons`); await openHomework(page => page.locator(".homework-list").screenshot({ path: `${output}/student-list-done-${width}.png` }));
+    await page.goto(`${base}/book/?view=lessons`); await openHomework();
     await expect(page.locator(".student-homework .homework-status")).toHaveText("Done");
     await expect(page.locator(".student-homework .homework-done")).toContainText("Done");
     await expect(page.locator(".student-homework .homework-feedback")).toHaveCount(6);
     await expect(page.locator(".student-homework .homework-feedback").nth(4)).toContainText("O teu pedido está claro e educado.");
+    await page.getByRole("button", { name: "All homework", exact: true }).click();
+    await expect(page.locator(".homework-list__state")).toHaveText("Done");
+    await page.locator(".homework-list").screenshot({ path: `${output}/student-list-done-${width}.png` });
+    await page.locator(".homework-list").getByRole("button").click();
     await page.locator(".my-lessons__homework").screenshot({ path: `${output}/student-done-${width}.png` });
     await page.getByRole("button", { name: "Print worksheet", exact: true }).click();
     await expect(page.locator(".student-homework .homework-paper-preview")).toBeVisible();

@@ -901,6 +901,7 @@ export function TeacherSchedule() {
         sending={welcoming}
         onMeet={() => { setActiveTab("profile"); document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true }); }}
         onView={setSelectedBooking}
+        onRetry={() => { void reloadStudents(); void reloadBookings(); }}
         onWelcome={(student, again) => void sendWelcome(student, again)}
         request={studentRequest}
         onAddStudent={() => openStudentPicker({ step: "new" })}

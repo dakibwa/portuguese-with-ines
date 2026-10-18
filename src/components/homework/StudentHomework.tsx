@@ -67,6 +67,13 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
       const result = await fetchHomeworkSheet(token, id);
       if (!active.current || readSession() !== token) return;
       setSelected(result); setDraft(result.progress);
+      // A sheet may have been reviewed since the list loaded. Keep its card
+      // in step with the feedback we have just read.
+      setList(current => current?.map(item => item.bookingId === id ? { ...item,
+        started: Boolean(result.progress.updatedAt), completedAt: result.progress.completedAt,
+        submittedAt: result.progress.submission?.submittedAt ?? null,
+        returnedAt: result.progress.submission?.returnedAt ?? null,
+      } : item) ?? null);
     } catch (error) { if (active.current) setError((error as Error).message); }
     finally { if (active.current) setBusy(false); }
   }

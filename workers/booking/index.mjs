@@ -1399,7 +1399,7 @@ async function handleRemoveStudentCard(request, env) {
   if (!student) return fail("Please sign in.", 401, request, env);
   const now = new Date().toISOString();
   await env.DB.batch([
-    env.DB.prepare("UPDATE students SET card_consent_at = NULL WHERE id = ?").bind(student.id),
+    env.DB.prepare("UPDATE students SET card_consent_at = NULL, card_setup_version = card_setup_version + 1 WHERE id = ?").bind(student.id),
     env.DB.prepare(
       `UPDATE bookings SET payment_status = 'not_required', payment_consent_at = NULL, payment_consent_version = NULL, updated_at = ?
        WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled'
@@ -1428,6 +1428,16 @@ async function confirmStudentCard(env, session) {
     console.warn("stripe-student-card-rejected", problem);
     return new Response("Session does not match student.", { status: 400 });
   }
+  // Removing a card also retires setups that were already open, including a
+  // first setup while consent is still NULL. Identity changes retire them via
+  // session_version. Old sessions without these fields belong to generation 0.
+  const setupVersion = String(session.metadata?.card_setup_version ?? "0");
+  const accountVersion = String(session.metadata?.session_version ?? "0");
+  if (!student.email_verified_at || !isStudentLike(student) ||
+      setupVersion !== String(student.card_setup_version ?? 0) ||
+      accountVersion !== String(student.session_version ?? 0)) {
+    return new Response("ok", { status: 200 });
+  }
 
   let intent;
   try {
@@ -1452,23 +1462,24 @@ async function confirmStudentCard(env, session) {
    * than putting back the card the student replaced.
    */
   const consentedAt = Number.isFinite(session.created) ? new Date(session.created * 1000).toISOString() : now;
-  const current = `EXISTS (SELECT 1 FROM students WHERE id = ? AND card_consent_at = ?)`;
+  const eligible = `card_setup_version = ? AND session_version = ? AND email_verified_at IS NOT NULL AND ${studentLikeSql()}`;
+  const current = `EXISTS (SELECT 1 FROM students WHERE id = ? AND card_consent_at = ? AND ${eligible})`;
   const [saved] = await env.DB.batch([
     env.DB.prepare(
       `UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ?, card_consent_at = ?
-       WHERE id = ? AND (card_consent_at IS NULL OR card_consent_at <= ?)`
-    ).bind(customer, paymentMethod, consentedAt, student.id, consentedAt),
+       WHERE id = ? AND (card_consent_at IS NULL OR card_consent_at <= ?) AND ${eligible}`
+    ).bind(customer, paymentMethod, consentedAt, student.id, consentedAt, setupVersion, accountVersion),
     env.DB.prepare(
       `UPDATE bookings SET payment_status = 'scheduled',
          amount_cents = COALESCE(amount_cents, (SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)),
          payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
        WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'not_required' AND starts_at > ?
          AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}' AND ${current}`
-    ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, now, student.id, consentedAt),
+    ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, now, student.id, consentedAt, setupVersion, accountVersion),
     env.DB.prepare(
       `UPDATE booking_series SET automatic_payment = 1, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
        WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active' AND automatic_payment = 0 AND ${current}`
-    ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, student.id, consentedAt)
+    ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, student.id, consentedAt, setupVersion, accountVersion)
   ]);
   if (!(saved?.meta?.changes > 0)) {
     console.warn("stripe-student-card-superseded", student.id);
@@ -1600,7 +1611,8 @@ const worker = {
           return fail("Send a JSON request.", 415, request, env);
         }
         const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
-          : /^\/(?:admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?|me\/homework\/[^/]+(?:\/submit)?)$/.test(path) ? 65536
+          : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path) ? 1048576
+          : /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path) ? 262144
           : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
         if (Number(request.headers.get("Content-Length") || 0) > bodyLimit) return fail("Request too large.", 413, request, env);
         // Cloudflare supplies this trusted edge header. It cannot be replaced
@@ -1675,7 +1687,7 @@ const worker = {
         const student = await currentStudent(request, env);
         if (!student) return fail("Please sign in.", 401, request, env);
         const reply = await homeworkReply(request, env, async () => studentHomework(env, student, request.method, path.split("/")[3] ?? null,
-          request.method === "POST" ? await readJson(request, 65536) : {}, path.split("/")[4] ?? ""));
+          request.method === "POST" ? await readJson(request, 262144) : {}, path.split("/")[4] ?? ""));
         // Marking has finished by the time a submission replies; tell Inês.
         if (reply.ok && request.method === "POST" && path.endsWith("/submit")) ctx.waitUntil(homeworkNotices(env, path.split("/")[3]));
         return reply;
@@ -4902,7 +4914,7 @@ async function handleAdmin(request, env, ctx, url, path) {
   const homework = path.match(/^\/admin\/lessons\/([^/]+)\/homework(?:\/(transcribe|generate|publish|return))?$/);
   if (homework) {
     return homeworkReply(request, env, async () => teacherHomework(env, request.method, homework[1], homework[2] ?? "",
-      request.method === "POST" ? await readJson(request, homework[2] === "transcribe" ? HOMEWORK_PHOTO_BODY_LIMIT : 65536) : {}));
+      request.method === "POST" ? await readJson(request, homework[2] === "transcribe" ? HOMEWORK_PHOTO_BODY_LIMIT : 1048576) : {}));
   }
 
   if (path === "/admin/expressions" || path.startsWith("/admin/expressions/")) {
@@ -4989,16 +5001,19 @@ async function handleAdmin(request, env, ctx, url, path) {
   if (request.method === "POST" && path === "/admin/availability") {
     const body = await readJson(request);
     if (!Array.isArray(body.rules)) return fail("Expected a rules array.", 400, request, env);
+    if (body.rules.length > 100) return fail("Use at most 100 weekly time ranges.", 400, request, env);
 
     const statements = [env.DB.prepare("DELETE FROM availability_rules")];
-    for (const rule of body.rules.slice(0, 100)) {
-      const weekday = Number(rule.weekday);
-      const start = Number(rule.startMinute);
+    for (const rule of body.rules) {
+      const weekday = rule?.weekday;
+      const start = rule?.startMinute;
       // The latest a lesson may begin, not when she finishes.
-      const lastStart = Number(rule.lastStartMinute);
-      if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) continue;
-      if (!Number.isInteger(start) || !Number.isInteger(lastStart)) continue;
-      if (lastStart < start || start < 0 || lastStart > 1440) continue;
+      const lastStart = rule?.lastStartMinute;
+      if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 ||
+          !Number.isInteger(start) || !Number.isInteger(lastStart) ||
+          lastStart < start || start < 0 || lastStart > 1440) {
+        return fail("Invalid weekly time range. No hours were changed.", 400, request, env);
+      }
       statements.push(
         env.DB.prepare(
           "INSERT INTO availability_rules (weekday, start_minute, last_start_minute, active) VALUES (?, ?, ?, 1)"
