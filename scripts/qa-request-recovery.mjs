@@ -113,6 +113,39 @@ async function currentSession(page) {
 }
 
 try {
+  // History and the useful upcoming count advance with the lesson's end,
+  // even when the account snapshot was read before it finished. Its live
+  // Meet action remains reachable throughout the running lesson.
+  for (const width of [1280, 390]) {
+    const running = { ...nextLesson, startAt: "2026-09-14T09:30:00Z", endAt: "2026-09-14T10:30:00Z", isPast: true, meetingUrl: "https://meet.google.com/abc-defg-hij" };
+    const state = await fixture(width, async path => path === "/me"
+      ? { json: { student, bookings: [running], series: [], sameDayFeeCents: 500 } }
+      : path === "/bookings/next" ? { json: { booking: running, isPast: true, sameDayFeeApplies: false } } : null);
+    const { page } = state;
+    async function chooseSection(name) {
+      const toggle = page.locator("#account-menu-button");
+      if (await toggle.isVisible()) await toggle.click();
+      await page.getByRole("button", { name, exact: true }).click();
+    }
+    try {
+      await page.clock.install({ time: new Date("2026-09-14T10:00:00Z") });
+      await page.goto(`${base}/book/?view=lessons`);
+      await expect(page.locator("#lesson-calendar .calendar-week button.is-next")).toHaveCount(1);
+      if (width === 390) await expect(page.locator(".lesson-overview__next .meeting-link")).toBeVisible();
+      else {
+        await page.locator("#lesson-calendar .calendar-week button.is-next").click();
+        await expect(page.locator(".lesson-manage-dialog .meeting-link")).toBeVisible();
+        await page.getByRole("button", { name: "Close lesson management", exact: true }).click();
+      }
+      await chooseSection("Past lessons");
+      await expect(page.locator(".history-lesson-card")).toHaveCount(0);
+      await expect(page.locator(".account-menu__places button").first()).toHaveText(/Your lessons\s*1/);
+      await page.clock.fastForward(31 * 60_000);
+      await expect(page.locator(".history-lesson-card")).toHaveCount(1);
+      await expect(page.locator(".account-menu__places button").first()).toHaveText("Your lessons");
+      assert.deepEqual(state.errors, []);
+    } finally { await state.context.close(); }
+  }
   for (const width of [390]) {
     // Dismiss a loading lesson, then deliver both a success and a failure.
     // Neither reply may reopen it or leave the page's scroll lock behind.

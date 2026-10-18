@@ -17,6 +17,7 @@ const originalWarn = console.warn;
 const db = new DatabaseSync(":memory:");
 db.exec(readFileSync(new URL("./schema.sql", import.meta.url), "utf8"));
 db.exec(readFileSync(new URL("./seed.sql", import.meta.url), "utf8"));
+let beforeRun = null;
 const DB = {
   prepare(sql) {
     let args = [];
@@ -24,7 +25,7 @@ const DB = {
       bind(...values) { args = values; return statement; },
       first() { return db.prepare(sql).get(...args) ?? null; },
       all() { return { results: db.prepare(sql).all(...args) }; },
-      run() { const result = db.prepare(sql).run(...args); return { meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } }; },
+      run() { beforeRun?.(sql); const result = db.prepare(sql).run(...args); return { meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } }; },
     };
     return statement;
   },
@@ -118,6 +119,7 @@ function addBooking(id, overrides = {}) {
   return row(id);
 }
 async function reset() {
+  beforeRun = null;
   db.exec("DELETE FROM bookings; DELETE FROM google_calendar_connections; DELETE FROM google_calendar_oauth_states; DELETE FROM revoked_sessions; DELETE FROM students;");
   for (const id of ["teacher", "student", "other-teacher"]) db.prepare("INSERT INTO students (id, email, name, password_hash, role, google_sub, created_at) VALUES (?, ?, ?, '', ?, ?, ?)")
     .run(id, id === "teacher" ? "ines@example.invalid" : `${id}@example.invalid`, id, id === "student" ? "student" : "teacher", id === "teacher" ? "ines-google" : null, iso(0));
@@ -453,6 +455,16 @@ try {
     const next = await begin();
     assert.notEqual(next.auth.searchParams.get("state"), auth.searchParams.get("state"));
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM google_calendar_oauth_states").get().count, 1);
+    await startCalendarConnection(env, teacher(), "fresh-session-hash");
+    const freshState = db.prepare("SELECT * FROM google_calendar_oauth_states").get();
+    beforeRun = sql => {
+      if (!sql.startsWith("DELETE FROM google_calendar_oauth_states")) return;
+      beforeRun = null;
+      db.prepare("INSERT INTO revoked_sessions (token_hash,expires_at) VALUES ('isolated-session-hash',?)").run(iso(600000));
+    };
+    await assert.rejects(startCalendarConnection(env, teacher(), "isolated-session-hash"), /sign in again/);
+    assert.deepEqual(db.prepare("SELECT * FROM google_calendar_oauth_states").get(), freshState,
+      "A revoked setup request cannot delete a fresh session's OAuth state");
   });
   await test("OAuth connects matching verified identity once, preserving teacher ownership", async () => {
     const { callback } = await begin();
@@ -473,6 +485,21 @@ try {
       const count = requests.length;
       assert.equal(await finishCalendarConnection(env, callback), "error");
       assert.equal(requests.length, count, "Invalid local state never exchanges an OAuth code");
+    }
+    // A recovery or logout can win after the final read and token encryption.
+    // The grant write itself must still prove that the original teacher session holds.
+    for (const mutate of [
+      () => db.prepare("UPDATE students SET session_version=session_version+1 WHERE id='teacher'").run(),
+      () => db.prepare("UPDATE students SET role='student' WHERE id='teacher'").run(),
+      () => db.prepare("INSERT INTO revoked_sessions (token_hash, expires_at) VALUES ('isolated-session-hash', ?)").run(iso(600000)),
+    ]) {
+      await reset(); const { callback } = await begin();
+      beforeRun = sql => {
+        if (!sql.includes("INSERT INTO google_calendar_connections")) return;
+        beforeRun = null; mutate();
+      };
+      assert.equal(await finishCalendarConnection(env, callback), "error");
+      assert.equal(await decryptCalendarToken(env, db.prepare("SELECT refresh_token_encrypted FROM google_calendar_connections").get().refresh_token_encrypted), "fixture-refresh");
     }
     await reset(); const { callback } = await begin(); oauthProfile = { sub: "someone-else", email: "other@example.invalid" };
     assert.equal(await finishCalendarConnection(env, callback), "error");

@@ -126,12 +126,12 @@ function runRows({ lesson, place, repeats, occurrences, forTeacher = false, pric
     ...(linked
       ? occurrences.map((item) => ({
           label: item.short,
-          value: item.meetingUrl ? "Join Google Meet" : item.online ? (forTeacher ? "Meet link not ready yet" : "Online link will appear in your booking") : item.place,
+          value: [item.price, item.meetingUrl ? "Join Google Meet" : item.online ? (forTeacher ? "Meet link not ready yet" : "Online link will appear in your booking") : item.place].filter(Boolean).join("\n"),
           url: item.meetingUrl,
           lesson: true,
           quiet: !item.meetingUrl && item.online
         }))
-      : [{ label: "Dates", value: occurrences.map((item) => item.long).join("\n"), dates: true }])
+      : [{ label: "Dates", value: occurrences.map((item) => `${item.long}${item.price ? ` — ${item.price}` : ""}`).join("\n"), dates: true }])
   ];
 }
 

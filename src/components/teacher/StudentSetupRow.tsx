@@ -244,6 +244,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
           idPrefix={`${paneId}-lesson`}
           onBusy={setBusy}
           onCreated={message => { setNotice(message); close(); onChanged?.({ ...student, hasLessons: true }); }}
+          onRefresh={() => onChanged?.()}
           student={student}
           token={token}
         />

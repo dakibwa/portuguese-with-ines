@@ -32,7 +32,7 @@ export async function studentExpressions(db, studentId, requestId) {
   };
 }
 
-export async function pickExpression(db, studentId, body) {
+export async function pickExpression(db, studentId, body, authorization = null) {
   if (Object.keys(body).some((key) => key !== "requestId") || typeof body.requestId !== "string" ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)) {
     throw new ExpressionProblem("Please try picking the expression again.");
@@ -44,7 +44,8 @@ export async function pickExpression(db, studentId, body) {
     SELECT ?, e.id, ?, ? FROM expressions e WHERE e.published = 1
       AND NOT EXISTS (SELECT 1 FROM expression_picks p WHERE p.student_id = ? AND p.expression_id = e.id)
       AND NOT EXISTS (SELECT 1 FROM expression_picks p WHERE p.student_id = ? AND p.request_id = ?)
+      AND (${authorization?.sql ?? "1"})
     ORDER BY random() LIMIT 1`)
-    .bind(studentId, body.requestId, new Date().toISOString(), studentId, studentId, body.requestId).run();
+    .bind(studentId, body.requestId, new Date().toISOString(), studentId, studentId, body.requestId, ...(authorization?.values ?? [])).run();
   return studentExpressions(db, studentId, body.requestId);
 }

@@ -72,6 +72,7 @@ export function LessonForm({
   onCreated,
   onBusy,
   onCancel,
+  onRefresh,
 }: {
   token: string;
   student: AdminStudent;
@@ -84,6 +85,8 @@ export function LessonForm({
   onBusy?: (busy: boolean) => void;
   /** Back to where she was, without adding anything. */
   onCancel?: () => void;
+  /** Re-read a student's price after the server refuses an obsolete quote. */
+  onRefresh?: () => void;
 }) {
   const [lesson, setLesson] = useState({ ...empty, date, time });
   const quiet = Boolean(student.awaitingWelcome);
@@ -142,6 +145,7 @@ export function LessonForm({
               startAt,
               location: lesson.location,
               notes: "",
+              ...(!past || (tickable && paid) ? { expectedPriceCents: cents } : {}),
               ...(weekly ? { repeat: lesson.repeat as Exclude<Repeat, "once"> } : {}),
               ...(tickable && paid ? { paid: true } : {}),
             });
@@ -152,6 +156,7 @@ export function LessonForm({
             setPaid(false);
             onCreated(addedLine(lesson.date, lesson.time, lesson.repeat, result.series, result.emailed !== false, past, tickable && paid));
           } catch (caught) {
+            if (caught instanceof AdminApiError && caught.status === 409 && /price.*changed/i.test(caught.message)) onRefresh?.();
             if (caught instanceof AdminApiError && caught.status === 409 && lesson.startAt) {
               forgetAvailability();
               setAvailabilityRefresh(current => current + 1);

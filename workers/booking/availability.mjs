@@ -28,6 +28,11 @@ function overlaps(startA, endA, startB, endB) {
 export const DEFAULT_BOOKING_HORIZON_DAYS = 84;
 export const DEFAULT_MINIMUM_NOTICE_HOURS = 14;
 
+/** Bumped in the same transaction as teaching-hour and notice-setting writes. */
+export function availabilityRevisionSql() {
+  return "COALESCE((SELECT value FROM settings WHERE key = 'availability_revision'), '0') = ?";
+}
+
 /**
  * One date's blocked spans as the teacher calendar sends them: whole minutes in
  * Porto time, sorted and merged. Anything malformed rejects the whole request
@@ -105,6 +110,7 @@ export async function loadSettings(env) {
   const settings = Object.fromEntries((results ?? []).map((row) => [row.key, row.value]));
 
   return {
+    availabilityRevision: String(settings.availability_revision ?? "0"),
     minimumNoticeHours: Number(settings.minimum_notice_hours ?? DEFAULT_MINIMUM_NOTICE_HOURS),
     // Matches what seed.sql writes. The two disagreed for a while, which meant
     // a database missing the row behaved differently from every real one.
@@ -290,7 +296,7 @@ export async function isSlotBookable(
   if (Number.isNaN(start.getTime())) return { ok: false, reason: "That time could not be understood." };
 
   const key = dateKey(start, PORTO);
-  const { slotsByDate } = await computeAvailability(env, {
+  const { slotsByDate, settings: checkedSettings } = await computeAvailability(env, {
     fromKey: key,
     toKey: key,
     lessonType,
@@ -302,7 +308,7 @@ export async function isSlotBookable(
   });
 
   const match = (slotsByDate?.[key] ?? []).some((slot) => slot.startAt === start.toISOString());
-  if (match) return { ok: true, endAt: new Date(start.getTime() + lessonType.duration_minutes * 60000) };
+  if (match) return { ok: true, endAt: new Date(start.getTime() + lessonType.duration_minutes * 60000), availabilityRevision: checkedSettings.availabilityRevision };
 
   /*
    * Say which of these it was. One message covered all of them, so a student

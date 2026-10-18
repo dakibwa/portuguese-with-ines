@@ -806,6 +806,7 @@ try {
   await expect(forSamForm).toBeHidden();
   assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.location, "porto");
   assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.studentId, "sam");
+  assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.expectedPriceCents, 2500, "Her displayed lesson price is part of confirmation");
   assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.startAt, "2026-09-11T16:00:00.000Z", "The free time keeps its Porto date and time");
   await showLessons(page);
   await page.getByRole("button", { name: /^Sam Known, .*11 September.*View lesson$/ }).click();
@@ -999,7 +1000,7 @@ try {
   await setupForm.getByRole("button", { name: "Add past lesson", exact: true }).click();
   await expect(noraSetup.getByRole("status")).toContainText("27 Aug, 09:30 · recorded · paid");
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/bookings").at(-1).data, {
-    studentId: "nora", lessonType: "single", startAt: "2026-08-27T08:30:00.000Z", location: "porto", notes: "", paid: true,
+    studentId: "nora", lessonType: "single", startAt: "2026-08-27T08:30:00.000Z", location: "porto", notes: "", expectedPriceCents: 2400, paid: true,
   });
   await noraSetup.getByRole("button", { name: "Lessons for Nora Lima", exact: true }).click();
   await picker.getByRole("button", { name: "Next month", exact: true }).click();
@@ -1020,7 +1021,7 @@ try {
   await setupForm.getByRole("button", { name: "Add lesson", exact: true }).click();
   await expect(noraSetup.getByRole("status")).toContainText("30 Sept, 18:30");
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/bookings").at(-1).data, {
-    studentId: "nora", lessonType: "long", startAt: "2026-09-30T17:30:00.000Z", location: "online", notes: "",
+    studentId: "nora", lessonType: "long", startAt: "2026-09-30T17:30:00.000Z", location: "online", notes: "", expectedPriceCents: 3600,
   });
   assert.ok(state.availabilityReads.includes("long"), "90-minute choices request 90-minute availability");
   await expect(noraSetup.getByRole("status")).not.toContainText("emailed");
@@ -1053,7 +1054,7 @@ try {
   const savedStudents = page.waitForResponse(isStudentRead);
   await setupForm.getByRole("button", { name: "Save details", exact: true }).click();
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/students/nora/details").at(-1).data,
-    { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "", mark: "" });
+    { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "" });
   await expect(setupForm).toBeHidden();
   await expect(noraSetup.getByRole("button", { name: "Email for Nora Lima", exact: true })).toBeFocused();
   await (await savedStudents).finished();
@@ -1334,9 +1335,11 @@ try {
 
   for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
+    await page.clock.install({ time: new Date("2026-09-07T10:15:00Z") });
     state.history = [
       { ...lesson("past", "Sam Known", "2025-12-12T09:00:00Z"), student_id: "sam", student_email: "old-address@example.invalid", payment_status: "paid", reschedule_count: 1 },
       { ...lesson("upcoming", "Sam Known", "2026-09-10T16:00:00Z"), student_id: "sam", added_by_teacher: 1, payment_status: "not_required" },
+      { ...lesson("running", "Sam Known", "2026-09-07T10:00:00Z"), student_id: "sam" },
       { ...lesson("cancelled", "Sam Known", "2026-09-11T16:00:00Z"), student_id: "sam", status: "cancelled", cancelled_by: "teacher", cancellation_message: "See you next week.", payment_status: "refunded" },
       { ...lesson("no-show", "Sam Known", "2026-08-14T09:00:00Z", "porto"), student_id: "sam", attendance_status: "no_show", payment_status: "paid" },
       { ...lesson("legacy", "Sam Known", "2026-08-01T09:00:00Z"), student_email: "SAM@example.invalid", payment_status: "paid" },
@@ -1349,9 +1352,9 @@ try {
     await page.keyboard.press("Enter");
     const samRow = studentRow(page, "Sam Known");
     const history = samRow.getByRole("region", { name: "Sam Known’s profile", exact: true });
-    await expect(history.getByRole("heading", { name: "Upcoming · 1" })).toBeVisible();
+    await expect(history.getByRole("heading", { name: "Upcoming · 2" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 4" })).toBeVisible();
-    await expect(history.locator(".teacher-history-lesson")).toHaveCount(5);
+    await expect(history.locator(".teacher-history-lesson")).toHaveCount(6);
     await expect(history).toContainText("12 Dec 2025");
     await expect(history).toContainText("Payment arranged directly");
     await expect(history).toContainText("Refunded");
@@ -1362,10 +1365,22 @@ try {
     await expect(history).not.toContainText("MUST NOT APPEAR");
     await expect(history.locator("section").last().locator("li").first()).toContainText("11 Sept ·");
     assert.ok(state.historyReads > 0, "History requests all dates, separately from the current week");
+    await expect(history).toContainText("Happening now");
+    await page.clock.fastForward(46 * 60_000);
+    await expect(history.getByRole("heading", { name: "Upcoming · 1" })).toBeVisible();
+    await expect(history.getByRole("heading", { name: "Past & cancelled · 5" })).toBeVisible();
+    await expect(history).not.toContainText("Happening now");
     await history.getByRole("button", { name: "Edit details", exact: true }).click();
     await expect(history.getByLabel("Full name", { exact: true })).toHaveValue("Sam Known");
     await expect(history.getByLabel(/^Email/)).toHaveValue("sam@example.invalid");
-    await samRow.getByRole("button", { name: "Close", exact: true }).click();
+    // The student chooses their splat elsewhere while this unrelated editor
+    // still holds its older account snapshot. Saving a phone never sends it.
+    state.students.find(student => student.id === "sam").mark = "bloom";
+    await history.getByLabel(/^Phone/).fill("+351 922 222 222");
+    await history.getByRole("button", { name: "Save details", exact: true }).click();
+    await expect.poll(() => state.writes.at(-1)?.path).toBe("/admin/students/sam/details");
+    assert.equal(Object.hasOwn(state.writes.at(-1).data, "mark"), false);
+    assert.equal(state.students.find(student => student.id === "sam").mark, "bloom");
     await expect(history).toBeHidden();
     await expect(open).toBeFocused();
     // A failed read stays an error, never an empty history, and can be retried.
@@ -1375,7 +1390,7 @@ try {
     await expect(history).not.toContainText("No lessons recorded");
     state.failHistory = false;
     await history.getByRole("button", { name: "Try again", exact: true }).click();
-    await expect(history.locator(".teacher-history-lesson")).toHaveCount(5);
+    await expect(history.locator(".teacher-history-lesson")).toHaveCount(6);
     await samRow.getByRole("button", { name: "Close", exact: true }).click();
     // Closing a slow request and opening another account cannot cross the histories.
     let release;
@@ -1394,7 +1409,7 @@ try {
     await page.evaluate(() => { localStorage.removeItem("ines-student-session"); window.dispatchEvent(new Event("ines:student-session-change")); });
     await expect(other).toHaveCount(0);
     await expect(page.locator(".teacher-workspace")).toHaveCount(0);
-    assert.deepEqual(state.writes, [], "Reading history never updates a booking or sends an email");
+    assert.deepEqual(state.writes.filter(write => write.path !== "/admin/students/sam/details"), [], "Reading history never updates a booking or sends an email");
     assert.deepEqual(state.errors, []);
     await page.close();
   }

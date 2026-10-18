@@ -172,6 +172,32 @@ try {
     assert.equal(result.moved, count); assertThursday(f.lessons());
   });
 
+  await test("a weekly move refuses a plan crossing the free-change boundary or its target's minimum notice", async f => {
+    f.db.prepare("UPDATE bookings SET starts_at='2026-10-03T08:26:00.000Z',ends_at='2026-10-03T09:26:00.000Z' WHERE id='anchor'").run();
+    f.addLesson("later", "2026-10-10T08:26:00.000Z");
+    const before = f.lessons(); const recipe = { ...f.series() };
+    const gate = f.pause("operation", sql => sql.startsWith("SELECT * FROM lesson_types WHERE id"));
+    const move = f.action("reschedule", { startAt: "2026-10-06T09:00:00.000Z" }); await gate.arrival;
+    testNow = "2026-10-02T18:27:00.000Z";
+    gate.resume(); const response = await move;
+    assert.equal(response.status, 409, await response.clone().text());
+    assert.deepEqual(f.lessons(), before); assert.deepEqual({ ...f.series() }, recipe);
+    const retried = await expectOk(await f.action("reschedule", { startAt: "2026-10-06T09:00:00.000Z" }));
+    assert.equal(retried.moved, 1); assert.deepEqual(retried.kept, [before[0].starts_at]);
+    assert.equal(f.lessons()[0].starts_at, before[0].starts_at);
+
+    testNow = "2026-10-02T18:25:00.000Z";
+    f.db.prepare("DELETE FROM bookings WHERE id='later'").run();
+    f.db.prepare("UPDATE bookings SET starts_at='2026-10-06T09:00:00.000Z',ends_at='2026-10-06T10:00:00.000Z' WHERE id='anchor'").run();
+    f.db.prepare("INSERT INTO availability_rules (weekday,start_minute,last_start_minute,active) VALUES (6,570,570,1)").run();
+    const targetGate = f.pause("operation", sql => sql.startsWith("SELECT * FROM lesson_types WHERE id"));
+    const targetMove = f.action("reschedule", { startAt: "2026-10-03T08:30:00.000Z" }); await targetGate.arrival;
+    testNow = "2026-10-02T18:31:00.000Z";
+    targetGate.resume(); const targetResponse = await targetMove;
+    assert.equal(targetResponse.status, 409, await targetResponse.clone().text());
+    assert.equal(f.lessons()[0].starts_at, "2026-10-06T09:00:00.000Z");
+  });
+
   await test("a concurrent individual move away and back changes neither occurrence nor recipe on refusal", async f => {
     // This week's occurrence was individually moved off its usual Thursday.
     f.db.prepare("UPDATE booking_series SET weekday=4,minute_of_day=1020,filled_to='2026-10-08'").run();
@@ -230,6 +256,17 @@ try {
     await f.tick(); assert.equal(f.lessons().length, count);
   });
 
+  await test("stop-and-cancel keeps a lesson entering the free-change window before its own cancellation", async f => {
+    f.db.prepare("UPDATE bookings SET starts_at='2026-10-03T08:26:00.000Z',ends_at='2026-10-03T09:26:00.000Z' WHERE id='anchor'").run();
+    let reads = 0;
+    const gate = f.pause("operation", sql => sql === "SELECT * FROM students WHERE id = ?" && ++reads === 2);
+    const stop = f.action("stop", { cancelRemaining: true }); await gate.arrival;
+    testNow = "2026-10-02T18:27:00.000Z";
+    gate.resume(); const stopped = await expectOk(await stop);
+    assert.equal(stopped.cancelled, 0); assert.equal(stopped.kept, 1);
+    assert.equal(f.lessons()[0].status, "confirmed"); assert.equal(f.series().status, "ended");
+  });
+
   await test("stopping without cancellation retains already-committed lessons and adds no later ones", async f => {
     await f.tick(); const before = f.lessons();
     const stopped = await expectOk(await f.action("stop", {}));
@@ -270,6 +307,18 @@ try {
     assert.ok(f.lessons().length > 1);
     assert.ok(!f.lessons().some(row => row.starts_at === "2026-10-13T09:00:00.000Z"));
     const before = f.lessons(); await f.tick(); assert.deepEqual(f.lessons(), before);
+  });
+
+  await test("new time off invalidates a planned teacher extension without advancing its bookmark", async f => {
+    f.db.prepare("UPDATE booking_series SET added_by_teacher=1").run();
+    const recipe = { ...f.series() };
+    const gate = f.pause("batch", extension);
+    const tick = f.tick(); await gate.arrival;
+    await expectOk(await f.request("/admin/exceptions/day", { date: "2026-10-13", dayOff: true }, "teacher"));
+    gate.resume(); await tick;
+    assert.equal(f.lessons().length, 1); assert.deepEqual({ ...f.series() }, recipe);
+    await f.tick(); assert.ok(f.lessons().length > 1);
+    assert.ok(!f.lessons().some(row => row.starts_at === "2026-10-13T09:00:00.000Z"));
   });
 
   await test("a stale skipped-week job cannot overwrite a moved recipe's bookmark", async f => {

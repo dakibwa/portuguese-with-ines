@@ -86,6 +86,7 @@ function HistoryLessonCard({ booking, named, zone }: { booking: MyBooking; named
  */
 export function MyLessons({
   initialAccount = null,
+  clock,
   onRatesChange,
   onStudentChange,
   onSelectSection,
@@ -95,6 +96,8 @@ export function MyLessons({
 }: {
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
   initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; cardsAccepted?: boolean } | null;
+  /** The calendar's minute clock keeps history current without another account read. */
+  clock: number;
   /** The account's own prices, as last read or changed here, so booking prices with them. */
   onRatesChange?: (rates: Record<number, number>) => void;
   /** Saved fields update the account name and splat on the surrounding calendar too. */
@@ -485,13 +488,13 @@ export function MyLessons({
   const activeSeriesIds = new Set(series.map((entry) => entry.id));
   const upcomingCount = new Set(
     bookings
-      .filter((booking) => !booking.isPast && booking.status === "confirmed")
+      .filter((booking) => Date.parse(booking.endAt) > clock && booking.status === "confirmed")
       .map((booking) =>
         booking.seriesId && activeSeriesIds.has(booking.seriesId) ? `series:${booking.seriesId}` : `booking:${booking.reference}`
       )
   ).size;
   const past = bookings
-    .filter((booking) => booking.status === "cancelled" || (booking.status === "confirmed" && booking.isPast))
+    .filter((booking) => booking.status === "cancelled" || (booking.status === "confirmed" && Date.parse(booking.endAt) <= clock))
     .sort((a, b) => historyTime(b) - historyTime(a) || b.startAt.localeCompare(a.startAt));
 
   if (loading) return section === "upcoming" ? null : <p className="booking-state-note">Loading your lessons…</p>;
@@ -918,7 +921,7 @@ export function MyLessons({
   // On Your lessons the calendar card carries the account; only a failure to
   // read it, or lessons Inês added that no card covers yet, need saying here.
   const unpaidAdded = bookings.filter((booking) =>
-    !booking.isPast && booking.status === "confirmed" && booking.addedByTeacher && booking.paymentStatus === "not_required" && !booking.paidByHand
+    Date.parse(booking.endAt) > clock && booking.status === "confirmed" && booking.addedByTeacher && booking.paymentStatus === "not_required" && !booking.paidByHand
   ).length;
   const cardSaved = cardAdded && student.hasCard === true && student.cardForAllLessons === true;
   const cardNote = cardAdded ? (
