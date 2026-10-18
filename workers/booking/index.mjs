@@ -826,7 +826,17 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
  * the same as requiring that much free time between it and any other lesson.
  * Students' lessons pass the setting; Inês's own bookings pass nothing.
  */
-function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = null, bufferMinutes = 0, seriesSnapshot = null, standingCardStudent = null }) {
+function studentSessionSql() {
+  return `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
+    AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
+}
+
+async function sameStudentSession(request, env, student) {
+  const current = await currentStudent(request, env);
+  return current?.id === student.id && (current.session_version ?? 0) === (student.session_version ?? 0);
+}
+
+function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = null, bufferMinutes = 0, seriesSnapshot = null, standingCardStudent = null, sessionIdentity = null }) {
   const placeholders = columns.map(() => "?").join(", ");
   const seriesId = values[columns.indexOf("series_id")] ?? null;
   // A pending setup reserves its slot for everyone, including its owner.
@@ -844,7 +854,8 @@ function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = nu
        SELECT 1 FROM bookings prior WHERE prior.student_id = ? AND prior.status != 'cancelled'
      )) AND (? IS NULL OR EXISTS (SELECT 1 FROM booking_series WHERE id = ? AND status = 'active'))
      ${seriesSnapshot ? `AND EXISTS (SELECT 1 FROM booking_series WHERE id = ? AND ${SERIES_FILL_GUARD})` : ""}
-     ${standingCardStudent ? `AND ${standingCardSnapshotSql()}` : ""}`
+     ${standingCardStudent ? `AND ${standingCardSnapshotSql()}` : ""}
+     ${sessionIdentity ? `AND ${studentSessionSql()}` : ""}`
   )
     .bind(
       ...values,
@@ -857,7 +868,8 @@ function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = nu
       seriesId,
       seriesId,
       ...(seriesSnapshot ? [seriesSnapshot.id, ...seriesFillValues(seriesSnapshot)] : []),
-      ...(standingCardStudent ? standingCardSnapshotValues(standingCardStudent) : [])
+      ...(standingCardStudent ? standingCardSnapshotValues(standingCardStudent) : []),
+      ...(sessionIdentity ?? [])
     );
 }
 
@@ -2459,8 +2471,11 @@ async function handleCreate(request, env, ctx) {
   // lessons stay together and /my-lessons can show all of them.
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in to book a lesson.", 401, request, env);
+  const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const sessionIdentity = [student.id, student.session_version ?? 0, await sessionHash(bearer)];
 
   const body = await readJson(request);
+  if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
   const now = new Date();
 
   const notes = cleanText(body.notes, 1000);
@@ -2490,7 +2505,9 @@ async function handleCreate(request, env, ctx) {
   // Backing out of the card form, reloading or closing the tab leaves this
   // student's unfinished setup holding its lessons; the new request replaces it
   // instead of being refused by the student's own hold.
-  await releaseOwnCardSetups(env, ctx, student.id, now);
+  if (!await releaseOwnCardSetups(env, ctx, student.id, now, sessionIdentity)) {
+    return fail("Please sign in again.", 401, request, env);
+  }
 
   // The trial is a first lesson, priced to make starting easy — not a discount
   // for people already having lessons. Anyone with a booking that wasn't
@@ -2577,7 +2594,8 @@ async function handleCreate(request, env, ctx) {
   if (selection.starts.length > 1) {
     return handleCreateSelection(request, env, ctx, {
       starts: selection.starts, student, lessonType, now, notes, location, timezone,
-      wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup, recentLessons: recent?.lessons ?? 0
+      wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup, recentLessons: recent?.lessons ?? 0,
+      sessionIdentity
     });
   }
 
@@ -2623,16 +2641,19 @@ async function handleCreate(request, env, ctx) {
     startAt: startsAt,
     endAt: endsAt,
     studentId: student.id,
-    bufferMinutes: settings.lessonBufferMinutes
+    bufferMinutes: settings.lessonBufferMinutes,
+    sessionIdentity
   });
 
   if (!claimed) {
+    if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
     return fail("That time has just been taken. Please choose another.", 409, request, env);
   }
 
   // Keep the account's timezone in step with the browser it was booked from.
   if (timezone !== student.timezone) {
-    await env.DB.prepare("UPDATE students SET timezone = ? WHERE id = ?").bind(timezone, student.id).run();
+    await env.DB.prepare(`UPDATE students SET timezone = ? WHERE id = ? AND ${studentSessionSql()}`)
+      .bind(timezone, student.id, ...sessionIdentity).run();
   }
 
   const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
@@ -2644,6 +2665,10 @@ async function handleCreate(request, env, ctx) {
   // reusable payment method exists. A repeat is handled as one hold below.
   if (needsCardSetup && !wantsRepeat) {
     try {
+      if (!await sameStudentSession(request, env, student)) {
+        await env.DB.prepare("DELETE FROM bookings WHERE id = ? AND status = 'pending_payment' AND stripe_session_id IS NULL").bind(id).run();
+        return fail("Please sign in again.", 401, request, env);
+      }
       const session = await createCardSetupSession(env, {
         booking: row,
         customer: student.stripe_customer_id ?? null,
@@ -2653,6 +2678,7 @@ async function handleCreate(request, env, ctx) {
       });
 
       await env.DB.prepare("UPDATE bookings SET stripe_session_id = ? WHERE id = ?").bind(session.id, id).run();
+      if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
 
       // Hosted checkout answers with a URL to send the student to; embedded
       // answers with a client secret the page mounts Stripe's form from.
@@ -2679,11 +2705,11 @@ async function handleCreate(request, env, ctx) {
     const slot = slotOf(startsAt);
     const seriesId = crypto.randomUUID();
 
-    await env.DB.prepare(
+    const recipe = await env.DB.prepare(
       `INSERT INTO booking_series (id, student_id, lesson_type_id, location, notes, weekday, minute_of_day,
          occurrences, status, filled_to, automatic_payment, payment_consent_at, payment_consent_version,
          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ? WHERE ${studentSessionSql()}`
     )
       .bind(
         seriesId,
@@ -2699,9 +2725,16 @@ async function handleCreate(request, env, ctx) {
         postpay ? timestamp : null,
         postpay ? PAYMENT_CONSENT_VERSION : null,
         timestamp,
-        timestamp
+        timestamp,
+        ...sessionIdentity
       )
       .run();
+    if (!(recipe?.meta?.changes > 0)) {
+      if (needsCardSetup) {
+        await env.DB.prepare("DELETE FROM bookings WHERE id = ? AND status = 'pending_payment' AND stripe_session_id IS NULL").bind(id).run();
+      }
+      return fail("Please sign in again.", 401, request, env);
+    }
 
     await env.DB.prepare("UPDATE bookings SET series_id = ? WHERE id = ?").bind(seriesId, id).run();
     const series = await env.DB.prepare("SELECT * FROM booking_series WHERE id = ?").bind(seriesId).first();
@@ -2720,7 +2753,8 @@ async function handleCreate(request, env, ctx) {
             // A new card setup holds the run until Stripe confirms it. A card
             // already on file schedules every occurrence immediately.
             paymentState: needsCardSetup ? "hold" : postpay ? "scheduled" : "none",
-            holdExpiresAt: needsCardSetup ? holdExpiresAt : null
+            holdExpiresAt: needsCardSetup ? holdExpiresAt : null,
+            sessionIdentity
           })
         : { rows: [], skipped: [] };
 
@@ -2737,6 +2771,13 @@ async function handleCreate(request, env, ctx) {
 
     if (needsCardSetup) {
       try {
+        if (!await sameStudentSession(request, env, student)) {
+          await env.DB.batch([
+            env.DB.prepare("DELETE FROM bookings WHERE (series_id = ? OR id = ?) AND status = 'pending_payment' AND stripe_session_id IS NULL").bind(seriesId, id),
+            env.DB.prepare("DELETE FROM booking_series WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bookings WHERE series_id = ?)").bind(seriesId, seriesId)
+          ]);
+          return fail("Please sign in again.", 401, request, env);
+        }
         const session = await createCardSetupSession(env, {
           booking: first,
           customer: student.stripe_customer_id ?? null,
@@ -2750,6 +2791,7 @@ async function handleCreate(request, env, ctx) {
         await env.DB.prepare("UPDATE bookings SET stripe_session_id = ? WHERE series_id = ? OR id = ?")
           .bind(session.id, seriesId, id)
           .run();
+        if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
 
         // Emails wait for the webhook; the run is held until its card is saved.
         return json(
@@ -2778,6 +2820,7 @@ async function handleCreate(request, env, ctx) {
       const occurrenceToken = await createManageToken(occurrence.id, env.BOOKING_TOKEN_SECRET);
       manageUrls[occurrence.id] = studentManageUrl(env, occurrenceToken);
     }
+    if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
 
     ctx.waitUntil(
       notifySeries(env, { rows: allRows, lessonType, settings, series, manageUrls, skipped: filled.skipped })
@@ -2796,6 +2839,7 @@ async function handleCreate(request, env, ctx) {
     );
   }
 
+  if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
   ctx.waitUntil(notify(env, { event: "booked", row, lessonType, settings, manageUrl }));
 
   return json(
@@ -2809,7 +2853,7 @@ async function handleCreate(request, env, ctx) {
 /** Reserve a selection through one card setup and one combined confirmation. */
 async function handleCreateSelection(request, env, ctx, {
   starts, student, lessonType, now, notes, location, timezone,
-  wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup, recentLessons
+  wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup, recentLessons, sessionIdentity
 }) {
   const timestamp = now.toISOString();
   const holdExpiresAt = needsCardSetup ? new Date(now.getTime() + 35 * 60000).toISOString() : null;
@@ -2866,7 +2910,8 @@ async function handleCreateSelection(request, env, ctx, {
   if (recentLessons + plannedRows.length > 26) {
     return fail("That's several bookings in a short time. Please wait an hour before adding more.", 429, request, env);
   }
-  if (!await claimSelection(env, { rows: plannedRows, series, now, bufferMinutes: settings.lessonBufferMinutes })) {
+  if (!await claimSelection(env, { rows: plannedRows, series, now, bufferMinutes: settings.lessonBufferMinutes, sessionIdentity })) {
+    if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
     return fail("A selected time has just been taken. Nothing has been booked; please review your dates.", 409, request, env);
   }
   const ids = JSON.stringify(plannedRows.map((row) => row.id));
@@ -2880,6 +2925,13 @@ async function handleCreateSelection(request, env, ctx, {
   const payload = { booking: publicBooking(first, lessonType, settings), selection, manageUrl: studentManageUrl(env, token), manageToken: token };
   if (needsCardSetup) {
     try {
+      if (!await sameStudentSession(request, env, student)) {
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM bookings WHERE id IN (SELECT value FROM json_each(?)) AND status = 'pending_payment' AND stripe_session_id IS NULL").bind(ids),
+          ...series.map((entry) => env.DB.prepare("DELETE FROM booking_series WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bookings WHERE series_id = ?)").bind(entry.id, entry.id))
+        ]);
+        return fail("Please sign in again.", 401, request, env);
+      }
       const session = await createCardSetupSession(env, {
         booking: first, customer: student.stripe_customer_id ?? null, customerEmail: student.email,
         selectionCount: rows.length,
@@ -2888,6 +2940,7 @@ async function handleCreateSelection(request, env, ctx, {
       });
       await env.DB.prepare("UPDATE bookings SET stripe_session_id = ? WHERE id IN (SELECT value FROM json_each(?)) AND status = 'pending_payment'")
         .bind(session.id, ids).run();
+      if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
       return json({ ...payload, ...(session.url ? { checkoutUrl: session.url } : { checkoutClientSecret: session.client_secret }) }, 201, request, env);
     } catch (error) {
       await env.DB.batch([
@@ -2898,6 +2951,7 @@ async function handleCreateSelection(request, env, ctx, {
       return fail("We couldn't save the card just now. Nothing has been booked; please try again in a moment.", 502, request, env);
     }
   }
+  if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
   ctx.waitUntil(notifySelection(env, { rows, lessonType, settings, series, skipped }));
   return json(payload, 201, request, env);
 }
@@ -2936,12 +2990,13 @@ function seriesFillValues(series) {
     series.automatic_payment, series.prepaid, series.payment_consent_at ?? null, series.payment_consent_version ?? null];
 }
 
-function prepareSeriesBookmark(env, series, key, now) {
-  return env.DB.prepare(`UPDATE booking_series SET filled_to = ?, updated_at = ? WHERE id = ? AND ${SERIES_FILL_GUARD}`)
-    .bind(key, now.toISOString(), series.id, ...seriesFillValues(series));
+function prepareSeriesBookmark(env, series, key, now, sessionIdentity = null) {
+  return env.DB.prepare(`UPDATE booking_series SET filled_to = ?, updated_at = ? WHERE id = ? AND ${SERIES_FILL_GUARD}
+    ${sessionIdentity ? `AND ${studentSessionSql()}` : ""}`)
+    .bind(key, now.toISOString(), series.id, ...seriesFillValues(series), ...(sessionIdentity ?? []));
 }
 
-async function insertOccurrence(env, { series, key, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null, bufferMinutes = 0, teacher = false }) {
+async function insertOccurrence(env, { series, key, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null, bufferMinutes = 0, teacher = false, sessionIdentity = null }) {
   const id = crypto.randomUUID();
   const timestamp = now.toISOString();
   const startsAt = new Date(startAt).toISOString();
@@ -2986,12 +3041,13 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
     endAt: endsAt,
     studentId: student.id,
     bufferMinutes,
-    seriesSnapshot: series
+    seriesSnapshot: series,
+    sessionIdentity
   });
 
   // Commit the occurrence and bookmark together. Stale jobs may neither add
   // an old appointment nor overwrite the bookmark of a moved/extended recipe.
-  const [claimed, advanced] = await env.DB.batch([claim, prepareSeriesBookmark(env, series, key, now)]);
+  const [claimed, advanced] = await env.DB.batch([claim, prepareSeriesBookmark(env, series, key, now, sessionIdentity)]);
   if (!(advanced?.meta?.changes > 0)) return { current: false, row: null };
   // A competing lesson only skips this week; the current recipe still advances.
   if (!(claimed?.meta?.changes > 0)) return { current: true, row: null };
@@ -3006,7 +3062,7 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
  * a skipped week is never reconsidered on the next top-up and the run cannot
  * stall on it forever.
  */
-async function fillSeries(env, { series, student, lessonType, fromKey, count, now, paymentState = "none", holdExpiresAt = null }) {
+async function fillSeries(env, { series, student, lessonType, fromKey, count, now, paymentState = "none", holdExpiresAt = null, sessionIdentity = null }) {
   lessonType = await studentLessonType(env, student.id, lessonType);
   const teacher = Boolean(series.added_by_teacher);
   const { lessonBufferMinutes } = await loadSettings(env);
@@ -3026,7 +3082,7 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
   let currentSeries = series;
   for (const occurrence of pending) {
     if (!occurrence.available) {
-      const advanced = await prepareSeriesBookmark(env, currentSeries, occurrence.key, now).run();
+      const advanced = await prepareSeriesBookmark(env, currentSeries, occurrence.key, now, sessionIdentity).run();
       if (!(advanced?.meta?.changes > 0)) break;
       consideredSkipped.push(occurrence);
       currentSeries = { ...currentSeries, filled_to: occurrence.key };
@@ -3050,7 +3106,8 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
       // Her own weekly slot keeps the spacing she chose, as a single lesson
       // she adds does.
       bufferMinutes: teacher ? 0 : lessonBufferMinutes,
-      teacher
+      teacher,
+      sessionIdentity
     });
 
     if (!current) break;
@@ -3230,6 +3287,8 @@ async function handleStopSeries(request, env, ctx, seriesId) {
 async function handleRescheduleSeries(request, env, ctx, seriesId) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
+  const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const sessionIdentity = [student.id, student.session_version ?? 0, await sessionHash(bearer)];
 
   const series = await env.DB.prepare(
     "SELECT * FROM booking_series WHERE id = ? AND student_id = ? AND status = 'active'"
@@ -3263,6 +3322,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
   }
 
   const body = await readJson(request);
+  if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
   const requestedStart = new Date(body.startAt);
   if (Number.isNaN(requestedStart.getTime())) return fail("That time could not be understood.", 400, request, env);
 
@@ -3341,6 +3401,9 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
       oldLessonType: row.lesson_type_id,
       oldLocation: row.location,
       oldSequence: row.sequence,
+      oldPaymentStatus: row.payment_status,
+      oldAmount: row.amount_cents ?? null,
+      oldConsentVersion: row.payment_consent_version ?? null,
       startAt: occurrence.startAt.toISOString(),
       endAt: check.endAt.toISOString(),
       amountCents,
@@ -3363,6 +3426,8 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
        SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.oldStart') AS old_start,
          json_extract(value, '$.oldLessonType') AS old_lesson_type, json_extract(value, '$.oldLocation') AS old_location,
          json_extract(value, '$.oldSequence') AS old_sequence,
+         json_extract(value, '$.oldPaymentStatus') AS old_payment_status,
+         json_extract(value, '$.oldAmount') AS old_amount, json_extract(value, '$.oldConsentVersion') AS old_consent_version,
          json_extract(value, '$.startAt') AS new_start, json_extract(value, '$.endAt') AS new_end,
          json_extract(value, '$.amountCents') AS new_amount,
          json_extract(value, '$.guardStart') AS guard_start, json_extract(value, '$.guardEnd') AS guard_end
@@ -3382,6 +3447,8 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
          WHERE p.id = bookings.id AND p.old_start = bookings.starts_at
            AND p.old_lesson_type = bookings.lesson_type_id AND p.old_location = bookings.location
            AND p.old_sequence = bookings.sequence
+           AND p.old_payment_status = bookings.payment_status AND p.old_amount IS bookings.amount_cents
+           AND p.old_consent_version IS bookings.payment_consent_version
        )
        AND (SELECT COUNT(*) FROM bookings current
             WHERE current.series_id = ? AND current.status = 'confirmed' AND current.starts_at > ?) = ?
@@ -3389,8 +3456,11 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
             JOIN proposed p ON p.id = current.id AND p.old_start = current.starts_at
               AND p.old_lesson_type = current.lesson_type_id AND p.old_location = current.location
               AND p.old_sequence = current.sequence
+              AND p.old_payment_status = current.payment_status AND p.old_amount IS current.amount_cents
+              AND p.old_consent_version IS current.payment_consent_version
             WHERE current.series_id = ? AND current.status = 'confirmed' AND current.starts_at > ?) = ?
        AND (SELECT status FROM booking_series WHERE id = ? AND student_id = ?) = 'active'
+       AND ${studentSessionSql()}
        AND NOT EXISTS (SELECT 1 FROM bookings processing WHERE processing.series_id = bookings.series_id
          AND processing.status = 'confirmed' AND processing.payment_status = 'processing')
        AND NOT EXISTS (
@@ -3416,6 +3486,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     planned.length,
     seriesId,
     student.id,
+    ...sessionIdentity,
     nowIso
   );
 
@@ -3428,6 +3499,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
      UPDATE booking_series
      SET lesson_type_id = ?, location = ?, weekday = ?, minute_of_day = ?, filled_to = ?, updated_at = ?
      WHERE id = ? AND student_id = ? AND status = 'active'
+       AND ${studentSessionSql()}
        AND changes() = ?
        AND (SELECT COUNT(*) FROM bookings b JOIN expected e
             ON e.id = b.id AND e.new_start = b.starts_at AND e.new_end = b.ends_at
@@ -3442,6 +3514,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     nowIso,
     seriesId,
     student.id,
+    ...sessionIdentity,
     planned.length,
     seriesId,
     planned.length
@@ -3452,6 +3525,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     (bookingResult?.meta?.changes ?? 0) !== planned.length ||
     (seriesResult?.meta?.changes ?? 0) !== 1
   ) {
+    if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
     return fail("That sequence or one of its times has just changed. Please reload and try again.", 409, request, env);
   }
 
@@ -3481,6 +3555,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     const token = await createManageToken(row.id, env.BOOKING_TOKEN_SECRET);
     manageUrls[row.id] = studentManageUrl(env, token);
   }
+  if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
 
   ctx.waitUntil(
     notifySeries(env, {
@@ -4186,20 +4261,34 @@ async function releaseExpiredHolds(env) {
  * finish keeps its hold for the webhook to confirm. A lapsed hold can never be
  * confirmed, so it simply goes.
  */
-async function releaseOwnCardSetups(env, ctx, studentId, now) {
+async function releaseOwnCardSetups(env, ctx, studentId, now, sessionIdentity) {
+  const identityCurrent = async () => Boolean(await env.DB.prepare(`SELECT 1 AS current WHERE ${studentSessionSql()}`)
+    .bind(...sessionIdentity).first());
   const { results } = await env.DB.prepare(
     `SELECT id, series_id, stripe_session_id, hold_expires_at FROM bookings
-     WHERE student_id = ? AND status = 'pending_payment' AND payment_status = 'pending'`
+     WHERE student_id = ? AND status = 'pending_payment' AND payment_status = 'pending'
+       AND ${studentSessionSql()}`
   )
-    .bind(studentId)
+    .bind(studentId, ...sessionIdentity)
     .all();
   const holds = results ?? [];
-  if (!holds.length) return;
+  if (!holds.length) return identityCurrent();
 
   const nowIso = now.toISOString();
   const released = [];
   for (const sessionId of new Set(holds.map((hold) => hold.stripe_session_id ?? ""))) {
     const group = holds.filter((hold) => (hold.stripe_session_id ?? "") === sessionId);
+    // Authorize this exact checkout just before provider work. A recovered
+    // owner may already have replaced it, so an account ID alone is not enough.
+    const eligible = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM bookings b WHERE b.student_id = ? AND b.status = 'pending_payment' AND b.payment_status = 'pending'
+         AND EXISTS (SELECT 1 FROM json_each(?) snapshot WHERE json_extract(snapshot.value, '$.id') = b.id
+           AND json_extract(snapshot.value, '$.stripe_session_id') IS b.stripe_session_id
+           AND json_extract(snapshot.value, '$.hold_expires_at') IS b.hold_expires_at
+           AND json_extract(snapshot.value, '$.series_id') IS b.series_id)
+         AND ${studentSessionSql()}`
+    ).bind(studentId, JSON.stringify(group), ...sessionIdentity).first();
+    if (eligible?.n !== group.length) continue;
     if (group.every((hold) => !hold.hold_expires_at || hold.hold_expires_at <= nowIso)) {
       released.push(...group);
       // Its Stripe form may still be open; completing it would confirm nothing.
@@ -4208,18 +4297,24 @@ async function releaseOwnCardSetups(env, ctx, studentId, now) {
       released.push(...group);
     }
   }
-  if (!released.length) return;
+  if (!released.length) return identityCurrent();
 
+  // Expiry accepted before recovery can finish. Only its original snapshots
+  // may be removed, never a newer checkout attached to the recovered account.
   await env.DB.batch([
     env.DB.prepare(
-      `DELETE FROM bookings WHERE id IN (SELECT value FROM json_each(?)) AND student_id = ?
-         AND status = 'pending_payment' AND payment_status = 'pending'`
-    ).bind(JSON.stringify(released.map((hold) => hold.id)), studentId),
+      `DELETE FROM bookings WHERE student_id = ? AND status = 'pending_payment' AND payment_status = 'pending'
+         AND EXISTS (SELECT 1 FROM json_each(?) snapshot WHERE json_extract(snapshot.value, '$.id') = bookings.id
+           AND json_extract(snapshot.value, '$.stripe_session_id') IS bookings.stripe_session_id
+           AND json_extract(snapshot.value, '$.hold_expires_at') IS bookings.hold_expires_at
+           AND json_extract(snapshot.value, '$.series_id') IS bookings.series_id)`
+    ).bind(studentId, JSON.stringify(released)),
     env.DB.prepare(
       `DELETE FROM booking_series WHERE id IN (SELECT value FROM json_each(?)) AND student_id = ?
          AND NOT EXISTS (SELECT 1 FROM bookings WHERE series_id = booking_series.id)`
     ).bind(JSON.stringify([...new Set(released.map((hold) => hold.series_id).filter(Boolean))]), studentId)
   ]);
+  return identityCurrent();
 }
 
 /** True only once Stripe reports the session expired, so it can never complete. */
@@ -4519,6 +4614,8 @@ async function handleRecurringRates(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
   if (request.method === "POST") {
+    const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const sessionIdentity = [student.id, student.session_version ?? 0, await sessionHash(bearer)];
     if (!await takeRateLimit(env, `rate:${student.id}`, 8)) {
       return fail("Too many attempts. Please wait 15 minutes before trying again.", 429, request, env);
     }
@@ -4542,9 +4639,11 @@ async function handleRecurringRates(request, env) {
     // Each length keeps its own, so a 60 and a 90 minute code sit side by side.
     await env.DB.prepare(
       `INSERT INTO student_recurring_rates (student_id, duration_minutes, amount_cents, redeemed_at)
-       VALUES (?, ?, ?, ?) ON CONFLICT(student_id, duration_minutes) DO NOTHING`
-    ).bind(student.id, rate.duration, rate.cents, new Date().toISOString()).run();
+       SELECT ?, ?, ?, ? WHERE ${studentSessionSql()}
+       ON CONFLICT(student_id, duration_minutes) DO NOTHING`
+    ).bind(student.id, rate.duration, rate.cents, new Date().toISOString(), ...sessionIdentity).run();
     const rates = await studentRates(env, student.id);
+    if (!await sameStudentSession(request, env, student)) return fail("Please sign in.", 401, request, env);
     if (rates[rate.duration] !== rate.cents) {
       return fail(
         `You already have an agreed rate for ${rate.duration}-minute lessons. Ask Inês if it needs to change.`,
@@ -4555,10 +4654,13 @@ async function handleRecurringRates(request, env) {
     }
     // Their lessons already booked at that length are on it at once, as any
     // price of theirs is (13 October 2026, Dan).
-    await repriceStudent(env, student.id);
+    await repriceStudent(env, student.id, new Date().toISOString(), sessionIdentity);
+    if (!await sameStudentSession(request, env, student)) return fail("Please sign in.", 401, request, env);
     return json({ rates, saved: { durationMinutes: rate.duration, cents: rate.cents } }, 200, request, env);
   }
-  return json({ rates: await studentRates(env, student.id) }, 200, request, env);
+  const rates = await studentRates(env, student.id);
+  if (!await sameStudentSession(request, env, student)) return fail("Please sign in.", 401, request, env);
+  return json({ rates }, 200, request, env);
 }
 
 async function handleStudentExpressions(request, env) {
@@ -4912,9 +5014,9 @@ async function lessonsStayingFree(env, studentId) {
  * 90-minute price follows a new 60-minute one when it is derived from it.
  * Returns how many lessons changed.
  */
-async function repriceStudent(env, studentId, now = new Date().toISOString()) {
+async function repriceStudent(env, studentId, now = new Date().toISOString(), sessionIdentity = null) {
   const rates = await studentRates(env, studentId);
-  const results = await env.DB.batch([60, 90].map((minutes) => repriceLessons(env, studentId, minutes, rates[minutes] ?? null, now)));
+  const results = await env.DB.batch([60, 90].map((minutes) => repriceLessons(env, studentId, minutes, rates[minutes] ?? null, now, sessionIdentity)));
   return results.reduce((total, result) => total + (result?.meta?.changes ?? 0), 0);
 }
 
@@ -4923,8 +5025,15 @@ async function repriceStudent(env, studentId, now = new Date().toISOString()) {
  * standard one). At €0 they become free, and no agreement to pay is left on
  * them. A free lesson is never in this set, so a raised price passes it by.
  */
-function repriceLessons(env, studentId, minutes, cents, now) {
+function repriceLessons(env, studentId, minutes, cents, now, sessionIdentity = null) {
   const standard = "(SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)";
+  // A newer price save may have finished since studentRates was read. Keep
+  // its lessons intact, including a derived 90-minute price and €0; NULL
+  // means the student still has no personal price and uses the public one.
+  const own = `(SELECT amount_cents FROM student_recurring_rates WHERE student_id = bookings.student_id AND duration_minutes = ${minutes})`;
+  const personal = minutes === 90
+    ? `COALESCE(${own}, (SELECT ROUND(amount_cents * 1.5) FROM student_recurring_rates WHERE student_id = bookings.student_id AND duration_minutes = 60))`
+    : own;
   return env.DB.prepare(
     `UPDATE bookings SET amount_cents = COALESCE(?, ${standard}), ${FREE_ON_ZERO("?")}, updated_at = ?
      WHERE student_id = ? AND status = 'confirmed' AND starts_at > ? AND charge_started_at IS NULL
@@ -4933,8 +5042,10 @@ function repriceLessons(env, studentId, minutes, cents, now) {
        AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
        AND COALESCE(amount_cents, -1) != COALESCE(?, ${standard})
        AND (payment_consent_version IS NULL OR payment_consent_version = ?
-         OR COALESCE(?, ${standard}) < COALESCE(amount_cents, ${standard}))`
-  ).bind(cents, cents, cents, cents, now, studentId, now, minutes, cents, STUDENT_CARD_CONSENT_VERSION, cents);
+         OR COALESCE(?, ${standard}) < COALESCE(amount_cents, ${standard}))
+       AND ${personal} IS ?
+       ${sessionIdentity ? `AND ${studentSessionSql()}` : ""}`
+  ).bind(cents, cents, cents, cents, now, studentId, now, minutes, cents, STUDENT_CARD_CONSENT_VERSION, cents, cents, ...(sessionIdentity ?? []));
 }
 
 async function handleUpdateMe(request, env) {

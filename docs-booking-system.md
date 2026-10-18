@@ -710,6 +710,14 @@ reply rechecks access before returning private sheets or feedback. Stopping a
 weekly series and claiming each cancellation or refund also bind the original
 session. Recovery blocks later claims while a refund already claimed, or
 marking already started for a saved submission, can finish safely.
+Booking creation, weekly filling and weekly moves requested by a student bind
+the original account version and session revocation inside their writes;
+private booking and price replies recheck the session. A weekly move checks
+each lesson's payment snapshot as well as its schedule, so a concurrent direct
+payment cannot turn into a receipt for a different amount.
+Replacing unfinished card setups targets the original checkout snapshots,
+preserving a newer checkout created after recovery. A refused weekly recipe
+removes its unopened card-setup hold while retaining confirmed lessons.
 
 - **Opening quickly.** `/book/` asks for `/me` from its HTML, before its code
   loads. `/me` reads the session's student and its revocation together, then
@@ -1844,6 +1852,9 @@ the student's price in `bookings.amount_cents`, including when payment is off.
 Existing rows keep their price when moved at the same duration; a new duration
 uses the student's price for it or the public price. Trials and €5 fees never
 use these prices. Booked rows follow a new price as described above.
+Each repricing write also verifies the current saved or derived personal
+price. An older request cannot overwrite a newer teacher price, including a
+derived 90-minute rate, a free price or a return to the public price.
 
 **Where a student adds a code.** Only under *Edit details*, behind a small `Have a
 code from Inês?` disclosure. Booking and lesson-length changes use the
