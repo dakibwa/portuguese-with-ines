@@ -1438,8 +1438,9 @@ it is a late change like any other (see *Late changes*).
 the seed and missing-setting fallback are both 14. Dan requested this change
 from the previous live setting of 24 hours on 13 September 2026. Since
 21 September 2026 the same setting is also the free-change window (see
-*Late changes*), so changing it changes the agreed fee terms as well as the
-booking notice.
+*Late changes*), so it affects both booking notice and fee terms. Admin changes
+may relax it to a whole number from 0 through 14 hours. A stricter window
+requires updated published terms and student consent before implementation.
 
 `availability_rules.last_start_minute` is the latest a lesson may **begin**, not
 when she finishes. That distinction matters: treating it as a finishing time
@@ -1751,6 +1752,13 @@ the lesson being moved or cancelled; exactly 14 hours is still free. Elapsed
 hours need no time zone, so the rule reads the same for every student. The
 columns, API fields and Stripe purpose keys keep their original `same_day_*`
 names; they now mean "inside the window".
+
+`same_day_change_fee_cents` may be 0 (waived) or a whole number from 50 through
+500 cents. Positive fees meet Stripe's €0.50 EUR minimum, and configuration
+cannot exceed the published €5 agreement. Raising that ceiling requires new
+published terms and student consent. Invalid settings leave all saved values
+and the availability revision unchanged. Existing captured payment requests
+keep their original parameters.
 
 - **Terms version**: bookings made under this rule record
   `payment_consent_version = 2026-09-21-fourteen-hours-v1`. Bookings (and their
