@@ -157,11 +157,11 @@ payment state (charges, refunds, webhooks, clashes, clock changes, NIF, rates,
 permissions), with Stripe and email isolated. `test:teacher-calendar` proves
 Porto times across the clock changes and how hours and time off are stored.
 
-The release then runs twelve customer journeys against the built export it
+The release then runs thirteen customer journeys against the built export it
 publishes, at desktop and phone widths, in about three minutes: `qa-flow`
 (public pages and a real booking, move and cancel), `qa-workspace-navigation`,
 `qa-booking-selection`, `qa-payment-recovery`, `qa-teacher-calendar` (Inês's
-schedule), `qa-transition-kit` (sign-in links and saving a card),
+schedule), `qa-homework`, `qa-transition-kit` (sign-in links and saving a card),
 `qa-meet-links`, `qa-student-nif`, `qa-profile-rates`, `qa-request-recovery`
 (paying lands on Stripe; a checkout return stays pending until confirmed),
 `qa-auth-recovery` (password reset) and `qa-selection-calendar-recovery` (the

@@ -1426,19 +1426,31 @@ async function handleRemoveStudentCard(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
   const now = new Date().toISOString();
-  await env.DB.batch([
-    env.DB.prepare("UPDATE students SET card_consent_at = NULL, card_setup_version = card_setup_version + 1 WHERE id = ?").bind(student.id),
+  const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const marker = `card-removal:${crypto.randomUUID()}`;
+  // The marker records this UPDATE's result inside the same transaction;
+  // matching a version alone cannot prove that the session was not revoked.
+  const [removed] = await env.DB.batch([
+    env.DB.prepare(`UPDATE students SET card_consent_at = NULL, card_setup_version = card_setup_version + 1
+      WHERE id = ? AND session_version = ? AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`)
+      .bind(student.id, student.session_version ?? 0, await sessionHash(bearer)),
+    env.DB.prepare("INSERT INTO request_limits (key, window, attempts) SELECT ?, ?, 1 WHERE changes() > 0")
+      .bind(marker, Math.floor(Date.now() / 900000)),
     env.DB.prepare(
       `UPDATE bookings SET payment_status = 'not_required', payment_consent_at = NULL, payment_consent_version = NULL, updated_at = ?
        WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled'
-         AND payment_consent_version = ?`
-    ).bind(now, student.id, STUDENT_CARD_CONSENT_VERSION),
+         AND payment_consent_version = ? AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`
+    ).bind(now, student.id, STUDENT_CARD_CONSENT_VERSION, marker),
     env.DB.prepare(
       `UPDATE booking_series SET automatic_payment = 0, payment_consent_at = NULL, payment_consent_version = NULL, updated_at = ?
-       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active'`
-    ).bind(now, student.id)
+       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active'
+         AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`
+    ).bind(now, student.id, marker),
+    env.DB.prepare("DELETE FROM request_limits WHERE key = ?").bind(marker)
   ]);
-  const updated = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(student.id).first();
+  if (!(removed?.meta?.changes > 0)) return fail("Please sign in again.", 401, request, env);
+  const updated = await currentStudent(request, env);
+  if (!updated || updated.id !== student.id || updated.session_version !== student.session_version) return fail("Please sign in again.", 401, request, env);
   return json({ student: publicStudent(updated) }, 200, request, env);
 }
 
@@ -1725,8 +1737,12 @@ const worker = {
       if (path === "/me/homework" || /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path)) {
         const student = await currentStudent(request, env);
         if (!student) return fail("Please sign in.", 401, request, env);
+        const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+        const tokenHash = await sessionHash(bearer);
         const reply = await homeworkReply(request, env, async () => studentHomework(env, student, request.method, path.split("/")[3] ?? null,
-          request.method === "POST" ? await readJson(request, 262144) : {}, path.split("/")[4] ?? ""));
+          request.method === "POST" ? await readJson(request, 262144) : {}, path.split("/")[4] ?? "", tokenHash));
+        const current = await currentStudent(request, env);
+        if (!current || current.id !== student.id || current.session_version !== student.session_version) return fail("Please sign in again.", 401, request, env);
         // Marking has finished by the time a submission replies; tell Inês.
         if (reply.ok && request.method === "POST" && path.endsWith("/submit")) ctx.waitUntil(homeworkNotices(env, path.split("/")[3]));
         return reply;
@@ -3101,6 +3117,9 @@ async function handleSeriesPreview(request, env) {
  * to come to the ones in their calendar, and silently cancelling those would be
  * the worse mistake of the two.
  */
+const SERIES_STOP_SESSION_SQL = `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
+  AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
+
 async function handleStopSeries(request, env, ctx, seriesId) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
@@ -3111,6 +3130,8 @@ async function handleStopSeries(request, env, ctx, seriesId) {
   if (!series) return fail("That repeating booking could not be found.", 404, request, env);
 
   const body = await readJson(request);
+  const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const identity = [student.id, student.session_version ?? 0, await sessionHash(bearer)];
   const cancelRemaining = body.cancelRemaining === true;
   const now = new Date();
   let cancelled = 0;
@@ -3121,9 +3142,11 @@ async function handleStopSeries(request, env, ctx, seriesId) {
 
   // End extension before reading the cancellation set. An occurrence committed
   // first is included below; a stale nightly fill cannot add one afterwards.
-  await env.DB.prepare("UPDATE booking_series SET status = 'ended', ended_at = ?, updated_at = ? WHERE id = ?")
-    .bind(now.toISOString(), now.toISOString(), seriesId)
+  const stopped = await env.DB.prepare(`UPDATE booking_series SET status = 'ended', ended_at = ?, updated_at = ?
+    WHERE id = ? AND student_id = ? AND ${SERIES_STOP_SESSION_SQL}`)
+    .bind(now.toISOString(), now.toISOString(), seriesId, student.id, ...identity)
     .run();
+  if (!(stopped?.meta?.changes > 0)) return fail("Please sign in again.", 401, request, env);
 
   if (cancelRemaining) {
     const { results } = await env.DB.prepare(
@@ -3148,9 +3171,15 @@ async function handleStopSeries(request, env, ctx, seriesId) {
     const settings = await loadSettings(env);
 
     const cancelledRows = [];
+    let accountChanged = false;
     for (const { row, refund } of cancellationPlan) {
+      const current = await currentStudent(request, env);
+      if (!current || current.id !== student.id || (current.session_version ?? 0) !== (student.session_version ?? 0)) {
+        accountChanged = true;
+        break;
+      }
       if (refund) {
-        if (!await claimRefund(env, row, "student")) { kept++; continue; }
+        if (!await claimRefund(env, row, "student", null, identity)) { kept++; continue; }
         const updated = await completeRefund(env, row.id);
         if (!updated) { kept++; pendingRefunds++; continue; }
         cancelledRows.push(updated); cancelled++; refunded++;
@@ -3161,9 +3190,10 @@ async function handleStopSeries(request, env, ctx, seriesId) {
         `UPDATE bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'student',
            sequence = sequence + 1, updated_at = ?,
            payment_status = CASE WHEN ? = 1 THEN 'refunded' ELSE payment_status END
-         WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'`
+         WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
+           AND ${SERIES_STOP_SESSION_SQL}`
       )
-        .bind(now.toISOString(), now.toISOString(), wasRefunded, row.id, row.sequence)
+        .bind(now.toISOString(), now.toISOString(), wasRefunded, row.id, row.sequence, ...identity)
         .run();
       if (!(result?.meta?.changes > 0)) { kept++; continue; }
       cancelledRows.push(await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first());
@@ -3175,6 +3205,13 @@ async function handleStopSeries(request, env, ctx, seriesId) {
     // drops most of them without saying so.
     if (cancelledRows.length) {
       ctx.waitUntil(notifySeriesCancelled(env, { rows: cancelledRows, lessonType, settings }));
+    }
+    // A refund already claimed is committed work and can finish safely. Once
+    // recovery wins, later rows must not acquire a new cancellation claim.
+    const current = await currentStudent(request, env);
+    if (accountChanged || !current || current.id !== student.id ||
+        (current.session_version ?? 0) !== (student.session_version ?? 0)) {
+      return fail("Your account changed. Please sign in again to review the remaining lessons.", 401, request, env);
     }
   }
 
@@ -3673,18 +3710,20 @@ async function handleReschedule(request, env, ctx, token) {
   );
 }
 
-async function claimRefund(env, row, requestedBy, cancellationMessage = null) {
+async function claimRefund(env, row, requestedBy, cancellationMessage = null, identity = null) {
   if (!stripeReady(env)) return false;
   const now = new Date().toISOString();
   const request = JSON.stringify({ bookingId: row.id, paymentIntent: row.stripe_payment_intent, amountCents: row.charged_cents ?? row.amount_cents ?? undefined });
   const results = await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO booking_refunds (booking_id, request, requested_by, created_at)
-      SELECT id, ?, ?, ? FROM bookings WHERE id = ? AND status = 'confirmed' AND payment_status = 'paid' AND sequence = ?`)
-      .bind(request, requestedBy, now, row.id, row.sequence),
+      SELECT id, ?, ?, ? FROM bookings WHERE id = ? AND status = 'confirmed' AND payment_status = 'paid' AND sequence = ?
+        ${identity ? `AND ${SERIES_STOP_SESSION_SQL}` : ""}`)
+      .bind(request, requestedBy, now, row.id, row.sequence, ...(identity ?? [])),
     env.DB.prepare(`UPDATE bookings SET payment_status = 'processing', updated_at = ?, cancellation_message = ?
       WHERE id = ? AND status = 'confirmed' AND payment_status = 'paid' AND sequence = ?
-        AND EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = bookings.id AND status = 'pending')`)
-      .bind(now, cancellationMessage, row.id, row.sequence)
+        AND EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = bookings.id AND status = 'pending')
+        ${identity ? `AND ${SERIES_STOP_SESSION_SQL}` : ""}`)
+      .bind(now, cancellationMessage, row.id, row.sequence, ...(identity ?? []))
   ]);
   return (results[0]?.meta?.changes ?? 0) > 0 && (results[1]?.meta?.changes ?? 0) > 0;
 }
@@ -4733,6 +4772,13 @@ async function handleConfirmEmailChange(request, env) {
   }
 
   const nonce = parsed.nonce;
+  const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const currentAccount = `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
+    AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
+  const tokenHash = await sessionHash(bearer);
+  const identity = [student.id, student.session_version ?? 0, tokenHash];
+  const clearPending = () => env.DB.prepare(`DELETE FROM email_changes WHERE nonce = ? AND student_id = ? AND ${currentAccount}`)
+    .bind(nonce, student.id, ...identity).run();
   const pending = await env.DB.prepare("SELECT * FROM email_changes WHERE nonce = ? AND student_id = ?")
     .bind(nonce, student.id)
     .first();
@@ -4745,7 +4791,7 @@ async function handleConfirmEmailChange(request, env) {
     .bind(pending.new_email, student.id)
     .first();
   if (taken) {
-    await env.DB.prepare("DELETE FROM email_changes WHERE nonce = ?").bind(nonce).run();
+    await clearPending();
     return fail("That address is now in use on another account.", 409, request, env);
   }
 
@@ -4753,8 +4799,8 @@ async function handleConfirmEmailChange(request, env) {
     const changed = await env.DB.batch([
       env.DB.prepare(`UPDATE students SET email = ?, google_sub = NULL, session_version = session_version + 1,
         email_verified_at = COALESCE(email_verified_at, ?)
-        WHERE id = ? AND session_version = ? AND EXISTS (SELECT 1 FROM email_changes WHERE nonce = ? AND student_id = students.id)`)
-        .bind(pending.new_email, now, student.id, student.session_version ?? 0, nonce),
+        WHERE id = ? AND ${currentAccount} AND EXISTS (SELECT 1 FROM email_changes WHERE nonce = ? AND student_id = students.id)`)
+        .bind(pending.new_email, now, student.id, ...identity, nonce),
       ...forgetPendingAccess(env, student.id, { email: pending.new_email, sessionVersion: (student.session_version ?? 0) + 1 }),
       env.DB.prepare(`UPDATE bookings SET student_email = ?, updated_at = ?
         WHERE student_id = ? AND status IN ('confirmed', 'pending_payment') AND starts_at > ?
@@ -4763,15 +4809,17 @@ async function handleConfirmEmailChange(request, env) {
     ]);
     if (!(changed[0]?.meta?.changes > 0)) return fail("That link has already been used. Please sign in again.", 409, request, env);
   } catch {
-    await env.DB.prepare("DELETE FROM email_changes WHERE nonce = ?").bind(nonce).run();
+    await clearPending();
     return fail("That address is now in use on another account.", 409, request, env);
   }
 
   await env.DB.prepare("DELETE FROM login_attempts WHERE email = ?").bind(student.email).run().catch(() => {});
-  const updated = await env.DB.prepare("SELECT * FROM students WHERE id = ? AND email = ? AND session_version = ?")
-    .bind(student.id, pending.new_email, (student.session_version ?? 0) + 1).first();
+  const session = await createSession(student.id, env.BOOKING_TOKEN_SECRET, (student.session_version ?? 0) + 1);
+  const updated = await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND email = ? AND session_version = ?
+    AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`)
+    .bind(student.id, pending.new_email, (student.session_version ?? 0) + 1, tokenHash).first();
   if (!updated) return fail("Your account changed. Please sign in again.", 409, request, env);
-  return json({ student: publicStudent(updated), session: await createSession(updated.id, env.BOOKING_TOKEN_SECRET, updated.session_version) }, 200, request, env);
+  return json({ student: publicStudent(updated), session }, 200, request, env);
 }
 
 // The splats a student can wear beside their name (the site's

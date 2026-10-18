@@ -387,19 +387,24 @@ async function approveHomework(env, booking, row, body) {
   return teacherView(env, booking, row);
 }
 
-async function writeProgress(env, bookingId, studentId, saved, answers, submission) {
+async function writeProgress(env, bookingId, studentId, saved, answers, submission, authorization) {
   const time = stamp(saved?.updated_at);
   const encoded = submission ? JSON.stringify(submission) : null;
+  const currentSession = `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
+    AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
+  const identity = [studentId, authorization.sessionVersion, authorization.tokenHash];
   const changed = saved
-    ? await env.DB.prepare("UPDATE homework_progress SET answers_json = ?, submission_json = ?, completed_at = ?, updated_at = ? WHERE booking_id = ? AND student_id = ? AND updated_at = ?")
-      .bind(JSON.stringify(answers), encoded, submission?.submittedAt ?? null, time, bookingId, studentId, saved.updated_at).run()
-    : await env.DB.prepare("INSERT INTO homework_progress(booking_id, student_id, answers_json, submission_json, completed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(booking_id) DO NOTHING")
-      .bind(bookingId, studentId, JSON.stringify(answers), encoded, submission?.submittedAt ?? null, time).run();
+    ? await env.DB.prepare(`UPDATE homework_progress SET answers_json = ?, submission_json = ?, completed_at = ?, updated_at = ?
+      WHERE booking_id = ? AND student_id = ? AND updated_at = ? AND ${currentSession}`)
+      .bind(JSON.stringify(answers), encoded, submission?.submittedAt ?? null, time, bookingId, studentId, saved.updated_at, ...identity).run()
+    : await env.DB.prepare(`INSERT INTO homework_progress(booking_id, student_id, answers_json, submission_json, completed_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ? WHERE ${currentSession} ON CONFLICT(booking_id) DO NOTHING`)
+      .bind(bookingId, studentId, JSON.stringify(answers), encoded, submission?.submittedAt ?? null, time, ...identity).run();
   if (!changed.meta.changes) throw conflict();
   return savedProgress(env.DB, bookingId, studentId);
 }
 
-async function submitHomework(env, studentId, bookingId, row, saved, answers) {
+async function submitHomework(env, studentId, bookingId, row, saved, answers, authorization) {
   const sheet = JSON.parse(row.published_json);
   const questions = sheet.sections.flatMap(section => section.questions.map(question => ({ ...question, instruction: section.instruction })));
   const written = questions.filter(question => question.marking !== "exact" && answers[question.id]);
@@ -408,7 +413,7 @@ async function submitHomework(env, studentId, bookingId, row, saved, answers) {
     returnedAt: null, state: canMark ? "marking" : "submitted", markingNote: written.length && !canMark ? "AI marking is unavailable. Check the written answers." : "" };
   // Claim and save the attempt BEFORE a paid request. A duplicate submission
   // sees the same attempt; a lost response never loses the student's work.
-  const claimed = await writeProgress(env, bookingId, studentId, saved, answers, submission);
+  const claimed = await writeProgress(env, bookingId, studentId, saved, answers, submission, authorization);
   if (!canMark) return { progress: progress(claimed) };
   try {
     const result = await ai(env, bookingId, markingInstructions,
@@ -433,7 +438,7 @@ async function submitHomework(env, studentId, bookingId, row, saved, answers) {
 }
 
 /** Only the current owner of a lesson can read its sheet, save or submit answers. */
-export async function studentHomework(env, student, method, bookingId, body, action = "") {
+export async function studentHomework(env, student, method, bookingId, body, action = "", tokenHash = "") {
   if (!isStudentLike(student)) throw new HomeworkProblem("Homework is in the student’s account. Open their lesson to prepare it.", 403);
   if (!bookingId && method !== "GET") throw new HomeworkProblem("Not found.", 404);
   if (method === "GET" && !bookingId) {
@@ -469,9 +474,12 @@ export async function studentHomework(env, student, method, bookingId, body, act
   }
   if ((saved?.updated_at ?? null) !== body.updatedAt) throw conflict();
   if (submission && !submission.returnedAt) throw new HomeworkProblem("This work is with Inês. You can practise again after she sends it back.", 409);
+  // Use the identity authenticated at the route's start, not a newer account
+  // read after recovery or logout. The check belongs in the answer write.
+  const authorization = { sessionVersion: student.session_version ?? 0, tokenHash };
   if (action === "submit") {
     if (!Object.values(answers).some(Boolean)) throw new HomeworkProblem("Answer at least one question before submitting.");
-    return submitHomework(env, student.id, bookingId, row, saved, answers);
+    return submitHomework(env, student.id, bookingId, row, saved, answers, authorization);
   }
-  return { progress: progress(await writeProgress(env, bookingId, student.id, saved, answers, submission)) };
+  return { progress: progress(await writeProgress(env, bookingId, student.id, saved, answers, submission, authorization)) };
 }
