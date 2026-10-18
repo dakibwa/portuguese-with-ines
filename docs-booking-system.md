@@ -235,6 +235,10 @@ still paid by hand, and any weekly slot. `Students` on `/schedule` puts
 those who still need to sign in or add a card first, each with
 `Send welcome email` (`POST /admin/students/:id/welcome`, three an hour per
 student). It is only ever sent by her press: nothing sends it on its own.
+Concurrent first-welcome requests share one durable delivery key and original
+sign-in link. Retries preserve that exact request; explicit `Send the link again`
+still creates a fresh link. The recipient's captured address and account version
+must match at link creation, email dispatch and the final welcome-state update.
 A student needs no lesson to be welcomed (16 October 2026, Inês); with no
 lesson to come the email invites them to sign in and book their next one,
 with no lesson list, and a student free at every length is asked for no card. Accounts the opt-in live check registers
@@ -736,8 +740,9 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   later without invalidating anyone.
 - **Google Sign-In**, optional. Only non-sensitive scopes (name, email), so no
   additional Calendar permission. Absent a client id the
-  button simply does not render. Matching is by *verified* email, so someone who
-  registered with a password and later uses Google lands on the same account.
+  button simply does not render. Returning accounts match Google's stable id.
+  First email matching requires Gmail/Workspace authority or a matching,
+  already mail-verified site session, as described below.
   Google renders that button itself and will not be styled, so the coral button
   a student sees is ours and Google's own is stretched over it at zero opacity.
   The click, the ID token and the Worker's verification are all still Google's;
@@ -979,6 +984,13 @@ another extension cannot add old times or overwrite the newer bookmark. A
 competing booking still skips only that week. Initial card-setup holds are not
 extended until confirmed. Stopping ends extension before reading the remaining
 lessons, so its cancellation set includes every occurrence committed first.
+Teaching hours, exceptions and notice settings advance an internal availability
+revision in their write transaction. Student claims and moves, and weekly
+occurrences with their bookmarks, require the preview's revision at commit.
+A concurrent hours or time-off change therefore requires a fresh preview.
+Student creation and moves also refresh the target notice cutoff just before
+claiming; a weekly move refuses a plan that crosses a source or target boundary
+while validation runs. Inês's explicit calendar additions retain their override.
 
 - **The occurrences are ordinary rows in `bookings`.** A series is only the
   recipe that made them. That is what puts the time in Ines's calendar for real,
@@ -1351,6 +1363,13 @@ after an interruption and reconcile proven delivery before claiming again.
 Messages held until a welcome, or skipped for a missing address, never count as
 delivered Meet links. A proven earlier send can repair a lost delivery marker.
 A cancelled run remains one combined email rather than one send per lesson.
+Per-lesson and combined lifecycle messages store every included lesson's
+identity, version, owner, dates and rendered financial facts. The sweep filters
+that complete snapshot before its batch limit and the send claim checks it
+again. A changed member cannot replay a stale combined confirmation. Snapshot
+metadata is purged with the private body after delivery or expiry.
+Mixed-price runs name each occurrence's own amount and payment terms rather
+than presenting the first lesson's price as the price of every lesson.
 
 ### The no-show policy
 
@@ -1958,6 +1977,20 @@ Single moves and cancellations also recheck their payment snapshot at the
 write, so a concurrent paid-by-hand mark, charge or repricing requires a reload.
 A teacher cancellation selected as unpaid cannot cancel a newly settled card
 payment without passing through the refund path.
+Changing a lesson's length and unticking a payment by hand also atomically
+verify the effective target price. Teacher creation accepts the displayed
+`expectedPriceCents`; a changed quote requires review, except for an unticked
+past lesson that records no price or payment.
+
+An existing Checkout can still settle after a later card changes the account's
+Stripe customer. If its customer differs from today's profile, the Worker
+retrieves that exact stored Checkout and verifies its original customer,
+booking, mode, purpose, intent and amount; an unavailable provider returns 503
+for retry. It never accepts an arbitrary customer mismatch.
+The payment sweep also recovers a receipt, fiscal reminder or payment-due notice
+whose first log row was never inserted. It verifies current positive payment
+truth and renders only a wholly absent key. Existing failed or unconfirmed
+attempts always retain their original immutable delivery history.
 
 Writes reject unapproved browser origins and non-JSON content; request bodies
 are bounded while streaming. Authentication has an edge-IP rate limit and
@@ -1974,8 +2007,15 @@ is refused even when it finally presents the right token. That budget is 20
 admin requests per 15 minutes per connection, which makes the shared token an
 emergency route into `/schedule`: a long session on it can reach the cap, while
 Inês's own teacher sign-in never does. `/admin/settings` range-checks its numbers — a zero slot
-interval would hang `/availability` — and validates its addresses. The live
-origin allow-list is the two live domains plus `http://localhost:3000`, which
+interval would hang `/availability` — and validates its addresses. Numeric
+settings require actual finite numbers; null, booleans, arrays and objects are
+refused before storage. Admin requests authenticate before reading a bounded
+body, then recheck the captured teacher role, account version and revocation.
+Mutations bind that authority in SQL, sensitive provider work rechecks before
+starting, and private replies recheck before returning. Work already committed,
+such as applying an accepted price grant or notifying an accepted lesson, can
+finish its consequences without starting a new teacher action after revocation.
+The live origin allow-list is the two live domains plus `http://localhost:3000`, which
 CI's journey tests serve the built export from. API responses are not cacheable. Password derivation
 uses six supported 100,000-iteration rounds for new passwords, retaining older
 hash verification. Webhooks check signature, environment, session, customer,
@@ -1994,6 +2034,12 @@ applied to staging, then production, and all four TEXT columns and nullable
 constraints verified on 18 October 2026 through the connected Cloudflare app.
 Both databases had zero pending, failed or unconfirmed messages afterward.
 Do not replay the full schema or older migrations against an existing database.
+
+Migration `0035-email-lifecycle.sql` was applied to staging, then production on
+18 October 2026 through the connected Cloudflare app. The new nullable TEXT
+column `email_log.lifecycle_json` was verified in both databases; both had zero
+pending, failed or unconfirmed messages afterward. It quarantines legacy
+lifecycle attempts whose included booking snapshots are unknown.
 
 ```bash
 npx wrangler d1 create ines-booking          # put the id in wrangler.jsonc
@@ -2096,10 +2142,8 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
   Needs you. The migration file was executed directly, without replaying the
   empty migration ledger.
 - **Migration 0031** (`workers/booking/migrations/0031-free-prices.sql`) is
-  written but not yet applied. It rebuilds `student_recurring_rates` so a
-  price may be €0, copying every row. Apply it by hand to staging, then
-  production D1, before or after the Worker: until then saving €0 is refused
-  and everything else works as before.
+  applied in staging and production. Both live table definitions were verified
+  on 18 October 2026 to allow `amount_cents >= 0`; do not replay the rebuild.
 - **Migration 0032** (`workers/booking/migrations/0032-also-student.sql`) is
   applied by hand to staging, then production D1, on 17 October 2026, before
   the Worker that reads it. It adds `students.also_student`, default 0.

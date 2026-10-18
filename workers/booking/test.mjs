@@ -1257,7 +1257,7 @@ function seriesEmailFixture() {
           async run() {
             if (sql.startsWith("INSERT INTO email_log")) {
               emailLog.push({ bookingId: values[0], kind: values[1], recipient: values[2], dedupeKey: values[3],
-                status: "pending", created_at: values[4], request_json: values[5] });
+                status: "pending", created_at: values[4], request_json: values[5], lifecycle_json: values[6] });
             }
             return { success: true, meta: { changes: 1 } };
           },
@@ -1378,7 +1378,7 @@ await test("a repeating booking sends one consolidated email to the client", asy
   try {
     const result = await deliver(fixture.env, {
       to: "ana@example.com", subject: "Lesson", content: { heading: "Lesson", intro: "Hi" },
-      dedupeKey: "isolated-provider-redirect", kind: "student_series_booked"
+      dedupeKey: "isolated-provider-redirect", kind: "student_meeting_ready"
     });
     assert.deepEqual(result, { ok: false, error: "HTTP 307" });
     assert.equal(calls, 1, "redirect destinations are never requested");
@@ -1386,7 +1386,7 @@ await test("a repeating booking sends one consolidated email to the client", asy
     globalThis.fetch = async () => Response.json({ id: "isolated-room-message" });
     const room = await deliver(fixture.env, {
       to: "ana@example.com", subject: "Lesson", content: { heading: "Lesson", intro: "Room https://meet.google.com/abc-defg-hij" },
-      dedupeKey: "isolated-room-message", kind: "student_series_booked"
+      dedupeKey: "isolated-room-message", kind: "student_meeting_ready"
     });
     assert.deepEqual(room, { ok: true, id: "isolated-room-message", meetingUrls: ["https://meet.google.com/abc-defg-hij"] });
   } finally {
@@ -1439,7 +1439,8 @@ await test("teacher notifications can pause without silencing the student", asyn
 
 await test("moving a recurring sequence sends one updated calendar to each enabled recipient", async () => {
   const fixture = seriesEmailFixture();
-  fixture.rows.forEach((row) => { row.sequence = 2; });
+  fixture.rows.forEach((row, index) => { row.sequence = 2; row.payment_status = "scheduled"; row.amount_cents = index === 1 ? 1800 : 1500; });
+  fixture.rows[2].payment_consent_version = "paid-by-hand";
   const originalLog = console.log;
   console.log = () => {};
   try {
@@ -1464,6 +1465,11 @@ await test("moving a recurring sequence sends one updated calendar to each enabl
     ]
   );
   assert.ok(fixture.emailLog.every(({ dedupeKey }) => dedupeKey.endsWith(":2")));
+  const message = JSON.parse(fixture.emailLog[0].request_json);
+  assert.match(message.text, /3 September[^\n]*— €15 · charged to your saved card after the lesson/);
+  assert.match(message.text, /10 September[^\n]*— €18 · charged to your saved card after the lesson/);
+  assert.match(message.text, /17 September[^\n]*— €15 · paid/);
+  assert.ok(!message.text.includes("€15 a lesson"), "different agreed prices and terms belong beside their own dates");
 });
 
 await test("automatic open-ended top-ups do not send another client email", async () => {

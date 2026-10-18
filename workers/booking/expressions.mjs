@@ -83,7 +83,8 @@ export async function publishedExpression(db, id) {
   return row ? unpack(row) : null;
 }
 
-export async function expressionsRequest(db, method, path, body) {
+export async function expressionsRequest(db, method, path, body, authorization = null) {
+  await authorization?.assert();
   if (path === "/admin/expressions" && method === "GET") return { expressions: await listExpressions(db) };
   if (method !== "POST") problem("Not found.", 404);
 
@@ -100,8 +101,9 @@ export async function expressionsRequest(db, method, path, body) {
     // parameter-limit problem when the collection grows beyond the seed.
     const result = await db.prepare(`UPDATE expressions SET
       sort_order = (SELECT CAST(key AS INTEGER) FROM json_each(?) WHERE value = expressions.id), updated_at = ?
-      WHERE (SELECT json_group_array(id) FROM (SELECT id FROM expressions ORDER BY sort_order, id)) = ?`)
-      .bind(JSON.stringify(ids), stamp, JSON.stringify(expected)).run();
+      WHERE (SELECT json_group_array(id) FROM (SELECT id FROM expressions ORDER BY sort_order, id)) = ? AND (${authorization?.sql ?? "1"})`)
+      .bind(JSON.stringify(ids), stamp, JSON.stringify(expected), ...(authorization?.values ?? [])).run();
+    await authorization?.assert();
     if (!result.meta.changes) problem("The collection changed. Reload it before changing the order.", 409);
     return { expressions: await listExpressions(db) };
   }
@@ -114,9 +116,10 @@ export async function expressionsRequest(db, method, path, body) {
       await db.prepare(`INSERT INTO expressions
         (id, expression, normalized, meaning_pt, meaning_en, literal_en, examples, notes, source_url, tags,
          image_url, image_alt, published, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM expressions), ?, ?)`)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM expressions), ?, ? WHERE (${authorization?.sql ?? "1"})`)
         .bind(id, value.expression, value.normalized, value.meaningPt, value.meaningEn, value.literalEn,
-          JSON.stringify(value.examples), value.notes, value.sourceUrl, JSON.stringify(value.tags), value.imageUrl, value.imageAlt, stamp, stamp).run();
+          JSON.stringify(value.examples), value.notes, value.sourceUrl, JSON.stringify(value.tags), value.imageUrl, value.imageAlt, stamp, stamp, ...(authorization?.values ?? [])).run();
+      await authorization?.assert();
     } catch (error) {
       if (String(error).includes("UNIQUE constraint failed: expressions.normalized")) problem("That expression is already in the collection.", 409);
       throw error;
@@ -132,26 +135,27 @@ export async function expressionsRequest(db, method, path, body) {
   const stamp = freshTime(row.updatedAt);
   let result;
   if (action === "delete") {
-    result = await db.prepare("DELETE FROM expressions WHERE id = ? AND updated_at = ?").bind(id, body.updatedAt).run();
+    result = await db.prepare(`DELETE FROM expressions WHERE id = ? AND updated_at = ? AND (${authorization?.sql ?? "1"})`).bind(id, body.updatedAt, ...(authorization?.values ?? [])).run();
   } else if (action === "publish") {
     if (body.published !== 0 && body.published !== 1) problem("Published must be 0 or 1.");
     if (body.published) ready(row);
-    result = await db.prepare("UPDATE expressions SET published = ?, updated_at = ? WHERE id = ? AND updated_at = ?")
-      .bind(body.published, stamp, id, body.updatedAt).run();
+    result = await db.prepare(`UPDATE expressions SET published = ?, updated_at = ? WHERE id = ? AND updated_at = ? AND (${authorization?.sql ?? "1"})`)
+      .bind(body.published, stamp, id, body.updatedAt, ...(authorization?.values ?? [])).run();
   } else {
     const value = content(body, true);
     if (row.published) ready(value);
     try {
       result = await db.prepare(`UPDATE expressions SET expression = ?, normalized = ?, meaning_pt = ?, meaning_en = ?,
         literal_en = ?, examples = ?, notes = ?, source_url = ?, tags = ?, image_url = ?, image_alt = ?, updated_at = ?
-        WHERE id = ? AND updated_at = ?`)
+        WHERE id = ? AND updated_at = ? AND (${authorization?.sql ?? "1"})`)
         .bind(value.expression, value.normalized, value.meaningPt, value.meaningEn, value.literalEn, JSON.stringify(value.examples),
-          value.notes, value.sourceUrl, JSON.stringify(value.tags), value.imageUrl, value.imageAlt, stamp, id, body.updatedAt).run();
+          value.notes, value.sourceUrl, JSON.stringify(value.tags), value.imageUrl, value.imageAlt, stamp, id, body.updatedAt, ...(authorization?.values ?? [])).run();
     } catch (error) {
       if (String(error).includes("UNIQUE constraint failed: expressions.normalized")) problem("That expression is already in the collection.", 409);
       throw error;
     }
   }
+  await authorization?.assert();
   if (!result.meta.changes) problem("This expression changed elsewhere. Reload the collection before trying again.", 409);
   return action === "delete" ? { ok: true } : { expression: await get(db, id) };
 }

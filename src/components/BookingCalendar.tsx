@@ -2800,7 +2800,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   }
 
   function renderLessonPreview(preview: MyBooking) {
-    const changeable = preview.status === "confirmed" && !preview.isPast && !preview.changeLocked;
+    const changeable = preview.status === "confirmed" && Date.parse(preview.startAt) > clock && !preview.changeLocked;
     const feeCents = loadedAccount?.sameDayFeeCents ?? SAME_DAY_RESCHEDULE_FEE_CENTS;
     return (
       <>
@@ -3245,7 +3245,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // A repeating schedule counts once, however many of its dates are booked.
   const upcomingCount = new Set(
     myBookings
-      .filter((booking) => !booking.isPast && booking.status === "confirmed")
+      .filter((booking) => Date.parse(booking.endAt) > clock && booking.status === "confirmed")
       .map((booking) => (isWeeklyLesson(booking) ? `series:${booking.seriesId}` : `booking:${booking.reference}`))
   ).size;
 
@@ -3361,6 +3361,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           <div className="unified-account-area">
             <AccountControls
               key={student.id}
+              clock={clock}
               initialAccount={loadedAccount?.student.id === student.id ? loadedAccount : null}
               onRatesChange={(rates) => {
                 // A code saved under Edit details prices the next weekly booking.

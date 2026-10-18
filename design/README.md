@@ -1231,7 +1231,10 @@ Preserve these desktop and mobile states:
   and it opens over the card. Booking is not repeated there: its
   one coral action belongs to the card. `Your lessons` may show the useful
   upcoming count; `Past lessons` deliberately has no count competing for
-  attention. The menu lives in the account cards, behind an open lesson too.
+  attention. A running lesson stays upcoming, with `Happening now` and its call,
+  until its end. History and counts advance with the current clock without a
+  reload, on both student and teacher screens. The menu lives in the account
+  cards, behind an open lesson too.
   While booking, the account heads the booking bar as the name's menu at
   every width, never the open places: booking is not one of the account's
   places, and a slider with nothing marked read as a place missing (11

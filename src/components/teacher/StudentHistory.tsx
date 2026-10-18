@@ -26,9 +26,14 @@ export function StudentHistory({ student, token, refresh = 0, homeworkId }: {
   const [refund, setRefund] = useState<AdminBooking | null>(null);
   const [notice, setNotice] = useState("");
   const historyRef = useRef<HTMLDivElement>(null);
-  const [now] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const studentId = student.id;
   const email = student.email?.trim().toLowerCase() ?? "";
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let active = true;

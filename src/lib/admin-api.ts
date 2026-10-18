@@ -408,7 +408,7 @@ export function addStudent(token: string, input: StudentDetailsInput & { prices?
 }
 
 /** Their details, all at once. Their email can change only until they first sign in. */
-export function updateStudentDetails(token: string, studentId: string, input: StudentDetailsInput) {
+export function updateStudentDetails(token: string, studentId: string, input: Omit<StudentDetailsInput, "mark">) {
   return adminRequest<{ student: AdminStudent }>(token, `/admin/students/${encodeURIComponent(studentId)}/details`, {
     method: "POST",
     body: JSON.stringify(input),
@@ -454,6 +454,8 @@ export function createBookingFor(
     startAt: string;
     location: "online" | "porto";
     notes: string;
+    /** The per-lesson amount shown before adding a financial obligation. */
+    expectedPriceCents?: number;
     /** Weekly: 4, 6 or 8 weeks, or "open" until stopped. Left out, one lesson. */
     repeat?: 4 | 6 | 8 | "open";
     /** Ticked "Already paid": never billed, in Receipts as paid by hand. One lesson only. */

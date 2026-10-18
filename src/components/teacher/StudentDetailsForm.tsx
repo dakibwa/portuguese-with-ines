@@ -41,7 +41,6 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy, 
             email: details.email.trim(),
             phone: details.phone.trim(),
             nif: details.nif.trim(),
-            mark: student.mark ?? "",
           });
           onSaved(result.student);
         } catch (caught) {

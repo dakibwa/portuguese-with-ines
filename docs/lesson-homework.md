@@ -64,8 +64,12 @@ It is sent after marking finishes, or, if marking was interrupted, by the
 every-minute cron after the 90-second hand-off. Before sending, the Worker
 claims `homework_progress.notified_submission_id` for that submission (migration
 0030) and the email log dedupes on `teacher:homework-submitted:<submission id>`,
-so retried submits and the sweep never send twice. A failed send releases the
-claim and the sweep retries it for up to three days. The email has no booking id
+so retried submits and the sweep never send twice. An interrupted claim expires
+after two minutes. Saved provider requests retry with the same idempotency key
+and exact body for at most 23 hours, within the provider's 24-hour retention;
+expired or ambiguous legacy attempts require manual reconciliation. The sweep
+considers recent submissions for three days, but never extends that send window.
+The email has no booking id
 so the failed-email sweep can never rebuild it as a lesson confirmation. A new
 attempt has a new submission id and is announced in its turn.
 `TEACHER_NOTIFICATIONS_ENABLED=0` pauses it with her other copies. Until
@@ -122,11 +126,11 @@ validated for every adult learner. Inês sets the level and checks suitability.
 ## Storage and access
 
 Migration `0029_lesson_homework.sql` adds only `lesson_homework`,
-`homework_progress` and `homework_ai_usage`. Apply that file manually, first to
-staging, then production, after release authority. Do not apply the full schema
-or replay older migrations on an existing database. This migration has not been
-applied remotely yet; its new progress table includes the submission JSON column.
-The schema is for new local databases only. Until the migration is applied, the
+`homework_progress` and `homework_ai_usage`. Migrations 0029 and 0030 are already
+applied in production; homework AI has been live since 15 October 2026.
+Apply future additive migrations manually to staging, then production. Do not
+apply the full schema or replay older migrations on an existing database.
+The schema is for new local databases only. Where these tables are absent, the
 Students list shows no homework to review and a student's Homework tab is empty,
 rather than either failing. Migration `0030-homework-notified.sql` adds the two
 notification columns; apply it after 0029. This feature does not change bookings, fees or meetings.
@@ -155,12 +159,10 @@ Anthropic's Messages API.
 
 ## AI activation
 
-AI is **off by default**. The deployed Worker currently has no Anthropic key.
-Before activation, obtain the owner's approval for the provider, paid usage and
-the new migrations/release; install an approved Anthropic API key as the Worker
-secret `ANTHROPIC_API_KEY` (`wrangler secret put ANTHROPIC_API_KEY`). Never put
-a key in a frontend variable or commit one. Then set `HOMEWORK_AI_ENABLED=1` for
-the approved environment. Staging uses its own secret and explicit environment
+AI fails closed without an explicit enabled flag and provider key. Production
+has `HOMEWORK_AI_ENABLED=1` and the approved `ANTHROPIC_API_KEY` Worker secret;
+staging keeps AI disabled. Never put a key in a frontend variable or commit one.
+Staging uses its own secret and explicit environment
 variables; it must not accidentally use live student material during testing.
 
 The default model is `claude-opus-5-5`; `HOMEWORK_AI_MODEL` overrides it. Calls

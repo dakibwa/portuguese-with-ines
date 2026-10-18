@@ -437,8 +437,32 @@ export function renderEmail(content) {
 const EMAIL_RETRY_MS = 23 * 3600000;
 const EMAIL_LEASE_MS = 120000;
 
+export const LIFECYCLE_EMAIL_KINDS = [
+  "student_booked", "student_rescheduled", "student_cancelled", "teacher_booked", "teacher_rescheduled", "teacher_cancelled",
+  "student_series_booked", "student_series_moved", "student_series_cancelled",
+  "teacher_series_booked", "teacher_series_moved", "teacher_series_cancelled", "teacher_series_extended",
+];
+const lifecycleFields = [
+  "id", "reference", "sequence", "status", "lesson_type_id", "student_id", "student_name", "student_email",
+  "student_phone", "student_timezone", "location", "notes", "starts_at", "ends_at", "amount_cents", "payment_status",
+  "payment_consent_version", "same_day_change", "same_day_fee_cents", "same_day_fee_status", "attendance_status", "cancellation_message",
+];
+export const emailLifecycle = rows => rows.map(row => Object.fromEntries(lifecycleFields.map(field => [field, row[field] ?? null])));
+
+/** Every lesson and financial fact conveyed by this exact saved body must still match. */
+export function emailLifecycleMatchesSql(alias = "email_log") {
+  const validArray = `CASE WHEN json_valid(${alias}.lifecycle_json) THEN
+    CASE WHEN json_type(${alias}.lifecycle_json) = 'array' THEN ${alias}.lifecycle_json ELSE '[]' END ELSE '[]' END`;
+  const memberObject = "CASE WHEN member.type = 'object' THEN member.value ELSE '{}' END";
+  return `(json_array_length(${validArray}) > 0
+    AND json_extract(${validArray}, '$[0].id') = ${alias}.booking_id
+    AND NOT EXISTS (SELECT 1 FROM json_each(${validArray}) member
+      LEFT JOIN bookings current_lesson ON current_lesson.id = json_extract(${memberObject}, '$.id')
+      WHERE current_lesson.id IS NULL OR NOT (${lifecycleFields.map(field => `current_lesson.${field} IS json_extract(${memberObject}, '$.${field}')`).join(" AND ")})))`;
+}
+
 async function unconfirmedEmail(env, dedupeKey, reason) {
-  await env.DB.prepare(`UPDATE email_log SET status = 'unconfirmed', error = ?, request_json = NULL,
+  await env.DB.prepare(`UPDATE email_log SET status = 'unconfirmed', error = ?, request_json = NULL, lifecycle_json = NULL,
     send_claim_id = NULL, send_claim_until = NULL WHERE dedupe_key = ? AND status IN ('pending', 'failed')`)
     .bind(reason, dedupeKey).run();
   console.warn("email-manual-reconciliation-required", dedupeKey);
@@ -448,23 +472,29 @@ async function unconfirmedEmail(env, dedupeKey, reason) {
 /** Purge sensitive bodies even when a superseded message is no longer eligible to retry. */
 export async function purgeExpiredEmailPayloads(env) {
   const cutoff = new Date(Date.now() - EMAIL_RETRY_MS).toISOString();
+  const legacyLifecycle = `lifecycle_json IS NULL AND kind IN (${LIFECYCLE_EMAIL_KINDS.map(kind => `'${kind}'`).join(", ")})`;
   await env.DB.prepare(`UPDATE email_log SET status = CASE WHEN status IN ('pending', 'failed') THEN 'unconfirmed' ELSE status END,
     error = CASE WHEN status IN ('pending', 'failed') THEN
       CASE WHEN request_json IS NULL THEN 'Legacy email delivery requires manual reconciliation.'
+      WHEN ${legacyLifecycle} THEN 'Legacy lesson email requires manual reconciliation.'
       ELSE 'Email retry window elapsed; reconcile delivery manually.' END ELSE error END,
-    request_json = NULL, send_claim_id = NULL, send_claim_until = NULL
+    request_json = NULL, lifecycle_json = NULL, send_claim_id = NULL, send_claim_until = NULL
     WHERE (request_json IS NOT NULL AND (created_at <= ? OR status IN ('sent', 'dry-run', 'unconfirmed')))
-      OR (request_json IS NULL AND status IN ('pending', 'failed'))`)
+      OR ((request_json IS NULL OR (${legacyLifecycle})) AND status IN ('pending', 'failed'))`)
     .bind(cutoff).run();
 }
 
 /** Retry one saved message only after its lifecycle owner has revalidated it. */
-export async function retryEmail(env, dedupeKey) {
+export async function retryEmail(env, dedupeKey, authorization = null) {
+  await authorization?.assert();
   const row = await env.DB.prepare("SELECT * FROM email_log WHERE dedupe_key = ?").bind(dedupeKey).first();
   if (!row) return { ok: false, error: "Email delivery record not found." };
   if (row.status === "sent" || row.status === "dry-run") return { ok: true, skipped: "already-sent" };
   if (row.status === "unconfirmed") return { ok: false, manualReview: true, error: row.error };
   if (!row.request_json) return unconfirmedEmail(env, dedupeKey, "Legacy email delivery requires manual reconciliation.");
+  if (LIFECYCLE_EMAIL_KINDS.includes(row.kind) && !row.lifecycle_json) {
+    return unconfirmedEmail(env, dedupeKey, "Legacy lesson email requires manual reconciliation.");
+  }
   const now = new Date().toISOString();
   const cutoff = new Date(Date.now() - EMAIL_RETRY_MS).toISOString();
   if (row.created_at <= cutoff || (row.first_attempt_at && row.first_attempt_at <= cutoff)) {
@@ -488,12 +518,14 @@ export async function retryEmail(env, dedupeKey) {
     first_attempt_at = COALESCE(first_attempt_at, ?), send_claim_id = ?, send_claim_until = ?
     WHERE dedupe_key = ? AND status IN ('pending', 'failed') AND request_json IS NOT NULL
       AND created_at > ? AND (first_attempt_at IS NULL OR first_attempt_at > ?)
-      AND (send_claim_until IS NULL OR send_claim_until <= ?)`)
-    .bind(now, claimId, new Date(Date.now() + EMAIL_LEASE_MS).toISOString(), dedupeKey, cutoff, cutoff, now).run();
+      AND (send_claim_until IS NULL OR send_claim_until <= ?)
+      AND (lifecycle_json IS NULL OR ${emailLifecycleMatchesSql()}) AND (${authorization?.sql ?? "1"})`)
+    .bind(now, claimId, new Date(Date.now() + EMAIL_LEASE_MS).toISOString(), dedupeKey, cutoff, cutoff, now, ...(authorization?.values ?? [])).run();
+  await authorization?.assert();
   if (!(claimed?.meta?.changes > 0)) return { ok: false, pending: true, error: "Email delivery is in progress." };
 
   if (dryRun) {
-    await env.DB.prepare(`UPDATE email_log SET status = 'dry-run', request_json = NULL, send_claim_id = NULL, send_claim_until = NULL
+    await env.DB.prepare(`UPDATE email_log SET status = 'dry-run', request_json = NULL, lifecycle_json = NULL, send_claim_id = NULL, send_claim_until = NULL
       WHERE dedupe_key = ? AND send_claim_id = ?`).bind(dedupeKey, claimId).run();
     console.log(JSON.stringify({ dryRun: true, to: row.recipient, subject: request.subject, kind: row.kind,
       calendar: request.attachments?.[0]?.content_type?.match(/method=([^;]+)/)?.[1] ?? null }));
@@ -503,6 +535,7 @@ export async function retryEmail(env, dedupeKey) {
   try {
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(dedupeKey));
     const idempotencyKey = `ines-email:${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("")}`;
+    await authorization?.assert();
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST", redirect: "manual", signal: AbortSignal.timeout(30000),
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
@@ -511,7 +544,7 @@ export async function retryEmail(env, dedupeKey) {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(String(payload.message ?? `HTTP ${response.status}`));
     if (typeof payload.id !== "string" || !payload.id) throw new Error("The email service returned no delivery id.");
-    await env.DB.prepare(`UPDATE email_log SET status = 'sent', provider_id = ?, request_json = NULL,
+    await env.DB.prepare(`UPDATE email_log SET status = 'sent', provider_id = ?, request_json = NULL, lifecycle_json = NULL,
       send_claim_id = NULL, send_claim_until = NULL WHERE dedupe_key = ? AND send_claim_id = ?`)
       .bind(payload.id, dedupeKey, claimId).run();
     return { ok: true, id: payload.id, meetingUrls };
@@ -525,9 +558,10 @@ export async function retryEmail(env, dedupeKey) {
   }
 }
 
-export async function deliver(env, { to, subject, content, calendar, dedupeKey, bookingId, kind, replyTo }) {
+export async function deliver(env, { to, subject, content, calendar, dedupeKey, bookingId, kind, replyTo, lifecycle = null, authorization = null }) {
   if (isNoEmailYet(to)) return { ok: true, skipped: "no-email-yet" };
   try {
+    await authorization?.assert();
     replyTo = realEmail(replyTo);
     const { html, text } = renderEmail(content);
     const request = JSON.stringify({
@@ -535,14 +569,14 @@ export async function deliver(env, { to, subject, content, calendar, dedupeKey, 
       ...(replyTo ? { reply_to: [replyTo] } : {}),
       ...(calendar ? { attachments: [{ filename: "lesson.ics", content: base64(calendar.body), content_type: `text/calendar; charset=utf-8; method=${calendar.method}` }] } : {}),
     });
-    await env.DB.prepare(`INSERT INTO email_log (booking_id, kind, recipient, dedupe_key, status, created_at, request_json)
-      VALUES (?, ?, ?, ?, 'pending', ?, ?) ON CONFLICT(dedupe_key) DO NOTHING`)
-      .bind(bookingId ?? null, kind, to, dedupeKey, new Date().toISOString(), request).run();
+    await env.DB.prepare(`INSERT INTO email_log (booking_id, kind, recipient, dedupe_key, status, created_at, request_json, lifecycle_json)
+      SELECT ?, ?, ?, ?, 'pending', ?, ?, ? WHERE (${authorization?.sql ?? "1"}) ON CONFLICT(dedupe_key) DO NOTHING`)
+      .bind(bookingId ?? null, kind, to, dedupeKey, new Date().toISOString(), request, lifecycle ? JSON.stringify(lifecycle) : null, ...(authorization?.values ?? [])).run();
     const row = await env.DB.prepare("SELECT recipient, status FROM email_log WHERE dedupe_key = ?").bind(dedupeKey).first();
     if (row?.recipient !== to && ["pending", "failed"].includes(row?.status)) {
       return unconfirmedEmail(env, dedupeKey, "Email recipient changed; reconcile the earlier attempt manually.");
     }
-    return await retryEmail(env, dedupeKey);
+    return await retryEmail(env, dedupeKey, authorization);
   } catch (error) {
     const message = String(error?.message ?? error);
     console.error("email-log-write", kind, message);

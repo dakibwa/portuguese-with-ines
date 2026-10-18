@@ -1,4 +1,4 @@
-import { computeAvailability, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans } from "./availability.mjs";
+import { availabilityRevisionSql, computeAvailability, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans } from "./availability.mjs";
 import {
   OPEN_ENDED_HORIZON_WEEKS,
   SERIES_LENGTHS,
@@ -9,7 +9,7 @@ import {
   slotOf
 } from "./series.mjs";
 import { buildCalendarInvite, buildCalendarSeriesInvite, calendarUid } from "./ics.mjs";
-import { deliver as sendEmail, purgeExpiredEmailPayloads, retryEmail, splitWhen } from "./email.mjs";
+import { deliver as sendEmail, emailLifecycle, emailLifecycleMatchesSql, LIFECYCLE_EMAIL_KINDS, purgeExpiredEmailPayloads, retryEmail, splitWhen } from "./email.mjs";
 import {
   FREE_LABEL, emailChangeConfirm, emailChangeNotice, lessonBookedTeacher, lessonCancelledTeacher, lessonMovedTeacher, lessonReminder,
   passwordReset, paymentFailed, paymentReceipt, paymentReceivedTeacher, priceValue, signInLink, studentBooked,
@@ -487,6 +487,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       subject: student.subject,
       kind: `student_${event}`,
       bookingId: row.id,
+      lifecycle: emailLifecycle([row]),
       dedupeKey: `student:${event}:${row.id}:${row.sequence}`,
       replyTo,
       calendar: { body: invite([{ name: row.student_name, email: row.student_email }], true), method },
@@ -505,6 +506,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
         subject: teacher.subject,
         kind: `teacher_${event}`,
         bookingId: row.id,
+        lifecycle: emailLifecycle([row]),
         dedupeKey: `teacher:${event}:${row.id}:${row.sequence}`,
         replyTo: row.student_email,
         calendar: calendarAttached ? { body: invite([{ name: settings.teacherName, email: teacherEmail }]), method } : null,
@@ -731,13 +733,21 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
       } ${skipped.map((entry) => skippedDate.format(new Date(entry.startAt))).join(", ")}.`
     : "";
 
-  // Each copy lists the dates on its reader's clock.
+  const rowTerms = row => row.payment_status === FREE ? "free"
+    : row.payment_status === "paid" || row.payment_consent_version === PAID_BY_HAND_MARK ? "paid"
+    : ["scheduled", "payment_due", "processing"].includes(row.payment_status) ? "card"
+    : welcome?.card ? "untilCard" : byTeacher ? "asUsual" : "onTheDay";
+  const mixedPrices = new Set(rows.map(row => JSON.stringify([row.amount_cents ?? lessonType.price_cents, rowTerms(row)]))).size > 1;
+
+  // Each copy lists the dates on its reader's clock. Different agreed amounts
+  // or payment terms belong beside their own lesson, never a false run price.
   const runOn = (zone, forTeacher = false) => ({
     oneOff: Boolean(series.oneOff), fixed: Boolean(series.occurrences), twoTimes: multipleWeeklyTimes, count: rows.length, skippedNote,
     repeats: { label: series.oneOff ? "Booking" : "Repeats", value: forTeacher && !series.occurrences ? "Every week, until stopped" : cadence },
     occurrences: rows.map((row) => ({
       short: formatShort(new Date(row.starts_at), zone), long: formatInZone(new Date(row.starts_at), zone),
-      meetingUrl: meetingUrl(row), online: row.location === "online", place: placeLabel(row)
+      meetingUrl: meetingUrl(row), online: row.location === "online", place: placeLabel(row),
+      price: !forTeacher && mixedPrices ? priceValue({ terms: rowTerms(row), amount: formatEuros(row.amount_cents ?? lessonType.price_cents) }) : null
     })),
     lastShort: formatShort(new Date(rows[rows.length - 1].starts_at), PORTO)
   });
@@ -746,7 +756,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   // lesson separately after it ends; an older run keeps its pay-on-the-day terms.
   const seriesOnCard = rows.some((row) => row.payment_status === "paid" || row.payment_status === "scheduled");
   const seriesFree = rows.every((row) => row.payment_status === FREE);
-  const price = priceValue({
+  const price = mixedPrices ? null : priceValue({
     run: true, amount: formatEuros(lessonType.price_cents),
     terms: seriesFree ? "free" : seriesOnCard ? "card" : welcome?.card ? "untilCard" : byTeacher ? "asUsual" : "onTheDay"
   });
@@ -781,6 +791,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
         subject,
         kind: moved ? "student_series_moved" : "student_series_booked",
         bookingId: first.id,
+        lifecycle: emailLifecycle(rows),
         dedupeKey: moved
           ? `student:series-moved:${series.id}:${first.sequence}`
           : `student:series:${series.id}:${rows[0].id}`,
@@ -808,6 +819,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
         subject,
         kind: reason === "extended" ? "teacher_series_extended" : moved ? "teacher_series_moved" : "teacher_series_booked",
         bookingId: first.id,
+        lifecycle: emailLifecycle(rows),
         dedupeKey: moved
           ? `teacher:series-moved:${series.id}:${first.sequence}`
           : `teacher:series:${series.id}:${rows[0].id}`,
@@ -850,7 +862,7 @@ async function sameStudentSession(request, env, student) {
   return current?.id === student.id && (current.session_version ?? 0) === (student.session_version ?? 0);
 }
 
-function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = null, bufferMinutes = 0, seriesSnapshot = null, standingCardStudent = null, sessionIdentity = null, priceSnapshot = null }) {
+function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = null, bufferMinutes = 0, seriesSnapshot = null, standingCardStudent = null, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null, minimumNoticeHours = null }) {
   const placeholders = columns.map(() => "?").join(", ");
   const seriesId = values[columns.indexOf("series_id")] ?? null;
   // A pending setup reserves its slot for everyone, including its owner.
@@ -870,7 +882,10 @@ function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = nu
      ${seriesSnapshot ? `AND EXISTS (SELECT 1 FROM booking_series WHERE id = ? AND ${SERIES_FILL_GUARD})` : ""}
      ${standingCardStudent ? `AND ${standingCardSnapshotSql()}` : ""}
      ${sessionIdentity ? `AND ${studentSessionSql()}` : ""}
-     ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}`
+     ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}
+     ${authorization ? `AND (${authorization.sql})` : ""}
+     ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}
+     ${minimumNoticeHours !== null ? "AND ? >= ?" : ""}`
   )
     .bind(
       ...values,
@@ -885,7 +900,10 @@ function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = nu
       ...(seriesSnapshot ? [seriesSnapshot.id, ...seriesFillValues(seriesSnapshot)] : []),
       ...(standingCardStudent ? standingCardSnapshotValues(standingCardStudent) : []),
       ...(sessionIdentity ?? []),
-      ...(priceSnapshot ?? [])
+      ...(priceSnapshot ?? []),
+      ...(authorization?.values ?? []),
+      ...(availabilityRevision !== null ? [availabilityRevision] : []),
+      ...(minimumNoticeHours !== null ? [startAt, new Date(Date.now() + minimumNoticeHours * 3600000).toISOString()] : [])
     );
 }
 
@@ -941,6 +959,7 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
       subject: studentCopy.subject,
       kind: "student_series_cancelled",
       bookingId: first.id,
+      lifecycle: emailLifecycle(rows),
       dedupeKey: `student:series-cancel:${first.id}:${rows.length}`,
       replyTo,
       calendar: { body: invite({ name: first.student_name, email: first.student_email }), method: "CANCEL" },
@@ -959,6 +978,7 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
         subject: teacherCopy.subject,
         kind: "teacher_series_cancelled",
         bookingId: first.id,
+        lifecycle: emailLifecycle(rows),
         dedupeKey: `teacher:series-cancel:${first.id}:${rows.length}`,
         replyTo: first.student_email,
         calendar: await calendarOwnsTeacherInvites(env) ? null : { body: invite({ name: settings.teacherName, email: teacherEmail }), method: "CANCEL" },
@@ -1066,13 +1086,18 @@ function standingCardSnapshotValues(student) {
   return [student.id, student.card_consent_at, student.card_setup_version ?? 0, student.session_version ?? 0];
 }
 
-async function issueSignInLink(env, student, minutes) {
+async function issueSignInLink(env, student, minutes, authorization = null) {
   const { token, nonce, expiresAt } = await createSignInToken(student.id, env.BOOKING_TOKEN_SECRET, minutes);
-  await env.DB.prepare(
-    "INSERT INTO sign_in_links (nonce, student_id, email, expires_at, created_at) VALUES (?, ?, ?, ?, ?)"
+  const issued = await env.DB.prepare(
+    `INSERT INTO sign_in_links (nonce, student_id, email, expires_at, created_at)
+     SELECT ?, ?, ?, ?, ? WHERE (${authorization?.sql ?? "1"})`
   )
-    .bind(nonce, student.id, student.email, expiresAt, new Date().toISOString())
+    .bind(nonce, student.id, student.email, expiresAt, new Date().toISOString(), ...(authorization?.values ?? []))
     .run();
+  if (!(issued?.meta?.changes > 0)) {
+    await authorization?.assert();
+    throw new WelcomeChangedError("Their details have changed. Please reload before sending their welcome.");
+  }
   return { url: siteUrl(env, `/book/?signin=${encodeURIComponent(token)}`), nonce };
 }
 
@@ -1082,13 +1107,13 @@ async function issueSignInLink(env, student, minutes) {
  * neither, so their email carries the usual manage link instead. A teacher's
  * account is never sent one.
  */
-async function issueWelcome(env, settings, student, { always = false } = {}) {
+async function issueWelcome(env, settings, student, { always = false, authorization = null } = {}) {
   // Nothing to send a way in to until she has given their address.
   if (student.role === "teacher" || isNoEmailYet(student.email)) return null;
   const card = cardsTaken(env, settings) && !student.card_consent_at && !await paysNothing(env, student.id);
   const neverIn = !student.password_hash && !student.google_sub && !student.last_login_at;
   if (!always && !card && !neverIn) return null;
-  return { ...await issueSignInLink(env, student, WELCOME_LINK_MINUTES), card, neverIn };
+  return { ...await issueSignInLink(env, student, WELCOME_LINK_MINUTES, authorization), card, neverIn };
 }
 
 
@@ -1158,16 +1183,17 @@ async function untickedTerms(env, row) {
     loadSettings(env)
   ]);
   const current = (await studentLessonType(env, row.student_id, lessonType)).price_cents;
+  const priceSnapshot = lessonPriceSnapshot(row.student_id, { ...lessonType, price_cents: current });
   const teacher = Boolean(row.added_by_teacher);
   const amount = teacher ? current : Math.min(current, row.amount_cents ?? current);
-  if (amount === 0) return { status: FREE, amount: 0, consentAt: null, version: null };
+  if (amount === 0) return { status: FREE, amount: 0, consentAt: null, version: null, priceSnapshot };
   if (teacher && student && cardPaysFor(env, settings, student)) {
-    return { status: "scheduled", amount, consentAt: student.card_consent_at, version: STUDENT_CARD_CONSENT_VERSION, standingCardStudent: student };
+    return { status: "scheduled", amount, consentAt: student.card_consent_at, version: STUDENT_CARD_CONSENT_VERSION, standingCardStudent: student, priceSnapshot };
   }
   if (!teacher && row.payment_consent_at && student?.stripe_customer_id && student?.stripe_payment_method && cardsTaken(env, settings)) {
-    return { status: "scheduled", amount, consentAt: row.payment_consent_at, version: PAYMENT_CONSENT_VERSION };
+    return { status: "scheduled", amount, consentAt: row.payment_consent_at, version: PAYMENT_CONSENT_VERSION, priceSnapshot };
   }
-  return { status: "not_required", amount, consentAt: null, version: null };
+  return { status: "not_required", amount, consentAt: null, version: null, priceSnapshot };
 }
 
 /** A student whose every lesson length costs nothing has no card to add. */
@@ -1297,7 +1323,7 @@ async function welcomeLessons(env, studentId) {
  * lesson list (16 October 2026, Inês). A student free at every length is told
  * there is no card and nothing to pay.
  */
-async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
+async function sendWelcome(env, { student, settings, welcome, lessons = [], dedupeKey = null, authorization = null }) {
   // Never to a placeholder: there is no one to send it to until she gives their address.
   if (isNoEmailYet(student.email)) return { ok: false, error: "no-email-yet" };
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
@@ -1317,9 +1343,9 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [] }) {
     to: student.email,
     subject,
     kind: "student_welcome",
-    dedupeKey: `welcome:${welcome.nonce}`,
+    dedupeKey: dedupeKey ?? `welcome:${welcome.nonce}`,
     replyTo: settings.replyToEmail || teacherEmail || undefined,
-    content
+    content, authorization
   });
 }
 
@@ -2082,18 +2108,18 @@ async function studentNif(env, studentId) {
 }
 
 
-async function notifyLessonCharged(env, { row, lessonType, amountCents, noShow = false }) {
+async function notifyLessonCharged(env, { row, lessonType, amountCents, noShow = false, missingOnly = false }) {
   const settings = await loadSettings(env);
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
-  return notifyPaid(env, { row, lessonType, settings, teacherEmail, amountCents, item: noShow ? "no-show" : "lesson",
+  return notifyPaid(env, { row, lessonType, settings, teacherEmail, amountCents, item: noShow ? "no-show" : "lesson", missingOnly,
     student: { kind: "student_lesson_charged", dedupeKey: `charged:${row.id}` },
     teacher: { kind: "teacher_lesson_charged", dedupeKey: `charged-teacher:${row.id}` } });
 }
 
-async function notifySameDayFeeCharged(env, { row, lessonType, amountCents }) {
+async function notifySameDayFeeCharged(env, { row, lessonType, amountCents, missingOnly = false }) {
   const settings = await loadSettings(env);
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
-  return notifyPaid(env, { row, lessonType, settings, teacherEmail, amountCents, item: "fee",
+  return notifyPaid(env, { row, lessonType, settings, teacherEmail, amountCents, item: "fee", missingOnly,
     student: { kind: "student_same_day_fee_paid", dedupeKey: `same-day-paid:${row.id}` },
     teacher: { kind: "teacher_same_day_fee_paid", dedupeKey: `same-day-paid-teacher:${row.id}` } });
 }
@@ -2103,21 +2129,26 @@ async function notifySameDayFeeCharged(env, { row, lessonType, amountCents }) {
  * issue its fiscal document, which goes even while her other copies are
  * paused. A fee is a payment like any other, so it gets the same reminder.
  */
-async function notifyPaid(env, { row, lessonType, settings, teacherEmail, amountCents, item, student, teacher }) {
+async function notifyPaid(env, { row, lessonType, settings, teacherEmail, amountCents, item, student, teacher, missingOnly = false }) {
+  const missing = async key => !await env.DB.prepare("SELECT 1 AS present FROM email_log WHERE dedupe_key = ?").bind(key).first();
+  const studentOwed = !missingOnly || await missing(student.dedupeKey);
+  const teacherOwed = teacherEmail && (!missingOnly || await missing(teacher.dedupeKey));
+  if (!studentOwed && !teacherOwed) return [];
   const start = new Date(row.starts_at);
   const amount = formatEuros(amountCents);
   const nif = await studentNif(env, row.student_id);
-  const receipt = paymentReceipt({
-    first: row.student_name.split(" ")[0], item, amount, lesson: lessonLine(lessonType), lessonName: lessonName(lessonType),
-    shortWhen: formatShort(start, lessonZone(row)), reference: row.reference, nif, noticeHours: settings.minimumNoticeHours
-  });
-  const sends = [
-    deliver(env, {
+  const sends = [];
+  if (studentOwed) {
+    const receipt = paymentReceipt({
+      first: row.student_name.split(" ")[0], item, amount, lesson: lessonLine(lessonType), lessonName: lessonName(lessonType),
+      shortWhen: formatShort(start, lessonZone(row)), reference: row.reference, nif, noticeHours: settings.minimumNoticeHours
+    });
+    sends.push(deliver(env, {
       to: row.student_email, subject: receipt.subject, ...student, bookingId: row.id,
       replyTo: settings.replyToEmail || teacherEmail || undefined, content: receipt.content
-    })
-  ];
-  if (teacherEmail) {
+    }));
+  }
+  if (teacherOwed) {
     const received = paymentReceivedTeacher({
       studentName: row.student_name, item, amount, lessonName: lessonName(lessonType), longWhen: formatInZone(start, PORTO),
       shortWhen: formatShort(start, PORTO), reference: row.reference, nif, noticeHours: settings.minimumNoticeHours
@@ -2257,20 +2288,77 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
 export async function retryPaymentRecovery(env) {
   const settings = await loadSettings(env);
   if (settings.paymentMode === "postpay" && stripeReady(env)) {
-    const { results } = await env.DB.prepare(`SELECT * FROM bookings
-      WHERE (payment_status = 'payment_due' AND stripe_session_id IS NULL)
-         OR (same_day_fee_status = 'payment_due' AND same_day_fee_session_id IS NULL) LIMIT 20`).all();
+    const { results } = await env.DB.prepare(`WITH outstanding AS (
+        SELECT b.*, CASE WHEN attendance_status = 'no_show' THEN 'no-show' ELSE 'lesson' END AS purpose,
+          COALESCE(charged_cents, amount_cents) AS captured_amount,
+          (b.student_email NOT LIKE 'no-email:%'
+            AND NOT EXISTS (SELECT 1 FROM students s WHERE s.email = lower(trim(b.student_email))
+              AND s.role = 'student' AND s.awaiting_welcome = 1 AND COALESCE(s.password_hash, '') = ''
+              AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL)) AS can_notify
+        FROM bookings b), repair AS (
+        SELECT *, (payment_status = 'payment_due' AND (stripe_session_id IS NULL
+            OR (can_notify AND captured_amount > 0
+              AND (charge_request IS NULL OR CASE WHEN json_valid(charge_request)
+                THEN json_extract(charge_request, '$.amountCents') = captured_amount
+                  AND json_extract(charge_request, '$.purpose') = purpose ELSE 0 END)
+              AND NOT EXISTS (SELECT 1 FROM email_log WHERE dedupe_key = 'payment-due:' || purpose || ':' || outstanding.id)))) AS repair_lesson,
+          (same_day_fee_status = 'payment_due' AND (same_day_fee_session_id IS NULL
+            OR (can_notify AND same_day_fee_cents > 0
+              AND (same_day_fee_request IS NULL OR CASE WHEN json_valid(same_day_fee_request)
+                THEN json_extract(same_day_fee_request, '$.amountCents') = same_day_fee_cents
+                  AND json_extract(same_day_fee_request, '$.purpose') = 'same-day-fee' ELSE 0 END)
+              AND NOT EXISTS (SELECT 1 FROM email_log WHERE dedupe_key = 'payment-due:same-day-fee:' || outstanding.id)))) AS repair_fee
+        FROM outstanding)
+      SELECT * FROM repair WHERE repair_lesson OR repair_fee ORDER BY updated_at LIMIT 20`).all();
     for (const row of results ?? []) {
       const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
       if (!lessonType) continue;
-      if (row.payment_status === "payment_due" && !row.stripe_session_id) {
+      if (row.repair_lesson) {
         await notifyPaymentDue(env, { row, lessonType, amountCents: row.charged_cents ?? row.amount_cents,
           purpose: row.attendance_status === "no_show" ? "no-show" : "lesson" });
       }
-      if (row.same_day_fee_status === "payment_due" && !row.same_day_fee_session_id) {
+      if (row.repair_fee) {
         await notifyPaymentDue(env, { row, lessonType, amountCents: row.same_day_fee_cents, purpose: "same-day-fee" });
       }
     }
+  }
+
+  // Settlement can commit before either notification reaches email_log. An
+  // absent key proves no provider attempt was made: deliver logs before send.
+  // Existing rows, including ambiguous legacy rows, always keep their original
+  // payload and are handled by the exact-request retry below.
+  const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail || "";
+  const { results: missingReceipts } = await env.DB.prepare(`WITH receipts AS (
+      SELECT b.*, CASE WHEN attendance_status = 'no_show' THEN 'no-show' ELSE 'lesson' END AS purpose,
+        'charged:' || id AS student_key, 'charged-teacher:' || id AS teacher_key,
+        charged_cents AS captured_amount, charge_request AS captured_request
+      FROM bookings b WHERE payment_status = 'paid' AND stripe_payment_intent IS NOT NULL AND charged_cents > 0
+      UNION ALL
+      SELECT b.*, 'same-day-fee' AS purpose,
+        'same-day-paid:' || id AS student_key, 'same-day-paid-teacher:' || id AS teacher_key,
+        same_day_fee_cents AS captured_amount, same_day_fee_request AS captured_request
+      FROM bookings b WHERE same_day_fee_status = 'paid' AND same_day_fee_payment_intent IS NOT NULL AND same_day_fee_cents > 0)
+    SELECT * FROM receipts b
+    WHERE (captured_request IS NULL OR CASE WHEN json_valid(captured_request)
+        THEN json_extract(captured_request, '$.amountCents') = captured_amount
+          AND json_extract(captured_request, '$.purpose') = purpose ELSE 0 END)
+      AND ((b.student_email NOT LIKE 'no-email:%'
+          AND NOT EXISTS (SELECT 1 FROM students s WHERE s.email = lower(trim(b.student_email))
+            AND s.role = 'student' AND s.awaiting_welcome = 1 AND COALESCE(s.password_hash, '') = ''
+            AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM email_log WHERE dedupe_key = b.student_key))
+        OR (? != '' AND NOT EXISTS (SELECT 1 FROM email_log WHERE dedupe_key = b.teacher_key)))
+    ORDER BY updated_at LIMIT 25`).bind(teacherEmail).all();
+  for (const row of missingReceipts ?? []) {
+    try {
+      const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
+      if (!lessonType) continue;
+      if (row.purpose === "same-day-fee") {
+        await notifySameDayFeeCharged(env, { row, lessonType, amountCents: row.captured_amount, missingOnly: true });
+      } else {
+        await notifyLessonCharged(env, { row, lessonType, amountCents: row.captured_amount, noShow: row.purpose === "no-show", missingOnly: true });
+      }
+    } catch (error) { console.error("payment-email-first-attempt", row.reference, String(error?.message ?? error)); }
   }
 
   // Saving a Checkout session is not proof that its email arrived. Neither is
@@ -2330,10 +2418,8 @@ export async function resendFailedEmails(env) {
     `SELECT e.* FROM email_log e JOIN bookings b ON b.id = e.booking_id
      WHERE ((e.status = 'failed' AND e.created_at < ?) OR e.status = 'pending')
        AND e.request_json IS NOT NULL AND (e.send_claim_until IS NULL OR e.send_claim_until <= ?)
-       AND e.kind IN ('student_booked', 'student_rescheduled', 'student_cancelled', 'teacher_booked', 'teacher_rescheduled', 'teacher_cancelled')
-       AND e.dedupe_key = replace(e.kind, '_', ':') || ':' || b.id || ':' || b.sequence
-       AND ((b.status = 'confirmed' AND e.kind NOT IN ('student_cancelled', 'teacher_cancelled'))
-         OR (b.status = 'cancelled' AND e.kind IN ('student_cancelled', 'teacher_cancelled')))
+       AND e.kind IN (${LIFECYCLE_EMAIL_KINDS.map(kind => `'${kind}'`).join(", ")})
+       AND ${emailLifecycleMatchesSql("e")}
        AND (
          (e.kind LIKE 'student_%'
            AND b.student_email NOT LIKE 'no-email:%'
@@ -2345,9 +2431,9 @@ export async function resendFailedEmails(env) {
        )
      ORDER BY e.created_at LIMIT 25`
   )
-    // Only a current per-booking lifecycle message is replayed here.
-    // Reminders, Meet and payment notices keep their own retry owners; old
-    // lifecycle keys must not occupy all 25 places in every later sweep.
+    // Match every member's immutable snapshot before the limit, including
+    // consolidated series and selections. Reminders, Meet and payment notices
+    // retain their own owners; superseded lifecycle mail never fills the queue.
     .bind(cutoff, now, teacherEnabled ? 1 : 0, env.TEACHER_EMAIL || settings.teacherEmail)
     .all();
 
@@ -2681,7 +2767,7 @@ async function handleCreate(request, env, ctx) {
     return handleCreateSelection(request, env, ctx, {
       starts: selection.starts, student, lessonType, now, notes, location, timezone,
       wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup, recentLessons: recent?.lessons ?? 0,
-      sessionIdentity, priceSnapshot
+      sessionIdentity, priceSnapshot, availabilityRevision: check.availabilityRevision
     });
   }
 
@@ -2728,7 +2814,7 @@ async function handleCreate(request, env, ctx) {
     endAt: endsAt,
     studentId: student.id,
     bufferMinutes: settings.lessonBufferMinutes,
-    sessionIdentity, priceSnapshot
+    sessionIdentity, priceSnapshot, availabilityRevision: check.availabilityRevision, minimumNoticeHours: settings.minimumNoticeHours
   });
 
   if (!claimed) {
@@ -2796,7 +2882,7 @@ async function handleCreate(request, env, ctx) {
          occurrences, status, filled_to, automatic_payment, payment_consent_at, payment_consent_version,
          created_at, updated_at)
        SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ? WHERE ${studentSessionSql()}
-         AND ${lessonPriceSnapshotSql()}`
+         AND ${lessonPriceSnapshotSql()} AND ${availabilityRevisionSql()}`
     )
       .bind(
         seriesId,
@@ -2814,7 +2900,8 @@ async function handleCreate(request, env, ctx) {
         timestamp,
         timestamp,
         ...sessionIdentity,
-        ...priceSnapshot
+        ...priceSnapshot,
+        check.availabilityRevision
       )
       .run();
     if (!(recipe?.meta?.changes > 0)) {
@@ -2825,8 +2912,8 @@ async function handleCreate(request, env, ctx) {
       if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
       if (accepted) ctx.waitUntil(notify(env, { event: "booked", row: accepted, lessonType, settings, manageUrl }));
       return fail(needsCardSetup
-        ? "Your lesson price has changed. Nothing has been booked; please review before confirming."
-        : "Your first lesson is booked, but your lesson price changed before the weekly run was added. Please review your lessons before booking again.", 409, request, env);
+        ? "The availability or your lesson price has changed. Nothing has been booked; please review before confirming."
+        : "Your first lesson is booked, but availability or your lesson price changed before the weekly run was added. Please review your lessons before booking again.", 409, request, env);
     }
 
     await env.DB.prepare("UPDATE bookings SET series_id = ? WHERE id = ?").bind(seriesId, id).run();
@@ -2847,7 +2934,7 @@ async function handleCreate(request, env, ctx) {
             // already on file schedules every occurrence immediately.
             paymentState: needsCardSetup ? "hold" : postpay ? "scheduled" : "none",
             holdExpiresAt: needsCardSetup ? holdExpiresAt : null,
-            sessionIdentity, priceSnapshot
+            sessionIdentity, priceSnapshot, availabilityRevision: check.availabilityRevision
           })
         : { rows: [], skipped: [] };
 
@@ -2946,7 +3033,7 @@ async function handleCreate(request, env, ctx) {
 /** Reserve a selection through one card setup and one combined confirmation. */
 async function handleCreateSelection(request, env, ctx, {
   starts, student, lessonType, now, notes, location, timezone,
-  wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup, recentLessons, sessionIdentity, priceSnapshot
+  wantsRepeat, repeatWeeks, settings, postpay, needsCardSetup, recentLessons, sessionIdentity, priceSnapshot, availabilityRevision
 }) {
   const timestamp = now.toISOString();
   const holdExpiresAt = needsCardSetup ? new Date(now.getTime() + 35 * 60000).toISOString() : null;
@@ -3003,7 +3090,7 @@ async function handleCreateSelection(request, env, ctx, {
   if (recentLessons + plannedRows.length > 26) {
     return fail("That's several bookings in a short time. Please wait an hour before adding more.", 429, request, env);
   }
-  if (!await claimSelection(env, { rows: plannedRows, series, now, bufferMinutes: settings.lessonBufferMinutes, sessionIdentity, priceSnapshot })) {
+  if (!await claimSelection(env, { rows: plannedRows, series, now, bufferMinutes: settings.lessonBufferMinutes, sessionIdentity, priceSnapshot, availabilityRevision, minimumNoticeHours: settings.minimumNoticeHours })) {
     if (!await sameStudentSession(request, env, student)) return fail("Please sign in again.", 401, request, env);
     return fail("A selected time or your lesson price has changed. Nothing has been booked; please review before confirming.", 409, request, env);
   }
@@ -3083,14 +3170,17 @@ function seriesFillValues(series) {
     series.automatic_payment, series.prepaid, series.payment_consent_at ?? null, series.payment_consent_version ?? null];
 }
 
-function prepareSeriesBookmark(env, series, key, now, sessionIdentity = null, priceSnapshot = null) {
+function prepareSeriesBookmark(env, series, key, now, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null) {
   return env.DB.prepare(`UPDATE booking_series SET filled_to = ?, updated_at = ? WHERE id = ? AND ${SERIES_FILL_GUARD}
     ${sessionIdentity ? `AND ${studentSessionSql()}` : ""}
-    ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}`)
-    .bind(key, now.toISOString(), series.id, ...seriesFillValues(series), ...(sessionIdentity ?? []), ...(priceSnapshot ?? []));
+    ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}
+    ${authorization ? `AND (${authorization.sql})` : ""}
+    ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}`)
+    .bind(key, now.toISOString(), series.id, ...seriesFillValues(series), ...(sessionIdentity ?? []), ...(priceSnapshot ?? []), ...(authorization?.values ?? []),
+      ...(availabilityRevision !== null ? [availabilityRevision] : []));
 }
 
-async function insertOccurrence(env, { series, key, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null, bufferMinutes = 0, teacher = false, sessionIdentity = null, priceSnapshot = null }) {
+async function insertOccurrence(env, { series, key, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null, bufferMinutes = 0, teacher = false, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null, minimumNoticeHours = null }) {
   const id = crypto.randomUUID();
   const timestamp = now.toISOString();
   const startsAt = new Date(startAt).toISOString();
@@ -3136,12 +3226,12 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
     studentId: student.id,
     bufferMinutes,
     seriesSnapshot: series,
-    sessionIdentity, priceSnapshot
+    sessionIdentity, priceSnapshot, authorization, availabilityRevision, minimumNoticeHours
   });
 
   // Commit the occurrence and bookmark together. Stale jobs may neither add
   // an old appointment nor overwrite the bookmark of a moved/extended recipe.
-  const [claimed, advanced] = await env.DB.batch([claim, prepareSeriesBookmark(env, series, key, now, sessionIdentity, priceSnapshot)]);
+  const [claimed, advanced] = await env.DB.batch([claim, prepareSeriesBookmark(env, series, key, now, sessionIdentity, priceSnapshot, authorization, availabilityRevision)]);
   if (!(advanced?.meta?.changes > 0)) return { current: false, row: null };
   // A competing lesson only skips this week; the current recipe still advances.
   if (!(claimed?.meta?.changes > 0)) return { current: true, row: null };
@@ -3156,7 +3246,7 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
  * a skipped week is never reconsidered on the next top-up and the run cannot
  * stall on it forever.
  */
-async function fillSeries(env, { series, student, lessonType, fromKey, count, now, paymentState = "none", holdExpiresAt = null, sessionIdentity = null, priceSnapshot = null }) {
+async function fillSeries(env, { series, student, lessonType, fromKey, count, now, paymentState = "none", holdExpiresAt = null, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null }) {
   // New bookings retain the quote already accepted. A nightly extension takes
   // a fresh price, then binds it to both its occurrence and its bookmark.
   if (!priceSnapshot) {
@@ -3164,7 +3254,9 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
     priceSnapshot = lessonPriceSnapshot(student.id, lessonType);
   }
   const teacher = Boolean(series.added_by_teacher);
-  const { lessonBufferMinutes } = await loadSettings(env);
+  const checkedSettings = await loadSettings(env);
+  const { lessonBufferMinutes } = checkedSettings;
+  availabilityRevision ??= checkedSettings.availabilityRevision;
   const { bookable, skipped } = await planOccurrences(env, {
     fromKey,
     minuteOfDay: series.minute_of_day,
@@ -3181,7 +3273,7 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
   let currentSeries = series;
   for (const occurrence of pending) {
     if (!occurrence.available) {
-      const advanced = await prepareSeriesBookmark(env, currentSeries, occurrence.key, now, sessionIdentity, priceSnapshot).run();
+      const advanced = await prepareSeriesBookmark(env, currentSeries, occurrence.key, now, sessionIdentity, priceSnapshot, authorization, availabilityRevision).run();
       if (!(advanced?.meta?.changes > 0)) break;
       consideredSkipped.push(occurrence);
       currentSeries = { ...currentSeries, filled_to: occurrence.key };
@@ -3206,7 +3298,7 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
       // she adds does.
       bufferMinutes: teacher ? 0 : lessonBufferMinutes,
       teacher,
-      sessionIdentity, priceSnapshot
+      sessionIdentity, priceSnapshot, authorization, availabilityRevision, minimumNoticeHours: teacher ? null : checkedSettings.minimumNoticeHours
     });
 
     if (!current) break;
@@ -3295,6 +3387,8 @@ async function handleStopSeries(request, env, ctx, seriesId) {
   let refunded = 0;
   let pendingRefunds = 0;
   let cancellationPlan = [];
+  let cancellationNoticeHours = 0;
+  let cancellationAvailabilityRevision = null;
 
   // End extension before reading the cancellation set. An occurrence committed
   // first is included below; a stale nightly fill cannot add one afterwards.
@@ -3314,7 +3408,10 @@ async function handleStopSeries(request, env, ctx, seriesId) {
     // A bulk action must not become a shortcut around the 14-hour rule. Keep
     // any occurrence inside the fee window; the student can still cancel it
     // individually and pay the fee.
-    const plan = planSeriesCancellation(results ?? [], now, (await loadSettings(env)).minimumNoticeHours);
+    const cancellationSettings = await loadSettings(env);
+    cancellationNoticeHours = cancellationSettings.minimumNoticeHours;
+    cancellationAvailabilityRevision = cancellationSettings.availabilityRevision;
+    const plan = planSeriesCancellation(results ?? [], new Date(), cancellationNoticeHours);
     kept = plan.kept.length;
     cancellationPlan = plan.cancellable;
 
@@ -3334,8 +3431,15 @@ async function handleStopSeries(request, env, ctx, seriesId) {
         accountChanged = true;
         break;
       }
+      // Earlier refunds may take time. Each remaining occurrence must still
+      // be outside the free-change window when its own cancellation starts.
+      const cancellationNow = new Date();
+      if (Date.parse(row.starts_at) <= cancellationNow.getTime() || changePolicy(row, cancellationNow, cancellationNoticeHours).late) {
+        kept++;
+        continue;
+      }
       if (refund) {
-        if (!await claimRefund(env, row, "student", null, identity)) { kept++; continue; }
+        if (!await claimRefund(env, row, "student", null, identity, null, cancellationAvailabilityRevision)) { kept++; continue; }
         const updated = await completeRefund(env, row.id);
         if (!updated) { kept++; pendingRefunds++; continue; }
         cancelledRows.push(updated); cancelled++; refunded++;
@@ -3349,11 +3453,11 @@ async function handleStopSeries(request, env, ctx, seriesId) {
          WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
            AND payment_status = ? AND amount_cents IS ? AND payment_consent_at IS ?
            AND payment_consent_version IS ? AND charge_started_at IS ?
-           AND ${SERIES_STOP_SESSION_SQL}`
+           AND ${SERIES_STOP_SESSION_SQL} AND ${availabilityRevisionSql()}`
       )
-        .bind(now.toISOString(), now.toISOString(), wasRefunded, row.id, row.sequence,
+        .bind(cancellationNow.toISOString(), cancellationNow.toISOString(), wasRefunded, row.id, row.sequence,
           row.payment_status, row.amount_cents ?? null, row.payment_consent_at ?? null,
-          row.payment_consent_version ?? null, row.charge_started_at ?? null, ...identity)
+          row.payment_consent_version ?? null, row.charge_started_at ?? null, ...identity, cancellationAvailabilityRevision)
         .run();
       if (!(result?.meta?.changes > 0)) { kept++; continue; }
       cancelledRows.push(await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first());
@@ -3400,8 +3504,8 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     .first();
   if (!series) return fail("That recurring lesson could not be found.", 404, request, env);
 
-  const now = new Date();
-  const nowIso = now.toISOString();
+  let now = new Date();
+  let nowIso = now.toISOString();
   const { results } = await env.DB.prepare(
     "SELECT * FROM bookings WHERE series_id = ? AND status = 'confirmed' AND starts_at > ? ORDER BY starts_at"
   )
@@ -3409,7 +3513,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     .all();
   // Moving a whole run must not become a route around the 14-hour rule: a
   // lesson inside the window stays where it is, and the rest of the run moves.
-  const { minimumNoticeHours, lessonBufferMinutes } = await loadSettings(env);
+  const { minimumNoticeHours, lessonBufferMinutes, availabilityRevision } = await loadSettings(env);
   const gapMs = lessonBufferMinutes * 60000;
   const kept = (results ?? []).filter((row) => changePolicy(row, now, minimumNoticeHours).late);
   const rows = (results ?? []).filter((row) => !kept.includes(row));
@@ -3514,6 +3618,17 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     });
   }
 
+  // A streamed request or the weekly preview may cross the notice boundary.
+  // Refuse this stale plan instead of moving a lesson the next read must keep.
+  now = new Date();
+  nowIso = now.toISOString();
+  if (rows.some(row => Date.parse(row.starts_at) <= now.getTime() || changePolicy(row, now, minimumNoticeHours).late)) {
+    return fail("Your next lesson is now inside the change window and stays where it is. Please reload to review the later lessons.", 409, request, env);
+  }
+  if (planned.some(entry => Date.parse(entry.startAt) < now.getTime() + minimumNoticeHours * 3600000)) {
+    return fail("That new weekly time is now too soon to book. Please reload and choose a later time.", 409, request, env);
+  }
+
   // D1 allows only 100 bound parameters per statement. JSON keeps a whole
   // ongoing run in one atomic move without exhausting that limit after nine
   // lessons, and carries each occurrence's optimistic sequence as well.
@@ -3524,6 +3639,10 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     guardEnd: new Date(Date.parse(entry.endAt) + gapMs).toISOString()
   })));
 
+  const changedLength = planned.find(entry => entry.oldLessonType !== lessonType.id);
+  const movePriceSnapshot = changedLength
+    ? lessonPriceSnapshot(student.id, { ...lessonType, price_cents: changedLength.amountCents })
+    : null;
   const moveBookings = env.DB.prepare(
     `WITH proposed AS MATERIALIZED (
        SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.oldStart') AS old_start,
@@ -3564,6 +3683,8 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
             WHERE current.series_id = ? AND current.status = 'confirmed' AND current.starts_at > ?) = ?
        AND (SELECT status FROM booking_series WHERE id = ? AND student_id = ?) = 'active'
        AND ${studentSessionSql()}
+       AND ${availabilityRevisionSql()}
+       ${movePriceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}
        AND NOT EXISTS (SELECT 1 FROM bookings processing WHERE processing.series_id = bookings.series_id
          AND processing.status = 'confirmed' AND processing.payment_status = 'processing')
        AND NOT EXISTS (
@@ -3590,6 +3711,8 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     seriesId,
     student.id,
     ...sessionIdentity,
+    availabilityRevision,
+    ...(movePriceSnapshot ?? []),
     nowIso
   );
 
@@ -3786,6 +3909,9 @@ async function handleReschedule(request, env, ctx, token) {
   if (new Date(row.starts_at) <= now) return fail("That lesson has already started. Please email Inês.", 409, request, env);
   policy = changePolicy(row, now, settings.minimumNoticeHours);
   if (policy.locked) return fail("That lesson is now inside the change window and cannot be moved. Please reload.", 409, request, env);
+  if (!sameTime && Date.parse(startsAt) < now.getTime() + settings.minimumNoticeHours * 3600000) {
+    return fail("That new time is now too soon to book. Please reload and choose a later time.", 409, request, env);
+  }
   const sameDay = policy.feeApplies && settings.sameDayChangeFeeCents > 0 ? 1 : 0;
   if (body.expectedLateFeeCents !== undefined && body.expectedLateFeeCents !== (sameDay ? settings.sameDayChangeFeeCents : 0)) {
     return fail("The change fee has changed. Please review it before confirming.", 409, request, env);
@@ -3822,6 +3948,8 @@ async function handleReschedule(request, env, ctx, token) {
        AND sequence = ? AND payment_status != 'processing'
        AND payment_status = ? AND amount_cents IS ? AND payment_consent_at IS ?
        AND payment_consent_version IS ? AND charge_started_at IS ?
+       AND ${availabilityRevisionSql()}
+       ${row.lesson_type_id !== lessonType.id ? `AND ${lessonPriceSnapshotSql()}` : ""}
        AND NOT EXISTS (
          SELECT 1 FROM bookings other
          WHERE (other.status = 'confirmed' OR (other.status = 'pending_payment' AND other.hold_expires_at > ?))
@@ -3853,6 +3981,8 @@ async function handleReschedule(request, env, ctx, token) {
       row.payment_consent_at ?? null,
       row.payment_consent_version ?? null,
       row.charge_started_at ?? null,
+      settings.availabilityRevision,
+      ...(row.lesson_type_id !== lessonType.id ? lessonPriceSnapshot(row.student_id, { ...lessonType, price_cents: amountCents }) : []),
       now.toISOString(),
       guardEnd,
       guardStart
@@ -3908,20 +4038,26 @@ async function handleReschedule(request, env, ctx, token) {
   );
 }
 
-async function claimRefund(env, row, requestedBy, cancellationMessage = null, identity = null) {
+async function claimRefund(env, row, requestedBy, cancellationMessage = null, identity = null, authorization = null, availabilityRevision = null) {
   if (!stripeReady(env)) return false;
   const now = new Date().toISOString();
   const request = JSON.stringify({ bookingId: row.id, paymentIntent: row.stripe_payment_intent, amountCents: row.charged_cents ?? row.amount_cents ?? undefined });
   const results = await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO booking_refunds (booking_id, request, requested_by, created_at)
       SELECT id, ?, ?, ? FROM bookings WHERE id = ? AND status = 'confirmed' AND payment_status = 'paid' AND sequence = ?
-        ${identity ? `AND ${SERIES_STOP_SESSION_SQL}` : ""}`)
-      .bind(request, requestedBy, now, row.id, row.sequence, ...(identity ?? [])),
+        ${identity ? `AND ${SERIES_STOP_SESSION_SQL}` : ""}
+        ${authorization ? `AND (${authorization.sql})` : ""}
+        ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}`)
+      .bind(request, requestedBy, now, row.id, row.sequence, ...(identity ?? []), ...(authorization?.values ?? []),
+        ...(availabilityRevision !== null ? [availabilityRevision] : [])),
     env.DB.prepare(`UPDATE bookings SET payment_status = 'processing', updated_at = ?, cancellation_message = ?
       WHERE id = ? AND status = 'confirmed' AND payment_status = 'paid' AND sequence = ?
         AND EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = bookings.id AND status = 'pending')
-        ${identity ? `AND ${SERIES_STOP_SESSION_SQL}` : ""}`)
-      .bind(now, cancellationMessage, row.id, row.sequence, ...(identity ?? []))
+        ${identity ? `AND ${SERIES_STOP_SESSION_SQL}` : ""}
+        ${authorization ? `AND (${authorization.sql})` : ""}
+        ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}`)
+      .bind(now, cancellationMessage, row.id, row.sequence, ...(identity ?? []), ...(authorization?.values ?? []),
+        ...(availabilityRevision !== null ? [availabilityRevision] : []))
   ]);
   return (results[0]?.meta?.changes ?? 0) > 0 && (results[1]?.meta?.changes ?? 0) > 0;
 }
@@ -4000,7 +4136,7 @@ async function handleCancel(request, env, ctx, token) {
     if (body.expectedLateFeeCents !== undefined && body.expectedLateFeeCents !== 0) {
       return fail("The change fee has changed. Please review it before confirming.", 409, request, env);
     }
-    if (!await claimRefund(env, row, "student")) return fail("That lesson has just changed. Please reload.", 409, request, env);
+    if (!await claimRefund(env, row, "student", null, null, null, settings.availabilityRevision)) return fail("That lesson or its change terms have just changed. Please reload.", 409, request, env);
     const updated = await completeRefund(env, row.id);
     if (!updated) return fail("Your cancellation request is recorded. The refund is being confirmed; the lesson stays reserved and locked until then. Please check back shortly.", 503, request, env);
     const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
@@ -4029,7 +4165,8 @@ async function handleCancel(request, env, ctx, token) {
          ELSE same_day_fee_cents END
      WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
        AND payment_status = ? AND amount_cents IS ? AND payment_consent_at IS ?
-       AND payment_consent_version IS ? AND charge_started_at IS ?`
+       AND payment_consent_version IS ? AND charge_started_at IS ?
+       AND ${availabilityRevisionSql()}`
   )
     .bind(
       now.toISOString(),
@@ -4045,7 +4182,8 @@ async function handleCancel(request, env, ctx, token) {
       row.amount_cents ?? null,
       row.payment_consent_at ?? null,
       row.payment_consent_version ?? null,
-      row.charge_started_at ?? null
+      row.charge_started_at ?? null,
+      settings.availabilityRevision
     )
     .run();
 
@@ -4113,13 +4251,30 @@ async function handleStripeWebhook(request, env, ctx) {
 
   const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(bookingId).first();
   if (!row) return new Response("Unknown booking.", { status: 200 });
+  const purpose = String(session.metadata?.purpose ?? "initial");
   const student = await env.DB.prepare("SELECT stripe_customer_id FROM students WHERE id = ?").bind(row.student_id).first();
   if (student?.stripe_customer_id && session.customer !== student.stripe_customer_id) {
-    return new Response("Customer does not match booking.", { status: 400 });
+    // Another legitimate card setup can replace the account's Customer while
+    // an earlier Checkout remains payable. Its exact stored session, rather
+    // than the later profile, owns that payment. Verify the original object
+    // with Stripe before accepting a different Customer.
+    const sameDayFee = purpose === "same-day-fee-due";
+    const expectedSession = sameDayFee ? row.same_day_fee_session_id : row.stripe_session_id;
+    if (!session.id || session.id !== expectedSession) return new Response("Customer does not match booking.", { status: 400 });
+    let original;
+    try { original = await retrieveCheckoutSession(env, expectedSession); }
+    catch { return new Response("Checkout ownership could not be verified.", { status: 503 }); }
+    const originalProblem = purpose === "card_setup" ? setupSessionProblem(original, row)
+      : checkoutSessionProblem(original, { ...row, stripe_session_id: expectedSession,
+        amount_cents: sameDayFee ? row.same_day_fee_cents : row.charged_cents ?? row.amount_cents });
+    if (originalProblem || original?.client_reference_id !== row.id || original?.customer !== session.customer ||
+        String(original?.metadata?.purpose ?? "initial") !== purpose || original?.mode !== session.mode ||
+        (purpose === "card_setup" ? original?.setup_intent !== session.setup_intent : original?.payment_intent !== session.payment_intent)) {
+      return new Response("Customer does not match booking.", { status: 400 });
+    }
   }
 
   let response;
-  const purpose = String(session.metadata?.purpose ?? "initial");
 
   if (purpose === "card_setup") {
     const problem = setupSessionProblem(session, row);
@@ -4845,9 +5000,20 @@ async function handleStudentExpressions(request, env) {
       : json(closedExpressions(), 200, request, env);
   }
   try {
+    const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const authorization = {
+      sql: `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ? AND ${studentLikeSql()})
+        AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`,
+      values: [student.id, student.session_version ?? 0, await sessionHash(bearer)]
+    };
     const data = request.method === "POST"
-      ? await pickExpression(env.DB, student.id, await readJson(request, 1024))
+      ? await pickExpression(env.DB, student.id, await readJson(request, 1024), authorization)
       : await studentExpressions(env.DB, student.id);
+    const current = await currentStudent(request, env);
+    if (!current || current.id !== student.id || (current.session_version ?? 0) !== (student.session_version ?? 0)) {
+      return fail("Please sign in again.", 401, request, env);
+    }
+    if (!isStudentLike(current)) return fail("The picker is for student accounts. Use the preview in Expressions.", 403, request, env);
     return json(data, 200, request, env);
   } catch (error) {
     if (error instanceof ExpressionProblem) return fail(error.message, error.status, request, env);
@@ -4904,7 +5070,7 @@ async function handleMe(request, env) {
         durationMinutes: row.duration_minutes,
         priceCents: row.amount_cents ?? row.price_cents
       },
-      isPast: new Date(row.starts_at) <= now,
+      isPast: new Date(row.ends_at) <= now,
       sameDayFeeApplies: changePolicy(row, now, settings.minimumNoticeHours).feeApplies && settings.sameDayChangeFeeCents > 0,
       sameDayFeeAutomatic: row.payment_status === "scheduled" || row.payment_status === "processing",
       changeLocked: changePolicy(row, now, settings.minimumNoticeHours).locked,
@@ -5148,21 +5314,26 @@ function studentPrices(value) {
  * they are, and applies to lessons booked from then on. Returns how many
  * lessons changed, or null while migration 0031 has yet to allow €0.
  */
-async function setStudentPrices(env, studentId, prices) {
+async function setStudentPrices(env, studentId, prices, authorization = null) {
   const now = new Date().toISOString();
   const statements = Object.entries(prices).map(([minutes, cents]) => cents === null
-    ? env.DB.prepare("DELETE FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = ?").bind(studentId, Number(minutes))
+    ? env.DB.prepare(`DELETE FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = ? AND (${authorization?.sql ?? "1"})`).bind(studentId, Number(minutes), ...(authorization?.values ?? []))
     : env.DB.prepare(
-      `INSERT INTO student_recurring_rates (student_id, duration_minutes, amount_cents, redeemed_at) VALUES (?, ?, ?, ?)
+      `INSERT INTO student_recurring_rates (student_id, duration_minutes, amount_cents, redeemed_at) SELECT ?, ?, ?, ? WHERE (${authorization?.sql ?? "1"})
        ON CONFLICT(student_id, duration_minutes) DO UPDATE SET amount_cents = excluded.amount_cents, redeemed_at = excluded.redeemed_at`
-    ).bind(studentId, Number(minutes), cents, now));
+    ).bind(studentId, Number(minutes), cents, now, ...(authorization?.values ?? [])));
   if (!statements.length) return 0;
+  let grantWritten = false;
   try {
-    await env.DB.batch(statements);
+    const results = await env.DB.batch(statements);
+    grantWritten = results.some(result => result?.meta?.changes > 0);
   } catch (error) {
     if (Object.values(prices).includes(0) && /CHECK constraint/i.test(String(error?.message ?? error))) return null;
     throw error;
   }
+  // An accepted price must reach its eligible lessons even if the teacher's
+  // session ends after the grant committed; the response still rechecks it.
+  if (!grantWritten) await authorization?.assert();
   return repriceStudent(env, studentId, now);
 }
 
@@ -5307,20 +5478,76 @@ async function homeworkReply(request, env, operation) {
   }
 }
 
+class AdminAuthorizationError extends Error {}
+class WelcomeChangedError extends Error {}
+
+function welcomeAuthorization(env, student, teacher = null, onlyIfWaiting = false) {
+  const sql = `(${teacher?.sql ?? "1"}) AND EXISTS (SELECT 1 FROM students welcome_owner
+    WHERE welcome_owner.id = ? AND welcome_owner.email = ? AND welcome_owner.session_version = ? AND welcome_owner.role = 'student'
+      ${onlyIfWaiting ? "AND welcome_owner.awaiting_welcome = 1 AND welcome_owner.password_hash = '' AND welcome_owner.google_sub IS NULL AND welcome_owner.last_login_at IS NULL" : ""})`;
+  const values = [...(teacher?.values ?? []), student.id, student.email, student.session_version ?? 0];
+  return { sql, values, async assert() {
+    await teacher?.assert();
+    if (!await env.DB.prepare(`SELECT 1 AS allowed WHERE ${sql}`).bind(...values).first()) {
+      throw new WelcomeChangedError("Their details or welcome have changed. Please reload before sending again.");
+    }
+  } };
+}
+
+/** A teacher's authority is captured once, and rechecked at the write itself. */
+async function adminAuthorization(request, env, admin) {
+  const sql = admin.student
+    ? `EXISTS (SELECT 1 FROM students WHERE id = ? AND role = 'teacher' AND session_version = ?)
+       AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`
+    : "1";
+  const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const values = admin.student ? [admin.student.id, admin.student.session_version ?? 0, await sessionHash(bearer)] : [];
+  const check = async () => !admin.student || (Number(bearer.split(".")[1]) >= Date.now() &&
+    Boolean(await env.DB.prepare(`SELECT 1 AS allowed WHERE ${sql}`).bind(...values).first()));
+  return { sql, values, check, async assert() {
+    if (!await check()) throw new AdminAuthorizationError("Please sign in again.");
+  } };
+}
+
+function availabilityRevisionBump(env, authorization) {
+  return env.DB.prepare(`INSERT INTO settings (key, value) SELECT 'availability_revision', '1' WHERE (${authorization.sql})
+    ON CONFLICT(key) DO UPDATE SET value = CAST(settings.value AS INTEGER) + 1`).bind(...authorization.values);
+}
+
 async function handleAdmin(request, env, ctx, url, path) {
   const admin = await isAdmin(request, env);
   if (admin === "throttled") return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
   if (!admin) return fail("Not authorised.", 401, request, env);
+  // Authenticate before accepting photos, then recheck once the entire bounded
+  // body has arrived. A request paused during logout cannot keep its authority.
+  const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
+    : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path) ? 1048576
+    : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
+  const adminBody = request.method === "POST" ? await readJson(request, bodyLimit) : {};
+  const authorization = await adminAuthorization(request, env, admin);
+  try {
+    await authorization.assert();
+    const reply = await handleAdminAction(request, env, ctx, url, path, admin, adminBody, authorization);
+    await authorization.assert();
+    return reply;
+  } catch (error) {
+    if (error instanceof AdminAuthorizationError) return fail(error.message, 401, request, env);
+    if (error instanceof WelcomeChangedError) return fail(error.message, 409, request, env);
+    throw error;
+  }
+}
+
+async function handleAdminAction(request, env, ctx, url, path, admin, adminBody, authorization) {
 
   const homework = path.match(/^\/admin\/lessons\/([^/]+)\/homework(?:\/(transcribe|generate|publish|return))?$/);
   if (homework) {
     return homeworkReply(request, env, async () => teacherHomework(env, request.method, homework[1], homework[2] ?? "",
-      request.method === "POST" ? await readJson(request, homework[2] === "transcribe" ? HOMEWORK_PHOTO_BODY_LIMIT : 1048576) : {}));
+      request.method === "POST" ? adminBody : {}, authorization));
   }
 
   if (path === "/admin/expressions" || path.startsWith("/admin/expressions/")) {
     try {
-      const data = await expressionsRequest(env.DB, request.method, path, request.method === "POST" ? await readJson(request, 131072) : {});
+      const data = await expressionsRequest(env.DB, request.method, path, request.method === "POST" ? adminBody : {}, authorization);
       // Her copy follows the same switch as the students' picker.
       if (path === "/admin/expressions" && request.method === "GET") data.openToStudents = expressionsOpenToStudents(env);
       return json(data, path === "/admin/expressions" && request.method === "POST" ? 201 : 200, request, env);
@@ -5340,7 +5567,8 @@ async function handleAdmin(request, env, ctx, url, path) {
     if (!await takeRateLimit(env, `google-connect:${admin.student.id}`, 5)) return fail("Please wait before trying again.", 429, request, env);
     const session = request.headers.get("Authorization").replace(/^Bearer\s+/i, "");
     try {
-      const authUrl = await startCalendarConnection(env, admin.student, await sessionHash(session));
+      await authorization.assert();
+      const authUrl = await startCalendarConnection(env, admin.student, await sessionHash(session), authorization);
       return json({ url: authUrl }, 200, request, env);
     } catch {
       return fail("Google Meet setup is not ready for this account. Please try again after setup.", 503, request, env);
@@ -5400,11 +5628,11 @@ async function handleAdmin(request, env, ctx, url, path) {
   }
 
   if (request.method === "POST" && path === "/admin/availability") {
-    const body = await readJson(request);
+    const body = adminBody;
     if (!Array.isArray(body.rules)) return fail("Expected a rules array.", 400, request, env);
     if (body.rules.length > 100) return fail("Use at most 100 weekly time ranges.", 400, request, env);
 
-    const statements = [env.DB.prepare("DELETE FROM availability_rules")];
+    const statements = [env.DB.prepare(`DELETE FROM availability_rules WHERE (${authorization.sql})`).bind(...authorization.values)];
     for (const rule of body.rules) {
       const weekday = rule?.weekday;
       const start = rule?.startMinute;
@@ -5417,19 +5645,22 @@ async function handleAdmin(request, env, ctx, url, path) {
       }
       statements.push(
         env.DB.prepare(
-          "INSERT INTO availability_rules (weekday, start_minute, last_start_minute, active) VALUES (?, ?, ?, 1)"
-        ).bind(weekday, start, lastStart)
+          `INSERT INTO availability_rules (weekday, start_minute, last_start_minute, active) SELECT ?, ?, ?, 1 WHERE (${authorization.sql})`
+        ).bind(weekday, start, lastStart, ...authorization.values)
       );
     }
 
-    await env.DB.batch(statements);
+    await env.DB.batch([...statements, availabilityRevisionBump(env, authorization)]);
     return json({ ok: true, count: statements.length - 1 }, 200, request, env);
   }
 
   if (request.method === "POST" && path === "/admin/exceptions") {
-    const body = await readJson(request);
+    const body = adminBody;
     if (body.remove) {
-      await env.DB.prepare("DELETE FROM availability_exceptions WHERE id = ?").bind(Number(body.remove)).run();
+      await env.DB.batch([
+        env.DB.prepare(`DELETE FROM availability_exceptions WHERE id = ? AND (${authorization.sql})`).bind(Number(body.remove), ...authorization.values),
+        availabilityRevisionBump(env, authorization)
+      ]);
       return json({ ok: true }, 200, request, env);
     }
     if (!parseDateKey(body.date)) return fail("Invalid date.", 400, request, env);
@@ -5442,11 +5673,12 @@ async function handleAdmin(request, env, ctx, url, path) {
       return fail("Invalid time range.", 400, request, env);
     }
 
-    await env.DB.prepare(
-      "INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-    )
-      .bind(body.date, kind, start, end, cleanText(body.note, 200), new Date().toISOString())
-      .run();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) SELECT ?, ?, ?, ?, ?, ? WHERE (${authorization.sql})`
+      ).bind(body.date, kind, start, end, cleanText(body.note, 200), new Date().toISOString(), ...authorization.values),
+      availabilityRevisionBump(env, authorization)
+    ]);
     return json({ ok: true }, 200, request, env);
   }
 
@@ -5455,7 +5687,7 @@ async function handleAdmin(request, env, ctx, url, path) {
   // off never discards the hours blocked within it. Weekly blocks and extra
   // hours are never touched here.
   if (request.method === "POST" && path === "/admin/exceptions/day") {
-    const body = await readJson(request);
+    const body = adminBody;
     if (!parseDateKey(body.date)) return fail("Invalid date.", 400, request, env);
     if (body.date < dateKey(new Date(), PORTO)) return fail("That date has already passed.", 400, request, env);
     const dayOff = typeof body.dayOff === "boolean" ? body.dayOff : undefined;
@@ -5468,28 +5700,28 @@ async function handleAdmin(request, env, ctx, url, path) {
     const created = new Date().toISOString();
     const statements = [];
     if (dayOff === false) {
-      statements.push(env.DB.prepare(`DELETE FROM availability_exceptions WHERE ${oneOff} AND ${wholeDay}`).bind(body.date));
+      statements.push(env.DB.prepare(`DELETE FROM availability_exceptions WHERE ${oneOff} AND ${wholeDay} AND (${authorization.sql})`).bind(body.date, ...authorization.values));
     } else if (dayOff) {
       // Idempotent, and an existing day off keeps its note ("Holiday").
       statements.push(
         env.DB.prepare(
           `INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at)
            SELECT ?, 'blocked', NULL, NULL, '', ?
-           WHERE NOT EXISTS (SELECT 1 FROM availability_exceptions WHERE ${oneOff} AND ${wholeDay})`
-        ).bind(body.date, created, body.date)
+           WHERE NOT EXISTS (SELECT 1 FROM availability_exceptions WHERE ${oneOff} AND ${wholeDay}) AND (${authorization.sql})`
+        ).bind(body.date, created, body.date, ...authorization.values)
       );
     }
     if (blocks) {
-      statements.push(env.DB.prepare(`DELETE FROM availability_exceptions WHERE ${oneOff} AND NOT (${wholeDay})`).bind(body.date));
+      statements.push(env.DB.prepare(`DELETE FROM availability_exceptions WHERE ${oneOff} AND NOT (${wholeDay}) AND (${authorization.sql})`).bind(body.date, ...authorization.values));
       for (const block of blocks) {
         statements.push(
           env.DB.prepare(
-            "INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) VALUES (?, 'blocked', ?, ?, '', ?)"
-          ).bind(body.date, block.start, block.end, created)
+            `INSERT INTO availability_exceptions (date, kind, start_minute, end_minute, note, created_at) SELECT ?, 'blocked', ?, ?, '', ? WHERE (${authorization.sql})`
+          ).bind(body.date, block.start, block.end, created, ...authorization.values)
         );
       }
     }
-    await env.DB.batch(statements);
+    await env.DB.batch([...statements, availabilityRevisionBump(env, authorization)]);
 
     const { results } = await env.DB.prepare(
       "SELECT * FROM availability_exceptions WHERE date = ? AND weekday IS NULL ORDER BY start_minute"
@@ -5537,7 +5769,7 @@ async function handleAdmin(request, env, ctx, url, path) {
   // their details, adds their lessons, and only then sends their welcome.
   // Nothing is emailed by this. A name is enough; the rest can follow.
   if (request.method === "POST" && path === "/admin/students") {
-    const body = await readJson(request);
+    const body = adminBody;
     const email = normaliseEmail(body.email);
     const name = cleanText(body.name, 120);
     if (email && !isEmail(email)) return fail("Please check the student's email address.", 400, request, env);
@@ -5549,9 +5781,9 @@ async function handleAdmin(request, env, ctx, url, path) {
     const id = crypto.randomUUID();
     const added = await env.DB.prepare(
       `INSERT INTO students (id, email, name, phone, nif, mark, timezone, password_hash, created_at, awaiting_welcome)
-       VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, 1) ON CONFLICT(email) DO NOTHING`
+       SELECT ?, ?, ?, ?, ?, ?, ?, '', ?, 1 WHERE (${authorization.sql}) ON CONFLICT(email) DO NOTHING`
     )
-      .bind(id, email || `${NO_EMAIL_YET}${id}`, name, details.phone, details.nif, details.mark, PORTO, new Date().toISOString())
+      .bind(id, email || `${NO_EMAIL_YET}${id}`, name, details.phone, details.nif, details.mark, PORTO, new Date().toISOString(), ...authorization.values)
       .run();
     let studentId = id;
     if (!(added?.meta?.changes > 0)) {
@@ -5562,13 +5794,13 @@ async function handleAdmin(request, env, ctx, url, path) {
        * they are, adding them again is a duplicate like any other.
        */
       const teacher = email
-        ? await env.DB.prepare("UPDATE students SET also_student = 1 WHERE email = ? AND role = 'teacher' AND also_student = 0 RETURNING id")
-          .bind(email).first()
+        ? await env.DB.prepare(`UPDATE students SET also_student = 1 WHERE email = ? AND role = 'teacher' AND also_student = 0 AND (${authorization.sql}) RETURNING id`)
+          .bind(email, ...authorization.values).first()
         : null;
       if (!teacher) return fail("Someone with that email is already on the site.", 409, request, env);
       studentId = teacher.id;
     }
-    if (await setStudentPrices(env, studentId, priced.prices) === null) {
+    if (await setStudentPrices(env, studentId, priced.prices, authorization) === null) {
       // The student stays; only the free price waits for the update.
       return fail("Free lessons need a database update first. The student was added on the standard price.", 503, request, env);
     }
@@ -5583,7 +5815,7 @@ async function handleAdmin(request, env, ctx, url, path) {
   if (detailedStudent && request.method === "POST") {
     const student = await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(detailedStudent[1]).first();
     if (!student) return fail("That student could not be found.", 404, request, env);
-    const body = await readJson(request);
+    const body = adminBody;
     const name = cleanText(body.name, 120);
     if (!name) return fail("Please give the student's name.", 400, request, env);
     const details = studentDetails(body);
@@ -5600,14 +5832,14 @@ async function handleAdmin(request, env, ctx, url, path) {
     // The address only moves while they have still never signed in, checked
     // in the same write so a sign-in landing meanwhile keeps their address.
     const rewrite = env.DB.prepare(
-      `UPDATE students SET name = ?, email = ?, phone = ?, nif = ?, mark = ?,
+      `UPDATE students SET name = ?, email = ?, phone = ?, nif = ?, mark = CASE WHEN ? THEN ? ELSE mark END,
          email_verified_at = CASE WHEN email = ? THEN email_verified_at ELSE NULL END,
          session_version = session_version + CASE WHEN email = ? THEN 0 ELSE 1 END
        WHERE id = ? AND email = ? AND session_version = ?
          AND NOT EXISTS (SELECT 1 FROM students other WHERE other.email = ? AND other.id != ?)
-         AND (? = 0 OR (password_hash = '' AND google_sub IS NULL AND last_login_at IS NULL))`
-    ).bind(name, stored, details.phone, details.nif, details.mark, stored, stored,
-      student.id, student.email, student.session_version ?? 0, stored, student.id, moving ? 1 : 0);
+         AND (? = 0 OR (password_hash = '' AND google_sub IS NULL AND last_login_at IS NULL)) AND (${authorization.sql})`
+    ).bind(name, stored, details.phone, details.nif, body.mark === undefined ? 0 : 1, details.mark, stored, stored,
+      student.id, student.email, student.session_version ?? 0, stored, student.id, moving ? 1 : 0, ...authorization.values);
     // Every lesson of theirs, past ones too so a receipt reads right, takes
     // their name, phone and any new address in the same write as the account
     // does (14 October 2026, Dan): never one without the other, for she adds
@@ -5618,10 +5850,10 @@ async function handleAdmin(request, env, ctx, url, path) {
       ...(moving ? forgetPendingAccess(env, student.id, { email: stored, sessionVersion: (student.session_version ?? 0) + 1 }) : []),
       env.DB.prepare(
         `UPDATE bookings SET student_name = ?, student_phone = ?${moving ? ", student_email = ?" : ""} WHERE student_id = ?
-           AND EXISTS (SELECT 1 FROM students WHERE id = ? AND name = ? AND phone = ? AND session_version = ?${moving ? " AND email = ?" : ""})`
+           AND EXISTS (SELECT 1 FROM students WHERE id = ? AND name = ? AND phone = ? AND session_version = ?${moving ? " AND email = ?" : ""}) AND (${authorization.sql})`
       ).bind(
         name, details.phone, ...(moving ? [email] : []), student.id,
-        student.id, name, details.phone, (student.session_version ?? 0) + (moving ? 1 : 0), ...(moving ? [email] : [])
+        student.id, name, details.phone, (student.session_version ?? 0) + (moving ? 1 : 0), ...(moving ? [email] : []), ...authorization.values
       )
     ]);
     if (!(updated?.meta?.changes > 0)) {
@@ -5644,9 +5876,9 @@ async function handleAdmin(request, env, ctx, url, path) {
   if (pricedStudent && request.method === "POST") {
     const student = await env.DB.prepare(`SELECT id FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(pricedStudent[1]).first();
     if (!student) return fail("That student could not be found.", 404, request, env);
-    const priced = studentPrices((await readJson(request)).prices);
+    const priced = studentPrices((adminBody).prices);
     if (priced.problem) return fail(priced.problem, 400, request, env);
-    const updated = await setStudentPrices(env, student.id, priced.prices);
+    const updated = await setStudentPrices(env, student.id, priced.prices, authorization);
     if (updated === null) return fail("Free lessons need a database update first. Nothing was changed.", 503, request, env);
     const list = await teacherStudentList(env);
     return json({ student: list.find((entry) => entry.id === student.id), updated, stayFree: await lessonsStayingFree(env, student.id) }, 200, request, env);
@@ -5669,7 +5901,7 @@ async function handleAdmin(request, env, ctx, url, path) {
     // device pressing a moment later would otherwise send a second welcome
     // with a fresh sign-in link, and spend the hourly allowance doing it. The
     // Students card sends no such flag, so it can still send one deliberately.
-    const welcomeBody = await readJson(request);
+    const welcomeBody = adminBody;
     if (welcomeBody.onlyIfWaiting === true && !awaitingWelcome(student)) {
       return fail("Their welcome has already been sent.", 409, request, env);
     }
@@ -5677,20 +5909,36 @@ async function handleAdmin(request, env, ctx, url, path) {
       return fail("A link was sent to them recently. Please wait an hour before sending another.", 429, request, env);
     }
     const settings = await loadSettings(env);
+    const onlyIfWaiting = welcomeBody.onlyIfWaiting === true;
+    const owner = welcomeAuthorization(env, student, authorization, onlyIfWaiting);
+    await owner.assert();
     // A lesson added from a stale read while their address was saved still
     // holds the stand-in; it takes the real one before anything goes out.
-    await env.DB.prepare("UPDATE bookings SET student_email = ? WHERE student_id = ? AND student_email LIKE ?")
-      .bind(student.email, student.id, `${NO_EMAIL_YET}%`).run();
-    const welcome = await issueWelcome(env, settings, student, { always: true });
-    const sent = await sendWelcome(env, { student, settings, welcome, lessons: await welcomeLessons(env, student.id) });
-    if (!sent.ok) return fail("The email could not be sent just now. Please try again.", 502, request, env);
-    // From now on, emails about their lessons reach them as usual.
-    await env.DB.prepare("UPDATE students SET awaiting_welcome = 0 WHERE id = ?").bind(student.id).run();
+    await env.DB.prepare(`UPDATE bookings SET student_email = ? WHERE student_id = ? AND student_email LIKE ? AND (${owner.sql})`)
+      .bind(student.email, student.id, `${NO_EMAIL_YET}%`, ...owner.values).run();
+    const welcome = await issueWelcome(env, settings, student, { always: true, authorization: owner });
+    // First welcomes share a durable provider request. A racing or interrupted
+    // request reuses its original sign-in link and cannot send a second email.
+    const dedupeKey = onlyIfWaiting
+      ? `welcome-first:${student.id}:${student.session_version ?? 0}:${await sessionHash(student.email)}` : null;
+    const sent = await sendWelcome(env, { student, settings, welcome, lessons: await welcomeLessons(env, student.id), dedupeKey, authorization: owner });
+    if (!sent.ok) {
+      await owner.assert();
+      return fail(sent.pending ? "Their welcome is already being sent. Please wait before trying again." : "The email could not be sent just now. Please try again.", sent.pending ? 409 : 502, request, env);
+    }
+    // Only the address and account version this welcome reached may begin
+    // receiving lesson emails. A corrected address still awaits its welcome.
+    const updated = await env.DB.prepare(`UPDATE students SET awaiting_welcome = 0 WHERE id = ? AND (${owner.sql})`)
+      .bind(student.id, ...owner.values).run();
+    if (!(updated?.meta?.changes > 0)) {
+      await owner.assert();
+      return fail("Their details have changed. Please reload before sending their welcome.", 409, request, env);
+    }
     return json({ ok: true, card: welcome.card }, 200, request, env);
   }
 
   if (request.method === "POST" && path === "/admin/bookings") {
-    const body = await readJson(request);
+    const body = adminBody;
     // A student is named by their account, so one with no email yet can have
     // lessons too (14 October 2026, Dan); an address still names them for a
     // caller that has only that.
@@ -5753,6 +6001,11 @@ async function handleAdmin(request, env, ctx, url, path) {
     // no loose lessons). Add a student creates them; this never does.
     if (!student) return fail("Add them as a student first.", 404, request, env);
 
+    lessonType = await studentLessonType(env, student.id, lessonType);
+    if ((!past || paid) && body.expectedPriceCents !== undefined && body.expectedPriceCents !== lessonType.price_cents) {
+      return fail("Their lesson price has changed. Please review it before confirming.", 409, request, env);
+    }
+
     /*
      * Registering proves nothing about an address, so whoever registered this
      * one first may not be the student Inês means. An unproven account with a
@@ -5767,14 +6020,13 @@ async function handleAdmin(request, env, ctx, url, path) {
       const [cleared] = await env.DB.batch([
         // A card someone else saved here never pays for the owner's lessons.
         env.DB.prepare(`UPDATE students SET password_hash = '', session_version = session_version + 1, card_consent_at = NULL
-          WHERE id = ? AND role != 'teacher' AND email_verified_at IS NULL AND password_hash != ''`).bind(student.id),
+          WHERE id = ? AND role != 'teacher' AND email_verified_at IS NULL AND password_hash != '' AND (${authorization.sql})`).bind(student.id, ...authorization.values),
         ...forgetPendingAccess(env, student.id, { email: student.email, sessionVersion: (student.session_version ?? 0) + 1 })
       ]);
       reclaimed = (cleared?.meta?.changes ?? 0) > 0;
       if (reclaimed) student = await env.DB.prepare("SELECT * FROM students WHERE id = ?").bind(student.id).first();
     }
 
-    lessonType = await studentLessonType(env, student.id, lessonType);
     const priceSnapshot = lessonPriceSnapshot(student.id, lessonType);
     const settings = await loadSettings(env);
     /*
@@ -5826,7 +6078,7 @@ async function handleAdmin(request, env, ctx, url, path) {
         past ? endsAt.toISOString() : null
       ], startAt: start.toISOString(), endAt: endsAt.toISOString(),
       standingCardStudent: onCard ? student : null,
-      priceSnapshot: past && !paidByHand ? null : priceSnapshot
+      priceSnapshot: past && !paidByHand ? null : priceSnapshot, authorization
     });
     if (!claimed) return fail("That time or their lesson price has changed. Please review before adding it.", 409, request, env);
 
@@ -5836,7 +6088,11 @@ async function handleAdmin(request, env, ctx, url, path) {
     // The student is told, and given one link into their account when they
     // have never been in or still have a card to add.
     const held = awaitingWelcome(student);
-    const welcome = held ? null : await issueWelcome(env, settings, student, { always: reclaimed });
+    // The first lesson is accepted. Its recipient link and notification must
+    // finish even if the teacher signs out before a later weekly claim.
+    const welcome = held ? null : await issueWelcome(env, settings, student, {
+      always: reclaimed, authorization: welcomeAuthorization(env, student)
+    });
 
     if (wantsRepeat) {
       // As a student's own run: the first lesson is real before the series
@@ -5850,11 +6106,11 @@ async function handleAdmin(request, env, ctx, url, path) {
            added_by_teacher, created_at, updated_at)
          SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, CASE WHEN authorized THEN 1 ELSE 0 END,
            CASE WHEN authorized THEN ? ELSE NULL END, CASE WHEN authorized THEN ? ELSE NULL END, 1, ?, ? FROM card
-         WHERE ${lessonPriceSnapshotSql()}`
+         WHERE ${lessonPriceSnapshotSql()} AND (${authorization.sql})`
       )
         .bind(cardPays ? 1 : 0, ...standingCardSnapshotValues(student),
           seriesId, student.id, lessonType.id, location, notes, slot.weekday, slot.minuteOfDay, repeatWeeks,
-          slot.dateKey, student.card_consent_at, STUDENT_CARD_CONSENT_VERSION, now, now, ...priceSnapshot)
+          slot.dateKey, student.card_consent_at, STUDENT_CARD_CONSENT_VERSION, now, now, ...priceSnapshot, ...authorization.values)
         .run();
       if (!(recipe?.meta?.changes > 0)) {
         const accepted = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
@@ -5865,7 +6121,7 @@ async function handleAdmin(request, env, ctx, url, path) {
         }));
         return fail("The first lesson was added, but their price changed before the weekly run was added. Please review their lessons before adding more.", 409, request, env);
       }
-      await env.DB.prepare("UPDATE bookings SET series_id = ? WHERE id = ?").bind(seriesId, id).run();
+      await env.DB.prepare(`UPDATE bookings SET series_id = ? WHERE id = ? AND (${authorization.sql})`).bind(seriesId, id, ...authorization.values).run();
       const series = await env.DB.prepare("SELECT * FROM booking_series WHERE id = ?").bind(seriesId).first();
       const remaining = (repeatWeeks ?? OPEN_ENDED_HORIZON_WEEKS) - 1;
       const filled = remaining > 0
@@ -5875,7 +6131,7 @@ async function handleAdmin(request, env, ctx, url, path) {
             count: remaining,
             now: new Date(),
             paymentState: series.automatic_payment ? "scheduled" : "none",
-            priceSnapshot
+            priceSnapshot, authorization
           })
         : { rows: [], skipped: [] };
       const first = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
@@ -5913,7 +6169,7 @@ async function handleAdmin(request, env, ctx, url, path) {
     const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(adminReschedule[1]).first();
     if (!row) return fail("That booking could not be found.", 404, request, env);
 
-    const body = await readJson(request);
+    const body = adminBody;
     const start = new Date(body.startAt);
     if (Number.isNaN(start.getTime())) return fail("That time could not be understood.", 400, request, env);
     // A record stays a record: a lesson to come is added, and announced, as one.
@@ -5946,11 +6202,11 @@ async function handleAdmin(request, env, ctx, url, path) {
            AND (starts_at != ? OR ends_at != ?) THEN NULL ELSE no_show_marked_at END
        WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
          AND NOT EXISTS (SELECT 1 FROM bookings other WHERE other.id != bookings.id
-           AND (other.status = 'confirmed' OR (other.status = 'pending_payment' AND other.hold_expires_at > ?)) AND other.starts_at < ? AND other.ends_at > ?)`
+           AND (other.status = 'confirmed' OR (other.status = 'pending_payment' AND other.hold_expires_at > ?)) AND other.starts_at < ? AND other.ends_at > ?) AND (${authorization.sql})`
     )
       .bind(start.toISOString(), endsAt.toISOString(), row.starts_at, now.toISOString(),
         start.toISOString(), endsAt.toISOString(), start.toISOString(), endsAt.toISOString(),
-        row.id, row.sequence, now.toISOString(), endsAt.toISOString(), start.toISOString())
+        row.id, row.sequence, now.toISOString(), endsAt.toISOString(), start.toISOString(), ...authorization.values)
       .run();
 
     if (!(moved?.meta?.changes > 0)) return fail("That lesson or time has just changed. Please reload.", 409, request, env);
@@ -5995,7 +6251,7 @@ async function handleAdmin(request, env, ctx, url, path) {
     if (!row) return fail("That booking could not be found.", 404, request, env);
     if (row.status === "cancelled") return fail("That lesson is already cancelled.", 409, request, env);
 
-    const body = await readJson(request);
+    const body = adminBody;
     if (body.message !== undefined && typeof body.message !== "string") {
       return fail("Write the message as text.", 400, request, env);
     }
@@ -6009,7 +6265,8 @@ async function handleAdmin(request, env, ctx, url, path) {
     // the money follows automatically so there is nothing to remember.
     const refunded = 0;
     if (row.payment_status === "paid" && row.stripe_payment_intent) {
-      if (!await claimRefund(env, row, "teacher", cancellationMessage)) return fail("That lesson has just changed. Please reload.", 409, request, env);
+      if (!await claimRefund(env, row, "teacher", cancellationMessage, null, authorization)) return fail("That lesson has just changed. Please reload.", 409, request, env);
+      await authorization.assert();
       const updated = await completeRefund(env, row.id);
       if (!updated) return fail("The cancellation request is recorded. Its refund is awaiting confirmation; the lesson stays reserved and locked. Review the payment in Stripe before any further action.", 503, request, env);
       const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
@@ -6029,11 +6286,11 @@ async function handleAdmin(request, env, ctx, url, path) {
        WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
          AND payment_status = ? AND amount_cents IS ? AND charged_cents IS ?
          AND stripe_payment_intent IS ? AND stripe_session_id IS ? AND charge_started_at IS ? AND charge_request IS ?
-         AND payment_consent_at IS ? AND payment_consent_version IS ?`
+         AND payment_consent_at IS ? AND payment_consent_version IS ? AND (${authorization.sql})`
     )
       .bind(now, now, cancellationMessage, refunded, row.id, row.sequence,
         row.payment_status, row.amount_cents, row.charged_cents, row.stripe_payment_intent, row.stripe_session_id,
-        row.charge_started_at, row.charge_request, row.payment_consent_at, row.payment_consent_version)
+        row.charge_started_at, row.charge_request, row.payment_consent_at, row.payment_consent_version, ...authorization.values)
       .run();
 
     if (!(cancelled?.meta?.changes > 0)) return fail("That lesson has just changed. Please reload.", 409, request, env);
@@ -6062,7 +6319,7 @@ async function handleAdmin(request, env, ctx, url, path) {
     const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(adminNoShow[1]).first();
     if (!row) return fail("That booking could not be found.", 404, request, env);
 
-    const body = await readJson(request);
+    const body = adminBody;
     const now = new Date();
     const timingProblem = noShowProblem(row, now);
     if (timingProblem) return fail(timingProblem, 409, request, env);
@@ -6072,10 +6329,10 @@ async function handleAdmin(request, env, ctx, url, path) {
     const changed = await env.DB.prepare(
       `UPDATE bookings SET attendance_status = ?, no_show_marked_at = ?, updated_at = ?
        WHERE id = ? AND status = 'confirmed' AND payment_status = 'scheduled' AND charge_started_at IS NULL
-         AND sequence = ? AND starts_at = ? AND ends_at = ? AND starts_at <= ? AND ends_at > ?`
+         AND sequence = ? AND starts_at = ? AND ends_at = ? AND starts_at <= ? AND ends_at > ? AND (${authorization.sql})`
     )
       .bind(noShow ? "no_show" : "expected", noShow ? updatedAt : null, updatedAt, row.id,
-        row.sequence, row.starts_at, row.ends_at, updatedAt, new Date(now.getTime() - NO_SHOW_WINDOW_HOURS * 3600000).toISOString())
+        row.sequence, row.starts_at, row.ends_at, updatedAt, new Date(now.getTime() - NO_SHOW_WINDOW_HOURS * 3600000).toISOString(), ...authorization.values)
       .run();
 
     if ((changed?.meta?.changes ?? 0) === 0) {
@@ -6097,7 +6354,7 @@ async function handleAdmin(request, env, ctx, url, path) {
   if (adminPaid && request.method === "POST") {
     const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(adminPaid[1]).first();
     if (!row) return fail("That booking could not be found.", 404, request, env);
-    const body = await readJson(request);
+    const body = adminBody;
     if (typeof body.paid !== "boolean") return fail("Say whether it is paid.", 400, request, env);
     const problem = paidTickProblem(row);
     if (problem) return fail(problem, 409, request, env);
@@ -6116,8 +6373,8 @@ async function handleAdmin(request, env, ctx, url, path) {
            amount_cents = ?, payment_consent_version = ?, updated_at = ?
          WHERE id = ? AND status = 'confirmed' AND charge_started_at IS NULL AND sequence = ?
            AND payment_status IN ('scheduled', 'not_required', '${RECORDED}')
-           AND COALESCE(payment_consent_version, '') != ?`
-      ).bind(price, PAID_BY_HAND_MARK, now, row.id, row.sequence, PAID_BY_HAND_MARK).run();
+           AND COALESCE(payment_consent_version, '') != ? AND (${authorization.sql})`
+      ).bind(price, PAID_BY_HAND_MARK, now, row.id, row.sequence, PAID_BY_HAND_MARK, ...authorization.values).run();
     } else if (!body.paid && ticked) {
       const terms = row.payment_status === RECORDED
         ? { status: RECORDED, amount: null, consentAt: null, version: null }
@@ -6126,9 +6383,12 @@ async function handleAdmin(request, env, ctx, url, path) {
         `UPDATE bookings SET payment_status = ?, amount_cents = ?, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
          WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status IN ('not_required', '${RECORDED}')
            AND payment_consent_version = ?
-           ${terms.standingCardStudent ? `AND ${standingCardSnapshotSql()}` : ""}`
+           ${terms.priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}
+           ${terms.standingCardStudent ? `AND ${standingCardSnapshotSql()}` : ""}
+           AND (${authorization.sql})`
       ).bind(terms.status, terms.amount, terms.consentAt, terms.version, now, row.id, row.sequence, PAID_BY_HAND_MARK,
-        ...(terms.standingCardStudent ? standingCardSnapshotValues(terms.standingCardStudent) : [])).run();
+        ...(terms.priceSnapshot ?? []),
+        ...(terms.standingCardStudent ? standingCardSnapshotValues(terms.standingCardStudent) : []), ...authorization.values).run();
     }
     if (!(changed?.meta?.changes > 0)) return fail("That lesson has just changed. Please reload.", 409, request, env);
     const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
@@ -6142,7 +6402,7 @@ async function handleAdmin(request, env, ctx, url, path) {
    */
   const adminRefundByHand = path.match(/^\/admin\/bookings\/([^/]+)\/refund-by-hand$/);
   if (adminRefundByHand && request.method === "POST") {
-    const body = await readJson(request);
+    const body = adminBody;
     if (body.refunded !== true) return fail("Confirm that you have refunded the student directly.", 400, request, env);
     const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(adminRefundByHand[1]).first();
     if (!row) return fail("That booking could not be found.", 404, request, env);
@@ -6154,8 +6414,8 @@ async function handleAdmin(request, env, ctx, url, path) {
       const changed = await env.DB.prepare(
         `UPDATE bookings SET payment_status = 'refunded', updated_at = ?
          WHERE id = ? AND status = 'cancelled' AND payment_consent_version = ?
-           AND payment_status IN ('not_required', '${RECORDED}') AND stripe_payment_intent IS NULL AND charge_started_at IS NULL`
-      ).bind(new Date().toISOString(), row.id, PAID_BY_HAND_MARK).run();
+           AND payment_status IN ('not_required', '${RECORDED}') AND stripe_payment_intent IS NULL AND charge_started_at IS NULL AND (${authorization.sql})`
+      ).bind(new Date().toISOString(), row.id, PAID_BY_HAND_MARK, ...authorization.values).run();
       if (!(changed?.meta?.changes > 0)) return fail("That payment has just changed. Please reload.", 409, request, env);
     }
     // This records money already returned by Inês. No provider call or email.
@@ -6167,9 +6427,9 @@ async function handleAdmin(request, env, ctx, url, path) {
   if (adminPaidByHand && request.method === "POST") {
     const changed = await env.DB.prepare(
       `UPDATE bookings SET payment_status = 'not_required', payment_consent_at = NULL, payment_consent_version = ?, updated_at = ?
-       WHERE id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled'`
+       WHERE id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'scheduled' AND (${authorization.sql})`
     )
-      .bind(PAID_BY_HAND_MARK, new Date().toISOString(), adminPaidByHand[1])
+      .bind(PAID_BY_HAND_MARK, new Date().toISOString(), adminPaidByHand[1], ...authorization.values)
       .run();
     if ((changed?.meta?.changes ?? 0) === 0) {
       return fail("Only a lesson you added that is waiting to be charged can be marked paid by hand.", 409, request, env);
@@ -6179,7 +6439,7 @@ async function handleAdmin(request, env, ctx, url, path) {
   }
 
   if (request.method === "POST" && path === "/admin/settings") {
-    const body = await readJson(request);
+    const body = adminBody;
     const allowed = new Set([
       "minimum_notice_hours",
       "booking_horizon_days",
@@ -6201,9 +6461,8 @@ async function handleAdmin(request, env, ctx, url, path) {
     };
     for (const [key, value] of Object.entries(body.settings ?? {})) {
       if (ranges[key]) {
-        const number = Number(value);
         const [min, max] = ranges[key];
-        if (!Number.isInteger(number) || number < min || number > max) {
+        if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
           return fail(`${key} must be a whole number from ${min} to ${max}.`, 400, request, env);
         }
       }
@@ -6214,9 +6473,10 @@ async function handleAdmin(request, env, ctx, url, path) {
     const statements = Object.entries(body.settings ?? {})
       .filter(([key]) => allowed.has(key))
       .map(([key, value]) =>
-        env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").bind(key, String(value))
+        env.DB.prepare(`INSERT INTO settings (key, value) SELECT ?, ? WHERE (${authorization.sql})
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(key, String(value), ...authorization.values)
       );
-    if (statements.length) await env.DB.batch(statements);
+    if (statements.length) await env.DB.batch([...statements, availabilityRevisionBump(env, authorization)]);
     return json({ ok: true, updated: statements.length }, 200, request, env);
   }
 

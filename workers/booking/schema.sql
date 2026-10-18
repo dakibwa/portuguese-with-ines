@@ -279,6 +279,9 @@ CREATE TABLE IF NOT EXISTS email_log (
   created_at  TEXT NOT NULL,
   -- Exact retry body and bounded send ownership (migration 0034).
   request_json TEXT,
+  -- Immutable membership and terms for a confirmation, move or cancellation.
+  -- Checked against every included lesson before retrying its saved body.
+  lifecycle_json TEXT,
   first_attempt_at TEXT,
   send_claim_id TEXT,
   send_claim_until TEXT

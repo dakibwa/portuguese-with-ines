@@ -40,19 +40,25 @@ export async function calendarOwnsTeacherInvites(env) {
   return Boolean((await connection(env))?.calendar_id);
 }
 
-export async function startCalendarConnection(env, teacher, sessionHash) {
+export async function startCalendarConnection(env, teacher, sessionHash, authorization = null) {
   if (!enabled(env) || !callback(env)) throw new Error("Google Meet setup is not ready yet.");
   const current = await connection(env);
   if (current && current.teacher_id !== teacher.id) throw new Error("Google Meet is connected to another teacher account.");
   const state = random();
   const verifier = random();
   const now = new Date();
-  await env.DB.batch([
-    env.DB.prepare("DELETE FROM google_calendar_oauth_states WHERE expires_at < ? OR teacher_id = ?").bind(now.toISOString(), teacher.id),
+  const sql = authorization?.sql ?? `EXISTS (SELECT 1 FROM students WHERE id = ? AND role = 'teacher' AND session_version = ?)
+    AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
+  const values = authorization?.values ?? [teacher.id, teacher.session_version ?? 0, sessionHash];
+  const results = await env.DB.batch([
+    env.DB.prepare(`DELETE FROM google_calendar_oauth_states WHERE (expires_at < ? OR teacher_id = ?) AND (${sql})`)
+      .bind(now.toISOString(), teacher.id, ...values),
     env.DB.prepare(`INSERT INTO google_calendar_oauth_states
-      (state_hash, teacher_id, session_version, session_hash, verifier_encrypted, expires_at) VALUES (?, ?, ?, ?, ?, ?)`)
-      .bind(await hash(state), teacher.id, teacher.session_version ?? 0, sessionHash, await encryptCalendarToken(env, verifier), new Date(now.getTime() + 600000).toISOString()),
+      (state_hash, teacher_id, session_version, session_hash, verifier_encrypted, expires_at)
+      SELECT ?, ?, ?, ?, ?, ? WHERE (${sql})`)
+      .bind(await hash(state), teacher.id, teacher.session_version ?? 0, sessionHash, await encryptCalendarToken(env, verifier), new Date(now.getTime() + 600000).toISOString(), ...values),
   ]);
+  if (!results[1]?.meta?.changes) throw new Error("Please sign in again.");
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.search = new URLSearchParams({ client_id: env.GOOGLE_CALENDAR_CLIENT_ID, redirect_uri: callback(env),
     response_type: "code", scope: `openid email ${CALENDAR_SCOPE}`, access_type: "offline", prompt: "consent",
@@ -92,12 +98,17 @@ export async function finishCalendarConnection(env, url) {
     const freshTeacher = await env.DB.prepare("SELECT role, session_version FROM students WHERE id = ?").bind(teacher.id).first();
     const freshlyRevoked = await env.DB.prepare("SELECT token_hash FROM revoked_sessions WHERE token_hash = ?").bind(stored.session_hash).first();
     if (freshTeacher?.role !== "teacher" || freshTeacher.session_version !== stored.session_version || freshlyRevoked) return "error";
-    await env.DB.prepare(`INSERT INTO google_calendar_connections
-      (id, teacher_id, google_sub, email, refresh_token_encrypted, status, updated_at) VALUES (1, ?, ?, ?, ?, 'active', ?)
+    const granted = await env.DB.prepare(`INSERT INTO google_calendar_connections
+      (id, teacher_id, google_sub, email, refresh_token_encrypted, status, updated_at)
+      SELECT 1, ?, ?, ?, ?, 'active', ?
+      WHERE EXISTS (SELECT 1 FROM students WHERE id = ? AND role = 'teacher' AND session_version = ?)
+        AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)
       ON CONFLICT(id) DO UPDATE SET google_sub=excluded.google_sub, email=excluded.email,
       refresh_token_encrypted=excluded.refresh_token_encrypted, status='active', updated_at=excluded.updated_at
       WHERE google_calendar_connections.teacher_id = excluded.teacher_id`)
-      .bind(teacher.id, profile.sub, profile.email, await encryptCalendarToken(env, tokens.refresh_token), new Date().toISOString()).run();
+      .bind(teacher.id, profile.sub, profile.email, await encryptCalendarToken(env, tokens.refresh_token), new Date().toISOString(),
+        teacher.id, stored.session_version, stored.session_hash).run();
+    if (!granted?.meta?.changes) return "error";
     const saved = await completeCalendarSetup(env);
     return saved?.calendar_id ? "connected" : "error";
   } catch {
