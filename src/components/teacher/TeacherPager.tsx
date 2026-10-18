@@ -27,7 +27,7 @@ export function TeacherPager({ unit, away, headingRef, onCurrent, onNext, onPrev
   return (
     <div className="teacher-pager">
       <button
-        className={`teacher-text-button${away ? "" : " is-idle"}`}
+        className={`button button--lilac button--compact teacher-pager-current${away ? "" : " is-idle"}`}
         disabled={!away}
         onClick={() => {
           headingRef.current?.focus({ preventScroll: true });

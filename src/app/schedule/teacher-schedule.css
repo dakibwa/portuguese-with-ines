@@ -228,7 +228,7 @@
   align-items: center;
   gap: 0.35rem;
   margin-left: auto;
-  /* The text button's own height, so its coming and going moves nothing. */
+  /* The compact button's own height, so its coming and going moves nothing. */
   min-height: 42px;
   flex: none;
 }
@@ -242,13 +242,15 @@
 .teacher-pager .teacher-icon-button:focus-visible {
   background: var(--blue-deep);
 }
-.teacher-pager .teacher-text-button {
+.teacher-pager .teacher-pager-current {
+  flex: none;
+  width: auto;
   margin-right: 0.2rem;
   white-space: nowrap;
 }
 /* Out of sight but still taking its place; visibility also drops it from the
    tab order and from assistive technology. */
-.teacher-pager .teacher-text-button.is-idle {
+.teacher-pager-current.is-idle {
   visibility: hidden;
 }
 .teacher-week-toolbar .teacher-pager {
@@ -1529,12 +1531,17 @@
   .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-pager { display: contents; }
   .teacher-week-toolbar .teacher-pager .teacher-icon-button:nth-of-type(2) { grid-area: previous; }
   .teacher-week-toolbar .teacher-pager .teacher-icon-button:nth-of-type(3) { grid-area: next; }
-  .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-pager .teacher-text-button {
+  .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-pager-current {
     grid-area: current;
     justify-self: end;
     margin: 0;
   }
-  .teacher-week-toolbar .teacher-pager .teacher-text-button.is-idle { display: none; }
+  .teacher-week-toolbar .teacher-pager-current.is-idle { display: none; }
+}
+
+/* Keep both lilac controls together on the narrowest phones. */
+@media (max-width: 360px) {
+  .teacher-week-toolbar .button--compact { padding-inline: 0.65rem; }
 }
 
 /* A side panel has room for the working week; phones retain one roomy day. */
