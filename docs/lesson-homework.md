@@ -91,6 +91,9 @@ practical communication task. Answers are separate and can be shown after an
 attempt. Personal questions use possible answers, not a single compulsory
 response. The A4 print view has writing space, a separate optional answer key,
 12-point body text and no navigation, coloured fills or decorative background.
+Its print copy and native-print handlers are prepared before the worksheet's
+first paint, so printing immediately from an open lesson selects that one
+worksheet rather than a blank page or a hidden editor behind it.
 
 ## Teaching and presentation sources
 
