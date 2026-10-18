@@ -700,6 +700,16 @@ bind the address and session version they verified. Pending-access cleanup is
 part of the identity write's D1 transaction and runs only when that write wins;
 a losing request cannot delete newer recovery links. The ephemeral
 `auth-cleanup:` request-limit marker is removed in the same transaction.
+Email-change confirmation also checks the presented session's revocation in
+its identity write, so signing out while a confirmation is running cannot
+produce a replacement session. Card removal checks the original account
+version and session revocation in its write; dependent lesson and series
+changes run only when that write wins, and its reply rechecks the session.
+Homework answer writes bind that same version and revocation; every homework
+reply rechecks access before returning private sheets or feedback. Stopping a
+weekly series and claiming each cancellation or refund also bind the original
+session. Recovery blocks later claims while a refund already claimed, or
+marking already started for a saved submission, can finish safely.
 
 - **Opening quickly.** `/book/` asks for `/me` from its HTML, before its code
   loads. `/me` reads the session's student and its revocation together, then

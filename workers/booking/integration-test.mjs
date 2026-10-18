@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import worker, { chargeDueLessons, chargeDueSameDayFees, notifySeries, resendFailedEmails, retryPaymentRecovery, retryRefunds, sendLessonReminders } from "./index.mjs";
-import { createSession, createResetToken, createSignInToken, hashPassword, sessionVersion } from "./auth.mjs";
+import { createSession, createResetToken, createSignInToken, hashPassword, sessionHash, sessionVersion } from "./auth.mjs";
 import { createManageToken, readManageToken } from "./tokens.mjs";
 import { findRecurringCode, studentLessonType, priceForMove } from "./rates.mjs";
 import { bookingSelection, portoWeekOf } from "./selection.mjs";
@@ -609,7 +609,7 @@ await test("logout revokes only the presented session and reset invalidates prev
 
 await test("account reads and profile saves refuse sessions revoked while a request is running", async () => {
   const originalPrepare = DB.prepare;
-  for (const change of ["version", "logout", "profile", "email", "admin-details"]) {
+  for (const change of ["version", "logout", "profile", "email", "email-confirm-logout", "email-confirm-taken-logout", "email-confirm-failed-logout", "email-confirm-after-write-logout", "admin-details"]) {
     const id = `snapshot-${change}`;
     student(id);
     const bearer = await createSession(id, env.BOOKING_TOKEN_SECRET);
@@ -633,6 +633,57 @@ await test("account reads and profile saves refuse sessions revoked while a requ
         };
         assert.equal((await call("/me/email", { ...options, body: { email: "new-snapshot@example.invalid" } })).status, 401);
         assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_changes WHERE student_id=?").get(id).n, 0);
+      } else if (change.startsWith("email-confirm-")) {
+        const confirmation = await createResetToken(id, env.BOOKING_TOKEN_SECRET);
+        const nonce = confirmation.split(".")[2];
+        const now = new Date().toISOString();
+        const afterWrite = change === "email-confirm-after-write-logout";
+        const bearerHash = await sessionHash(bearer);
+        const newEmail = `${id}-new@example.invalid`;
+        db.prepare("INSERT INTO email_changes(nonce,student_id,new_email,created_at) VALUES (?,?,?,?)")
+          .run(nonce, id, change === "email-confirm-taken-logout" ? "bob@example.invalid" : newEmail, now);
+        db.prepare("INSERT INTO password_resets(nonce,student_id,created_at) VALUES (?,?,?)").run(`${id}-reset`, id, now);
+        db.prepare("INSERT INTO sign_in_links(nonce,student_id,email,expires_at,created_at) VALUES (?,?,?,?,?)")
+          .run(`${id}-sign-in`, id, `${id}@example.invalid`, "2026-09-06T10:00:00.000Z", now);
+        const before = { ...db.prepare("SELECT email,session_version FROM students WHERE id=?").get(id) };
+        let loggedOut = false;
+        DB.prepare = sql => {
+          const statement = originalPrepare(sql);
+          if (sql.startsWith("SELECT * FROM email_changes WHERE nonce = ?")) {
+            const first = statement.first;
+            statement.first = async () => {
+              if (!afterWrite) {
+                assert.equal((await call("/auth/logout", options)).status, 200);
+                loggedOut = true;
+              }
+              if (change === "email-confirm-failed-logout") beforeRun = mutation => {
+                if (!mutation.startsWith("UPDATE students SET email = ?")) return;
+                beforeRun = null;
+                throw new Error("Isolated email-change write failure");
+              };
+              return first();
+            };
+          } else if (afterWrite && sql.startsWith("SELECT * FROM students WHERE id = ? AND email = ? AND session_version = ?")) {
+            const first = statement.first;
+            statement.first = () => {
+              // A logout authenticated before the transition can commit its
+              // revocation after that transition but before this final read.
+              db.prepare("INSERT INTO revoked_sessions(token_hash,expires_at) VALUES (?,?)").run(bearerHash, Number(bearer.split(".")[1]));
+              loggedOut = true;
+              return first();
+            };
+          }
+          return statement;
+        };
+        const response = await call("/me/email/confirm", { ...options, body: { token: confirmation } });
+        assert.equal(loggedOut, true, "the original session is revoked before the sensitive write, cleanup or final response");
+        assert.equal(response.status, 409);
+        assert.equal((await response.json()).session, undefined, "a revoked session cannot renew itself");
+        assert.deepEqual({ ...db.prepare("SELECT email,session_version FROM students WHERE id=?").get(id) },
+          afterWrite ? { email: newEmail, session_version: before.session_version + 1 } : before);
+        for (const table of ["email_changes", "password_resets", "sign_in_links"]) {
+          assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE student_id=?`).get(id).n, afterWrite ? 0 : 1, "only a winning transition clears pending access");
+        }
       } else if (change === "profile") {
         beforeRun = sql => {
           if (!sql.startsWith("UPDATE students SET name = ?")) return;
@@ -668,6 +719,8 @@ await test("account reads and profile saves refuse sessions revoked while a requ
       beforeRun = null;
       db.prepare("DELETE FROM bookings WHERE student_id=?").run(id);
       db.prepare("DELETE FROM password_resets WHERE student_id=?").run(id);
+      db.prepare("DELETE FROM email_changes WHERE student_id=?").run(id);
+      db.prepare("DELETE FROM sign_in_links WHERE student_id=?").run(id);
       db.prepare("DELETE FROM students WHERE id=?").run(id);
     }
   }
@@ -841,6 +894,55 @@ await test("series cancellation locks paid occurrences before refunding and repo
   assert.equal((await response.json()).refunded, 1);
   assert.equal(db.prepare("SELECT status FROM bookings WHERE id='refund-series'").get().status, "cancelled");
   duringRefund = null;
+  assert.equal((await call(`/series/${seriesId}/stop`)).status, 200, "stopping an ended series remains idempotent");
+
+  // Recovery or logout can win after authentication but before any one of
+  // the stopping, cancellation or refund writes. Each claim checks identity.
+  for (const [stage, revoked] of [["stop", false], ["stop", true], ["cancel", false], ["refund", true], ["between-refunds", false]]) {
+    const user = `series-identity-${stage}-${revoked}`;
+    const run = `run-${user}`;
+    const lesson = `lesson-${user}`;
+    student(user);
+    sessions[user] = await createSession(user, env.BOOKING_TOKEN_SECRET);
+    const bearerHash = await sessionHash(sessions[user]);
+    const recover = () => revoked
+      ? db.prepare("INSERT INTO revoked_sessions(token_hash,expires_at) VALUES (?,?)").run(bearerHash, Number(sessions[user].split(".")[1]))
+      : db.prepare("UPDATE students SET session_version=session_version+1 WHERE id=?").run(user);
+    db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES (?,?,'single',1,660,?,?)")
+      .run(run, user, new Date().toISOString(), new Date().toISOString());
+    const payment = stage === "refund" || stage === "between-refunds" ? "paid" : "scheduled";
+    booking(lesson, { owner: user, payment, series: run, start: "2026-09-28T12:00:00.000Z", end: "2026-09-28T13:00:00.000Z" });
+    db.prepare("UPDATE bookings SET stripe_payment_intent=? WHERE id=?").run(`pi_${lesson}`, lesson);
+    if (stage === "between-refunds") {
+      booking(`${lesson}-later`, { owner: user, payment: "paid", series: run, start: "2026-09-29T12:00:00.000Z", end: "2026-09-29T13:00:00.000Z" });
+      db.prepare("UPDATE bookings SET stripe_payment_intent=? WHERE id=?").run(`pi_${lesson}_later`, `${lesson}-later`);
+      duringRefund = async () => { duringRefund = null; recover(); };
+    } else {
+      const prefix = stage === "stop" ? "UPDATE booking_series SET status = 'ended'"
+        : stage === "cancel" ? "UPDATE bookings SET status = 'cancelled'" : "INSERT OR IGNORE INTO booking_refunds";
+      beforeRun = (sql) => { if (sql.startsWith(prefix)) { beforeRun = null; recover(); } };
+    }
+    const count = refunds.length;
+    try {
+      assert.equal((await call(`/series/${run}/stop`, { user, body: { cancelRemaining: true } })).status, 401);
+      assert.equal(db.prepare("SELECT status FROM booking_series WHERE id=?").get(run).status, stage === "stop" ? "active" : "ended");
+      assert.equal(refunds.length - count, stage === "between-refunds" ? 1 : 0, "only a refund already claimed can finish after recovery");
+      assert.equal(db.prepare("SELECT status FROM bookings WHERE id=?").get(lesson).status, stage === "between-refunds" ? "cancelled" : "confirmed");
+      if (stage === "between-refunds") {
+        assert.equal(db.prepare("SELECT status FROM bookings WHERE id=?").get(`${lesson}-later`).status, "confirmed", "the old request cannot claim the next refund");
+      } else {
+        assert.equal(db.prepare("SELECT COUNT(*) AS n FROM booking_refunds WHERE booking_id=?").get(lesson).n, 0);
+      }
+    } finally {
+      beforeRun = null; duringRefund = null;
+      db.prepare("DELETE FROM booking_refunds WHERE booking_id IN (SELECT id FROM bookings WHERE student_id=?)").run(user);
+      db.prepare("DELETE FROM bookings WHERE student_id=?").run(user);
+      db.prepare("DELETE FROM booking_series WHERE id=?").run(run);
+      db.prepare("DELETE FROM revoked_sessions WHERE token_hash=?").run(bearerHash);
+      db.prepare("DELETE FROM students WHERE id=?").run(user);
+      delete sessions[user];
+    }
+  }
 });
 
 // Multi-date booking uses the same real SQLite adapter and isolated providers.
@@ -2491,6 +2593,36 @@ await test("a card saved from the account pays for the lessons Inês added from 
     assert.equal((await webhook({ ...event, id: "evt_card_again", data: { object: { ...session, id: "cs_again", setup_intent: "seti_card_again", created: Math.floor(Date.now() / 1000) + 600 } } })).status, 200);
     assert.equal(statusOf("2026-10-09T02:00:00.000Z"), "not_required", "a new card doesn't take it back");
 
+    // A removal authenticated before an account transition or logout cannot
+    // change the current agreement, its lessons or its weekly recipe.
+    const cardBefore = { ...db.prepare("SELECT card_consent_at,card_setup_version,session_version,stripe_payment_method FROM students WHERE id=?").get(id) };
+    const obligations = () => [
+      db.prepare("SELECT id,payment_status,payment_consent_at,payment_consent_version FROM bookings WHERE student_id=? ORDER BY id").all(id),
+      db.prepare("SELECT id,automatic_payment,payment_consent_at,payment_consent_version FROM booking_series WHERE student_id=? ORDER BY id").all(id)
+    ];
+    const obligationsBefore = obligations();
+    const bearerHash = await sessionHash(token);
+    for (const change of ["version", "logout"]) {
+      let intervened = false;
+      beforeRun = sql => {
+        if (!sql.startsWith("UPDATE students SET card_consent_at = NULL, card_setup_version")) return;
+        beforeRun = null;
+        intervened = true;
+        if (change === "version") db.prepare("UPDATE students SET session_version=session_version+1 WHERE id=?").run(id);
+        else db.prepare("INSERT INTO revoked_sessions(token_hash,expires_at) VALUES (?,?)").run(bearerHash, Number(token.split(".")[1]));
+      };
+      const refused = await call("/me/card/remove", { token });
+      assert.equal(intervened, true);
+      assert.equal(refused.status, 401);
+      assert.equal((await refused.json()).student, undefined, "the stale caller cannot read the current profile");
+      assert.deepEqual({ ...db.prepare("SELECT card_consent_at,card_setup_version,session_version,stripe_payment_method FROM students WHERE id=?").get(id) },
+        { ...cardBefore, session_version: cardBefore.session_version + (change === "version" ? 1 : 0) });
+      assert.deepEqual(obligations(), obligationsBefore, "a losing removal cannot downgrade lessons or the weekly recipe");
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM request_limits WHERE key LIKE 'card-removal:%'").get().n, 0);
+      db.prepare("UPDATE students SET session_version=? WHERE id=?").run(cardBefore.session_version, id);
+      db.prepare("DELETE FROM revoked_sessions WHERE token_hash=?").run(bearerHash);
+    }
+
     // Taking the card back: her lessons still to come go back to being paid by hand.
     const removed = await call("/me/card/remove", { token, body: {} });
     assert.equal(removed.status, 200);
@@ -3480,6 +3612,59 @@ await test("homework: private drafts, teacher review, lesson ownership and saved
   const returnedStudents = await (await call("/admin/students", { user: "teacher", method: "GET" })).json();
   assert.ok(returnedStudents.students.find(student => student.id === "alice").homeworkToReview.some(item => item.bookingId === id));
   assert.equal((await call(route, { user: "teacher", body: { ...input, updatedAt: teacher.updatedAt } })).status, 409, "published questions cannot invalidate saved answers");
+
+  // An old request must not read the recovered account's feedback, retry a
+  // submission into that feedback, or write answers after its session ends.
+  const prepare = DB.prepare;
+  for (const [operation, transition] of [["insert", "recovery"], ["insert", "logout"], ["update", "recovery"], ["update", "logout"],
+    ["read", "recovery"], ["retry", "recovery"], ["list", "logout"]]) {
+    const account = `homework-${operation}-${transition}`;
+    student(account); sessions[account] = await createSession(account, env.BOOKING_TOKEN_SECRET);
+    const hash = await sessionHash(sessions[account]);
+    const lessonId = linkedBooking(account, { owner: account });
+    const teacherRoute = `/admin/lessons/${lessonId}/homework`;
+    let transitioned = false;
+    const invalidate = () => {
+      transitioned = true;
+      if (transition === "recovery") db.prepare("UPDATE students SET session_version = session_version + 1 WHERE id = ?").run(account);
+      else db.prepare("INSERT INTO revoked_sessions(token_hash, expires_at) VALUES (?, ?)").run(hash, Date.now() + 3600000);
+    };
+    try {
+      const created = await (await call(teacherRoute, { user: "teacher", body: input })).json();
+      assert.equal((await call(`${teacherRoute}/publish`, { user: "teacher", body: { ...input, updatedAt: created.updatedAt, reviewed: true } })).status, 200);
+      if (operation !== "insert") db.prepare(`INSERT INTO homework_progress
+        (booking_id, student_id, answers_json, submission_json, completed_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(lessonId, account, JSON.stringify(feedback.answers), JSON.stringify(feedback.submission), feedback.completedAt, feedback.updatedAt);
+      const before = db.prepare("SELECT * FROM homework_progress WHERE booking_id = ?").get(lessonId);
+      if (operation === "insert" || operation === "update") beforeRun = sql => {
+        if (!sql.startsWith(operation === "insert" ? "INSERT INTO homework_progress" : "UPDATE homework_progress SET answers_json")) return;
+        beforeRun = null; invalidate();
+      };
+      else DB.prepare = sql => {
+        const statement = prepare(sql);
+        const method = operation === "list" ? "all" : "first";
+        if (operation === "list" ? sql.startsWith("SELECT h.booking_id, b.starts_at") : sql.startsWith("SELECT * FROM homework_progress")) {
+          const read = statement[method];
+          statement[method] = () => { DB.prepare = prepare; invalidate(); return read(); };
+        }
+        return statement;
+      };
+      const response = await call(operation === "list" ? "/me/homework" : `/me/homework/${lessonId}${["insert", "retry"].includes(operation) ? "/submit" : ""}`, {
+        user: account, method: ["read", "list"].includes(operation) ? "GET" : "POST",
+        body: operation === "retry" ? { answers: feedback.submission.answers, updatedAt: feedback.updatedAt }
+          : { answers: { q1: "Must not survive this transition", q2: "Queria uma água." }, updatedAt: before?.updated_at ?? null },
+      });
+      assert.equal(transitioned, true, `${operation} overlaps ${transition}`);
+      assert.equal(response.status, 401, `${operation} refuses the ended session`);
+      assert.deepEqual(db.prepare("SELECT * FROM homework_progress WHERE booking_id = ?").get(lessonId), before, "ended sessions neither save answers nor replace the submission");
+    } finally {
+      beforeRun = null; DB.prepare = prepare;
+      db.prepare("DELETE FROM bookings WHERE id = ?").run(lessonId);
+      db.prepare("DELETE FROM revoked_sessions WHERE token_hash = ?").run(hash);
+      db.prepare("DELETE FROM students WHERE id = ?").run(account);
+      delete sessions[account];
+    }
+  }
   // Old linkage must never expose homework after the booking changes owner.
   db.prepare("UPDATE bookings SET student_id = 'bob' WHERE id = ?").run(id);
   assert.equal((await call(`/me/homework/${id}`, { method: "GET" })).status, 404);
@@ -3579,6 +3764,9 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
       assert.equal((await duplicate.json()).progress.submission.state, "marking", "an in-flight retry reuses the claimed attempt without a second bill");
       const attempt = await (await call(route, { user: "teacher", method: "GET" })).json();
       assert.equal((await call(`${route}/return`, { user: "teacher", body: { submissionId: attempt.progress.submission.id, updatedAt: attempt.progress.updatedAt, approved: true } })).status, 409);
+      // Recovery can end the student's request while the already-saved
+      // attempt is being marked. Its teacher review must still finish.
+      db.prepare("UPDATE students SET session_version = session_version + 1 WHERE id = 'alice'").run();
       return reply(name, { marks: [{ id: "q1", status: "correct", feedback: "O teu pedido está correto." }] });
     }
     if (name === "lesson_transcription") {
@@ -3623,8 +3811,10 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     markingBody = { answers: { q1: "Queria um chá, por favor." }, updatedAt: null };
     assert.equal((await call(`/me/homework/${id}/submit`, { user: "bob", body: markingBody })).status, 404);
     const marked = await call(`/me/homework/${id}/submit`, { body: markingBody });
-    assert.equal(marked.status, 200, await marked.clone().text());
-    assert.equal((await marked.json()).progress.submission.marks, undefined, "AI suggestions cannot bypass teacher approval");
+    assert.equal(marked.status, 401, "account recovery ends the response without discarding the saved marking");
+    sessions.alice = await createSession("alice", env.BOOKING_TOKEN_SECRET, db.prepare("SELECT session_version FROM students WHERE id = 'alice'").get().session_version);
+    const studentProgress = await (await call(`/me/homework/${id}`, { method: "GET" })).json();
+    assert.equal(studentProgress.progress.submission.marks, undefined, "AI suggestions cannot bypass teacher approval");
     const graded = await (await call(route, { user: "teacher", method: "GET" })).json();
     assert.equal(graded.progress.submission.marks.q1.source, "ai");
     assert.equal(graded.progress.submission.marks.q1.status, "correct");
