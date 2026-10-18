@@ -13,7 +13,7 @@ if (!base) throw new Error("Supply QA_BASE_URL explicitly.");
 const browser = await chromium.launch({ headless: true });
 const student = {
   id: "student-brought", name: "Rita Sousa", email: "rita@example.invalid", phone: "", nif: "", timezone: "Europe/Lisbon",
-  role: "student", hasCard: false, cardForAllLessons: false,
+  role: "student", mark: "", hasCard: false, cardForAllLessons: false,
 };
 const added = {
   reference: "PT-ADDED1", status: "confirmed", startAt: "2026-09-10T16:00:00.000Z", endAt: "2026-09-10T17:00:00.000Z",
@@ -203,16 +203,23 @@ try {
 
     // Back from Stripe: a short thank-you, no ask, and the card in Your details.
     const removeWaiting = deferred(), removeStarted = deferred();
+    const savedStudent = { ...student, hasCard: true, cardForAllLessons: true };
+    const savedBookings = [{ ...added, paymentStatus: "scheduled" }];
     const saved = await open(width, "/book/?view=lessons&card=added", {
       session: "qa-link-session",
-      me: { ...student, hasCard: true, cardForAllLessons: true },
-      bookings: [{ ...added, paymentStatus: "scheduled" }],
+      me: savedStudent,
+      bookings: savedBookings,
       reply: async (endpoint, body) => {
         if (endpoint === "/me/card/remove") {
           removeStarted.resolve(); await removeWaiting.promise;
-          return { json: { student: { ...student, hasCard: false, cardForAllLessons: false } } };
+          Object.assign(savedStudent, { hasCard: false, cardForAllLessons: false });
+          savedBookings[0].paymentStatus = "not_required";
+          return { json: { student: savedStudent } };
         }
-        if (endpoint === "/me" && body) return { json: { student: { ...student, ...body, hasCard: true, cardForAllLessons: true } } };
+        if (endpoint === "/me" && body) {
+          Object.assign(savedStudent, body);
+          return { json: { student: savedStudent } };
+        }
         return null;
       },
     });
@@ -245,9 +252,27 @@ try {
     await expect(cardRow).toContainText("Not added");
     await expect(nameRow).toContainText("Rita Updated");
     await expect(emailRow.getByLabel("Email", { exact: true })).toBeVisible();
+    const markRow = saved.page.locator('.my-lessons__fact[data-field="mark"]');
+    await markRow.getByRole("button", { name: "Change splat", exact: true }).click();
+    await markRow.getByRole("button", { name: "Bloom", exact: true }).click();
+    await expect(markRow.locator(".my-lessons__fact-value img")).toHaveAttribute("src", "/visuals/v2-splats/built-around-you-splat-v2.svg");
+    await chooseFromMenu(saved.page, "Done editing");
+    await expect(saved.page.locator(".card-added")).toHaveCount(0);
+    await expect(saved.page.locator(".card-prompt")).toBeVisible();
+    await expect(saved.page.locator(".lesson-overview .account-menu__name")).toHaveText("Rita Updated");
+    await expect(saved.page.locator(".calendar-panel > .account-signature")).toHaveAttribute("src", "/visuals/v2-splats/built-around-you-splat-v2.svg");
     assert.ok(await noOverflow(saved.page), `no sideways scroll at ${width}px`);
     assert.deepEqual(saved.errors, []);
     await saved.page.close();
+
+    // Stripe's return marker alone is not proof that its webhook saved a card.
+    const unconfirmed = await open(width, "/book/?view=lessons&card=added", { session: "qa-link-session" });
+    await expect(unconfirmed.page.locator(".card-added")).toContainText("We’re confirming your saved card");
+    await expect(unconfirmed.page.locator(".card-added")).not.toContainText("Card saved");
+    await expect(unconfirmed.page.locator(".card-prompt")).toBeVisible({ timeout: 15000 });
+    await expect(unconfirmed.page.locator(".card-added")).toContainText("hasn’t been confirmed");
+    assert.deepEqual(unconfirmed.errors, []);
+    await unconfirmed.page.close();
   }
 
   // /idioms is an account page. Inês paints her drafts locally; opening the

@@ -1266,6 +1266,8 @@ Preserve these desktop and mobile states:
   `Card saved. You’re all set.` Its words are as short and
   plain as they can be (12 October 2026, Dan: "the language here can be
   even more simple"), and so are the emails that bring students in.
+  That success waits for verified current card permission; a return URL alone
+  cannot hide `Add card`, and removing the card clears the success state.
   A sign-in link from an email opens on `Welcome`, `Sign in to see your
   lessons. No password needed.` and one coral `Sign in`, spent only when
   pressed, since mail scanners open links on their own; a spent link says so
@@ -1281,7 +1283,8 @@ Preserve these desktop and mobile states:
   are raised cream there exactly as on the booking sheet. The splat
   opens as a row of the site's own marks, all but the FAQ's question, with the
   initial first; choosing one saves it, and it shows wherever the name's menu
-  does. A small `Sign out` waits at the card's foot, on the right. `Done
+  does. Saved names and splats update every account menu immediately. A small
+  `Sign out` waits at the card's foot, on the right. `Done
   editing` returns to Your lessons. Its
   last item is the small `Have a code from Inês?` disclosure, one field with a blue `Add code`
   beside it that stays open for the second length's code, with any saved weekly

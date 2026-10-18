@@ -98,6 +98,33 @@ async function settleNavigation(page) {
 }
 
 try {
+  // An existing site session can authenticate a Google link. A refusal of the
+  // Google credential must show its error while keeping that site session.
+  for (const width of [1280, 390]) {
+    const currentSession = "isolated-current-link-session";
+    let exchanges = 0;
+    const state = await fixture(width, async (path, request) => {
+      if (path !== "/auth/google") return null;
+      exchanges += 1;
+      assert.equal(request.headers().authorization, `Bearer ${currentSession}`);
+      return { status: 401, json: { error: "That Google sign-in could not be verified. Please try again." } };
+    });
+    try {
+      await state.page.goto(`${base}/book/?view=lessons`);
+      const panel = state.page.locator(".auth-panel");
+      await expect(panel).toBeVisible();
+      if (!await panel.locator(".google-signin").count()) continue;
+      // Storage can change before its event reaches an already open form.
+      await state.page.evaluate(token => localStorage.setItem("ines-student-session", token), currentSession);
+      await panel.getByRole("button", { name: "Continue with Google", exact: true }).click();
+      await expect(panel.getByRole("alert")).toContainText("Google sign-in could not be verified");
+      assert.equal(await state.page.evaluate(() => localStorage.getItem("ines-student-session")), currentSession);
+      assert.equal(exchanges, 1);
+      assert.deepEqual(state.errors, []);
+      googleChecks += 1;
+    } finally { await state.context.close(); }
+  }
+
   for (const width of [390]) {
     // A successful exchange is not a signed-in browser until its bearer has
     // actually been saved. Account creation still happened on the server, so

@@ -948,6 +948,9 @@ Monday–Sunday week. Duration, location and repeat period are shared. Trials
 remain single. `POST /bookings` accepts `startAts`; the existing `startAt` route
 still books one lesson. The server normalises instants, rejects overlap and
 enforces the same-week rule independently of the browser.
+The second weekly time can span two weeks on the student's displayed clock;
+the calendar exposes every local date in that Porto week rather than hiding
+valid starts behind the first time's local week.
 
 The two recurring times use separate existing `booking_series` recipes. One
 D1 transaction inserts all planned lesson rows after an atomic overlap check,
@@ -1055,6 +1058,13 @@ lessons, so its cancellation set includes every occurrence committed first.
   hands you their account with your password still on it. Email is kept only as a
   fallback for someone who registered with a password first, and never claims a
   row already linked to a different Google account.
+  First email matching requires Google to be authoritative for that address:
+  Gmail, or a verified Workspace token carrying its hosted domain. A verified
+  third-party address alone cannot claim or create a site account. Its owner
+  first signs in with email (or creates an email account), then can link Google
+  while signed into that same already mail-verified account. That explicit own
+  link preserves their password and sessions. Existing linked Google ids keep
+  working independently of email-domain authority.
 - On a confirmed change, outstanding password resets are deleted — a live reset
   link sitting in the old mailbox would otherwise stay valid for its hour — and
   future lessons are re-addressed. Past and cancelled lessons keep the address
@@ -1074,6 +1084,8 @@ lessons, so its cancellation set includes every occurrence committed first.
   without repeating the mutation. A move renders the saved booking returned
   by its POST, so an unavailable detail reread cannot undo the displayed success.
   Change controls stay disabled while the save is pending.
+  Delayed Meet polling cannot overwrite a completed move or cancellation.
+  Name and splat saves update the calendar's account identity immediately.
 - Background account refreshes update both the calendar and the account menu's
   lesson count/history. Incoming lesson data preserves the student's profile
   drafts and independently saved fields; a successful refresh clears an older
@@ -1128,6 +1140,12 @@ lessons, so its cancellation set includes every occurrence committed first.
   the same held booking and client secret, without booking again. Signing out
   or replacing the account also dismisses its pending checkout-return check;
   a late verification cannot restore that account's success banner.
+  The `card=added` return flag starts verification; it does not prove a saved
+  card or charging agreement. Success reflects the current account state and
+  clears after card removal.
+  Move and cancel requests may include `expectedLateFeeCents`. If the current
+  fee differs, the Worker answers 409 before changing the lesson and the page
+  shows the new fee for explicit confirmation.
 
 ### NIF for receipts
 
@@ -1313,24 +1331,26 @@ different students were confirmed into the same lesson in testing.
 
 ### When email fails
 
-Email is best-effort, but "best effort" used to mean "one attempt, and silence".
+Each delivery saves its exact provider request before sending and uses a stable
+hashed Resend idempotency key. A two-minute conditional lease permits recovery
+after an interrupted send; provider calls time out after 30 seconds. Pending
+attempts are never reported as delivered, and retries reuse the original bytes
+and first-attempt time rather than rendering a different message.
 
-- **A failed send is retryable.** The log row was written before the send and left
-  behind on failure, so the unique key made every later attempt return "already
-  sent" without sending. A message Resend rate-limited was lost for good, and the
-  caller was told it succeeded.
-- **There is now a sweep.** The scheduled cron re-sends failed rows older than five
-  minutes. Only a booking's own confirmation can be rebuilt — the body is not
-  stored — so anything else stays in the log for a person to look at.
-- **The day-before reminder is retried by its own sweep** every five minutes
-  while it is still in time, and is never rebuilt as a confirmation. When two
-  sweeps reach the same failed email, only the one that reclaims it sends: the
-  reset from `failed` to `pending` is conditional, for every retried email.
-- **A cancelled run is one email, not one per lesson.** Stopping a twelve-week
-  series fired twenty-four requests at the provider in the same instant; behind a
-  2/second limit, twenty-two were dropped and never retried.
-- **A database error is not a duplicate.** Any write failure used to be reported
-  as "already sent"; only a unique-constraint violation means that now.
+Retries stop after 23 hours, within Resend's 24-hour idempotency retention.
+Legacy attempts without a saved body/key, recipient changes and expired attempts
+become `unconfirmed` for manual reconciliation. No automatic resend can turn an
+ambiguous old attempt into a duplicate. Saved bodies, including private links,
+are purged after success, dry-run or expiry.
+
+The booking sweep retries only current confirmation/change/cancellation keys,
+status, sequence and recipient, filtering before its batch limit so superseded
+failures cannot starve current messages. Reminders, Meet links, payment notices
+and homework notifications revalidate eligibility in their own sweeps. Homework claims expire
+after an interruption and reconcile proven delivery before claiming again.
+Messages held until a welcome, or skipped for a missing address, never count as
+delivered Meet links. A proven earlier send can repair a lost delivery marker.
+A cancelled run remains one combined email rather than one send per lesson.
 
 ### The no-show policy
 
@@ -1348,10 +1368,16 @@ before `ends_at` plus six hours. The charge sweep then claims the row as
 `processing` before reading attendance, so the teacher decision cannot race the
 PaymentIntent. Until the charge, a lesson inside the window is still an
 ordinary `scheduled` one, so Inês's own move and cancel still reach it.
+Attendance writes also require the original lesson version and times. Moving an
+uncharged scheduled lesson to a genuinely different time clears its old no-show;
+a same-time edit and already committed payment retain attendance evidence.
 
 - **Expected attendance** charges the booked lesson price six hours after
   `ends_at`, on the first minute sweep once the window has closed.
 - **No-show** charges €5 at the same point, instead of the booked lesson price.
+- If Inês configures that fee to zero, the Worker settles the zero obligation
+  without a Stripe request, receipt or payment-recovery link. A positive charge
+  already captured under its immutable request keeps that original amount.
 - Bookings without explicit automatic-payment consent remain
   `not_required`; the teacher control is not offered for them.
 - Moving or cancelling less than 14 hours before the lesson is a separate €5
@@ -1855,6 +1881,12 @@ use these prices. Booked rows follow a new price as described above.
 Each repricing write also verifies the current saved or derived personal
 price. An older request cannot overwrite a newer teacher price, including a
 derived 90-minute rate, a free price or a return to the public price.
+New booking, selection, weekly recipe and top-up claims atomically check that
+their quoted effective price is still current. A changed price returns a
+conflict for review rather than silently charging an older or higher quote.
+A losing weekly claim cannot advance its bookmark or leave an empty recipe.
+If a first confirmed lesson already committed, it remains booked and gets its
+single confirmation; the response explains that the remaining run was not added.
 
 **Where a student adds a code.** Only under *Edit details*, behind a small `Have a
 code from Inês?` disclosure. Booking and lesson-length changes use the
@@ -1903,7 +1935,7 @@ an atomic session-pointer update. Setup and payment requests use Stripe's defaul
 expiry rather than recomputing a timestamp under an existing idempotency key;
 the database still rejects setup confirmation after its 35-minute booking hold.
 
-On a first Google link to a password-created email, verified Google ownership
+On an authoritative first Google link to a password-created email, Google ownership
 retains the same account and lessons but clears the unverified password and
 invalidates all earlier sessions and pending account-change/reset requests.
 Subsequent logins match the stable Google id without repeating that transition.
@@ -1922,6 +1954,10 @@ cancelled/refunded; never manually retry money without first checking Stripe.
 Teacher creation uses the same atomic slot claim as student creation, and all
 move paths ignore expired setup holds. Whole-series duration changes require
 the displayed new price; unchanged-duration rows retain each agreed snapshot.
+Single moves and cancellations also recheck their payment snapshot at the
+write, so a concurrent paid-by-hand mark, charge or repricing requires a reload.
+A teacher cancellation selected as unpaid cannot cancel a newly settled card
+payment without passing through the refund path.
 
 Writes reject unapproved browser origins and non-JSON content; request bodies
 are bounded while streaming. Authentication has an edge-IP rate limit and
@@ -1947,12 +1983,17 @@ amount and currency; expired card-setup holds cannot reclaim a slot.
 
 ## Deploying the Worker
 
-For an existing database, apply `migrations/0033-card-setup-version.sql` before
-releasing this Worker. It adds the card-setup revocation generation only; do
-not replay the full schema or older migrations. This migration was applied
-and its type, NOT NULL constraint and default verified in staging and
+Migration `0033-card-setup-version.sql` adds the card-setup revocation generation.
+It was applied and its type, NOT NULL constraint and default verified in staging and
 production on 18 October 2026, using the connected Cloudflare app. The local
 runtime's Cloudflare token did not grant D1 query access.
+
+Migration `0034-email-recovery.sql` adds four nullable delivery-payload/lease
+fields and quarantines ambiguous legacy attempts as `unconfirmed`. It was
+applied to staging, then production, and all four TEXT columns and nullable
+constraints verified on 18 October 2026 through the connected Cloudflare app.
+Both databases had zero pending, failed or unconfirmed messages afterward.
+Do not replay the full schema or older migrations against an existing database.
 
 ```bash
 npx wrangler d1 create ines-booking          # put the id in wrangler.jsonc

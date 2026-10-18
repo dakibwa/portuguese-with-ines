@@ -1,4 +1,5 @@
 import { PORTO, addDaysToKey, dateKey } from "./time.mjs";
+import { lessonPriceSnapshotSql } from "./rates.mjs";
 
 export const MAX_SINGLE_SELECTIONS = 8;
 
@@ -51,7 +52,7 @@ const SERIES_COLUMNS = [
  * which keeps that much free time between it and every other lesson. Only the
  * booking columns are inserted, so the guard span never reaches the table.
  */
-export async function claimSelection(env, { rows, series, now, bufferMinutes = 0, sessionIdentity = null }) {
+export async function claimSelection(env, { rows, series, now, bufferMinutes = 0, sessionIdentity = null, priceSnapshot = null }) {
   const sessionGuard = `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ?)
     AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`;
   const gapMs = bufferMinutes * 60000;
@@ -62,8 +63,9 @@ export async function claimSelection(env, { rows, series, now, bufferMinutes = 0
   }));
   const statements = series.map((entry) => env.DB.prepare(
     `INSERT INTO booking_series (${SERIES_COLUMNS.join(", ")}) SELECT ${SERIES_COLUMNS.map(() => "?").join(", ")}
-     ${sessionIdentity ? `WHERE ${sessionGuard}` : ""}`
-  ).bind(...SERIES_COLUMNS.map((column) => entry[column] ?? null), ...(sessionIdentity ?? [])));
+     WHERE 1 = 1 ${sessionIdentity ? `AND ${sessionGuard}` : ""}
+       ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}`
+  ).bind(...SERIES_COLUMNS.map((column) => entry[column] ?? null), ...(sessionIdentity ?? []), ...(priceSnapshot ?? [])));
   const claimIndex = statements.length;
   statements.push(env.DB.prepare(
     `WITH candidates AS MATERIALIZED (SELECT value FROM json_each(?1)),
@@ -73,12 +75,13 @@ export async function claimSelection(env, { rows, series, now, bufferMinutes = 0
            WHERE (occupied.status = 'confirmed' OR (occupied.status = 'pending_payment' AND occupied.hold_expires_at > ?2))
              AND occupied.starts_at < json_extract(proposed.value, '$.guard_end')
              AND occupied.ends_at > json_extract(proposed.value, '$.guard_start')
-         ) ${sessionIdentity ? `AND ${sessionGuard}` : ""} AS available
+         ) ${sessionIdentity ? `AND ${sessionGuard}` : ""}
+           ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""} AS available
        )
      INSERT INTO bookings (${BOOKING_COLUMNS.join(", ")})
      SELECT ${BOOKING_COLUMNS.map((column) => `json_extract(value, '$.${column}')`).join(", ")}
      FROM candidates WHERE (SELECT available FROM free)`
-  ).bind(JSON.stringify(candidates), now.toISOString(), ...(sessionIdentity ?? [])));
+  ).bind(JSON.stringify(candidates), now.toISOString(), ...(sessionIdentity ?? []), ...(priceSnapshot ?? [])));
   // If the whole claim lost a race, remove only this request's empty recipes
   // before committing. A SQL error rolls the entire D1 batch back.
   for (const entry of series) statements.push(env.DB.prepare(

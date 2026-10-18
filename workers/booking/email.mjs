@@ -432,110 +432,120 @@ export function renderEmail(content) {
  * Sends, or records the attempt. Never throws: callers treat email as
  * best-effort and the log is the audit trail.
  */
-export async function deliver(env, { to, subject, content, calendar, dedupeKey, bookingId, kind, replyTo }) {
-  // A student with no email yet has nowhere to be written to: nothing is
-  // logged, rendered or sent, and the caller is told it went nowhere.
-  if (isNoEmailYet(to)) return { ok: true, skipped: "no-email-yet" };
-  // Her copies reply to the student; with no address yet there is none.
-  replyTo = realEmail(replyTo);
-  const { html, text } = renderEmail(content);
-  const from = env.MAIL_FROM || "Português com a Inês <bookings@portuguesewithines.com>";
-  const now = new Date().toISOString();
+// Resend retains idempotency keys for 24 hours. Leave a full hour of margin,
+// never extend the first attempt, and use the exact saved bytes on every retry.
+const EMAIL_RETRY_MS = 23 * 3600000;
+const EMAIL_LEASE_MS = 120000;
 
-  /*
-   * Idempotency before anything leaves: a retried request must not send twice.
-   *
-   * But a failed attempt must not be mistaken for a delivered one. The row was
-   * written first and left behind on failure, so a message Resend rejected —
-   * or that never reached it — became permanently unsendable: every retry hit
-   * the unique key and returned "already sent". A single bad minute at the
-   * provider silently cost a student their confirmation, for good.
-   *
-   * So a row is only a duplicate if it is one. A previous attempt that failed
-   * is cleared and tried again, and any other database trouble is reported
-   * rather than dressed up as success.
-   */
+async function unconfirmedEmail(env, dedupeKey, reason) {
+  await env.DB.prepare(`UPDATE email_log SET status = 'unconfirmed', error = ?, request_json = NULL,
+    send_claim_id = NULL, send_claim_until = NULL WHERE dedupe_key = ? AND status IN ('pending', 'failed')`)
+    .bind(reason, dedupeKey).run();
+  console.warn("email-manual-reconciliation-required", dedupeKey);
+  return { ok: false, manualReview: true, error: reason };
+}
+
+/** Purge sensitive bodies even when a superseded message is no longer eligible to retry. */
+export async function purgeExpiredEmailPayloads(env) {
+  const cutoff = new Date(Date.now() - EMAIL_RETRY_MS).toISOString();
+  await env.DB.prepare(`UPDATE email_log SET status = CASE WHEN status IN ('pending', 'failed') THEN 'unconfirmed' ELSE status END,
+    error = CASE WHEN status IN ('pending', 'failed') THEN
+      CASE WHEN request_json IS NULL THEN 'Legacy email delivery requires manual reconciliation.'
+      ELSE 'Email retry window elapsed; reconcile delivery manually.' END ELSE error END,
+    request_json = NULL, send_claim_id = NULL, send_claim_until = NULL
+    WHERE (request_json IS NOT NULL AND (created_at <= ? OR status IN ('sent', 'dry-run', 'unconfirmed')))
+      OR (request_json IS NULL AND status IN ('pending', 'failed'))`)
+    .bind(cutoff).run();
+}
+
+/** Retry one saved message only after its lifecycle owner has revalidated it. */
+export async function retryEmail(env, dedupeKey) {
+  const row = await env.DB.prepare("SELECT * FROM email_log WHERE dedupe_key = ?").bind(dedupeKey).first();
+  if (!row) return { ok: false, error: "Email delivery record not found." };
+  if (row.status === "sent" || row.status === "dry-run") return { ok: true, skipped: "already-sent" };
+  if (row.status === "unconfirmed") return { ok: false, manualReview: true, error: row.error };
+  if (!row.request_json) return unconfirmedEmail(env, dedupeKey, "Legacy email delivery requires manual reconciliation.");
+  const now = new Date().toISOString();
+  const cutoff = new Date(Date.now() - EMAIL_RETRY_MS).toISOString();
+  if (row.created_at <= cutoff || (row.first_attempt_at && row.first_attempt_at <= cutoff)) {
+    return unconfirmedEmail(env, dedupeKey, "Email retry window elapsed; reconcile delivery manually.");
+  }
+  let request;
   try {
-    await env.DB.prepare(
-      "INSERT INTO email_log (booking_id, kind, recipient, dedupe_key, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)"
-    )
-      .bind(bookingId ?? null, kind, to, dedupeKey, now)
-      .run();
+    request = JSON.parse(row.request_json);
+    if (typeof request?.text !== "string") throw new Error("Missing email text.");
+  } catch {
+    return unconfirmedEmail(env, dedupeKey, "Saved email payload is invalid; reconcile delivery manually.");
+  }
+  // Lifecycle owners may only mark the room URL this exact saved body conveys.
+  const meetingUrls = [...new Set(Array.from(request.text.matchAll(
+    /(?:^|[\s<(])(https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3})(?=$|[\s>)\],;!])/g
+  ), match => match[1]))];
+  const dryRun = !env.RESEND_API_KEY || env.EMAIL_DRY_RUN === "1";
+  if (dryRun && row.first_attempt_at) return { ok: false, pending: true, error: "Live email retries are paused." };
+  const claimId = crypto.randomUUID();
+  const claimed = await env.DB.prepare(`UPDATE email_log SET status = 'pending', error = NULL,
+    first_attempt_at = COALESCE(first_attempt_at, ?), send_claim_id = ?, send_claim_until = ?
+    WHERE dedupe_key = ? AND status IN ('pending', 'failed') AND request_json IS NOT NULL
+      AND created_at > ? AND (first_attempt_at IS NULL OR first_attempt_at > ?)
+      AND (send_claim_until IS NULL OR send_claim_until <= ?)`)
+    .bind(now, claimId, new Date(Date.now() + EMAIL_LEASE_MS).toISOString(), dedupeKey, cutoff, cutoff, now).run();
+  if (!(claimed?.meta?.changes > 0)) return { ok: false, pending: true, error: "Email delivery is in progress." };
+
+  if (dryRun) {
+    await env.DB.prepare(`UPDATE email_log SET status = 'dry-run', request_json = NULL, send_claim_id = NULL, send_claim_until = NULL
+      WHERE dedupe_key = ? AND send_claim_id = ?`).bind(dedupeKey, claimId).run();
+    console.log(JSON.stringify({ dryRun: true, to: row.recipient, subject: request.subject, kind: row.kind,
+      calendar: request.attachments?.[0]?.content_type?.match(/method=([^;]+)/)?.[1] ?? null }));
+    return { ok: true, dryRun: true, meetingUrls };
+  }
+
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(dedupeKey));
+    const idempotencyKey = `ines-email:${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("")}`;
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST", redirect: "manual", signal: AbortSignal.timeout(30000),
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+      body: row.request_json,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(payload.message ?? `HTTP ${response.status}`));
+    if (typeof payload.id !== "string" || !payload.id) throw new Error("The email service returned no delivery id.");
+    await env.DB.prepare(`UPDATE email_log SET status = 'sent', provider_id = ?, request_json = NULL,
+      send_claim_id = NULL, send_claim_until = NULL WHERE dedupe_key = ? AND send_claim_id = ?`)
+      .bind(payload.id, dedupeKey, claimId).run();
+    return { ok: true, id: payload.id, meetingUrls };
+  } catch (error) {
+    const message = String(error?.message ?? error).slice(0, 400);
+    // If this write also fails, the pending lease expires and the same exact
+    // provider request is recovered. A pending row is never reported as sent.
+    await env.DB.prepare(`UPDATE email_log SET status = 'failed', error = ?, send_claim_id = NULL, send_claim_until = NULL
+      WHERE dedupe_key = ? AND send_claim_id = ?`).bind(message, dedupeKey, claimId).run().catch(() => {});
+    return { ok: false, error: message };
+  }
+}
+
+export async function deliver(env, { to, subject, content, calendar, dedupeKey, bookingId, kind, replyTo }) {
+  if (isNoEmailYet(to)) return { ok: true, skipped: "no-email-yet" };
+  try {
+    replyTo = realEmail(replyTo);
+    const { html, text } = renderEmail(content);
+    const request = JSON.stringify({
+      from: env.MAIL_FROM || "Português com a Inês <bookings@portuguesewithines.com>", to: [to], subject, html, text,
+      ...(replyTo ? { reply_to: [replyTo] } : {}),
+      ...(calendar ? { attachments: [{ filename: "lesson.ics", content: base64(calendar.body), content_type: `text/calendar; charset=utf-8; method=${calendar.method}` }] } : {}),
+    });
+    await env.DB.prepare(`INSERT INTO email_log (booking_id, kind, recipient, dedupe_key, status, created_at, request_json)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?) ON CONFLICT(dedupe_key) DO NOTHING`)
+      .bind(bookingId ?? null, kind, to, dedupeKey, new Date().toISOString(), request).run();
+    const row = await env.DB.prepare("SELECT recipient, status FROM email_log WHERE dedupe_key = ?").bind(dedupeKey).first();
+    if (row?.recipient !== to && ["pending", "failed"].includes(row?.status)) {
+      return unconfirmedEmail(env, dedupeKey, "Email recipient changed; reconcile the earlier attempt manually.");
+    }
+    return await retryEmail(env, dedupeKey);
   } catch (error) {
     const message = String(error?.message ?? error);
-    if (!/UNIQUE|constraint/i.test(message)) {
-      console.error("email-log-write", kind, message);
-      return { ok: false, error: message };
-    }
-
-    const previous = await env.DB.prepare("SELECT status FROM email_log WHERE dedupe_key = ?")
-      .bind(dedupeKey)
-      .first();
-
-    if (previous?.status !== "failed") return { ok: true, skipped: "already-sent" };
-
-    // Two retries can both read 'failed' here, and only the one that flips it
-    // sends: the other finds the row already pending and stands down.
-    const reset = await env.DB.prepare(
-      "UPDATE email_log SET status = 'pending', error = NULL, created_at = ? WHERE dedupe_key = ? AND status = 'failed'"
-    )
-      .bind(now, dedupeKey)
-      .run();
-    if (reset?.meta && !reset.meta.changes) return { ok: true, skipped: "already-sent" };
-  }
-
-  const attachments = calendar
-    ? [
-        {
-          filename: "lesson.ics",
-          content: base64(calendar.body),
-          content_type: `text/calendar; charset=utf-8; method=${calendar.method}`
-        }
-      ]
-    : undefined;
-
-  if (!env.RESEND_API_KEY || env.EMAIL_DRY_RUN === "1") {
-    await env.DB.prepare("UPDATE email_log SET status = 'dry-run' WHERE dedupe_key = ?").bind(dedupeKey).run();
-    console.log(JSON.stringify({ dryRun: true, to, subject, kind, calendar: calendar?.method ?? null }));
-    return { ok: true, dryRun: true };
-  }
-
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      redirect: "manual",
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        subject,
-        html,
-        text,
-        ...(replyTo ? { reply_to: [replyTo] } : {}),
-        ...(attachments ? { attachments } : {})
-      })
-    });
-
-    const payload = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      await env.DB.prepare("UPDATE email_log SET status = 'failed', error = ? WHERE dedupe_key = ?")
-        .bind(String(payload.message ?? response.status).slice(0, 400), dedupeKey)
-        .run();
-      return { ok: false, error: payload.message ?? `HTTP ${response.status}` };
-    }
-
-    await env.DB.prepare("UPDATE email_log SET status = 'sent', provider_id = ? WHERE dedupe_key = ?")
-      .bind(payload.id ?? null, dedupeKey)
-      .run();
-    return { ok: true, id: payload.id };
-  } catch (error) {
-    await env.DB.prepare("UPDATE email_log SET status = 'failed', error = ? WHERE dedupe_key = ?")
-      .bind(String(error?.message ?? error).slice(0, 400), dedupeKey)
-      .run();
-    return { ok: false, error: String(error?.message ?? error) };
+    console.error("email-log-write", kind, message);
+    return { ok: false, error: message };
   }
 }

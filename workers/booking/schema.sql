@@ -276,7 +276,12 @@ CREATE TABLE IF NOT EXISTS email_log (
   status      TEXT NOT NULL,
   provider_id TEXT,
   error       TEXT,
-  created_at  TEXT NOT NULL
+  created_at  TEXT NOT NULL,
+  -- Exact retry body and bounded send ownership (migration 0034).
+  request_json TEXT,
+  first_attempt_at TEXT,
+  send_claim_id TEXT,
+  send_claim_until TEXT
 );
 
 CREATE TABLE IF NOT EXISTS settings (

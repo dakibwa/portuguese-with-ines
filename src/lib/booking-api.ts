@@ -462,7 +462,8 @@ export function rescheduleBooking(
   startAt: string,
   lessonType?: string,
   location?: "online" | "porto",
-  expectedPriceCents?: number
+  expectedPriceCents?: number,
+  expectedLateFeeCents?: number
 ) {
   return request<{ booking: Booking; sameDayFeeApplied: boolean }>(
     `/bookings/${encodeURIComponent(token)}/reschedule`,
@@ -471,6 +472,7 @@ export function rescheduleBooking(
       body: JSON.stringify({
         startAt,
         ...(expectedPriceCents === undefined ? {} : { expectedPriceCents }),
+        ...(expectedLateFeeCents === undefined ? {} : { expectedLateFeeCents }),
         ...(lessonType ? { lessonType } : {}),
         ...(location ? { location } : {})
       })
@@ -478,10 +480,10 @@ export function rescheduleBooking(
   ).then(validateLessonChange);
 }
 
-export function cancelBooking(token: string) {
+export function cancelBooking(token: string, expectedLateFeeCents?: number) {
   return request<{ booking: Booking; sameDayFeeApplied: boolean }>(
     `/bookings/${encodeURIComponent(token)}/cancel`,
-    { method: "POST", body: "{}" }
+    { method: "POST", body: JSON.stringify(expectedLateFeeCents === undefined ? {} : { expectedLateFeeCents }) }
   ).then(validateLessonChange);
 }
 

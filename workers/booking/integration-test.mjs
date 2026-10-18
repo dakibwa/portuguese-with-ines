@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
-import worker, { chargeDueLessons, chargeDueSameDayFees, notifySeries, resendFailedEmails, retryPaymentRecovery, retryRefunds, sendLessonReminders } from "./index.mjs";
+import worker, { chargeDueLessons, chargeDueSameDayFees, notifyMeetingReady, notifySeries, resendFailedEmails, retryPaymentRecovery, retryRefunds, sendLessonReminders } from "./index.mjs";
 import { createSession, createResetToken, createSignInToken, hashPassword, sessionHash, sessionVersion } from "./auth.mjs";
 import { createManageToken, readManageToken } from "./tokens.mjs";
 import { findRecurringCode, studentLessonType, priceForMove } from "./rates.mjs";
@@ -9,9 +9,10 @@ import { bookingSelection, portoWeekOf } from "./selection.mjs";
 import { computeAvailability } from "./availability.mjs";
 
 const NativeDate = Date;
+let clock = NativeDate.parse("2026-09-05T10:00:00.000Z");
 globalThis.Date = class extends NativeDate {
-  constructor(...args) { super(...(args.length ? args : ["2026-09-05T10:00:00.000Z"])); }
-  static now() { return new NativeDate("2026-09-05T10:00:00.000Z").getTime(); }
+  constructor(...args) { super(...(args.length ? args : [clock])); }
+  static now() { return clock; }
 };
 const nativeFetch = globalThis.fetch;
 const charges = [];
@@ -33,8 +34,10 @@ const completedSessions = new Set();
 let expiryUnavailable = false;
 // Only reached while a test sets RESEND_API_KEY and turns dry run off.
 const sentEmails = [];
+let emailUnavailable = false;
 globalThis.fetch = async (url, options) => {
   if (String(url) === "https://api.resend.com/emails") {
+    if (emailUnavailable) return Response.json({ message: "Isolated email outage" }, { status: 503 });
     sentEmails.push(JSON.parse(options.body));
     return Response.json({ id: `email_${sentEmails.length}` });
   }
@@ -177,7 +180,7 @@ async function googleCredential(claims) {
     env.GOOGLE_CLIENT_ID = "isolated-client";
   }
   const encode = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
-  const payload = `${encode({ alg: "RS256", kid: googleJwk.kid })}.${encode({ email_verified: true, iss: "https://accounts.google.com", aud: env.GOOGLE_CLIENT_ID, exp: Date.now() / 1000 + 3600, ...claims })}`;
+  const payload = `${encode({ alg: "RS256", kid: googleJwk.kid })}.${encode({ email_verified: true, hd: "example.invalid", iss: "https://accounts.google.com", aud: env.GOOGLE_CLIENT_ID, exp: Date.now() / 1000 + 3600, ...claims })}`;
   const signature = Buffer.from(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", googleKeys.privateKey, new TextEncoder().encode(payload))).toString("base64url");
   return `${payload}.${signature}`;
 }
@@ -426,7 +429,12 @@ await test("a cancellation inside 14 hours records and charges just one separate
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const id = linkedBooking("same-day-cancel", { start: "2026-09-05T12:00:00.000Z", end: "2026-09-05T13:00:00.000Z" });
   const path = `/bookings/${await token(id)}/cancel`;
-  const responses = await Promise.all([call(path), call(path)]);
+  const unreviewed = await call(path, { body: { expectedLateFeeCents: 0 } });
+  assert.equal(unreviewed.status, 409, await unreviewed.clone().text());
+  assert.match(await unreviewed.text(), /review it before confirming/);
+  assert.equal(db.prepare("SELECT status FROM bookings WHERE id=?").get(id).status, "confirmed");
+  assert.ok(!charges.some(charge => charge.key.includes(id)), "a stale free quote cannot authorize a late fee");
+  const responses = await Promise.all([call(path, { body: { expectedLateFeeCents: 500 } }), call(path, { body: { expectedLateFeeCents: 500 } })]);
   assert.deepEqual(responses.map((res) => res.status).sort(), [200, 409]);
   await drain();
   await chargeDueSameDayFees(env);
@@ -436,6 +444,27 @@ await test("a cancellation inside 14 hours records and charges just one separate
   assert.equal(row.same_day_fee_status, "paid");
   assert.equal(charges.filter((charge) => charge.key.includes(id)).length, 1);
   assert.equal(charges.find((charge) => charge.key.includes(id)).amount, 500);
+  const boundary = linkedBooking("notice-boundary", { start: "2026-09-06T00:00:00.000Z", end: "2026-09-06T01:00:00.000Z" });
+  const originalPrepare = DB.prepare;
+  const before = clock;
+  DB.prepare = sql => {
+    const statement = originalPrepare(sql);
+    if (sql === "SELECT * FROM lesson_types WHERE id = ?") {
+      const read = statement.first;
+      statement.first = () => { DB.prepare = originalPrepare; clock++; return read(); };
+    }
+    return statement;
+  };
+  try {
+    const response = await call(`/bookings/${await token(boundary)}/cancel`, { body: { expectedLateFeeCents: 0 } });
+    assert.equal(response.status, 409, await response.clone().text());
+    assert.match(await response.text(), /review it before confirming/);
+    assert.equal(db.prepare("SELECT status,same_day_fee_status FROM bookings WHERE id=?").get(boundary).same_day_fee_status, "not_required");
+  } finally {
+    DB.prepare = originalPrepare;
+    clock = before;
+    db.prepare("DELETE FROM bookings WHERE id=?").run(boundary);
+  }
 });
 await test("duplicate slot claims have one winner, and pending setup reserves its owner's slot", async () => {
   const body = { lessonType: "single", startAt: "2026-09-10T16:00:00.000Z", paymentConsent: true };
@@ -464,8 +493,16 @@ await test("opening, unchanged submission and failed move never charge a fee", a
 });
 await test("a move inside 14 hours preserves agreed price, charges once, then lesson only after its new end", async () => {
   const id = linkedBooking("same-day-move", { start: "2026-09-05T16:00:00.000Z", end: "2026-09-05T17:00:00.000Z" });
-  const result = await call(`/bookings/${await token(id)}/reschedule`, { body: { startAt: "2026-09-08T14:00:00.000Z" } });
+  const path = `/bookings/${await token(id)}/reschedule`;
+  const unreviewed = await call(path, { body: { startAt: "2026-09-08T14:00:00.000Z", expectedLateFeeCents: 0 } });
+  assert.equal(unreviewed.status, 409, await unreviewed.clone().text());
+  assert.equal(db.prepare("SELECT starts_at FROM bookings WHERE id=?").get(id).starts_at, "2026-09-05T16:00:00.000Z");
+  assert.ok(!charges.some(charge => charge.key.includes(id)));
+  db.prepare("UPDATE bookings SET attendance_status='no_show',no_show_marked_at='2026-09-05T09:00:00.000Z' WHERE id=?").run(id);
+  const result = await call(path, { body: { startAt: "2026-09-08T14:00:00.000Z", expectedLateFeeCents: 500 } });
   assert.equal(result.status, 200, await result.clone().text());
+  assert.deepEqual({ ...db.prepare("SELECT attendance_status,no_show_marked_at FROM bookings WHERE id=?").get(id) },
+    { attendance_status: "expected", no_show_marked_at: null }, "the new time has a new attendance decision");
   // A student's change reaches Inês's Needs you.
   assert.ok(db.prepare("SELECT student_changed_at FROM bookings WHERE id=?").get(id).student_changed_at);
   await drain();
@@ -473,6 +510,28 @@ await test("a move inside 14 hours preserves agreed price, charges once, then le
   assert.equal(charges.filter((charge) => charge.key.includes(id)).length, 1);
   await chargeDueLessons(env, new Date("2026-09-08T21:00:00Z"));
   assert.deepEqual(charges.filter((charge) => charge.key.includes(id)).map((charge) => charge.amount), [500, 1500]);
+});
+await test("a single move or cancellation cannot overwrite a concurrent hand payment or price reduction", async () => {
+  for (const operation of ["reschedule", "cancel"]) for (const transition of ["paid", "lower-price"]) {
+    const id = linkedBooking(`${operation}-money-${transition}`, { start: "2026-11-25T09:00:00.000Z", end: "2026-11-25T10:00:00.000Z" });
+    let changed = false;
+    beforeRun = sql => {
+      if (!sql.startsWith(operation === "reschedule" ? "UPDATE bookings SET lesson_type_id = ?" : "UPDATE bookings SET status = 'cancelled'")) return;
+      beforeRun = null;
+      changed = true;
+      if (transition === "paid") db.prepare("UPDATE bookings SET payment_status='not_required',payment_consent_version='paid-by-hand' WHERE id=?").run(id);
+      else db.prepare("UPDATE bookings SET amount_cents=750 WHERE id=?").run(id);
+    };
+    const response = await call(`/bookings/${await token(id)}/${operation}`, { body: {
+      ...(operation === "reschedule" ? { startAt: "2026-11-25T17:00:00.000Z", ...(transition === "paid" ? { lessonType: "long", expectedPriceCents: 2700 } : {}) } : {}), expectedLateFeeCents: 0
+    } });
+    assert.equal(changed, true, await response.clone().text());
+    assert.equal(response.status, 409, await response.clone().text());
+    assert.deepEqual({ ...db.prepare("SELECT lesson_type_id,starts_at,amount_cents,payment_consent_version FROM bookings WHERE id=?").get(id) },
+      { lesson_type_id: "single", starts_at: "2026-11-25T09:00:00.000Z", amount_cents: transition === "paid" ? 1500 : 750, payment_consent_version: transition === "paid" ? "paid-by-hand" : null });
+    assert.equal(db.prepare("SELECT status FROM bookings WHERE id=?").get(id).status, "confirmed");
+    db.prepare("DELETE FROM bookings WHERE id=?").run(id);
+  }
 });
 await test("13.5 hours ahead on the next Porto day is late; lesson-day wording keeps its promise", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
@@ -532,11 +591,61 @@ await test("decline recovery-link outage retries without charging again or sendi
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM email_log WHERE booking_id='declined'").get().count, 0);
   const attempts = charges.length;
   decline = false; checkoutUnavailable = false;
-  // With her copies on, Inês is still not emailed: the decline is a card in her Needs you.
-  Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "1", TEACHER_EMAIL: "ines@example.invalid" });
-  try { await retryPaymentRecovery(env); } finally { Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0", TEACHER_EMAIL: undefined }); }
+  // The Checkout link can succeed while the email provider is unavailable.
+  const beforeFetch = globalThis.fetch;
+  let mailDown = true;
+  globalThis.fetch = (url, options) => String(url) === "https://api.resend.com/emails" && mailDown
+    ? Promise.resolve(Response.json({ message: "Isolated mail outage" }, { status: 503 }))
+    : beforeFetch(url, options);
+  Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0" });
+  try {
+    await retryPaymentRecovery(env);
+    assert.equal(db.prepare("SELECT status FROM email_log WHERE dedupe_key='payment-due:lesson:declined'").get().status, "failed");
+    assert.equal(charges.length, attempts, "repairing the link never retries the declined charge");
+    // Paid lesson and fee notices have their own owner too. Fiscal reminders
+    // remain owed while ordinary teacher copies are paused.
+    booking("payment-mail-retry", { start: "2026-01-04T12:00:00.000Z", end: "2026-01-04T13:00:00.000Z" });
+    db.prepare("UPDATE bookings SET same_day_fee_status='scheduled',same_day_fee_cents=500 WHERE id='payment-mail-retry'").run();
+    await chargeDueLessons(env);
+    await chargeDueSameDayFees(env);
+    const saved = db.prepare("SELECT * FROM email_log WHERE booking_id IN ('declined','payment-mail-retry')").all();
+    assert.equal(saved.length, 5, "one due notice, two receipts and two fiscal reminders");
+    const now = new Date().toISOString();
+    const old = new Date(Date.now() - 6 * 60000).toISOString();
+    db.prepare(`UPDATE email_log SET status='pending',created_at=?,send_claim_until=?
+      WHERE booking_id IN ('declined','payment-mail-retry')`).run(old, new Date(Date.now() + 60000).toISOString());
+    mailDown = false;
+    const sentBefore = sentEmails.length;
+    const checkoutsBefore = checkoutRequests.length;
+    const chargesBefore = charges.length;
+    await retryPaymentRecovery(env);
+    assert.equal(sentEmails.length, sentBefore, "active delivery leases are left alone");
+    db.prepare("UPDATE email_log SET send_claim_until=? WHERE booking_id IN ('declined','payment-mail-retry')").run(now);
+    db.prepare("UPDATE bookings SET student_email='changed@example.invalid' WHERE id='declined'").run();
+    db.prepare("UPDATE bookings SET payment_status='refunded',same_day_fee_cents=750 WHERE id='payment-mail-retry'").run();
+    await retryPaymentRecovery(env);
+    assert.equal(sentEmails.length, sentBefore, "wrong recipient, payment state and captured amount cannot be replayed");
+    db.prepare("UPDATE bookings SET student_email='alice@example.invalid' WHERE id='declined'").run();
+    db.prepare("UPDATE bookings SET payment_status='paid',same_day_fee_cents=500 WHERE id='payment-mail-retry'").run();
+    await retryPaymentRecovery(env);
+    assert.equal(sentEmails.length, sentBefore + 5);
+    assert.equal(checkoutRequests.length, checkoutsBefore, "email recovery creates no replacement Checkout");
+    assert.equal(charges.length, chargesBefore, "email recovery never charges again");
+    for (const row of saved) {
+      assert.ok(sentEmails.slice(sentBefore).some(email => JSON.stringify(email) === row.request_json), "the original provider body is replayed exactly");
+      const recovered = db.prepare("SELECT status,request_json FROM email_log WHERE id=?").get(row.id);
+      assert.deepEqual({ ...recovered }, { status: "sent", request_json: null });
+    }
+    await retryPaymentRecovery(env);
+    assert.equal(sentEmails.length, sentBefore + 5, "proven deliveries are not sent twice");
+  } finally {
+    globalThis.fetch = beforeFetch;
+    Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0", TEACHER_EMAIL: undefined, EMAIL_DRY_RUN: "1" });
+    delete env.RESEND_API_KEY;
+    db.prepare("DELETE FROM email_log WHERE booking_id='payment-mail-retry'").run();
+    db.prepare("DELETE FROM bookings WHERE id='payment-mail-retry'").run();
+  }
   assert.equal(db.prepare("SELECT stripe_session_id FROM bookings WHERE id='declined'").get().stripe_session_id, "cs_recovery");
-  assert.equal(charges.length, attempts);
   assert.deepEqual(db.prepare("SELECT kind FROM email_log WHERE booking_id='declined'").all().map((row) => row.kind), ["student_payment_due"]);
   const { students } = await (await call("/admin/students", { method: "GET", user: "teacher" })).json();
   assert.deepEqual(students.find((row) => row.id === "alice").cardDeclined,
@@ -595,6 +704,7 @@ await test("ambiguous retry freezes card and money; idempotency errors never ope
   await chargeDueLessons(env); await chargeDueSameDayFees(env);
   db.prepare("UPDATE students SET stripe_payment_method='pm_changed' WHERE id='alice'").run();
   db.prepare("UPDATE bookings SET amount_cents=9900,same_day_fee_cents=9900,updated_at='2026-09-05T09:00:00.000Z' WHERE id='ambiguous-snapshot'").run();
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('same_day_change_fee_cents','0')").run();
   chargeError = { status: 400, type: "idempotency_error" };
   await chargeDueLessons(env);
   db.prepare("UPDATE bookings SET updated_at='2026-09-05T09:00:00.000Z' WHERE id='ambiguous-snapshot'").run();
@@ -603,6 +713,7 @@ await test("ambiguous retry freezes card and money; idempotency errors never ope
   assert.equal(charges[before + 1].body, charges[before + 3].body);
   assert.equal(checkoutRequests.length, checkouts);
   assert.deepEqual({ ...db.prepare("SELECT payment_status,same_day_fee_status FROM bookings WHERE id='ambiguous-snapshot'").get() }, { payment_status: "processing", same_day_fee_status: "processing" });
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('same_day_change_fee_cents','500')").run();
   chargeError = null;
 });
 await test("durable recovery only replaces a provider-expired session and remains single-path under concurrency", async () => {
@@ -628,6 +739,27 @@ await test("durable recovery only replaces a provider-expired session and remain
   db.prepare("UPDATE bookings SET payment_status='paid' WHERE reference='expired-recovery'").run();
   assert.equal((await call(path, { body: { purpose: "lesson" } })).status, 409);
   checkoutStatus = "open";
+
+  // Legacy zero debts are retired by either the durable link or its retry
+  // sweep, without creating a Checkout Session or a false payment receipt.
+  for (const via of ["link", "retry"]) {
+    const zero = linkedBooking(`zero-recovery-${via}`, { payment: "payment_due" });
+    db.prepare("UPDATE bookings SET charged_cents=0,same_day_fee_status='payment_due',same_day_fee_cents=0 WHERE id=?").run(zero);
+    const payments = charges.length;
+    const checkouts = checkoutRequests.length;
+    if (via === "link") {
+      for (const purpose of ["lesson", "same-day-fee"]) {
+        assert.equal((await call(`/bookings/${await token(zero)}/payment`, { body: { purpose } })).status, 409);
+      }
+    } else {
+      await retryPaymentRecovery(env);
+    }
+    assert.deepEqual({ ...db.prepare("SELECT payment_status,amount_cents,same_day_fee_status,stripe_session_id,same_day_fee_session_id FROM bookings WHERE id=?").get(zero) },
+      { payment_status: "free", amount_cents: 0, same_day_fee_status: "not_required", stripe_session_id: null, same_day_fee_session_id: null });
+    assert.equal(charges.length, payments);
+    assert.equal(checkoutRequests.length, checkouts);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE booking_id=?").get(zero).n, 0);
+  }
 });
 await test("verified Google first-link removes preregistration password and sessions while preserving account data", async () => {
   const registered = await call("/auth/register", { user: null, body: { email: "victim@example.invalid", name: "Victim", password: "attacker-known-password" } });
@@ -645,6 +777,80 @@ await test("verified Google first-link removes preregistration password and sess
   assert.equal((await call("/me", { method: "GET", token: victim.session })).status, 200);
   const again = await (await call("/auth/google", { user: null, body: { credential } })).json();
   assert.equal(sessionVersion(again.session), 1);
+
+  // A signed Google claim for a third-party address may name its former
+  // owner. Neither an unknown nor an existing email can be claimed by it.
+  const external = "external-google-owner";
+  const externalCredential = await googleCredential({ sub: external, email: `${external}@example.invalid`, hd: undefined });
+  const ip = { "CF-Connecting-IP": "198.51.100.109" };
+  const unknown = await call("/auth/google", { user: null, headers: ip, body: { credential: externalCredential } });
+  assert.equal(unknown.status, 409);
+  const challenge = await unknown.json();
+  assert.equal(db.prepare("SELECT id FROM students WHERE email=?").get(`${external}@example.invalid`), undefined);
+  student(external);
+  const bearer = await createSession(external, env.BOOKING_TOKEN_SECRET);
+  const ownHeaders = { ...ip, Authorization: `Bearer ${bearer}` };
+  for (const headers of [ip, ownHeaders]) {
+    const refused = await call("/auth/google", { user: null, headers, body: { credential: externalCredential } });
+    assert.equal(refused.status, 409);
+    assert.deepEqual(await refused.json(), challenge, "the challenge reveals no account existence or verification state");
+  }
+  assert.equal(db.prepare("SELECT email_verified_at FROM students WHERE id=?").get(external).email_verified_at, null);
+  const password = await hashPassword("external-owner-password");
+  db.prepare("UPDATE students SET email_verified_at=?,password_hash=? WHERE id=?").run(new Date().toISOString(), password, external);
+  db.prepare("INSERT INTO password_resets(nonce,student_id,created_at) VALUES ('external-pending-reset',?,?)").run(external, new Date().toISOString());
+  const wrongAccount = await call("/auth/google", { user: "alice", headers: ip, body: { credential: externalCredential } });
+  assert.equal(wrongAccount.status, 409);
+  assert.deepEqual(await wrongAccount.json(), challenge);
+  const owned = await call("/auth/google", { user: null, headers: ownHeaders, body: { credential: externalCredential } });
+  assert.equal(owned.status, 200, await owned.clone().text());
+  assert.equal((await owned.json()).student.id, external);
+  const linkedOwner = db.prepare("SELECT google_sub,password_hash,session_version FROM students WHERE id=?").get(external);
+  assert.deepEqual({ ...linkedOwner }, { google_sub: external, password_hash: password, session_version: 0 });
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM password_resets WHERE student_id=?").get(external).n, 1, "own linking preserves mail-based access");
+  assert.equal((await call("/auth/google", { user: null, headers: ip, body: { credential: externalCredential } })).status, 200, "an already-linked external sub signs in normally");
+
+  // Both the link write and the response retain the authenticated site's
+  // original identity; a logout cannot mint a replacement session.
+  const prepare = DB.prepare;
+  for (const phase of ["version", "logout", "reply"]) {
+    const id = `external-google-${phase}`;
+    student(id);
+    db.prepare("UPDATE students SET email_verified_at=? WHERE id=?").run(new Date().toISOString(), id);
+    const token = await createSession(id, env.BOOKING_TOKEN_SECRET);
+    const hash = await sessionHash(token);
+    const credential = await googleCredential({ sub: id, email: `${id}@example.invalid`, hd: null });
+    const invalidate = () => phase === "version"
+      ? db.prepare("UPDATE students SET session_version=session_version+1 WHERE id=?").run(id)
+      : db.prepare("INSERT INTO revoked_sessions(token_hash,expires_at) VALUES (?,?)").run(hash, Number(token.split(".")[1]));
+    if (phase === "reply") {
+      DB.prepare = sql => {
+        const statement = prepare(sql);
+        if (sql.startsWith("SELECT * FROM students WHERE id = ? AND email = ? AND session_version = ?")) {
+          const first = statement.first;
+          statement.first = () => { DB.prepare = prepare; invalidate(); return first(); };
+        }
+        return statement;
+      };
+    } else {
+      beforeRun = sql => {
+        if (!sql.startsWith("UPDATE students SET google_sub = ?, last_login_at = ?")) return;
+        beforeRun = null; invalidate();
+      };
+    }
+    try {
+      const refused = await call("/auth/google", { user: null, headers: { ...ip, Authorization: `Bearer ${token}` }, body: { credential } });
+      assert.equal(refused.status, 409, await refused.clone().text());
+      assert.equal((await refused.json()).session, undefined);
+      assert.equal(db.prepare("SELECT google_sub FROM students WHERE id=?").get(id).google_sub, phase === "reply" ? id : null);
+    } finally {
+      beforeRun = null; DB.prepare = prepare;
+      db.prepare("DELETE FROM revoked_sessions WHERE token_hash=?").run(hash);
+      db.prepare("DELETE FROM students WHERE id=?").run(id);
+    }
+  }
+  db.prepare("DELETE FROM password_resets WHERE student_id=?").run(external);
+  db.prepare("DELETE FROM students WHERE id=?").run(external);
 });
 await test("logout revokes only the presented session and reset invalidates previous sessions", async () => {
   assert.equal((await call("/auth/logout", { user: "bob" })).status, 200);
@@ -1004,6 +1210,31 @@ await test("series cancellation locks paid occurrences before refunding and repo
   duringRefund = null;
   assert.equal((await call(`/series/${seriesId}/stop`)).status, 200, "stopping an ended series remains idempotent");
 
+  const run = "series-money-race";
+  db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES (?,'alice','single',4,720,?,?)")
+    .run(run, new Date().toISOString(), new Date().toISOString());
+  booking("series-money-race-lesson", { series: run, start: "2026-11-26T12:00:00.000Z", end: "2026-11-26T13:00:00.000Z" });
+  beforeRun = sql => {
+    if (!sql.startsWith("UPDATE bookings SET status = 'cancelled'")) return;
+    beforeRun = null;
+    db.prepare("UPDATE bookings SET payment_status='paid',stripe_payment_intent='pi_series_money_race',charged_cents=1500 WHERE id='series-money-race-lesson'").run();
+  };
+  const countBefore = refunds.length;
+  const stale = await call(`/series/${run}/stop`, { body: { cancelRemaining: true } });
+  assert.equal(stale.status, 200, await stale.clone().text());
+  const staleResult = await stale.json();
+  assert.deepEqual([staleResult.cancelled, staleResult.kept, staleResult.refunded], [0, 1, 0]);
+  assert.equal(db.prepare("SELECT status FROM bookings WHERE id='series-money-race-lesson'").get().status, "confirmed", "a newly settled payment cannot be cancelled without its refund");
+  assert.equal(refunds.length, countBefore);
+  const refreshed = await call(`/series/${run}/stop`, { body: { cancelRemaining: true } });
+  assert.equal(refreshed.status, 200, await refreshed.clone().text());
+  assert.equal((await refreshed.json()).refunded, 1);
+  assert.equal(refunds.length, countBefore + 1, "reviewing the settled lesson takes the refund path once");
+  await drain();
+  db.prepare("DELETE FROM booking_refunds WHERE booking_id='series-money-race-lesson'").run();
+  db.prepare("DELETE FROM bookings WHERE series_id=?").run(run);
+  db.prepare("DELETE FROM booking_series WHERE id=?").run(run);
+
   // Recovery or logout can win after authentication but before any one of
   // the stopping, cancellation or refund writes. Each claim checks identity.
   for (const [stage, revoked] of [["stop", false], ["stop", true], ["cancel", false], ["refund", true], ["between-refunds", false]]) {
@@ -1350,6 +1581,48 @@ await test("Meet links follow booking ownership and disappear for Porto or cance
   db.prepare("UPDATE bookings SET location='online',status='cancelled' WHERE reference='meet-owned'").run();
   mine = await call("/me", { method: "GET", user: "meet-owner" });
   assert.equal((await mine.json()).bookings[0].meetingUrl, null);
+
+  // A teacher's confirmation, weekly confirmation and later link notice must
+  // all leave a held link undelivered until the student's welcome has gone.
+  const google = { GOOGLE_CALENDAR_ENABLED: "1", GOOGLE_CALENDAR_CLIENT_ID: "isolated-calendar-client", GOOGLE_CALENDAR_CLIENT_SECRET: "isolated-calendar-secret", GOOGLE_CALENDAR_TOKEN_KEY: "ab".repeat(32) };
+  Object.assign(env, google);
+  captureEmail();
+  try {
+    db.prepare("UPDATE bookings SET status='confirmed' WHERE id=?").run(id);
+    db.prepare("UPDATE students SET awaiting_welcome=1 WHERE id='meet-owner'").run();
+    const moved = await call(`/admin/bookings/${id}/reschedule`, { user: "teacher", body: { startAt: "2026-10-05T07:00:00.000Z" } });
+    assert.equal(moved.status, 200, await moved.clone().text());
+    await drain();
+    assert.equal(db.prepare("SELECT meeting_notified_at FROM bookings WHERE id=?").get(id).meeting_notified_at, null);
+    const seriesNotice = () => notifySeries(env, {
+      rows: db.prepare("SELECT * FROM bookings WHERE id=?").all(id), lessonType: db.prepare("SELECT * FROM lesson_types WHERE id='single'").get(),
+      settings: { teacherName: "Inês", teacherEmail: "", sameDayChangeFeeCents: 500, minimumNoticeHours: 14 },
+      series: { id: "held-meet-series", occurrences: 4 }, manageUrls: {}, skipped: [], byTeacher: true
+    });
+    await seriesNotice();
+    assert.equal(db.prepare("SELECT meeting_notified_at FROM bookings WHERE id=?").get(id).meeting_notified_at, null);
+    assert.equal(await notifyMeetingReady(env, { id }), false, "held is not delivered");
+    db.prepare("UPDATE bookings SET student_email='no-email:meet-owner' WHERE id=?").run(id);
+    assert.equal(await notifyMeetingReady(env, { id }), false, "a placeholder is not delivered");
+    assert.equal(sentEmails.length, 0);
+    db.prepare("UPDATE bookings SET student_email='meet-owner@example.invalid' WHERE id=?").run(id);
+    db.prepare("UPDATE students SET awaiting_welcome=0 WHERE id='meet-owner'").run();
+    db.prepare("UPDATE bookings SET meeting_url=NULL WHERE id=?").run(id);
+    emailUnavailable = true;
+    await seriesNotice();
+    emailUnavailable = false;
+    db.prepare("UPDATE bookings SET meeting_url='https://meet.google.com/abc-defg-hij' WHERE id=?").run(id);
+    await seriesNotice();
+    assert.equal(db.prepare("SELECT meeting_notified_at FROM bookings WHERE id=?").get(id).meeting_notified_at, null,
+      "replaying a roomless confirmation does not claim its later Meet URL was included");
+    assert.equal(await notifyMeetingReady(env, { id }), true);
+    assert.equal(await notifyMeetingReady(env, { id }), true, "a proven send can repair a lost notification marker");
+    assert.equal(sentEmails.filter(email => email.text.includes("https://meet.google.com/abc-defg-hij")).length, 1, "the ready notice still sends the link once after the welcome");
+  } finally {
+    emailUnavailable = false;
+    for (const key of Object.keys(google)) delete env[key];
+    releaseEmail();
+  }
 });
 
 await test("sign-up keeps an optional NIF, tidied, and refuses a mistyped one without creating the account", async () => {
@@ -2065,7 +2338,7 @@ await test("teacher cancellation accepts no message, blank text and the limit, b
   } finally { releaseEmail(); }
 });
 
-await test("a cancellation that loses a move race cannot save its message", async () => {
+await test("a cancellation that loses a move or payment race cannot save its message", async () => {
   for (const payment of ["scheduled", "paid"]) {
     const id = `cancel-message-race-${payment}`;
     booking(id, { payment });
@@ -2080,6 +2353,35 @@ await test("a cancellation that loses a move race cannot save its message", asyn
     assert.equal((await call(`/admin/bookings/${id}/cancel`, { user: "teacher", body: { message: "A stale message" } })).status, 409);
     assert.equal(refunds.length, refundCount);
     assert.equal(db.prepare("SELECT cancellation_message FROM bookings WHERE id=?").get(id).cancellation_message, null);
+  }
+  for (const change of ["paid", "by-hand", "repriced"]) {
+    const id = `cancel-payment-race-${change}`;
+    booking(id);
+    beforeRun = sql => {
+      if (!sql.startsWith("UPDATE bookings SET status = 'cancelled'")) return;
+      beforeRun = null;
+      if (change === "paid") {
+        db.prepare("UPDATE bookings SET payment_status='paid',stripe_payment_intent=?,charged_cents=1500,charge_started_at=?,charge_request='{}' WHERE id=?")
+          .run(`pi_${id}`, new Date().toISOString(), id);
+      } else if (change === "by-hand") {
+        db.prepare("UPDATE bookings SET payment_status='not_required',payment_consent_version='paid-by-hand' WHERE id=?").run(id);
+      } else {
+        db.prepare("UPDATE bookings SET amount_cents=1200 WHERE id=?").run(id);
+      }
+    };
+    const refundCount = refunds.length;
+    const rejected = await call(`/admin/bookings/${id}/cancel`, { user: "teacher", body: { message: "A stale payment decision" } });
+    assert.equal(rejected.status, 409, change);
+    assert.equal(refunds.length, refundCount, "a losing cancellation sends no refund");
+    assert.deepEqual({ ...db.prepare("SELECT status,sequence,cancellation_message FROM bookings WHERE id=?").get(id) },
+      { status: "confirmed", sequence: 0, cancellation_message: null }, change);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE booking_id=? AND kind='student_cancelled'").get(id).n, 0);
+    if (change === "paid") {
+      const retry = await call(`/admin/bookings/${id}/cancel`, { user: "teacher", body: { message: "Cancel and refund this payment" } });
+      assert.equal(retry.status, 200, await retry.clone().text());
+      assert.equal(refunds.length, refundCount + 1, "reloading the paid lesson takes the refund path once");
+      assert.deepEqual({ ...db.prepare("SELECT status,payment_status FROM bookings WHERE id=?").get(id) }, { status: "cancelled", payment_status: "refunded" });
+    }
   }
 });
 
@@ -2109,8 +2411,14 @@ await test("a paid teacher cancellation keeps its message through an immediate o
       assert.ok(email.text.includes(`Message from Inês\n${message}`));
       assert.ok(email.text.includes("Refunded in full"));
       assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(id).payment_status, "refunded");
-      // Simulate a provider failure and the delayed email reconciliation path.
-      db.prepare("UPDATE email_log SET status='failed', created_at='2026-09-05T09:00:00.000Z' WHERE booking_id=?").run(id);
+      // A lost provider result keeps its exact request for a safe retry. Old
+      // lifecycle and separately owned notices must not fill every queue place.
+      const request = JSON.stringify(email);
+      const obsolete = db.prepare(`INSERT INTO email_log (booking_id,kind,recipient,dedupe_key,status,created_at,request_json,first_attempt_at)
+        VALUES (?,?,?,?,'failed','2026-09-05T08:00:00.000Z',?,'2026-09-05T08:00:00.000Z')`);
+      for (let index = 0; index < 25; index++) obsolete.run(id, index % 2 ? "student_meeting_ready" : "student_cancelled", "alice@example.invalid", `obsolete:${id}:${index}`, request);
+      db.prepare(`UPDATE email_log SET status='failed', created_at='2026-09-05T09:00:00.000Z',
+        first_attempt_at='2026-09-05T09:00:00.000Z', request_json=? WHERE booking_id=? AND kind='student_cancelled' AND dedupe_key NOT LIKE 'obsolete:%'`).run(request, id);
       await resendFailedEmails(env);
       const retried = sentEmails.filter(sent => sent.text.includes(`Reference: ${id}`));
       assert.equal(retried.length, 2);
@@ -2118,6 +2426,7 @@ await test("a paid teacher cancellation keeps its message through an immediate o
       assert.equal(retried[1].html, email.html);
       await resendFailedEmails(env);
       assert.equal(sentEmails.filter(sent => sent.text.includes(`Reference: ${id}`)).length, 2, "successful retry is deduplicated");
+      db.prepare("DELETE FROM email_log WHERE dedupe_key LIKE ?").run(`obsolete:${id}:%`);
     }
   } finally {
     refundStatus = "succeeded";
@@ -2162,14 +2471,20 @@ await test("the day-before reminder goes once per lesson version, on its own clo
     lesson("rem-series", "2026-11-03T14:30:00.000Z", { series_id: "rem-series", sequence: 3 });
     logged("rem-series", "student:series-moved:rem-series:3", "sent", "2026-11-02T08:00:00.000Z", "student_series_moved");
     lesson("rem-retry", "2026-11-03T15:00:00.000Z", { location: "porto", sequence: 2, payment_status: "paid" });
-    logged("rem-retry", "student:reminder:rem-retry:2", "failed", "2026-09-05T09:00:00.000Z");
     lesson("rem-recent", "2026-11-03T15:30:00.000Z");
     logged("rem-recent", "student:reminder:rem-recent:0", "failed", "2026-11-02T17:58:00.000Z");
     lesson("rem-race", "2026-11-03T16:15:00.000Z", { meeting_url: "https://meet.google.com/xyz-abcd-efg" });
-    logged("rem-race", "student:reminder:rem-race:0", "failed", "2026-09-05T09:00:00.000Z");
     lesson("rem-near", "2026-11-03T07:00:00.000Z");
     lesson("rem-far", "2026-11-03T19:00:00.000Z");
     lesson("rem-noemail", "2026-11-03T12:30:00.000Z", { student_email: "no-email:rem" });
+
+    // A real failed attempt retains its exact reminder. An interrupted send
+    // with an expired lease follows the same safe provider retry path.
+    emailUnavailable = true;
+    await sendLessonReminders(env, N);
+    emailUnavailable = false;
+    db.prepare(`UPDATE email_log SET status='pending',send_claim_until='2026-09-05T09:59:00.000Z'
+      WHERE dedupe_key='student:reminder:rem-retry:2'`).run();
 
     // A failed reminder has a booking id, but is not "booked": it retries in its own sweep.
     await resendFailedEmails(env);
@@ -2177,8 +2492,8 @@ await test("the day-before reminder goes once per lesson version, on its own clo
 
     // Another tick reclaims the failed row first: only the one that flips it sends.
     beforeRun = (sql, values) => {
-      if (sql.startsWith("UPDATE email_log SET status = 'pending'") && values[1] === "student:reminder:rem-race:0") {
-        db.prepare("UPDATE email_log SET status = 'pending' WHERE dedupe_key = ?").run(values[1]);
+      if (sql.startsWith("UPDATE email_log SET status = 'pending'") && values[3] === "student:reminder:rem-race:0") {
+        db.prepare("UPDATE email_log SET status = 'pending',send_claim_id='other',send_claim_until='2026-09-05T10:10:00.000Z' WHERE dedupe_key = ?").run(values[3]);
       }
     };
     await sweep();
@@ -2240,6 +2555,7 @@ await test("the day-before reminder goes once per lesson version, on its own clo
     assert.equal(remindersFor("rem-gone").length + remindersFor("rem-shifted").length, 0);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE booking_id IN ('rem-gone','rem-shifted')").get().n, 0);
   } finally {
+    emailUnavailable = false;
     DB.prepare = realPrepare;
     beforeRun = null;
     for (const key of Object.keys(google)) delete env[key];
@@ -2542,6 +2858,55 @@ await test("Inês can record a no-show until six hours after the lesson ends, an
   assert.deepEqual(charged("attended-recently"), []);
   await chargeDueLessons(env, new Date("2026-09-05T15:00:00.000Z"));
   assert.deepEqual(charged("attended-recently"), [1500]);
+
+  booking("absent-move", { start: "2026-09-05T06:00:00.000Z", end: "2026-09-05T07:00:00.000Z" });
+  assert.equal((await mark("absent-move")).status, 200);
+  const attendance = (id) => ({ ...db.prepare("SELECT attendance_status,no_show_marked_at FROM bookings WHERE id=?").get(id) });
+  const marked = attendance("absent-move");
+  const move = (id, startAt) => call(`/admin/bookings/${id}/reschedule`, { user: "teacher", body: { startAt } });
+  const unchanged = await move("absent-move", "2026-09-05T06:00:00.000Z");
+  assert.equal(unchanged.status, 200, await unchanged.clone().text());
+  assert.deepEqual(attendance("absent-move"), marked, "saving the same time preserves attendance");
+  const moved = await move("absent-move", "2027-02-10T10:00:00.000Z");
+  assert.equal(moved.status, 200, await moved.clone().text());
+  assert.deepEqual(attendance("absent-move"), { attendance_status: "expected", no_show_marked_at: null }, "the new lesson time starts with expected attendance");
+  assert.deepEqual({ ...db.prepare("SELECT payment_status,amount_cents FROM bookings WHERE id='absent-move'").get() }, { payment_status: "scheduled", amount_cents: 1500 }, "its full price remains to be charged");
+
+  const committed = attendance("absent-in-time");
+  assert.equal((await move("absent-in-time", "2027-02-11T10:00:00.000Z")).status, 200);
+  assert.deepEqual(attendance("absent-in-time"), committed, "attendance already charged keeps its payment evidence");
+  assert.equal(db.prepare("SELECT charged_cents FROM bookings WHERE id='absent-in-time'").get().charged_cents, 500);
+
+  booking("absent-move-race", { start: "2026-09-05T06:00:00.000Z", end: "2026-09-05T07:00:00.000Z" });
+  beforeRun = sql => {
+    if (!sql.startsWith("UPDATE bookings SET attendance_status")) return;
+    beforeRun = null;
+    db.prepare("UPDATE bookings SET starts_at='2027-02-12T10:00:00.000Z',ends_at='2027-02-12T11:00:00.000Z',sequence=sequence+1 WHERE id='absent-move-race'").run();
+  };
+  assert.equal((await mark("absent-move-race")).status, 409, "an attendance request that loses a move race is rejected");
+  assert.deepEqual(attendance("absent-move-race"), { attendance_status: "expected", no_show_marked_at: null });
+
+  booking("absent-zero", { start: "2026-09-05T03:01:00.000Z", end: "2026-09-05T04:01:00.000Z" });
+  assert.equal((await mark("absent-zero")).status, 200);
+  try {
+    const configured = await call("/admin/settings", { user: "teacher", body: { settings: { same_day_change_fee_cents: 0 } } });
+    assert.equal(configured.status, 200);
+    booking("action-zero", { payment: "not_required" });
+    db.prepare("UPDATE bookings SET same_day_change=1,same_day_fee_status='scheduled',same_day_fee_cents=0 WHERE id='action-zero'").run();
+    const checkouts = checkoutRequests.length;
+    await chargeDueLessons(env, new Date("2026-09-05T10:01:00.000Z"));
+    await chargeDueSameDayFees(env);
+    assert.deepEqual({ ...db.prepare("SELECT payment_status,amount_cents,charged_cents,charge_request FROM bookings WHERE id='absent-zero'").get() },
+      { payment_status: "free", amount_cents: 0, charged_cents: null, charge_request: null }, "a zero no-show fee leaves nothing to collect");
+    assert.deepEqual(charged("absent-zero"), []);
+    assert.deepEqual(charged("action-zero"), []);
+    assert.deepEqual({ ...db.prepare("SELECT same_day_fee_status,same_day_change,same_day_fee_request FROM bookings WHERE id='action-zero'").get() },
+      { same_day_fee_status: "not_required", same_day_change: 0, same_day_fee_request: null });
+    assert.equal(checkoutRequests.length, checkouts);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE booking_id IN ('absent-zero','action-zero')").get().n, 0);
+  } finally {
+    db.prepare("INSERT OR REPLACE INTO settings VALUES ('same_day_change_fee_cents','500')").run();
+  }
 });
 await test("signing up again with a registered address says so, whatever its case, and makes no second account", async () => {
   // Deliberate (Dan, 24 September 2026): telling a returning student to sign
@@ -2724,7 +3089,28 @@ await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours
     assert.equal(db.prepare("SELECT status FROM email_log WHERE dedupe_key='student:reminder:tick-reminder:0'").get()?.status, "dry-run", "the minute tick sends it");
     const regrown = db.prepare("SELECT added_by_teacher, payment_status FROM bookings WHERE series_id=? AND starts_at=?").get(seriesId, last.starts_at);
     assert.deepEqual({ ...regrown }, { added_by_teacher: 1, payment_status: "not_required" }, "the week comes back as hers, at 04:00 Porto time");
+
+    // A lower price can finish after the nightly read but before its INSERT.
+    // Neither the stale lesson nor its bookmark may survive that lost claim.
+    db.prepare("DELETE FROM bookings WHERE series_id=? AND starts_at=?").run(seriesId, last.starts_at);
+    db.prepare("UPDATE booking_series SET filled_to=? WHERE id=?").run(previous, seriesId);
+    let raced = false;
+    beforeRun = (sql, values) => {
+      if (!sql.startsWith("INSERT INTO bookings") || values[3] !== id) return;
+      beforeRun = null; raced = true;
+      db.prepare("INSERT INTO student_recurring_rates VALUES (?,60,0,?)").run(id, new Date().toISOString());
+    };
+    await worker.scheduled({ scheduledTime: Date.parse("2026-09-06T03:10:00.000Z") }, env, ctx);
+    await drain();
+    assert.equal(raced, true);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE series_id=? AND starts_at=?").get(seriesId, last.starts_at).n, 0);
+    assert.equal(db.prepare("SELECT filled_to FROM booking_series WHERE id=?").get(seriesId).filled_to, previous, "a stale price cannot skip the week");
+    await worker.scheduled({ scheduledTime: Date.parse("2026-09-06T03:10:00.000Z") }, env, ctx);
+    await drain();
+    const free = db.prepare("SELECT amount_cents, payment_status FROM bookings WHERE series_id=? AND starts_at=?").get(seriesId, last.starts_at);
+    assert.deepEqual({ ...free }, { amount_cents: 0, payment_status: "free" }, "the next fill takes the current price");
   } finally {
+    beforeRun = null;
     forgetStudent(email);
   }
 });
@@ -3324,6 +3710,75 @@ await test("her price for a student prices their lessons, and only lessons nothi
       assert.equal(changed.status, 200, await changed.clone().text());
       assert.equal(raced, true, label);
       assert.deepEqual(db.prepare("SELECT amount_cents, payment_status FROM bookings WHERE id IN ('price-snapshot-sixty', 'price-snapshot-ninety') ORDER BY lesson_type_id DESC").all().map((row) => [row.amount_cents, row.payment_status]), expected.map((cents) => [cents, "not_required"]), label);
+    }
+
+    // A price save which finishes before a new claim cannot miss the row and
+    // leave it chargeable at an older quote. Exercise the production INSERTs,
+    // including their empty-recipe cleanup and weekly bookmark transaction.
+    for (const scenario of [
+      { label: "explicit", before: { 60: 2000 }, after: { 60: 1500 }, quote: 2000 },
+      { label: "derived", before: { 60: 2001 }, after: { 60: 1801 }, quote: 3002, type: "long" },
+      { label: "explicit becomes derived", before: { 60: 2000, 90: 2500 }, after: { 60: 2000 }, quote: 2500, type: "long" },
+      { label: "personal becomes public", before: { 60: 2000 }, after: {}, quote: 2000 },
+      { label: "free becomes paid", before: { 60: 0 }, after: { 60: 1800 }, quote: 0 },
+      { label: "trial keeps its public price", after: { 60: 0 }, quote: 2000, type: "trial" },
+      { label: "public becomes free selection", stage: "selection", after: { 60: 0 } },
+      { label: "public becomes free selection recipe", stage: "selection-recipe", after: { 60: 0 } },
+      { label: "first lesson stays without stale recipe", stage: "recipe", after: { 60: 0 } },
+      { label: "unopened setup is released", stage: "recipe", setup: true, after: { 60: 0 } },
+      { label: "teacher claim", teacher: true, after: { 60: 0 } },
+      { label: "teacher recipe", teacher: true, stage: "recipe", after: { 60: 0 } },
+      { label: "later weeks cannot silently rise", stage: "occurrence", after: { 60: 3000 } }
+    ]) {
+      const user = await selectionFixture({ savedCard: !scenario.setup });
+      const replaceRates = rates => {
+        db.prepare("DELETE FROM student_recurring_rates WHERE student_id = ?").run(user);
+        for (const [minutes, cents] of Object.entries(rates)) {
+          db.prepare("INSERT INTO student_recurring_rates VALUES (?, ?, ?, ?)").run(user, Number(minutes), cents, new Date().toISOString());
+        }
+      };
+      replaceRates(scenario.before ?? {});
+      const checkoutBefore = checkoutRequests.length;
+      let claims = 0;
+      let raced = false;
+      beforeRun = sql => {
+        const prefix = scenario.stage === "recipe" || scenario.stage === "selection-recipe"
+          ? scenario.teacher ? "WITH card(authorized)" : "INSERT INTO booking_series"
+          : scenario.stage === "selection" ? "WITH candidates" : "INSERT INTO bookings";
+        if (!sql.startsWith(prefix)) return;
+        if (scenario.stage === "occurrence" && ++claims === 1) return;
+        beforeRun = null; raced = true; replaceRates(scenario.after);
+      };
+      try {
+        const repeated = ["recipe", "selection", "selection-recipe", "occurrence"].includes(scenario.stage);
+        const body = selectionBody({
+          lessonType: scenario.type ?? "single", expectedPriceCents: scenario.quote ?? 2500,
+          startAts: scenario.stage?.startsWith("selection") ? selectedStarts : [selectedStarts[0]],
+          ...(repeated ? { repeat: 4 } : {})
+        });
+        const response = scenario.teacher
+          ? await call("/admin/bookings", { user: "teacher", body: { ...body, studentId: user, startAt: selectedStarts[0] } })
+          : await call("/bookings", { user, body });
+        assert.equal(raced, true, scenario.label);
+        const accepted = scenario.stage === "occurrence" || scenario.type === "trial";
+        assert.equal(response.status, accepted ? 201 : 409, `${scenario.label}: ${await response.clone().text()}`);
+        const rows = db.prepare("SELECT * FROM bookings WHERE student_id = ?").all(user);
+        const acceptedFirst = (scenario.stage === "recipe" && !scenario.setup) || accepted;
+        assert.equal(rows.length, acceptedFirst ? 1 : 0, scenario.label);
+        await drain();
+        if (scenario.stage === "recipe" && acceptedFirst) {
+          assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE booking_id = ? AND kind = 'student_booked'").get(rows[0].id).n, 1, "the accepted first lesson still has its confirmation");
+        }
+        const recipe = db.prepare("SELECT filled_to FROM booking_series WHERE student_id = ?").get(user);
+        assert.deepEqual(recipe ? { ...recipe } : null, scenario.stage === "occurrence" ? { filled_to: "2026-09-14" } : null, scenario.label);
+        if (scenario.stage === "occurrence") assert.equal(rows[0].amount_cents, 2500, "the accepted first lesson retains its lower quote");
+        assert.equal(checkoutRequests.length, checkoutBefore, "no stale quote opens card setup");
+      } finally {
+        beforeRun = null;
+        await drain();
+        forgetStudent(`${user}@example.invalid`);
+        delete sessions[user];
+      }
     }
   } finally {
     beforeRun = null;
@@ -4138,9 +4593,24 @@ await test("homework notice: Inês is emailed once per submission, with a link a
   const ours = [];
   const notices = () => sentEmails.filter(email => email.subject.includes("homework") && ours.some(id => email.text.includes(id)));
   const beforeFetch = globalThis.fetch;
+  const accepted = new Map();
+  const attempts = [];
   let resendDown = false;
-  globalThis.fetch = async (url, options) => resendDown && String(url) === "https://api.resend.com/emails"
-    ? Response.json({ message: "isolated outage" }, { status: 500 }) : beforeFetch(url, options);
+  globalThis.fetch = async (url, options) => {
+    if (String(url) !== "https://api.resend.com/emails") return beforeFetch(url, options);
+    const key = options.headers["Idempotency-Key"];
+    assert.match(key, /^ines-email:[a-f0-9]{64}$/);
+    assert.ok(options.signal, "provider calls have a bounded timeout");
+    attempts.push({ key, body: options.body });
+    if (resendDown) return Response.json({ message: "isolated outage" }, { status: 500 });
+    if (accepted.has(key)) {
+      assert.equal(options.body, accepted.get(key).body, "a provider retry uses exactly the original bytes");
+      return Response.json({ id: accepted.get(key).id });
+    }
+    const response = await beforeFetch(url, options);
+    accepted.set(key, { body: options.body, ...(await response.clone().json()) });
+    return response;
+  };
   Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0", TEACHER_NOTIFICATIONS_ENABLED: "1" });
   sentEmails.length = 0;
   try {
@@ -4173,6 +4643,78 @@ await test("homework notice: Inês is emailed once per submission, with a link a
     await drain();
     assert.equal(notices().length, 2);
 
+    // An accepted provider request can outlive all three local writes: the
+    // sent record, failure record and homework claim release. Both leases
+    // expire, and the original provider key/body recover without a second mail.
+    const interrupted = await published("homework-notice-interrupted");
+    let key;
+    beforeRun = (sql, values) => {
+      if (sql.startsWith("INSERT INTO email_log") && values[3].startsWith("teacher:homework-submitted:")) key = values[3];
+      if ((/^UPDATE email_log SET status = '(?:sent|failed)'/.test(sql) && values[1] === key) ||
+          (sql.startsWith("UPDATE homework_progress SET notified_submission_id = NULL") && values[0] === interrupted)) {
+        throw new Error("Isolated interrupted delivery record");
+      }
+    };
+    try {
+      assert.equal((await call(`/me/homework/${interrupted}/submit`, { body: answers })).status, 200);
+      await drain();
+    } finally { beforeRun = null; }
+    const pending = db.prepare("SELECT * FROM email_log WHERE dedupe_key = ?").get(key);
+    assert.equal(pending.status, "pending");
+    assert.ok(pending.request_json);
+    assert.equal(notices().length, 3);
+    const calls = attempts.length;
+    db.prepare("UPDATE homework_progress SET notified_at = ? WHERE booking_id = ?")
+      .run(new Date(Date.now() - 121000).toISOString(), interrupted);
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx); await drain();
+    assert.equal(attempts.length, calls, "an active provider lease cannot be sent again");
+    assert.equal(db.prepare("SELECT notified_submission_id FROM homework_progress WHERE booking_id = ?").get(interrupted).notified_submission_id, null,
+      "pending is not mistaken for successful notification");
+    db.prepare("UPDATE email_log SET send_claim_until = ? WHERE dedupe_key = ?").run(new Date(Date.now() - 1).toISOString(), key);
+    db.prepare("UPDATE bookings SET student_name = 'Changed after first send' WHERE id = ?").run(interrupted);
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx); await drain();
+    assert.equal(attempts.length, calls + 1);
+    assert.equal(notices().length, 3, "Resend replays the original result, never another email");
+    const recovered = db.prepare("SELECT * FROM email_log WHERE dedupe_key = ?").get(key);
+    assert.equal(recovered.status, "sent");
+    assert.equal(recovered.first_attempt_at, pending.first_attempt_at);
+    assert.equal(recovered.request_json, null, "delivered messages retain no sensitive body");
+    db.prepare("UPDATE homework_progress SET notified_submission_id = NULL, notified_at = NULL WHERE booking_id = ?").run(interrupted);
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx); await drain();
+    assert.equal(attempts.length, calls + 1, "a lost homework marker reconciles confirmed delivery without contacting the provider");
+    assert.ok(db.prepare("SELECT notified_submission_id FROM homework_progress WHERE booking_id = ?").get(interrupted).notified_submission_id);
+
+    // A claim abandoned before any email row exists is also recoverable.
+    const unstarted = await published("homework-notice-unstarted");
+    const snapshot = db.prepare("SELECT * FROM homework_progress WHERE booking_id = ?").get(interrupted);
+    const submission = { ...JSON.parse(snapshot.submission_json), id: crypto.randomUUID() };
+    db.prepare(`INSERT INTO homework_progress(booking_id, student_id, answers_json, submission_json, completed_at, updated_at, notified_submission_id, notified_at)
+      VALUES (?, 'alice', ?, ?, ?, ?, ?, ?)`)
+      .run(unstarted, snapshot.answers_json, JSON.stringify(submission), snapshot.completed_at, snapshot.updated_at, submission.id, new Date(Date.now() - 121000).toISOString());
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx); await drain();
+    assert.equal(notices().length, 4, "an interrupted homework claim does not suppress its first send");
+
+    // After the safe replay window, never risk a duplicate. Purge the body
+    // and leave an explicit manual reconciliation record instead.
+    const expiredKey = `teacher:homework-submitted:${crypto.randomUUID()}`;
+    const old = new Date(Date.now() - 24 * 3600000).toISOString();
+    db.prepare(`INSERT INTO email_log(kind, recipient, dedupe_key, status, created_at, request_json, first_attempt_at)
+      VALUES ('teacher_homework_submitted', 'ines@example.invalid', ?, 'pending', ?, ?, ?)`)
+      .run(expiredKey, old, pending.request_json, old);
+    // The old Worker can write once more between applying the migration and
+    // deploying this version. Such bodyless attempts are unsafe to replay too.
+    const legacyKey = `late-legacy:${crypto.randomUUID()}`;
+    db.prepare(`INSERT INTO email_log(kind, recipient, dedupe_key, status, created_at)
+      VALUES ('student_booked', 'ana@example.invalid', ?, 'pending', ?)`)
+      .run(legacyKey, new Date().toISOString());
+    const beforeExpiry = attempts.length;
+    await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx); await drain();
+    assert.equal(attempts.length, beforeExpiry);
+    assert.deepEqual({ ...db.prepare("SELECT status, request_json FROM email_log WHERE dedupe_key = ?").get(expiredKey) },
+      { status: "unconfirmed", request_json: null });
+    assert.deepEqual({ ...db.prepare("SELECT status, request_json FROM email_log WHERE dedupe_key = ?").get(legacyKey) },
+      { status: "unconfirmed", request_json: null });
+
     // Interrupted marking waits for the 90-second hand-off, then is announced.
     const stalled = await published("homework-notice-stalled");
     const attempt = state => JSON.stringify({ id: crypto.randomUUID(), answers: answers.answers, marks: {}, submittedAt: new Date(Date.now() - state.ago).toISOString(), returnedAt: null, state: "marking", markingNote: "" });
@@ -4180,11 +4722,11 @@ await test("homework notice: Inês is emailed once per submission, with a link a
       .run(stalled, JSON.stringify(answers.answers), attempt({ ago: 30000 }), new Date().toISOString(), new Date().toISOString());
     await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx);
     await drain();
-    assert.equal(notices().length, 2, "not while marking may still finish");
+    assert.equal(notices().length, 4, "not while marking may still finish");
     db.prepare("UPDATE homework_progress SET submission_json = ? WHERE booking_id = ?").run(attempt({ ago: 120000 }), stalled);
     await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.now() }, env, ctx);
     await drain();
-    assert.equal(notices().length, 3);
+    assert.equal(notices().length, 5);
     assert.equal(JSON.parse(db.prepare("SELECT submission_json FROM homework_progress WHERE booking_id = ?").get(stalled).submission_json).state, "submitted");
 
     // If another review wins while a stale marking attempt is handed off,

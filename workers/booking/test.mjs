@@ -1047,6 +1047,7 @@ async function makeIdToken(overrides = {}, { signingKey = googleKeyPair.privateK
     sub: "10769150350006150715",
     email: "joana@example.com",
     email_verified: true,
+    hd: "example.com",
     name: "Joana Ferreira",
     iat: now,
     exp: now + 3600,
@@ -1064,6 +1065,12 @@ await test("a genuine Google ID token is accepted", async () => {
   const profile = await verifyGoogleIdToken(await makeIdToken(), CLIENT_ID);
   assert.equal(profile?.email, "joana@example.com");
   assert.equal(profile?.name, "Joana Ferreira");
+  assert.equal(profile?.emailAuthoritative, true, "verified Workspace mail has Google authority");
+  assert.equal((await verifyGoogleIdToken(await makeIdToken({ email: "joana@gmail.com", hd: undefined }), CLIENT_ID))?.emailAuthoritative, true);
+  for (const hd of [undefined, null, "", " ", "bad/domain", "-invalid.example", ["example.com"]]) {
+    const external = await verifyGoogleIdToken(await makeIdToken({ hd }), CLIENT_ID);
+    assert.equal(external?.emailAuthoritative, false, "email_verified alone cannot prove a third-party mailbox's current owner");
+  }
 });
 
 await test("a token minted for another app is rejected", async () => {
@@ -1249,9 +1256,13 @@ function seriesEmailFixture() {
           },
           async run() {
             if (sql.startsWith("INSERT INTO email_log")) {
-              emailLog.push({ bookingId: values[0], kind: values[1], recipient: values[2], dedupeKey: values[3] });
+              emailLog.push({ bookingId: values[0], kind: values[1], recipient: values[2], dedupeKey: values[3],
+                status: "pending", created_at: values[4], request_json: values[5] });
             }
-            return { success: true };
+            return { success: true, meta: { changes: 1 } };
+          },
+          async first() {
+            return emailLog.find(row => row.dedupeKey === values[0]) ?? null;
           }
         };
       }
@@ -1304,10 +1315,11 @@ await test("direct calendar sync omits teacher attachments but preserves student
   const prepare = fixture.env.DB.prepare;
   fixture.env.DB.prepare = sql => {
     const statement = prepare(sql);
+    const first = statement.first.bind(statement);
     let args = [];
     const bind = statement.bind.bind(statement);
     statement.bind = (...values) => { args = values; return bind(...values); };
-    statement.first = async () => sql.includes("google_calendar_connections")
+    statement.first = async () => sql.includes("email_log") ? first() : sql.includes("google_calendar_connections")
       ? { calendar_id: "fixture@group.calendar.google.com", status: "active" }
       : fixture.rows.find(row => row.id === args[0]);
     return statement;
@@ -1371,6 +1383,12 @@ await test("a repeating booking sends one consolidated email to the client", asy
     assert.deepEqual(result, { ok: false, error: "HTTP 307" });
     assert.equal(calls, 1, "redirect destinations are never requested");
     assert.ok(writes.some(sql => sql.startsWith("UPDATE email_log SET status = 'failed'")));
+    globalThis.fetch = async () => Response.json({ id: "isolated-room-message" });
+    const room = await deliver(fixture.env, {
+      to: "ana@example.com", subject: "Lesson", content: { heading: "Lesson", intro: "Room https://meet.google.com/abc-defg-hij" },
+      dedupeKey: "isolated-room-message", kind: "student_series_booked"
+    });
+    assert.deepEqual(room, { ok: true, id: "isolated-room-message", meetingUrls: ["https://meet.google.com/abc-defg-hij"] });
   } finally {
     globalThis.fetch = originalFetch;
     fixture.env.DB.prepare = prepare;

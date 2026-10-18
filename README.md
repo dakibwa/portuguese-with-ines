@@ -115,7 +115,8 @@ request only competes with the fonts for no gain.
   recurring-rate codes supplied by Inês, one for 60-minute and one for
   90-minute lessons, only under Edit details. Booking and lesson changes
   use the saved rates automatically; sign-up never asks for a code. Grants persist
-  for future recurring lessons without changing existing bookings or the €5 fees.
+  for future lessons and lower eligible uncharged bookings under the documented
+  repricing rules; they never change the €5 fees.
   The Worker's `lesson_types` table decides what is actually bookable; the
   lessons page is the copy a visitor reads. Keep the two in step.
 - The booking flow can confirm up to eight selected single-lesson dates at
@@ -131,6 +132,12 @@ request only competes with the fonts for no gain.
   it ends Inês can mark a no-show; that replaces the full lesson charge with
   €5, charged when that window closes.
   One booking can incur the late change fee only once.
+- Booking and change writes recheck current prices, payment state and any
+  displayed late fee. Stale quotes require review before a new charge.
+  Email retries preserve the exact provider request and idempotency key for
+  at most 23 hours; migration 0034 adds the delivery recovery fields. See
+  [docs-booking-system.md](./docs-booking-system.md) for deployment and manual
+  reconciliation rules.
 
 ## Run and verify
 

@@ -310,23 +310,27 @@ const noticeColumnsMissing = error => /no such column: (?:\w+\.)?notified_/.test
  * Tells Inês, once per submission, that homework is waiting: the student, the
  * lesson and a link to its review, never the answers or any automatic mark.
  * It runs after marking finishes or is handed to her at 90 seconds. The claim
- * on `notified_submission_id` and the email log's dedupe key both keep a retry
- * or the cron sweep from sending twice; a failed send is released for the
- * next sweep to try again.
+ * on `notified_submission_id` expires after two minutes unless the email log
+ * confirms delivery. An interrupted claim or send is retried with the same
+ * exact provider payload and idempotency key, within its safe retry window.
  */
 export async function notifyHomeworkSubmissions(env, { to, send, link, bookingId = null }) {
   if (!to) return 0;
   let rows;
+  const stale = new Date(Date.now() - 120000).toISOString();
   try {
     const recent = new Date(Date.now() - 3 * 86400000).toISOString();
     rows = (await env.DB.prepare(`SELECT p.booking_id, p.student_id FROM homework_progress p
       JOIN lesson_homework h ON h.booking_id = p.booking_id AND h.student_id = p.student_id AND h.published_at IS NOT NULL
       JOIN bookings b ON b.id = p.booking_id AND b.student_id = p.student_id
+      LEFT JOIN email_log e ON e.dedupe_key = 'teacher:homework-submitted:' || json_extract(p.submission_json, '$.id')
       WHERE (? IS NULL OR p.booking_id = ?) AND p.submission_json IS NOT NULL
         AND json_extract(p.submission_json, '$.returnedAt') IS NULL
         AND json_extract(p.submission_json, '$.submittedAt') > ?
-        AND p.notified_submission_id IS NOT json_extract(p.submission_json, '$.id')
-      LIMIT 10`).bind(bookingId, bookingId, recent).all()).results ?? [];
+        AND COALESCE(e.status, '') != 'unconfirmed'
+        AND (p.notified_submission_id IS NOT json_extract(p.submission_json, '$.id')
+          OR ((p.notified_at IS NULL OR p.notified_at <= ?) AND COALESCE(e.status, '') NOT IN ('sent', 'dry-run')))
+      LIMIT 10`).bind(bookingId, bookingId, recent, stale).all()).results ?? [];
   } catch (error) {
     if (homeworkTablesMissing(error) || noticeColumnsMissing(error)) return 0;
     throw error;
@@ -339,24 +343,29 @@ export async function notifyHomeworkSubmissions(env, { to, send, link, bookingId
     if (!submission || submission.returnedAt || submission.state === "marking") continue;
     const time = new Date().toISOString();
     const claimed = await env.DB.prepare(`UPDATE homework_progress SET notified_submission_id = ?, notified_at = ?
-      WHERE booking_id = ? AND student_id = ? AND notified_submission_id IS NOT ? AND json_extract(submission_json, '$.id') = ?`)
-      .bind(submission.id, time, lessonId, studentId, submission.id, submission.id).run();
+      WHERE booking_id = ? AND student_id = ? AND json_extract(submission_json, '$.id') = ?
+        AND json_extract(submission_json, '$.returnedAt') IS NULL AND json_extract(submission_json, '$.state') != 'marking'
+        AND (notified_submission_id IS NOT ? OR notified_at IS NULL OR notified_at <= ?)`)
+      .bind(submission.id, time, lessonId, studentId, submission.id, submission.id, stale).run();
     if (!claimed.meta.changes) continue;
-    const lesson = await env.DB.prepare(`SELECT b.starts_at, b.student_name, b.student_email, json_extract(h.published_json, '$.title') AS title
-      FROM bookings b JOIN lesson_homework h ON h.booking_id = b.id WHERE b.id = ?`).bind(lessonId).first();
-    const name = lesson?.student_name?.trim() || "A student";
-    const when = lesson ? formatInZone(new Date(lesson.starts_at)) : "";
-    const result = await send({
-      to, kind: "teacher_homework_submitted",
-      // No booking id: the failed-email sweep rebuilds booking rows as lesson
-      // confirmations. This notice retries through its own claim instead.
-      bookingId: null, dedupeKey: `teacher:homework-submitted:${submission.id}`,
-      replyTo: lesson?.student_email || undefined,
-      ...homeworkSubmitted({ name, title: lesson?.title ?? "", when: when ? `${when}, Porto time` : "", url: link(lessonId, studentId) }),
-    }).catch(error => ({ ok: false, error }));
+    let result;
+    try {
+      const lesson = await env.DB.prepare(`SELECT b.starts_at, b.student_name, b.student_email, json_extract(h.published_json, '$.title') AS title
+        FROM bookings b JOIN lesson_homework h ON h.booking_id = b.id WHERE b.id = ?`).bind(lessonId).first();
+      const name = lesson?.student_name?.trim() || "A student";
+      const when = lesson ? formatInZone(new Date(lesson.starts_at)) : "";
+      result = await send({
+        to, kind: "teacher_homework_submitted",
+        // The homework sweep owns retries after checking the submission.
+        bookingId: null, dedupeKey: `teacher:homework-submitted:${submission.id}`,
+        replyTo: lesson?.student_email || undefined,
+        ...homeworkSubmitted({ name, title: lesson?.title ?? "", when: when ? `${when}, Porto time` : "", url: link(lessonId, studentId) }),
+      });
+    } catch { result = { ok: false }; }
     if (result?.ok) { sent++; continue; }
     await env.DB.prepare(`UPDATE homework_progress SET notified_submission_id = NULL, notified_at = NULL
-      WHERE booking_id = ? AND student_id = ? AND notified_submission_id = ?`).bind(lessonId, studentId, submission.id).run();
+      WHERE booking_id = ? AND student_id = ? AND notified_submission_id = ? AND notified_at = ?`)
+      .bind(lessonId, studentId, submission.id, time).run();
   }
   return sent;
 }

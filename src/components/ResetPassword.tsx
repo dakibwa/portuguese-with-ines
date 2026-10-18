@@ -14,15 +14,17 @@ export function ResetPassword() {
   const [teacher, setTeacher] = useState(false);
   const [storageNote, setStorageNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const resetToken = useRef<string | null>(null);
   const resetRequest = useRef(0);
   useLayoutEffect(() => () => { resetRequest.current += 1; }, []);
 
   useEffect(() => {
-    const found = new URLSearchParams(window.location.search).get("token");
+    const found = new URLSearchParams(window.location.search).get("token") || resetToken.current;
+    resetToken.current = found;
     if (!found) setError("This page needs the link from your reset email.");
     setToken(found);
-    // The token is held in state from here; it has no reason to stay in the
-    // address bar, the history entry or a screenshot.
+    // Retain it across an effect restart after clearing the address, including
+    // Strict Mode's replay. It stays out of history and screenshots.
     if (found) window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
