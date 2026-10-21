@@ -1857,6 +1857,16 @@ await test("sign-up keeps an optional NIF, tidied, and refuses a mistyped one wi
   assert.equal((await none.json()).student.nif, "");
 });
 
+await test("a name keeps no control characters or text-reversing marks for Inês's subjects and calendar", async () => {
+  const registered = await call("/auth/register", {
+    user: null, headers: { "CF-Connecting-IP": "198.51.100.91" },
+    body: { name: "Ana‮\u0001 Silva\u0000​ ", email: "hidden-marks@example.invalid", password: "a-long-password" }
+  });
+  assert.equal(registered.status, 201, await registered.clone().text());
+  assert.equal((await registered.json()).student.name, "Ana Silva");
+  assert.equal(db.prepare("SELECT name FROM students WHERE email='hidden-marks@example.invalid'").get().name, "Ana Silva");
+});
+
 await test("students add, keep, change and clear their own NIF, and a typo changes nothing", async () => {
   try {
     let saved = await call("/me", { body: { nif: "123 456 789" } });

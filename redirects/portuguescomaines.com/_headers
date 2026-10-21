@@ -1,0 +1,5 @@
+# This project only redirects to portuguesewithines.com. It still names HSTS,
+# so a typed portuguescomaines.com is not left to plain http on the next visit.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff

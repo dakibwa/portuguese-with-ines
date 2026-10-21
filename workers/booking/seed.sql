@@ -1,7 +1,12 @@
+-- First install only, and safe to run again: every statement below adds what
+-- is missing and never overwrites a value Inês has since changed on her
+-- schedule page (her prices, hours, notice and fee). A replayed seed once
+-- would have put all of those back to these defaults without a word.
+--
 -- Her approved public product set (README "Sources of truth"): trial EUR 20/60,
 -- single EUR 25/60, long EUR 35/90. Legacy students keep individually agreed
 -- pricing, which is deliberately not advertised and so is not modelled here.
-INSERT OR REPLACE INTO lesson_types (id, slug, name, description, duration_minutes, price_cents, sort_order, active) VALUES
+INSERT OR IGNORE INTO lesson_types (id, slug, name, description, duration_minutes, price_cents, sort_order, active) VALUES
   ('trial',  'trial-lesson',  'Trial lesson',   'A full hour, not a sales call. We find out where your Portuguese is and what you want to do with it.', 60, 2000, 1, 1),
   ('single', 'single-lesson', 'Single lesson',  'One to one, in Porto or online.',                                                                        60, 2500, 2, 1),
   ('long',   'long-lesson',   'Longer lesson',  'An hour and a half, if you want more time to talk.',                                                    90, 3500, 3, 1);
@@ -11,15 +16,17 @@ INSERT OR REPLACE INTO lesson_types (id, slug, name, description, duration_minut
 --   Wed-Fri  first 17:00, last lesson starts 19:00
 -- These are start times. A 90-minute lesson beginning at 19:00 runs to 20:30,
 -- which is intended.
-DELETE FROM availability_rules;
-INSERT INTO availability_rules (weekday, start_minute, last_start_minute, active) VALUES
-  (1, 600, 1140, 1),
-  (2, 600, 1140, 1),
-  (3, 1020, 1140, 1),
-  (4, 1020, 1140, 1),
-  (5, 1020, 1140, 1);
+INSERT INTO availability_rules (weekday, start_minute, last_start_minute, active)
+  SELECT weekday, start_minute, last_start_minute, active FROM (
+    SELECT 1 AS weekday, 600 AS start_minute, 1140 AS last_start_minute, 1 AS active
+    UNION ALL SELECT 2, 600, 1140, 1
+    UNION ALL SELECT 3, 1020, 1140, 1
+    UNION ALL SELECT 4, 1020, 1140, 1
+    UNION ALL SELECT 5, 1020, 1140, 1
+  )
+  WHERE NOT EXISTS (SELECT 1 FROM availability_rules);
 
-INSERT OR REPLACE INTO settings (key, value) VALUES
+INSERT OR IGNORE INTO settings (key, value) VALUES
   ('minimum_notice_hours', '14'),
   -- Twelve weeks ahead, which the calendar shows four weeks at a time.
   ('booking_horizon_days', '84'),

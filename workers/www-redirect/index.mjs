@@ -5,7 +5,16 @@ const redirectWorker = {
     destination.hostname = "portuguesewithines.com";
     destination.port = "";
 
-    return Response.redirect(destination.toString(), 301);
+    // The canonical site sends HSTS from its own _headers; these hosts only
+    // redirect, so they say it themselves, and a typed www address is not
+    // left to plain http on the next visit.
+    return new Response(null, {
+      status: 301,
+      headers: {
+        Location: destination.toString(),
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+      }
+    });
   }
 };
 

@@ -17,6 +17,7 @@ for (const [source, expected] of [
   const response = worker.fetch(new Request(source));
   assert.equal(response.status, 301);
   assert.equal(response.headers.get("location"), expected);
+  assert.match(response.headers.get("strict-transport-security") ?? "", /max-age=31536000/);
 }
 
 console.log("5 www redirect tests passed.");

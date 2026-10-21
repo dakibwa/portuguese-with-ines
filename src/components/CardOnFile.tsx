@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CreditCard } from "lucide-react";
 import { openCardPage, readSession } from "@/lib/auth-api";
 import { NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS } from "@/lib/config";
-import { formatMoneyCents } from "@/lib/booking-api";
+import { formatMoneyCents, stripePaymentUrl } from "@/lib/booking-api";
 
 /**
  * Saving a card from the account (12 October 2026, Dan): how a student Inês
@@ -27,7 +27,8 @@ export function CardTerms({ change = false, onCancel }: { change?: boolean; onCa
     setBusy(true);
     setError("");
     try {
-      const checkoutUrl = await openCardPage(session);
+      // Held to the same Stripe-only rule as every other payment page.
+      const checkoutUrl = stripePaymentUrl(await openCardPage(session));
       if (!current()) return;
       window.location.assign(checkoutUrl);
     } catch (caught) {

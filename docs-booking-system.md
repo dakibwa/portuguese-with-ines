@@ -2056,6 +2056,9 @@ npx wrangler d1 execute ines-booking --remote --config workers/booking/wrangler.
 npx wrangler deploy --config workers/booking/wrangler.jsonc
 ```
 
+`seed.sql` holds first-install defaults. It only adds what is missing, so a
+replay never puts back prices, hours, notice or the fee Inês has changed.
+
 Secrets, each via `npx wrangler secret put <NAME> --config workers/booking/wrangler.jsonc`:
 
 | Secret | What it is |

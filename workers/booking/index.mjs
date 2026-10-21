@@ -192,8 +192,19 @@ function isEmail(value) {
   );
 }
 
+/*
+ * Control characters and the invisible marks that reorder or hide text have no
+ * place in a name or a note. They used to reach Inês's subject lines, calendar
+ * and receipts unchanged: a right-to-left override reversed the rest of a
+ * subject, and a NUL silently cut the stored name short. Whitespace controls
+ * still collapse to a single space, and the cut counts characters, so it never
+ * leaves half of an emoji behind.
+ */
+const HIDDEN_TEXT = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F​⁠‪-‮⁦-⁩﻿]/g;
+
 function cleanText(value, maxLength) {
-  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+  const text = String(value ?? "").replace(HIDDEN_TEXT, "").replace(/\s+/g, " ").trim();
+  return Array.from(text).slice(0, maxLength).join("").trim();
 }
 
 /** Public shape of a booking. Never leaks another student's details. */
