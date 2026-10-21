@@ -131,7 +131,11 @@ price, like any other past lesson. Homework is set on it as usual.
 Moving it to another past time, or cancelling it, is as quiet, since the
 student was never told of it. It cannot be moved into the future (409 `A
 recorded lesson stays in the past. Add a new lesson instead.`), so a record
-never becomes an unannounced lesson to come.
+never becomes an unannounced lesson to come. The reverse is refused too: a
+lesson still to come cannot be moved to a time already gone (409 `That time has
+already passed.`), so a past day picked by mistake never tells the student of a
+lesson that did not happen or charges a saved card for it. A lesson that has
+happened can still have its time corrected.
 An unproven account with a password is still reclaimed first (below), because
 the lesson and its homework must not reach whoever registered the address;
 with no confirmation sent, the mailbox's owner gets back in with Google or a
@@ -1227,6 +1231,8 @@ that window four weeks at a time rather than as one long scroll. It was 56
   view keeps paging until its last booked lesson, `Later weeks` counts what
   lies beyond the page on show, and those lessons open the same in-place
   move/cancel interface.
+- Moving a whole weekly run holds its new first lesson to the horizon, as
+  booking one does; only the weeks after it may reach beyond it.
 - A signed-in student with any non-cancelled booking is never offered the trial,
   matching the Worker's booking rule. An unfinished card setup of their own
   (`status: "pending_payment"` in `/me`) is the exception: their next booking
@@ -1985,6 +1991,11 @@ Single moves and cancellations also recheck their payment snapshot at the
 write, so a concurrent paid-by-hand mark, charge or repricing requires a reload.
 A teacher cancellation selected as unpaid cannot cancel a newly settled card
 payment without passing through the refund path.
+Cancelling a lesson whose card was declined (`payment_due`) first expires its
+Stripe payment link, then retires what was owed (`not_required`, no session),
+so a cancelled lesson can no longer be paid, marked paid and left unrefunded.
+If Stripe cannot confirm the link closed, it may just have been paid, and the
+cancellation is refused with a reload prompt.
 Changing a lesson's length and unticking a payment by hand also atomically
 verify the effective target price. Teacher creation accepts the displayed
 `expectedPriceCents`; a changed quote requires review, except for an unticked

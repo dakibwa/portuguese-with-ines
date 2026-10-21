@@ -196,7 +196,7 @@ export function studentBooked({ first, byInes, welcome = null, lesson, lessonNam
         { label: "Lesson", value: lesson },
         { label: "Where", value: place },
         { label: "Price", value: price },
-        { label: "When", value: `Every ${run.slot.weekday}, ${run.slot.time}${run.fixed ? ` · ${run.count} lessons` : ""}` }
+        { label: "When", value: `Every ${run.slot.weekday}, ${run.slot.time}${run.fixed ? ` · ${run.count} ${run.count === 1 ? "lesson" : "lessons"}` : ""}` }
       ]
     : runRows({ lesson, place, price, repeats: run.repeats, occurrences: run.occurrences });
   return {

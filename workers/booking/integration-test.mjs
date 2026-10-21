@@ -605,6 +605,36 @@ await test("teacher move and cancellation have no student action fee and cannot 
   assert.equal((await call("/admin/bookings/processing/cancel", { user: "teacher" })).status, 409);
   assert.equal((await call("/admin/bookings/processing/reschedule", { user: "teacher", body: { startAt: "2026-09-09T15:00:00.000Z" } })).status, 409);
 });
+await test("Inês cancelling a declined lesson closes its payment link and retires what was owed", async () => {
+  booking("declined-cancel", { payment: "payment_due", start: "2026-09-01T09:00:00.000Z", end: "2026-09-01T10:00:00.000Z" });
+  db.prepare("UPDATE bookings SET stripe_session_id='cs_declined_open' WHERE id='declined-cancel'").run();
+  expiryUnavailable = true;
+  checkoutStatus = "open";
+  try {
+    // A link that can't be shown closed may just have been paid: nothing changes.
+    assert.equal((await call("/admin/bookings/declined-cancel/cancel", { user: "teacher" })).status, 409);
+    assert.deepEqual({ ...db.prepare("SELECT status, payment_status, stripe_session_id FROM bookings WHERE id='declined-cancel'").get() },
+      { status: "confirmed", payment_status: "payment_due", stripe_session_id: "cs_declined_open" });
+  } finally {
+    expiryUnavailable = false;
+  }
+  assert.equal((await call("/admin/bookings/declined-cancel/cancel", { user: "teacher" })).status, 200);
+  assert.ok(expiredSessions.includes("cs_declined_open"));
+  assert.deepEqual({ ...db.prepare("SELECT status, payment_status, stripe_session_id FROM bookings WHERE id='declined-cancel'").get() },
+    { status: "cancelled", payment_status: "not_required", stripe_session_id: null });
+});
+await test("Inês cannot move a lesson still to come into the past, where a saved card would be charged for it", async () => {
+  booking("teacher-misclick", { start: "2026-09-10T17:00:00.000Z", end: "2026-09-10T18:00:00.000Z" });
+  const refused = await call("/admin/bookings/teacher-misclick/reschedule", { user: "teacher", body: { startAt: "2026-09-03T17:00:00.000Z" } });
+  assert.equal(refused.status, 409);
+  assert.match(await refused.text(), /already passed/);
+  assert.equal((await call("/admin/bookings/teacher-misclick/reschedule", { user: "teacher", body: { startAt: true } })).status, 400);
+  assert.equal(db.prepare("SELECT starts_at FROM bookings WHERE id='teacher-misclick'").get().starts_at, "2026-09-10T17:00:00.000Z");
+  // A lesson that has happened can still have its time corrected.
+  booking("teacher-correction", { start: "2026-09-04T09:00:00.000Z", end: "2026-09-04T10:00:00.000Z" });
+  assert.equal((await call("/admin/bookings/teacher-correction/reschedule", { user: "teacher", body: { startAt: "2026-09-04T08:00:00.000Z" } })).status, 200);
+  db.prepare("UPDATE bookings SET status='cancelled' WHERE id IN ('teacher-misclick', 'teacher-correction')").run();
+});
 await test("cancel wins before selected due charge is claimed", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   booking("race-cancel", { start: "2026-01-01T10:00:00.000Z", end: "2026-01-01T11:00:00.000Z" });
@@ -1246,6 +1276,17 @@ await test("pending provider refunds reconcile by id, never create another refun
   assert.equal(refunds.length, count);
   assert.equal(refundLookups, lookups + 1);
   assert.equal(db.prepare("SELECT status FROM bookings WHERE reference='refund-pending'").get().status, "cancelled");
+});
+await test("a moved weekly run starts within the booking horizon, as a new one must", async () => {
+  db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('far-series','alice','single',3,1080,?,?)").run(new Date().toISOString(), new Date().toISOString());
+  booking("far-a", { series: "far-series", start: "2026-10-07T17:00:00.000Z", end: "2026-10-07T18:00:00.000Z" });
+  booking("far-b", { series: "far-series", start: "2026-10-14T17:00:00.000Z", end: "2026-10-14T18:00:00.000Z" });
+  const far = await call("/series/far-series/reschedule", { body: { lessonType: "single", startAt: "2027-06-07T09:00:00.000Z", expectedPriceCents: 1500 } });
+  assert.equal(far.status, 409);
+  assert.match(await far.text(), /further ahead than booking is open/);
+  assert.deepEqual(db.prepare("SELECT starts_at FROM bookings WHERE series_id='far-series' ORDER BY starts_at").all().map((row) => row.starts_at),
+    ["2026-10-07T17:00:00.000Z", "2026-10-14T17:00:00.000Z"]);
+  db.prepare("UPDATE bookings SET status='cancelled' WHERE series_id='far-series'").run();
 });
 await test("whole-series duration changes require the displayed rate while unchanged durations preserve mixed prices", async () => {
   db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('mixed-series','alice','single',1,660,?,?)").run(new Date().toISOString(), new Date().toISOString());
@@ -1931,6 +1972,58 @@ await test("payment emails carry the NIF: Inês's reminder always, the student's
   assert.match(studentWithNif.text, /^NIF: 123456789 · on your receipt from Inês$/m);
   assert.ok(studentWithNif.html.includes("123456789"));
   assert.ok(!sent("receipt-none", false).text.includes("NIF"), "no NIF, no row: the student isn't asked for one here");
+});
+
+await test("a late move or cancel of a saved-card lesson still sends both change emails beside its fee", async () => {
+  const savedClock = clock;
+  const savedMode = db.prepare("SELECT value FROM settings WHERE key='payment_mode'").get()?.value ?? "off";
+  const created = [];
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0", TEACHER_NOTIFICATIONS_ENABLED: "1" });
+  try {
+    clock = Date.parse("2026-11-01T10:00:00.000Z");
+    const slots = (await (await call("/availability?lessonType=single&from=2026-11-16&to=2026-11-18", { method: "GET", user: null })).json()).slotsByDate;
+    const book = async (startAt) => {
+      const reply = await call("/bookings", { body: { lessonType: "single", startAt, location: "online", timezone: "Europe/Lisbon", paymentConsent: true } });
+      assert.equal(reply.status, 201, await reply.clone().text());
+      return (await reply.json()).manageToken;
+    };
+    const emailStatus = (kind, bookingId) => db.prepare("SELECT status FROM email_log WHERE kind = ? AND booking_id = ?").get(kind, bookingId)?.status;
+
+    const moving = slots["2026-11-16"][4].startAt;
+    const movedTo = slots["2026-11-17"][6].startAt;
+    const movingToken = await book(moving);
+    await drain();
+    sentEmails.length = 0;
+    clock = Date.parse(moving) - 5 * 3600000;
+    const moved = await call(`/bookings/${movingToken}/reschedule`, { body: { startAt: movedTo } });
+    assert.equal(moved.status, 200, await moved.clone().text());
+    await drain();
+    const movedId = db.prepare("SELECT id FROM bookings WHERE starts_at = ? AND status = 'confirmed'").get(movedTo).id;
+    created.push(movedId);
+    assert.equal(db.prepare("SELECT same_day_fee_status FROM bookings WHERE id = ?").get(movedId).same_day_fee_status, "paid");
+    for (const kind of ["student_rescheduled", "teacher_rescheduled"]) assert.equal(emailStatus(kind, movedId), "sent", kind);
+    assert.ok(sentEmails.some((email) => email.attachments?.some((file) => /method=REQUEST/.test(file.content_type ?? ""))), "the calendar update goes out");
+
+    clock = Date.parse("2026-11-01T10:00:00.000Z");
+    const cancelling = slots["2026-11-18"][4].startAt;
+    const cancellingToken = await book(cancelling);
+    await drain();
+    clock = Date.parse(cancelling) - 3 * 3600000;
+    const cancelled = await call(`/bookings/${cancellingToken}/cancel`, { body: {} });
+    assert.equal(cancelled.status, 200, await cancelled.clone().text());
+    await drain();
+    const cancelledId = db.prepare("SELECT id FROM bookings WHERE starts_at = ? AND status = 'cancelled'").get(cancelling).id;
+    for (const kind of ["student_cancelled", "teacher_cancelled"]) assert.equal(emailStatus(kind, cancelledId), "sent", kind);
+  } finally {
+    clock = savedClock;
+    // Free the times for the tests that follow.
+    for (const id of created) db.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = ?").run(id);
+    db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode', ?)").run(savedMode);
+    Object.assign(env, { EMAIL_DRY_RUN: "1", TEACHER_NOTIFICATIONS_ENABLED: "0" });
+    delete env.TEACHER_EMAIL;
+    delete env.RESEND_API_KEY;
+  }
 });
 
 await test("skipped weekly emails show the missing spring date without inventing a later time", async () => {
@@ -3347,17 +3440,22 @@ await test("a weekly move across spring's missing hour changes nothing and permi
   db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,created_at,updated_at) VALUES ('spring-move','alice','single',0,600,?,?)").run(now, now);
   for (const day of [21, 28]) booking(`spring-move-${day}`, { series: "spring-move", start: `2027-03-${day}T10:00:00.000Z`, end: `2027-03-${day}T11:00:00.000Z` });
   const rows = () => db.prepare("SELECT starts_at,ends_at,sequence FROM bookings WHERE series_id='spring-move' ORDER BY starts_at").all();
+  // Within the booking horizon of the new first lesson, as any move must be.
+  const savedClock = clock;
+  clock = Date.parse("2027-03-10T10:00:00.000Z");
+  const current = await createSession("alice", env.BOOKING_TOKEN_SECRET, db.prepare("SELECT session_version FROM students WHERE id='alice'").get().session_version ?? 0);
   try {
     const before = rows();
-    const failed = await call("/series/spring-move/reschedule", { body: { startAt: "2027-03-21T01:30:00.000Z" } });
+    const failed = await call("/series/spring-move/reschedule", { token: current, body: { startAt: "2027-03-21T01:30:00.000Z" } });
     assert.equal(failed.status, 409, await failed.clone().text());
     assert.match((await failed.json()).error, /clock-change day/);
     assert.deepEqual(rows(), before, "no occurrence changes when a later week names a missing time");
-    const retried = await call("/series/spring-move/reschedule", { body: { startAt: "2027-03-21T02:30:00.000Z" } });
+    const retried = await call("/series/spring-move/reschedule", { token: current, body: { startAt: "2027-03-21T02:30:00.000Z" } });
     assert.equal(retried.status, 200, await retried.clone().text());
     assert.equal((await retried.json()).moved, 2);
     assert.deepEqual(rows().map(row => row.starts_at), ["2027-03-21T02:30:00.000Z", "2027-03-28T01:30:00.000Z"]);
   } finally {
+    clock = savedClock;
     db.prepare("DELETE FROM bookings WHERE series_id='spring-move'").run();
     db.prepare("DELETE FROM booking_series WHERE id='spring-move'").run();
     db.prepare("DELETE FROM availability_rules WHERE id=?").run(rule);

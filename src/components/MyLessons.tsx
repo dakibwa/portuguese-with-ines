@@ -134,6 +134,9 @@ export function MyLessons({
   const [emailPending, setEmailPending] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
   const [detailsNote, setDetailsNote] = useState("");
+  // The emailed confirmation link lands on Your lessons, not Edit details, so
+  // its outcome is said there too.
+  const [emailConfirmedNote, setEmailConfirmedNote] = useState("");
   // The prices saved on the account, read each time the details open.
   // `null` until they arrive, so a slow answer never reads as "none saved".
   const [rates, setRates] = useState<Record<number, number> | null>(null);
@@ -333,6 +336,7 @@ export function MyLessons({
           setDetails((current) => ({ ...current, email: result.student.email }));
         }
         setDetailsNote("That’s your email address updated.");
+        setEmailConfirmedNote(`That’s your email address updated to ${result.student.email}.`);
         setEmailPending("");
       })
       .catch((caught) => {
@@ -934,6 +938,12 @@ export function MyLessons({
     student.cardForAllLessons === false && unpaidAdded > 0;
   return (
     <>
+      {emailConfirmedNote ? (
+        <div className="booking-outcome" role="status">
+          <CheckCircle2 size={20} aria-hidden="true" />
+          <p>{emailConfirmedNote}</p>
+        </div>
+      ) : null}
       {cardNote}
       {askForCard ? <CardPrompt /> : null}
       {alert}

@@ -728,7 +728,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     });
 
 
-  const cadence = series.occurrences ? `${rows.length} lessons` : "Every week, until you stop it";
+  const cadence = series.occurrences ? `${rows.length} ${rows.length === 1 ? "lesson" : "lessons"}` : "Every week, until you stop it";
   const multipleWeeklyTimes = (series.weeklyTimes ?? 1) > 1;
   // A nonexistent spring wall time cannot be represented by an instant.
   // Skipped values also travel through older card-setup metadata, so show
@@ -3586,9 +3586,13 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
       lessonType,
       now,
       ignoreSeriesId: seriesId,
-      ignoreHorizon: true
+      // Only the weeks after the new first lesson may reach past the booking
+      // horizon, as when a weekly run is booked; the first is a new choice and
+      // is held to the same horizon as any booking.
+      ignoreHorizon: index > 0
     });
     if (!check.ok) {
+      if (index === 0 && /further ahead/.test(check.reason ?? "")) return fail(check.reason, 409, request, env);
       return fail(
         `${formatShort(occurrence.startAt, PORTO)} is not free for the new weekly time. Choose another day or time.`,
         409,
@@ -6181,11 +6185,19 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     if (!row) return fail("That booking could not be found.", 404, request, env);
 
     const body = adminBody;
-    const start = new Date(body.startAt);
+    // A time is written out; a number or true would be read as 1970.
+    const start = new Date(typeof body.startAt === "string" ? body.startAt : NaN);
     if (Number.isNaN(start.getTime())) return fail("That time could not be understood.", 400, request, env);
     // A record stays a record: a lesson to come is added, and announced, as one.
     if (row.payment_status === RECORDED && start > new Date()) {
       return fail("A recorded lesson stays in the past. Add a new lesson instead.", 409, request, env);
+    }
+    // A lesson still to come cannot be moved to a time already gone (a past
+    // day picked by mistake): the student would be told of a lesson that never
+    // happened, and a saved card charged for it on the next sweep. A lesson
+    // that has happened can still have its time corrected.
+    if (row.payment_status !== RECORDED && new Date(row.starts_at) > new Date() && start <= new Date()) {
+      return fail("That time has already passed. Choose a time still to come, or add it as a past lesson.", 409, request, env);
     }
 
     const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?")
@@ -6286,6 +6298,15 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       return json({ booking: publicBooking(updated, lessonType, settings), emailed: !await awaitingWelcomeAt(env, updated.student_email) }, 200, request, env);
     }
 
+    // A declined lesson's payment link stays open until it is paid. Her
+    // cancellation retires what was owed, so the link is closed first: a
+    // cancelled lesson could otherwise still be paid, be marked paid and never
+    // be refunded. A link that cannot be shown closed may just have been paid.
+    const owed = row.payment_status === "payment_due";
+    if (owed && row.stripe_session_id && stripeReady(env) && !await checkoutSessionExpired(env, row.stripe_session_id)) {
+      return fail("This lesson's payment link couldn't be closed just now, so it may have just been paid. Please reload and try again.", 409, request, env);
+    }
+
     const now = new Date().toISOString();
     // A charge may finish after our read without changing sequence. Only the
     // payment we inspected may take this path; a newly paid lesson must reload
@@ -6293,7 +6314,8 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const cancelled = await env.DB.prepare(
       `UPDATE bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'teacher',
          sequence = sequence + 1, same_day_change = 0, updated_at = ?, cancellation_message = ?,
-         payment_status = CASE WHEN ? = 1 THEN 'refunded' ELSE payment_status END
+         payment_status = CASE WHEN ? = 1 THEN 'refunded' WHEN payment_status = 'payment_due' THEN 'not_required' ELSE payment_status END,
+         stripe_session_id = CASE WHEN payment_status = 'payment_due' THEN NULL ELSE stripe_session_id END
        WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
          AND payment_status = ? AND amount_cents IS ? AND charged_cents IS ?
          AND stripe_payment_intent IS ? AND stripe_session_id IS ? AND charge_started_at IS ? AND charge_request IS ?

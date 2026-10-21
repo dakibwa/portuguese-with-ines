@@ -254,7 +254,7 @@ export function AuthPanel({
               Your name
             </span>
             <input
-              autoComplete="given-name"
+              autoComplete="name"
               onChange={(event) => update({ name: event.target.value })}
               required
               value={form.name}

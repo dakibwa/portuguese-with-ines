@@ -442,10 +442,16 @@ export const LIFECYCLE_EMAIL_KINDS = [
   "student_series_booked", "student_series_moved", "student_series_cancelled",
   "teacher_series_booked", "teacher_series_moved", "teacher_series_cancelled", "teacher_series_extended",
 ];
+// Not same_day_fee_status: a late change starts charging its fee beside the
+// change email, and the fee moving on from scheduled to processing to paid
+// says nothing new about the change. Checking it left every late move and
+// cancel of a saved-card lesson pending for good, so neither the student nor
+// Inês got the email or its calendar update. Whether a fee applies, and how
+// much, are still checked through same_day_change and same_day_fee_cents.
 const lifecycleFields = [
   "id", "reference", "sequence", "status", "lesson_type_id", "student_id", "student_name", "student_email",
   "student_phone", "student_timezone", "location", "notes", "starts_at", "ends_at", "amount_cents", "payment_status",
-  "payment_consent_version", "same_day_change", "same_day_fee_cents", "same_day_fee_status", "attendance_status", "cancellation_message",
+  "payment_consent_version", "same_day_change", "same_day_fee_cents", "attendance_status", "cancellation_message",
 ];
 export const emailLifecycle = rows => rows.map(row => Object.fromEntries(lifecycleFields.map(field => [field, row[field] ?? null])));
 
