@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle2, Send } from "lucide-react";
 import { readSession } from "@/lib/auth-api";
-import { fetchHomework, fetchHomeworkSheet, saveHomeworkAnswers, type HomeworkProgress, type HomeworkSummary, type StudentHomeworkData } from "@/lib/homework-api";
+import { fetchHomework, fetchHomeworkSheet, lessonDateZone, saveHomeworkAnswers, type HomeworkProgress, type HomeworkSummary, type StudentHomeworkData } from "@/lib/homework-api";
 import { HomeworkSplat } from "./HomeworkArt";
 import { HomeworkWorksheet } from "./HomeworkWorksheet";
 
@@ -137,7 +137,7 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
           <button type="button" className={`homework-list__item homework-list__item--${state}`} onClick={() => void open(item.bookingId)} disabled={busy}>
             <HomeworkSplat seed={item.bookingId} offset={index} className="homework-list__mark" />
             <span className="homework-list__text">
-              <small>{new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Lisbon" }).format(new Date(item.lessonAt))} lesson · {item.minutes} mins</small>
+              <small>{new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: lessonDateZone(item.location) }).format(new Date(item.lessonAt))} lesson · {item.minutes} mins</small>
               <strong lang="pt-PT">{item.title}</strong>
             </span>
             <span className="homework-list__state">

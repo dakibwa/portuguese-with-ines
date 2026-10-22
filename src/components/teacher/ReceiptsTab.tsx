@@ -82,7 +82,8 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
   const monthName = dateLabel(`${month}-01`, { month: "long", year: "numeric" });
 
   function download() {
-    const blob = new Blob([csv(lines)], { type: "text/csv;charset=utf-8" });
+    // The byte-order mark tells Excel it is UTF-8, so "João" doesn't come out garbled.
+    const blob = new Blob(["\uFEFF", csv(lines)], { type: "text/csv;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `receipts-${month}.csv`;

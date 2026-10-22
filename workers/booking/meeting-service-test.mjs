@@ -355,6 +355,11 @@ try {
     const included = await prepareMeeting(env, addBooking("confirmation-included"));
     await markMeetingNotified(env, included);
     await syncPendingMeetings(env, async () => { throw new Error("Already-included link must not be resent"); });
+    // Held until their welcome, or with nowhere to go: never picked, so they cannot crowd out a batch.
+    db.prepare("INSERT INTO students (id, email, name, password_hash, role, awaiting_welcome, created_at) VALUES ('waiting', 'waiting@example.invalid', 'Wanda', '', 'student', 1, ?)").run(iso(0));
+    await prepareMeeting(env, addBooking("held-welcome", { student_email: "waiting@example.invalid" }));
+    await prepareMeeting(env, addBooking("held-no-email", { student_email: "no-email:held" }));
+    await syncPendingMeetings(env, async booking => { throw new Error(`${booking.id} is held, so it is not picked`); });
   });
   await test("first OAuth setup creates one visible app calendar and reconnect reuses it", async () => {
     db.exec("DELETE FROM google_calendar_connections");

@@ -954,6 +954,8 @@ export function TeacherSchedule() {
             setSelectedBooking(null);
             setStatus(message);
             void reloadBookings();
+            // A lesson's change shows in their row too: next lesson, paid by hand, Needs you.
+            void reloadStudents();
           }}
         />
       ) : null}

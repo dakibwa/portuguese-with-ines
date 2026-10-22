@@ -926,6 +926,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [bookingKind, setBookingKind] = useState<BookingKind>("");
   const [todayKey, setTodayKey] = useState("");
   const [horizonDays, setHorizonDays] = useState(BOOKING_HORIZON_DAYS_FALLBACK);
+  // The notice and late change fee as the Worker has them: both are settings
+  // Inês may lower. The published terms stand in until availability says.
+  const [noticeHours, setNoticeHours] = useState(NOTICE_HOURS);
+  const [lateFeeCents, setLateFeeCents] = useState(SAME_DAY_RESCHEDULE_FEE_CENTS);
   // The free time after each lesson, so two picked lessons keep it between
   // them just as the Worker will insist when they are booked.
   const [lessonGapMinutes, setLessonGapMinutes] = useState(0);
@@ -1574,6 +1578,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       if (ready) {
         setSlotsByDate(ready.slotsByDate);
         setHorizonDays(ready.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
+        setNoticeHours(ready.minimumNoticeHours ?? NOTICE_HOURS);
+        setLateFeeCents(ready.sameDayFeeCents ?? SAME_DAY_RESCHEDULE_FEE_CENTS);
         setLessonGapMinutes(Math.max(0, Number(ready.bufferMinutes) || 0));
         setAvailabilityError("");
         setLoadingSlots(false);
@@ -1588,6 +1594,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           if (request !== availabilityVersion.current || signal?.aborted || readSession() !== session) return;
           setSlotsByDate(data.slotsByDate);
           setHorizonDays(data.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
+          setNoticeHours(data.minimumNoticeHours ?? NOTICE_HOURS);
+          setLateFeeCents(data.sameDayFeeCents ?? SAME_DAY_RESCHEDULE_FEE_CENTS);
           setLessonGapMinutes(Math.max(0, Number(data.bufferMinutes) || 0));
         })
         .catch((error: Error) => {
@@ -2247,7 +2255,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     if (!fresh.sameDayFeeApplies) return true;
     setManaged(fresh);
     setManageError(
-      `This lesson is now less than ${NOTICE_HOURS} hours away, so this change costs ${formatMoneyCents(fresh.booking.sameDayFeeCents)}. Check the details and confirm again.`
+      `This lesson is now less than ${noticeHours} hours away, so this change costs ${formatMoneyCents(fresh.booking.sameDayFeeCents)}. Check the details and confirm again.`
     );
     return false;
   }
@@ -2320,7 +2328,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           movingSequence
             ? `Your upcoming weekly lessons have moved. We’ve emailed you and updated your calendar.${
                 keptStarts.length
-                  ? ` ${keptStarts.map((startAt) => `${formatLongDate(startAt, viewZone)} at ${lessonTime(startAt, viewZone)}`).join(" and ")} stays where it is, as it’s less than ${NOTICE_HOURS} hours away.`
+                  ? ` ${keptStarts.map((startAt) => `${formatLongDate(startAt, viewZone)} at ${lessonTime(startAt, viewZone)}`).join(" and ")} stays where it is, as it’s less than ${noticeHours} hours away.`
                   : ""
               }`
             : saved.booking.lessonType.id === previousLessonTypeId
@@ -2391,7 +2399,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           result.pendingRefunds
             ? `Your weekly lessons have stopped and ${cancelledLessons} ${result.cancelled === 1 ? "was" : "were"} cancelled. ${result.pendingRefunds === 1 ? "1 refund is" : `${result.pendingRefunds} refunds are`} being confirmed; ${result.pendingRefunds === 1 ? "that lesson stays" : "those lessons stay"} reserved and locked until then.`
             : result.kept
-            ? `Your weekly lessons have stopped and ${cancelledLessons} ${result.cancelled === 1 ? "was" : "were"} cancelled. Any lesson less than ${NOTICE_HOURS} hours away, or with a payment still going through, stays booked; check your calendar.`
+            ? `Your weekly lessons have stopped and ${cancelledLessons} ${result.cancelled === 1 ? "was" : "were"} cancelled. Any lesson less than ${noticeHours} hours away, or with a payment still going through, stays booked; check your calendar.`
             : result.cancelled
               ? `Your weekly lessons have stopped and ${cancelledLessons} ${result.cancelled === 1 ? "was" : "were"} cancelled.`
               : "Your weekly lessons have stopped. There were no future booked lessons to cancel."
@@ -2588,6 +2596,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           // below are checked against it.
           setSlotsByDate(ready.slotsByDate);
           setHorizonDays(ready.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
+          setNoticeHours(ready.minimumNoticeHours ?? NOTICE_HOURS);
+          setLateFeeCents(ready.sameDayFeeCents ?? SAME_DAY_RESCHEDULE_FEE_CENTS);
           setLessonGapMinutes(Math.max(0, Number(ready.bufferMinutes) || 0));
         } else {
           // The four weeks on show stay where they are while the new lesson's
@@ -2801,7 +2811,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
   function renderLessonPreview(preview: MyBooking) {
     const changeable = preview.status === "confirmed" && Date.parse(preview.startAt) > clock && !preview.changeLocked;
-    const feeCents = loadedAccount?.sameDayFeeCents ?? SAME_DAY_RESCHEDULE_FEE_CENTS;
+    const feeCents = loadedAccount?.sameDayFeeCents ?? lateFeeCents;
     return (
       <>
         <p className={`lesson-calendar__status${preview.status !== "cancelled" && activeManagedSeries ? " lesson-calendar__status--recurring" : ""}`}>
@@ -2826,11 +2836,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         </div>
         {preview.changeLocked && preview.status === "confirmed" ? (
           <p className="lesson-calendar__notice">
-            This lesson is less than {NOTICE_HOURS} hours away and can&rsquo;t be changed or cancelled.
+            This lesson is less than {noticeHours} hours away and can&rsquo;t be changed or cancelled.
           </p>
         ) : preview.sameDayFeeApplies && preview.status === "confirmed" ? (
           <p className="lesson-calendar__notice">
-            Changing or cancelling now costs {formatMoneyCents(feeCents)}, as it&rsquo;s less than {NOTICE_HOURS} hours away.
+            Changing or cancelling now costs {formatMoneyCents(feeCents)}, as it&rsquo;s less than {noticeHours} hours away.
             {preview.sameDayFeeAutomatic ? " Your saved card is charged when you confirm." : ""}
           </p>
         ) : null}
@@ -3225,11 +3235,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             {/* The fee rule as the confirm step's dabs, said once. */}
             <ul className="booking-payment-facts booking-success__note">
               {lessonType?.price_cents === 0 ? (
-                <li>Please give Inês {NOTICE_HOURS} hours&rsquo; notice to move or cancel</li>
+                <li>Please give Inês {noticeHours} hours&rsquo; notice to move or cancel</li>
+              ) : lateFeeCents === 0 ? (
+                <li>Free to change or cancel</li>
               ) : (
                 <>
-                  <li>Free to change or cancel until {NOTICE_HOURS} hours before</li>
-                  <li><strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> after that</li>
+                  <li>Free to change or cancel until {noticeHours} hours before</li>
+                  <li><strong>{formatMoneyCents(lateFeeCents)}</strong> after that</li>
                 </>
               )}
             </ul>
@@ -3512,11 +3524,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       ) : null)}
                       {managed.changeLocked && managed.booking.status === "confirmed" ? (
                         <p className="lesson-calendar__notice">
-                          This lesson is less than {NOTICE_HOURS} hours away and can&rsquo;t be changed or cancelled.
+                          This lesson is less than {noticeHours} hours away and can&rsquo;t be changed or cancelled.
                         </p>
                       ) : managed.sameDayFeeApplies && managed.booking.status === "confirmed" ? (
                         <p className="lesson-calendar__notice">
-                          Changing or cancelling now costs {formatMoneyCents(managed.booking.sameDayFeeCents)}, as it&rsquo;s less than {NOTICE_HOURS} hours away.
+                          Changing or cancelling now costs {formatMoneyCents(managed.booking.sameDayFeeCents)}, as it&rsquo;s less than {noticeHours} hours away.
                           {managed.sameDayFeeAutomatic ? " Your saved card is charged when you confirm." : ""}
                         </p>
                       ) : null}
@@ -3635,7 +3647,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   {activeManagedSeries && manageMode === "confirm-cancel-sequence" ? (
                     <div className="lesson-manage-dialog__decision">
                       <p>
-                        Every upcoming weekly lesson is cancelled, and no new ones are added. Any paid lesson that can still be cancelled is refunded automatically. A lesson less than {NOTICE_HOURS} hours away stays booked.
+                        Every upcoming weekly lesson is cancelled, and no new ones are added. Any paid lesson that can still be cancelled is refunded automatically. A lesson less than {noticeHours} hours away stays booked.
                       </p>
                       <div className="lesson-manage-dialog__actions">
                         <button className="button button--coral" disabled={manageWorking} onClick={() => stopManagedSequence(true)} type="button">
@@ -4575,7 +4587,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           {freeLesson ? (
                             <>
                               <li>Free, with nothing to pay and no card needed</li>
-                              <li>Please give Inês {NOTICE_HOURS} hours&rsquo; notice to move or cancel</li>
+                              <li>Please give Inês {noticeHours} hours&rsquo; notice to move or cancel</li>
                             </>
                           ) : postpay ? (
                             <>
@@ -4585,19 +4597,21 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                                   and that a no-show costs it instead of the lesson, are in
                                   the terms the agreement links (10 October 2026, at Dan's
                                   request). */}
-                              <li>
-                                <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> to move or cancel less than {NOTICE_HOURS} hours before
-                              </li>
-                              <li>
-                                <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> if you don’t show up to a lesson
-                              </li>
+                              {lateFeeCents ? <>
+                                <li>
+                                  <strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel less than {noticeHours} hours before
+                                </li>
+                                <li>
+                                  <strong>{formatMoneyCents(lateFeeCents)}</strong> if you don’t show up to a lesson
+                                </li>
+                              </> : <li>No fee to move or cancel, or for a missed lesson</li>}
                             </>
                           ) : (
                             <>
                               <li>Pay Inês on the lesson day</li>
-                              <li>
-                                <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> to move or cancel less than {NOTICE_HOURS} hours before
-                              </li>
+                              {lateFeeCents ? <li>
+                                <strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel less than {noticeHours} hours before
+                              </li> : null}
                             </>
                           )}
                           {form.repeat === null ? <li>Ongoing lessons repeat until you stop them</li> : null}

@@ -1079,8 +1079,11 @@ while validation runs. Inês's explicit calendar additions retain their override
   working independently of email-domain authority.
 - On a confirmed change, outstanding password resets are deleted — a live reset
   link sitting in the old mailbox would otherwise stay valid for its hour — and
-  future lessons are re-addressed. Past and cancelled lessons keep the address
-  they were taken under, which is the record of what happened.
+  future lessons are re-addressed, as are past ones whose lesson payment or late
+  change fee is still to settle: a card is charged after the lesson, so its
+  receipt or pay-now email goes to the new address. Other past and cancelled
+  lessons keep the address they were taken under, which is the record of what
+  happened.
 - The confirming browser saves the renewed session without closing this
   account's profile editor. Confirmation updates the verified email while
   preserving newer drafts and independently saved name/NIF fields. The link's
@@ -1395,7 +1398,8 @@ a same-time edit and already committed payment retain attendance evidence.
   `ends_at`, on the first minute sweep once the window has closed.
 - **No-show** charges €5 at the same point, instead of the booked lesson price.
 - If Inês configures that fee to zero, the Worker settles the zero obligation
-  without a Stripe request, receipt or payment-recovery link. A positive charge
+  without a Stripe request, receipt or payment-recovery link. The lesson keeps
+  its booked `amount_cents` on record, with `charged_cents` 0. A positive charge
   already captured under its immutable request keeps that original amount.
 - Bookings without explicit automatic-payment consent remain
   `not_required`; the teacher control is not offered for them.

@@ -3,7 +3,7 @@
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Printer, BookOpen, CheckCircle2, RotateCcw, CircleHelp, PencilLine, Eye, EyeOff } from "lucide-react";
-import type { HomeworkMark, HomeworkSheet } from "@/lib/homework-api";
+import { lessonDateZone, type HomeworkMark, type HomeworkSheet, type LessonPlace } from "@/lib/homework-api";
 import { DrawnRule, HomeworkSplat, PaperBloom } from "./HomeworkArt";
 
 /** The site's sliding two-option control, for a choice of view rather than a form value. */
@@ -21,6 +21,7 @@ export function HomeworkToggle<T extends string>({ label, value, options, onChan
 type Props = {
   sheet: HomeworkSheet;
   lessonAt: string;
+  location?: LessonPlace;
   level: string;
   minutes: number;
   answers?: Record<string, string>;
@@ -34,7 +35,7 @@ type Props = {
   tools?: ReactNode;
 };
 
-export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {}, onAnswer, disabled, preview = false, marks = {}, markedAnswers, onViewChange, tools }: Props) {
+export function HomeworkWorksheet({ sheet, lessonAt, location, level, minutes, answers = {}, onAnswer, disabled, preview = false, marks = {}, markedAnswers, onViewChange, tools }: Props) {
   const prefix = useId();
   const [view, setView] = useState<"online" | "print">("online");
   const [showAnswers, setShowAnswers] = useState(preview);
@@ -58,7 +59,7 @@ export function HomeworkWorksheet({ sheet, lessonAt, level, minutes, answers = {
     window.addEventListener("afterprint", afterPrint);
     return () => { window.removeEventListener("beforeprint", beforePrint); window.removeEventListener("afterprint", afterPrint); };
   }, []);
-  const date = new Intl.DateTimeFormat("pt-PT", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Lisbon" }).format(new Date(lessonAt));
+  const date = new Intl.DateTimeFormat("pt-PT", { day: "numeric", month: "long", year: "numeric", timeZone: lessonDateZone(location) }).format(new Date(lessonAt));
   const hasAnswers = Object.values(answers).some(answer => answer.trim());
 
   function chooseView(next: "online" | "print") {

@@ -95,7 +95,7 @@ export function MyLessons({
   section = "upcoming"
 }: {
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
-  initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; cardsAccepted?: boolean } | null;
+  initialAccount?: { student: Student; bookings: MyBooking[]; series?: LessonSeries[]; cardsAccepted?: boolean; sameDayFeeCents?: number; minimumNoticeHours?: number } | null;
   /** The calendar's minute clock keeps history current without another account read. */
   clock: number;
   /** The account's own prices, as last read or changed here, so booking prices with them. */
@@ -112,6 +112,8 @@ export function MyLessons({
   const [bookings, setBookings] = useState<MyBooking[]>(initialAccount?.bookings ?? []);
   const [series, setSeries] = useState<LessonSeries[]>(initialAccount?.series ?? []);
   const [cardsAccepted, setCardsAccepted] = useState(Boolean(initialAccount?.cardsAccepted));
+  // The live fee and notice the card is agreed under.
+  const [cardRules, setCardRules] = useState({ feeCents: initialAccount?.sameDayFeeCents, noticeHours: initialAccount?.minimumNoticeHours });
   // Back from Stripe with a card saved; the account may take a moment to say so.
   const [cardAdded, setCardAdded] = useState(false);
   const [cardChecking, setCardChecking] = useState(false);
@@ -167,6 +169,7 @@ export function MyLessons({
     setBookings(initialAccount.bookings);
     setSeries(initialAccount.series ?? []);
     setCardsAccepted(Boolean(initialAccount.cardsAccepted));
+    setCardRules({ feeCents: initialAccount.sameDayFeeCents, noticeHours: initialAccount.minimumNoticeHours });
     setStudent((current) => current && {
       ...current,
       hasCard: initialAccount.student.hasCard,
@@ -278,6 +281,7 @@ export function MyLessons({
       setBookings(data.bookings);
       setSeries(data.series ?? []);
       setCardsAccepted(Boolean(data.cardsAccepted));
+      setCardRules({ feeCents: data.sameDayFeeCents, noticeHours: data.minimumNoticeHours });
     } catch (caught) {
       if (request !== accountRequest.current || readSession() !== session) return;
       setLoadError(caught instanceof Error ? caught.message : "We couldn’t load your lessons.");
@@ -765,7 +769,7 @@ export function MyLessons({
               <span className="my-lessons__fact-label">Card</span>
               {openField === "card" ? (
                 <div className="card-row-open">
-                  <CardTerms change={student.cardForAllLessons} onCancel={() => setOpenField(null)} />
+                  <CardTerms change={student.cardForAllLessons} onCancel={() => setOpenField(null)} {...cardRules} />
                   {student.cardForAllLessons ? (
                     <button
                       className="text-action"

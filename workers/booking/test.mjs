@@ -28,6 +28,7 @@ import {
 import { verifyGoogleIdToken } from "./google.mjs";
 import { hashPassword, verifyPassword, passwordProblem } from "./auth.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
+import { receiptLines } from "./receipts.mjs";
 import { formatEuros } from "./money.mjs";
 import { buildCalendarInvite, buildCalendarSeriesInvite, calendarUid } from "./ics.mjs";
 import { normaliseWeeks, occurrenceInstants, outstandingFor, planOccurrences, slotOf, SERIES_LENGTHS } from "./series.mjs";
@@ -1750,7 +1751,7 @@ await test("sixteen templates cover every email, each in both colour schemes and
     templates.studentMoved({ ...lesson, first: "Ana", price: "€25", policy: "again", notice: "14 hours", fee: "€5" }),
     templates.lessonMovedTeacher({ ...lesson, student, notice: "14 hours", run }),
     templates.studentCancelled({ ...lesson, first: "Ana", byInes: true }),
-    templates.lessonCancelledTeacher({ student, run: { count: "2 lessons", dates: "Tuesday 13 October 2026 at 17:00" } }),
+    templates.lessonCancelledTeacher({ student, run: { count: "2 lessons", dates: "Tuesday 13 October 2026 at 17:00", kept: { count: 1, dates: "Tuesday 6 October 2026 at 17:00" } } }),
     templates.paymentReceipt({ ...lesson, ...money, first: "Ana", item: "fee" }),
     templates.paymentReceivedTeacher({ ...lesson, ...money, item: "fee" }),
     templates.paymentFailed({ ...lesson, ...money, first: "Ana", item: "no-show", payUrl: "https://x.invalid/p" }),
@@ -1771,6 +1772,11 @@ await test("sixteen templates cover every email, each in both colour schemes and
     // Every text that sits on the card has an explicit colour, never an inherited one.
     assert.ok(!/<p class="[^"]*" style="(?![^"]*color:)/.test(html), subject);
   }
+  // A lesson too close to cancel is still on, and the run's email says so.
+  const stopped = renderEmail(templates.studentCancelled({ first: "Ana", run: { count: "2 lessons", zone: "Porto time", dates: "Tuesday 13 October 2026 at 17:00",
+    kept: { count: 1, dates: "Tuesday 6 October 2026 at 17:00" } } }).content);
+  assert.match(stopped.text, /removed from your calendar\. One lesson was too close to cancel and stays as it was\./);
+  assert.match(stopped.text, /Still booked, Porto time/);
   // Her receipt automation reads these words: kept exactly.
   const fee = templates.paymentReceivedTeacher({ ...lesson, ...money, item: "fee" });
   assert.equal(fee.subject, "Payment received — Ana Silva, €5 same-day fee");
@@ -1779,6 +1785,15 @@ await test("sixteen templates cover every email, each in both colour schemes and
   assert.match(renderEmail(fee.content).text, /^NIF: 123456789$/m);
 });
 
+await test("a no-show still charging shows on Receipts at the no-show amount, not the lesson price", () => {
+  const row = { id: "absent", reference: "PT-ABSENT", starts_at: "2026-10-01T09:00:00.000Z", ends_at: "2026-10-01T10:00:00.000Z", student_name: "Ana",
+    student_email: "ana@example.invalid", student_nif: "", status: "confirmed", attendance_status: "no_show", payment_status: "scheduled",
+    amount_cents: 2500, charged_cents: null, charge_request: null, same_day_fee_status: "not_required", duration_minutes: 60, price_cents: 2500 };
+  const [line] = receiptLines([row], new Date("2026-10-02T00:00:00.000Z"), 500);
+  assert.deepEqual([line.kind, line.state, line.amountCents], ["no-show", "charging", 500]);
+  // Once claimed, the stored request's amount is the one it takes.
+  assert.equal(receiptLines([{ ...row, payment_status: "processing", charge_request: JSON.stringify({ amountCents: 400 }) }], new Date("2026-10-02T00:00:00.000Z"), 500)[0].amountCents, 400);
+});
 await test("a welcome tells a weekly run as one line, its gaps and a changed lesson as their own, and says how many it leaves out", () => {
   const thursday = { weekday: 4, minuteOfDay: 17 * 60 }; // 17:00 in Porto
   // October 2026 plus overflow: day 36 is 5 November. Porto is an hour ahead of UTC until 25 October.

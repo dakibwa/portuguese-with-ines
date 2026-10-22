@@ -671,7 +671,7 @@ export async function sendLessonReminders(env, now = new Date()) {
  * the added time in her external calendar. Changing a single week later goes
  * out through the ordinary per-lesson path and matches that event by UID.
  */
-export async function notifySeries(env, { rows, lessonType, settings, series, manageUrls, skipped, reason = "booked", byTeacher = false, welcome = null }) {
+export async function notifySeries(env, { rows, lessonType, settings, series, manageUrls, skipped, reason = "booked", byTeacher = false, welcome = null, kept = [] }) {
   lessonType = { ...lessonType, price_cents: rows[0]?.amount_cents ?? lessonType.price_cents };
   if (!rows.length) return [];
   const held = byTeacher && await awaitingWelcomeAt(env, rows[0].student_email);
@@ -749,7 +749,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
       meetingUrl: meetingUrl(row), online: row.location === "online", place: placeLabel(row),
       price: !forTeacher && mixedPrices ? priceValue({ terms: rowTerms(row), amount: formatEuros(row.amount_cents ?? lessonType.price_cents) }) : null
     })),
-    lastShort: formatShort(new Date(rows[rows.length - 1].starts_at), PORTO)
+    lastShort: formatShort(new Date(rows[rows.length - 1].starts_at), PORTO),
+    kept: keptLessons(kept, zone)
   });
 
   // Price on the student's copy only, per lesson. Current runs charge each
@@ -923,7 +924,16 @@ async function claimSlot(env, options) {
  * own booking's UID with its own incremented SEQUENCE, which is what a calendar
  * needs to remove them.
  */
-async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
+/**
+ * A run's lessons too close for its change to reach, on one reader's clock.
+ * They are still on, so the run's email names them rather than claiming the
+ * whole run changed.
+ */
+function keptLessons(kept, zone) {
+  return kept.length ? { count: kept.length, dates: kept.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n") } : null;
+}
+
+async function notifySeriesCancelled(env, { rows, kept = [], lessonType, settings }) {
   if (!rows.length) return [];
 
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
@@ -951,7 +961,7 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
 
   const studentCopy = studentCancelled({
     first: first.student_name.split(" ")[0],
-    run: { count, zone: zoneName(studentClock, new Date(first.starts_at)), dates: datesOn(studentClock) }
+    run: { count, zone: zoneName(studentClock, new Date(first.starts_at)), dates: datesOn(studentClock), kept: keptLessons(kept, studentClock) }
   });
   const sends = [
     deliver(env, {
@@ -970,7 +980,7 @@ async function notifySeriesCancelled(env, { rows, lessonType, settings }) {
   if (teacherNotificationsEnabled(env) && teacherEmail) {
     const teacherCopy = lessonCancelledTeacher({
       student: { name: first.student_name, email: shownEmail(first.student_email), nif: await studentNif(env, first.student_id) },
-      run: { count, dates: datesOn(PORTO) }
+      run: { count, dates: datesOn(PORTO), kept: keptLessons(kept, PORTO) }
     });
     sends.push(
       deliver(env, {
@@ -1866,7 +1876,8 @@ const worker = {
     if (!event?.cron || (scheduledAt.getUTCHours() === 3 && scheduledAt.getUTCMinutes() === 10)) {
       ctx.waitUntil(topUpOpenSeries(env));
       ctx.waitUntil(env.DB.batch([
-        env.DB.prepare("DELETE FROM request_limits WHERE window < ?").bind(Math.floor(Date.now() / 900000) - 96),
+        // A day after its start, any window (an hour at most) has closed.
+        env.DB.prepare("DELETE FROM request_limits WHERE window < ?").bind(Math.floor(Date.now() / 1000) - 86400),
         env.DB.prepare("DELETE FROM revoked_sessions WHERE expires_at < ?").bind(Date.now())
       ]));
       ctx.waitUntil(env.DB.prepare("DELETE FROM sign_in_links WHERE expires_at < ?").bind(new Date().toISOString()).run()
@@ -2179,14 +2190,17 @@ async function settleZeroPayment(env, { row, amountCents, purpose }) {
          AND same_day_fee_request IS ? AND same_day_fee_session_id IS ?`
     ).bind(now, row.id, row.same_day_fee_status, row.same_day_fee_cents, request, row.same_day_fee_session_id).run();
   } else {
+    // A waived no-show took nothing, but its booked price stays for the record.
+    const noShow = purpose === "no-show" ? 1 : 0;
     await env.DB.prepare(
-      `UPDATE bookings SET payment_status = '${FREE}', amount_cents = 0, charged_cents = NULL,
+      `UPDATE bookings SET payment_status = '${FREE}', amount_cents = CASE WHEN ? = 1 THEN amount_cents ELSE 0 END,
+         charged_cents = CASE WHEN ? = 1 THEN 0 ELSE NULL END,
          charge_started_at = NULL, charge_request = NULL, stripe_session_id = NULL,
          payment_consent_at = NULL, payment_consent_version = NULL, updated_at = ?
        WHERE id = ? AND payment_status = ? AND payment_status IN ('scheduled', 'processing', 'payment_due')
          AND stripe_payment_intent IS NULL AND amount_cents IS ? AND charged_cents IS ?
          AND charge_request IS ? AND stripe_session_id IS ?`
-    ).bind(now, row.id, row.payment_status, row.amount_cents, row.charged_cents, request, row.stripe_session_id).run();
+    ).bind(noShow, noShow, now, row.id, row.payment_status, row.amount_cents, row.charged_cents, request, row.stripe_session_id).run();
   }
   // A concurrent winner must not make this stale €0 request contact Stripe.
   return true;
@@ -2621,6 +2635,7 @@ async function handleAvailability(request, env, url) {
       slotsByDate: slotsByDate ?? {},
       timeZone: PORTO,
       minimumNoticeHours: settings.minimumNoticeHours,
+      sameDayFeeCents: settings.sameDayChangeFeeCents,
       horizonDays: settings.bookingHorizonDays,
       bufferMinutes: settings.lessonBufferMinutes,
       lessonType: {
@@ -3424,6 +3439,8 @@ async function handleStopSeries(request, env, ctx, seriesId) {
     const settings = await loadSettings(env);
 
     const cancelledRows = [];
+    // Too close to cancel, so still on: the email names them.
+    const keptRows = [];
     let accountChanged = false;
     for (const { row, refund } of cancellationPlan) {
       const current = await currentStudent(request, env);
@@ -3436,6 +3453,7 @@ async function handleStopSeries(request, env, ctx, seriesId) {
       const cancellationNow = new Date();
       if (Date.parse(row.starts_at) <= cancellationNow.getTime() || changePolicy(row, cancellationNow, cancellationNoticeHours).late) {
         kept++;
+        keptRows.push(row);
         continue;
       }
       if (refund) {
@@ -3468,7 +3486,7 @@ async function handleStopSeries(request, env, ctx, seriesId) {
     // two dozen simultaneous requests to the mail provider, and its rate limit
     // drops most of them without saying so.
     if (cancelledRows.length) {
-      ctx.waitUntil(notifySeriesCancelled(env, { rows: cancelledRows, lessonType, settings }));
+      ctx.waitUntil(notifySeriesCancelled(env, { rows: cancelledRows, kept: keptRows, lessonType, settings }));
     }
     // A refund already claimed is committed work and can finish safely. Once
     // recovery wins, later rows must not acquire a new cancellation claim.
@@ -3791,7 +3809,8 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
       series: updatedSeries,
       manageUrls,
       skipped: [],
-      reason: "moved"
+      reason: "moved",
+      kept
     })
   );
 
@@ -5096,7 +5115,7 @@ async function handleMe(request, env) {
   const current = await currentStudent(request, env);
   if (!current || current.id !== student.id || current.session_version !== student.session_version) return fail("Please sign in again.", 401, request, env);
   return json(
-    { student: publicStudent(student), bookings, series, sameDayFeeCents: settings.sameDayChangeFeeCents, cardsAccepted: cardsTaken(env, settings) },
+    { student: publicStudent(student), bookings, series, sameDayFeeCents: settings.sameDayChangeFeeCents, minimumNoticeHours: settings.minimumNoticeHours, cardsAccepted: cardsTaken(env, settings) },
     200,
     request,
     env
@@ -5240,8 +5259,13 @@ async function handleConfirmEmailChange(request, env) {
         WHERE id = ? AND ${currentAccount} AND EXISTS (SELECT 1 FROM email_changes WHERE nonce = ? AND student_id = students.id)`)
         .bind(pending.new_email, now, student.id, ...identity, nonce),
       ...forgetPendingAccess(env, student.id, { email: pending.new_email, sessionVersion: (student.session_version ?? 0) + 1 }),
+      // Lessons to come, and any whose money is still to settle: a card is
+      // charged after the lesson, so its receipt or pay-now email must reach
+      // the new address. Settled past lessons keep the one they were taken under.
       env.DB.prepare(`UPDATE bookings SET student_email = ?, updated_at = ?
-        WHERE student_id = ? AND status IN ('confirmed', 'pending_payment') AND starts_at > ?
+        WHERE student_id = ? AND ((status IN ('confirmed', 'pending_payment') AND starts_at > ?)
+            OR payment_status IN ('scheduled', 'processing', 'payment_due')
+            OR same_day_fee_status IN ('scheduled', 'processing', 'payment_due'))
           AND EXISTS (SELECT 1 FROM students WHERE id = ? AND email = ? AND session_version = ?)`)
         .bind(pending.new_email, now, student.id, now, student.id, pending.new_email, (student.session_version ?? 0) + 1)
     ]);
@@ -5747,7 +5771,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
        WHERE b.starts_at >= ? AND b.starts_at < ? AND b.status IN ('confirmed', 'cancelled')
        ORDER BY b.starts_at`
     ).bind(from.toISOString(), to.toISOString()).all();
-    const receipts = receiptLines(results ?? []);
+    const receipts = receiptLines(results ?? [], new Date(), (await loadSettings(env)).sameDayChangeFeeCents);
     return json({
       month: `${month.year}-${String(month.month).padStart(2, "0")}`,
       receipts,
@@ -6263,7 +6287,6 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     // Her cancellation always refunds a paid lesson — inside the 14-hour window
     // included. A student loses the free change window; she never does, and
     // the money follows automatically so there is nothing to remember.
-    const refunded = 0;
     if (row.payment_status === "paid" && row.stripe_payment_intent) {
       if (!await claimRefund(env, row, "teacher", cancellationMessage, null, authorization)) return fail("That lesson has just changed. Please reload.", 409, request, env);
       await authorization.assert();
@@ -6275,6 +6298,21 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       return json({ booking: publicBooking(updated, lessonType, settings), emailed: !await awaitingWelcomeAt(env, updated.student_email) }, 200, request, env);
     }
 
+    // A card declined after the lesson, or on a late change fee, leaves money
+    // owed and a page to pay it on. Her cancellation never costs them
+    // anything (22 October 2026, Dan), so it waives both, once that page can
+    // no longer take a payment: one landing on a cancelled lesson would have
+    // nothing to refund it.
+    const owed = [
+      row.payment_status === "payment_due" && row.stripe_session_id,
+      row.same_day_fee_status === "payment_due" && row.same_day_fee_session_id
+    ].filter(Boolean);
+    for (const sessionId of owed) {
+      if (!await checkoutSessionExpired(env, sessionId)) {
+        return fail("A payment for this lesson may be going through. Please reload in a few minutes.", 409, request, env);
+      }
+    }
+
     const now = new Date().toISOString();
     // A charge may finish after our read without changing sequence. Only the
     // payment we inspected may take this path; a newly paid lesson must reload
@@ -6282,15 +6320,18 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const cancelled = await env.DB.prepare(
       `UPDATE bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'teacher',
          sequence = sequence + 1, same_day_change = 0, updated_at = ?, cancellation_message = ?,
-         payment_status = CASE WHEN ? = 1 THEN 'refunded' ELSE payment_status END
+         payment_status = CASE WHEN payment_status = 'payment_due' THEN 'not_required' ELSE payment_status END,
+         same_day_fee_status = CASE WHEN same_day_fee_status IN ('scheduled', 'payment_due') THEN 'not_required' ELSE same_day_fee_status END
        WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
          AND payment_status = ? AND amount_cents IS ? AND charged_cents IS ?
          AND stripe_payment_intent IS ? AND stripe_session_id IS ? AND charge_started_at IS ? AND charge_request IS ?
-         AND payment_consent_at IS ? AND payment_consent_version IS ? AND (${authorization.sql})`
+         AND payment_consent_at IS ? AND payment_consent_version IS ?
+         AND same_day_fee_status != 'processing' AND same_day_fee_status = ? AND same_day_fee_session_id IS ? AND (${authorization.sql})`
     )
-      .bind(now, now, cancellationMessage, refunded, row.id, row.sequence,
+      .bind(now, now, cancellationMessage, row.id, row.sequence,
         row.payment_status, row.amount_cents, row.charged_cents, row.stripe_payment_intent, row.stripe_session_id,
-        row.charge_started_at, row.charge_request, row.payment_consent_at, row.payment_consent_version, ...authorization.values)
+        row.charge_started_at, row.charge_request, row.payment_consent_at, row.payment_consent_version,
+        row.same_day_fee_status, row.same_day_fee_session_id ?? null, ...authorization.values)
       .run();
 
     if (!(cancelled?.meta?.changes > 0)) return fail("That lesson has just changed. Please reload.", 409, request, env);

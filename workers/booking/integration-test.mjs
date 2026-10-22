@@ -5,7 +5,7 @@ import { emailLifecycle } from "./email.mjs";
 import worker, { chargeDueLessons, chargeDueSameDayFees, notifyMeetingReady, notifySeries, resendFailedEmails, retryPaymentRecovery, retryRefunds, sendLessonReminders } from "./index.mjs";
 import { createSession, createResetToken, createSignInToken, hashPassword, sessionHash, sessionVersion } from "./auth.mjs";
 import { createManageToken, readManageToken } from "./tokens.mjs";
-import { findRecurringCode, studentLessonType, priceForMove } from "./rates.mjs";
+import { findRecurringCode, studentLessonType, priceForMove, takeRateLimit } from "./rates.mjs";
 import { bookingSelection, portoWeekOf } from "./selection.mjs";
 import { computeAvailability } from "./availability.mjs";
 
@@ -604,6 +604,19 @@ await test("teacher move and cancellation have no student action fee and cannot 
   booking("processing", { payment: "processing" });
   assert.equal((await call("/admin/bookings/processing/cancel", { user: "teacher" })).status, 409);
   assert.equal((await call("/admin/bookings/processing/reschedule", { user: "teacher", body: { startAt: "2026-09-09T15:00:00.000Z" } })).status, 409);
+  // A declined lesson she cancels is waived, and its pay page closed first.
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const declined = linkedBooking("declined-cancel", { start: "2026-09-01T09:00:00.000Z", end: "2026-09-01T10:00:00.000Z", payment: "payment_due" });
+  db.prepare("UPDATE bookings SET stripe_session_id='cs_declined', same_day_fee_status='payment_due', same_day_fee_cents=500, same_day_fee_session_id='cs_declined_fee' WHERE id=?").run(declined);
+  completedSessions.add("cs_declined");
+  assert.equal((await call(`/admin/bookings/${declined}/cancel`, { user: "teacher" })).status, 409, "a payment that may have landed keeps the lesson");
+  assert.equal(db.prepare("SELECT status FROM bookings WHERE id=?").get(declined).status, "confirmed");
+  completedSessions.delete("cs_declined");
+  assert.equal((await call(`/admin/bookings/${declined}/cancel`, { user: "teacher" })).status, 200);
+  assert.deepEqual({ ...db.prepare("SELECT status,payment_status,same_day_fee_status FROM bookings WHERE id=?").get(declined) },
+    { status: "cancelled", payment_status: "not_required", same_day_fee_status: "not_required" });
+  assert.ok(expiredSessions.includes("cs_declined") && expiredSessions.includes("cs_declined_fee"));
+  assert.equal((await call(`/bookings/${await token(declined)}/payment`, { body: { purpose: "lesson" } })).status, 409);
 });
 await test("cancel wins before selected due charge is claimed", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
@@ -2557,8 +2570,18 @@ await test("moving a recurrence leaves a lesson inside 14 hours where it is and 
   for (const [id, start] of [["keep-late-1", "2026-09-05T18:00:00.000Z"], ["keep-late-2", "2026-09-12T18:00:00.000Z"], ["keep-late-3", "2026-09-19T18:00:00.000Z"]]) {
     booking(id, { series: "keep-late", start, end: new Date(Date.parse(start) + 3600000).toISOString() });
   }
-  const moved = await call("/series/keep-late/reschedule", { body: { startAt: "2026-11-17T12:00:00.000Z" } });
+  Object.assign(env, { RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0" });
+  let moved;
+  try {
+    moved = await call("/series/keep-late/reschedule", { body: { startAt: "2026-11-17T12:00:00.000Z" } });
+    await drain();
+  } finally {
+    Object.assign(env, { EMAIL_DRY_RUN: "1" });
+    delete env.RESEND_API_KEY;
+  }
   assert.equal(moved.status, 200, await moved.clone().text());
+  // Its email names the lesson that stayed, rather than claiming they all moved.
+  assert.match(sentEmails.findLast((sent) => sent.subject.startsWith("Your weekly Portuguese lessons have moved")).text, /One lesson was too close to move and stays as it was\./);
   const result = await moved.json();
   assert.equal(result.moved, 2);
   assert.deepEqual(result.kept, ["2026-09-05T18:00:00.000Z"]);
@@ -3000,6 +3023,8 @@ await test("a confirmed address change proves the new address, so Inês's bookin
   const registered = await call("/auth/register", { user: null, headers: { "CF-Connecting-IP": "198.51.100.64" }, body: { email: "moving-from@example.invalid", name: "Mo Ving", password: "moving-password" } });
   assert.equal(registered.status, 201, await registered.clone().text());
   const { student: account, session } = await registered.json();
+  // A lesson that has ended is still to be charged, so its receipt follows them.
+  booking("moving-past", { owner: account.id, start: "2026-09-05T07:00:00.000Z", end: "2026-09-05T08:00:00.000Z" });
   captureEmail();
   try {
     assert.equal((await call("/me/email", { token: session, body: { email: "moving-to@example.invalid" } })).status, 200);
@@ -3009,6 +3034,7 @@ await test("a confirmed address change proves the new address, so Inês's bookin
     assert.equal(confirmed.status, 200, await confirmed.clone().text());
     const moved = await confirmed.json();
     assert.ok(db.prepare("SELECT email_verified_at FROM students WHERE id=?").get(account.id).email_verified_at, "the new address proved itself");
+    assert.equal(db.prepare("SELECT student_email FROM bookings WHERE id='moving-past'").get().student_email, "moving-to@example.invalid");
     const booked = await call("/admin/bookings", { user: "teacher", body: { email: "moving-to@example.invalid", lessonType: "single", startAt: "2026-12-15T10:00:00.000Z" } });
     assert.equal(booked.status, 201, await booked.clone().text());
     await drain();
@@ -3234,7 +3260,7 @@ await test("Inês can record a no-show until six hours after the lesson ends, an
     await chargeDueLessons(env, new Date("2026-09-05T10:01:00.000Z"));
     await chargeDueSameDayFees(env);
     assert.deepEqual({ ...db.prepare("SELECT payment_status,amount_cents,charged_cents,charge_request FROM bookings WHERE id='absent-zero'").get() },
-      { payment_status: "free", amount_cents: 0, charged_cents: null, charge_request: null }, "a zero no-show fee leaves nothing to collect");
+      { payment_status: "free", amount_cents: 1500, charged_cents: 0, charge_request: null }, "a zero no-show fee leaves nothing to collect, and keeps the booked price on record");
     assert.deepEqual(charged("absent-zero"), []);
     assert.deepEqual(charged("action-zero"), []);
     assert.deepEqual({ ...db.prepare("SELECT same_day_fee_status,same_day_change,same_day_fee_request FROM bookings WHERE id='action-zero'").get() },
@@ -3421,8 +3447,12 @@ await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours
     // The same tick sends the day-before reminder: 14 to 24 hours ahead of the frozen clock.
     booking("tick-reminder", { start: "2026-09-06T00:10:00.000Z", end: "2026-09-06T01:10:00.000Z" });
     db.prepare("UPDATE bookings SET created_at='2026-09-01T00:00:00.000Z' WHERE id='tick-reminder'").run();
+    // Its cleanup keeps a current hourly limit and drops a day-old one.
+    assert.ok(await takeRateLimit(env, "nightly-hour", 3, 3600));
+    db.prepare("INSERT INTO request_limits VALUES ('nightly-stale', ?, 1)").run(Math.floor(Date.now() / 1000) - 90000);
     await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.parse("2026-09-06T03:10:00.000Z") }, env, ctx);
     await drain();
+    assert.deepEqual(db.prepare("SELECT key FROM request_limits WHERE key LIKE 'nightly-%'").all().map((row) => row.key), ["nightly-hour"]);
     assert.equal(db.prepare("SELECT status FROM email_log WHERE dedupe_key='student:reminder:tick-reminder:0'").get()?.status, "dry-run", "the minute tick sends it");
     const regrown = db.prepare("SELECT added_by_teacher, payment_status FROM bookings WHERE series_id=? AND starts_at=?").get(seriesId, last.starts_at);
     assert.deepEqual({ ...regrown }, { added_by_teacher: 1, payment_status: "not_required" }, "the week comes back as hers, at 04:00 Porto time");

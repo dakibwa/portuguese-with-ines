@@ -460,17 +460,17 @@ export async function studentHomework(env, student, method, bookingId, body, act
   if (!isStudentLike(student)) throw new HomeworkProblem("Homework is in the student’s account. Open their lesson to prepare it.", 403);
   if (!bookingId && method !== "GET") throw new HomeworkProblem("Not found.", 404);
   if (method === "GET" && !bookingId) {
-    const results = await rowsOrNone(env.DB.prepare(`SELECT h.booking_id, b.starts_at, h.level, h.minutes,
+    const results = await rowsOrNone(env.DB.prepare(`SELECT h.booking_id, b.starts_at, b.location, h.level, h.minutes,
       json_extract(h.published_json, '$.title') AS title, h.published_at, p.completed_at, p.updated_at AS progress_at,
       json_extract(p.submission_json, '$.submittedAt') AS submitted_at, json_extract(p.submission_json, '$.returnedAt') AS returned_at
       FROM lesson_homework h JOIN bookings b ON b.id = h.booking_id AND b.student_id = h.student_id
       LEFT JOIN homework_progress p ON p.booking_id = h.booking_id AND p.student_id = h.student_id
       WHERE h.student_id = ? AND h.published_at IS NOT NULL ORDER BY b.starts_at DESC`).bind(student.id));
-    return { homework: results.map(row => ({ bookingId: row.booking_id, lessonAt: row.starts_at, title: row.title, level: row.level, minutes: row.minutes,
+    return { homework: results.map(row => ({ bookingId: row.booking_id, lessonAt: row.starts_at, location: row.location, title: row.title, level: row.level, minutes: row.minutes,
       publishedAt: row.published_at, completedAt: row.completed_at ?? null, submittedAt: row.submitted_at ?? null,
       returnedAt: row.returned_at ?? null, started: Boolean(row.progress_at) })) };
   }
-  const row = await env.DB.prepare(`SELECT h.*, b.starts_at FROM lesson_homework h JOIN bookings b ON b.id = h.booking_id AND b.student_id = h.student_id
+  const row = await env.DB.prepare(`SELECT h.*, b.starts_at, b.location FROM lesson_homework h JOIN bookings b ON b.id = h.booking_id AND b.student_id = h.student_id
     WHERE h.booking_id = ? AND h.student_id = ? AND h.published_at IS NOT NULL`).bind(bookingId, student.id).first();
   if (!row) throw new HomeworkProblem("Homework not found.", 404);
   const sheet = JSON.parse(row.published_json);
@@ -478,7 +478,7 @@ export async function studentHomework(env, student, method, bookingId, body, act
   if (method === "GET" && !action) {
     // The student is told about automatic checks only when a submission would use them.
     const aiMarking = homeworkAiOn(env) && sheet.sections.some(section => section.questions.some(question => question.marking !== "exact"));
-    return { bookingId, lessonAt: row.starts_at, title: sheet.title, level: row.level, minutes: row.minutes, sheet, aiMarking, progress: progress(saved) };
+    return { bookingId, lessonAt: row.starts_at, location: row.location, title: sheet.title, level: row.level, minutes: row.minutes, sheet, aiMarking, progress: progress(saved) };
   }
   if (method !== "POST") throw new HomeworkProblem("Not found.", 404);
   if (action && action !== "submit") throw new HomeworkProblem("Not found.", 404);

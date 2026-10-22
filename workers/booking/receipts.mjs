@@ -34,7 +34,16 @@ function lessonLabel(row) {
 }
 
 /** Receipt lines for bookings whose lesson starts in the month, oldest first. */
-export function receiptLines(rows, now = new Date()) {
+/** The amount a claimed charge will take, from its stored request. */
+function requestedCents(request) {
+  try {
+    return JSON.parse(request)?.amountCents ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function receiptLines(rows, now = new Date(), noShowCents = null) {
   const lines = [];
   for (const row of rows) {
     const ended = Date.parse(row.ends_at) <= now.getTime();
@@ -73,7 +82,8 @@ export function receiptLines(rows, now = new Date()) {
         id: `${row.id}:lesson`,
         kind: noShow ? "no-show" : "lesson",
         label: noShow ? "No-show" : lessonLabel(row),
-        amountCents: row.charged_cents ?? row.amount_cents ?? row.price_cents ?? null,
+        // A no-show still charging is due the no-show amount, not the lesson's.
+        amountCents: row.charged_cents ?? (noShow ? requestedCents(row.charge_request) ?? noShowCents : null) ?? row.amount_cents ?? row.price_cents ?? null,
         method,
         state,
         ready: state === "paid",

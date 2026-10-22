@@ -116,6 +116,16 @@ function notEmailed(noEmailYet) {
  * ready each lesson is its own line, linked or saying when its link comes;
  * otherwise the dates are one list.
  */
+/** A run's lessons its change left alone, too close to move or cancel. */
+function keptNote(kept, verb) {
+  if (!kept) return "";
+  return kept.count === 1 ? ` One lesson was too close to ${verb} and stays as it was.` : ` ${kept.count} lessons were too close to ${verb} and stay as they were.`;
+}
+
+function keptRows(kept, zone = "") {
+  return kept ? [{ label: zone ? `Still booked, ${zone}` : "Still booked", value: kept.dates, dates: true }] : [];
+}
+
 function runRows({ lesson, place, repeats, occurrences, forTeacher = false, price = null }) {
   const linked = occurrences.some((item) => item.meetingUrl);
   return [
@@ -325,10 +335,10 @@ export function studentMoved({ first, byInes, lengthChanged = false, minutes, le
       content: {
         heading: "Your weekly lessons have moved",
         preheader: `${lessonName} · ${run.repeats.value}`,
-        intro: `${hello(first)} your upcoming weekly lessons now use this new time. The updated dates are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`,
+        intro: `${hello(first)} your upcoming weekly lessons now use this new time.${keptNote(run.kept, "move")} The updated dates are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`,
         callout: run.skippedNote,
         hero: when,
-        rows: runRows({ lesson, place, price, repeats: run.repeats, occurrences: run.occurrences }),
+        rows: [...runRows({ lesson, place, price, repeats: run.repeats, occurrences: run.occurrences }), ...keptRows(run.kept)],
         action: welcome ? welcomeAction(welcome) : { label: ALL_LESSONS_LABEL, url: lessonsUrl },
         footer: welcome ? [...policyFooter(policy, { notice, fee, run: true }), ...WELCOME_FOOTER] : policyFooter(policy, { notice, fee, run: true })
       }
@@ -366,10 +376,10 @@ export function lessonMovedTeacher({ student, byInes, held = false, lengthChange
       content: {
         heading: "Weekly lessons moved",
         preheader: `${name} · ${run.repeats.value}`,
-        intro: `${name}'s upcoming weekly lessons have moved. The updated events will appear in your calendar.`,
+        intro: `${name}'s upcoming weekly lessons have moved.${keptNote(run.kept, "move")} The updated events will appear in your calendar.`,
         callout: run.skippedNote,
         hero: when,
-        rows: [...runRows({ lesson, place, repeats: run.repeats, occurrences: run.occurrences, forTeacher: true }), ...studentRows(student)],
+        rows: [...runRows({ lesson, place, repeats: run.repeats, occurrences: run.occurrences, forTeacher: true }), ...keptRows(run.kept), ...studentRows(student)],
         footer: SIGN_OFF
       }
     };
@@ -406,8 +416,8 @@ export function studentCancelled({ first, byInes, message = "", note = "", lesso
       content: {
         heading: "Your weekly lessons are cancelled",
         preheader: `${run.count} removed from your calendar.`,
-        intro: `${hello(first)} the rest of your weekly run has been cancelled and removed from your calendar.`,
-        rows: [{ label: `Cancelled, ${run.zone}`, value: run.dates, dates: true }],
+        intro: `${hello(first)} the rest of your weekly run has been cancelled and removed from your calendar.${keptNote(run.kept, "cancel")}`,
+        rows: [{ label: `Cancelled, ${run.zone}`, value: run.dates, dates: true }, ...keptRows(run.kept, run.zone)],
         footer: "You’re welcome back any time — booking is always open on the website."
       }
     };
@@ -442,8 +452,8 @@ export function lessonCancelledTeacher({ student, byInes, held = false, late = f
       content: {
         heading: "Weekly lessons cancelled",
         preheader: `${name} · ${run.count}`,
-        intro: `${name} cancelled the rest of their weekly lessons. They are off your calendar.`,
-        rows: [...studentRows(student, { withPhone: false }), { label: "Cancelled", value: run.dates, dates: true }],
+        intro: `${name} cancelled the rest of their weekly lessons. They are off your calendar.${keptNote(run.kept, "cancel")}`,
+        rows: [...studentRows(student, { withPhone: false }), { label: "Cancelled", value: run.dates, dates: true }, ...keptRows(run.kept)],
         footer: SIGN_OFF
       }
     };

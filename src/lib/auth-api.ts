@@ -334,6 +334,8 @@ type Account = {
   bookings: MyBooking[];
   series?: LessonSeries[];
   sameDayFeeCents: number;
+  /** Hours' notice for a free change; absent from an older Worker. */
+  minimumNoticeHours?: number;
   /** Whether a card can be saved from the account just now. */
   cardsAccepted?: boolean;
 };
