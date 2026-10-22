@@ -106,7 +106,12 @@ CREATE TABLE IF NOT EXISTS students (
   -- 1 for a teacher who is also one of Inês's students (migration 0032): she
   -- added their email from Add student. They stay a teacher everywhere and
   -- also have lessons, a card and homework like any student.
-  also_student INTEGER NOT NULL DEFAULT 0
+  also_student INTEGER NOT NULL DEFAULT 0,
+  -- When Inês marked them dormant (migration 0036): no lesson in a while, kept
+  -- apart in her list. A lesson of theirs ending after it wakes them again.
+  dormant_at TEXT,
+  -- When her come-back email to dormant students last went to them.
+  dormant_emailed_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_students_role ON students (role);

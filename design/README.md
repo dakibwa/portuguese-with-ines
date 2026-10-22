@@ -668,6 +668,23 @@ usual lesson starts and days off; avoid a wall of administration forms.
     is asked for). A student free at every length is told there is no card to
     add and nothing to pay. The Welcome and Sign-in panels say in their dabs
     which of these the email will be before she sends it.
+  - Dormant (22 October 2026, Dan) is hers to set: `Mark as dormant` is a
+    lilac compact button beside the contact details in a student's profile,
+    offered only with no lesson to come, and `Mark as active` returns them.
+    Marking sends nothing. Dormant students rest in a `Dormant · n` section
+    beneath the list, by name, as ordinary rows labelled `Dormant` with no
+    setup steps, and a `Come-back email sent 22 Oct` dab once she has emailed
+    them; a new lesson of theirs brings them back on its own. Each has its
+    own email (Dan: "for each individual student but there be the default
+    email already written for each"): `Come-back email` takes the place of
+    `Sign-in link` among their controls, and its panel, headed `Come-back
+    email to Marta` with two dabs (it ends with a button to sign in and book;
+    when it was last sent), holds Subject and Message prefilled with `Olá
+    Marta,` above her default, an outline `Start again` once she edits, and
+    coral `Send to Marta`. The lilac `Default come-back email` beside the
+    section's heading opens one sheet for the words every panel starts from,
+    with outline `Cancel` and coral `Save default`. The email is the site's
+    design with her words as plain text under `Book your next lesson`.
 - `Receipts`, a tab of its own beside `Students` (13 October 2026, Dan: "make
   her automation as easy as possible"), shows a month at a time with the
   Time off month's pager (the one pager above): two dabs for what there is to

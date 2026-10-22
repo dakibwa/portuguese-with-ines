@@ -535,6 +535,13 @@ test("setup suggests lessons before email and student steps without requiring th
   assert.equal(workspace.attentionCount, 8, "count each actionable student once, plus general warnings; waiting on the student does not count");
   assert.equal(workspace.rows.find(row => row.student.id === "regular").setup, undefined, "a past confirmed lesson and standard prices remain complete");
   assert.equal(studentWorkspace([ready("cards-off", { hasCard: false })], [], false, []).attentionCount, 0);
+  // Dormant students rest apart by name, with no setup to nag about, unless something of theirs needs her.
+  const changedDormant = { kind: "changed", key: "changed:dormant", booking: booking("dormant", "dormant-changed", "", { student_changed_at: "2026-10-14T09:00:00Z" }), count: 1 };
+  const resting = studentWorkspace([...workspaceStudents, student("zed", { name: "Zed", email: "", dormant: true }), ready("dormant-changed", { dormant: true })],
+    [...setupTasks, ...operational, changedDormant], true, [paymentBooking, paymentBookingTwo]);
+  assert.deepEqual(resting.dormant.map(row => [row.student.id, row.setup]), [["zed", undefined]]);
+  assert.ok(resting.rows.some(row => row.student.id === "dormant-changed"), "a dormant student with something new stays where she will see it");
+  assert.equal(resting.attentionCount, workspace.attentionCount + 1, "only the change counts, never a dormant student's setup");
 });
 
 test("a teacher who is also a student opens Your lessons only when asked; every other teacher opens the schedule", () => {
