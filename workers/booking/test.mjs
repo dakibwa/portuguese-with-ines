@@ -1630,8 +1630,8 @@ await test("a no-show can only be changed after the lesson starts and before its
   assert.equal(noShowProblem(row, new Date("2026-09-09T16:00:00.000Z")), "");
   assert.equal(noShowProblem(row, new Date("2026-09-09T16:59:59.000Z")), "");
   assert.equal(noShowProblem(row, new Date("2026-09-09T17:00:00.000Z")), "", "the scheduled end is inside the window");
-  assert.equal(noShowProblem(row, new Date("2026-09-09T22:59:59.000Z")), "", "which lasts six hours after it");
-  assert.match(noShowProblem(row, new Date("2026-09-09T23:00:00.000Z")), /6 hours after the lesson ends/);
+  assert.equal(noShowProblem(row, new Date("2026-09-09T17:59:59.000Z")), "", "which lasts an hour after it");
+  assert.match(noShowProblem(row, new Date("2026-09-09T18:00:00.000Z")), /until an hour after the lesson ends/);
   assert.match(noShowProblem({ ...row, payment_status: "processing" }, new Date("2026-09-09T16:30:00.000Z")), /already started/i);
 });
 

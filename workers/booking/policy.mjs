@@ -38,10 +38,11 @@ export const PAID_BY_HAND_MARK = "paid-by-hand";
 
 /**
  * How long after a lesson's scheduled end Inês can still record or undo a
- * no-show (Dan, 23 September 2026). A no-show turns the lesson price into the
- * EUR 5 fee, so the lesson's own charge waits until this has closed.
+ * no-show (Dan, 22 October 2026; six hours before that). A no-show turns the
+ * lesson price into the EUR 5 fee, so the lesson's own charge waits until this
+ * has closed.
  */
-export const NO_SHOW_WINDOW_HOURS = 6;
+export const NO_SHOW_WINDOW_HOURS = 1;
 
 /** Wording that promised free changes until the lesson's Porto calendar day. */
 const LESSON_DAY_CONSENT_VERSIONS = new Set(["2026-09-01-after-lesson-v1"]);
