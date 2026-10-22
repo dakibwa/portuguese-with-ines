@@ -1873,8 +1873,8 @@ price and how it is paid). `Move lesson` in coral and `Cancel lesson` in
 outline share a row while both labels fit, and `Mark no-show` is a quiet
 underlined link beneath them. Moving opens under its own `Move this lesson`
 heading, as cancelling does under `Cancel this lesson?`, with what happens as a
-dab (`Sam gets an email with the new time`). `Mark no-show` is live from the lesson's start until six hours after
-its end, and before that it shows greyed out with `Available 11:00–18:00`, so
+dab (`Sam gets an email with the new time`). `Mark no-show` is live from the lesson's start until an hour after
+its end, and before that it shows greyed out with `Available 11:00–13:00`, so
 she always knows where it is. The marked state stays reversible within the same
 window, the lesson is charged once it closes, and a no-show means only €5 is
 taken instead of the full price. Confirmations keep a `Back to lesson` button

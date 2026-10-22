@@ -109,9 +109,13 @@ export function rateLimitAddress(value) {
   return `${pieces.slice(0, 4).map((piece) => piece.toString(16)).join(":")}::/64`;
 }
 
-/** Atomic fixed windows bound parallel guesses as well as sequential requests. */
+/**
+ * Atomic fixed windows bound parallel guesses as well as sequential requests.
+ * A window is stored as its start in epoch seconds, whatever its length, so
+ * one nightly cleanup can tell an old hour from a current quarter-hour.
+ */
 export async function takeRateLimit(env, key, limit, seconds = 900, now = Date.now()) {
-  const window = Math.floor(now / (seconds * 1000));
+  const window = Math.floor(now / (seconds * 1000)) * seconds;
   const result = await env.DB.prepare(
     `INSERT INTO request_limits (key, window, attempts) VALUES (?, ?, 1)
      ON CONFLICT(key) DO UPDATE SET window = excluded.window,

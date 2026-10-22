@@ -1,5 +1,6 @@
-import { BOOKING_API_BASE_URL } from "@/lib/config";
+import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE } from "@/lib/config";
 import { forgetSession } from "@/lib/auth-api";
+import { browserTimeZone } from "@/lib/booking-api";
 
 export type HomeworkQuestion = { id: string; prompt: string; answer: string; explanation: string; marking?: "exact" | "written"; acceptedAnswers?: string[] };
 export type HomeworkSheet = {
@@ -16,12 +17,16 @@ export type HomeworkSubmission = {
   marks?: Record<string, HomeworkMark>; markingNote?: string;
 };
 export type HomeworkProgress = { answers: Record<string, string>; completedAt: string | null; updatedAt: string | null; submission: HomeworkSubmission | null };
+/** A lesson in Porto reads on Porto's clock, an online one on the student's. */
+export type LessonPlace = "online" | "porto";
+/** The clock a lesson's date reads on, as on their lessons page; Porto's for Inês, who gets no place. */
+export const lessonDateZone = (location?: LessonPlace) => location === "online" ? browserTimeZone() : BOOKING_TIME_ZONE;
 export type HomeworkSummary = {
-  bookingId: string; lessonAt: string; title: string; level: string; minutes: number;
+  bookingId: string; lessonAt: string; location?: LessonPlace; title: string; level: string; minutes: number;
   publishedAt: string; completedAt: string | null; started: boolean; submittedAt: string | null; returnedAt: string | null;
 };
 export type StudentHomeworkData = {
-  bookingId: string; lessonAt: string; level: string; minutes: number; sheet: HomeworkSheet; progress: HomeworkProgress;
+  bookingId: string; lessonAt: string; location?: LessonPlace; level: string; minutes: number; sheet: HomeworkSheet; progress: HomeworkProgress;
   /** Whether a submission's written answers get an automatic suggestion. */
   aiMarking?: boolean;
 };

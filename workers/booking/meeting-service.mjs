@@ -215,8 +215,15 @@ export async function syncPendingMeetings(env, notifyReady) {
   for (const row of results ?? []) await prepareMeeting(env, row);
   // Give the ordinary confirmation a chance to include a synchronously-ready
   // link. Later-created links get one dedicated email, retried on send failure.
-  const { results: ready } = await env.DB.prepare(`SELECT * FROM bookings WHERE status = 'confirmed' AND location = 'online'
-    AND meeting_url IS NOT NULL AND meeting_notified_at IS NULL AND ends_at > ? AND created_at < ? ORDER BY starts_at LIMIT 6`)
+  // A student with no email yet, or still awaiting their welcome, is left
+  // out: their email is held, never marked sent, and six of them would fill
+  // every batch ahead of everyone else.
+  const { results: ready } = await env.DB.prepare(`SELECT * FROM bookings b WHERE status = 'confirmed' AND location = 'online'
+    AND meeting_url IS NOT NULL AND meeting_notified_at IS NULL AND ends_at > ? AND created_at < ?
+    AND student_email NOT LIKE 'no-email:%'
+    AND NOT EXISTS (SELECT 1 FROM students s WHERE s.email = lower(trim(b.student_email)) AND s.role = 'student' AND s.awaiting_welcome = 1
+      AND COALESCE(s.password_hash, '') = '' AND COALESCE(s.google_sub, '') = '' AND s.last_login_at IS NULL)
+    ORDER BY starts_at LIMIT 6`)
     .bind(now, new Date(Date.now() - 120000).toISOString()).all();
   for (const row of ready ?? []) {
     if (!meetingUrl(row)) continue;

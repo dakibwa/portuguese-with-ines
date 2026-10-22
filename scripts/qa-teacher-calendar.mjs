@@ -614,7 +614,7 @@ try {
   await expect(
     page.getByRole("button", { name: "Mark no-show", exact: true }),
   ).toBeDisabled();
-  // Open from the start until six hours after the end.
+  // Open from the start until an hour after the end.
   await expect(page.getByRole("dialog")).toContainText(/Available \d\d:\d\d–\d\d:\d\d/);
   await page.getByRole("button", { name: "Move lesson", exact: true }).click();
   await page.getByLabel("New date").fill("2026-09-10");

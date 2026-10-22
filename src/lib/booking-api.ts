@@ -18,6 +18,8 @@ export type AvailabilityResponse = {
   slotsByDate: Record<string, Slot[]>;
   timeZone: string;
   minimumNoticeHours: number;
+  /** The late change and no-show fee; absent from an older Worker. */
+  sameDayFeeCents?: number;
   horizonDays: number;
   /** Free time Inês keeps after every lesson; absent from an older Worker. */
   bufferMinutes?: number;

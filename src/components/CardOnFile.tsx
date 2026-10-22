@@ -12,7 +12,11 @@ import { formatMoneyCents } from "@/lib/booking-api";
  * short list a booking shows, and pressing the button is the agreement; the
  * card itself is entered on Stripe's page.
  */
-export function CardTerms({ change = false, onCancel }: { change?: boolean; onCancel?: () => void }) {
+export function CardTerms({ change = false, onCancel, feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
+  change?: boolean; onCancel?: () => void;
+  /** The live late change fee and notice; the published terms until the account says. */
+  feeCents?: number; noticeHours?: number;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const cardRequest = useRef(0);
@@ -44,12 +48,14 @@ export function CardTerms({ change = false, onCancel }: { change?: boolean; onCa
         <li>Your upcoming lessons with Inês are charged to it, each after it ends</li>
         <li>Already paid Inês for some? Tell her and she&rsquo;ll take them off</li>
         <li>Stripe keeps your card safe</li>
-        <li>
-          <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> to move or cancel less than {NOTICE_HOURS} hours before
-        </li>
-        <li>
-          <strong>{formatMoneyCents(SAME_DAY_RESCHEDULE_FEE_CENTS)}</strong> if you don’t show up to a lesson
-        </li>
+        {feeCents ? <>
+          <li>
+            <strong>{formatMoneyCents(feeCents)}</strong> to move or cancel less than {noticeHours} hours before
+          </li>
+          <li>
+            <strong>{formatMoneyCents(feeCents)}</strong> if you don’t show up to a lesson
+          </li>
+        </> : <li>No fee to move or cancel, or for a missed lesson</li>}
         <li>
           The full rules are in{" "}
           <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">terms &amp; privacy</a>

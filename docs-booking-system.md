@@ -1103,7 +1103,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   runs in setup mode, so no money is taken while the run is booked. The whole
   run is held until its webhook proves a reusable card exists, then every
   occurrence becomes `scheduled`. The minute cron charges an occurrence
-  only once its no-show window has closed, six hours after `ends_at` (see
+  only once its no-show window has closed, an hour after `ends_at` (see
   *The no-show policy*). Open-ended top-ups inherit the same consent
   and scheduled state. A declined charge marks the row `payment_due` and emails
   the student a hosted pay-now link; Inês sees it as a Needs you card until it
@@ -1136,8 +1136,11 @@ while validation runs. Inês's explicit calendar additions retain their override
   working independently of email-domain authority.
 - On a confirmed change, outstanding password resets are deleted — a live reset
   link sitting in the old mailbox would otherwise stay valid for its hour — and
-  future lessons are re-addressed. Past and cancelled lessons keep the address
-  they were taken under, which is the record of what happened.
+  future lessons are re-addressed, as are past ones whose lesson payment or late
+  change fee is still to settle: a card is charged after the lesson, so its
+  receipt or pay-now email goes to the new address. Other past and cancelled
+  lessons keep the address they were taken under, which is the record of what
+  happened.
 - The confirming browser saves the renewed session without closing this
   account's profile editor. Confirmation updates the verified email while
   preserving newer drafts and independently saved name/NIF fields. The link's
@@ -1431,16 +1434,17 @@ than presenting the first lesson's price as the price of every lesson.
 ### The no-show policy
 
 For a confirmed saved-card lesson, the teacher schedule offers `Mark no-show`
-from the scheduled start until **six hours after the scheduled end** (Dan,
-23 September 2026; `NO_SHOW_WINDOW_HOURS` in `policy.mjs`), so Inês can record
+from the scheduled start until **an hour after the scheduled end** (Dan,
+22 October 2026, shortened from six hours; `NO_SHOW_WINDOW_HOURS` in
+`policy.mjs`), so Inês can record
 it after the lesson rather than during it. The same control can undo the mark
 during that window. `POST /admin/bookings/:id/no-show` (`{ "noShow": false }`
 undoes) accepts the change only inside that window and only while
-`payment_status = 'scheduled'`; from six hours after the end it answers 409.
+`payment_status = 'scheduled'`; from an hour after the end it answers 409.
 Because a no-show changes the amount, the lesson's own charge waits for the
 window to close: nothing about the lesson's payment — the charge attempt, the
 move off `scheduled`, the receipt, a declined card's pay-now email — happens
-before `ends_at` plus six hours. The charge sweep then claims the row as
+before `ends_at` plus an hour. The charge sweep then claims the row as
 `processing` before reading attendance, so the teacher decision cannot race the
 PaymentIntent. Until the charge, a lesson inside the window is still an
 ordinary `scheduled` one, so Inês's own move and cancel still reach it.
@@ -1448,11 +1452,12 @@ Attendance writes also require the original lesson version and times. Moving an
 uncharged scheduled lesson to a genuinely different time clears its old no-show;
 a same-time edit and already committed payment retain attendance evidence.
 
-- **Expected attendance** charges the booked lesson price six hours after
+- **Expected attendance** charges the booked lesson price an hour after
   `ends_at`, on the first minute sweep once the window has closed.
 - **No-show** charges €5 at the same point, instead of the booked lesson price.
 - If Inês configures that fee to zero, the Worker settles the zero obligation
-  without a Stripe request, receipt or payment-recovery link. A positive charge
+  without a Stripe request, receipt or payment-recovery link. The lesson keeps
+  its booked `amount_cents` on record, with `charged_cents` 0. A positive charge
   already captured under its immutable request keeps that original amount.
 - Bookings without explicit automatic-payment consent remain
   `not_required`; the teacher control is not offered for them.
@@ -1679,12 +1684,12 @@ With `postpay` and Stripe configured:
 
 **The after-lesson policy** (Dan, 1 September 2026, `policy.mjs` is the single
 home): booking saves a card but takes no money. A scheduled row charges its
-booked amount only once its no-show window has closed, six hours after
-`ends_at` (Dan, 23 September 2026). Moving or cancelling at least 14 hours
+booked amount only once its no-show window has closed, an hour after
+`ends_at` (Dan, 22 October 2026). Moving or cancelling at least 14 hours
 before the lesson is free; doing either later schedules one €5 action fee and
 prevents the full price from charging if the lesson was cancelled (the 14-hour
 rule, Dan, 21 September 2026). A no-show recorded between the lesson's start
-and six hours after its end changes the end charge from the booked price to €5.
+and an hour after its end changes the end charge from the booked price to €5.
 Inês is never charged a fee for a move or cancellation she makes. Older `paid`
 rows retain their earlier lock/refund promise inside the window; `not_required` rows keep
 their original pay-in-person terms. The card itself never touches the database
@@ -1828,7 +1833,7 @@ keep their original parameters.
   old tab open. `same_day_change` is never set on a paid row.
 - **Scheduled saved-card booking**: students may move or cancel right up to the
   lesson start. A change inside the window atomically schedules one €5 charge
-  to the saved card. A move keeps the later full lesson charge, due six hours
+  to the saved card. A move keeps the later full lesson charge, due an hour
   after the new end; a cancellation removes the full lesson charge. Once the fee is paid,
   the student and Inês are each emailed once; hers is the fiscal reminder.
 - **Stripe**: the off-session PaymentIntent is described as `Late lesson change
