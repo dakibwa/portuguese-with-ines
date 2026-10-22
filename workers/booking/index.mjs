@@ -3402,6 +3402,8 @@ async function handleStopSeries(request, env, ctx, seriesId) {
   let refunded = 0;
   let pendingRefunds = 0;
   let cancellationPlan = [];
+  // Too close to cancel, so still on: the email names them.
+  let keptRows = [];
   let cancellationNoticeHours = 0;
   let cancellationAvailabilityRevision = null;
 
@@ -3428,6 +3430,7 @@ async function handleStopSeries(request, env, ctx, seriesId) {
     cancellationAvailabilityRevision = cancellationSettings.availabilityRevision;
     const plan = planSeriesCancellation(results ?? [], new Date(), cancellationNoticeHours);
     kept = plan.kept.length;
+    keptRows = plan.kept;
     cancellationPlan = plan.cancellable;
 
   }
@@ -3439,8 +3442,6 @@ async function handleStopSeries(request, env, ctx, seriesId) {
     const settings = await loadSettings(env);
 
     const cancelledRows = [];
-    // Too close to cancel, so still on: the email names them.
-    const keptRows = [];
     let accountChanged = false;
     for (const { row, refund } of cancellationPlan) {
       const current = await currentStudent(request, env);

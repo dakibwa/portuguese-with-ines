@@ -2593,6 +2593,20 @@ await test("moving a recurrence leaves a lesson inside 14 hours where it is and 
   // Only the lessons that moved are the student's change; the one kept inside 14 hours is not.
   assert.deepEqual(db.prepare("SELECT id FROM bookings WHERE series_id='keep-late' AND student_changed_at IS NOT NULL ORDER BY id").all().map((row) => row.id), ["keep-late-2", "keep-late-3"]);
   assert.deepEqual({ ...db.prepare("SELECT weekday, minute_of_day FROM booking_series WHERE id='keep-late'").get() }, { weekday: 2, minute_of_day: 720 });
+
+  // Stopping the run keeps the same lesson, and that email names it too.
+  Object.assign(env, { RESEND_API_KEY: "re_isolated", EMAIL_DRY_RUN: "0" });
+  let stopped;
+  try {
+    stopped = await call("/series/keep-late/stop", { body: { cancelRemaining: true } });
+    await drain();
+  } finally {
+    Object.assign(env, { EMAIL_DRY_RUN: "1" });
+    delete env.RESEND_API_KEY;
+  }
+  assert.equal(stopped.status, 200, await stopped.clone().text());
+  assert.deepEqual((({ cancelled, kept }) => ({ cancelled, kept }))(await stopped.json()), { cancelled: 2, kept: 1 });
+  assert.match(sentEmails.findLast((sent) => sent.subject.startsWith("Your weekly lessons are cancelled")).text, /One lesson was too close to cancel and stays as it was\./);
 });
 await test("a moved recurrence cannot land on the lesson it leaves inside the window", async () => {
   const at = new Date().toISOString();
