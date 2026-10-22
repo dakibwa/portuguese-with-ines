@@ -721,13 +721,15 @@ sees, books or is charged reads either.
 - **The default** is what each panel starts from: the standard words in
   `DORMANT_EMAIL` until she saves her own (`settings.dormant_email_subject`
   and `dormant_email_message`) from `Default come-back email` above the
-  dormant rows. Changing one student's email never changes the default.
+  dormant rows. Changing one student's email never changes the default; an
+  email open and untouched when she saves a new default takes it up.
 - **Sending** is `POST /admin/students/:id/dormant-email` with the subject and
   message exactly as she left them, greeting included. The Worker refuses
   anyone no longer dormant (409) or without an email (400), and claims
   `dormant_emailed_at` before sending: one email per student a day, so a
-  second press or device sends nothing (409), and the panel says so. A send
-  that fails puts the claim back, so she can retry at once; the same words to
+  second press or device sends nothing (409), and the panel says so: any 409
+  reloads her list, so Send is not offered again. Settings are read before
+  the claim, and a send that fails puts the claim back, so she can retry at once; the same words to
   the same address that day resend the first attempt's exact request under
   the same provider key, so a reply lost on the way never sends two.
 - **The email** (`dormantInvite`, 41) has her subject, `Book your next

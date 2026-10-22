@@ -30,6 +30,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
   const [busyStudent, setBusyStudent] = useState("");
   const [editingDefault, setEditingDefault] = useState(false);
   const [defaultSaved, setDefaultSaved] = useState(false);
+  // Any come-back email open and untouched follows a default she saves.
+  const [defaultVersion, setDefaultVersion] = useState(0);
   useEffect(() => {
     if (!request) return;
     setQuery("");
@@ -67,6 +69,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
       time={selected?.time}
       homeworkId={selected?.homeworkId}
       homeworkRequestKey={selected?.homeworkRequestKey}
+      comeBackDefaultVersion={defaultVersion}
       token={token}
     />;
   };
@@ -96,7 +99,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
           <Mail size={15} aria-hidden="true" />Default come-back email
         </button> : null}
       </div>
-      {editingDefault ? <DefaultComeBackEmail token={token} onSaved={() => { setEditingDefault(false); setDefaultSaved(true); }} onClose={() => setEditingDefault(false)} /> : null}
+      {editingDefault ? <DefaultComeBackEmail token={token} onSaved={() => { setEditingDefault(false); setDefaultSaved(true); setDefaultVersion(value => value + 1); }} onClose={() => setEditingDefault(false)} /> : null}
       {defaultSaved ? <p className="teacher-inline-success" role="status"><Check size={15} aria-hidden="true" />Saved. Each come-back email now starts from it.</p> : null}
       {resting.length ? <ul className="teacher-setup-list teacher-students__unified">{resting.map(row)}</ul> : null}
     </section> : null}

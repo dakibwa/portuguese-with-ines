@@ -17,7 +17,7 @@ export type StudentPanel = StudentSetupStep | "history" | "details" | "come-back
 export type StudentRowSelection = { studentId: string; panel: StudentPanel; date?: string; time?: string; homeworkId?: string; homeworkRequestKey?: number };
 
 /** The same row holds setup, then the student’s ongoing details and lessons. */
-export function StudentSetupRow({ student, setup, token, step: requestedStep, date, time, homeworkId, homeworkRequestKey, sending, locked, attention, onSelect, onHomework, onChanged, onWelcome, onBusy }: {
+export function StudentSetupRow({ student, setup, token, step: requestedStep, date, time, homeworkId, homeworkRequestKey, comeBackDefaultVersion, sending, locked, attention, onSelect, onHomework, onChanged, onWelcome, onBusy }: {
   student: AdminStudent;
   setup: StudentSetup | null;
   token: string;
@@ -26,6 +26,8 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   time?: string;
   homeworkId?: string;
   homeworkRequestKey?: number;
+  /** Changes when she saves a new default come-back email. */
+  comeBackDefaultVersion?: number;
   sending: string;
   locked?: boolean;
   /** Lesson changes or payment notes belong to this student's one row. */
@@ -39,8 +41,10 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   const steps = setup?.steps ?? [];
   const next = setup?.next;
   const ready = !setup;
-  const step = requestedStep === "history" || requestedStep === "details" || ready
-    ? requestedStep : steps.find(entry => entry.id === requestedStep && !entry.lockedReason)?.id ?? null;
+  // A come-back email is only for someone still dormant, with an address.
+  const step = requestedStep === "come-back" && !(student.dormant && student.email) ? null
+    : requestedStep === "history" || requestedStep === "details" || ready
+      ? requestedStep : steps.find(entry => entry.id === requestedStep && !entry.lockedReason)?.id ?? null;
   const statusStep = step === "welcome" || step === "sign-in" || step === "card";
   const [busy, setBusyState] = useState(false);
   const setBusy = (value: boolean) => { setBusyState(value); onBusy?.(value); };
@@ -270,7 +274,9 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
         />
       </> : step === "come-back" ? <ComeBackEmail
         key={`${student.id}-come-back`}
+        defaultVersion={comeBackDefaultVersion}
         onBusy={setBusy}
+        onRefresh={() => onChanged?.()}
         onSent={updated => { setNotice(`Sent to ${firstName(student)}.`); onChanged?.(updated); close(); }}
         student={student}
         token={token}

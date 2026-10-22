@@ -6079,6 +6079,9 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     if (!student.dormant) return fail("They aren’t dormant any more.", 409, request, env);
     if (!hasEmail(student)) return fail("Add their email first, so the email has somewhere to go.", 400, request, env);
     const owner = dormantAuthorization(env, student, authorization);
+    // Read before the claim, so nothing between the claim and the send can
+    // fail without giving it back.
+    const settings = await loadSettings(env);
     const now = new Date().toISOString();
     // Claimed before anything is sent: of two presses, or two devices, one sends.
     const claimed = await env.DB.prepare(`UPDATE students SET dormant_emailed_at = ?
@@ -6088,7 +6091,6 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       await owner.assert();
       return fail("They were sent it in the last day.", 409, request, env);
     }
-    const settings = await loadSettings(env);
     let sent = null;
     try {
       sent = await sendDormantInvite(env, { student, settings, words, owner });
