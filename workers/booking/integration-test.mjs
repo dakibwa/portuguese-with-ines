@@ -5334,16 +5334,17 @@ await test("she marks students dormant and sends them her own come-back email, o
     assert.deepEqual(await saved.json(), { subject: "Saudades! Come back for a lesson?", message: "It’s been too long.\n\nSee you <b>soon</b>,\nInês" });
     assert.equal((await (await call("/admin/dormant-email", { method: "GET", user: "teacher" })).json()).subject, "Saudades! Come back for a lesson?");
 
-    // Sent to one dormant student: her words under their name, and the way in her welcome uses.
+    // Sent to one dormant student: the words she wrote for them, and the way in her welcome uses.
     const send = (id, body = words) => call(`/admin/students/${id}/dormant-email`, { user: "teacher", body });
     assert.equal((await call(`/admin/students/${old.id}/dormant-email`, { user: "alice", body: words })).status, 401);
-    const sent = await send(old.id);
+    const sent = await send(old.id, { ...words, message: `Olá Olga,\n\n${words.message}` });
     assert.equal(sent.status, 200, await sent.clone().text());
     const reply = await sent.json();
     assert.ok(reply.student.dormantEmailedAt, "her list shows when it went");
     const [email] = to("old-student@example.invalid");
     assert.equal(email.subject, "Saudades! Come back for a lesson?");
     assert.ok(email.text.includes("Olá Olga,\n\nIt’s been too long.\n\nSee you <b>soon</b>,\nInês"), email.text);
+    assert.equal(email.text.split("Olá").length, 2, "her greeting is the only one");
     assert.ok(email.html.includes("&lt;b&gt;soon&lt;/b&gt;") && !email.html.includes("<b>soon"), "her words are text, never markup");
     assert.ok(email.text.includes("Sign in and book"));
     const link = signInLinkIn(email);

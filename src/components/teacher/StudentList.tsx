@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mail, UserPlus } from "lucide-react";
-import { DormantEmail } from "@/components/teacher/DormantEmail";
+import { Check, Mail, UserPlus } from "lucide-react";
+import { DefaultComeBackEmail } from "@/components/teacher/DormantEmail";
 import { NeedsYou } from "@/components/teacher/NeedsYou";
 import { StudentSetupRow, type StudentRowSelection } from "@/components/teacher/StudentSetupRow";
 import type { AdminBooking, AdminStudent } from "@/lib/admin-api";
@@ -28,7 +28,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<StudentRowSelection | null>(null);
   const [busyStudent, setBusyStudent] = useState("");
-  const [emailing, setEmailing] = useState(false);
+  const [editingDefault, setEditingDefault] = useState(false);
+  const [defaultSaved, setDefaultSaved] = useState(false);
   useEffect(() => {
     if (!request) return;
     setQuery("");
@@ -38,9 +39,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
   const matches = ({ student }: StudentWorkspaceRow) => !term || student.name.toLowerCase().includes(term) || student.email.toLowerCase().includes(term);
   const shown = workspace.rows.filter(matches);
   const resting = workspace.dormant.filter(matches);
-  // Everyone dormant can be sent her email, even one whose row is up top for now.
-  const dormant = (students ?? []).filter(student => student.dormant)
-    .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  // Everyone dormant counts, even one whose row is up top for now.
+  const dormantCount = (students ?? []).filter(student => student.dormant).length;
   const noticeProps = {
     sending, onMeet, onView, onWelcome,
     onStudent: (student: AdminStudent, editDetails?: boolean) => {
@@ -89,14 +89,15 @@ export function StudentList({ token, students, workspace, error, sending, reques
     {!students && !error ? <p role="status">Loading your students…</p> : null}
     {students && !students.length ? <p>No students yet.</p> : students && !shown.length && !resting.length ? <p>No students match.</p> : null}
     <ul className="teacher-setup-list teacher-students__unified">{shown.map(row)}</ul>
-    {dormant.length ? <section className="teacher-dormant" aria-labelledby="teacher-dormant-title">
+    {dormantCount ? <section className="teacher-dormant" aria-labelledby="teacher-dormant-title">
       <div className="teacher-dormant__bar">
-        <h3 className="teacher-eyebrow" id="teacher-dormant-title">Dormant · {dormant.length}</h3>
-        {!emailing ? <button className="button button--lilac button--compact" disabled={Boolean(busyStudent)} onClick={() => setEmailing(true)} type="button">
-          <Mail size={15} aria-hidden="true" />Email dormant students
+        <h3 className="teacher-eyebrow" id="teacher-dormant-title">Dormant · {dormantCount}</h3>
+        {!editingDefault ? <button className="button button--lilac button--compact" disabled={Boolean(busyStudent)} onClick={() => { setDefaultSaved(false); setEditingDefault(true); }} type="button">
+          <Mail size={15} aria-hidden="true" />Default come-back email
         </button> : null}
       </div>
-      {emailing ? <DormantEmail token={token} students={dormant} onSent={() => onStudentsChanged()} onClose={() => setEmailing(false)} /> : null}
+      {editingDefault ? <DefaultComeBackEmail token={token} onSaved={() => { setEditingDefault(false); setDefaultSaved(true); }} onClose={() => setEditingDefault(false)} /> : null}
+      {defaultSaved ? <p className="teacher-inline-success" role="status"><Check size={15} aria-hidden="true" />Saved. Each come-back email now starts from it.</p> : null}
       {resting.length ? <ul className="teacher-setup-list teacher-students__unified">{resting.map(row)}</ul> : null}
     </section> : null}
   </section>;

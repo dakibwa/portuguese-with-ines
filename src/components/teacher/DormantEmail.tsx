@@ -1,153 +1,137 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, X } from "lucide-react";
+import { X } from "lucide-react";
 import { fetchDormantEmail, saveDormantEmail, sendDormantEmail, type AdminStudent, type DormantEmailWords } from "@/lib/admin-api";
-import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 
 /** The Worker sends each student it at most once a day. */
-const DAY_MS = 24 * 3_600_000;
-const first = (student: AdminStudent) => student.name.trim().split(/\s+/)[0];
-const names = (list: string[]) => list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}` : list[0] ?? "";
+const GAP_MS = 24 * 3_600_000;
+export const firstName = (student: AdminStudent) => student.name.trim().split(/\s+/)[0];
 
-/**
- * Her come-back email to dormant students (22 October 2026, Dan: "you haven't
- * had a lesson in a while but here is the new website if you're interested in
- * booking a new one"). Her subject and words, kept for next time, to the
- * students she ticks: one, some or all. Each is its own request, so one that
- * can't be sent never stops the rest.
- */
-export function DormantEmail({ token, students, onSent, onClose }: {
-  token: string;
-  /** Every dormant student, whether or not they can be sent it today. */
-  students: AdminStudent[];
-  /** Once a round has sent anything, so her list reads afresh. */
-  onSent: () => void;
-  onClose: () => void;
-}) {
+/** Her default words, as saved, and a way to try again if they can't be read. */
+function useDefaultWords(token: string) {
   const [words, setWords] = useState<DormantEmailWords | null>(null);
-  const [loadError, setLoadError] = useState("");
+  const [problem, setProblem] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const [now] = useState(() => Date.now());
-  const sendable = (student: AdminStudent) => Boolean(student.email) &&
-    !(student.dormantEmailedAt && now - Date.parse(student.dormantEmailedAt) < DAY_MS);
-  const [chosen, setChosen] = useState(() => new Set(students.filter(sendable).map(student => student.id)));
-  const [busy, setBusy] = useState("");
-  const [notice, setNotice] = useState("");
-  const [problems, setProblems] = useState<string[]>([]);
-
   useEffect(() => {
     let current = true;
     fetchDormantEmail(token)
       .then(saved => { if (current) setWords({ subject: saved.subject, message: saved.message }); })
-      .catch(caught => { if (current) setLoadError(caught instanceof Error ? caught.message : "Your email couldn’t be loaded."); });
+      .catch(caught => { if (current) setProblem(caught instanceof Error ? caught.message : "Your email couldn’t be loaded."); });
     return () => { current = false; };
   }, [token, attempt]);
+  const retry = () => { setProblem(""); setAttempt(value => value + 1); };
+  return { words, setWords, problem, retry };
+}
 
-  const recipients = students.filter(student => chosen.has(student.id) && sendable(student));
+function Loading({ problem, retry }: { problem: string; retry: () => void }) {
+  return problem
+    ? <div className="teacher-inline-error" role="alert"><p>{problem}</p><button className="teacher-text-button" onClick={retry} type="button">Try again</button></div>
+    : <p role="status">Loading your email…</p>;
+}
+
+function Fields({ words, disabled, onChange }: { words: DormantEmailWords; disabled: boolean; onChange: (words: DormantEmailWords) => void }) {
+  return <>
+    <label>
+      <span>Subject</span>
+      <input disabled={disabled} maxLength={150} onChange={event => onChange({ ...words, subject: event.target.value })} type="text" value={words.subject} />
+    </label>
+    <label>
+      <span>Message</span>
+      <textarea disabled={disabled} maxLength={3000} onChange={event => onChange({ ...words, message: event.target.value })} rows={9} value={words.message} />
+    </label>
+  </>;
+}
+
+/**
+ * One dormant student's come-back email (22 October 2026, Dan: "can the email
+ * be for each individual student but there be the default email already
+ * written for each"): her default beneath "Olá" and their first name, theirs
+ * to change before she sends it.
+ */
+export function ComeBackEmail({ token, student, onBusy, onSent }: {
+  token: string;
+  student: AdminStudent;
+  onBusy: (busy: boolean) => void;
+  onSent: (student: AdminStudent) => void;
+}) {
+  const { words, problem: loadProblem, retry } = useDefaultWords(token);
+  const [written, setWritten] = useState<DormantEmailWords | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  const [now] = useState(() => Date.now());
+  const sentRecently = Boolean(student.dormantEmailedAt && now - Date.parse(student.dormantEmailedAt) < GAP_MS);
+  const email = written ?? (words ? { subject: words.subject, message: `Olá ${firstName(student)},\n\n${words.message}` } : null);
+  const ready = Boolean(email?.subject.trim() && email.message.trim());
+
+  async function send() {
+    if (!email || !ready || busy || sentRecently) return;
+    setBusy(true);
+    onBusy(true);
+    setProblem("");
+    try {
+      const { student: updated } = await sendDormantEmail(token, student.id, email);
+      onSent(updated);
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : "It couldn’t be sent. Please try again.");
+    } finally {
+      setBusy(false);
+      onBusy(false);
+    }
+  }
+
+  if (!email) return <Loading problem={loadProblem} retry={retry} />;
+  return <form className="teacher-form teacher-come-back" onSubmit={event => { event.preventDefault(); void send(); }}>
+    <Fields disabled={busy || sentRecently} onChange={setWritten} words={email} />
+    {problem ? <p className="teacher-inline-error" role="alert">{problem}</p> : null}
+    {sentRecently ? <p className="teacher-come-back__wait">Each student gets it at most once a day, so this can go again 24 hours after the last one.</p> : null}
+    <div className="teacher-dialog-actions">
+      {written ? <button className="button button--outline button--compact" disabled={busy} onClick={() => setWritten(null)} type="button">Start again</button> : null}
+      <button className="button button--coral button--compact" disabled={!ready || busy || sentRecently} type="submit">
+        {busy ? "Sending…" : `Send to ${firstName(student)}`}
+      </button>
+    </div>
+  </form>;
+}
+
+/** The words every dormant student's email starts from, hers to change. */
+export function DefaultComeBackEmail({ token, onSaved, onClose }: {
+  token: string;
+  onSaved: () => void;
+  onClose: () => void;
+}) {
+  const { words, setWords, problem: loadProblem, retry } = useDefaultWords(token);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
   const ready = Boolean(words?.subject.trim() && words.message.trim());
 
   async function save() {
     if (!words || !ready || busy) return;
-    setBusy("save");
-    setNotice("");
-    setProblems([]);
+    setBusy(true);
+    setProblem("");
     try {
-      setWords(await saveDormantEmail(token, words));
-      setNotice("Saved for next time.");
+      await saveDormantEmail(token, words);
+      onSaved();
     } catch (caught) {
-      setProblems([caught instanceof Error ? caught.message : "Your email couldn’t be saved."]);
-    } finally {
-      setBusy("");
+      setProblem(caught instanceof Error ? caught.message : "Your email couldn’t be saved.");
+      setBusy(false);
     }
   }
 
-  async function send() {
-    if (!words || !ready || busy || !recipients.length) return;
-    setBusy("send");
-    setNotice("");
-    setProblems([]);
-    const sent: string[] = [];
-    const failed: string[] = [];
-    try {
-      // What she sends is what is kept for next time.
-      const saved = await saveDormantEmail(token, words);
-      setWords(saved);
-      for (const [index, student] of recipients.entries()) {
-        setNotice(`Sending ${index + 1} of ${recipients.length}…`);
-        try {
-          await sendDormantEmail(token, student.id, saved);
-          sent.push(first(student));
-          setChosen(current => { const next = new Set(current); next.delete(student.id); return next; });
-        } catch (caught) {
-          failed.push(`${student.name}: ${caught instanceof Error ? caught.message : "it couldn’t be sent."}`);
-        }
-      }
-    } catch (caught) {
-      failed.push(caught instanceof Error ? caught.message : "Your email couldn’t be saved, so nothing was sent.");
-    } finally {
-      setNotice(sent.length ? `Sent to ${names(sent)}.` : "");
-      setProblems(failed);
-      setBusy("");
-      if (sent.length) onSent();
-    }
-  }
-
-  const toggle = (id: string) => setChosen(current => {
-    const next = new Set(current);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-
-  return <section className="teacher-dormant-email" aria-labelledby="teacher-dormant-email-title">
-    <div className="teacher-dormant-email__heading">
-      <h3 id="teacher-dormant-email-title">Email dormant students</h3>
-      <button className="teacher-dialog-close" aria-label="Close" disabled={Boolean(busy)} onClick={onClose} type="button"><X size={20} aria-hidden="true" /></button>
-    </div>
+  return <section className="teacher-come-back-default" aria-labelledby="teacher-come-back-default-title">
+    <h3 id="teacher-come-back-default-title">Default come-back email</h3>
+    <button className="teacher-dialog-close" aria-label="Close" disabled={busy} onClick={onClose} type="button"><X size={20} aria-hidden="true" /></button>
     <ul className="booking-payment-facts teacher-setup__help">
-      <li>It starts “Olá” and their first name, and ends with a button to sign in and book.</li>
-      <li>Each student is sent it at most once a day.</li>
+      <li>Each dormant student’s email starts “Olá” and their first name, then this.</li>
+      <li>You can still change anyone’s before you send it.</li>
     </ul>
-    {loadError ? <div className="teacher-inline-error" role="alert"><p>{loadError}</p><button className="teacher-text-button" onClick={() => { setLoadError(""); setAttempt(value => value + 1); }} type="button">Try again</button></div> : null}
-    {!words && !loadError ? <p role="status">Loading your email…</p> : null}
-    {words ? <form className="teacher-form" onSubmit={event => { event.preventDefault(); void send(); }}>
-      <label>
-        <span>Subject</span>
-        <input disabled={Boolean(busy)} maxLength={150} onChange={event => setWords({ ...words, subject: event.target.value })} type="text" value={words.subject} />
-      </label>
-      <label>
-        <span>Message</span>
-        <textarea disabled={Boolean(busy)} maxLength={3000} onChange={event => setWords({ ...words, message: event.target.value })} rows={7} value={words.message} />
-      </label>
-      <fieldset className="teacher-dormant-email__to">
-        <legend>Send to</legend>
-        {students.map(student => {
-          const can = sendable(student);
-          const ticked = can && chosen.has(student.id);
-          const why = !student.email ? "no email"
-            : student.dormantEmailedAt ? `sent ${dateLabel(dateKey(new Date(student.dormantEmailedAt)), { day: "numeric", month: "short" })}` : "";
-          return <button
-            aria-checked={ticked}
-            className={`paid-tick${ticked ? " is-checked" : ""}`}
-            disabled={!can || Boolean(busy)}
-            key={student.id}
-            onClick={() => toggle(student.id)}
-            role="checkbox"
-            type="button"
-          >
-            <span aria-hidden="true" className="paid-tick__dab">{ticked ? <Check size={13} strokeWidth={3.4} /> : null}</span>
-            {student.name}{why ? <span className="teacher-dormant-email__why"> · {why}</span> : null}
-          </button>;
-        })}
-      </fieldset>
+    {words ? <form className="teacher-form" onSubmit={event => { event.preventDefault(); void save(); }}>
+      <Fields disabled={busy} onChange={setWords} words={words} />
+      {problem ? <p className="teacher-inline-error" role="alert">{problem}</p> : null}
       <div className="teacher-dialog-actions">
-        <button className="button button--lilac button--compact" disabled={!ready || Boolean(busy)} onClick={() => void save()} type="button">{busy === "save" ? "Saving…" : "Save"}</button>
-        <button className="button button--coral button--compact" disabled={!ready || !recipients.length || Boolean(busy)} type="submit">
-          {busy === "send" ? "Sending…" : !recipients.length ? "Send" : recipients.length === 1 ? `Send to ${first(recipients[0])}` : `Send to ${recipients.length} students`}
-        </button>
+        <button className="button button--outline button--compact" disabled={busy} onClick={onClose} type="button">Cancel</button>
+        <button className="button button--coral button--compact" disabled={!ready || busy} type="submit">{busy ? "Saving…" : "Save default"}</button>
       </div>
-    </form> : null}
-    {notice ? <p className="teacher-inline-success" role="status">{busy ? null : <Check size={15} aria-hidden="true" />}{notice}</p> : null}
-    {problems.length ? <div className="teacher-inline-error" role="alert">{problems.map(text => <p key={text}>{text}</p>)}</div> : null}
+    </form> : <Loading problem={loadProblem} retry={retry} />}
   </section>;
 }

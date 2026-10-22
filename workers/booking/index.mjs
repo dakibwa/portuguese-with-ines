@@ -1367,8 +1367,9 @@ function dormantSql(alias) {
 /**
  * Her come-back email (22 October 2026, Dan: "you haven't had a lesson in a
  * while but here is the new website if you're interested in booking a new
- * one"). The words are hers to change and are kept in settings; these are
- * what it says until she does.
+ * one"). Each student's is written for them, starting from this default
+ * beneath "Olá" and their first name. The default is hers to change and is
+ * kept in settings; these are its words until she does.
  */
 export const DORMANT_EMAIL = {
   subject: "It’s been a while! Book your next lesson with Inês",
@@ -1425,8 +1426,7 @@ function dormantAuthorization(env, student, teacher) {
 async function sendDormantInvite(env, { student, settings, words, owner }) {
   const signIn = student.role === "student" ? await issueSignInLink(env, student, WELCOME_LINK_MINUTES, owner) : null;
   const { subject, content } = dormantInvite({
-    first: student.name.split(" ")[0], subject: words.subject, message: words.message,
-    signInUrl: signIn?.url ?? "", bookUrl: siteUrl(env, "/book/")
+    subject: words.subject, message: words.message, signInUrl: signIn?.url ?? "", bookUrl: siteUrl(env, "/book/")
   });
   const sameSend = await sessionHash(JSON.stringify([student.email, words.subject, words.message]));
   return deliver(env, {
@@ -6067,9 +6067,8 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     return json({ subject: words.subject, message: words.message }, 200, request, env);
   }
 
-  // Her come-back email to one dormant student, in the words she sends with
-  // it. Sending to several is one press for each, so every student's reply is
-  // their own and no request outlives its time limit.
+  // Her come-back email to one dormant student, in the words she wrote for
+  // them (greeting included), sent from their own row.
   const dormantInviteFor = path.match(/^\/admin\/students\/([^/]+)\/dormant-email$/);
   if (dormantInviteFor && request.method === "POST") {
     const words = dormantEmailInput(adminBody);

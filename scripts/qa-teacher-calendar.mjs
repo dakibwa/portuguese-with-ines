@@ -966,23 +966,20 @@ try {
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/alex/welcome").length).toBe(1);
   await alex.getByRole("button", { name: "Close", exact: true }).click();
   // Dormant (22 October 2026, Dan): marked from the profile, sending nothing;
-  // her come-back email goes only to whom she ticks, in the words she sees.
+  // each one's come-back email is written for them from her default.
   await alex.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
   await profile.getByRole("button", { name: "Mark as dormant", exact: true }).click();
   const dormant = students.locator(".teacher-dormant");
   await expect(dormant.getByRole("heading", { name: "Dormant · 1", exact: true })).toBeVisible();
   await expect(dormant.locator(".teacher-student__label")).toHaveText("Dormant");
-  await dormant.getByRole("button", { name: "Email dormant students", exact: true }).click();
-  const comeBack = dormant.getByRole("region", { name: "Email dormant students", exact: true });
-  await expect(comeBack.getByLabel("Subject")).toHaveValue("It’s been a while!");
-  await comeBack.getByLabel("Subject").fill("Saudades!");
-  await expect(comeBack.getByRole("checkbox", { name: "Alex", exact: true })).toHaveAttribute("aria-checked", "true");
-  await comeBack.getByRole("button", { name: "Send to Alex", exact: true }).click();
-  await expect(comeBack.getByRole("status")).toHaveText("Sent to Alex.");
+  await alex.getByRole("button", { name: "Come-back email for Alex", exact: true }).click();
+  await expect(profile.getByLabel("Message")).toHaveValue("Olá Alex,\n\nBook a lesson on my new website.\n\nInês");
+  await profile.getByLabel("Subject").fill("Saudades!");
+  await profile.getByRole("button", { name: "Send to Alex", exact: true }).click();
+  await expect(alex.getByRole("status")).toHaveText("Sent to Alex.");
   assert.deepEqual(state.writes.filter(entry => entry.path.startsWith("/admin/students/alex/dormant-email")).map(entry => entry.data),
-    [{ subject: "Saudades!", message: "Book a lesson on my new website.\n\nInês" }]);
-  await expect(comeBack.getByRole("checkbox", { name: /^Alex · sent / })).toBeDisabled();
-  await comeBack.getByRole("button", { name: "Close", exact: true }).click();
+    [{ subject: "Saudades!", message: "Olá Alex,\n\nBook a lesson on my new website.\n\nInês" }]);
+  await alex.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
   await profile.getByRole("button", { name: "Mark as active", exact: true }).click();
   await expect(dormant).toHaveCount(0);
   await alex.getByRole("button", { name: "Close", exact: true }).click();

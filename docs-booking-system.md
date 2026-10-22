@@ -52,8 +52,8 @@ Inês on /schedule                     (her own account, role=teacher)
                                                      with the NIF to issue to (her Receipts tab and automation)
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
   → POST /admin/students/:id/dormant                 mark them dormant, or active again; nothing emailed
-  → GET/POST /admin/dormant-email                    her come-back email's subject and message
-  → POST /admin/students/:id/dormant-email           send it to one dormant student, at most once a day
+  → GET/POST /admin/dormant-email                    the default each come-back email starts from
+  → POST /admin/students/:id/dormant-email           send one dormant student theirs, at most once a day
   → POST /admin/bookings/:id/reschedule | /cancel
 Stripe → POST /stripe/webhook                        signature-verified
 ```
@@ -698,8 +698,8 @@ adds `students.dormant_at` and `students.dormant_emailed_at`; nothing a student
 sees, books or is charged reads either.
 
 - **Marking.** A student's profile (their name, then the lesson history panel)
-  offers `Mark as dormant` while they have no lesson to come, and `Mark as
-  active` once dormant. `POST /admin/students/:id/dormant` with
+  offers a lilac `Mark as dormant` button while they have no lesson to come,
+  and `Mark as active` once dormant. `POST /admin/students/:id/dormant` with
   `{ dormant: true | false }` sets or clears `dormant_at`, teacher only; a
   lesson to come answers 409. Nothing is emailed.
 - **Waking.** `GET /admin/students` returns `dormant` only while no confirmed
@@ -711,24 +711,28 @@ sees, books or is charged reads either.
   section beneath it, by name, labelled `Dormant`, with no setup steps and no
   setup count on the Students badge. One with something new for her (a
   payment, a change, homework) stays up top until it clears.
-- **Her words.** `Email dormant students` opens the email above them: a subject
-  (150 characters) and a message (3,000), prefilled with what she last saved,
-  or the standard words in `DORMANT_EMAIL` until she does
-  (`settings.dormant_email_subject` and `dormant_email_message`). `Save` keeps
-  them; sending saves them first, so what she sent is what she sees next time.
-- **Sending.** Every dormant student with an email is ticked, as the `Already
-  paid` capsule; she unticks anyone, so one, some or all. Each is its own
-  `POST /admin/students/:id/dormant-email` with the words she sees, so one
-  that fails never stops the rest, and no request outlives its time limit. The
-  Worker refuses anyone no longer dormant (409) or without an email (400), and
-  claims `dormant_emailed_at` before sending: one email per student a day, so
-  a second press or device sends nothing (409). A send that fails puts the
-  claim back, so she can retry at once; the same words to the same address
-  that day resend the first attempt's exact request under the same provider
-  key, so a reply lost on the way never sends two.
+- **Each student's email** (22 October 2026, Dan: "can the email be for each
+  individual student but there be the default email already written for
+  each"). A dormant student with an email has `Come-back email` in place of
+  `Sign-in link` among their row's controls, since it carries one. Its panel
+  is written for them: the subject, and `Olá <first name>,` above the default
+  message, both hers to change for that student (150 and 3,000 characters),
+  with `Start again` once she has, then coral `Send to Marta`.
+- **The default** is what each panel starts from: the standard words in
+  `DORMANT_EMAIL` until she saves her own (`settings.dormant_email_subject`
+  and `dormant_email_message`) from `Default come-back email` above the
+  dormant rows. Changing one student's email never changes the default.
+- **Sending** is `POST /admin/students/:id/dormant-email` with the subject and
+  message exactly as she left them, greeting included. The Worker refuses
+  anyone no longer dormant (409) or without an email (400), and claims
+  `dormant_emailed_at` before sending: one email per student a day, so a
+  second press or device sends nothing (409), and the panel says so. A send
+  that fails puts the claim back, so she can retry at once; the same words to
+  the same address that day resend the first attempt's exact request under
+  the same provider key, so a reply lost on the way never sends two.
 - **The email** (`dormantInvite`, 41) has her subject, `Book your next
-  lesson`, `Olá <first name>,` and her message as plain text, then `Sign in
-  and book`, the one-click sign-in link (14 days, once) her welcome uses, and
+  lesson`, and her message as plain text (the Worker adds no greeting of its
+  own), then `Sign in and book`, the one-click sign-in link (14 days, once) her welcome uses, and
   the welcome's footer. Replies go to her. A teacher who is also a student is
   never sent a sign-in link, so theirs is `Book a lesson`, to `/book/`. It is
   never held for a welcome: for someone she set up and never welcomed, it is

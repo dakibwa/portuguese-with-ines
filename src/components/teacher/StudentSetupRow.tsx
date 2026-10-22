@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Clock3, LockKeyhole, X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
+import { ComeBackEmail, firstName } from "@/components/teacher/DormantEmail";
 import { LessonForm } from "@/components/teacher/LessonForm";
 import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
 import { StudentHistory } from "@/components/teacher/StudentHistory";
@@ -12,7 +13,7 @@ import { dateKey, dateLabel, type StudentSetup, type StudentSetupStep } from "@/
 import { formatPriceCents, formatSlotTime } from "@/lib/booking-api";
 import { defaultStudentMark } from "@/lib/student-marks";
 
-export type StudentPanel = StudentSetupStep | "history" | "details";
+export type StudentPanel = StudentSetupStep | "history" | "details" | "come-back";
 export type StudentRowSelection = { studentId: string; panel: StudentPanel; date?: string; time?: string; homeworkId?: string; homeworkRequestKey?: number };
 
 /** The same row holds setup, then the student’s ongoing details and lessons. */
@@ -68,6 +69,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   // What the email she is about to send says (16 October 2026, Inês): with no
   // lesson to come it asks them to book one; a free student is asked for no card.
   const free = student.prices?.[60] === 0 && student.prices?.[90] === 0;
+  const comeBackSent = student.dormantEmailedAt ? dateLabel(dateKey(new Date(student.dormantEmailedAt)), { day: "numeric", month: "short" }) : "";
   const emailSays = student.email ? [
     student.nextLessonAt ? "Lists their lessons to come." : "No lessons yet: it asks them to book one.",
     free ? "Free lessons: no card asked." : steps.some(entry => entry.id === "card") && !student.cardForAllLessons ? "Asks them to add a card." : "",
@@ -85,6 +87,9 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
           : student.hasCard ? "Student has saved a card." : "Student hasn’t added a card yet.",
       ...(!student.email ? ["Email address needed."] : step === "card" && !student.hasCard && !student.signedIn ? ["Student needs to sign in first."] : []),
       ...emailSays,
+    ] : step === "come-back" ? [
+      "Ends with a button to sign in and book.",
+      comeBackSent ? `Last sent ${comeBackSent}.` : "Not sent yet.",
     ] : [];
 
   useEffect(() => {
@@ -153,9 +158,10 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
       setBusy(false);
     }
   }
-  const dormantButton = student.dormant
-    ? <button className="teacher-text-button" disabled={disabled} onClick={() => void markDormant(false)} type="button">Mark as active</button>
-    : !student.nextLessonAt ? <button className="teacher-text-button" disabled={disabled} onClick={() => void markDormant(true)} type="button">Mark as dormant</button> : null;
+  const dormantButton = student.dormant || !student.nextLessonAt
+    ? <button className="button button--lilac button--compact" disabled={disabled} onClick={() => void markDormant(!student.dormant)} type="button">
+      {busy ? "Saving…" : student.dormant ? "Mark as active" : "Mark as dormant"}
+    </button> : null;
 
   const send = (again: boolean) => onWelcome(student, again);
   const sendButton = (again: boolean) => <button
@@ -168,8 +174,9 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   const profilePanel = ready || step === "history" || step === "details";
   const controls = [
     ["details", "Details"], ["price", "Price"], ["lessons", "Add a lesson"], ["history", "Lesson history"],
-    // A fresh way in for someone already set up, sent only by her press inside it.
-    ...(student.email ? [["sign-in", "Sign-in link"] as const] : []),
+    // A fresh way in for someone already set up, sent only by her press inside
+    // it; a dormant student's come-back email carries one already.
+    ...(!student.email ? [] : student.dormant ? [["come-back", "Come-back email"] as const] : [["sign-in", "Sign-in link"] as const]),
   ] as const;
   const prices = ([60, 90] as const).filter(minutes => student.prices?.[minutes] !== undefined)
     .map(minutes => `${minutes} mins · ${formatPriceCents(student.prices![minutes]!)}`).join(", ");
@@ -223,7 +230,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     </div> : null}
     {step ? <div className={`teacher-setup__body${statusStep ? " teacher-setup__body--status" : ""}`} id={paneId} aria-label={`${student.name}’s ${profilePanel ? "profile" : "setup"}`} role="region" ref={body} tabIndex={-1}>
       <div className="teacher-setup__body-heading">
-        <h3 id={`${paneId}-heading`}>{step === "history" ? "Lesson history" : step === "email" || step === "details" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome" : step === "sign-in" ? "Sign in" : "Saved card"}</h3>
+        <h3 id={`${paneId}-heading`}>{step === "history" ? "Lesson history" : step === "email" || step === "details" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome" : step === "sign-in" ? "Sign in" : step === "come-back" ? `Come-back email to ${firstName(student)}` : "Saved card"}</h3>
         {help.length ? <ul className="booking-payment-facts teacher-setup__help">{help.map(text => <li key={text}>{text}</li>)}</ul> : null}
         {statusStep && student.email ? <p className="teacher-setup__email">{student.email}</p> : null}
       </div>
@@ -261,7 +268,13 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
           student={student}
           token={token}
         />
-      </> : step === "lessons" ? <>
+      </> : step === "come-back" ? <ComeBackEmail
+        key={`${student.id}-come-back`}
+        onBusy={setBusy}
+        onSent={updated => { setNotice(`Sent to ${firstName(student)}.`); onChanged?.(updated); close(); }}
+        student={student}
+        token={token}
+      /> : step === "lessons" ? <>
         <LessonForm
           key={`${student.id}-${date ?? ""}-${time ?? ""}`}
           date={date}

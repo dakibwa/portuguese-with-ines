@@ -569,17 +569,18 @@ export function welcome({ first, welcome, book, card, free, rows }) {
 
 /**
  * 41 — her come-back email to a student she marked dormant (22 October 2026,
- * Dan): her own subject and words under their name, then the way back to
- * booking. A student gets the one-click sign-in her welcome carries; a teacher
- * who is also a student signs in as themselves, so theirs opens the booking page.
+ * Dan): the subject and words she wrote for them, greeting included, then the
+ * way back to booking. A student gets the one-click sign-in her welcome
+ * carries; a teacher who is also a student signs in as themselves, so theirs
+ * opens the booking page.
  */
-export function dormantInvite({ first, subject, message, signInUrl = "", bookUrl }) {
+export function dormantInvite({ subject, message, signInUrl = "", bookUrl }) {
   return {
     subject,
     content: {
       heading: "Book your next lesson",
       preheader: signInUrl ? "Sign in with one click, then choose a time." : "Choose a time on Inês’s website.",
-      intro: `${hello(first)}\n\n${message}`,
+      intro: message,
       action: signInUrl ? { label: "Sign in and book", url: signInUrl } : { label: "Book a lesson", url: bookUrl },
       footer: signInUrl ? WELCOME_FOOTER : "Reply to this email to write to Inês."
     }
