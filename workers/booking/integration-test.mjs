@@ -5348,6 +5348,98 @@ await test("a teacher Inês adds as a student stays a teacher, is sent nothing, 
   }
 });
 
+await test("she marks students dormant and sends them her own come-back email, once a day, until a lesson wakes them", async () => {
+  captureEmail();
+  const to = (email) => sentEmails.filter((sent) => sent.to[0] === email);
+  const listed = async (id) => (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).students.find((entry) => entry.id === id);
+  const added = async (email, name) => (await (await call("/admin/students", { user: "teacher", body: { email, name } })).json()).student;
+  const startedAt = clock;
+  try {
+    const old = await added("old-student@example.invalid", "Olga Pires");
+    const other = await added("other-old@example.invalid", "Oscar Reis");
+    assert.equal(old.dormant, false, "nobody starts dormant");
+    const mark = (id, dormant, user = "teacher") => call(`/admin/students/${id}/dormant`, { user, body: { dormant } });
+    assert.equal((await mark(old.id, true, "alice")).status, 401, "only a teacher marks a student dormant");
+    assert.equal((await mark(old.id, "yes")).status, 400);
+    const marked = await mark(old.id, true);
+    assert.equal(marked.status, 200, await marked.clone().text());
+    assert.deepEqual([(await marked.json()).student.dormant, (await listed(old.id)).dormant], [true, true]);
+    assert.equal((await mark(other.id, true)).status, 200);
+    assert.deepEqual(sentEmails, [], "marking someone dormant sends nothing");
+
+    // Her words: the standard ones until she saves her own.
+    const standard = await (await call("/admin/dormant-email", { method: "GET", user: "teacher" })).json();
+    assert.equal(standard.subject, standard.standard.subject);
+    assert.ok(standard.message.includes("new website"));
+    assert.equal((await call("/admin/dormant-email", { user: "teacher", body: { subject: " ", message: "Hi" } })).status, 400);
+    assert.equal((await call("/admin/dormant-email", { user: "alice", body: { subject: "Hi", message: "Hi" } })).status, 401);
+    const words = { subject: "Saudades!  Come back for a lesson?", message: "It’s been too long.\r\n\r\n\r\nSee you <b>soon</b>,\nInês" };
+    const saved = await call("/admin/dormant-email", { user: "teacher", body: words });
+    assert.deepEqual(await saved.json(), { subject: "Saudades! Come back for a lesson?", message: "It’s been too long.\n\nSee you <b>soon</b>,\nInês" });
+    assert.equal((await (await call("/admin/dormant-email", { method: "GET", user: "teacher" })).json()).subject, "Saudades! Come back for a lesson?");
+
+    // Sent to one dormant student: the words she wrote for them, and the way in her welcome uses.
+    const send = (id, body = words) => call(`/admin/students/${id}/dormant-email`, { user: "teacher", body });
+    assert.equal((await call(`/admin/students/${old.id}/dormant-email`, { user: "alice", body: words })).status, 401);
+    const sent = await send(old.id, { ...words, message: `Olá Olga,\n\n${words.message}` });
+    assert.equal(sent.status, 200, await sent.clone().text());
+    const reply = await sent.json();
+    assert.ok(reply.student.dormantEmailedAt, "her list shows when it went");
+    const [email] = to("old-student@example.invalid");
+    assert.equal(email.subject, "Saudades! Come back for a lesson?");
+    assert.ok(email.text.includes("Olá Olga,\n\nIt’s been too long.\n\nSee you <b>soon</b>,\nInês"), email.text);
+    assert.equal(email.text.split("Olá").length, 2, "her greeting is the only one");
+    assert.ok(email.html.includes("&lt;b&gt;soon&lt;/b&gt;") && !email.html.includes("<b>soon"), "her words are text, never markup");
+    assert.ok(email.text.includes("Sign in and book"));
+    const link = signInLinkIn(email);
+    assert.ok(link, "a student she never welcomed is given the one-click way in");
+    assert.equal(db.prepare("SELECT awaiting_welcome FROM students WHERE id=?").get(old.id).awaiting_welcome, 0, "it counts as their welcome");
+
+    // A second press, or another device, sends nothing more that day.
+    assert.equal((await send(old.id)).status, 409);
+    assert.equal(to("old-student@example.invalid").length, 1);
+
+    // Not sent is not counted: she can try again at once.
+    emailUnavailable = true;
+    assert.equal((await send(other.id)).status, 502);
+    emailUnavailable = false;
+    assert.equal(db.prepare("SELECT dormant_emailed_at FROM students WHERE id=?").get(other.id).dormant_emailed_at, null);
+    const firstTry = JSON.parse(db.prepare("SELECT request_json FROM email_log WHERE kind='student_dormant_invite' AND recipient=?").get("other-old@example.invalid").request_json);
+    assert.equal((await send(other.id)).status, 200);
+    assert.deepEqual(to("other-old@example.invalid").map((sent) => sent.text), [firstTry.text], "a retry sends the first attempt's exact request, once");
+
+    // The link signs them in, and a day later she may send it again.
+    assert.equal((await call("/auth/email-link/confirm", { user: null, body: { token: link } })).status, 200);
+    clock += 25 * 3600000;
+    assert.equal((await send(old.id)).status, 200);
+    assert.equal(to("old-student@example.invalid").length, 2);
+
+    // A lesson wakes them; someone with a lesson to come can't be marked dormant.
+    const lesson = await call("/admin/bookings", { user: "teacher", body: { studentId: old.id, lessonType: "single", startAt: "2026-10-27T10:00:00.000Z" } });
+    assert.equal(lesson.status, 201, await lesson.clone().text());
+    await drain();
+    assert.equal((await listed(old.id)).dormant, false, "a lesson after the mark makes them active again");
+    assert.equal((await send(old.id)).status, 409, "only a dormant student is sent it");
+    assert.equal((await mark(old.id, true)).status, 409);
+    // Cancelled, it still brought them back; marked again, it is behind them.
+    const lessonId = db.prepare("SELECT id FROM bookings WHERE reference=?").get((await lesson.json()).booking.reference).id;
+    assert.equal((await call(`/admin/bookings/${lessonId}/cancel`, { user: "teacher" })).status, 200);
+    await drain();
+    assert.equal((await listed(old.id)).dormant, false, "a lesson booked after the mark and then cancelled keeps them active");
+    assert.equal((await (await mark(old.id, true)).json()).student.dormant, true, "one cancelled before the mark never wakes them");
+    // She can wake someone herself, and a student she hasn't marked is never sent it.
+    assert.equal((await (await mark(other.id, false)).json()).student.dormant, false);
+    assert.equal((await send(other.id)).status, 409);
+    assert.equal((await send("alice")).status, 409);
+  } finally {
+    clock = startedAt;
+    emailUnavailable = false;
+    releaseEmail();
+    forgetStudent("old-student@example.invalid");
+    forgetStudent("other-old@example.invalid");
+  }
+});
+
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;
