@@ -2205,11 +2205,14 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
   applied by hand to staging, then production D1, on 17 October 2026, before
   the Worker that reads it. It adds `students.also_student`, default 0.
 - **Migration 0036** (`workers/booking/migrations/0036-dormant-students.sql`)
-  must be applied to staging, then production D1, before the Worker that reads
-  it: `GET /admin/students` selects both new columns, so without them her
-  Students tab cannot load. It adds nullable `students.dormant_at` and
-  `students.dormant_emailed_at`; existing rows stay NULL, so nobody starts
-  dormant. Not yet applied.
+  was applied by hand to staging, then production D1, on 22 October 2026,
+  before the Worker that reads it (`GET /admin/students` selects both new
+  columns, so without them her Students tab cannot load). It adds nullable
+  `students.dormant_at` and `students.dormant_emailed_at`. Both columns were
+  absent before each application, and `pragma_table_info('students')`
+  confirmed them afterwards. Existing rows stay NULL, so nobody starts
+  dormant. The file was executed directly, without replaying the empty
+  migration ledger.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
 ## Google Calendar and Meet setup
