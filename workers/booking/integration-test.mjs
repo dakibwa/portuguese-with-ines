@@ -5377,6 +5377,12 @@ await test("she marks students dormant and sends them her own come-back email, o
     assert.equal((await listed(old.id)).dormant, false, "a lesson after the mark makes them active again");
     assert.equal((await send(old.id)).status, 409, "only a dormant student is sent it");
     assert.equal((await mark(old.id, true)).status, 409);
+    // Cancelled, it still brought them back; marked again, it is behind them.
+    const lessonId = db.prepare("SELECT id FROM bookings WHERE reference=?").get((await lesson.json()).booking.reference).id;
+    assert.equal((await call(`/admin/bookings/${lessonId}/cancel`, { user: "teacher" })).status, 200);
+    await drain();
+    assert.equal((await listed(old.id)).dormant, false, "a lesson booked after the mark and then cancelled keeps them active");
+    assert.equal((await (await mark(old.id, true)).json()).student.dormant, true, "one cancelled before the mark never wakes them");
     // She can wake someone herself, and a student she hasn't marked is never sent it.
     assert.equal((await (await mark(other.id, false)).json()).student.dormant, false);
     assert.equal((await send(other.id)).status, 409);

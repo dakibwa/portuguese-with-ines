@@ -1356,12 +1356,16 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [], dedu
  * A student Inês marked dormant (22 October 2026, Dan: "an option for Ines to
  * add students to dormant") who has had no lesson since: one of theirs ending
  * after the mark, whoever booked or recorded it, makes them active again
- * without anyone unmarking them. It is hers alone; nothing a student sees,
- * books or is charged reads it.
+ * without anyone unmarking them. A lesson booked after the mark and then
+ * cancelled keeps them active too (Dan: "they can be active after that"); one
+ * cancelled from before the mark does not wake them. It is hers alone;
+ * nothing a student sees, books or is charged reads it.
  */
 function dormantSql(alias) {
   return `(${alias}.dormant_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM bookings dormant_lesson
-    WHERE dormant_lesson.student_id = ${alias}.id AND dormant_lesson.status = 'confirmed' AND dormant_lesson.ends_at > ${alias}.dormant_at))`;
+    WHERE dormant_lesson.student_id = ${alias}.id
+      AND ((dormant_lesson.status = 'confirmed' AND dormant_lesson.ends_at > ${alias}.dormant_at)
+        OR (dormant_lesson.status = 'cancelled' AND dormant_lesson.created_at > ${alias}.dormant_at))))`;
 }
 
 /**

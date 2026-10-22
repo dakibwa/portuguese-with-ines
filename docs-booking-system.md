@@ -702,11 +702,13 @@ sees, books or is charged reads either.
   and `Mark as active` once dormant. `POST /admin/students/:id/dormant` with
   `{ dormant: true | false }` sets or clears `dormant_at`, teacher only; a
   lesson to come answers 409. Nothing is emailed.
-- **Waking.** `GET /admin/students` returns `dormant` only while no confirmed
-  lesson of theirs ends after `dormant_at` (`dormantSql()` in the Worker): a
-  lesson they book, one she adds, or one she records as had after the mark
-  makes them active again with nobody unmarking them. A lesson recorded from
-  before the mark does not.
+- **Waking.** `GET /admin/students` returns `dormant` only while no lesson
+  has brought them back since `dormant_at` (`dormantSql()` in the Worker): a
+  confirmed lesson ending after the mark (one they book, one she adds, or one
+  she records as had) makes them active again with nobody unmarking them, and
+  so does one booked after the mark and then cancelled (Dan: "they can be
+  active after that"). A lesson recorded from before the mark, or cancelled
+  before it, does not.
 - **Her list.** Dormant students leave the main list for a `Dormant · n`
   section beneath it, by name, labelled `Dormant`, with no setup steps and no
   setup count on the Students badge. One with something new for her (a
