@@ -143,7 +143,7 @@ export function DormantEmail({ token, students, onSent, onClose }: {
       <div className="teacher-dialog-actions">
         <button className="button button--lilac button--compact" disabled={!ready || Boolean(busy)} onClick={() => void save()} type="button">{busy === "save" ? "Saving…" : "Save"}</button>
         <button className="button button--coral button--compact" disabled={!ready || !recipients.length || Boolean(busy)} type="submit">
-          {busy === "send" ? "Sending…" : recipients.length === 1 ? `Send to ${first(recipients[0])}` : `Send to ${recipients.length} students`}
+          {busy === "send" ? "Sending…" : !recipients.length ? "Send" : recipients.length === 1 ? `Send to ${first(recipients[0])}` : `Send to ${recipients.length} students`}
         </button>
       </div>
     </form> : null}

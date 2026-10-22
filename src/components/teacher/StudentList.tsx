@@ -39,7 +39,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
   const shown = workspace.rows.filter(matches);
   const resting = workspace.dormant.filter(matches);
   // Everyone dormant can be sent her email, even one whose row is up top for now.
-  const dormant = (students ?? []).filter(student => student.dormant);
+  const dormant = (students ?? []).filter(student => student.dormant)
+    .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   const noticeProps = {
     sending, onMeet, onView, onWelcome,
     onStudent: (student: AdminStudent, editDetails?: boolean) => {
