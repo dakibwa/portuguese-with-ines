@@ -458,13 +458,18 @@ export type StudentWorkspaceRow = {
   items: NeedsYouItem[];
 };
 
-/** One student once: her operational work first, then setup and the students already ready. */
+/**
+ * One student once: her operational work first, then setup and the students
+ * already ready. Dormant students (22 October 2026, Dan) rest apart, by name,
+ * with no setup to nag about, unless something of theirs needs her.
+ */
 export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[], cardsAccepted: boolean, bookings: AdminBooking[]): {
   rows: StudentWorkspaceRow[];
+  dormant: StudentWorkspaceRow[];
   general: NeedsYouItem[];
   attentionCount: number;
 } {
-  const setup = new Map(gettingStarted(students, cardsAccepted).map(row => [row.student.id, row]));
+  const setup = new Map(gettingStarted(students.filter(student => !student.dormant), cardsAccepted).map(row => [row.student.id, row]));
   const rows: StudentWorkspaceRow[] = students.map(student => ({ student, setup: setup.get(student.id), items: [] }));
   const byId = new Map(rows.map(row => [row.student.id, row]));
   const byBooking = new Map(bookings.map(booking => [booking.id, booking]));
@@ -512,8 +517,10 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
     || a.student.name.localeCompare(b.student.name)
     || a.student.id.localeCompare(b.student.id));
 
+  const resting = (row: StudentWorkspaceRow) => Boolean(row.student.dormant && !row.items.length && !row.student.homeworkToReview?.length);
   return {
-    rows,
+    rows: rows.filter(row => !resting(row)),
+    dormant: rows.filter(resting).sort((a, b) => a.student.name.localeCompare(b.student.name) || a.student.id.localeCompare(b.student.id)),
     general,
     attentionCount: general.length + rows.filter(row => row.items.length || row.setup?.owner === "Yours" || row.student.homeworkToReview?.length).length,
   };

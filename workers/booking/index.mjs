@@ -13,7 +13,7 @@ import { deliver as sendEmail, emailLifecycle, emailLifecycleMatchesSql, LIFECYC
 import {
   FREE_LABEL, emailChangeConfirm, emailChangeNotice, lessonBookedTeacher, lessonCancelledTeacher, lessonMovedTeacher, lessonReminder,
   passwordReset, paymentFailed, paymentReceipt, paymentReceivedTeacher, priceValue, signInLink, studentBooked,
-  studentCancelled, studentMoved, welcome as welcomeTemplate
+  studentCancelled, studentMoved, welcome as welcomeTemplate, dormantInvite
 } from "./email-templates.mjs";
 import { NO_EMAIL_YET, isNoEmailYet, realEmail, withRealEmail } from "./no-email.mjs";
 import { isStudentLike, studentLikeSql } from "./student-like.mjs";
@@ -317,14 +317,17 @@ async function awaitingWelcomeAt(env, email) {
   }
 }
 
+/** What she sends by her own press, and brings the student in, is never held. */
+const SENT_BEFORE_WELCOME = new Set(["student_welcome", "student_dormant_invite"]);
+
 /**
  * Every email leaves through here. Anything about lessons for a student still
  * awaiting their welcome is held: added, moved, cancelled, the Meet link,
- * charges. The welcome itself, and sign-in or address emails they ask for,
- * always go.
+ * charges. The welcome itself, her come-back email to a dormant student, and
+ * sign-in or address emails they ask for, always go.
  */
 async function deliver(env, message) {
-  if (message.kind?.startsWith("student_") && message.kind !== "student_welcome" && await awaitingWelcomeAt(env, message.to)) {
+  if (message.kind?.startsWith("student_") && !SENT_BEFORE_WELCOME.has(message.kind) && await awaitingWelcomeAt(env, message.to)) {
     return { ok: true, held: true };
   }
   return sendEmail(env, message);
@@ -1349,6 +1352,93 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [], dedu
   });
 }
 
+/**
+ * A student Inês marked dormant (22 October 2026, Dan: "an option for Ines to
+ * add students to dormant") who has had no lesson since: one of theirs ending
+ * after the mark, whoever booked or recorded it, makes them active again
+ * without anyone unmarking them. It is hers alone; nothing a student sees,
+ * books or is charged reads it.
+ */
+function dormantSql(alias) {
+  return `(${alias}.dormant_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM bookings dormant_lesson
+    WHERE dormant_lesson.student_id = ${alias}.id AND dormant_lesson.status = 'confirmed' AND dormant_lesson.ends_at > ${alias}.dormant_at))`;
+}
+
+/**
+ * Her come-back email (22 October 2026, Dan: "you haven't had a lesson in a
+ * while but here is the new website if you're interested in booking a new
+ * one"). The words are hers to change and are kept in settings; these are
+ * what it says until she does.
+ */
+export const DORMANT_EMAIL = {
+  subject: "It’s been a while! Book your next lesson with Inês",
+  message: "It’s been a while since your last lesson, and I’d love to see you again.\n\n" +
+    "I now have a new website where you can see when I’m free and book a lesson whenever it suits you.\n\n" +
+    "Até breve,\nInês"
+};
+const DORMANT_SUBJECT_LIMIT = 150;
+const DORMANT_MESSAGE_LIMIT = 3000;
+/** Each student is sent it at most once a day, so a second press or device never repeats it. */
+const DORMANT_EMAIL_GAP_MS = 24 * 3600000;
+
+async function dormantEmailWords(env) {
+  const { results } = await env.DB.prepare("SELECT key, value FROM settings WHERE key IN ('dormant_email_subject', 'dormant_email_message')").all();
+  const saved = Object.fromEntries((results ?? []).map((row) => [row.key, row.value]));
+  return { subject: saved.dormant_email_subject || DORMANT_EMAIL.subject, message: saved.dormant_email_message || DORMANT_EMAIL.message };
+}
+
+/** Her subject and message as given, tidied, or what is wrong with them. */
+function dormantEmailInput(body) {
+  const subject = String(body.subject ?? "").replace(/\s+/g, " ").trim();
+  const message = String(body.message ?? "").replace(/\r\n?/g, "\n").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
+  if (!subject) return { problem: "Please give the email a subject." };
+  if (!message) return { problem: "Please write the email’s message." };
+  if (subject.length > DORMANT_SUBJECT_LIMIT) return { problem: `Please keep the subject to ${DORMANT_SUBJECT_LIMIT} characters.` };
+  if (message.length > DORMANT_MESSAGE_LIMIT) return { problem: `Please keep the message to ${DORMANT_MESSAGE_LIMIT.toLocaleString("en-GB")} characters.` };
+  return { subject, message };
+}
+
+/**
+ * Her authority and the dormant student this email was meant for, at the
+ * address and account version it was read at, rechecked at every write.
+ */
+function dormantAuthorization(env, student, teacher) {
+  const sql = `(${teacher.sql}) AND EXISTS (SELECT 1 FROM students dormant_owner
+    WHERE dormant_owner.id = ? AND dormant_owner.email = ? AND dormant_owner.session_version = ? AND dormant_owner.role = ?
+      AND ${studentLikeSql("dormant_owner")} AND ${dormantSql("dormant_owner")})`;
+  const values = [...teacher.values, student.id, student.email, student.session_version ?? 0, student.role];
+  return { sql, values, async assert() {
+    await teacher.assert();
+    if (!await env.DB.prepare(`SELECT 1 AS allowed WHERE ${sql}`).bind(...values).first()) {
+      throw new WelcomeChangedError("Their details have changed, or they are no longer dormant. Please reload before sending again.");
+    }
+  } };
+}
+
+/**
+ * Her come-back email to one dormant student. A student is given the
+ * one-click way in her welcome uses, so someone she set up and never welcomed
+ * isn't turned away for having no password; it then counts as their welcome.
+ * Trying the same words again the same day after a failure resends the first
+ * attempt's exact request, so a reply lost on the way never sends it twice.
+ */
+async function sendDormantInvite(env, { student, settings, words, owner }) {
+  const signIn = student.role === "student" ? await issueSignInLink(env, student, WELCOME_LINK_MINUTES, owner) : null;
+  const { subject, content } = dormantInvite({
+    first: student.name.split(" ")[0], subject: words.subject, message: words.message,
+    signInUrl: signIn?.url ?? "", bookUrl: siteUrl(env, "/book/")
+  });
+  const sameSend = await sessionHash(JSON.stringify([student.email, words.subject, words.message]));
+  return deliver(env, {
+    to: student.email,
+    subject,
+    kind: "student_dormant_invite",
+    dedupeKey: `dormant:${student.id}:${student.session_version ?? 0}:${dateKey(new Date(), PORTO)}:${sameSend}`,
+    replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined,
+    content, authorization: owner
+  });
+}
+
 /** Her students at a glance: who is in, who has a card, what comes next. */
 /** How long her Needs you shows that a student has just added a card. */
 const CARD_ADDED_NOTICE_DAYS = 7;
@@ -1357,6 +1447,7 @@ async function teacherStudentList(env) {
   const now = new Date().toISOString();
   const { results } = await env.DB.prepare(
     `SELECT s.id, s.name, s.email, s.phone, COALESCE(s.nif, '') AS nif, s.created_at, COALESCE(s.mark, '') AS mark, s.awaiting_welcome,
+       ${dormantSql("s")} AS dormant, s.dormant_emailed_at,
        (COALESCE(s.stripe_customer_id, '') != '' AND COALESCE(s.stripe_payment_method, '') != '') AS has_card,
        s.card_consent_at,
        (s.password_hash != '' OR s.google_sub IS NOT NULL OR s.last_login_at IS NOT NULL) AS signed_in,
@@ -1424,6 +1515,8 @@ async function teacherStudentList(env) {
     nextLessonAt: row.next_lesson_at ?? null,
     unpaidUpcoming: Number(row.unpaid_upcoming ?? 0),
     weekly: Number(row.weekly ?? 0),
+    dormant: Boolean(row.dormant),
+    dormantEmailedAt: row.dormant_emailed_at ?? null,
     // What they pay, a 90-minute price derived from a 60-minute one included,
     // and the prices set for them, which is what she edits.
     prices: withDerived(own[row.id] ?? {}),
@@ -5935,6 +6028,88 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       return fail("Their details have changed. Please reload before sending their welcome.", 409, request, env);
     }
     return json({ ok: true, card: welcome.card }, 200, request, env);
+  }
+
+  // Dormant (22 October 2026, Dan): a student who hasn't had a lesson in a
+  // while, kept apart in her list and offered her come-back email. Marking
+  // sends nothing. Someone with a lesson to come isn't dormant, and a lesson
+  // of theirs ending after the mark makes them active again by itself.
+  const dormantStudent = path.match(/^\/admin\/students\/([^/]+)\/dormant$/);
+  if (dormantStudent && request.method === "POST") {
+    if (typeof adminBody.dormant !== "boolean") return fail("Say whether they are dormant.", 400, request, env);
+    const student = await env.DB.prepare(`SELECT id FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(dormantStudent[1]).first();
+    if (!student) return fail("That student could not be found.", 404, request, env);
+    const now = new Date().toISOString();
+    const changed = adminBody.dormant
+      ? await env.DB.prepare(`UPDATE students SET dormant_at = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bookings b
+          WHERE b.student_id = students.id AND b.status = 'confirmed' AND b.ends_at > ?) AND (${authorization.sql})`)
+        .bind(now, student.id, now, ...authorization.values).run()
+      : await env.DB.prepare(`UPDATE students SET dormant_at = NULL WHERE id = ? AND (${authorization.sql})`)
+        .bind(student.id, ...authorization.values).run();
+    if (!(changed?.meta?.changes > 0)) {
+      await authorization.assert();
+      return fail("They have a lesson to come, so they aren’t dormant.", 409, request, env);
+    }
+    const list = await teacherStudentList(env);
+    return json({ student: list.find((entry) => entry.id === student.id) }, 200, request, env);
+  }
+
+  // Her come-back email's words, as she last saved them.
+  if (path === "/admin/dormant-email" && request.method === "GET") {
+    return json({ ...await dormantEmailWords(env), standard: DORMANT_EMAIL }, 200, request, env);
+  }
+  if (path === "/admin/dormant-email" && request.method === "POST") {
+    const words = dormantEmailInput(adminBody);
+    if (words.problem) return fail(words.problem, 400, request, env);
+    await env.DB.batch([["dormant_email_subject", words.subject], ["dormant_email_message", words.message]].map(([key, value]) =>
+      env.DB.prepare(`INSERT INTO settings (key, value) SELECT ?, ? WHERE (${authorization.sql})
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(key, value, ...authorization.values)));
+    return json({ subject: words.subject, message: words.message }, 200, request, env);
+  }
+
+  // Her come-back email to one dormant student, in the words she sends with
+  // it. Sending to several is one press for each, so every student's reply is
+  // their own and no request outlives its time limit.
+  const dormantInviteFor = path.match(/^\/admin\/students\/([^/]+)\/dormant-email$/);
+  if (dormantInviteFor && request.method === "POST") {
+    const words = dormantEmailInput(adminBody);
+    if (words.problem) return fail(words.problem, 400, request, env);
+    const student = await env.DB.prepare(`SELECT s.*, ${dormantSql("s")} AS dormant FROM students s WHERE s.id = ? AND ${studentLikeSql("s")}`)
+      .bind(dormantInviteFor[1]).first();
+    if (!student) return fail("That student could not be found.", 404, request, env);
+    if (!student.dormant) return fail("They aren’t dormant any more.", 409, request, env);
+    if (!hasEmail(student)) return fail("Add their email first, so the email has somewhere to go.", 400, request, env);
+    const owner = dormantAuthorization(env, student, authorization);
+    const now = new Date().toISOString();
+    // Claimed before anything is sent: of two presses, or two devices, one sends.
+    const claimed = await env.DB.prepare(`UPDATE students SET dormant_emailed_at = ?
+      WHERE id = ? AND (dormant_emailed_at IS NULL OR dormant_emailed_at <= ?) AND (${owner.sql})`)
+      .bind(now, student.id, new Date(Date.now() - DORMANT_EMAIL_GAP_MS).toISOString(), ...owner.values).run();
+    if (!(claimed?.meta?.changes > 0)) {
+      await owner.assert();
+      return fail("They were sent it in the last day.", 409, request, env);
+    }
+    const settings = await loadSettings(env);
+    let sent = null;
+    try {
+      sent = await sendDormantInvite(env, { student, settings, words, owner });
+    } finally {
+      // Not sent, so not counted: she can try again straight away.
+      if (!sent?.ok) {
+        await env.DB.prepare("UPDATE students SET dormant_emailed_at = ? WHERE id = ? AND dormant_emailed_at = ?")
+          .bind(student.dormant_emailed_at ?? null, student.id, now).run();
+      }
+    }
+    if (!sent.ok) {
+      await owner.assert();
+      return fail("The email could not be sent just now. Please try again.", 502, request, env);
+    }
+    // It brought them in, as her welcome would have, so their lesson emails
+    // may go from now on.
+    await env.DB.prepare(`UPDATE students SET awaiting_welcome = 0 WHERE id = ? AND awaiting_welcome = 1 AND (${owner.sql})`)
+      .bind(student.id, ...owner.values).run();
+    const list = await teacherStudentList(env);
+    return json({ ok: true, student: list.find((entry) => entry.id === student.id) }, 200, request, env);
   }
 
   if (request.method === "POST" && path === "/admin/bookings") {

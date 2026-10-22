@@ -3162,6 +3162,24 @@
 .teacher-student__contact { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem 1rem; }
 .teacher-student__contact .booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0; font-size: 0.78rem; overflow-wrap: anywhere; }
 .teacher-student__contact:has(ul:empty):not(:has(button)) { display: none; }
+.teacher-student__contact-actions { display: flex; flex-wrap: wrap; gap: 0 1rem; }
+/* Dormant students (22 October 2026, Dan): apart beneath the rest, by name,
+   with her come-back email opening above them. Its recipients are the
+   Already paid tick's capsules, one per student. */
+.teacher-dormant { display: grid; gap: 0.65rem; margin-top: 1.6rem; }
+.teacher-dormant__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
+.teacher-dormant__bar .teacher-eyebrow { margin: 0; }
+.teacher-dormant__bar .button { gap: 0.5rem; }
+.teacher-dormant-email { position: relative; display: grid; gap: 0.75rem; min-width: 0; padding: 0.9rem 1rem 1rem; border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet); }
+.teacher-dormant-email h3 { margin: 0.7rem 3.2rem 0 0; font-size: 0.9rem; }
+.teacher-dormant-email > .teacher-setup__help { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0; font-size: 0.78rem; }
+.teacher-dormant-email .teacher-form { display: grid; gap: 0.85rem; min-width: 0; }
+.teacher-dormant-email textarea { resize: vertical; line-height: 1.6; }
+.teacher-dormant-email__to { display: flex; flex-wrap: wrap; gap: 0.45rem; min-width: 0; margin: 0; padding: 0; border: 0; }
+.teacher-dormant-email__to legend { float: left; width: 100%; margin-bottom: 0.3rem; padding: 0; font: 600 0.72rem/1.5 var(--ui); letter-spacing: 0.06em; text-transform: uppercase; }
+.teacher-dormant-email__why { font-weight: 500; opacity: 0.8; }
+.teacher-dormant-email > :is(.teacher-inline-success, .teacher-inline-error) { margin: 0; }
+.teacher-dormant-email .teacher-inline-error p { flex: 1 1 100%; margin: 0; }
 .teacher-student__history { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); align-items: start; gap: 1rem; min-width: 0; }
 .teacher-student__history > section { min-width: 0; }
 .teacher-student__history > section > h3 { margin: 0 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }

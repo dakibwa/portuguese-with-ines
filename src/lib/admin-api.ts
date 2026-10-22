@@ -28,6 +28,10 @@ export type AdminStudent = {
   unpaidUpcoming?: number;
   /** Active weekly slots. */
   weekly?: number;
+  /** She marked them dormant and they have had no lesson since (migration 0036). */
+  dormant?: boolean;
+  /** When her come-back email last went to them. */
+  dormantEmailedAt?: string | null;
   /** What they pay per lesson length, in cents, a 90-minute price derived from their 60 included; a missing length is the standard price. */
   prices?: Partial<Record<60 | 90, number>>;
   /** The prices set for them (by her or a code), which is what she edits. */
@@ -284,9 +288,9 @@ function validateBookingAcknowledgment<T extends { booking: { reference: string 
 function validStudent(value: unknown): value is AdminStudent {
   if (!isApiRecord(value) || !["id", "name", "email", "phone"].every(key => typeof value[key] === "string") || !value.id) return false;
   if (!["nif", "mark"].every(key => value[key] === undefined || typeof value[key] === "string") ||
-    !["signedIn", "awaitingWelcome", "hasCard", "hasLessons", "cardForAllLessons"].every(key => value[key] === undefined || typeof value[key] === "boolean") ||
+    !["signedIn", "awaitingWelcome", "hasCard", "hasLessons", "cardForAllLessons", "dormant"].every(key => value[key] === undefined || typeof value[key] === "boolean") ||
     !["upcoming", "unpaidUpcoming", "weekly"].every(key => value[key] === undefined || (Number.isInteger(value[key]) && Number(value[key]) >= 0)) ||
-    !(value.nextLessonAt == null || isApiInstant(value.nextLessonAt))) return false;
+    !(value.nextLessonAt == null || isApiInstant(value.nextLessonAt)) || !(value.dormantEmailedAt == null || isApiInstant(value.dormantEmailedAt))) return false;
   for (const key of ["prices", "ownPrices"]) {
     const prices = value[key];
     if (prices !== undefined && (!isApiRecord(prices) || !Object.values(prices).every(amount => Number.isInteger(amount) && Number(amount) >= 0))) return false;
@@ -424,6 +428,49 @@ export function setStudentPrices(token: string, studentId: string, prices: Stude
   return adminRequest<{ student: AdminStudent; updated: number; stayFree?: number }>(token, `/admin/students/${encodeURIComponent(studentId)}/prices`, {
     method: "POST",
     body: JSON.stringify({ prices }),
+  }).then(data => studentReply(data, studentId));
+}
+
+/**
+ * Marks a student dormant, or active again; nothing is emailed. Someone with a
+ * lesson to come can't be dormant (409), and a lesson of theirs ending after the
+ * mark makes them active again by itself.
+ */
+export function setStudentDormant(token: string, studentId: string, dormant: boolean) {
+  return adminRequest<{ student: AdminStudent }>(token, `/admin/students/${encodeURIComponent(studentId)}/dormant`, {
+    method: "POST",
+    body: JSON.stringify({ dormant }),
+  }).then(data => studentReply(data, studentId));
+}
+
+/** Her come-back email to dormant students: a subject and her own message. */
+export type DormantEmailWords = { subject: string; message: string };
+
+function dormantWords<T extends DormantEmailWords>(data: T) {
+  if (typeof data.subject !== "string" || typeof data.message !== "string") throw new Error(BOOKING_REPLY_ERROR);
+  return data;
+}
+
+/** Her words as last saved, or the standard ones until she saves her own. */
+export function fetchDormantEmail(token: string) {
+  return adminRequest<DormantEmailWords>(token, "/admin/dormant-email").then(dormantWords);
+}
+
+export function saveDormantEmail(token: string, words: DormantEmailWords) {
+  return adminRequest<DormantEmailWords>(token, "/admin/dormant-email", {
+    method: "POST",
+    body: JSON.stringify(words),
+  }).then(dormantWords);
+}
+
+/**
+ * Sends her come-back email to one dormant student, with a one-click way to
+ * sign in and book. At most once a day each (409 after that).
+ */
+export function sendDormantEmail(token: string, studentId: string, words: DormantEmailWords) {
+  return adminRequest<{ ok: true; student: AdminStudent }>(token, `/admin/students/${encodeURIComponent(studentId)}/dormant-email`, {
+    method: "POST",
+    body: JSON.stringify(words),
   }).then(data => studentReply(data, studentId));
 }
 

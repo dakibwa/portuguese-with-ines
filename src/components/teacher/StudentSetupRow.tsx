@@ -7,7 +7,7 @@ import { LessonForm } from "@/components/teacher/LessonForm";
 import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
 import { StudentHistory } from "@/components/teacher/StudentHistory";
 import { StudentPrice } from "@/components/teacher/StudentPrice";
-import type { AdminStudent } from "@/lib/admin-api";
+import { setStudentDormant, type AdminStudent } from "@/lib/admin-api";
 import { dateKey, dateLabel, type StudentSetup, type StudentSetupStep } from "@/lib/teacher-calendar";
 import { formatPriceCents, formatSlotTime } from "@/lib/booking-api";
 import { defaultStudentMark } from "@/lib/student-marks";
@@ -44,6 +44,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   const [busy, setBusyState] = useState(false);
   const setBusy = (value: boolean) => { setBusyState(value); onBusy?.(value); };
   const [notice, setNotice] = useState("");
+  const [problem, setProblem] = useState("");
   const row = useRef<HTMLLIElement>(null);
   const height = useRef<number | null>(null);
   const motion = useRef<Animation | null>(null);
@@ -137,6 +138,25 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     return () => { observer.disconnect(); motion.current?.cancel(); };
   }, []);
 
+  // Dormant (22 October 2026, Dan): hers to set, nothing is sent. Someone
+  // with a lesson to come isn't dormant, so only the way back is offered then.
+  async function markDormant(dormant: boolean) {
+    setBusy(true);
+    setNotice("");
+    setProblem("");
+    try {
+      const { student: updated } = await setStudentDormant(token, student.id, dormant);
+      onChanged?.(updated);
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : "That couldn’t be saved. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  const dormantButton = student.dormant
+    ? <button className="teacher-text-button" disabled={disabled} onClick={() => void markDormant(false)} type="button">Mark as active</button>
+    : !student.nextLessonAt ? <button className="teacher-text-button" disabled={disabled} onClick={() => void markDormant(true)} type="button">Mark as dormant</button> : null;
+
   const send = (again: boolean) => onWelcome(student, again);
   const sendButton = (again: boolean) => <button
     className={`button button--${again ? "lilac" : "coral"} button--compact`}
@@ -165,7 +185,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
         disabled={disabled}
         onClick={() => onSelect(step === "history" ? null : "history")}
         type="button"
-      ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{ready ? <span className="teacher-student__label">Student</span> : null}</span></button>
+      ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{ready ? <span className="teacher-student__label">{student.dormant ? "Dormant" : "Student"}</span> : null}</span></button>
       {ready ? <div className="teacher-student__controls" aria-label={`${student.name}’s profile sections`}>
         {controls.map(([panel, label]) => <button aria-controls={paneId} aria-expanded={step === panel} aria-label={`${label} for ${student.name}`} disabled={disabled} key={panel} onClick={() => { setNotice(""); onSelect(step === panel ? null : panel); }} type="button">{label}</button>)}
       </div> : <ol className="teacher-setup__steps">
@@ -192,6 +212,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
       {student.weekly ? <li>Weekly lessons</li> : null}
       {prices ? <li>{prices}</li> : null}
       {student.unpaidUpcoming ? <li>{student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} paid by hand</li> : null}
+      {student.dormant && student.dormantEmailedAt ? <li>Come-back email sent {dateLabel(dateKey(new Date(student.dormantEmailedAt)), { day: "numeric", month: "short" })}</li> : null}
     </ul> : null}
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
     {student.homeworkToReview?.length ? <div className="teacher-homework-return">
@@ -213,8 +234,12 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
             {student.phone ? <li>{student.phone}</li> : null}
             {student.nif ? <li>NIF {student.nif}</li> : null}
           </ul>
-          {!ready ? <button className="teacher-text-button" disabled={disabled} onClick={() => onSelect("details")} type="button">Edit details</button> : null}
+          <div className="teacher-student__contact-actions">
+            {!ready ? <button className="teacher-text-button" disabled={disabled} onClick={() => onSelect("details")} type="button">Edit details</button> : null}
+            {dormantButton}
+          </div>
         </div>
+        {problem ? <p className="teacher-inline-error" role="alert">{problem}</p> : null}
         <div className="teacher-student__history"><StudentHistory key={`${student.id}-${token}-${homeworkRequestKey ?? 0}`} student={student} token={token} homeworkId={homeworkId} /></div>
       </> : step === "email" || step === "details" ? <StudentDetailsForm
         key={`${student.id}-details`}

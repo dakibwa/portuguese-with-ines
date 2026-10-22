@@ -285,11 +285,18 @@ async function fixture(width, options = {}) {
       state.added = student;
       return route.fulfill({ status: 201, json: { student } });
     }
-    // Their welcome, their details and their price: each answers as the Worker does.
-    const studentRoute = path.match(/^\/admin\/students\/([^/]+)\/(welcome|details|prices)$/);
+    // Her come-back email's words for dormant students.
+    if (path === "/admin/dormant-email") return route.fulfill({ json: data ?? { subject: "It’s been a while!", message: "Book a lesson on my new website.\n\nInês" } });
+    // Their welcome, details, price, dormant mark and come-back email: each answers as the Worker does.
+    const studentRoute = path.match(/^\/admin\/students\/([^/]+)\/(welcome|details|prices|dormant|dormant-email)$/);
     if (studentRoute) {
       const target = [state.added, ...state.students].find((entry) => entry?.id === studentRoute[1]);
       if (!target) return fail("That student could not be found.");
+      if (studentRoute[2] === "dormant") target.dormant = data.dormant;
+      if (studentRoute[2] === "dormant-email") {
+        target.dormantEmailedAt = "2026-09-07T10:15:00.000Z";
+        return route.fulfill({ json: { ok: true, student: target } });
+      }
       if (studentRoute[2] === "details") Object.assign(target, { name: data.name, email: data.email, phone: data.phone, nif: data.nif });
       if (studentRoute[2] === "prices") {
         target.ownPrices = Object.fromEntries(Object.entries(data.prices).filter(([, cents]) => cents !== null));
@@ -957,6 +964,27 @@ try {
   assert.equal(state.writes.filter(entry => entry.path === "/admin/students/alex/welcome").length, 0);
   await profile.getByRole("button", { name: "Send the link again to Alex", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/alex/welcome").length).toBe(1);
+  await alex.getByRole("button", { name: "Close", exact: true }).click();
+  // Dormant (22 October 2026, Dan): marked from the profile, sending nothing;
+  // her come-back email goes only to whom she ticks, in the words she sees.
+  await alex.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
+  await profile.getByRole("button", { name: "Mark as dormant", exact: true }).click();
+  const dormant = students.locator(".teacher-dormant");
+  await expect(dormant.getByRole("heading", { name: "Dormant · 1", exact: true })).toBeVisible();
+  await expect(dormant.locator(".teacher-student__label")).toHaveText("Dormant");
+  await dormant.getByRole("button", { name: "Email dormant students", exact: true }).click();
+  const comeBack = dormant.getByRole("region", { name: "Email dormant students", exact: true });
+  await expect(comeBack.getByLabel("Subject")).toHaveValue("It’s been a while!");
+  await comeBack.getByLabel("Subject").fill("Saudades!");
+  await expect(comeBack.getByRole("checkbox", { name: "Alex", exact: true })).toHaveAttribute("aria-checked", "true");
+  await comeBack.getByRole("button", { name: "Send to Alex", exact: true }).click();
+  await expect(comeBack.getByRole("status")).toHaveText("Sent to Alex.");
+  assert.deepEqual(state.writes.filter(entry => entry.path.startsWith("/admin/students/alex/dormant-email")).map(entry => entry.data),
+    [{ subject: "Saudades!", message: "Book a lesson on my new website.\n\nInês" }]);
+  await expect(comeBack.getByRole("checkbox", { name: /^Alex · sent / })).toBeDisabled();
+  await comeBack.getByRole("button", { name: "Close", exact: true }).click();
+  await profile.getByRole("button", { name: "Mark as active", exact: true }).click();
+  await expect(dormant).toHaveCount(0);
   await alex.getByRole("button", { name: "Close", exact: true }).click();
 
   // Her setup follows price, lessons, email and welcome. Later unfinished

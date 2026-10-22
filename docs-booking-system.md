@@ -51,6 +51,9 @@ Inês on /schedule                     (her own account, role=teacher)
   → GET  /admin/receipts?month=YYYY-MM               every amount paid or due for a Porto month's lessons,
                                                      with the NIF to issue to (her Receipts tab and automation)
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
+  → POST /admin/students/:id/dormant                 mark them dormant, or active again; nothing emailed
+  → GET/POST /admin/dormant-email                    her come-back email's subject and message
+  → POST /admin/students/:id/dormant-email           send it to one dormant student, at most once a day
   → POST /admin/bookings/:id/reschedule | /cancel
 Stripe → POST /stripe/webhook                        signature-verified
 ```
@@ -685,6 +688,52 @@ what is needed; help uses short bullets. Sign-in and card belong to the student.
 without an email, and surfaces the existing 3-per-hour endpoint's 429 message.
 Waiting on students adds no badge count. All writes use the existing teacher
 permission path and validation.
+
+### Dormant students and the come-back email
+
+Dormant (22 October 2026, Dan: "an option for Ines to add students to dormant
+and also create a custom email to say you haven't had a lesson in a while but
+here is the new website") is hers alone. Migration `0036-dormant-students.sql`
+adds `students.dormant_at` and `students.dormant_emailed_at`; nothing a student
+sees, books or is charged reads either.
+
+- **Marking.** A student's profile (their name, then the lesson history panel)
+  offers `Mark as dormant` while they have no lesson to come, and `Mark as
+  active` once dormant. `POST /admin/students/:id/dormant` with
+  `{ dormant: true | false }` sets or clears `dormant_at`, teacher only; a
+  lesson to come answers 409. Nothing is emailed.
+- **Waking.** `GET /admin/students` returns `dormant` only while no confirmed
+  lesson of theirs ends after `dormant_at` (`dormantSql()` in the Worker): a
+  lesson they book, one she adds, or one she records as had after the mark
+  makes them active again with nobody unmarking them. A lesson recorded from
+  before the mark does not.
+- **Her list.** Dormant students leave the main list for a `Dormant · n`
+  section beneath it, by name, labelled `Dormant`, with no setup steps and no
+  setup count on the Students badge. One with something new for her (a
+  payment, a change, homework) stays up top until it clears.
+- **Her words.** `Email dormant students` opens the email above them: a subject
+  (150 characters) and a message (3,000), prefilled with what she last saved,
+  or the standard words in `DORMANT_EMAIL` until she does
+  (`settings.dormant_email_subject` and `dormant_email_message`). `Save` keeps
+  them; sending saves them first, so what she sent is what she sees next time.
+- **Sending.** Every dormant student with an email is ticked, as the `Already
+  paid` capsule; she unticks anyone, so one, some or all. Each is its own
+  `POST /admin/students/:id/dormant-email` with the words she sees, so one
+  that fails never stops the rest, and no request outlives its time limit. The
+  Worker refuses anyone no longer dormant (409) or without an email (400), and
+  claims `dormant_emailed_at` before sending: one email per student a day, so
+  a second press or device sends nothing (409). A send that fails puts the
+  claim back, so she can retry at once; the same words to the same address
+  that day resend the first attempt's exact request under the same provider
+  key, so a reply lost on the way never sends two.
+- **The email** (`dormantInvite`, 41) has her subject, `Book your next
+  lesson`, `Olá <first name>,` and her message as plain text, then `Sign in
+  and book`, the one-click sign-in link (14 days, once) her welcome uses, and
+  the welcome's footer. Replies go to her. A teacher who is also a student is
+  never sent a sign-in link, so theirs is `Book a lesson`, to `/book/`. It is
+  never held for a welcome: for someone she set up and never welcomed, it is
+  their welcome, and `awaiting_welcome` clears once it is sent, so their
+  lesson emails may follow.
 
 Migration `0028-student-changed-at.sql` adds `bookings.student_changed_at`.
 A student's own move (`handleReschedule`, `handleRescheduleSeries`) stamps it in
@@ -2155,6 +2204,12 @@ Release `ee812d2` passed all CI gates and published to Cloudflare Pages on
 - **Migration 0032** (`workers/booking/migrations/0032-also-student.sql`) is
   applied by hand to staging, then production D1, on 17 October 2026, before
   the Worker that reads it. It adds `students.also_student`, default 0.
+- **Migration 0036** (`workers/booking/migrations/0036-dormant-students.sql`)
+  must be applied to staging, then production D1, before the Worker that reads
+  it: `GET /admin/students` selects both new columns, so without them her
+  Students tab cannot load. It adds nullable `students.dormant_at` and
+  `students.dormant_emailed_at`; existing rows stay NULL, so nobody starts
+  dormant. Not yet applied.
 - **Two-way Google Calendar sync**, once OAuth verification is worth doing.
 
 ## Google Calendar and Meet setup
