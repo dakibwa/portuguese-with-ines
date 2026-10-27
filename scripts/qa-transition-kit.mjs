@@ -212,8 +212,8 @@ try {
     await expect(spent.page.locator(".auth-panel [role=status]")).toContainText("a link is on its way");
     assert.deepEqual(spent.posts.find((post) => post.endpoint === "/auth/email-link")?.body, { email: "rita@example.invalid" });
     await spent.page.getByRole("button", { name: "Back to signing in" }).click();
-    await expect(spent.page.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
-    await expect(spent.page.getByRole("button", { name: "I’ve forgotten my password" })).toBeVisible();
+    await expect(spent.page.getByRole("button", { name: "Email a link", exact: true })).toBeVisible();
+    await expect(spent.page.getByRole("button", { name: "Forgot password", exact: true })).toBeVisible();
     assert.ok(await noOverflow(spent.page), `no sideways scroll at ${width}px`);
     assert.deepEqual(spent.errors, []);
     await spent.page.close();

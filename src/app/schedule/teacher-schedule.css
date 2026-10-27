@@ -183,9 +183,9 @@
 /* Her hours' title, legend and way back share one row (15 October 2026,
    Dan: the legend stacked under the title wasted the top); phones stack it. */
 .teacher-week--editing .teacher-week-toolbar {
-  grid-template-areas: "title hint mode";
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 0.5rem 2rem;
+  grid-template-areas: "title hint actions mode";
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 0.5rem 1rem;
 }
 .teacher-week--editing .teacher-week-title h2 {
   margin: 0;
@@ -746,38 +746,46 @@
   font-size: 0.8rem;
   color: var(--lavender-ink);
 }
-/* Set exact hours and saving share the row beneath the week (27 October
-   2026, Dan): the disclosure at the left, Save at the right, with no rule and
-   no row left empty around a lone button. The open editor grows beneath its
-   own button while Save stays where it was. */
-.teacher-hours-foot {
+/* Set exact hours, Discard and Save share the top row with View lessons
+   (27 October 2026, Dan), so Save is in view however long the day; the
+   exact editor opens beneath that row, above the week. */
+.teacher-week-actions {
+  grid-area: actions;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem 1rem;
-  margin-top: 0.9rem;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
-.teacher-hours-foot > .teacher-exact-hours {
-  flex: 1 1 320px;
-  min-width: 0;
-  margin-top: 0;
+.teacher-week-exact {
+  display: contents;
 }
-/* Level with Save's taller button beside it. */
-.teacher-hours-foot > .teacher-exact-hours > summary {
-  margin-top: 3px;
+.teacher-week-toolbar .teacher-week-actions .button {
+  width: auto;
+  white-space: nowrap;
+}
+/* Narrower, the legend takes a row of its own beneath them. */
+@media (max-width: 1000px) {
+  .teacher-week--editing .teacher-week-toolbar {
+    grid-template-areas: "title actions mode" "hint hint hint";
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+}
+@media (max-width: 760px) {
+  .teacher-week--editing .teacher-week-toolbar {
+    grid-template-areas: "title mode" "hint hint" "actions actions";
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .teacher-week-actions {
+    justify-content: space-between;
+  }
+}
+.teacher-exact-toggle.is-open {
+  background: var(--blue-deep);
+  color: var(--paper-light);
 }
 .teacher-hours-invalid {
   margin-top: 0.8rem;
-}
-.teacher-save-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.7rem 1rem;
-}
-.teacher-hours-foot > .teacher-save-row {
-  justify-content: flex-end;
 }
 .teacher-save-note {
   color: var(--lavender-ink);
@@ -820,14 +828,17 @@
   box-shadow: none;
 }
 .teacher-exact-hours {
-  margin-top: 0.5rem;
+  margin: 0 0 0.9rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: 0 1rem;
+  background: var(--sheet);
   font-size: 0.8rem;
 }
 /* Her small disclosures (Set exact hours, more clashing lessons, sharing
    her calendar) are the site's small lilac button, like Edit weekly hours,
    never an underlined line (27 October 2026, Dan). Open, it turns blue as a
    chosen thing does. */
-.teacher-exact-hours > summary,
 .teacher-hours-clashes-more > summary,
 .teacher-profile__more > summary,
 .teacher-meet .teacher-meet-note summary {
@@ -846,19 +857,16 @@
   text-transform: uppercase;
   transition: background 200ms ease, color 200ms ease;
 }
-.teacher-exact-hours > summary::-webkit-details-marker,
 .teacher-hours-clashes-more > summary::-webkit-details-marker,
 .teacher-profile__more > summary::-webkit-details-marker,
 .teacher-meet .teacher-meet-note summary::-webkit-details-marker {
   display: none;
 }
-.teacher-exact-hours > summary:hover,
 .teacher-hours-clashes-more > summary:hover,
 .teacher-profile__more > summary:hover,
 .teacher-meet .teacher-meet-note summary:hover {
   background: #cdc8f1;
 }
-.teacher-exact-hours[open] > summary,
 .teacher-hours-clashes-more[open] > summary,
 .teacher-profile__more[open] > summary,
 .teacher-meet .teacher-meet-note[open] summary {
@@ -866,7 +874,6 @@
   color: var(--paper-light);
 }
 @media (pointer: coarse) {
-  .teacher-exact-hours > summary,
   .teacher-hours-clashes-more > summary,
   .teacher-profile__more > summary,
   .teacher-meet .teacher-meet-note summary {
@@ -1061,8 +1068,8 @@
   text-align: center;
 }
 /* Set as a student's own lesson dialog is: the same lilac sheet over paper,
-   its close at the top right, the status, then who and when (10 October
-   2026, at Dan's request). */
+   its close at the top right, who with their status beside them, then when
+   (10 October 2026, at Dan's request; status by the name 27 October). */
 .teacher-lesson-dialog {
   position: fixed;
   inset: 0;
@@ -1087,10 +1094,7 @@
 .teacher-lesson-dialog > :is(.teacher-lesson-facts, .teacher-lesson-note, .teacher-inline-error, .teacher-inline-notice, .teacher-inline-success) {
   margin: 0;
 }
-/* Who the lesson is with sits close under its status. */
-.teacher-lesson-dialog > .lesson-calendar__status + * {
-  margin-top: -0.5rem;
-}
+
 /* The one scrim every dialog shares, the student's included. */
 .teacher-lesson-dialog::backdrop {
   background: rgba(26, 49, 105, 0.24);
@@ -1116,20 +1120,25 @@
   background: rgba(170, 164, 230, 0.34);
   color: var(--coral-action);
 }
-.teacher-lesson-dialog > .lesson-calendar__status {
-  justify-self: start;
+.teacher-dialog-top > .lesson-calendar__status {
+  flex: none;
   margin: 0;
 }
 /* Booked is the calendar's navy, as in the key; coral read as a warning. */
-.teacher-lesson-dialog > .lesson-calendar__status:not(.lesson-calendar__status--added):not(.lesson-calendar__status--cancelled) {
+.teacher-dialog-top > .lesson-calendar__status:not(.lesson-calendar__status--added):not(.lesson-calendar__status--cancelled) {
   background: var(--blue-deep);
 }
+/* The splat, the name and its status on one line, a long name taking the
+   status beneath it. */
 .teacher-dialog-top {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   margin-right: 2.8rem;
-  gap: 0.7rem;
+  gap: 0.4rem 0.7rem;
+}
+.teacher-dialog-top > h2 {
+  min-width: 0;
 }
 .teacher-lesson-mark {
   width: 40px;
@@ -1242,19 +1251,31 @@
 .teacher-lesson-dialog .button:disabled {
   opacity: 0.45;
 }
-/* No-show is a small outline button beneath the pair. */
+/* What happened to a lesson, recorded on one row: Already paid and the
+   no-show beside it, the same capsule each, with Move and Cancel left as
+   the dialog's foot. */
+.teacher-lesson-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
 .teacher-no-show {
   display: grid;
-  grid-column: 1 / -1;
-  justify-items: center;
-  margin-top: 0.15rem;
-  gap: 0.15rem;
+  justify-items: start;
+  gap: 0.2rem;
 }
 .teacher-no-show__hint {
-  margin: 0;
+  margin: 0 0 0 0.4rem;
   color: var(--lavender-ink);
   font: 500 0.72rem/1.4 var(--ui);
-  text-align: center;
+}
+/* An action rather than a tick: its dab carries the mark of what it does. */
+.paid-tick--action .paid-tick__dab {
+  color: var(--ink);
+}
+.paid-tick--action.is-checked .paid-tick__dab {
+  color: var(--paper);
 }
 /* Join Google Meet is the lesson's own call to action: a solid blue button
    as the site's, never an outline (13 October 2026, Dan). */
@@ -1413,6 +1434,11 @@
     order: 1;
     font-size: 0.76rem;
   }
+  .teacher-week-actions {
+    flex: 1 0 100%;
+    order: 2;
+    justify-content: space-between;
+  }
   .teacher-week-days {
     grid-template-columns: repeat(var(--teacher-days, 7), minmax(0, 1fr));
   }
@@ -1502,12 +1528,6 @@
   .teacher-save-state {
     justify-content: flex-start;
     text-align: left;
-  }
-  .teacher-hours-foot > .teacher-save-row {
-    flex: 1 1 100%;
-  }
-  .teacher-hours-foot > .teacher-save-row .button {
-    flex: 1;
   }
   .teacher-exact-hours__body {
     grid-template-columns: 1fr;
@@ -3030,6 +3050,7 @@
 .teacher-account h2 { margin: 0; color: var(--ink); font: 600 1.05rem/1.35 var(--ui); }
 .teacher-account h3 { margin: 0 0 0.3rem; font: 600 0.8rem/1.5 var(--ui); }
 .teacher-account p { margin: 0; font-size: 0.8rem; line-height: 1.6; overflow-wrap: anywhere; }
+.teacher-account__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem 1rem; }
 .teacher-account__heading p { margin-top: 0.3rem; color: var(--lavender-ink); }
 .teacher-account__detail { display: grid; gap: 0.6rem; padding-top: 1rem; border-top: 1px solid var(--rule-soft); }
 .teacher-account__line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.4rem 1rem; min-width: 0; }
@@ -3039,11 +3060,10 @@
 .teacher-account__email > p, .teacher-account__waiting { color: var(--lavender-ink); }
 .teacher-account__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; }
 .teacher-account .button { justify-self: start; max-width: 100%; }
-.teacher-account .button:not(.button--compact) { min-height: 44px; font-size: 0.72rem; }
+.teacher-account .button:not(.button--compact, .button--small) { min-height: 44px; font-size: 0.72rem; }
 .teacher-account__note { display: flex; align-items: flex-start; gap: 0.4rem; color: var(--blue-deep); }
 .teacher-account__note svg { flex: none; margin-top: 0.2em; }
 .teacher-account__error { color: #a73523; }
-.teacher-account__signout { padding-top: 0.5rem; border-top: 1px solid var(--rule-soft); }
 @media (max-width: 760px) { .teacher-account-layout { grid-template-columns: minmax(0, 1fr); } }
 
 /* Getting started: each step opens its work within the student's row. */
@@ -3078,10 +3098,9 @@
 .teacher-setup__body--status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.65rem 1.25rem; }
 .teacher-setup__body--status .teacher-setup__body-heading { flex: 1 1 24rem; }
 .teacher-setup__body--status > .teacher-dialog-actions { flex: 0 1 auto; margin-left: auto; }
-.teacher-setup__email { margin: 0; font-size: 0.8rem; overflow-wrap: anywhere; }
 .teacher-setup__notice { grid-column: 1 / -1; margin: 0; }
 .teacher-setup__attention { grid-column: 1 / -1; min-width: 0; }
-.teacher-setup__body .teacher-setup__help { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0; font-size: 0.78rem; }
+.teacher-setup__body .teacher-setup__help { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0; font-size: 0.78rem; overflow-wrap: anywhere; }
 @container setup-list (min-width: 58rem) {
   .teacher-setup__body .teacher-profile__form { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)) max-content; }
   .teacher-setup__body .teacher-profile__form .teacher-dialog-actions { grid-column: auto; }
@@ -3153,6 +3172,9 @@
 .teacher-student--row .teacher-student__facts { grid-column: auto; margin: 0; font-size: 0.72rem; }
 .teacher-student--row .teacher-student__action { grid-column: auto; border: 0; padding: 0; align-self: center; }
 .teacher-student__label { color: var(--blue); font-size: 0.65rem; font-weight: 700; }
+/* A student on a weekly run says so in the row's corner, as a small lilac tag. */
+.teacher-student__weekly { display: inline-flex; align-items: center; gap: 0.35rem; border-radius: var(--squiggle-thumb); padding: 0.35rem 0.7rem; background: var(--lavender-soft); color: var(--ink); font: 700 0.6rem/1 var(--ui); letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
+.teacher-student__weekly svg { color: var(--blue); }
 .teacher-student__attention { position: relative; z-index: 2; grid-column: 1 / -1; min-width: 0; }
 .teacher-student-notices { position: relative; z-index: 2; margin: 0; }
 .teacher-student-notices .teacher-lesson-card { flex-wrap: wrap; padding: 0.5rem 0.65rem; }
@@ -3182,6 +3204,8 @@
 .teacher-student__contact { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem 1rem; }
 .teacher-student__contact .booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0; font-size: 0.78rem; overflow-wrap: anywhere; }
 .teacher-student__contact:has(ul:empty):not(:has(button)) { display: none; }
+/* No contact facts yet: the buttons start at the edge, not a gap in. */
+.teacher-student__contact > ul:empty { display: none; }
 .teacher-student__contact-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 /* Where the row is wide, Lesson history shares its line with the contact
    facts and their buttons rather than leaving each on a line of its own. */

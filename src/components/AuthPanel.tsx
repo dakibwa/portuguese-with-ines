@@ -360,14 +360,16 @@ export function AuthPanel({
           ) : (
             <>
               {/* Students Inês brought may never have chosen a password;
-                  her own schedule signs in with one, or with Google. */}
+                  her own schedule signs in with one, or with Google. Two
+                  short labels, so they share a row on a phone (27 October
+                  2026, Dan). */}
               {!signInOnly ? (
                 <button className="button button--outline button--small" onClick={() => switchMode("link")} type="button">
-                  Email me a sign-in link
+                  Email a link
                 </button>
               ) : null}
               <button className="button button--outline button--small" onClick={() => switchMode("forgot")} type="button">
-                I&rsquo;ve forgotten my password
+                Forgot password
               </button>
             </>
           )}

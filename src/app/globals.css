@@ -2735,8 +2735,7 @@ textarea,
   }
 }
 
-/* Signing in to see booked lessons is the account card on its own, with the
-   way back tucked above its corner. */
+/* Signing in to see booked lessons is the account card on its own. */
 .booking-workflow-sign-in {
   display: grid;
   width: min(460px, 100%);
@@ -2751,10 +2750,6 @@ textarea,
 .booking-workflow-sign-in > .auth-panel {
   max-width: none;
   margin: 0;
-}
-
-.booking-workflow-sign-in > .booking-back {
-  justify-self: start;
 }
 
 /* The quiet way in for a student booked on another browser: a first visit
@@ -5966,6 +5961,13 @@ p.lesson-when > span {
   margin: 1rem 0 0;
 }
 
+/* Set a touch closer than other small buttons, so the pair keeps one row
+   down to a 360px phone. */
+.auth-panel .auth-panel__aside > .button {
+  padding-inline: 0.75rem;
+  letter-spacing: 0.1em;
+}
+
 /* The menu shares the header's geometry so its wordmark stays still. Only
    the links drop down. Its own scroll area also works from a footer opener. */
 .nav-toggle {
@@ -6874,8 +6876,11 @@ p.lesson-when > span {
 }
 
 /* The small outline button every other card's Change is: the same edge, cut
-   and 14px label as the times panel's Change and a lesson row's. */
-.my-lessons__change {
+   and 14px label as the times panel's Change and a lesson row's. Sign out and
+   Have a code from Inês? take it too, so Your details speaks at one size
+   (27 October 2026, Dan). */
+.my-lessons__change,
+.my-lessons__code summary {
   min-height: 44px;
   justify-self: end;
   border: 1.5px solid rgba(26, 49, 105, 0.55);
@@ -6980,20 +6985,6 @@ p.lesson-when > span {
   .my-lessons__fact > .my-lessons__change {
     grid-column: 2;
     grid-row: 1 / span 2;
-  }
-}
-
-/* On the narrowest phones an address, the one long value, broke mid-word
-   beside Change (`ana.martins@e` / `xample.invalid` at 320px,
-   `ana.martins@example.i` / `nvalid` at 390px). There its Change sits beside
-   its name instead, and the address takes the row's whole width beneath. */
-@container booking (max-width: 379.98px) {
-  .my-lessons__fact[data-field="email"] > .my-lessons__change {
-    grid-row: 1;
-  }
-
-  .my-lessons__fact[data-field="email"] > .my-lessons__fact-value {
-    grid-column: 1 / -1;
   }
 }
 
@@ -7231,6 +7222,8 @@ p.lesson-when > span {
 .lesson-calendar__lesson-copy > strong {
   font-family: var(--ui);
   font-size: 0.92rem;
+  /* A long date breaks before its year, never leaving the time alone. */
+  text-wrap: balance;
 }
 
 /* The status pill is a span here too, but keeps the pill's own size and
@@ -7434,18 +7427,8 @@ p.lesson-when > span {
    never an underlined line (27 October 2026, Dan). */
 .my-lessons__code summary {
   display: inline-flex;
-  min-height: 40px;
   align-items: center;
-  border: 1.5px solid rgba(26, 49, 105, 0.55);
-  border-radius: var(--squiggle-button-alt);
-  padding: 0.55rem 1rem;
-  color: var(--ink);
-  cursor: pointer;
-  font: 600 0.66rem/1.15 var(--ui);
-  letter-spacing: 0.14em;
   list-style: none;
-  text-transform: uppercase;
-  transition: background 200ms ease, border-color 200ms ease;
 }
 
 .my-lessons__code summary::-webkit-details-marker {

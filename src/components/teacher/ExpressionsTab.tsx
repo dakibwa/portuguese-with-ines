@@ -134,7 +134,7 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
               </div>
               <ExpressionCard expression={item} />
               <div className="teacher-expression__actions">
-                <button className="button button--blue button--compact" type="button" disabled={busy} onClick={() => setDialog({ expression: item, preview: false })}>Edit</button>
+                <button className="button button--lilac button--compact" type="button" disabled={busy} onClick={() => setDialog({ expression: item, preview: false })}>Edit</button>
                 <button className="button button--lilac button--compact" type="button" disabled={busy} onClick={() => setDialog({ expression: item, preview: true })}>
                   <Eye size={16} aria-hidden="true" />Preview<span className="visually-hidden"> as students see it: {item.expression}</span>
                 </button>

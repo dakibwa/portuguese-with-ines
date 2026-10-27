@@ -83,6 +83,7 @@ export function TeacherSchedule() {
     () => (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7,
   );
   const [dayControlHost, setDayControlHost] = useState<HTMLDivElement | null>(null);
+  const [exactHost, setExactHost] = useState<HTMLDivElement | null>(null);
   const [activeTab, setActiveTab] = useState<TeacherTab>("week");
   const [editingHours, setEditingHours] = useState(false);
   const editing = activeTab === "week" && editingHours;
@@ -734,6 +735,35 @@ export function TeacherSchedule() {
               <li>Repeats every week</li>
             </ul>
           ) : null}
+          {/* Her hours' tools share the top row with the way back, so Save
+              is in view however long the day (27 October 2026, Dan). */}
+          {editing ? (
+            <div className="teacher-week-actions">
+              <div className="teacher-week-exact" ref={setExactHost} />
+              {/* Said to a screen reader; the coral Save already shows it. */}
+              <span className="teacher-save-note visually-hidden" aria-live="polite">
+                {hoursDirty ? "Not saved yet" : ""}
+              </span>
+              {hoursDirty ? (
+                <button
+                  className="button button--outline button--small"
+                  type="button"
+                  disabled={savingHours}
+                  onClick={() => setDraftHours(savedHours)}
+                >
+                  Discard
+                </button>
+              ) : null}
+              <button
+                className="button button--coral button--compact"
+                type="button"
+                disabled={savingHours || !hoursDirty || Boolean(invalidHours) || bookingsLoading || Boolean(bookingsError)}
+                onClick={() => void saveHours()}
+              >
+                {savingHours ? "Saving…" : "Save weekly hours"}
+              </button>
+            </div>
+          ) : null}
           <button
             className={`button ${editing ? "button--blue" : "button--lilac"} button--compact teacher-week-mode`}
             type="button"
@@ -804,32 +834,7 @@ export function TeacherSchedule() {
             disabled={savingHours}
             mobileDay={mobileDay}
             dayControlHost={dayControlHost}
-            footer={
-              <div className="teacher-save-row">
-                {/* Said to a screen reader; the coral Save already shows it. */}
-                <span className="teacher-save-note visually-hidden" aria-live="polite">
-                  {hoursDirty ? "Not saved yet" : ""}
-                </span>
-                {hoursDirty ? (
-                  <button
-                    className="button button--outline button--small"
-                    type="button"
-                    disabled={savingHours}
-                    onClick={() => setDraftHours(savedHours)}
-                  >
-                    Discard
-                  </button>
-                ) : null}
-                <button
-                  className="button button--coral"
-                  type="button"
-                  disabled={savingHours || !hoursDirty || Boolean(invalidHours) || bookingsLoading || Boolean(bookingsError)}
-                  onClick={() => void saveHours()}
-                >
-                  {savingHours ? "Saving…" : "Save weekly hours"}
-                </button>
-              </div>
-            }
+            exactHost={exactHost}
             status={
               editing ? null : (
                 <p

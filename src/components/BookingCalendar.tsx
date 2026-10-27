@@ -2125,32 +2125,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     if (!student) orientTo("booking-lessons-sign-in", true);
   }
 
-  function resetJourneyToStart() {
-    closeManagedLesson();
-    setIntent("book");
-    setShowAccountSignIn(false);
-    setBookingKind("");
-    setLessonTypeId("");
-    setSelectedDate("");
-    setSelectedSlot("");
-    setSavedChoices([]);
-    setCalendarWeekCount(4);
-    setCalendarPageStart("");
-    setStep("day");
-    setPayment(null);
-    setPaymentError("");
-    setPaymentConsent(false);
-  }
-
-  function returnToJourneyStart() {
-    if (student) {
-      openLessonsJourney();
-      return;
-    }
-    transitionBooking(resetJourneyToStart);
-    orientTo("lesson-calendar");
-  }
-
   function openAccountShortcut(section: AccountSection) {
     closeManagedLesson();
     setIntent("lessons");
@@ -3792,9 +3766,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </section>
         ) : needsLessonsSignIn ? (
           <section className="booking-workflow-sign-in" id="booking-lessons-sign-in" tabIndex={-1}>
-            <button className="booking-back booking-back--tertiary" onClick={returnToJourneyStart} type="button">
-              <ArrowLeft size={16} aria-hidden="true" /> Back
-            </button>
+            {/* No Back above it: the header's Booking already starts a
+                booking afresh (27 October 2026, Dan: "is there even a purpose
+                in the back button?"). */}
             <AuthPanel
               heading="Your account"
               headingLevel={2}

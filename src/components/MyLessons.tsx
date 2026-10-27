@@ -628,7 +628,7 @@ export function MyLessons({
           "profile",
           // Signing out ends the visit, so it waits at the top right, small,
           // where Book stands on Your lessons (10 October 2026, at Dan's request).
-          <button className="button button--outline button--small my-lessons__sign-out" onClick={() => onSignOut?.()} type="button">
+          <button className="my-lessons__change my-lessons__sign-out" onClick={() => onSignOut?.()} type="button">
             Sign out
           </button>
         )}
@@ -750,7 +750,9 @@ export function MyLessons({
               <>
                 <span className="my-lessons__fact-label">Email</span>
                 <span className="my-lessons__fact-value">
-                  {student.email}
+                  {/* A long address breaks after its @, never mid-word, so
+                      it keeps its row beside Change as every detail does. */}
+                  <span>{student.email.split("@")[0]}{student.email.includes("@") ? <>@<wbr />{student.email.slice(student.email.indexOf("@") + 1)}</> : null}</span>
                   {emailPending ? (
                     <small className="my-lessons__details-note">
                       Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.

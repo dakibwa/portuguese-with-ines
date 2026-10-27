@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { X, ArrowLeft, CheckCircle2, CircleX } from "lucide-react";
+import { X, ArrowLeft, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
   addedByTeacher,
   cancelBookingAs,
@@ -205,10 +205,6 @@ export function LessonDetails({
       >
         <X size={20} aria-hidden="true" />
       </button>
-      <p className={`lesson-calendar__status${booking.status === "cancelled" ? " lesson-calendar__status--cancelled" : addedByTeacher(booking) ? " lesson-calendar__status--added" : ""}`}>
-        {booking.status === "cancelled" ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
-        {booking.status === "cancelled" ? "Cancelled" : addedByTeacher(booking) ? "Added by you" : "Booked"}
-      </p>
       <div className="teacher-dialog-top">
         {/* The student's own splat when they have chosen one, so Inês knows
             them at a glance (10 October 2026, at Dan's request). */}
@@ -217,6 +213,12 @@ export function LessonDetails({
           className="teacher-lesson-mark"
         />
         <h2 id="teacher-lesson-title">{booking.student_name}</h2>
+        {/* Its status beside the name rather than a row of its own
+            (27 October 2026, Dan: it felt disjointed). */}
+        <p className={`lesson-calendar__status${booking.status === "cancelled" ? " lesson-calendar__status--cancelled" : addedByTeacher(booking) ? " lesson-calendar__status--added" : ""}`}>
+          {booking.status === "cancelled" ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
+          {booking.status === "cancelled" ? "Cancelled" : addedByTeacher(booking) ? "Added by you" : "Booked"}
+        </p>
       </div>
       <div className="teacher-lesson-when">
         {/* The date, then the time on a line of its own, rather than the
@@ -243,6 +245,9 @@ export function LessonDetails({
             {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
             {awaiting ? <li>{noEmail ? "No email yet: add it under Edit details, then send their welcome" : "Not emailed yet: send their welcome from Students"}</li> : null}
           </ul>
+          {/* What happened, recorded side by side: paid by hand, and a
+              no-show (27 October 2026, Dan). */}
+          {tickable || (booking.status !== "cancelled" && (canMarkAttendance || noShowLater)) ? <div className="teacher-lesson-record">
           {tickable ? (
             <PaidTick
               checked={ticked}
@@ -270,6 +275,29 @@ export function LessonDetails({
               }}
             />
           ) : null}
+          {booking.status !== "cancelled" && (canMarkAttendance || noShowLater) ? (
+            <div className="teacher-no-show">
+              {/* Short enough to sit beside Already paid on a phone; marked,
+                  it reads as ticked, as that does. */}
+              <button
+                aria-describedby={noShowLater ? "teacher-no-show-hint" : undefined}
+                aria-label={noShow ? "Undo no-show" : "Mark no-show"}
+                className={`paid-tick paid-tick--action${noShow ? " is-checked" : ""}`}
+                type="button"
+                disabled={busy || !canMarkAttendance || locked}
+                onClick={() => setAction("no-show")}
+              >
+                <span aria-hidden="true" className="paid-tick__dab"><UserX size={13} strokeWidth={2.6} /></span>
+                No-show
+              </button>
+              {noShowLater ? (
+                <p className="teacher-no-show__hint" id="teacher-no-show-hint">
+                  Available {formatSlotTime(booking.starts_at)}–{formatSlotTime(noShowCloses.toISOString())}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          </div> : null}
           {!ticked && !noEmail && addedByTeacher(booking) && booking.status === "confirmed" &&
             booking.payment_status === "not_required" && !noShow && !locked && !booking.charge_started_at && Boolean(booking.amount_cents && booking.amount_cents > 0) ? (
             <div className="teacher-card-link">
@@ -337,24 +365,6 @@ export function LessonDetails({
           >
             Cancel lesson
           </button>
-          {canMarkAttendance || noShowLater ? (
-            <div className="teacher-no-show">
-              <button
-                aria-describedby={noShowLater ? "teacher-no-show-hint" : undefined}
-                className="button button--outline button--small"
-                type="button"
-                disabled={busy || !canMarkAttendance || locked}
-                onClick={() => setAction("no-show")}
-              >
-                {noShow ? "Undo no-show" : "Mark no-show"}
-              </button>
-              {noShowLater ? (
-                <p className="teacher-no-show__hint" id="teacher-no-show-hint">
-                  Available {formatSlotTime(booking.starts_at)}–{formatSlotTime(noShowCloses.toISOString())}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       ) : action === "homework" ? <div className="teacher-dialog-homework">
         {backToLesson}

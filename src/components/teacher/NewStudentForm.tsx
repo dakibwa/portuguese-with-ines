@@ -117,11 +117,15 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
             </div>
           </div>
         </details>
+        {/* Two choices side by side, coral and outline: the dialog's own
+            close is the way out, so Add a student needs no Cancel beside them
+            (27 October 2026, Dan: one calm footer). */}
         <div className="teacher-dialog-actions">
           <button className="button button--coral" disabled={busy} type="submit" value="lessons">{busy ? "Adding…" : "Next: their lessons"}</button>
           {/* No lessons yet: their welcome asks them to book one (16 October 2026, Inês). */}
-          {offerNoLessons ? <button className="button button--lilac" disabled={busy} type="submit" value="welcome">No lessons yet</button> : null}
-          <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">{cancelLabel}</button>
+          {offerNoLessons
+            ? <button className="button button--outline" disabled={busy} type="submit" value="welcome">No lessons yet</button>
+            : <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">{cancelLabel}</button>}
         </div>
         {error ? <p className="teacher-inline-error" role="alert">{error}</p> : null}
       </form>

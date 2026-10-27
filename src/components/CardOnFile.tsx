@@ -155,14 +155,13 @@ export function CardTerms({ change = false, onCancel, bookingId = "", feeCents =
         <li>Your upcoming lessons with Inês are charged to it, each one hour after it ends, at the price in your bookings</li>
         <li>Already paid Inês for some? Tell her before agreeing</li>
         <li>Stripe keeps your card safe</li>
-        {fee ? <>
+        {/* One fee line, as the payment approval card has (27 October 2026,
+            Dan: fewer lines, the same terms). */}
+        {fee ? (
           <li>
-            <strong>{formatMoneyCents(fee)}</strong> to move or cancel less than {notice} hours before
+            <strong>{formatMoneyCents(fee)}</strong> to move or cancel less than {notice} hours before, or if you don’t show up
           </li>
-          <li>
-            <strong>{formatMoneyCents(fee)}</strong> if you don’t show up to a lesson
-          </li>
-        </> : <li>No fee to move or cancel, or for a missed lesson</li>}
+        ) : <li>No fee to move or cancel, or for a missed lesson</li>}
         <li>
           The full rules are in{" "}
           <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">terms &amp; privacy</a>
