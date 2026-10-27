@@ -521,7 +521,11 @@ usual lesson starts and days off; avoid a wall of administration forms.
   details, next lesson and price. Its controls become Details, Price, Add a lesson
   and Lesson history, and, with an email, `Sign-in link`, whose panel holds
   `Send the link again`. No duplicate To do list or separate student profile popup.
-  The name and journey share one band where they fit. On small phones the steps
+  Student cards sit side by side according to the list's available width,
+  with one column on phones. An opened card spans the whole list so details,
+  lesson forms and history have room; closing it restores the compact card.
+  Keep their ranked reading order across each row. The name and journey share
+  one band where they fit. On smaller cards the steps
   wrap beneath the name without horizontal scrolling. Opening a step keeps the
   student's name visible and places one X close control at the top right.
   The editor spans the row, and the selected step's
