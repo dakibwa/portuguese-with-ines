@@ -765,6 +765,8 @@ account: Inês paints her draft collection locally; students use the existing
 published-expression access switch. Signed-out visitors sign in there. The
 page links back to her collection or the student's lessons, and does not add
 public access or a public navigation item.
+Her collection header also has a `View page` link beside `Add an expression`,
+opening `/idioms/` with the same signed-in account.
 
 - Use the same lilac sheet as Receipts, cream reading cards, Beth Ellen
   expression titles and Montserrat labels and content. Keep the latest bundle
