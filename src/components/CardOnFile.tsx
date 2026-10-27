@@ -92,8 +92,8 @@ export function CardTerms({ change = false, onCancel, bookingId = "", feeCents =
               {bookingConsent ? <CheckCircle2 size={20} aria-hidden="true" /> : <Circle size={20} aria-hidden="true" />}
               I authorise card payments for this and future lessons
             </button>
+            <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">Terms &amp; privacy</a>
           </div>
-          <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">Terms &amp; privacy</a>
         </div>
       </> : !bookingId ? <ul className="booking-payment-facts" id="card-terms-summary">
         <li>Your upcoming lessons with Inês are charged to it, each one hour after it ends, at the price in your bookings</li>

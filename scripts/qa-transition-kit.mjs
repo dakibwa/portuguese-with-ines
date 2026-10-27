@@ -128,6 +128,9 @@ try {
     await expect(approval).toContainText("€15");
     const agree = approval.getByRole("button", { name: "Authorise payments" });
     await expect(agree).toBeDisabled();
+    await approval.getByRole("link", { name: "Terms & privacy" }).click();
+    await combined.page.getByRole("button", { name: "Close terms & privacy" }).click();
+    await expect(agree).toBeDisabled();
     assert.equal(combined.posts.filter(post => post.endpoint === "/me/card").length, 0);
     await approval.screenshot({ path: `tmp/qa/transition-kit/combined-${width}.png` });
     await approval.getByRole("button", { name: "I authorise card payments for this and future lessons" }).click();

@@ -2424,3 +2424,28 @@ collects once due, or on its next tick after later card confirmation. Creating
 or viewing the link cannot take payment. Old welcome links retain their
 future-only behaviour. The lesson and card consent stay unchanged until the
 student completes their own approval (and Stripe setup if a card is needed).
+
+Reuse this workflow whenever a student needs to authorise a teacher-added
+lesson that has already happened, including a student who already saved a
+card. Inês opens that unpaid lesson in her timetable, chooses **Create payment
+approval link**, then **Copy payment approval link**. The link can be shared
+privately through WhatsApp or email; creating it sends neither. Confirm any
+direct payment with Inês first and record it as **Already paid** instead of
+requesting another payment.
+
+The student signs in, reviews three short sections (the selected lesson,
+future payments, and fees), ticks **I authorise card payments for this and
+future lessons**, then presses **Authorise payments**. **Terms & privacy**
+sits inside that agreement area and opens without ticking it. A saved card
+needs permission only; a missing card opens Stripe setup. Approval includes
+only the one named past lesson, never an unseen backlog. Repeat the same
+workflow for another unpaid past lesson when needed; future teacher-added
+lessons and recurring lessons then use the standing consent.
+
+For an assistant preparing this on Dan's behalf, create the link and a
+preview first, then ask Inês to approve the proposed student message. Keep
+the private sign-in link out of screenshots and review drafts. Hold the
+student message until Inês approves, and never authorise payment on the
+student's behalf. Creating
+and reviewing the link cannot charge the card; the student's own completed
+approval lets the normal scheduler collect the named lesson when due.
