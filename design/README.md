@@ -1297,7 +1297,16 @@ Preserve these desktop and mobile states:
   there and offers `Email me a new link`. The card terms add `Your upcoming
   lessons with Inês are charged to it, each after it ends` and `Already paid
   Inês for some? Tell her and she’ll take them off`; an open Card row also
-  offers `Remove card`. In Inês's lesson dialog a lesson a card now pays for
+  offers `Remove card`. A payment approval link for one lesson Inês added
+  opens the same card as `Confirm your card payments` (27 October 2026,
+  Dan: "simple and beautiful", in the site's own styling and words): the
+  lesson as the booking step's cream time tile (its splat, day and times,
+  `Porto time`, the price on the right), the confirm step's three dabs (when
+  that lesson is charged, future lessons charged automatically, the €5 fee),
+  then the agreement capsule with `Terms & privacy` inside it and
+  `Authorise payments` beside `Cancel`. A wide card sets the lesson and dabs
+  on the left and the agreement on the right, level in the middle; a phone
+  reads them top to bottom. In Inês's lesson dialog a lesson a card now pays for
   offers the `Already paid` tick (below). The sign-in panel's quiet links read `Email me a sign-in link` and
   `I’ve forgotten my password` side by side; asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.

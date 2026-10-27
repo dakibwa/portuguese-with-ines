@@ -2433,8 +2433,9 @@ privately through WhatsApp or email; creating it sends neither. Confirm any
 direct payment with Inês first and record it as **Already paid** instead of
 requesting another payment.
 
-The student signs in, reviews three short sections (the selected lesson,
-future payments, and fees), ticks **I authorise card payments for this and
+The student signs in, reviews the selected lesson (its date, time and price)
+and three short lines (when that lesson is charged, future payments, and
+fees), ticks **I authorise card payments for this and
 future lessons**, then presses **Authorise payments**. **Terms & privacy**
 sits inside that agreement area and opens without ticking it. A saved card
 needs permission only; a missing card opens Stripe setup. Approval includes

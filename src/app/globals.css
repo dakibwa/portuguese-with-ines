@@ -9730,47 +9730,77 @@ dialog[open]::backdrop {
   grid-column: 1 / -1;
 }
 
-.card-terms__facts {
-  gap: 0.9rem;
+/* A payment approval: the lesson's time tile and the confirm step's dabs,
+   then the agreement and its actions. Read top to bottom on a phone; on a
+   wide card the two halves sit side by side, level in the middle. */
+.card-terms--approval {
+  gap: 1.25rem;
+  margin-top: 0.25rem;
 }
 
-.card-terms__facts li {
+.card-terms__summary,
+.card-terms__consent {
   display: grid;
-  gap: 0.15rem;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.card-terms__lesson {
+  background: var(--raised);
+}
+
+/* A narrow tile breaks between the day and the times, never inside them. */
+.card-terms__lesson strong > span {
+  white-space: nowrap;
+}
+
+.card-terms__price {
+  color: var(--ink);
+  font: 700 1.05rem/1 var(--ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.card-terms--approval .booking-payment-facts {
+  padding-left: 0.2rem;
 }
 
 .card-terms__agreement {
   margin-top: 0;
-  gap: 0;
-}
-
-.card-terms__agreement .booking-agreement__button {
-  width: 100%;
-  padding-bottom: 0.2rem;
-  white-space: normal;
 }
 
 .card-terms__agreement .booking-agreement__control {
   display: grid;
-  justify-items: start;
-  gap: 0;
-  padding-bottom: 0.35rem;
+  justify-content: stretch;
+  padding: 0.15rem 0.9rem 0.45rem 0;
 }
 
+.card-terms__agreement .booking-agreement__button {
+  padding-bottom: 0.15rem;
+  white-space: normal;
+}
+
+/* Under the words it belongs to, its own quiet action. */
 .card-terms__agreement .booking-agreement__control > a {
-  margin-left: calc(0.9rem + 20px + 0.6rem);
+  justify-self: start;
   min-height: 32px;
+  margin-left: calc(0.9rem + 20px + 0.6rem);
   font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.card-terms--approval .my-lessons__edit-actions > .button {
+  flex: 1 1 auto;
 }
 
 @container booking (min-width: 720px) {
-  .card-terms__facts {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.5rem;
+  .card-terms--approval {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    column-gap: clamp(2rem, 5cqi, 4rem);
   }
 
-  .card-terms__agreement {
-    justify-self: start;
+  .card-terms--approval > [role="status"] {
+    grid-column: 1 / -1;
   }
 }
 
