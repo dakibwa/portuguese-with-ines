@@ -114,10 +114,11 @@ async function fixture(width, options = {}) {
     json: { lessonTypes: [], postpay: false },
   }));
   await page.route("**/me/recurring-rates", (route) => route.fulfill({ json: { rates: {} } }));
-  await page.route("**/availability?**", route => {
-    const query = new URL(route.request().url()).searchParams;
+  const availableTimes = route => {
+    const url = new URL(route.request().url());
+    const query = url.searchParams;
     const lessonType = query.get("lessonType");
-    state.availabilityReads.push(lessonType);
+    state.availabilityReads.push({ lessonType, path: url.pathname });
     const long = lessonType === "long";
     const date = "2026-09-30";
     const available = (query.get("from") ?? "") <= date && (query.get("to") ?? "") >= date;
@@ -127,7 +128,8 @@ async function fixture(width, options = {}) {
         endAt: long ? (state.conflictMoved ? "2026-09-30T19:00:00.000Z" : "2026-09-30T18:30:00.000Z") : "2026-09-30T17:00:00.000Z",
       }] } : {}, horizonDays: 56,
     } });
-  });
+  };
+  await page.route("**/availability?**", availableTimes);
   await page.route("**/auth/login", (route) => route.fulfill({
     json: { student: state.account, session: "isolated-teacher-fixture" },
   }));
@@ -162,6 +164,10 @@ async function fixture(width, options = {}) {
     const data = request.method() === "POST" ? request.postDataJSON() : null;
     const fail = (error) => route.fulfill({ status: 503, json: { error } });
     if (data) state.writes.push({ path, data });
+    if (path === "/admin/lesson-availability") {
+      assert.equal(request.headers().authorization, "Bearer isolated-teacher-fixture");
+      return availableTimes(route);
+    }
     if (path === "/admin/google-calendar") return route.fulfill({ json: { configured: false, connected: false, email: null, needsReconnect: false, pending: 0 } });
     if (path === "/admin/expressions" && request.method() === "GET") return route.fulfill({ json: { expressions: [{
       id: "original-1", expression: "Partir o coco a rir", meaningPt: "Rir muito.", meaningEn: "To split your sides laughing",
@@ -1048,7 +1054,7 @@ try {
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/bookings").at(-1).data, {
     studentId: "nora", lessonType: "long", startAt: "2026-09-30T17:30:00.000Z", location: "online", notes: "", expectedPriceCents: 3600,
   });
-  assert.ok(state.availabilityReads.includes("long"), "90-minute choices request 90-minute availability");
+  assert.ok(state.availabilityReads.some(read => read.lessonType === "long" && read.path === "/admin/lesson-availability"), "Her 90-minute choices use authenticated teacher availability");
   await expect(noraSetup.getByRole("status")).not.toContainText("emailed");
   assert.equal(state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length, 0, "Adding the lesson waits for Nora's welcome");
   await expect(noraSetup.getByRole("button", { name: "Welcome for Nora Lima", exact: true })).toBeDisabled();

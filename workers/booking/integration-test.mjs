@@ -218,6 +218,46 @@ await test("the seeded 14-hour rule filters availability and protects booking an
   }
 });
 
+await test("teacher availability offers same-day quarter hours without weakening student notice or clash checks", async () => {
+  const insertException = db.prepare(`INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,created_at) VALUES ('2026-09-05',?,?,?,?)`);
+  const extra = insertException.run("extra", 1020, 1185, new Date().toISOString()).lastInsertRowid;
+  const blocked = insertException.run("blocked", 1170, 1185, new Date().toISOString()).lastInsertRowid;
+  // Porto is UTC+1 in this fixture: the existing lesson is 17:00–18:00.
+  booking("teacher-picker-before", { start: "2026-09-05T16:00:00.000Z", end: "2026-09-05T17:00:00.000Z" });
+  booking("teacher-picker-hold", { start: "2026-09-05T18:45:00.000Z", end: "2026-09-05T19:45:00.000Z", owner: "bob" });
+  db.prepare("UPDATE bookings SET status='pending_payment', hold_expires_at=? WHERE id='teacher-picker-hold'")
+    .run(new Date(Date.now() + 3600000).toISOString());
+  const query = "?lessonType=single&from=2026-09-05&to=2026-09-05";
+  const path = `/admin/lesson-availability${query}`;
+  try {
+    for (const user of [null, "alice"]) assert.equal((await call(path, { method: "GET", user })).status, 401);
+    for (const credentials of [{ user: "teacher" }, { token: env.ADMIN_TOKEN }]) {
+      const response = await call(path, { method: "GET", ...credentials });
+      assert.equal(response.status, 200, await response.clone().text());
+      const available = await response.json();
+      assert.equal(available.minimumNoticeHours, 0);
+      assert.equal(available.bufferMinutes, 0);
+      const starts = available.slotsByDate["2026-09-05"].map(slot => slot.startAt);
+      assert.ok(starts.includes("2026-09-05T17:15:00.000Z"), "18:15 today is offered to Inês");
+      assert.ok(starts.includes("2026-09-05T17:00:00.000Z"), "She may start as the previous lesson ends");
+      assert.ok(!starts.includes("2026-09-05T16:45:00.000Z"), "The existing lesson still blocks overlaps");
+      assert.ok(!starts.includes("2026-09-05T17:45:00.000Z"), "A lesson cannot run into her time off");
+      assert.ok(!starts.includes("2026-09-05T18:45:00.000Z"), "An active checkout hold stays busy");
+    }
+    const longer = await (await call(path.replace("single", "long"), { method: "GET", user: "teacher" })).json();
+    assert.ok(!(longer.slotsByDate["2026-09-05"] ?? []).some(slot => slot.startAt === "2026-09-05T17:15:00.000Z"), "90 minutes at 18:15 would overlap time off");
+    for (const user of [null, "alice", "teacher"]) {
+      const publicReply = await (await call(`/availability${query}&teacher=true`, { method: "GET", user })).json();
+      assert.equal(publicReply.minimumNoticeHours, 14);
+      assert.equal(publicReply.bufferMinutes, 15);
+      assert.deepEqual(publicReply.slotsByDate, {}, "Public bookings still require 14 hours, even for a teacher account");
+    }
+  } finally {
+    db.prepare("DELETE FROM availability_exceptions WHERE id IN (?,?)").run(extra, blocked);
+    db.prepare("DELETE FROM bookings WHERE id IN ('teacher-picker-before','teacher-picker-hold')").run();
+  }
+});
+
 await test("lesson history exposes each student's cancellation time independently of lesson and update dates", async () => {
   booking("history-completed", { start: "2026-09-04T09:00:00.000Z", end: "2026-09-04T10:00:00.000Z" });
   booking("history-running", { start: new Date(Date.now() - 30 * 60_000).toISOString(), end: new Date(Date.now() + 30 * 60_000).toISOString() });

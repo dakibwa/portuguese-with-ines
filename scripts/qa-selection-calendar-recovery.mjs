@@ -52,7 +52,7 @@ async function fixture(width, reply = async () => null, signed = true) {
       if (path === "/me") return route.fulfill({ headers: cors, json: { student, bookings: [lesson], series: [], sameDayFeeCents: 500 } });
       if (path === "/me/recurring-rates") return route.fulfill({ headers: cors, json: { rates: {} } });
       if (path === "/lesson-types") return route.fulfill({ headers: cors, json: { lessonTypes: types, postpay: false, paymentReady: true } });
-      if (path === "/availability") return route.fulfill({ headers: cors, json: { slotsByDate: {}, horizonDays: 84, timeZone: "Europe/Lisbon" } });
+      if (path === "/availability" || path === "/admin/lesson-availability") return route.fulfill({ headers: cors, json: { slotsByDate: {}, horizonDays: 84, timeZone: "Europe/Lisbon" } });
       if (path === "/bookings/fixture") return route.fulfill({ headers: cors, json: { booking: lesson, isPast: false, sameDayFeeApplies: false } });
       if (path === "/admin/availability") return route.fulfill({ headers: cors, json: { rules: [], exceptions: [] } });
       // Her add-a-lesson form asks for her students when she reaches the email.
@@ -531,7 +531,7 @@ try {
       const state = await fixture(width, async (path, request) => {
         if (path === "/admin/bookings" && request.method() === "POST") { writes += 1; return { json: {} }; }
         if (path === "/admin/students") return { json: { students: [{ id: "rui", name: "Rui", email: "rui@example.invalid", phone: "", signedIn: false, awaitingWelcome: true }], cardsAccepted: false } };
-        if (path === "/availability") return bookingDefaults(path);
+        if (path === "/admin/lesson-availability") return bookingDefaults("/availability");
         return teacherDefaults(path);
       });
       try {
