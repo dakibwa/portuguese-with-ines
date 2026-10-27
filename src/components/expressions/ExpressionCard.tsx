@@ -45,7 +45,7 @@ function Example({ text, phrase }: { text: string; phrase: string }) {
 /** What the words say, what they mean, and the English for it. Each value is a span, which a student's card turns to wax while it paints another. */
 export function ExpressionMeanings({ item }: { item: ExpressionInput }) {
   const facts = [
-    item.literalEn ? { key: "literal", label: "Ao pé da letra", text: item.literalEn, lang: "en" } : null,
+    item.literalEn ? { key: "literal", label: "Tradução literal", text: item.literalEn, lang: "en" } : null,
     item.meaningPt ? { key: "meaning", label: "Quer dizer", text: item.meaningPt } : null,
     item.meaningEn ? { key: "english", label: "Em inglês", text: item.meaningEn, lang: "en" } : null,
   ].filter((fact) => fact !== null);
