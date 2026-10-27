@@ -272,7 +272,6 @@ function layout({ heading, preheader, intro, hero, heroNote, rows = [], callout,
 <meta name="color-scheme" content="light dark">
 <meta name="supported-color-schemes" content="light dark">
 <title>${escapeHtml(heading)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
 ${STYLE}
 </head>
 <body class="pwi-page" style="margin:0;padding:0;background:${BRAND.paper};-webkit-text-size-adjust:100%;text-size-adjust:100%">

@@ -29,7 +29,11 @@
 
 export const SIGN_OFF = "Sent automatically by the booking system.";
 export const FREE_LABEL = "Free";
-const WELCOME_FOOTER = ["The button lasts 14 days.", "Later, press Sign in on the website, then “Email me a sign-in link”."];
+const WELCOME_FOOTER = [
+  "The button lasts 14 days.",
+  "You can also open portuguesewithines.com yourself, press Sign in, then “Email me a sign-in link”.",
+  "Reply to this email if you have a question for Inês."
+];
 const MANAGE_LABEL = "Change or cancel this lesson";
 const ALL_LESSONS_LABEL = "See all your lessons";
 
@@ -557,15 +561,15 @@ export function paymentFailed({ first, item, amount, lesson, lessonName, shortWh
  * 32 33 34 — her welcome: their lessons and prices and the one-click way in;
  * with no lesson yet, an invitation to book one (`rows` then holds prices only).
  */
-export function welcome({ first, welcome, book, card, free, rows }) {
+export function welcome({ first, welcome, book, free, rows }) {
   return {
-    subject: book ? "Book your next lesson with Inês" : card ? "Your lessons with Inês: add your card" : "Your lessons with Inês, in one place",
+    subject: book ? "Book your next lesson with Inês" : "Your lessons with Inês, in one place",
     content: {
       heading: book ? "Book your next lesson" : "Your lessons, in one place",
-      preheader: book ? "Sign in with one click, then choose a time." : "Sign in with one click, no password needed.",
+      preheader: "Inês has invited you to use her website for your Portuguese lessons.",
       intro: book
-        ? `${hello(first)} Inês has set you up on her website. Sign in with one click, no password needed, and choose a time for your next lesson.`
-        : `${hello(first)} Inês has set up your lessons on her website. Here they are; sign in to see or change them.`,
+        ? `${hello(first)} Inês has invited you to use portuguesewithines.com for your Portuguese lessons. Sign in with one click, no password needed, and choose a time for your next lesson.`
+        : `${hello(first)} Inês has invited you to use portuguesewithines.com to manage your Portuguese lessons. Your lessons and prices are below; sign in to see or change your bookings.`,
       callout: free ? "Your lessons with Inês are free: there’s no card to add and nothing to pay." : "",
       rows,
       steps: welcomeSteps(welcome, { book }),

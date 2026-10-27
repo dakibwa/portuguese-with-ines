@@ -1351,7 +1351,7 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [], dedu
     value: prices[minutes] === 0 ? FREE_LABEL : `${formatEuros(prices[minutes])} a lesson`
   })));
   const free = prices[60] === 0 && prices[90] === 0;
-  const { subject, content } = welcomeTemplate({ first, welcome, book, card: welcome.card, free, rows });
+  const { subject, content } = welcomeTemplate({ first, welcome, book, free, rows });
   return deliver(env, {
     to: student.email,
     subject,

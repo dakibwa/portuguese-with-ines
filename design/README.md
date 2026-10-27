@@ -660,8 +660,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
     (`No lesson on 3 November`, so a skipped or cancelled week is never read as
     a lesson) and `60 minutes · €22 a lesson`. A lesson moved, lengthened or put
     elsewhere reads as the lesson it now is. Past twelve lines an `And more` dab
-    says how many lessons are left to the website. Its subject and preheader do
-    not change. With no lesson to come (16 October 2026, Inês) it is an
+    says how many lessons are left to the website. Its subject identifies the
+    lessons with Inês; card setup is explained in the body. The introduction
+    names her website and the footer explains how to open it directly or reply
+    to Inês. With no lesson to come (16 October 2026, Inês) it is an
     invitation instead: `Book your next lesson with Inês`, the price dabs, no
     lesson list, and steps ending `Choose a day and time for your next
     lesson.` behind `Sign in and book` (or `Sign in and add card` when a card
