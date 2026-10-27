@@ -517,16 +517,18 @@ usual lesson starts and days off; avoid a wall of administration forms.
   do not repeat the next action as a top-right button or status beside the name.
   Explain what is outstanding inside the selected step, without vague ownership
   labels such as Yours or Theirs.
-  Completed onboarding becomes a normal row labelled Student, with their
-  details, next lesson and price. Its controls become Details, Price, Add a lesson
+  Completed onboarding becomes a normal card: their splat and name, a
+  `Weekly` tag in its top right corner when they have a weekly run, and only
+  the dabs that need her eye (27 October 2026, Dan). Its controls become Details, Price, Add a lesson
   and Lesson history, and, with an email, `Sign-in link`, whose panel holds
   `Send the link again`. No duplicate To do list or separate student profile popup.
   Student cards sit side by side according to the list's available width,
   with one column on phones. An opened card spans the whole list so details,
   lesson forms and history have room; closing it restores the compact card.
-  Keep their ranked reading order across each row. The name and journey share
-  one band where they fit. On smaller cards the steps
-  wrap beneath the name without horizontal scrolling. Opening a step keeps the
+  Keep their ranked reading order across each row. A closed card puts its
+  steps or places beneath the name, on a tablet's single column as well, so
+  nothing sits out past the last place; only an opened card on a wide list
+  shares one band. The steps wrap without horizontal scrolling. Opening a step keeps the
   student's name visible and places one X close control at the top right.
   The editor spans the row, and the selected step's
   heading and short bullet facts share a band with status actions. Details and

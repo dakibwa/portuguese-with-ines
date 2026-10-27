@@ -3118,7 +3118,11 @@
   .teacher-setup__body .teacher-manual-settings .segmented--four.segmented--position-2 .segmented__thumb { transform: translateY(calc(100% + 4px)); }
   .teacher-setup__body .teacher-manual-settings .segmented--four.segmented--position-3 .segmented__thumb { transform: translate(calc(100% + 4px), calc(100% + 4px)); }
 }
-@container student-card (max-width: 42rem) {
+/* A closed card reads name first, its places beneath and `Weekly` in the top
+   right corner whenever it is not the full width of a wide list, so on a
+   tablet's single column too nothing sits out past the last place
+   (27 October 2026, Dan). */
+@container student-card (max-width: 56.75rem) {
   .teacher-setup__header,
   .teacher-setup__header:has(.teacher-setup__steps li:last-child:nth-child(5)) { grid-template-columns: minmax(0, 1fr) max-content; }
   .teacher-setup__action { grid-column: 2; grid-row: 1; }
@@ -3239,7 +3243,7 @@
 /* A card too narrow for the name and its places in one band puts them on a
    row of their own; on a phone five names will not share a row without
    breaking two of them over two lines, so they sit three and two, each name whole. */
-@container student-card (max-width: 42rem) {
+@container student-card (max-width: 56.75rem) {
   .teacher-student__controls { grid-column: 1 / -1; grid-row: 2; }
 }
 @container student-card (max-width: 32rem) {
