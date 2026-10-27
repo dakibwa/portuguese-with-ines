@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      issues: write
+      pull-requests: write
     steps:
       # Deliberately no checkout: deploy only the static export, with no access
       # to repository Worker configuration, functions or migration scripts.
@@ -91,7 +91,7 @@ jobs:
               throw new Error('Cloudflare did not return a valid preview URL');
             }
             const marker = '<!-- ines-website-preview -->';
-            const body = `${marker}\nWebsite preview: ${url.href}\n\nStatic website only. The booking Worker and D1 were not deployed or changed. Booking features still use the existing live service.`;
+            const body = `${marker}\nWebsite preview: ${url.href}\n\nFor public page layout and copy review only. Booking, sign-in and payment journeys are unavailable on preview origins. The booking Worker and D1 were not deployed or changed.`;
             const scope = {owner: context.repo.owner, repo: context.repo.repo};
             const comments = await github.paginate(github.rest.issues.listComments, {
               ...scope, issue_number: context.issue.number, per_page: 100

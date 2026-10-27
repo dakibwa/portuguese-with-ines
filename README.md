@@ -365,7 +365,11 @@ builds pull requests to `main` from branches in this repository and publishes
 them to a separate Cloudflare Pages preview branch. One PR comment carries the
 preview URL and is updated after each successful preview. Forks do not deploy.
 Previews never deploy the booking Worker or run D1 commands or migrations.
-Booking features in a preview still use the existing live booking service.
+Previews are for public page layout and copy review only. The existing live
+booking service rejects preview origins, so booking, sign-in and payment
+journeys are unavailable in these previews. Do not use them to test students,
+bookings or payments. Changes in those areas need Dan's approval and a separately
+authorized verification route.
 Review the preview before approving a merge; merging still publishes production.
 
 This needs two repository secrets, under Settings → Secrets and variables →
