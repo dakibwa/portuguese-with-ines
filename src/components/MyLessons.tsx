@@ -92,6 +92,7 @@ export function MyLessons({
   onSelectSection,
   onSignOut,
   openUpcomingRequest = 0,
+  cardBookingId = "",
   section = "upcoming"
 }: {
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
@@ -105,6 +106,7 @@ export function MyLessons({
   onSelectSection?: (section: AccountSection) => void;
   onSignOut?: () => void;
   openUpcomingRequest?: number;
+  cardBookingId?: string;
   section?: AccountSection;
 }) {
   const [student, setStudent] = useState<Student | null>(initialAccount?.student ?? null);
@@ -116,6 +118,7 @@ export function MyLessons({
   const [cardRules, setCardRules] = useState({ feeCents: initialAccount?.sameDayFeeCents, noticeHours: initialAccount?.minimumNoticeHours });
   // Back from Stripe with a card saved; the account may take a moment to say so.
   const [cardAdded, setCardAdded] = useState(false);
+  const [cardAuthorised, setCardAuthorised] = useState(false);
   const [cardChecking, setCardChecking] = useState(false);
   const returningCard = useRef(false);
   const [removingCard, setRemovingCard] = useState(false);
@@ -352,7 +355,8 @@ export function MyLessons({
    */
   useEffect(() => {
     const url = new URL(window.location.href);
-    if (url.searchParams.get("card") === "added") {
+    if (["added", "authorised"].includes(url.searchParams.get("card") ?? "")) {
+      setCardAuthorised(url.searchParams.get("card") === "authorised");
       returningCard.current = true;
       url.searchParams.delete("card");
       window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
@@ -931,7 +935,7 @@ export function MyLessons({
   const cardNote = cardAdded ? (
     <div className="booking-outcome card-added" role="status">
       {cardSaved ? <CheckCircle2 size={20} aria-hidden="true" /> : <AlertCircle size={20} aria-hidden="true" />}
-      <p>{cardSaved ? <>Card saved. You&rsquo;re all set.</> : cardChecking ? "We’re confirming your saved card…" : "Your card hasn’t been confirmed yet. You can try adding it again."}</p>
+      <p>{cardSaved ? <>{cardAuthorised ? "Payments authorised." : "Card saved."} You&rsquo;re all set.</> : cardChecking ? "We’re confirming your saved card…" : "Your card hasn’t been confirmed yet. You can try adding it again."}</p>
     </div>
   ) : null;
   const askForCard = !cardSaved && !cardChecking && cardsAccepted && hasStudentSide(student) &&
@@ -939,7 +943,7 @@ export function MyLessons({
   return (
     <>
       {cardNote}
-      {askForCard ? <CardPrompt /> : null}
+      {cardBookingId || askForCard ? <CardPrompt key={cardBookingId} bookingId={cardBookingId} /> : null}
       {alert}
     </>
   );

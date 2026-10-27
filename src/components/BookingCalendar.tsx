@@ -952,6 +952,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // A one-click sign-in link that could not be used: the sign-in panel then
   // opens on asking for a new one, saying why.
   const [signInLinkError, setSignInLinkError] = useState("");
+  const [cardBookingId, setCardBookingId] = useState("");
   // A link from an email waits for a press: mail scanners open links on
   // their own, and spending a one-time link on arrival let them use it up.
   const [pendingSignIn, setPendingSignIn] = useState("");
@@ -1268,6 +1269,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
      * address bar at once, so a reload or a shared screenshot cannot reuse
      * it, and held for the student's own press of Sign in.
      */
+    const requestedCardBooking = params.get("cardBooking") ?? "";
+    if (requestedCardBooking) {
+      setCardBookingId(requestedCardBooking);
+      // The booking id is not a credential. Keep it for reloads and a
+      // cancelled Stripe visit; every read still checks the signed-in owner.
+      params.set("view", "lessons");
+      window.history.replaceState({}, "", `/book/?${params}`);
+    }
     const signInToken = params.get("signin") ?? "";
     if (signInToken) {
       params.delete("signin");
@@ -3374,6 +3383,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             <AccountControls
               key={student.id}
               clock={clock}
+              cardBookingId={pendingSignIn ? "" : cardBookingId}
               initialAccount={loadedAccount?.student.id === student.id ? loadedAccount : null}
               onRatesChange={(rates) => {
                 // A code saved under Edit details prices the next weekly booking.

@@ -1,10 +1,10 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
-import { AlertCircle, CreditCard } from "lucide-react";
-import { openCardPage, readSession } from "@/lib/auth-api";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { AlertCircle, CheckCircle2, Circle, CreditCard } from "lucide-react";
+import { openCardPage, previewCardBooking, readSession, type CardBooking } from "@/lib/auth-api";
 import { NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS } from "@/lib/config";
-import { formatMoneyCents } from "@/lib/booking-api";
+import { formatMoneyCents, formatShortDay, formatSlotTime } from "@/lib/booking-api";
 
 /**
  * Saving a card from the account (12 October 2026, Dan): how a student Inês
@@ -12,18 +12,35 @@ import { formatMoneyCents } from "@/lib/booking-api";
  * short list a booking shows, and pressing the button is the agreement; the
  * card itself is entered on Stripe's page.
  */
-export function CardTerms({ change = false, onCancel, feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
-  change?: boolean; onCancel?: () => void;
+export function CardTerms({ change = false, onCancel, bookingId = "", feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
+  change?: boolean; onCancel?: () => void; bookingId?: string;
   /** The live late change fee and notice; the published terms until the account says. */
   feeCents?: number; noticeHours?: number;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [review, setReview] = useState<{ booking: CardBooking; savedCardKey: string; sameDayFeeCents: number; minimumNoticeHours: number } | null>(null);
+  const [bookingConsent, setBookingConsent] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!bookingId) return;
+    let active = true;
+    const session = readSession();
+    void previewCardBooking(session, bookingId).then(data => {
+      if (active && readSession() === session) setReview(data);
+    }).catch(caught => {
+      if (active && readSession() === session) setError(caught instanceof Error ? caught.message : "We couldn’t check this lesson. Please try again.");
+    });
+    return () => { active = false; };
+  }, [bookingId, attempt]);
+  const selected = review?.booking;
+  const fee = review?.sameDayFeeCents ?? feeCents;
+  const notice = review?.minimumNoticeHours ?? noticeHours;
   const cardRequest = useRef(0);
   useLayoutEffect(() => () => { cardRequest.current += 1; }, []);
 
   async function open() {
-    if (busy) return;
+    if (busy || (bookingId && (!selected || !bookingConsent))) return;
     const request = ++cardRequest.current;
     const session = readSession();
     const page = window.location.pathname;
@@ -31,9 +48,9 @@ export function CardTerms({ change = false, onCancel, feeCents = SAME_DAY_RESCHE
     setBusy(true);
     setError("");
     try {
-      const checkoutUrl = await openCardPage(session);
+      const result = await openCardPage(session, selected, review?.savedCardKey);
       if (!current()) return;
-      window.location.assign(checkoutUrl);
+      window.location.assign("authorised" in result ? "/book/?view=lessons&card=authorised" : result.checkoutUrl);
     } catch (caught) {
       if (!current()) return;
       setError(caught instanceof Error ? caught.message : "We couldn’t open the card form just now. Please try again.");
@@ -44,23 +61,57 @@ export function CardTerms({ change = false, onCancel, feeCents = SAME_DAY_RESCHE
 
   return (
     <div className="card-terms">
-      <ul className="booking-payment-facts" id="card-terms-summary">
-        <li>Your upcoming lessons with Inês are charged to it, each after it ends</li>
-        <li>Already paid Inês for some? Tell her and she&rsquo;ll take them off</li>
-        <li>Stripe keeps your card safe</li>
-        {feeCents ? <>
+      {bookingId && !selected && !error ? <p role="status">Checking your lesson…</p> : null}
+      {selected ? <>
+        <p>{review?.savedCardKey ? "Use your saved card. No need to add it again." : "Add your card securely with Stripe."}</p>
+        <ul className="booking-payment-facts card-terms__facts" id="card-terms-summary">
           <li>
-            <strong>{formatMoneyCents(feeCents)}</strong> to move or cancel less than {noticeHours} hours before
+            <b>This lesson · {formatMoneyCents(selected.amountCents)}</b>
+            <span>{formatShortDay(selected.startAt)} · {formatSlotTime(selected.startAt)}–{formatSlotTime(selected.endAt)} Porto</span>
+            <span>Charged one hour after it ends, or after you authorise if later.</span>
           </li>
           <li>
-            <strong>{formatMoneyCents(feeCents)}</strong> if you don’t show up to a lesson
+            <b>Future lessons</b>
+            <span>Automatic payment one hour after each lesson, at the booked price.</span>
+          </li>
+          <li>
+            <b>Changes &amp; missed lessons</b>
+            <span>{fee ? <>{formatMoneyCents(fee)} if you move or cancel with less than {notice} hours&rsquo; notice, or miss a lesson.</> : "No fee to move, cancel or miss a lesson."}</span>
+          </li>
+        </ul>
+        <div className="booking-agreement card-terms__agreement">
+          <div className={`booking-agreement__control${bookingConsent ? " is-agreed" : ""}`}>
+            <button
+              className="booking-agreement__button"
+              type="button"
+              aria-pressed={bookingConsent}
+              aria-describedby="card-terms-summary"
+              disabled={busy}
+              onClick={() => setBookingConsent(value => !value)}
+            >
+              {bookingConsent ? <CheckCircle2 size={20} aria-hidden="true" /> : <Circle size={20} aria-hidden="true" />}
+              I authorise card payments for this and future lessons
+            </button>
+          </div>
+          <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">Terms &amp; privacy</a>
+        </div>
+      </> : !bookingId ? <ul className="booking-payment-facts" id="card-terms-summary">
+        <li>Your upcoming lessons with Inês are charged to it, each one hour after it ends, at the price in your bookings</li>
+        <li>Already paid Inês for some? Tell her before agreeing</li>
+        <li>Stripe keeps your card safe</li>
+        {fee ? <>
+          <li>
+            <strong>{formatMoneyCents(fee)}</strong> to move or cancel less than {notice} hours before
+          </li>
+          <li>
+            <strong>{formatMoneyCents(fee)}</strong> if you don’t show up to a lesson
           </li>
         </> : <li>No fee to move or cancel, or for a missed lesson</li>}
         <li>
           The full rules are in{" "}
           <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">terms &amp; privacy</a>
         </li>
-      </ul>
+      </ul> : null}
       {error ? (
         <div className="booking-alert booking-alert--error" role="alert">
           <AlertCircle size={18} aria-hidden="true" />
@@ -71,12 +122,13 @@ export function CardTerms({ change = false, onCancel, feeCents = SAME_DAY_RESCHE
         <button
           aria-describedby="card-terms-summary"
           className="button button--coral"
-          disabled={busy}
+          disabled={busy || Boolean(bookingId && (!selected || !bookingConsent))}
           onClick={() => void open()}
           type="button"
         >
-          {busy ? "Opening…" : change ? "Agree & change card" : "Agree & add card"}
+          {busy ? (review?.savedCardKey ? "Authorising…" : "Opening…") : review?.savedCardKey ? "Authorise payments" : bookingId ? "Agree & confirm payments" : change ? "Agree & change card" : "Agree & add card"}
         </button>
+        {bookingId && error ? <button className="my-lessons__change" onClick={() => { setError(""); setReview(null); setBookingConsent(false); setAttempt(value => value + 1); }} type="button">Review again</button> : null}
         {onCancel ? (
           <button className="my-lessons__change" disabled={busy} onClick={onCancel} type="button">Cancel</button>
         ) : null}
@@ -89,21 +141,21 @@ export function CardTerms({ change = false, onCancel, feeCents = SAME_DAY_RESCHE
  * On Your lessons, only while lessons Inês added are still paid to her by
  * hand: one quiet card above the calendar asking once, in her words.
  */
-export function CardPrompt() {
-  const [open, setOpen] = useState(false);
+export function CardPrompt({ bookingId = "" }: { bookingId?: string }) {
+  const [open, setOpen] = useState(Boolean(bookingId));
   return (
-    <section aria-labelledby="card-prompt-heading" className="card-prompt">
+    <section aria-labelledby="card-prompt-heading" className={`card-prompt${bookingId && open ? " card-prompt--review" : ""}`}>
       <span aria-hidden="true" className="card-prompt__icon">
         <CreditCard size={20} />
       </span>
       <div className="card-prompt__body">
-        <h3 id="card-prompt-heading">Pay by card</h3>
-        <p>Add your card once and you&rsquo;re set.</p>
+        <h3 id="card-prompt-heading">{bookingId ? "Confirm your card payments" : "Pay by card"}</h3>
+        {bookingId ? null : <p>Add your card once and you&rsquo;re set.</p>}
         {open ? (
-          <CardTerms onCancel={() => setOpen(false)} />
+          <CardTerms key={bookingId} bookingId={bookingId} onCancel={() => setOpen(false)} />
         ) : (
           <button className="button button--blue button--compact" onClick={() => setOpen(true)} type="button">
-            Add card
+            {bookingId ? "Review payments" : "Add card"}
           </button>
         )}
       </div>

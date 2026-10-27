@@ -274,10 +274,28 @@ export function confirmSignInLink(token: string) {
  * Stripe's page for saving a card to the account. Asking for it is the
  * student's agreement, given beside the terms it shows.
  */
-export function openCardPage(token: string) {
-  return post<{ checkoutUrl: string }>("/me/card", { consent: true }, token).then((data) => {
+export type CardBooking = { id: string; reference: string; startAt: string; endAt: string; amountCents: number };
+
+export function previewCardBooking(token: string, bookingId: string) {
+  return post<{ booking: CardBooking; savedCardKey: string; sameDayFeeCents: number; minimumNoticeHours: number }>("/me/card/preview", { bookingId }, token).then(data => {
+    const booking = data.booking;
+    if (typeof data.savedCardKey !== "string" || !booking || booking.id !== bookingId || typeof booking.reference !== "string" ||
+        !Number.isFinite(Date.parse(booking.startAt)) || !Number.isFinite(Date.parse(booking.endAt)) ||
+        !Number.isSafeInteger(booking.amountCents) || booking.amountCents <= 0 ||
+        !Number.isFinite(data.sameDayFeeCents) || !Number.isFinite(data.minimumNoticeHours)) {
+      throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
+    }
+    return data;
+  });
+}
+
+export function openCardPage(token: string, booking?: CardBooking, savedCardKey?: string) {
+  return post<{ checkoutUrl?: string; authorised?: boolean }>("/me/card", {
+    consent: true, ...(booking ? { booking, bookingConsent: true, ...(savedCardKey ? { savedCardKey } : {}) } : {})
+  }, token).then((data) => {
+    if (data.authorised === true) return { authorised: true as const };
     if (typeof data.checkoutUrl !== "string" || !/^https:\/\//.test(data.checkoutUrl)) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
-    return data.checkoutUrl;
+    return { checkoutUrl: data.checkoutUrl };
   });
 }
 

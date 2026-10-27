@@ -9717,6 +9717,48 @@ dialog[open]::backdrop {
   margin: 0;
 }
 
+.card-prompt--review .card-prompt__body {
+  display: contents;
+}
+
+.card-prompt--review h3 {
+  grid-column: 2;
+  align-self: center;
+}
+
+.card-prompt--review .card-terms {
+  grid-column: 1 / -1;
+}
+
+.card-terms__facts {
+  gap: 0.9rem;
+}
+
+.card-terms__facts li {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.card-terms__agreement {
+  margin-top: 0;
+  gap: 0;
+}
+
+.card-terms__agreement .booking-agreement__button {
+  white-space: normal;
+}
+
+@container booking (min-width: 720px) {
+  .card-terms__facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+
+  .card-terms__agreement {
+    justify-self: start;
+  }
+}
+
 .card-added {
   margin-bottom: 1rem;
 }
@@ -10047,3 +10089,14 @@ dialog[open]::backdrop {
     .expression-reading__text > .expression-card__extras { margin-top: 0.9rem; }
   }
 }
+
+/* A prepared approval stays separate from the teacher's paid-by-hand control. */
+.teacher-card-link {
+  display: grid;
+  justify-items: start;
+  gap: 0.6rem;
+  margin-block: 1rem;
+  padding-block: 1rem;
+  border-top: 1px solid var(--rule);
+}
+.teacher-card-link p { margin: 0; }
