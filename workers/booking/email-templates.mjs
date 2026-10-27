@@ -29,7 +29,17 @@
 
 export const SIGN_OFF = "Sent automatically by the booking system.";
 export const FREE_LABEL = "Free";
-const WELCOME_FOOTER = ["The button lasts 14 days.", "Later, press Sign in on the website, then “Email me a sign-in link”."];
+/*
+ * A welcome is the first email many students have from this address, so it
+ * says who sent it and why, and keeps passwords and cards out of its subject,
+ * preheader and button: a sign-in link from an unknown sender asking for a
+ * card is what spam filters treat as phishing (27 October 2026, students
+ * found it in spam).
+ */
+const WELCOME_FOOTER = [
+  "You’re getting this because Inês added you as one of her students. Reply to write to her.",
+  "The button lasts 14 days.", "Later, press Sign in on the website, then “Email me a sign-in link”."
+];
 const MANAGE_LABEL = "Change or cancel this lesson";
 const ALL_LESSONS_LABEL = "See all your lessons";
 
@@ -98,7 +108,7 @@ function welcomeSteps(welcome, { book = false } = {}) {
 }
 
 function welcomeAction(welcome, { book = false } = {}) {
-  return { label: welcome.card ? "Sign in and add card" : book ? "Sign in and book" : "Sign in, no password needed", url: welcome.url };
+  return { label: book ? "Choose a time" : "See your lessons", url: welcome.url };
 }
 
 /** How her own email says the student was brought in. */
@@ -171,7 +181,7 @@ export function studentBooked({ first, byInes, welcome = null, lesson, lessonNam
       subject: byInes ? `Inês has booked your Portuguese lesson — ${shortWhen}` : `Your Portuguese lesson is booked — ${shortWhen}`,
       content: {
         heading: "Your lesson is booked",
-        preheader: welcome ? "Inês has booked your lesson. Sign in with one click to see it." : `${lessonName} · ${when}`,
+        preheader: welcome ? "Inês has booked your lesson. You can see it on her website." : `${lessonName} · ${when}`,
         intro: byInes
           ? welcome?.neverIn
             ? `${hello(first)} Inês has booked your next lesson. From now on you can see and change your lessons on Inês's website. A calendar invitation is attached.`
@@ -557,14 +567,14 @@ export function paymentFailed({ first, item, amount, lesson, lessonName, shortWh
  * 32 33 34 — her welcome: their lessons and prices and the one-click way in;
  * with no lesson yet, an invitation to book one (`rows` then holds prices only).
  */
-export function welcome({ first, welcome, book, card, free, rows }) {
+export function welcome({ first, welcome, book, free, rows }) {
   return {
-    subject: book ? "Book your next lesson with Inês" : card ? "Your lessons with Inês: add your card" : "Your lessons with Inês, in one place",
+    subject: book ? "Book your next lesson with Inês" : "Your lessons with Inês, in one place",
     content: {
       heading: book ? "Book your next lesson" : "Your lessons, in one place",
-      preheader: book ? "Sign in with one click, then choose a time." : "Sign in with one click, no password needed.",
+      preheader: book ? "Choose a time on Inês’s new website." : "Your lessons and prices on Inês’s new website.",
       intro: book
-        ? `${hello(first)} Inês has set you up on her website. Sign in with one click, no password needed, and choose a time for your next lesson.`
+        ? `${hello(first)} Inês now takes bookings on her own website, and she has set you up there, so you can choose a time for your next lesson whenever it suits you.`
         : `${hello(first)} Inês has set up your lessons on her website. Here they are; sign in to see or change them.`,
       callout: free ? "Your lessons with Inês are free: there’s no card to add and nothing to pay." : "",
       rows,
@@ -589,9 +599,9 @@ export function dormantInvite({ subject, message, signInUrl = "", bookUrl }) {
     subject,
     content: {
       heading: "Book your next lesson",
-      preheader: signInUrl ? "Sign in with one click, then choose a time." : "Choose a time on Inês’s website.",
+      preheader: "Choose a time on Inês’s website.",
       intro: message,
-      action: signInUrl ? { label: "Sign in and book", url: signInUrl } : { label: "Book a lesson", url: bookUrl },
+      action: signInUrl ? { label: "Choose a time", url: signInUrl } : { label: "Book a lesson", url: bookUrl },
       footer: signInUrl ? WELCOME_FOOTER : "Reply to this email to write to Inês."
     }
   };
