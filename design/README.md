@@ -839,10 +839,12 @@ reading's title; the facts follow it.
 
 - No visible heading and no helper text (Dan: "do we even need the top
   stuff"). The section keeps `Uma expressão para ti` as a visually hidden
-  heading, so it is still named. At rest the sheet itself invites: the same
-  words as a small uppercase label at its top, in the waiting paint's
-  lettering colour, and `Paint it`. Once painted, the card is the whole
-  section, and it ends in one row at the foot of the facts at every width:
+  heading, so it is still named. Every visit starts with a blank cream canvas
+  and `Paint it`: no phrase hints, paint marks, meanings or fact labels are
+  visible before the press (27 October 2026, Dan). A returning student
+  repaints their saved expression on that first press without spending
+  another pick; `Paint another` asks for a new one. Once painted, the card is
+  the whole section, and it ends in one row at the foot of the facts at every width:
   the reading's themes, then `Notas e origem` (when Inês has written notes or
   a source) and the compact `Paint another` at the row's end. The notes'
   toggle reads like the facts' labels, its chevron in the dabs' column when it
@@ -860,7 +862,7 @@ reading's title; the facts follow it.
   carries ink `#1A3169` (5.4:1; cream on it would be 2.1:1). A new painting is
   never the colour of the last one painted on this device, nor of its family
   (blue or the two lavenders), so each one reads as a new colour. A
-  returning student sees their expression in the colour it was painted in,
+  returning student repaints their saved expression in its original colour,
   remembered on the device for each student as soon as the Worker has saved
   the pick (two students sharing a device keep their own colours), or else in
   a colour that expression always gets.
@@ -886,21 +888,19 @@ reading's title; the facts follow it.
   gap in the shorter, whose foot simply ends sooner. A painted card with a
   one-line phrase fits a landscape phone's screen (667×375, 844×390). On a
   very wide card the example moves up into a third column with the themes and
-  button beneath it, and all three columns start level. At rest the sheet
-  fills its column beside the facts still to come, with its wax and pool at
-  its top, where the paint will land: the paint lands where it stays and never
-  slides on the sheet. The painted sheet closes round its phrase as the
-  reading opens, only its foot rising, so a one-line phrase never sits in a
+  button beneath it, and all three columns start level. At rest the blank
+  sheet reserves room for the first strokes, with the button at the card's
+  foot. The paint lands where it stays and never slides on the sheet. The
+  painted sheet closes round its phrase as the reading opens, only its foot
+  rising, so a one-line phrase never sits in a
   tall empty sheet. Nothing above the section moves, and the card grows and
   shrinks smoothly below.
-- At rest a few real, unseen phrases are written in dark blue so they are
-  readable on the cream paper, and a flat pool of the next paint waits by the
-  margin. Beside the painting, the facts still to come wait in wax. Gouache is
-  matte: nothing glossy. Finished lettering stays cream on dark paint and dark
-  on lavender.
+- The idle canvas reveals nothing from the collection. The first paint
+  appears only after the press. Gouache is matte: nothing glossy. Finished
+  lettering stays cream on dark paint and dark on lavender.
 - The press starts the painting at once while the Worker picks and saves the
-  expression: a dab lands in the pool and spreads. On about one press in three
-  the wait becomes a near-miss: a thin dry brush starts the first word or two
+  expression: a dab lands on the blank sheet and spreads. On about one press
+  in three the wait becomes a near-miss: a thin dry brush starts the first word or two
   of an unseen phrase near the top, and a quick stroke of the real paint
   crosses it out, before the real phrase is painted. The near-miss is brushed
   in a wash the real paint stands out against (lavender behind the blues and

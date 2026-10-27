@@ -9752,8 +9752,8 @@ dialog[open]::backdrop {
 .expression-card .expression-card__title { margin: 0 0 1rem; font: 400 clamp(1.05rem, 1.6vw, 1.25rem)/2 var(--display); color: var(--blue-deep); }
 .expression-card__label { display: block; margin: 0; color: var(--paint-ink, var(--blue-deep)); font: 700 0.66rem/1.5 var(--ui); letter-spacing: 0.15em; text-transform: uppercase; }
 .expression-card__meanings { display: grid; gap: 0.95rem; margin: 0; }
-.expression-card__fact, .expression-card__examples, .expression-reading__waiting p { position: relative; padding-left: 1.75rem; }
-.expression-card__fact::before, .expression-card__examples::before, .expression-reading__waiting p::before {
+.expression-card__fact, .expression-card__examples { position: relative; padding-left: 1.75rem; }
+.expression-card__fact::before, .expression-card__examples::before {
   position: absolute;
   top: 0.02rem;
   left: 0;
@@ -9764,8 +9764,8 @@ dialog[open]::backdrop {
   -webkit-mask: var(--payment-dab) center / contain no-repeat;
   mask: var(--payment-dab) center / contain no-repeat;
 }
-.expression-card__fact:nth-child(3n + 2)::before, .expression-reading__waiting p:nth-child(3n + 2)::before { background: var(--paint-2, var(--lavender)); rotate: 60deg; }
-.expression-card__fact:nth-child(3n + 3)::before, .expression-reading__waiting p:nth-child(3n + 3)::before { background: var(--paint-3, var(--coral)); rotate: 180deg; }
+.expression-card__fact:nth-child(3n + 2)::before { background: var(--paint-2, var(--lavender)); rotate: 60deg; }
+.expression-card__fact:nth-child(3n + 3)::before { background: var(--paint-3, var(--coral)); rotate: 180deg; }
 .expression-card__examples::before { rotate: 330deg; }
 .expression-card__fact dd { margin: 0.18rem 0 0; font-size: 0.92rem; line-height: 1.55; white-space: pre-wrap; text-wrap: pretty; }
 /* The meaning is what a student came for: a step larger than the rest. */
@@ -9799,8 +9799,8 @@ dialog[open]::backdrop {
    request). Inês has written it in wax on a cream sheet; the press sweeps a
    gouache brush across it and the phrase shows through the paint, which is
    then the reading's title. The section's heading is for assistive
-   technology only: at rest the sheet itself invites, with a small label and
-   the button, and once painted the card is the whole section. "Paint
+   technology only: at rest the sheet is blank, with only the paint button,
+   and once painted the card is the whole section. "Paint
    another" ends the reading's last row, after its themes and the notes'
    toggle. On a phone the reading opens beneath
    the sheet. On a wide card the example sits straight under the painting and
@@ -9842,11 +9842,10 @@ dialog[open]::backdrop {
 /* The paper's grain lies over the paint as well as the card. */
 .expression-reading::after { position: absolute; z-index: 1; inset: 0; background: var(--paper-texture); content: ""; pointer-events: none; }
 .expression-reading > .paint-sheet { grid-row: 1; grid-column: 1; }
-.expression-reading__text, .expression-reading__waiting { position: relative; z-index: 2; grid-row: 2; }
-/* While another is painted, the last reading waits in wax where it stands, as
-   the facts to come do at rest: its labels stay, its words dry to wax and its
-   themes fade, out of reach. The card is never left empty, and nothing below
-   moves until the new reading opens. */
+.expression-reading__text { position: relative; z-index: 2; grid-row: 2; }
+/* While another is painted, the last reading waits in wax where it stands:
+   its labels stay, its words dry to wax and its themes fade, out of reach.
+   Nothing below moves until the new reading opens. */
 .expression-card__value { transition: color 240ms var(--motion-ease); }
 .expression-reading[data-busy] .expression-card__value {
   color: transparent;
@@ -9865,25 +9864,6 @@ dialog[open]::backdrop {
 .expression-reading__title { margin: 0.9rem 0 1rem; color: var(--paint-ink); font: 400 clamp(1.5rem, 6cqi, 2.2rem)/1.35 var(--display); text-wrap: balance; }
 .expression-reading:not([data-unpainted]) .expression-reading__title { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .expression-reading[data-unpainted] > .paint-sheet { display: none; }
-.expression-reading__waiting, .expression-reading__waiting p:nth-child(4) { display: none; }
-.expression-reading__waiting p { margin: 0; padding-left: 0; }
-.expression-reading__waiting p::before { left: -1.6rem; }
-/* The waiting sheet's label, over its top; it fades as the paint lands. */
-.expression-reading__label {
-  position: relative;
-  z-index: 2;
-  grid-row: 1;
-  grid-column: 1;
-  align-self: start;
-  margin: 1rem 1rem 0 var(--paint-text-x);
-  color: var(--paint-ink);
-  font: 700 0.66rem/1.5 var(--ui);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  pointer-events: none;
-  transition: opacity 240ms var(--motion-ease);
-}
-.expression-reading[data-busy] .expression-reading__label { opacity: 0; }
 /* The button stays with the card: under the waiting sheet, then at the end of the reading's last row. */
 .expression-reading__actions { position: relative; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem 1rem; min-width: 0; }
 .expression-reading > .expression-reading__actions { grid-row: 3; padding: 0.35rem 1rem 1rem; }
@@ -9913,17 +9893,6 @@ dialog[open]::backdrop {
 /* On a narrow column the row takes the card's whole width from the dabs'
    column, so a theme and the button share it; it wraps only for many themes. */
 .expression-reading__text .expression-card__foot { margin-inline: -1.6rem -0.75rem; }
-/* Each fact still to come, written in wax: a shade brighter than the paper, the faintest raised edge. */
-.expression-reading__wax {
-  display: block;
-  width: 72%;
-  height: 0.85rem;
-  margin-top: 0.45rem;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='16' viewBox='0 0 64 16'%3E%3Cpath d='M1 12c2-8 5-8 6 0s3-9 6-1 4 5 6-3 3-3 4 4 4-7 6-1 3 5 6-3 3 2 5 2 5-8 6 0 3-6 6-1 2 4 4 4' fill='none' stroke='%23fffefa' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") left center / auto 100% repeat-x;
-  filter: drop-shadow(0.4px 0.8px 0 rgba(26, 49, 105, 0.08));
-}
-.expression-reading__waiting p:nth-child(2) .expression-reading__wax { width: 90%; }
-.expression-reading__waiting p:nth-child(3) .expression-reading__wax { width: 52%; }
 @media (prefers-reduced-motion: no-preference) {
   .expression-reading__text > :not(h3) { animation: expression-fact-in 560ms var(--motion-ease) backwards; }
   .expression-reading__text > :nth-child(3) { animation-delay: 90ms; }
@@ -9936,12 +9905,9 @@ dialog[open]::backdrop {
 }
 
 /* The sheet. Its layers are built and moved by the painter (painter.ts),
-   which keeps --paint-label-room clear for the label at the top of the
-   resting sheet. */
+   with room around the first dab at the top of the sheet. */
 .paint-sheet { --paint-label-room: 42px; position: relative; height: 180px; overflow: hidden; font-family: var(--display); }
 .paint-sheet canvas { display: block; }
-.paint-sheet__wax { position: absolute; top: 0; left: 0; transition: opacity 280ms var(--motion-ease); }
-.paint-sheet__wax[data-gone] { opacity: 0; }
 .paint-sheet__art, .paint-sheet__layer { position: absolute; inset: 0; pointer-events: none; }
 .paint-sheet__pool, .paint-sheet__group { position: absolute; top: 0; left: 0; width: 0; height: 0; }
 .paint-sheet__group > canvas { position: absolute; }
@@ -9987,11 +9953,9 @@ dialog[open]::backdrop {
   .expression-reading__text > .expression-card__examples { grid-column: 1; grid-row: 1 / -1; align-self: start; margin: var(--paint-sheet-h) 0 0 var(--paint-text-x); padding: 0 0.5rem 1.25rem 0; }
   .expression-reading__text > .expression-card__extras { grid-column: 2; grid-row: 2; align-self: start; margin: 0; padding: 0.9rem 0.75rem 1rem 0.4rem; }
   .expression-reading__text .expression-card__foot { margin-inline: -1.6rem -0.5rem; }
-  /* At rest: the label and the button across the card's top, the facts to come in wax beneath the button. */
+  /* At rest only the paint button sits at the foot of the blank card. */
   .expression-reading[data-state="waiting"] > .paint-sheet { grid-row: 1 / -1; align-self: stretch; }
-  .expression-reading__label { margin-top: 0.9rem; line-height: 48px; }
-  .expression-reading > .expression-reading__actions { grid-column: 2; grid-row: 1; align-self: start; padding: 0.9rem 0.9rem 0 0; }
-  .expression-reading__waiting { display: grid; grid-column: 2; grid-row: 2 / -1; align-self: start; gap: 1.2rem; padding: 0.9rem 1.25rem 1.5rem 0.4rem; }
+  .expression-reading > .expression-reading__actions { grid-column: 2; grid-row: 2; align-self: end; padding: 0.9rem 0.9rem 1rem 0; }
 }
 
 /* Where the sheet cannot be painted, the expression's title heads the first
@@ -10011,7 +9975,6 @@ dialog[open]::backdrop {
   .expression-reading__text .expression-card__foot { margin-right: -0.75rem; }
   .expression-reading__text .expression-card__fact dd, .expression-reading__text .expression-card__examples li { font-size: 0.97rem; }
   .expression-reading__text .expression-card__fact[data-fact="meaning"] dd { font-size: 1.1rem; }
-  .expression-reading__waiting { padding-right: 2.25rem; }
 }
 
 @container expressions (min-width: 60rem) {
@@ -10032,10 +9995,6 @@ dialog[open]::backdrop {
   .expression-reading__text > .expression-card__examples { grid-column: 3; grid-row: 1; margin: 1.2rem 0 0 0.4rem; padding: 0 2.25rem 0 0; }
   .expression-reading__text > .expression-card__extras { grid-column: 3; grid-row: 2; }
   .expression-reading > .expression-reading__actions { grid-column: 3; }
-  .expression-reading__waiting { grid-column: 2 / 4; grid-row: 1 / -1; grid-template-columns: subgrid; grid-template-rows: repeat(3, auto); align-content: center; column-gap: 2.5rem; padding-right: 0; }
-  .expression-reading__waiting p { grid-column: 1; }
-  .expression-reading__waiting p:nth-child(4) { display: block; grid-column: 2; grid-row: 2; padding-right: 2.25rem; }
-  .expression-reading__waiting p:nth-child(4)::before { rotate: 330deg; background: var(--paint); }
 }
 
 /* Without subgrid, the wide reading keeps to the column beside the painting. */

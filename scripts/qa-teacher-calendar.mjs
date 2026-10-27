@@ -1668,6 +1668,8 @@ try {
   // Closed to students, her try-out paints her drafts in her browser alone: nothing is written.
   await expect(expressions.page.getByText("Only you can see expressions for now.", { exact: false })).toBeVisible();
   const tryOut = expressions.page.getByRole("region", { name: "Uma expressão para ti", exact: true });
+  await expect(tryOut.getByRole("button", { name: "Paint it", exact: true })).toBeEnabled();
+  await expect(tryOut.locator(".expression-reading__text, .paint-sheet canvas")).toHaveCount(0);
   await tryOut.getByRole("button", { name: "Paint it", exact: true }).click();
   await expect(tryOut.getByRole("button", { name: "Paint another", exact: true })).toBeEnabled({ timeout: 10_000 });
   await expect(tryOut.getByRole("heading", { name: "Partir o coco a rir", exact: true })).toBeAttached();

@@ -5,7 +5,7 @@ import type { PaintKey } from "@/lib/expression-paint";
 import { Painter } from "./painter";
 
 export type PaintingStart =
-  | { kind: "rest"; paint: PaintKey; wax: string[] }
+  | { kind: "rest"; paint: PaintKey }
   | { kind: "show"; phrase: string; id: string; paint: PaintKey };
 
 export type ExpressionPaintingHandle = {
@@ -17,8 +17,8 @@ export type ExpressionPaintingHandle = {
   stop(): Promise<void>;
   /** The finished painting at once. */
   show(phrase: string, id: string, paint: PaintKey, fade?: boolean): void;
-  /** The waiting sheet: phrases in wax, `paint` pooled by the margin. */
-  rest(paint: PaintKey, wax: string[], fade?: boolean): void;
+  /** The blank waiting sheet; paint only appears after the press. */
+  rest(paint: PaintKey, fade?: boolean): void;
   /**
    * The landed painting closes round its phrase as the reading opens: sets
    * its final size at once, so the card can measure it, and returns what
@@ -57,7 +57,7 @@ export function ExpressionPainting({ start, onUnavailable, ref }: { start: Paint
     const first = initial.current;
     try {
       if (first.kind === "show") current.show(first.phrase, first.id, first.paint);
-      else current.rest(first.paint, first.wax);
+      else current.rest(first.paint);
     } catch {
       // The reading carries the expression without its painting.
       current.destroy();
@@ -87,7 +87,7 @@ export function ExpressionPainting({ start, onUnavailable, ref }: { start: Paint
       land: (phrase, id) => safely((current) => current.land(phrase, id).catch(() => {}), Promise.resolve()),
       stop: () => safely((current) => current.stop().catch(() => {}), Promise.resolve()),
       show: (phrase, id, paint, fade) => safely((current) => current.show(phrase, id, paint, fade), undefined),
-      rest: (paint, wax, fade) => safely((current) => current.rest(paint, wax, fade), undefined),
+      rest: (paint, fade) => safely((current) => current.rest(paint, fade), undefined),
       settle: () => safely((current) => current.settle(), () => {}),
     };
   }, []);
