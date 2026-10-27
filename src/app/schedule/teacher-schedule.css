@@ -2442,11 +2442,12 @@
 .teacher-history-lesson { min-width: 0; padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
 .teacher-history-lesson.is-cancelled { background: var(--lavender-pale, #f1eef7); }
 .teacher-history-lesson__top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.45rem; font-size: 0.8rem; }
+.teacher-history-lesson__when { display: flex; flex: 1 1 9rem; flex-direction: column; align-items: flex-start; gap: 0.35rem; min-width: 0; }
 .teacher-history-status { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); padding: 0.2rem 0.5rem; font: 600 0.65rem/1.4 var(--ui); }
 .teacher-history-status.is-muted { background: var(--lavender-soft); color: var(--ink); }
-.teacher-history-lesson__top strong span { font-weight: 500; }
+.teacher-history-lesson__top strong span { display: inline-block; font-weight: 500; white-space: nowrap; }
 /* The lesson's facts as a row of dabs. */
-.teacher-history-lesson__facts.booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.3rem 1.1rem; margin: 0.5rem 0 0; font-size: 0.74rem; }
+.teacher-history-lesson__facts.booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.25rem 0.85rem; margin: 0.35rem 0 0; font-size: 0.74rem; }
 /* Her message and their note read as the emails show a message: a lilac
    edge, a small label above. */
 .teacher-history-lesson__note { margin: 0.65rem 0 0; padding-left: 0.75rem; border-left: 3px solid var(--lavender); white-space: pre-wrap; overflow-wrap: anywhere; font: 400 0.75rem/1.5 var(--ui); }

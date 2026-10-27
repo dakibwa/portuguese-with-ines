@@ -706,13 +706,17 @@ usual lesson starts and days off; avoid a wall of administration forms.
   hides past the edge; wider, they share one row. Sign out is inside Profile.
 - A student's inline Lesson history shows
   upcoming lessons first, then past and cancelled, one card each with
-  the date and time on one line (the year only when it isn't this one), a pill
+  the date and time sharing a line where they fit (the year only when it isn't
+  this one), a pill
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
   Each section uses a responsive grid of lesson cards: several across where
-  there is room, one column on phones. Opening homework expands that lesson
-  across the full row; closing it returns the card to the grid.
+  there is room, one column on phones. `Homework` sits at the top right beside
+  the date, with compact facts beneath, instead of taking another row at the
+  bottom. The date and time can wrap within the header; on very narrow cards
+  the button can wrap too, retaining a 44px target. Opening homework expands
+  that lesson across the full row; closing it returns the card to the grid.
   The Price control opens the two fields in place and says how many lessons to
   come moved to it, and `· standard` marks a length she hasn't priced.
   History includes older lessons outside the current week and follows the account

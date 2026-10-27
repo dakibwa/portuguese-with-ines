@@ -10,7 +10,7 @@
 .teacher-homework { container: homework / inline-size; }
 .homework-worksheet { container: worksheet / inline-size; }
 /* An opened worksheet needs the whole row; closed lessons stay in the grid. */
-.teacher-history-lesson:has(> .teacher-history-homework[aria-expanded="true"]) { grid-column: 1 / -1; }
+.teacher-history-lesson:has(.teacher-history-homework[aria-expanded="true"]) { grid-column: 1 / -1; }
 .teacher-history-lesson .teacher-homework { margin-top: 1rem; }
 .teacher-homework fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .teacher-homework .button, .student-homework .button { gap: 0.5rem; white-space: nowrap; }
@@ -41,7 +41,7 @@
 .homework-back svg { transition: transform 160ms var(--motion-ease); }
 .homework-back:hover:not(:disabled) svg { transform: translateX(-3px); }
 .teacher-homework :is(.homework-link, .homework-review summary), .teacher-history-homework.teacher-history-homework { background: rgba(170, 164, 230, 0.26); }
-.teacher-history-homework.teacher-history-homework { margin-top: 0.5rem; color: var(--ink); }
+.teacher-history-homework.teacher-history-homework { flex: 0 0 auto; min-height: 44px; margin: 0 0 0 auto; padding-inline: 0.75rem; color: var(--ink); white-space: nowrap; }
 .teacher-history-homework svg { color: currentColor; }
 .teacher-history-homework[aria-expanded="true"] { background: var(--blue-deep); color: var(--paper-light); }
 
