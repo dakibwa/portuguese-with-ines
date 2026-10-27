@@ -759,7 +759,8 @@ student picker below Your lessons. Drafts stay in her interface; there is no
 anonymous page or main-menu item.
 
 The painting and learning experience also has its own `/idioms/` page, with
-the shared site header and a full-width reading layout (14 October 2026, Dan).
+the shared site header and a reading layout capped at 84rem including its
+outer padding, so the content stays together on a wide desktop.
 Open full page leads there from an available painting card. It keeps the same
 account: Inês paints her draft collection locally; students use the existing
 published-expression access switch. Signed-out visitors sign in there. The
@@ -846,12 +847,14 @@ reading's title; the facts follow it.
   visible before the press (27 October 2026, Dan). A returning student
   repaints their saved expression on that first press without spending
   another pick; `Paint another` asks for a new one. Once painted, the card is
-  the whole section, and it ends in one row at the foot of the facts at every width:
+  the whole section, and it ends in a footer separated by a quiet rule:
   the reading's themes, then `Notas e origem` (when Inês has written notes or
   a source) and the compact `Paint another` at the row's end. The notes'
   toggle reads like the facts' labels, its chevron in the dabs' column when it
-  leads the row, and the notes open below the whole row, so opening them never
-  moves it. On a narrow column the row starts at the dabs' column and runs to
+  leads the row. On desktop the footer spans both reading columns; notes
+  open below the whole row with a comfortable line length, so opening them
+  never moves the action row or leaves an empty half beside the notes. On a
+  narrow column the row starts at the dabs' column and runs to
   the card's edge, so two short themes, or the notes' toggle, share it with
   the button; the toggle and the button drop beneath the themes together only
   for a longer set of themes, and only on the narrowest phones (320px) does the
@@ -883,14 +886,12 @@ reading's title; the facts follow it.
   Nothing is ever cut: a phrase too long for every size takes as many lines as
   it needs at the smallest, and the sheet grows to hold them.
 - Composition: on a phone the sheet fills the cream card and the reading opens
-  beneath it. From a landscape phone up, two columns each run from the card's
-  top on their own: the painting with its example straight beneath it, and
-  beside it the facts with the themes and `Paint another` straight beneath
-  them. Neither column waits on the other, so the taller one never opens a
-  gap in the shorter, whose foot simply ends sooner. A painted card with a
-  one-line phrase fits a landscape phone's screen (667×375, 844×390). On a
-  very wide card the example moves up into a third column with the themes and
-  button beneath it, and all three columns start level. At rest the blank
+  beneath it. From a landscape phone up, the painting with its example
+  straight beneath it sits beside the meanings. Both columns begin at the
+  top, and the footer follows the taller of them. Notes and the next-paint
+  action use that shared footer rather than extending only the right column
+  (27 October 2026, Dan: the layout should feel cleaner). Keep two reading
+  columns on larger screens as well. At rest the blank
   sheet reserves room for the first strokes, with the button at the card's
   foot. The paint lands where it stays and never slides on the sheet. The
   painted sheet closes round its phrase as the reading opens, only its foot

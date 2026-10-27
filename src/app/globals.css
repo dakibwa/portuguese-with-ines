@@ -9803,10 +9803,9 @@ dialog[open]::backdrop {
    then the reading's title. The section's heading is for assistive
    technology only: at rest the sheet is blank, with only the paint button,
    and once painted the card is the whole section. "Paint
-   another" ends the reading's last row, after its themes and the notes'
-   toggle. On a phone the reading opens beneath
-   the sheet. On a wide card the example sits straight under the painting and
-   the facts, then the themes, beside it, each column from the top. */
+   another" sits in a footer with the themes and notes' toggle. On a phone
+   the reading opens beneath the sheet. On a wide card the painting and its
+   examples sit beside the facts, above a footer spanning both columns. */
 /* The section holds the focus while "Paint another" paints (the reading is out of reach), with no ring of its own. */
 .student-expressions:focus { outline: none; }
 .student-expressions { position: relative; container: expressions / inline-size; width: 100%; min-width: 0; margin-top: 1.5rem; padding: var(--pad-card); border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet); }
@@ -9861,6 +9860,9 @@ dialog[open]::backdrop {
 .expression-reading__text { padding: 0.15rem 1.25rem 1rem var(--paint-text-x); background: none; outline: none; }
 .expression-reading__text :is(.expression-card__fact, .expression-card__examples, .expression-card__extras) { padding-left: 0; }
 .expression-reading__text :is(.expression-card__fact, .expression-card__examples)::before { left: -1.6rem; }
+.expression-reading__text > .expression-card__extras { justify-items: stretch; margin-top: 1rem; padding-top: 0.6rem; border-top: 1px solid var(--rule-soft); }
+.expression-reading__text .expression-card__notes { max-width: 72ch; }
+.expression-reading__text .expression-card__image { max-width: 28rem; }
 /* The painting is the reading's title. Its words are for assistive technology,
    and show in the hand only if the sheet cannot be painted. */
 .expression-reading__title { margin: 0.9rem 0 1rem; color: var(--paint-ink); font: 400 clamp(1.5rem, 6cqi, 2.2rem)/1.35 var(--display); text-wrap: balance; }
@@ -9932,13 +9934,9 @@ dialog[open]::backdrop {
   .expression-reading__text .expression-card__foot { margin-right: -0.5rem; }
 }
 
-/* From a landscape phone up, the facts sit beside the painting: stacked, a
-   one-line phrase would leave a half-empty card twice the viewport's height.
-   Each column runs from the card's top on its own: the painting, then its
-   example straight beneath it (the painter tells the card the sheet's
-   height); the facts, then the themes and the button straight beneath them.
-   Neither column waits on the other, so the taller never opens a gap in the
-   shorter. */
+/* The painting and examples share the upper row with the meanings. Notes,
+   themes and the next-paint action span the card beneath that reading, so
+   opening notes cannot leave a tall empty half beside them. */
 @property --paint-sheet-h {
   syntax: "<length>";
   inherits: true;
@@ -9946,15 +9944,16 @@ dialog[open]::backdrop {
 }
 @container expressions (min-width: 34rem) {
   .paint-sheet { --paint-label-room: 48px; }
-  .expression-reading { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 1.5rem; }
-  .expression-reading > .paint-sheet { grid-column: 1; grid-row: 1 / -1; align-self: start; }
+  .expression-reading { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 1.5rem; }
+  .expression-reading > .paint-sheet { grid-column: 1; grid-row: 1; align-self: start; }
   .expression-reading__title { margin: 1.1rem 0.5rem 0.9rem var(--paint-text-x); }
   .expression-reading[data-unpainted] .expression-reading__title { grid-column: 1; grid-row: 1; align-self: start; }
   .expression-reading__text { display: grid; grid-column: 1 / -1; grid-row: 1 / -1; grid-template-columns: subgrid; grid-template-rows: subgrid; padding: 0; }
-  .expression-reading__text > .expression-card__meanings { grid-column: 2; grid-row: 1; align-self: start; padding: 1.2rem 1.25rem 0 0.4rem; }
-  .expression-reading__text > .expression-card__examples { grid-column: 1; grid-row: 1 / -1; align-self: start; margin: var(--paint-sheet-h) 0 0 var(--paint-text-x); padding: 0 0.5rem 1.25rem 0; }
-  .expression-reading__text > .expression-card__extras { grid-column: 2; grid-row: 2; align-self: start; margin: 0; padding: 0.9rem 0.75rem 1rem 0.4rem; }
-  .expression-reading__text .expression-card__foot { margin-inline: -1.6rem -0.5rem; }
+  .expression-reading__text > .expression-card__meanings { grid-column: 2; grid-row: 1; align-self: start; padding: 1.2rem 1.25rem 1.25rem 0.4rem; }
+  .expression-reading__text > .expression-card__examples { grid-column: 1; grid-row: 1; align-self: start; margin: var(--paint-sheet-h) 0 0 var(--paint-text-x); padding: 0 0.5rem 1.25rem 0; }
+  .expression-reading__text > .expression-card__extras { grid-column: 1 / -1; grid-row: 2; align-self: start; margin: 0 1.25rem; padding: 0.6rem 0 1rem; }
+  .expression-reading__text .expression-card__foot { margin-inline: 0; }
+  .expression-reading__text .expression-card__foot[data-lead="notes"] .expression-card__notes-toggle::before { margin-inline: 0.15rem 0.6rem; }
   /* At rest only the paint button sits at the foot of the blank card. */
   .expression-reading[data-state="waiting"] > .paint-sheet { grid-row: 1 / -1; align-self: stretch; }
   .expression-reading > .expression-reading__actions { grid-column: 2; grid-row: 2; align-self: end; padding: 0.9rem 0.9rem 1rem 0; }
@@ -9962,10 +9961,10 @@ dialog[open]::backdrop {
 
 /* Where the sheet cannot be painted, the expression's title heads the first
    column instead, with the example beneath it. */
-@container expressions (34rem <= width < 90rem) {
-  .expression-reading[data-unpainted] { grid-template-rows: auto auto 1fr; }
+@container expressions (min-width: 34rem) {
+  .expression-reading[data-unpainted] { grid-template-rows: auto auto auto; }
   .expression-reading[data-unpainted] .expression-reading__text > .expression-card__meanings { grid-row: 1 / span 2; }
-  .expression-reading[data-unpainted] .expression-reading__text > .expression-card__examples { grid-row: 2 / span 2; margin-top: 0; }
+  .expression-reading[data-unpainted] .expression-reading__text > .expression-card__examples { grid-row: 2; margin-top: 0; }
   .expression-reading[data-unpainted] .expression-reading__text > .expression-card__extras { grid-row: 3; }
 }
 
@@ -9973,30 +9972,13 @@ dialog[open]::backdrop {
   .expression-reading { --paint-text-x: 64px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); column-gap: 2.5rem; }
   .expression-reading__text > .expression-card__meanings { padding-right: 2.25rem; }
   .expression-reading__text > .expression-card__examples { padding: 0 1rem 1.6rem 0; }
-  .expression-reading__text > .expression-card__extras { padding: 1rem 1.25rem 1.25rem 0.4rem; }
-  .expression-reading__text .expression-card__foot { margin-right: -0.75rem; }
+  .expression-reading__text > .expression-card__extras { margin-inline: 2rem; padding-bottom: 1.25rem; }
   .expression-reading__text .expression-card__fact dd, .expression-reading__text .expression-card__examples li { font-size: 0.97rem; }
   .expression-reading__text .expression-card__fact[data-fact="meaning"] dd { font-size: 1.1rem; }
 }
 
 @container expressions (min-width: 60rem) {
   .expression-reading { grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr); }
-  /* A wide column has room: the row lines up with the facts' words again
-     (the notes' toggle still leads from the dabs' column). */
-  .expression-reading__text .expression-card__foot { margin-inline: 0; }
-  .expression-reading__text .expression-card__foot[data-lead="notes"] { margin-left: -1.6rem; }
-}
-
-/* On a very wide card a short phrase would leave the middle empty: the
-   example moves up into a third column, with the themes and the button
-   beneath it, and all three columns start level. */
-@container expressions (min-width: 90rem) {
-  .expression-reading { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  .expression-reading > .paint-sheet { grid-row: 1 / -1; }
-  .expression-reading__text > .expression-card__meanings { grid-column: 2; grid-row: 1 / -1; padding: 1.2rem 0 1.5rem 0.4rem; }
-  .expression-reading__text > .expression-card__examples { grid-column: 3; grid-row: 1; margin: 1.2rem 0 0 0.4rem; padding: 0 2.25rem 0 0; }
-  .expression-reading__text > .expression-card__extras { grid-column: 3; grid-row: 2; }
-  .expression-reading > .expression-reading__actions { grid-column: 3; }
 }
 
 /* Without subgrid, the wide reading keeps to the column beside the painting. */
