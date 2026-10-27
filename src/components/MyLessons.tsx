@@ -628,7 +628,7 @@ export function MyLessons({
           "profile",
           // Signing out ends the visit, so it waits at the top right, small,
           // where Book stands on Your lessons (10 October 2026, at Dan's request).
-          <button className="my-lessons__sign-out" onClick={() => onSignOut?.()} type="button">
+          <button className="button button--outline button--small my-lessons__sign-out" onClick={() => onSignOut?.()} type="button">
             Sign out
           </button>
         )}
@@ -776,7 +776,7 @@ export function MyLessons({
                   <CardTerms change={student.cardForAllLessons} onCancel={() => setOpenField(null)} {...cardRules} />
                   {student.cardForAllLessons ? (
                     <button
-                      className="text-action"
+                      className="button button--outline button--small"
                       disabled={removingCard}
                       onClick={async () => {
                         const session = readSession();

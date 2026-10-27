@@ -2,6 +2,20 @@
 
 import type { RefObject } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { dateLabel } from "@/lib/teacher-calendar";
+
+/**
+ * A month the pager turns, named in full; on a phone the visible name is
+ * short (`Sept 2026`), so the heading and the pager share one row rather
+ * than the arrows dropping onto a line of their own. The full name is still
+ * what is read aloud.
+ */
+export function MonthLabel({ month }: { month: string }) {
+  return <>
+    <span className="teacher-month-label">{dateLabel(month, { month: "long", year: "numeric" })}</span>
+    <span className="teacher-month-label--short" aria-hidden="true">{dateLabel(month, { month: "short", year: "numeric" })}</span>
+  </>;
+}
 
 /**
  * The one pager on Inês's pages (14 October 2026, Dan: "there feels

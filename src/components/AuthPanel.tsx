@@ -354,7 +354,7 @@ export function AuthPanel({
       {mode !== "register" ? (
         <p className="auth-panel__aside">
           {byEmail ? (
-            <button className="auth-panel__link" onClick={() => switchMode("signin")} type="button">
+            <button className="button button--outline button--small" onClick={() => switchMode("signin")} type="button">
               Back to signing in
             </button>
           ) : (
@@ -362,11 +362,11 @@ export function AuthPanel({
               {/* Students Inês brought may never have chosen a password;
                   her own schedule signs in with one, or with Google. */}
               {!signInOnly ? (
-                <button className="auth-panel__link" onClick={() => switchMode("link")} type="button">
+                <button className="button button--outline button--small" onClick={() => switchMode("link")} type="button">
                   Email me a sign-in link
                 </button>
               ) : null}
-              <button className="auth-panel__link" onClick={() => switchMode("forgot")} type="button">
+              <button className="button button--outline button--small" onClick={() => switchMode("forgot")} type="button">
                 I&rsquo;ve forgotten my password
               </button>
             </>

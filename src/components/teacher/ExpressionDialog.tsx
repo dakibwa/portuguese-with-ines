@@ -114,7 +114,7 @@ export function ExpressionDialog({ expression, preview, openToStudents, fallback
             <button className="button button--coral" type="submit" disabled={busy}>{busy ? "Saving…" : expression?.published ? "Save changes" : "Save draft"}</button>
             <button className="button button--outline" type="button" disabled={busy} onClick={close}>Cancel</button>
           </div>
-          {expression ? <button className="teacher-text-button expression-form__delete" type="button" disabled={busy} onClick={() => { setConfirm("delete"); setError(""); }}>Delete expression</button> : null}
+          {expression ? <button className="button button--outline button--small expression-form__delete" type="button" disabled={busy} onClick={() => { setConfirm("delete"); setError(""); }}>Delete expression</button> : null}
         </form>
       )}
     </dialog>

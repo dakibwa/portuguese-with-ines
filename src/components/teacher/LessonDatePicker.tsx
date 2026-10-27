@@ -155,7 +155,7 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", idPrefi
         <h4>{dayInView ? dateLabel(date, { weekday: "short", day: "numeric", month: "short" }) : "Choose a day"}</h4>
         {loading ? <p role="status">Checking available times…</p> : current?.error ? <div className="teacher-inline-error" role="alert">
           <p>Available times couldn’t be checked.</p>
-          <button className="teacher-text-button" disabled={disabled} onClick={() => { forgetAvailability(); setRetry(value => value + 1); }} type="button">Try again</button>
+          <button className="button button--outline button--small" disabled={disabled} onClick={() => { forgetAvailability(); setRetry(value => value + 1); }} type="button">Try again</button>
         </div> : dayInView ? selectedTimes.length || gone.length ? <div className="teacher-lesson-picker__slots" aria-label={gone.length ? "Times in Porto" : "Available times in Porto"}>
           {/* Gone: any quarter hour, for a lesson she is recording. */}
           {gone.map(value => <button
@@ -176,7 +176,7 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", idPrefi
             onClick={() => onChange({ date: portoDateKey(new Date(slot.startAt)), time: formatSlotTime(slot.startAt), startAt: slot.startAt })}
             type="button"
           >{formatSlotTime(slot.startAt)}</button>)}
-        </div> : <p>No available times. Choose another day.</p> : <p>Choose a day to see its available times.</p>}
+        </div> : <p>No available times. Choose another day.</p> : <p>Its free times show here.</p>}
         {date && time ? <p className="teacher-lesson-picker__chosen">Chosen: <strong>{dateLabel(date, { day: "numeric", month: "short" })}, {time}</strong> · Porto time</p> : null}
       </div>
     </div>

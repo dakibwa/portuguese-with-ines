@@ -451,7 +451,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   with what she presses raised in cream inside them, as the student side's
   are (13 October 2026, Dan); the week's timetable keeps its own paper. They
   use the site's buttons: coral for the main action, outline for the other, a
-  quiet link for a rare one. Weekly hours is headed `Your weekly hours` with two dabs:
+  small outline or lilac button for a rare one (27 October 2026). Weekly hours is headed `Your weekly hours` with two dabs:
   tap or drag to mark when a lesson can start, and that it repeats every week.
 - `Edit weekly hours` in the Timetable opens the repeating weekly pattern in
   the same calendar. `View lessons` returns to the chosen week and day without
@@ -601,7 +601,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - Google Meet lives inside `Profile` (14 October 2026, Dan), in one card: the logo and `Connected as …` (or what
   it needs), two dabs (every lesson goes to her Google Calendar with its Meet
   link; move or cancel lessons here, not in Google), then `Open Google
-  Calendar` with `Reconnect Google Meet` as a quiet link, or a coral connect
+  Calendar` with a small `Reconnect Google Meet` button, or a coral connect
   when it needs her, and `Share your calendar` folded beneath. When the connection needs her, `Needs you` on her Timetable says so.
   Returning from Google opens Profile with the connection result. The same
   tab lets her request a confirmed sign-in email change or an emailed password
@@ -1307,7 +1307,7 @@ Preserve these desktop and mobile states:
   `Authorise payments` beside `Cancel`. A wide card sets the lesson and dabs
   on the left and the agreement on the right, level in the middle; a phone
   reads them top to bottom. In Inês's lesson dialog a lesson a card now pays for
-  offers the `Already paid` tick (below). The sign-in panel's quiet links read `Email me a sign-in link` and
+  offers the `Already paid` tick (below). The sign-in panel's small outline buttons read `Email me a sign-in link` and
   `I’ve forgotten my password` side by side; asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.
   Text fields are 44 px tall, the usual touch height. The change dialog is
@@ -1743,7 +1743,7 @@ as a form:
   in their name (`Already one of your students`): everything she does here
   should take as few steps as it can. A lesson opens in the student's own dialog: status, the student,
   the time in bold with its length and place beneath, then `Move lesson` in
-  coral beside `Cancel lesson`, with `Mark no-show` a quiet link below.
+  coral beside `Cancel lesson`, with `Mark no-show` a small outline button below.
   Confirming a change keeps to who and when (the Meet button, address and
   NIF step aside until `Back to lesson`): the question under a quiet rule,
   what it does as dabs (`Alex is emailed`, `It comes off your calendar`,
@@ -1881,8 +1881,8 @@ Inês's lesson dialog is about the lesson: its status, the student's splat and
 name, the date in bold with the time beneath, then `Join Google Meet` as a solid
 blue button carrying Meet's own mark, and the lesson's dabs (place, length,
 price and how it is paid). `Move lesson` in coral and `Cancel lesson` in
-outline share a row while both labels fit, and `Mark no-show` is a quiet
-underlined link beneath them. Moving opens under its own `Move this lesson`
+outline share a row while both labels fit, and `Mark no-show` is a small
+outline button beneath them. Moving opens under its own `Move this lesson`
 heading, as cancelling does under `Cancel this lesson?`, with what happens as a
 dab (`Sam gets an email with the new time`). `Mark no-show` is live from the lesson's start until an hour after
 its end, and before that it shows greyed out with `Available 11:00–13:00`, so
@@ -1890,6 +1890,36 @@ she always knows where it is. The marked state stays reversible within the same
 window, the lesson is charged once it closes, and a no-show means only €5 is
 taken instead of the full price. Confirmations keep a `Back to lesson` button
 beside the confirming one.
+
+## Design once-over — 27 October 2026
+
+Dan asked for one consistent, beautiful pass over every student and teacher
+page, and for onboarding to feel easy:
+
+- no word on its own is an underlined button. A rare action (`Try again`,
+  `Clear`, `Sign out`, `Change email`, `Edit details`, `Mark no-show`,
+  `Reconnect Google Meet`, the sign-in panel's other ways in) is the site's
+  small button: 40 px tall (44 px on touch), the compact label type, in
+  outline, or soft lilac where it adds something (`Show all`, `Add another
+  break`). It keeps its own width on a phone, where other buttons still run
+  full width. Disclosures that fold a rare choice away (`Set exact hours`,
+  a clash list's rest, Meet's note, `Have a code from Inês?`) are the same
+  small button and look pressed while open. Underlines stay for links inside sentences, the
+  footer's `Terms & privacy`, and emails; going back keeps the coral arrow;
+- a student's `Join Google Meet` in their lesson's dialog is the same raised
+  cream pill with Meet's mark as on their next lesson's card, never an
+  underlined line;
+- cards are filled, not left with a hole: `Set exact hours` and `Save weekly
+  hours` share the timetable's foot row; a set-up student's controls carry
+  their icons and wrap three and two on a narrow card; lesson history puts its
+  heading and the student's contact on one row where there is room; a wide
+  `Add a lesson` runs its calendar the full height beside the choices; and
+  the footer of Inês's tabs meets the bottom of the window;
+- a phone's month pagers say `Sept 2026`, so the month and both arrows
+  share one row;
+- `Add a student` opens on just a name and an email; their phone, NIF,
+  price and splat are folded under one small `Phone, NIF, price and splat`
+  button, and the price can still be set from the start.
 
 ## Transactional emails — 16 October 2026
 

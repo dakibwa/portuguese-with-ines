@@ -79,36 +79,44 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
           <span>Email <span className="teacher-field-optional">(optional, their welcome needs one)</span></span>
           <input autoComplete="off" disabled={busy} onChange={set("email")} type="email" value={details.email} />
         </label>
-        <label>
-          <span>Phone <span className="teacher-field-optional">(optional)</span></span>
-          <input autoComplete="off" disabled={busy} onChange={set("phone")} type="tel" value={details.phone} />
-        </label>
-        <label>
-          <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
-          <input autoComplete="off" disabled={busy} inputMode="numeric" onChange={set("nif")} type="text" value={details.nif} />
-        </label>
-        <fieldset className="teacher-profile__price">
-          <legend>Their price <span className="teacher-field-optional">(optional, per lesson)</span></legend>
-          <PriceFields draft={prices} disabled={busy} idPrefix="teacher-student-price" onChange={setPrices} />
-        </fieldset>
-        <div className="teacher-profile__splat">
-          <span id="teacher-student-splat">Their splat <span className="teacher-field-optional">(optional)</span></span>
-          <div aria-labelledby="teacher-student-splat" className="my-lessons__marks" role="group">
-            {[{ id: "", label: "Their initial" }, ...STUDENT_MARKS].map((choice) => (
-              <button
-                aria-label={choice.label}
-                aria-pressed={details.mark === choice.id}
-                className="my-lessons__mark"
-                disabled={busy}
-                key={choice.id || "initial"}
-                onClick={() => setDetails((current) => ({ ...current, mark: choice.id }))}
-                type="button"
-              >
-                <AccountAvatar mark={choice.id} name={details.name.trim() || "?"} />
-              </button>
-            ))}
+        {/* Name and email are all most students need on day one, so the rest
+            waits, folded, a press away (27 October 2026, Dan: onboarding
+            should feel easy). Their price still goes in from the start. */}
+        <details className="teacher-profile__more">
+          <summary>Phone, NIF, price and splat</summary>
+          <div className="teacher-profile__more-body">
+            <label>
+              <span>Phone <span className="teacher-field-optional">(optional)</span></span>
+              <input autoComplete="off" disabled={busy} onChange={set("phone")} type="tel" value={details.phone} />
+            </label>
+            <label>
+              <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
+              <input autoComplete="off" disabled={busy} inputMode="numeric" onChange={set("nif")} type="text" value={details.nif} />
+            </label>
+            <fieldset className="teacher-profile__price">
+              <legend>Their price <span className="teacher-field-optional">(optional, per lesson)</span></legend>
+              <PriceFields draft={prices} disabled={busy} idPrefix="teacher-student-price" onChange={setPrices} />
+            </fieldset>
+            <div className="teacher-profile__splat">
+              <span id="teacher-student-splat">Their splat <span className="teacher-field-optional">(optional)</span></span>
+              <div aria-labelledby="teacher-student-splat" className="my-lessons__marks" role="group">
+                {[{ id: "", label: "Their initial" }, ...STUDENT_MARKS].map((choice) => (
+                  <button
+                    aria-label={choice.label}
+                    aria-pressed={details.mark === choice.id}
+                    className="my-lessons__mark"
+                    disabled={busy}
+                    key={choice.id || "initial"}
+                    onClick={() => setDetails((current) => ({ ...current, mark: choice.id }))}
+                    type="button"
+                  >
+                    <AccountAvatar mark={choice.id} name={details.name.trim() || "?"} />
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
+        </details>
         <div className="teacher-dialog-actions">
           <button className="button button--coral" disabled={busy} type="submit" value="lessons">{busy ? "Adding…" : "Next: their lessons"}</button>
           {/* No lessons yet: their welcome asks them to book one (16 October 2026, Inês). */}

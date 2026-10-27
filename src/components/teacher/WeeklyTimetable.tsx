@@ -50,6 +50,8 @@ type Props = {
   mobileDay: number;
   dayControlHost?: HTMLElement | null;
   status?: ReactNode;
+  /** Saving weekly hours: beside Set exact hours, on the row it would leave empty. */
+  footer?: ReactNode;
   onSelectDay: (index: number) => void;
   onChange: (day: number, windows: TeachingWindow[]) => void;
   onDayOff: (date: string, off: boolean) => void;
@@ -80,6 +82,7 @@ export function WeeklyTimetable({
   mobileDay,
   dayControlHost,
   status,
+  footer,
   onSelectDay,
   onChange,
   onDayOff,
@@ -793,96 +796,99 @@ export function WeeklyTimetable({
       ) : null}
 
       {editing ? (
-        <details className="teacher-exact-hours" ref={exactRef}>
-          <summary>Set exact hours</summary>
-          <div className="teacher-form teacher-exact-hours__body">
-            <label>
-              <span>Day</span>
-              <select
-                value={exactDay}
-                onChange={(event) => setExactDay(Number(event.target.value))}
-              >
-                {WEEKDAYS.map((day) => (
-                  <option key={day.value} value={day.value}>
-                    {day.name}
-                  </option>
+        <div className="teacher-hours-foot">
+          <details className="teacher-exact-hours" ref={exactRef}>
+            <summary>Set exact hours</summary>
+            <div className="teacher-form teacher-exact-hours__body">
+              <label>
+                <span>Day</span>
+                <select
+                  value={exactDay}
+                  onChange={(event) => setExactDay(Number(event.target.value))}
+                >
+                  {WEEKDAYS.map((day) => (
+                    <option key={day.value} value={day.value}>
+                      {day.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="teacher-exact-windows">
+                {(hours[exactDay] ?? []).map((window, index) => (
+                  <div className="teacher-exact-window" key={index}>
+                    <label>
+                      <span>First start</span>
+                      <input
+                        aria-label={`${WEEKDAYS.find((d) => d.value === exactDay)!.name} window ${index + 1}, first start`}
+                        type="time"
+                        disabled={disabled}
+                        value={
+                          Number.isFinite(window.start)
+                            ? minuteLabel(window.start)
+                            : ""
+                        }
+                        onChange={(event) =>
+                          updateExact(index, {
+                            start: parseMinute(event.target.value),
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      <span>Last start</span>
+                      <input
+                        aria-label={`${WEEKDAYS.find((d) => d.value === exactDay)!.name} window ${index + 1}, last start`}
+                        type={window.lastStart === 1440 ? "text" : "time"}
+                        disabled={disabled}
+                        value={
+                          Number.isFinite(window.lastStart)
+                            ? minuteLabel(window.lastStart)
+                            : ""
+                        }
+                        onChange={(event) =>
+                          updateExact(index, {
+                            lastStart: parseMinute(event.target.value),
+                          })
+                        }
+                      />
+                    </label>
+                    <button
+                      className="teacher-icon-button"
+                      aria-label={`Remove teaching window ${index + 1}`}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() =>
+                        onChange(
+                          exactDay,
+                          (hours[exactDay] ?? []).filter(
+                            (_, position) => position !== index,
+                          ),
+                        )
+                      }
+                    >
+                      <Trash2 size={17} aria-hidden="true" />
+                    </button>
+                  </div>
                 ))}
-              </select>
-            </label>
-            <div className="teacher-exact-windows">
-              {(hours[exactDay] ?? []).map((window, index) => (
-                <div className="teacher-exact-window" key={index}>
-                  <label>
-                    <span>First start</span>
-                    <input
-                      aria-label={`${WEEKDAYS.find((d) => d.value === exactDay)!.name} window ${index + 1}, first start`}
-                      type="time"
-                      disabled={disabled}
-                      value={
-                        Number.isFinite(window.start)
-                          ? minuteLabel(window.start)
-                          : ""
-                      }
-                      onChange={(event) =>
-                        updateExact(index, {
-                          start: parseMinute(event.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>Last start</span>
-                    <input
-                      aria-label={`${WEEKDAYS.find((d) => d.value === exactDay)!.name} window ${index + 1}, last start`}
-                      type={window.lastStart === 1440 ? "text" : "time"}
-                      disabled={disabled}
-                      value={
-                        Number.isFinite(window.lastStart)
-                          ? minuteLabel(window.lastStart)
-                          : ""
-                      }
-                      onChange={(event) =>
-                        updateExact(index, {
-                          lastStart: parseMinute(event.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                  <button
-                    className="teacher-icon-button"
-                    aria-label={`Remove teaching window ${index + 1}`}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() =>
-                      onChange(
-                        exactDay,
-                        (hours[exactDay] ?? []).filter(
-                          (_, position) => position !== index,
-                        ),
-                      )
-                    }
-                  >
-                    <Trash2 size={17} aria-hidden="true" />
-                  </button>
-                </div>
-              ))}
-              <button
-                className="teacher-text-button"
-                type="button"
-                disabled={disabled}
-                onClick={() =>
-                  onChange(exactDay, [
-                    ...(hours[exactDay] ?? []),
-                    { start: 600, lastStart: 690 },
-                  ])
-                }
-              >
-                <Plus size={15} aria-hidden="true" />
-                Add a time window
-              </button>
+                <button
+                  className="button button--outline button--small"
+                  type="button"
+                  disabled={disabled}
+                  onClick={() =>
+                    onChange(exactDay, [
+                      ...(hours[exactDay] ?? []),
+                      { start: 600, lastStart: 690 },
+                    ])
+                  }
+                >
+                  <Plus size={15} aria-hidden="true" />
+                  Add a time window
+                </button>
+              </div>
             </div>
-          </div>
-        </details>
+          </details>
+          {footer}
+        </div>
       ) : null}
 
       {slotMenu

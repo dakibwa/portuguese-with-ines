@@ -122,7 +122,7 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
             <h3>Sign-in email</h3>
             <p>{student.email}</p>
           </div>
-          {!editingEmail ? <button className="teacher-text-button" disabled={locked} onClick={() => { setEditingEmail(true); setEmail(""); setError(""); setNote(""); }} type="button">Change email</button> : null}
+          {!editingEmail ? <button className="button button--outline button--small" disabled={locked} onClick={() => { setEditingEmail(true); setEmail(""); setError(""); setNote(""); }} type="button">Change email</button> : null}
         </div>
         {editingEmail ? (
           <form className="teacher-form teacher-account__email" onSubmit={changeEmail}>
@@ -131,7 +131,7 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
             <p>Confirm the link sent to the new address to change where you sign in.</p>
             <div className="teacher-account__actions">
               <button className="button button--coral" disabled={locked || !email.trim() || email.trim().toLowerCase() === student.email.toLowerCase()} type="submit">{busy === "email" ? "Sending…" : "Send confirmation email"}</button>
-              <button className="teacher-text-button" disabled={locked} onClick={() => setEditingEmail(false)} type="button">Cancel</button>
+              <button className="button button--outline button--small" disabled={locked} onClick={() => setEditingEmail(false)} type="button">Cancel</button>
             </div>
           </form>
         ) : null}
@@ -146,7 +146,7 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
       {error ? <p className="teacher-account__error" role="alert">{error}</p> : null}
       {note ? <p className="teacher-account__note" role="status"><CheckCircle2 size={17} aria-hidden="true" />{note}</p> : null}
       <div className="teacher-account__signout">
-        <button className="teacher-sign-out" disabled={locked} onClick={onSignOut} type="button">Sign out</button>
+        <button className="button button--outline button--small" disabled={locked} onClick={onSignOut} type="button">Sign out</button>
       </div>
     </section>
   );

@@ -341,7 +341,7 @@ export function LessonDetails({
             <div className="teacher-no-show">
               <button
                 aria-describedby={noShowLater ? "teacher-no-show-hint" : undefined}
-                className="text-action"
+                className="button button--outline button--small"
                 type="button"
                 disabled={busy || !canMarkAttendance || locked}
                 onClick={() => setAction("no-show")}

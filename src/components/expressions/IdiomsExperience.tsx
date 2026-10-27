@@ -77,7 +77,7 @@ export function IdiomsExperience() {
   return (
     <div className="idioms-workspace" key={`${token}:${me.id}`}>
       <div className="idioms-toolbar">
-        <a href={publicAssetPath(teacher ? "/schedule/?tab=expressions" : "/book/?view=lessons")}><ArrowLeft aria-hidden="true" size={18} />{teacher ? "Expressions collection" : "Your lessons"}</a>
+        <a className="button button--outline button--small" href={publicAssetPath(teacher ? "/schedule/?tab=expressions" : "/book/?view=lessons")}><ArrowLeft aria-hidden="true" size={16} />{teacher ? "Expressions collection" : "Your lessons"}</a>
         <span className="idioms-account"><AccountAvatar mark={me.mark} name={me.name} /><span>{me.name}</span></span>
       </div>
       {teacher ? <TeacherPainting account={me} token={token} /> : <StudentExpressions fullPage studentId={me.id} token={token} />}

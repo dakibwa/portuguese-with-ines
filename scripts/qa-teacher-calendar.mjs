@@ -912,6 +912,9 @@ try {
   const addStudent = page.getByRole("dialog");
   await addStudent.getByLabel("Full name").fill("Ana Costa");
   await addStudent.getByLabel("Email").fill("ana@example.invalid");
+  // The rest is folded, so the form opens on just a name and an email.
+  await expect(addStudent.getByLabel(/^Phone/)).toBeHidden();
+  await addStudent.getByText("Phone, NIF, price and splat", { exact: true }).click();
   await addStudent.getByLabel(/^Phone/).fill("+351 912 345 678");
   await addStudent.getByLabel(/^NIF/).fill("123456789");
   await addStudent.getByRole("button", { name: "Bloom", exact: true }).click();

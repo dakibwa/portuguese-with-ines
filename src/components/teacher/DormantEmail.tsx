@@ -29,7 +29,7 @@ function useDefaultWords(token: string, version = 0) {
 
 function Loading({ problem, retry }: { problem: string; retry: () => void }) {
   return problem
-    ? <div className="teacher-inline-error" role="alert"><p>{problem}</p><button className="teacher-text-button" onClick={retry} type="button">Try again</button></div>
+    ? <div className="teacher-inline-error" role="alert"><p>{problem}</p><button className="button button--outline button--small" onClick={retry} type="button">Try again</button></div>
     : <p role="status">Loading your email…</p>;
 }
 

@@ -755,7 +755,7 @@ function deferred<Props extends object>(fetchComponent: () => Promise<ComponentT
       return (
         <p className="booking-state-note" role="alert">
           This part of the page couldn&rsquo;t load.{" "}
-          <button className="text-action" onClick={() => setFailed(false)} type="button">
+          <button className="button button--outline button--small" onClick={() => setFailed(false)} type="button">
             Try again
           </button>
         </p>
@@ -4000,7 +4000,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 {returnCalendarWeekCount && !restrictedWeeks ? (
                   <button
                     aria-controls="booking-calendar-weeks"
-                    className="text-action unified-calendar__expand"
+                    className="button button--lilac button--small unified-calendar__expand"
                     disabled={manageWorking}
                     onClick={() => transitionBooking(() => setCalendarWeekCount(returnCalendarWeekCount))}
                     type="button"
@@ -4481,7 +4481,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         {showWorkflowCalendar && intent === "book" && !managed && !student && !returningDevice && !isConfirmingBooking ? (
           <p className="booking-returning">
             Already booked?{" "}
-            <button onClick={openLessonsJourney} type="button">Sign in</button>
+            <button className="button button--outline button--small" onClick={openLessonsJourney} type="button">Sign in</button>
           </p>
         ) : null}
 

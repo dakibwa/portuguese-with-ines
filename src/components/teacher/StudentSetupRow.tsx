@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Check, Clock3, LockKeyhole, X } from "lucide-react";
+import { CalendarPlus, Check, Clock3, Euro, History, KeyRound, LockKeyhole, Mail, UserRound, X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { ComeBackEmail, firstName } from "@/components/teacher/DormantEmail";
 import { LessonForm } from "@/components/teacher/LessonForm";
@@ -176,11 +176,13 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   >{sending === student.id ? "Sending…" : again ? "Send the link again" : "Send welcome email"}<span className="visually-hidden"> to {student.name}</span></button>;
 
   const profilePanel = ready || step === "history" || step === "details";
+  // Each with its mark above its name, as the setup steps are, so a set-up
+  // student's row reads as the same kind of control (27 October 2026, Dan).
   const controls = [
-    ["details", "Details"], ["price", "Price"], ["lessons", "Add a lesson"], ["history", "Lesson history"],
+    ["details", "Details", UserRound], ["price", "Price", Euro], ["lessons", "Add a lesson", CalendarPlus], ["history", "Lesson history", History],
     // A fresh way in for someone already set up, sent only by her press inside
     // it; a dormant student's come-back email carries one already.
-    ...(!student.email ? [] : student.dormant ? [["come-back", "Come-back email"] as const] : [["sign-in", "Sign-in link"] as const]),
+    ...(!student.email ? [] : student.dormant ? [["come-back", "Come-back email", Mail] as const] : [["sign-in", "Sign-in link", KeyRound] as const]),
   ] as const;
   const prices = ([60, 90] as const).filter(minutes => student.prices?.[minutes] !== undefined)
     .map(minutes => `${minutes} mins · ${formatPriceCents(student.prices![minutes]!)}`).join(", ");
@@ -198,7 +200,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
         type="button"
       ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{ready ? <span className="teacher-student__label">{student.dormant ? "Dormant" : "Student"}</span> : null}</span></button>
       {ready ? <div className="teacher-student__controls" aria-label={`${student.name}’s profile sections`}>
-        {controls.map(([panel, label]) => <button aria-controls={paneId} aria-expanded={step === panel} aria-label={`${label} for ${student.name}`} disabled={disabled} key={panel} onClick={() => { setNotice(""); onSelect(step === panel ? null : panel); }} type="button">{label}</button>)}
+        {controls.map(([panel, label, Icon]) => <button aria-controls={paneId} aria-expanded={step === panel} aria-label={`${label} for ${student.name}`} disabled={disabled} key={panel} onClick={() => { setNotice(""); onSelect(step === panel ? null : panel); }} type="button"><i aria-hidden="true"><Icon size={14} strokeWidth={2.2} /></i><span>{label}</span></button>)}
       </div> : <ol className="teacher-setup__steps">
         {steps.map(entry => <li className={entry.done ? "is-done" : entry.lockedReason ? "is-locked" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
           <button
@@ -246,7 +248,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
             {student.nif ? <li>NIF {student.nif}</li> : null}
           </ul>
           <div className="teacher-student__contact-actions">
-            {!ready ? <button className="teacher-text-button" disabled={disabled} onClick={() => onSelect("details")} type="button">Edit details</button> : null}
+            {!ready ? <button className="button button--outline button--small" disabled={disabled} onClick={() => onSelect("details")} type="button">Edit details</button> : null}
             {dormantButton}
           </div>
         </div>

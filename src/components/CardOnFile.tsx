@@ -181,7 +181,7 @@ export function CardTerms({ change = false, onCancel, bookingId = "", feeCents =
 export function CardPrompt({ bookingId = "" }: { bookingId?: string }) {
   const [open, setOpen] = useState(Boolean(bookingId));
   return (
-    <section aria-labelledby="card-prompt-heading" className={`card-prompt${bookingId && open ? " card-prompt--review" : ""}`}>
+    <section aria-labelledby="card-prompt-heading" className={`card-prompt${open ? " card-prompt--open" : ""}${bookingId && open ? " card-prompt--review" : ""}`}>
       <span aria-hidden="true" className="card-prompt__icon">
         <CreditCard size={20} />
       </span>
