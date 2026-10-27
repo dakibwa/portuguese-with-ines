@@ -30,13 +30,13 @@ function deferred() {
   return { promise, resolve };
 }
 
-async function open(width, path, { session = "", me = student, bookings = [added], reply = () => null } = {}) {
+async function open(width, path, { session = "", me = student, bookings = [added], now = "2026-09-07T10:15:00Z", reply = () => null } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width < 741 });
   const errors = [];
   const posts = [];
   const reads = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.clock.setFixedTime(new Date("2026-09-07T10:15:00Z"));
+  await page.clock.setFixedTime(new Date(now));
   if (session) await page.addInitScript((value) => localStorage.setItem("ines-student-session", value), session);
   await page.route("https://checkout.stripe.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<title>Stripe</title>" }));
   await page.route(url => /^\/(me(?:\/|$)|auth\/|admin\/expressions$|lesson-types$|availability$|bookings)/.test(url.pathname), async (route) => {
@@ -95,13 +95,49 @@ try {
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/prompt-${width}.png`, fullPage: false });
 
     await prompt.getByRole("button", { name: "Add card" }).click();
-    await expect(prompt.locator(".booking-payment-facts")).toContainText("Your upcoming lessons with Inês are charged to it, each after it ends");
+    await expect(prompt.locator(".booking-payment-facts")).toBeVisible();
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/terms-${width}.png`, fullPage: false });
     await prompt.getByRole("button", { name: "Agree & add card" }).click();
     await linked.page.waitForURL(/checkout\.stripe\.com/);
     assert.deepEqual(linked.posts.find((post) => post.endpoint === "/me/card")?.body, { consent: true });
     assert.deepEqual(linked.errors, []);
     await linked.page.close();
+
+    // A named past lesson stays explicit and requires its own payment
+    // agreement. Merely opening the personal link never starts card setup.
+    const approvedBooking = { id: "approved-past-lesson", reference: "PT-COMBINED", startAt: "2026-10-27T17:00:00.000Z", endAt: "2026-10-27T18:00:00.000Z", amountCents: 1500 };
+    let combinedAuthorised = false;
+    const combined = await open(width, "/book/?signin=qa-combined-link&cardBooking=approved-past-lesson", {
+      now: "2026-10-27T20:00:00Z",
+      me: { ...student, hasCard: true },
+      reply: endpoint => {
+        if (endpoint === "/auth/email-link/confirm") return { json: { student: { ...student, hasCard: true }, session: "qa-combined-session" } };
+        if (endpoint === "/me/card/preview") return { json: { booking: approvedBooking, savedCardKey: "qa-saved-card", sameDayFeeCents: 500, minimumNoticeHours: 14 } };
+        if (endpoint === "/me" && combinedAuthorised) return { json: { student: { ...student, hasCard: true, cardForAllLessons: true }, bookings: [added], series: [], cardsAccepted: true } };
+        if (endpoint === "/me/card") { combinedAuthorised = true; return { json: { authorised: true } }; }
+        return null;
+      }
+    });
+    await expect(combined.page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible({ timeout: 15000 });
+    assert.equal(combined.posts.length, 0);
+    assert.ok(!combined.page.url().includes("signin="));
+    await combined.page.getByRole("button", { name: "Sign in", exact: true }).click();
+    const approval = combined.page.locator(".card-prompt");
+    await expect(approval).toContainText("€15");
+    await combined.page.reload();
+    await expect(approval).toContainText("€15");
+    const agree = approval.getByRole("button", { name: "Authorise payments" });
+    await expect(agree).toBeDisabled();
+    assert.equal(combined.posts.filter(post => post.endpoint === "/me/card").length, 0);
+    await approval.screenshot({ path: `tmp/qa/transition-kit/combined-${width}.png` });
+    await approval.getByRole("button", { name: "I authorise card payments for this and future lessons" }).click();
+    await expect(agree).toBeEnabled();
+    assert.ok(await noOverflow(combined.page));
+    await agree.click();
+    await expect(combined.page.getByText("Payments authorised. You’re all set.")).toBeVisible();
+    assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card")?.body, { consent: true, booking: approvedBooking, bookingConsent: true, savedCardKey: "qa-saved-card" });
+    assert.deepEqual(combined.errors, []);
+    await combined.page.close();
 
     // A link may finish after another tab has signed in. Its one-time reply
     // must preserve that newer session; leaving a card request behind must

@@ -197,7 +197,7 @@ export function createCardSetupSession(
  * reference names the student, so the webhook can never mistake it for a
  * booking's setup.
  */
-export function createStudentCardSession(env, { student, successUrl, cancelUrl }) {
+export function createStudentCardSession(env, { student, successUrl, cancelUrl, approvedBooking = null }) {
   return stripeRequest(
     env,
     "/checkout/sessions",
@@ -214,6 +214,12 @@ export function createStudentCardSession(env, { student, successUrl, cancelUrl }
       ...uiModeFields(env, { successUrl, cancelUrl, forceHosted: true }),
       metadata: {
         purpose: "student_card",
+        ...(approvedBooking ? {
+          approved_booking_id: approvedBooking.id,
+          approved_booking_amount: approvedBooking.amountCents,
+          approved_booking_start: approvedBooking.startAt,
+          approved_booking_end: approvedBooking.endAt
+        } : {}),
         student_id: student.id,
         session_version: student.session_version ?? 0,
         card_setup_version: student.card_setup_version ?? 0

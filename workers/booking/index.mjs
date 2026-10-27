@@ -1542,6 +1542,78 @@ async function teacherStudentList(env) {
   }));
 }
 
+/** One explicitly selected unpaid lesson, including one that has already ended.
+ * No other past lesson is swept into standing card consent. */
+async function cardBooking(env, studentId, bookingId) {
+  if (typeof bookingId !== "string" || !BOOKING_ID.test(bookingId)) return null;
+  return env.DB.prepare(`SELECT b.*, COALESCE(b.amount_cents, l.price_cents) AS card_amount
+    FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
+    WHERE b.id = ? AND b.student_id = ? AND b.added_by_teacher = 1 AND b.status = 'confirmed'
+      AND b.payment_status = 'not_required' AND b.charge_started_at IS NULL AND b.attendance_status = 'expected'
+      AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
+      AND COALESCE(b.amount_cents, l.price_cents) > 0`).bind(bookingId, studentId).first();
+}
+
+function cardBookingSummary(row) {
+  return { id: row.id, reference: row.reference, startAt: row.starts_at, endAt: row.ends_at, amountCents: row.card_amount };
+}
+
+async function savedCardKey(student) {
+  return student.stripe_customer_id && student.stripe_payment_method
+    ? sessionHash(`${student.id}:${student.stripe_customer_id}:${student.stripe_payment_method}:${student.card_setup_version ?? 0}`) : "";
+}
+
+/** The verified, already-stored card needs new permission, not new card details.
+ * A transaction marker makes logout, card removal and a concurrently paid or
+ * edited lesson fail closed before either the lesson or repeats are scheduled. */
+async function authoriseSavedCard(request, env, student, booking) {
+  const now = new Date().toISOString();
+  const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const marker = `card-authorisation:${crypto.randomUUID()}`;
+  const [saved] = await env.DB.batch([
+    env.DB.prepare(`UPDATE students SET card_consent_at = ?
+      WHERE id = ? AND session_version = ? AND card_setup_version = ?
+        AND stripe_customer_id = ? AND stripe_payment_method = ? AND email_verified_at IS NOT NULL AND ${studentLikeSql()}
+        AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)
+        AND EXISTS (SELECT 1 FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
+          WHERE b.id = ? AND b.student_id = students.id AND b.added_by_teacher = 1 AND b.status = 'confirmed'
+            AND b.payment_status = 'not_required' AND b.charge_started_at IS NULL AND b.attendance_status = 'expected'
+            AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
+            AND b.starts_at = ? AND b.ends_at = ? AND COALESCE(b.amount_cents, l.price_cents) = ?)`)
+      .bind(now, student.id, student.session_version ?? 0, student.card_setup_version ?? 0,
+        student.stripe_customer_id, student.stripe_payment_method, await sessionHash(bearer),
+        booking.id, booking.startAt, booking.endAt, booking.amountCents),
+    env.DB.prepare("INSERT INTO request_limits (key, window, attempts) SELECT ?, ?, 1 WHERE changes() > 0")
+      .bind(marker, Math.floor(Date.now() / 900000)),
+    env.DB.prepare(`UPDATE bookings SET payment_status = 'scheduled',
+        amount_cents = COALESCE(amount_cents, (SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)),
+        payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
+      WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'not_required'
+        AND (starts_at > ? OR id = ?) AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
+        AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`)
+      .bind(now, STUDENT_CARD_CONSENT_VERSION, now, student.id, now, booking.id, marker),
+    env.DB.prepare(`UPDATE booking_series SET automatic_payment = 1, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
+      WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active' AND automatic_payment = 0
+        AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`)
+      .bind(now, STUDENT_CARD_CONSENT_VERSION, now, student.id, marker),
+    env.DB.prepare("DELETE FROM request_limits WHERE key = ?").bind(marker)
+  ]);
+  if (!(saved?.meta?.changes > 0)) return fail("Your card or lesson changed. Review it again before agreeing.", 409, request, env);
+  return json({ authorised: true }, 200, request, env);
+}
+
+async function handleCardBookingPreview(request, env) {
+  const student = await currentStudent(request, env);
+  if (!student || !isStudentLike(student)) return fail("Please sign in to review this lesson.", 401, request, env);
+  const body = await readJson(request);
+  const row = await cardBooking(env, student.id, body.bookingId);
+  if (!row) return fail("This lesson is no longer waiting for card approval. Please check with Inês before paying.", 409, request, env);
+  const settings = await loadSettings(env);
+  if (!cardsTaken(env, settings)) return fail("Cards can't be added just now. Please try again later.", 503, request, env);
+  return json({ booking: cardBookingSummary(row), savedCardKey: await savedCardKey(student), sameDayFeeCents: settings.sameDayChangeFeeCents,
+    minimumNoticeHours: settings.minimumNoticeHours }, 200, request, env);
+}
+
 /**
  * A card saved from the student's account: Stripe's hosted page, not tied to
  * a booking. Pressing the button is the agreement, and the page says what to
@@ -1560,14 +1632,29 @@ async function handleStudentCard(request, env) {
   if (!cardsTaken(env, settings)) return fail("Cards can't be added just now. Please try again later.", 503, request, env);
   const body = await readJson(request);
   if (body.consent !== true) return fail("Please agree to the card terms first.", 400, request, env);
+  let approvedBooking = null;
+  if (body.booking !== undefined) {
+    const row = await cardBooking(env, student.id, body.booking?.id);
+    if (body.bookingConsent !== true) return fail("Please authorise this lesson and future card payments first.", 400, request, env);
+    if (!row || body.booking.amountCents !== row.card_amount || body.booking.startAt !== row.starts_at || body.booking.endAt !== row.ends_at) {
+      return fail("This lesson or its price has changed. Review it again before agreeing.", 409, request, env);
+    }
+    approvedBooking = cardBookingSummary(row);
+  }
   if (!await takeRateLimit(env, `card:${student.id}`, 10, 3600)) {
     return fail("Too many attempts. Please try again in an hour.", 429, request, env);
   }
+  if (body.savedCardKey) {
+    if (!approvedBooking || body.savedCardKey !== await savedCardKey(student)) {
+      return fail("Your saved card has changed. Review it again before agreeing.", 409, request, env);
+    }
+    return authoriseSavedCard(request, env, student, approvedBooking);
+  }
   try {
     const session = await createStudentCardSession(env, {
-      student,
+      student, approvedBooking,
       successUrl: siteUrl(env, "/book/?view=lessons&card=added"),
-      cancelUrl: siteUrl(env, "/book/?view=lessons")
+      cancelUrl: siteUrl(env, `/book/?view=lessons${approvedBooking ? `&cardBooking=${encodeURIComponent(approvedBooking.id)}` : ""}`)
     });
     if (!session?.url) throw new Error("Stripe returned no card page");
     return json({ checkoutUrl: session.url }, 200, request, env);
@@ -1618,7 +1705,8 @@ async function handleRemoveStudentCard(request, env) {
 /**
  * Stripe has saved the card. From now on the lessons Inês added that are
  * still to come pay for themselves after they end, on the same terms as a
- * lesson the student books; anything already past stays as it was.
+ * lesson the student books. Past lessons stay unchanged unless the student
+ * explicitly approved the one named in this session's reviewed snapshot.
  */
 async function confirmStudentCard(env, session) {
   const studentId = String(session.metadata?.student_id ?? "");
@@ -1665,6 +1753,14 @@ async function confirmStudentCard(env, session) {
   const consentedAt = Number.isFinite(session.created) ? new Date(session.created * 1000).toISOString() : now;
   const eligible = `card_setup_version = ? AND session_version = ? AND email_verified_at IS NOT NULL AND ${studentLikeSql()}`;
   const current = `EXISTS (SELECT 1 FROM students WHERE id = ? AND card_consent_at = ? AND ${eligible})`;
+  const approvedId = session.metadata?.approved_booking_id || "";
+  const approvedAmount = Number(session.metadata?.approved_booking_amount);
+  const approvedStart = session.metadata?.approved_booking_start || "";
+  const approvedEnd = session.metadata?.approved_booking_end || "";
+  if (approvedId && (!BOOKING_ID.test(approvedId) || !Number.isSafeInteger(approvedAmount) || approvedAmount <= 0 ||
+      !Number.isFinite(Date.parse(approvedStart)) || !Number.isFinite(Date.parse(approvedEnd)))) {
+    return new Response("Invalid approved lesson.", { status: 400 });
+  }
   const [saved] = await env.DB.batch([
     env.DB.prepare(
       `UPDATE students SET stripe_customer_id = ?, stripe_payment_method = ?, card_consent_at = ?
@@ -1674,9 +1770,20 @@ async function confirmStudentCard(env, session) {
       `UPDATE bookings SET payment_status = 'scheduled',
          amount_cents = COALESCE(amount_cents, (SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)),
          payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
-       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'not_required' AND starts_at > ?
+       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'not_required' AND starts_at > ? AND id != ?
          AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}' AND ${current}`
-    ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, now, student.id, consentedAt, setupVersion, accountVersion),
+    ).bind(consentedAt, STUDENT_CARD_CONSENT_VERSION, now, student.id, now, approvedId, student.id, consentedAt, setupVersion, accountVersion),
+    // Snapshot conditions run at the write: paid, cancelled, moved or repriced
+    // while Stripe was open means this named lesson is never charged by it.
+    ...(approvedId ? [env.DB.prepare(`UPDATE bookings SET payment_status = 'scheduled', amount_cents = ?,
+        payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
+      WHERE id = ? AND student_id = ? AND added_by_teacher = 1 AND status = 'confirmed'
+        AND payment_status = 'not_required' AND charge_started_at IS NULL AND attendance_status = 'expected'
+        AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
+        AND starts_at = ? AND ends_at = ?
+        AND COALESCE(amount_cents, (SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)) = ? AND ${current}`)
+      .bind(approvedAmount, consentedAt, STUDENT_CARD_CONSENT_VERSION, now, approvedId, student.id,
+        approvedStart, approvedEnd, approvedAmount, student.id, consentedAt, setupVersion, accountVersion)] : []),
     env.DB.prepare(
       `UPDATE booking_series SET automatic_payment = 1, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
        WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active' AND automatic_payment = 0 AND ${current}`
@@ -1893,6 +2000,7 @@ const worker = {
       if (request.method === "POST" && path === "/me") return await handleUpdateMe(request, env);
       if (request.method === "POST" && path === "/me/email") return await handleRequestEmailChange(request, env, ctx);
       if (request.method === "POST" && path === "/me/email/confirm") return await handleConfirmEmailChange(request, env);
+      if (request.method === "POST" && path === "/me/card/preview") return await handleCardBookingPreview(request, env);
       if (request.method === "POST" && path === "/me/card") return await handleStudentCard(request, env);
       if (request.method === "POST" && path === "/me/card/remove") return await handleRemoveStudentCard(request, env);
       if (path === "/me/homework" || /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path)) {
@@ -6005,6 +6113,22 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     if (updated === null) return fail("Free lessons need a database update first. Nothing was changed.", 503, request, env);
     const list = await teacherStudentList(env);
     return json({ student: list.find((entry) => entry.id === student.id), updated, stayFree: await lessonsStayingFree(env, student.id) }, 200, request, env);
+  }
+
+  // Prepare a personal approval link without emailing, changing consent or
+  // touching Stripe. The student reviews one named lesson after signing in.
+  const cardLink = path.match(/^\/admin\/bookings\/([^/]+)\/card-link$/);
+  if (cardLink && request.method === "POST") {
+    const booking = await env.DB.prepare("SELECT student_id FROM bookings WHERE id = ?").bind(cardLink[1]).first();
+    const student = booking?.student_id ? await env.DB.prepare("SELECT * FROM students WHERE id = ? AND role = 'student'").bind(booking.student_id).first() : null;
+    const row = student ? await cardBooking(env, student.id, cardLink[1]) : null;
+    if (!row || !hasEmail(student)) return fail("This lesson needs an unpaid student booking with an email address.", 409, request, env);
+    if (!cardsTaken(env, await loadSettings(env))) return fail("Cards can't be added just now.", 503, request, env);
+    if (!await takeRateLimit(env, `card-link:${student.id}`, 10, 3600)) return fail("Please wait before creating another link.", 429, request, env);
+    const owner = welcomeAuthorization(env, student, authorization);
+    await owner.assert();
+    const link = await issueSignInLink(env, student, WELCOME_LINK_MINUTES, owner);
+    return json({ url: `${link.url}&cardBooking=${encodeURIComponent(row.id)}`, booking: cardBookingSummary(row) }, 200, request, env);
   }
 
   // Her welcome for a student: their one-click way in and the lessons she has

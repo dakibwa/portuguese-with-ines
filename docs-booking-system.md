@@ -2394,3 +2394,33 @@ Provider references: [Calendar scopes](https://developers.google.com/workspace/c
 [calendar creation](https://developers.google.com/workspace/calendar/api/v3/reference/calendars/insert),
 [event conferences](https://developers.google.com/workspace/calendar/api/guides/create-events),
 [OAuth production readiness](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview).
+
+### Approval for one unpaid lesson and future lessons — 27 October 2026
+
+From an unpaid lesson's details, Inês can create and copy a payment approval
+link (`POST /admin/bookings/:id/card-link`). Creating it only issues the
+existing 14-day, one-use sign-in link; it sends no email, opens no Stripe
+session, and changes no booking or payment consent. It does not mark a first
+welcome as sent. The link names the selected booking with `cardBooking`.
+
+After signing in, the student reviews that lesson's date, time and price,
+then actively agrees to both that lesson and
+standing automatic payment for future lessons. Previewing is read-only
+(`POST /me/card/preview`); `POST /me/card` checks the reviewed snapshot and
+explicit lesson consent. A previously saved card is authorised in place:
+the student does not add it again or visit Stripe. Its opaque review key binds
+the approval to that saved card; the transaction rechecks the card, session,
+revocation and lesson snapshot before recording consent. A card removed or
+replaced, a revoked session, or a paid/edited lesson refuses the approval.
+
+Without a saved card, Stripe setup collects one and only its verified
+completion schedules the selected lesson, including one that has started or
+ended. The webhook pins its amount and times and
+checks ownership, confirmed/unpaid status, attendance and card generations
+at the write. A changed, cancelled or already-paid lesson is skipped; no
+other past lesson is included. Future teacher-added lessons and active repeats
+use the existing standing consent. The existing hourly-after-end scheduler
+collects once due, or on its next tick after later card confirmation. Creating
+or viewing the link cannot take payment. Old welcome links retain their
+future-only behaviour. The lesson and card consent stay unchanged until the
+student completes their own approval (and Stripe setup if a card is needed).

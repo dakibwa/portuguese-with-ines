@@ -3495,6 +3495,137 @@ await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours
     forgetStudent(email);
   }
 });
+await test("a saved card can authorise the named lesson and repeats without entering card details or charging early", async () => {
+  const id = "saved-card-approval", email = `${id}@example.invalid`;
+  student(id);
+  db.prepare("UPDATE students SET email_verified_at=? WHERE id=?").run(new Date().toISOString(), id);
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const selected = linkedBooking("saved-card-today", { owner: id, payment: "not_required", start: "2026-09-01T17:00:00.000Z", end: "2026-09-01T18:00:00.000Z" });
+  const otherPast = linkedBooking("saved-card-older", { owner: id, payment: "not_required", start: "2026-08-25T17:00:00.000Z", end: "2026-08-25T18:00:00.000Z" });
+  db.prepare("UPDATE bookings SET added_by_teacher=1 WHERE student_id=?").run(id);
+  const ownToken = await createSession(id, env.BOOKING_TOKEN_SECRET);
+  const tokenHash = await sessionHash(ownToken);
+  try {
+    const added = await call("/admin/bookings", { user: "teacher", body: {
+      email, name: "Saved Card Student", lessonType: "single", startAt: "2026-10-13T01:30:00.000Z", repeat: "open"
+    } });
+    assert.equal(added.status, 201, await added.clone().text());
+    await drain();
+    const preview = await (await call("/me/card/preview", { token: ownToken, body: { bookingId: selected } })).json();
+    assert.ok(preview.savedCardKey);
+    const body = { consent: true, bookingConsent: true, booking: preview.booking, savedCardKey: preview.savedCardKey };
+    const setupCount = checkoutRequests.length, chargeCount = charges.length;
+    assert.equal((await call("/me/card", { token: ownToken, body: { ...body, savedCardKey: "stale-card" } })).status, 409);
+    for (const race of ["paid", "changed-card", "signed-out"]) {
+      beforeRun = sql => {
+        if (!sql.startsWith("UPDATE students SET card_consent_at = ?")) return;
+        if (race === "paid") db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(selected);
+        if (race === "changed-card") db.prepare("UPDATE students SET stripe_payment_method='pm_replaced' WHERE id=?").run(id);
+        if (race === "signed-out") db.prepare("INSERT INTO revoked_sessions (token_hash,expires_at) VALUES (?,?)").run(tokenHash, Date.now() + 86400000);
+      };
+      try { assert.equal((await call("/me/card", { token: ownToken, body })).status, 409, race); }
+      finally { beforeRun = null; }
+      assert.equal(db.prepare("SELECT card_consent_at FROM students WHERE id=?").get(id).card_consent_at, null);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND payment_status='scheduled'").get(id).n, 0);
+      db.prepare("UPDATE bookings SET payment_consent_version=NULL WHERE id=?").run(selected);
+      db.prepare("UPDATE students SET stripe_payment_method=? WHERE id=?").run(`pm_${id}`, id);
+      db.prepare("DELETE FROM revoked_sessions WHERE token_hash=?").run(tokenHash);
+    }
+    const consent = await call("/me/card", { token: ownToken, body });
+    assert.equal(consent.status, 200, await consent.clone().text());
+    assert.deepEqual(await consent.json(), { authorised: true });
+    assert.equal(checkoutRequests.length, setupCount, "no new card form or setup session for a saved card");
+    assert.equal(charges.length, chargeCount, "only the normal due-payment scheduler takes payment");
+    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(selected).payment_status, "scheduled");
+    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(otherPast).payment_status, "not_required");
+    assert.equal(db.prepare("SELECT automatic_payment FROM booking_series WHERE student_id=?").get(id).automatic_payment, 1);
+    assert.equal((await call("/me/card", { token: ownToken, body })).status, 409, "a repeat press cannot consent or charge twice");
+  } finally { beforeRun = null; forgetStudent(email); }
+});
+await test("a prepared card link needs the student's approval and covers exactly one past lesson plus future repeats", async () => {
+  const previousClock = clock;
+  clock = NativeDate.parse("2026-10-27T18:30:00Z");
+  const id = "combined-card", email = `${id}@example.invalid`;
+  student(id);
+  db.prepare("UPDATE students SET email_verified_at=? WHERE id=?").run(new Date().toISOString(), id);
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const selected = linkedBooking("combined-today", { owner: id, payment: "not_required", start: "2026-10-27T17:00:00.000Z", end: "2026-10-27T18:00:00.000Z" });
+  const otherPast = linkedBooking("combined-older", { owner: id, payment: "not_required", start: "2026-10-20T17:00:00.000Z", end: "2026-10-20T18:00:00.000Z" });
+  db.prepare("UPDATE bookings SET added_by_teacher=1 WHERE student_id=?").run(id);
+  try {
+    const series = await call("/admin/bookings", { user: "teacher", body: {
+      email, name: "Combined Student", lessonType: "single", startAt: "2026-11-03T03:30:00.000Z", repeat: "open"
+    } });
+    assert.equal(series.status, 201, await series.clone().text());
+    await drain();
+    const emailCount = db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n;
+    const stripeCount = checkoutRequests.length, chargeCount = charges.length;
+    assert.equal((await call(`/admin/bookings/${selected}/card-link`)).status, 401);
+    const prepared = await call(`/admin/bookings/${selected}/card-link`, { user: "teacher" });
+    assert.equal(prepared.status, 200, await prepared.clone().text());
+    const url = new URL((await prepared.json()).url);
+    assert.equal(url.searchParams.get("cardBooking"), selected);
+    assert.ok(url.searchParams.get("signin"));
+    assert.equal(checkoutRequests.length, stripeCount, "creating a link does not even create a Stripe session");
+    assert.equal(charges.length, chargeCount);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, emailCount, "no email sent or queued");
+    assert.equal(db.prepare("SELECT card_consent_at FROM students WHERE id=?").get(id).card_consent_at, null);
+    assert.equal((await call("/me/card/preview", { body: { bookingId: selected } })).status, 409, "another account cannot see the lesson");
+    const login = await call("/auth/email-link/confirm", { user: null, body: { token: url.searchParams.get("signin") } });
+    assert.equal(login.status, 200);
+    const ownToken = (await login.json()).session;
+    const preview = await call("/me/card/preview", { token: ownToken, body: { bookingId: selected } });
+    assert.equal(preview.status, 200);
+    const reviewed = (await preview.json()).booking;
+    assert.equal(reviewed.amountCents, 1500);
+    assert.equal((await call("/me/card", { token: ownToken, body: { booking: reviewed, bookingConsent: true } })).status, 400);
+    assert.equal((await call("/me/card", { token: ownToken, body: { consent: true, booking: reviewed } })).status, 400);
+    assert.equal((await call("/me/card", { token: ownToken, body: { consent: true, bookingConsent: true, booking: { ...reviewed, amountCents: 1 } } })).status, 409);
+    assert.equal((await call("/me/card", { token: ownToken, body: { consent: true, bookingConsent: true, booking: reviewed } })).status, 200);
+    const setup = new URLSearchParams(checkoutRequests.at(-1).body);
+    const metadata = Object.fromEntries([...setup].filter(([key]) => key.startsWith("metadata[")).map(([key, value]) => [key.slice(9, -1), value]));
+    assert.equal(setup.get("mode"), "setup");
+    assert.equal(new URL(setup.get("cancel_url")).searchParams.get("cardBooking"), selected, "cancelling Stripe preserves the named lesson for retry");
+    assert.equal(metadata.approved_booking_id, selected);
+    assert.equal(metadata.approved_booking_amount, "1500");
+    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(selected).payment_status, "not_required");
+    assert.equal(charges.length, chargeCount, "approval still waits for Stripe's completed card setup");
+    setupIntents.set("seti_combined", { status: "succeeded", customer: `cus_${id}`, payment_method: "pm_combined" });
+    const session = { id: "cs_combined", mode: "setup", status: "complete", created: Math.floor(Date.now() / 1000),
+      client_reference_id: `student:${id}`, customer: `cus_${id}`, setup_intent: "seti_combined", metadata };
+    const event = { id: "evt_combined", type: "checkout.session.completed", livemode: false, data: { object: session } };
+    assert.equal((await webhook(event)).status, 200);
+    assert.equal((await webhook(event)).status, 200);
+    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(selected).payment_status, "scheduled");
+    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(otherPast).payment_status, "not_required");
+    assert.equal(db.prepare("SELECT automatic_payment FROM booking_series WHERE student_id=?").get(id).automatic_payment, 1);
+    assert.equal(charges.length, chargeCount, "the webhook schedules; it does not take a payment");
+    await chargeDueLessons(env, new Date("2026-10-27T18:59:59Z"));
+    assert.equal(charges.filter(charge => charge.key.includes(selected)).length, 0, "the one-hour delay is preserved");
+    await chargeDueLessons(env, new Date("2026-10-27T19:00:01Z"));
+    await chargeDueLessons(env, new Date("2026-10-27T19:01:00Z"));
+    assert.deepEqual(charges.filter(charge => charge.key.includes(selected)).map(charge => charge.amount), [1500], "exactly the authorised amount, once");
+
+    for (const change of ["paid", "moved", "repriced", "cancelled"]) {
+      const changedId = linkedBooking(`combined-${change}`, { owner: id, payment: "not_required", start: "2026-10-26T17:00:00.000Z", end: "2026-10-26T18:00:00.000Z" });
+      db.prepare("UPDATE bookings SET added_by_teacher=1 WHERE id=?").run(changedId);
+      const selectedChange = (await (await call("/me/card/preview", { token: ownToken, body: { bookingId: changedId } })).json()).booking;
+      assert.equal((await call("/me/card", { token: ownToken, body: { consent: true, bookingConsent: true, booking: selectedChange } })).status, 200);
+      const fields = new URLSearchParams(checkoutRequests.at(-1).body);
+      const changedMetadata = Object.fromEntries([...fields].filter(([key]) => key.startsWith("metadata[")).map(([key, value]) => [key.slice(9, -1), value]));
+      const mutation = { paid: "payment_consent_version='paid-by-hand'", moved: "starts_at='2026-10-26T16:00:00.000Z'", repriced: "amount_cents=2000", cancelled: "status='cancelled'" }[change];
+      duringSetupRead = () => db.prepare(`UPDATE bookings SET ${mutation} WHERE id=?`).run(changedId);
+      try {
+        assert.equal((await webhook({ ...event, id: `evt_combined_${change}`, data: { object: { ...session, id: `cs_combined_${change}`, metadata: changedMetadata } } })).status, 200);
+      } finally { duringSetupRead = null; }
+      assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(changedId).payment_status, "not_required", `${change} while Stripe was open is never scheduled`);
+    }
+  } finally {
+    duringSetupRead = null;
+    forgetStudent(email);
+    clock = previousClock;
+  }
+});
 await test("a card saved from the account pays for the lessons Inês added from then on, and only those", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   const email = "card-later@example.invalid";

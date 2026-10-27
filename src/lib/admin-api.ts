@@ -571,6 +571,20 @@ export function paidByHand(booking: Pick<AdminBooking, "payment_consent_version"
   return booking.payment_consent_version === "paid-by-hand";
 }
 
+/** Prepare the student's own review link. This never sends mail or starts card setup. */
+export function createCardApprovalLink(token: string, bookingId: string) {
+  return adminRequest<{ url: string }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/card-link`, {
+    method: "POST", body: JSON.stringify({}),
+  }).then(data => {
+    const url = new URL(data.url);
+    if (![window.location.origin, "https://portuguesewithines.com"].includes(url.origin) ||
+        url.pathname !== "/book/" || !url.searchParams.get("signin") || url.searchParams.get("cardBooking") !== bookingId) {
+      throw new Error(BOOKING_REPLY_ERROR);
+    }
+    return data.url;
+  });
+}
+
 /**
  * Ticks or unticks "Already paid" on one lesson. Ticked, it is never billed
  * and is in Receipts as paid by hand; unticked, it is billed as it would be now.
