@@ -54,7 +54,7 @@ export function ExpressionMeanings({ item }: { item: ExpressionInput }) {
     <dl className="expression-card__meanings">
       {facts.map((fact) => (
         <div className="expression-card__fact" data-fact={fact.key} key={fact.key}>
-          <dt className="expression-card__label">{fact.label}</dt>
+          <dt className={fact.key === "literal" ? "visually-hidden" : "expression-card__label"}>{fact.label}</dt>
           <dd lang={fact.lang}><span className="expression-card__value">{fact.text}</span></dd>
         </div>
       ))}

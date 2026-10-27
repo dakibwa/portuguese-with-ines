@@ -798,10 +798,12 @@ opening `/idioms/` with the same signed-in account.
 - Each list card groups its small `Draft` or `Published` pill with the ↑↓
   arrows in its head. Facts keep their reading order and painted label dabs.
   At 27rem of inner card width the head sits level with the title at the top
-  right, and each label sits beside its value; narrower cards and the preview
-  keep labels above values:
-  `Ao pé da letra` (the literal translation, when there is one), `Quer dizer`
-  (the Portuguese meaning, a step larger than the rest) and `Em inglês`; then
+  right, and each visible label sits beside its value; narrower cards and the
+  preview keep labels above values. The literal translation, when present,
+  has no visible `À letra` / `Ao pé da letra` label in the collection, preview
+  or painting; its label remains available to screen readers and its text
+  uses the full row. The meanings use `Quer dizer` (the Portuguese meaning,
+  a step larger than the rest) and `Em inglês`; then
   `Exemplo`/`Exemplos`, where the expression's own words are marked with a
   soft wash of the paint, taking in a verb the example has conjugated. Notes/origin and reference links
   open in a quiet disclosure. Optional themes use a lilac pill fill.
