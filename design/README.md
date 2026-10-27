@@ -706,6 +706,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
+  Each section uses a responsive grid of lesson cards: several across where
+  there is room, one column on phones. Opening homework expands that lesson
+  across the full row; closing it returns the card to the grid.
   The Price control opens the two fields in place and says how many lessons to
   come moved to it, and `· standard` marks a length she hasn't priced.
   History includes older lessons outside the current week and follows the account

@@ -2437,8 +2437,9 @@
 /* One profile for a student, their card and its Add a lesson button, Add a
    student and a free time on her week all open (14 October 2026, Dan). */
 .teacher-profile { width: min(620px, calc(100vw - 2rem)); }
-.teacher-history-list { display: grid; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
-.teacher-history-lesson { padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
+/* Let the row's available width decide how many readable lesson cards fit. */
+.teacher-history-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); align-items: start; gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
+.teacher-history-lesson { min-width: 0; padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
 .teacher-history-lesson.is-cancelled { background: var(--lavender-pale, #f1eef7); }
 .teacher-history-lesson__top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.45rem; font-size: 0.8rem; }
 .teacher-history-status { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); padding: 0.2rem 0.5rem; font: 600 0.65rem/1.4 var(--ui); }
@@ -3180,10 +3181,11 @@
 :is(.teacher-come-back-default, .teacher-come-back) .teacher-dialog-actions { justify-self: end; }
 .teacher-come-back__wait { margin: 0; font-size: 0.78rem; }
 .teacher-come-back > .teacher-inline-error { margin: 0; }
-.teacher-student__history { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); align-items: start; gap: 1rem; min-width: 0; }
-.teacher-student__history > section { min-width: 0; }
-.teacher-student__history > section > h3 { margin: 0 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
-.teacher-student__history > section > h3 span { color: var(--lavender-ink); font-weight: 500; }
+.teacher-student__history { min-width: 0; }
+.teacher-history { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+.teacher-history > section { min-width: 0; }
+.teacher-history > section > h3 { margin: 0 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
+.teacher-history > section > h3 span { color: var(--lavender-ink); font-weight: 500; }
 @container setup-list (max-width: 32rem) {
   .teacher-student__controls { grid-column: 1 / -1; grid-row: 2; }
   .teacher-student__controls button { padding-inline: 0.25rem; font-size: 0.65rem; }

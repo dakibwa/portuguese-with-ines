@@ -61,7 +61,7 @@ export function StudentHistory({ student, token, refresh = 0, homeworkId }: {
   const current = history?.token === token && history.studentId === studentId && history.email === email
     ? history : null;
 
-  return <div ref={historyRef} tabIndex={-1}>
+  return <div className="teacher-history" ref={historyRef} tabIndex={-1}>
     {notice ? <p className="teacher-inline-success" role="status">{notice}</p> : null}
     <StudentLessons
       token={token}

@@ -9,7 +9,8 @@
 .teacher-homework, .student-homework { --hw-dab: 42% 58% 49% 51% / 63% 43% 57% 37%; --hw-dab-alt: 60% 40% 32% 68% / 40% 58% 42% 60%; min-width: 0; color: var(--ink); }
 .teacher-homework { container: homework / inline-size; }
 .homework-worksheet { container: worksheet / inline-size; }
-.teacher-student__history:has(.teacher-homework) { grid-template-columns: minmax(0, 1fr); }
+/* An opened worksheet needs the whole row; closed lessons stay in the grid. */
+.teacher-history-lesson:has(> .teacher-history-homework[aria-expanded="true"]) { grid-column: 1 / -1; }
 .teacher-history-lesson .teacher-homework { margin-top: 1rem; }
 .teacher-homework fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .teacher-homework .button, .student-homework .button { gap: 0.5rem; white-space: nowrap; }
