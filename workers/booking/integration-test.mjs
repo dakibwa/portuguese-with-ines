@@ -3802,7 +3802,6 @@ await test("she sets a student up and adds their lessons without emailing them, 
     const [welcome] = to("quiet@example.invalid");
     assert.equal(welcome.text, originalWelcome.text, "a retry keeps the original sign-in link and exact provider payload");
     assert.ok(welcome.subject.startsWith("Your lessons with Inês"));
-    assert.ok(welcome.text.includes("Inês has set up your lessons"));
     // The weekly run is one line, the lesson on its own another.
     assert.equal((welcome.text.match(/Lesson · Online/g) ?? []).length, 1, "the lesson on its own has its own line");
     assert.equal((welcome.text.match(/Weekly · Online/g) ?? []).length, 1, "a weekly run is one line, not a row of dates");

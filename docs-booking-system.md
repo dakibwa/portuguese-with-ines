@@ -1330,8 +1330,10 @@ different students were confirmed into the same lesson in testing.
   student's receipt (lesson, no-show or late change fee), Inês's payment
   received, the student's declined card, welcome, sign-in link, password
   reset, email-change confirmation and notice, and homework to review.
-  Subjects, and the subject, heading and preheader of her payment emails, are
-  unchanged because her filters and receipt automation read them.
+  Her notification subjects, and the heading and preheader of her payment
+  emails, stay stable because her filters and receipt automation read them.
+  Student welcome subjects identify the lessons or the invitation to book;
+  any card setup is explained in the body.
   `node scripts/render-email-previews-v2.mjs [dir]` writes every variant as
   HTML and text with a manifest of the old emails each covers.
 - **Dark mode and phones.** The layout declares `color-scheme: light dark`
@@ -1350,6 +1352,11 @@ different students were confirmed into the same lesson in testing.
   automatically by the booking system.` above the site's link.
   Amounts are written as the site writes them: whole euros bare (€25), anything
   else with its cents (€22.50), never rounded.
+- Email fonts use the existing local font stack with Arial/Helvetica fallbacks;
+  no external font stylesheet is loaded. Welcome emails explain that Inês sent
+  the invitation, name `portuguesewithines.com`, and explain how to open the
+  website directly or reply to her. Prices, card requirements and the signed
+  one-click link remain in both HTML and plain text.
 - `email/receipt-kit/README.md` and `scripts/build-receipt-email-kit.mjs` provide
   the matching Gmail/Codex receipt-email kit. It attaches the original fiscal
   PDF issued by Inês's separate automation; it does not issue documents or send
@@ -1363,6 +1370,47 @@ different students were confirmed into the same lesson in testing.
   there — a semicolon starts the next parameter and a colon ends the list — so a
   student's own name could forge calendar properties or cut the address off the
   ATTENDEE line. Parameter values are quoted per RFC 5545 §3.1 instead.
+
+### Email authentication and inbox placement
+
+Students have reported invitations arriving in spam (27 October 2026).
+The cause is unconfirmed.
+
+The sending domain is `portuguesewithines.com`, through Resend in `eu-west-1`.
+Its public DNS and Resend configuration were checked on 27 October 2026:
+
+| Purpose | DNS name | Configuration |
+| --- | --- | --- |
+| SPF | `send.portuguesewithines.com` | TXT `v=spf1 include:amazonses.com ~all` |
+| Return-path feedback | `send.portuguesewithines.com` | MX priority 10, `feedback-smtp.eu-west-1.amazonses.com` |
+| DKIM | `resend._domainkey.portuguesewithines.com` | Published public key matching the verified Resend domain |
+| DMARC | `_dmarc.portuguesewithines.com` | TXT `v=DMARC1; p=none;` |
+
+SPF belongs on Resend's `send` return-path subdomain; an empty apex TXT lookup
+does not mean it is missing. DMARC's `p=none` is a valid monitoring policy,
+not an instruction to put legitimate messages in spam. Open and click tracking
+are disabled. Invitation action links and image assets use the sending domain.
+The sender address is sending-only; replies use the configured `Reply-To`
+inbox, not the sender address (see the contact section below).
+
+A provider `delivered` event means the receiving server accepted the email;
+it does not reveal inbox versus spam placement. A spam report alone cannot
+establish an AI-content flag or an authentication failure. To diagnose an
+affected message, obtain its original headers and the recipient's displayed
+spam reason, then compare SPF, DKIM and DMARC results, sending IP, dates and
+Resend's Deliverability Insights. Redact recipient addresses and private sign-in
+links before sharing diagnostic material outside the account.
+
+No DNS repair was identified in this check. Optional DMARC aggregate reporting
+needs an agreed reporting mailbox or service before adding a `rua` address;
+do not tighten the policy as a speculative spam fix. Students who expected the
+invitation can mark it as not spam and add the sender to their contacts. Confirm
+the effect of any changes on a newly received message; template changes do not
+prove improved inbox placement or justify resending every invitation.
+
+Sources: [Resend's spam troubleshooting](https://resend.com/docs/knowledge-base/why-are-my-emails-going-to-spam),
+[Google's sender guidelines](https://support.google.com/a/answer/81126?hl=en),
+and [Resend's delivered-message guidance](https://resend.com/docs/knowledge-base/what-if-an-email-says-delivered-but-the-recipient-has-not-received-it).
 
 ### The day-before reminder
 
