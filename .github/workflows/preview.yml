@@ -1,0 +1,105 @@
+name: Website preview
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Forks never receive a preview deployment or Cloudflare credentials.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_BOOKING_API_BASE_URL: ${{ vars.NEXT_PUBLIC_BOOKING_API_BASE_URL }}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_STRIPE_EXPECTED_MODE: live
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+      LESSON_PRICE_CENTS: ${{ vars.LESSON_PRICE_CENTS || '2500' }}
+      LESSON_CURRENCY: ${{ vars.LESSON_CURRENCY || 'eur' }}
+      NEXT_PUBLIC_LESSON_DURATION_MINUTES: ${{ vars.NEXT_PUBLIC_LESSON_DURATION_MINUTES || '60' }}
+      NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS: ${{ vars.NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS || '500' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Build only. No Worker deployment, release probes or D1 commands.
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview-site
+          path: out
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # Deliberately no checkout: deploy only the static export, with no access
+      # to repository Worker configuration, functions or migration scripts.
+      - uses: actions/download-artifact@v4
+        with:
+          name: preview-site
+          path: out
+      - name: Choose a safe preview branch
+        id: branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          node <<'JS'
+          const fs = require('node:fs');
+          const slug = process.env.HEAD_REF.toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+            .slice(0, 40).replace(/-$/g, '') || 'preview';
+          const branch = `pr-${process.env.PR_NUMBER}-${slug}`;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `name=${branch}\n`);
+          JS
+      - name: Deploy static preview to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.145.0'
+          command: pages deploy out --project-name=portuguese-with-ines --branch=${{ steps.branch.outputs.name }}
+      - name: Post or update the preview link
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.deployment-url }}
+        with:
+          script: |
+            const url = new URL(process.env.PREVIEW_URL);
+            if (url.protocol !== 'https:' || !url.hostname.endsWith('.portuguese-with-ines.pages.dev')) {
+              throw new Error('Cloudflare did not return a valid preview URL');
+            }
+            const marker = '<!-- ines-website-preview -->';
+            const body = `${marker}\nWebsite preview: ${url.href}\n\nStatic website only. The booking Worker and D1 were not deployed or changed. Booking features still use the existing live service.`;
+            const scope = {owner: context.repo.owner, repo: context.repo.repo};
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...scope, issue_number: context.issue.number, per_page: 100
+            });
+            const previous = comments.find(comment =>
+              comment.user.login === 'github-actions[bot]' && comment.body.includes(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({...scope, comment_id: previous.id, body});
+            } else {
+              await github.rest.issues.createComment({...scope, issue_number: context.issue.number, body});
+            }

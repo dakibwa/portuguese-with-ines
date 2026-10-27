@@ -360,6 +360,14 @@ domains serve. There is no GitHub Pages preview any more: it needed the root of
 `dakibwa/dakibwa.github.io` to `dakibwa/portuguese-with-ines` on
 17 September 2026.
 
+**Pull requests get a static website preview.** `.github/workflows/preview.yml`
+builds pull requests to `main` from branches in this repository and publishes
+them to a separate Cloudflare Pages preview branch. One PR comment carries the
+preview URL and is updated after each successful preview. Forks do not deploy.
+Previews never deploy the booking Worker or run D1 commands or migrations.
+Booking features in a preview still use the existing live booking service.
+Review the preview before approving a merge; merging still publishes production.
+
 This needs two repository secrets, under Settings → Secrets and variables →
 Actions. Without them the publish job fails loudly rather than skipping, because
 a silent skip is indistinguishable from a completed release:
