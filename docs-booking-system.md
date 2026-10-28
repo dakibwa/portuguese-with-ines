@@ -35,6 +35,7 @@ Student on /book                                     (browse without an account)
 Legacy /my-lessons and /booking links resolve into /book without losing state
 Inês on /schedule                     (her own account, role=teacher)
   → GET/POST /admin/availability, /admin/exceptions
+  → GET  /admin/lesson-availability                 teacher lesson picker
   → POST /admin/exceptions/day                       one date's day off and blocked hours
   → GET  /admin/bookings, /admin/students            her lessons; her students and how far
                                                      each is onto the site
@@ -1567,6 +1568,12 @@ reports it as `bufferMinutes`. Inês's own bookings and moves are exempt, so she
 can still place a lesson straight after another. A lesson keeping its time, such
 as a switch between online and Porto, is not held to a gap its neighbours were
 booked without. A missing setting means no gap.
+
+Her lesson picker uses authenticated `/admin/lesson-availability`, which offers
+future starts within her hours without the student notice window or buffer.
+Confirmed lessons, active checkout holds and time off still block overlapping
+choices. Teacher accounts and the emergency access key can use this endpoint;
+the public `/availability` keeps student rules even for a teacher's own booking.
 
 `settings.slot_interval_minutes` is **15** (same migration): within her hours a
 lesson can start on any quarter hour, so the next lesson can begin as soon as

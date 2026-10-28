@@ -152,14 +152,15 @@ export async function listLessonTypes(env) {
  */
 export async function computeAvailability(
   env,
-  { fromKey, toKey, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false }
+  { fromKey, toKey, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false, teacher = false }
 ) {
   const settings = await loadSettings(env);
   const duration = Number(lessonType.duration_minutes);
   const interval = settings.slotIntervalMinutes;
   // Each lesson, booked or proposed, reaches this far past its end, so two
   // lessons always keep the gap between them whichever one comes first.
-  const bufferMs = settings.lessonBufferMinutes * 60000;
+  // Only the authenticated teacher picker opts out of student notice and gaps.
+  const bufferMs = teacher ? 0 : settings.lessonBufferMinutes * 60000;
 
   const todayKey = dateKey(now, PORTO);
   /*
@@ -174,7 +175,7 @@ export async function computeAvailability(
   const end = !ignoreHorizon && toKey > horizonKey ? horizonKey : toKey;
   if (!parseDateKey(start) || !parseDateKey(end) || start > end) return { slots: [], settings };
 
-  const earliest = new Date(now.getTime() + settings.minimumNoticeHours * 3600000);
+  const earliest = new Date(now.getTime() + (teacher ? 0 : settings.minimumNoticeHours) * 3600000);
 
   const windowStart = dayBounds(start).start.toISOString();
   const windowEnd = dayBounds(end).end.toISOString();

@@ -49,7 +49,7 @@ try {
       const data = request.method() === "POST" ? request.postDataJSON() : null;
       if (url.pathname === "/me") return json({ student: studentView ? student : { ...student, id: "teacher", name: "Inês", role: "teacher" }, bookings: [], series: [] });
       if (url.pathname === "/lesson-types") return json({ lessonTypes: [{ id: "single", slug: "single", name: "60 minutes", duration_minutes: 60, price_cents: 2500 }], postpay: false });
-      if (url.pathname === "/availability") return json({ slotsByDate: {}, horizonDays: 56 });
+      if (url.pathname === "/availability" || url.pathname === "/admin/lesson-availability") return json({ slotsByDate: {}, horizonDays: 56 });
       if (url.pathname === "/me/recurring-rates") return json({ rates: {} });
       if (url.pathname === "/me/expressions") return json({ expression: null, canPick: false, hasPublished: false, shuffleLabels: [] });
       if (url.pathname === "/admin/bookings") return json({ bookings: [lesson], reconciliation: [] });

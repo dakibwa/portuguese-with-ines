@@ -287,6 +287,7 @@ export function LessonForm({
           ) : null}
         </div>
         <LessonDatePicker
+          token={token}
           date={lesson.date}
           disabled={busy}
           idPrefix={`${idPrefix}-date`}

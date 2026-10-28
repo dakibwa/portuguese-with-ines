@@ -2799,7 +2799,7 @@ function ctx_releaseHolds(env) {
   releaseExpiredHolds(env).catch((error) => console.error("release-holds", String(error?.message ?? error)));
 }
 
-async function handleAvailability(request, env, url) {
+async function handleAvailability(request, env, url, teacher = false) {
   const lessonTypeId = url.searchParams.get("lessonType") ?? "single";
   const lessonType = await loadLessonType(env, lessonTypeId);
   if (!lessonType) return fail("That lesson type is not available.", 400, request, env);
@@ -2818,8 +2818,8 @@ async function handleAvailability(request, env, url) {
   // owner's session. Anything else quietly gets the public answer. A signed-in
   // student's own unfinished card setup is not busy for them either, since
   // their next booking replaces it; everyone else still sees it held.
-  const student = await currentStudent(request, env);
-  const ignoreBookingId = await readManageToken(url.searchParams.get("manage") ?? "", env.BOOKING_TOKEN_SECRET);
+  const student = teacher ? null : await currentStudent(request, env);
+  const ignoreBookingId = teacher ? null : await readManageToken(url.searchParams.get("manage") ?? "", env.BOOKING_TOKEN_SECRET);
   let ignoreSeriesId = null;
   const seriesId = url.searchParams.get("series");
   if (seriesId) {
@@ -2833,17 +2833,17 @@ async function handleAvailability(request, env, url) {
 
   ctx_releaseHolds(env);
   const { slotsByDate, settings } = await computeAvailability(env, {
-    fromKey, toKey, lessonType, now, ignoreBookingId, ignoreSeriesId, ignoreHoldsOf: student?.id ?? null
+    fromKey, toKey, lessonType, now, ignoreBookingId, ignoreSeriesId, ignoreHoldsOf: student?.id ?? null, teacher
   });
 
   return json(
     {
       slotsByDate: slotsByDate ?? {},
       timeZone: PORTO,
-      minimumNoticeHours: settings.minimumNoticeHours,
+      minimumNoticeHours: teacher ? 0 : settings.minimumNoticeHours,
       sameDayFeeCents: settings.sameDayChangeFeeCents,
       horizonDays: settings.bookingHorizonDays,
-      bufferMinutes: settings.lessonBufferMinutes,
+      bufferMinutes: teacher ? 0 : settings.lessonBufferMinutes,
       lessonType: {
         id: lessonType.id,
         name: lessonName(lessonType),
@@ -5769,6 +5769,12 @@ async function handleAdmin(request, env, ctx, url, path) {
 }
 
 async function handleAdminAction(request, env, ctx, url, path, admin, adminBody, authorization) {
+
+  // Her picker must offer same-day and back-to-back lessons, just as her
+  // booking writes allow. The admin gate above checks accounts and access keys.
+  if (request.method === "GET" && path === "/admin/lesson-availability") {
+    return handleAvailability(request, env, url, true);
+  }
 
   const homework = path.match(/^\/admin\/lessons\/([^/]+)\/homework(?:\/(transcribe|generate|publish|return))?$/);
   if (homework) {
