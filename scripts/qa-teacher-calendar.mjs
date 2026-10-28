@@ -1713,7 +1713,7 @@ try {
   const student = await fixture(390, { student: true });
   await student.page
     .getByRole("status")
-    .filter({ hasText: "this page is Inês’s" })
+    .filter({ hasText: "This page is for Inês" })
     .waitFor();
   await expect(student.page.locator(".teacher-workspace")).toHaveCount(0);
   assert.deepEqual(student.state.writes, []);
