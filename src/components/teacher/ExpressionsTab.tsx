@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { ArrowDown, ArrowUp, Eye, Plus } from "lucide-react";
 import { ExpressionCard } from "@/components/expressions/ExpressionCard";
 import { TeacherExpressionTryOut } from "@/components/expressions/TeacherExpressionTryOut";
@@ -93,11 +94,17 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
           <dt>expressão idiomática <span>nome feminino</span></dt>
           <dd>Conjunto de palavras com um significado próprio, diferente do seu sentido literal.</dd>
         </dl>
-        <button className="button button--coral" ref={addButton} type="button" disabled={!expressions || busy}
-          onClick={() => setDialog({ expression: null, preview: false })}>
-          <Plus size={17} aria-hidden="true" />
-          Add an expression
-        </button>
+        <div className="teacher-expressions__intro-actions">
+          <Link className="button button--outline" href="/idioms/">
+            <Eye size={17} aria-hidden="true" />
+            View page
+          </Link>
+          <button className="button button--coral" ref={addButton} type="button" disabled={!expressions || busy}
+            onClick={() => setDialog({ expression: null, preview: false })}>
+            <Plus size={17} aria-hidden="true" />
+            Add an expression
+          </button>
+        </div>
       </div>
       {rows.length ? <TeacherExpressionTryOut accountId={accountId} rows={rows} token={token} /> : null}
       <ul className="booking-payment-facts teacher-expressions__help">
@@ -115,7 +122,7 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
         {filtered ? <button className="button button--outline button--compact" type="button" onClick={() => { setSearch(""); setTheme(""); }}>Clear filters</button> : null}
       </div>
       {notice ? <p className="teacher-inline-success" role="status">{notice}</p> : null}
-      {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="teacher-text-button" disabled={busy} onClick={() => setAttempt((value) => value + 1)} type="button">Reload collection</button></div> : null}
+      {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" disabled={busy} onClick={() => setAttempt((value) => value + 1)} type="button">Reload collection</button></div> : null}
       {!expressions && !error ? <p role="status">Loading expressions…</p> : null}
       {expressions && !rows.length ? <p>Your collection is empty. Add your first expression.</p> : null}
       {rows.length > 0 && !visible.length ? <p role="status">No expressions match those filters.</p> : null}
@@ -134,7 +141,7 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
               </div>
               <ExpressionCard expression={item} />
               <div className="teacher-expression__actions">
-                <button className="button button--blue button--compact" type="button" disabled={busy} onClick={() => setDialog({ expression: item, preview: false })}>Edit</button>
+                <button className="button button--lilac button--compact" type="button" disabled={busy} onClick={() => setDialog({ expression: item, preview: false })}>Edit</button>
                 <button className="button button--lilac button--compact" type="button" disabled={busy} onClick={() => setDialog({ expression: item, preview: true })}>
                   <Eye size={16} aria-hidden="true" />Preview<span className="visually-hidden"> as students see it: {item.expression}</span>
                 </button>

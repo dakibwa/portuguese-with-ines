@@ -14,14 +14,12 @@ type Paints = { shown: PaintKey | null; next: PaintKey };
 
 const TITLE = "Uma expressão para ti";
 const EXHAUSTED = "You’ve explored every expression. Come back when Inês adds more.";
-/** The facts still to come, in wax; Exemplo waits only where it will open beside them. */
-const WAITING = ["Ao pé da letra", "Quer dizer", "Em inglês", "Exemplo"];
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
- * "Uma expressão para ti": the press asks the Worker to pick and save one of
- * Inês's expressions, and the brush paints whatever it saved. A failed reply
+ * "Uma expressão para ti": the first press repaints a saved expression, or
+ * asks the Worker to pick one. Later presses pick another. A failed reply
  * keeps its request, so trying again cannot spend a second pick.
  *
  * `source` replaces the Worker: Inês's try-out paints from her own collection
@@ -68,6 +66,7 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
     let current = true;
     setCollection(null);
     setPaints(null);
+    setRevealed(0);
     setLoadError("");
     // Expressions are a gift beside the lessons, never in their way: if they
     // cannot be read, the section stays away rather than raising an alarm.
@@ -128,8 +127,11 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
   async function pick() {
     if (pending.current || !collection || !paints) return;
     pending.current = true;
-    const previous = collection.expression;
-    request.current ??= { id: crypto.randomUUID(), paint: paints.next };
+    const previous = revealed ? collection.expression : null;
+    // A return visit starts blank too. Its first press repaints the saved
+    // expression without asking the Worker to spend another pick.
+    const saved = !revealed ? collection.expression : null;
+    request.current ??= { id: crypto.randomUUID(), paint: saved ? paints.shown ?? paintFor(studentId, saved.id) : paints.next };
     const { id: requestId, paint } = request.current;
     const still = reducedMotion();
     // "Paint another" sits in the reading, which is out of reach while it
@@ -146,20 +148,20 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
       card.current?.querySelector(".paint-sheet")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
     // A failed reply puts back what was there: the last painting, or the
-    // waiting sheet with the freshest phrases in its wax.
-    const putBack = (labels = collection.shuffleLabels) => {
+    // blank waiting sheet.
+    const putBack = () => {
       if (still) return;
       measure();
       setResized((count) => count + 1);
       if (previous) painting.current?.show(previous.expression, previous.id, paints.shown ?? paintFor(studentId, previous.id), true);
-      else painting.current?.rest(paints.next, labels, true);
+      else painting.current?.rest(paints.next, true);
     };
     try {
-      const next = await (source ?? workerExpressions(token)).pick(requestId);
+      const next = saved ? collection : await (source ?? workerExpressions(token)).pick(requestId);
       if (!canUpdate()) return;
       const picked = next.expression;
       if (picked) {
-        // Remembered as soon as it is saved, so a reload mid-painting shows it in this paint.
+        // A return visit can repaint the saved expression in this same colour.
         rememberPaint(studentId, picked.id, paint);
         if (still) painting.current?.show(picked.expression, picked.id, paint);
         else await painting.current?.land(picked.expression, picked.id);
@@ -177,7 +179,7 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
         if (!canUpdate()) return;
         request.current = null;
         refocus.current = true;
-        putBack(next.shuffleLabels);
+        putBack();
         setCollection({ ...next, expression: previous });
         setAnnouncement("");
         if (next.canPick) setError("That expression is no longer available. Please try again.");
@@ -205,14 +207,15 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
     </div>
   ) : <p className="idioms-state" role="status">Loading expressions…</p> : null;
   if (!collection.hasPublished) return fullPage ? <p className="idioms-state" role="status">Expressions aren’t available yet.</p> : null;
-  const expression = collection.expression;
+  const expression = revealed ? collection.expression : null;
+  const canPaint = collection.canPick || (!revealed && Boolean(collection.expression));
   const start: PaintingStart = expression
     ? { kind: "show", phrase: expression.expression, id: expression.id, paint: paints.shown ?? paints.next }
-    : { kind: "rest", paint: paints.next, wax: collection.shuffleLabels };
-  // Beside the reading's themes once painted; with the label on the waiting sheet before.
+    : { kind: "rest", paint: paints.shown ?? paints.next };
+  // Beside the reading's themes once painted; on the empty sheet before.
   const actions = (
     <div className="expression-reading__actions" lang="en">
-      {collection.canPick ? (
+      {canPaint ? (
         <button className="button button--coral button--compact expression-reading__go" disabled={Boolean(busy)} ref={button} type="button" onClick={() => void pick()}>
           <span>{busy ? "Painting…" : error ? "Try again" : expression ? "Paint another" : "Paint it"}</span>
           {/* In the reading's last row the button keeps the width of its longest label, so the row never reflows as it changes. */}
@@ -226,7 +229,7 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
     <section className={`student-expressions${fullPage ? " student-expressions--page" : ""}`} aria-labelledby="student-expressions-title" ref={section} tabIndex={-1}>
       <h2 className="visually-hidden" id="student-expressions-title" lang="pt-PT">{TITLE}</h2>
       <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
-      {collection.canPick || expression ? (
+      {canPaint || expression ? (
         <div
           className="expression-reading"
           data-busy={busy && !busy.still ? "" : undefined}
@@ -245,19 +248,10 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
               <ExpressionExamples item={expression} />
               <ExpressionExtras action={actions} image item={expression} />
             </article>
-          ) : (
-            <>
-              {/* At rest the sheet invites; the hidden heading says the same to assistive technology. */}
-              <p aria-hidden="true" className="expression-reading__label" lang="pt-PT">{TITLE}</p>
-              <div aria-hidden="true" className="expression-reading__waiting">
-                {WAITING.map((label) => <p key={label}><span className="expression-card__label">{label}</span><span className="expression-reading__wax" /></p>)}
-              </div>
-              {actions}
-            </>
-          )}
+          ) : actions}
         </div>
       ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
-      {!fullPage ? <p className="expression-page-link"><Link href="/idioms/">Open full page</Link></p> : null}
+      {!fullPage ? <p className="expression-page-link"><Link className="button button--outline button--small" href="/idioms/">Open full page</Link></p> : null}
     </section>
   );
 }

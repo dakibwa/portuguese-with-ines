@@ -34,7 +34,7 @@ async function open(width, path, { session = "", me = student, reply = () => nul
     if (endpoint === "/me/recurring-rates") return route.fulfill({ json: { rates: {} } });
     if (endpoint === "/me/expressions") return route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } });
     if (endpoint === "/lesson-types") return route.fulfill({ json: { lessonTypes: [], postpay: false } });
-    if (endpoint === "/availability") return route.fulfill({ json: { slotsByDate: {}, horizonDays: 56 } });
+    if (endpoint === "/availability" || endpoint === "/admin/lesson-availability") return route.fulfill({ json: { slotsByDate: {}, horizonDays: 56 } });
     if (endpoint === "/admin/google-calendar") return route.fulfill({ json: { configured: false, connected: false, email: null, needsReconnect: false, pending: 0 } });
     if (endpoint === "/admin/availability") return route.fulfill({ json: { rules: [], exceptions: [], settings: { slotIntervalMinutes: 30 } } });
     if (endpoint === "/admin/students") return route.fulfill({ json: { students: [], cardsAccepted: false } });

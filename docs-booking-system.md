@@ -35,6 +35,7 @@ Student on /book                                     (browse without an account)
 Legacy /my-lessons and /booking links resolve into /book without losing state
 Inês on /schedule                     (her own account, role=teacher)
   → GET/POST /admin/availability, /admin/exceptions
+  → GET  /admin/lesson-availability                 teacher lesson picker
   → POST /admin/exceptions/day                       one date's day off and blocked hours
   → GET  /admin/bookings, /admin/students            her lessons; her students and how far
                                                      each is onto the site
@@ -736,7 +737,7 @@ sees, books or is charged reads either.
   the same provider key, so a reply lost on the way never sends two.
 - **The email** (`dormantInvite`, 41) has her subject, `Book your next
   lesson`, and her message as plain text (the Worker adds no greeting of its
-  own), then `Sign in and book`, the one-click sign-in link (14 days, once) her welcome uses, and
+  own), then `Choose a time`, the one-click sign-in link (14 days, once) her welcome uses, and
   the welcome's footer. Replies go to her. A teacher who is also a student is
   never sent a sign-in link, so theirs is `Book a lesson`, to `/book/`. It is
   never held for a welcome: for someone she set up and never welcomed, it is
@@ -834,7 +835,7 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   how fast addresses can be tested.
 - Reset links are single-use and last an hour. A Google-only account has no
   password; using "forgot password" is how such a student sets one.
-- **Sign-in links** (migration 0023). `Email me a sign-in link` on the sign-in
+- **Sign-in links** (migration 0023). `Email a link` on the sign-in
   panel (`POST /auth/email-link`) emails an existing student account a link
   that signs it in once, within 30 minutes; the answer is the same whether or
   not the address has an account, and each account gets three an hour. The
@@ -911,7 +912,7 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   has signed in before (a local flag that outlives the session and grants
   nothing; Inês or an unused account does not set it), and a quiet
   line beneath the calendar for anyone else. It opens the `Your account` card
-  on its own, with `Back` above it.
+  on its own; the header's `Booking` is the way back to booking.
   Every booked lesson is marked there, weekly lessons in lilac and one-off
   lessons in coral. Choosing a date with one lesson opens that lesson; a date
   with several lists them in a dialog titled by that date; a free future date opens booking
@@ -1481,7 +1482,8 @@ than presenting the first lesson's price as the price of every lesson.
 
 ### The no-show policy
 
-For a confirmed saved-card lesson, the teacher schedule offers `Mark no-show`
+For a confirmed saved-card lesson, the teacher schedule's lesson dialog offers
+a `No-show` tick beside `Already paid` (its accessible name `Mark no-show`)
 from the scheduled start until **an hour after the scheduled end** (Dan,
 22 October 2026, shortened from six hours; `NO_SHOW_WINDOW_HOURS` in
 `policy.mjs`), so Inês can record
@@ -1567,6 +1569,12 @@ reports it as `bufferMinutes`. Inês's own bookings and moves are exempt, so she
 can still place a lesson straight after another. A lesson keeping its time, such
 as a switch between online and Porto, is not held to a gap its neighbours were
 booked without. A missing setting means no gap.
+
+Her lesson picker uses authenticated `/admin/lesson-availability`, which offers
+future starts within her hours without the student notice window or buffer.
+Confirmed lessons, active checkout holds and time off still block overlapping
+choices. Teacher accounts and the emergency access key can use this endpoint;
+the public `/availability` keeps student rules even for a teacher's own booking.
 
 `settings.slot_interval_minutes` is **15** (same migration): within her hours a
 lesson can start on any quarter hour, so the next lesson can begin as soon as

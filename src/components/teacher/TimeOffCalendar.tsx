@@ -4,7 +4,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "reac
 import { CalendarCheck, CalendarOff, Clock } from "lucide-react";
 import type { AdminBooking, AvailabilityException } from "@/lib/admin-api";
 import { dateBlocks, dateKey, dateLabel, daysOff, mondayOf, shiftDate, spanLabel, WEEKDAYS, type Span } from "@/lib/teacher-calendar";
-import { TeacherPager } from "@/components/teacher/TeacherPager";
+import { MonthLabel, TeacherPager } from "@/components/teacher/TeacherPager";
 import { TimeOffDayDialog } from "@/components/teacher/TimeOffDayDialog";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 
@@ -94,7 +94,7 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
       <div className="teacher-timeoff-layout">
         <div className="teacher-month">
           <div className="teacher-month-heading">
-            <h3 id="teacher-timeoff-month" aria-live="polite" ref={monthTitleRef} tabIndex={-1}>{dateLabel(month, { month: "long", year: "numeric" })}</h3>
+            <h3 id="teacher-timeoff-month" aria-live="polite" ref={monthTitleRef} tabIndex={-1}><MonthLabel month={month} /></h3>
             <TeacherPager
               unit="month"
               away={month !== monthStart(today)}
@@ -150,7 +150,7 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
         <div className={`teacher-timeoff-selection${chosen.length ? " has-days" : ""}`}>
           <div className="teacher-timeoff-selection-heading">
             <h3 aria-live="polite">{chosen.length ? `${chosen.length} ${chosen.length === 1 ? "day" : "days"} chosen` : "Tap the days you want off"}</h3>
-            {chosen.length ? <button className="teacher-text-button" disabled={busy} onClick={() => setSelected(new Set())} type="button">Clear</button> : null}
+            {chosen.length ? <button className="button button--outline button--small" disabled={busy} onClick={() => setSelected(new Set())} type="button">Clear</button> : null}
           </div>
           {chosen.length ? (
             <ul className="teacher-selected-days">
@@ -175,7 +175,7 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
           {bookingsError && chosen.length ? (
             <div className="teacher-inline-error" role="alert">
               <p>Booked lessons couldn’t be checked.</p>
-              <button className="teacher-text-button" onClick={onReloadBookings} type="button">Try again</button>
+              <button className="button button--outline button--small" onClick={onReloadBookings} type="button">Try again</button>
             </div>
           ) : null}
           {chosen.length ? (

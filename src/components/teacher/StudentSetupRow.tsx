@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Check, Clock3, LockKeyhole, X } from "lucide-react";
+import { CalendarPlus, Check, Clock3, Euro, History, KeyRound, LockKeyhole, Mail, Repeat, UserRound, X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { ComeBackEmail, firstName } from "@/components/teacher/DormantEmail";
 import { LessonForm } from "@/components/teacher/LessonForm";
@@ -10,7 +10,7 @@ import { StudentHistory } from "@/components/teacher/StudentHistory";
 import { StudentPrice } from "@/components/teacher/StudentPrice";
 import { setStudentDormant, type AdminStudent } from "@/lib/admin-api";
 import { dateKey, dateLabel, type StudentSetup, type StudentSetupStep } from "@/lib/teacher-calendar";
-import { formatPriceCents, formatSlotTime } from "@/lib/booking-api";
+import { formatPriceCents } from "@/lib/booking-api";
 import { defaultStudentMark } from "@/lib/student-marks";
 
 export type StudentPanel = StudentSetupStep | "history" | "details" | "come-back";
@@ -74,7 +74,9 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   // lesson to come it asks them to book one; a free student is asked for no card.
   const free = student.prices?.[60] === 0 && student.prices?.[90] === 0;
   const comeBackSent = student.dormantEmailedAt ? dateLabel(dateKey(new Date(student.dormantEmailedAt)), { day: "numeric", month: "short" }) : "";
+  // Where it goes is the first dab, not a bare line after them (27 October 2026).
   const emailSays = student.email ? [
+    `Goes to ${student.email}.`,
     student.nextLessonAt ? "Lists their lessons to come." : "No lessons yet: it asks them to book one.",
     free ? "Free lessons: no card asked." : steps.some(entry => entry.id === "card") && !student.cardForAllLessons ? "Asks them to add a card." : "",
   ].filter(Boolean) : [];
@@ -163,7 +165,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     }
   }
   const dormantButton = student.dormant || !student.nextLessonAt
-    ? <button className="button button--lilac button--compact" disabled={disabled} onClick={() => void markDormant(!student.dormant)} type="button">
+    ? <button className="button button--lilac button--small" disabled={disabled} onClick={() => void markDormant(!student.dormant)} type="button">
       {busy ? "Saving…" : student.dormant ? "Mark as active" : "Mark as dormant"}
     </button> : null;
 
@@ -176,11 +178,13 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   >{sending === student.id ? "Sending…" : again ? "Send the link again" : "Send welcome email"}<span className="visually-hidden"> to {student.name}</span></button>;
 
   const profilePanel = ready || step === "history" || step === "details";
+  // Each with its mark above its name, as the setup steps are, so a set-up
+  // student's row reads as the same kind of control (27 October 2026, Dan).
   const controls = [
-    ["details", "Details"], ["price", "Price"], ["lessons", "Add a lesson"], ["history", "Lesson history"],
+    ["details", "Details", UserRound], ["price", "Price", Euro], ["lessons", "Add a lesson", CalendarPlus], ["history", "Lesson history", History],
     // A fresh way in for someone already set up, sent only by her press inside
     // it; a dormant student's come-back email carries one already.
-    ...(!student.email ? [] : student.dormant ? [["come-back", "Come-back email"] as const] : [["sign-in", "Sign-in link"] as const]),
+    ...(!student.email ? [] : student.dormant ? [["come-back", "Come-back email", Mail] as const] : [["sign-in", "Sign-in link", KeyRound] as const]),
   ] as const;
   const prices = ([60, 90] as const).filter(minutes => student.prices?.[minutes] !== undefined)
     .map(minutes => `${minutes} mins · ${formatPriceCents(student.prices![minutes]!)}`).join(", ");
@@ -196,9 +200,9 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
         disabled={disabled}
         onClick={() => onSelect(step === "history" ? null : "history")}
         type="button"
-      ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{ready ? <span className="teacher-student__label">{student.dormant ? "Dormant" : "Student"}</span> : null}</span></button>
+      ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{ready && student.dormant ? <span className="teacher-student__label">Dormant</span> : null}</span></button>
       {ready ? <div className="teacher-student__controls" aria-label={`${student.name}’s profile sections`}>
-        {controls.map(([panel, label]) => <button aria-controls={paneId} aria-expanded={step === panel} aria-label={`${label} for ${student.name}`} disabled={disabled} key={panel} onClick={() => { setNotice(""); onSelect(step === panel ? null : panel); }} type="button">{label}</button>)}
+        {controls.map(([panel, label, Icon]) => <button aria-controls={paneId} aria-expanded={step === panel} aria-label={`${label} for ${student.name}`} disabled={disabled} key={panel} onClick={() => { setNotice(""); onSelect(step === panel ? null : panel); }} type="button"><i aria-hidden="true"><Icon size={14} strokeWidth={2.2} /></i><span>{label}</span></button>)}
       </div> : <ol className="teacher-setup__steps">
         {steps.map(entry => <li className={entry.done ? "is-done" : entry.lockedReason ? "is-locked" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
           <button
@@ -215,12 +219,14 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
       </ol>}
       {step ? <div className="teacher-setup__action teacher-setup__close">
         <button className="teacher-dialog-close" aria-label="Close" aria-controls={paneId} disabled={disabled} onClick={close} type="button"><X size={20} aria-hidden="true" /></button>
+      </div> : ready && student.weekly ? <div className="teacher-setup__action">
+        {/* Their weekly run, in the row's otherwise empty corner (27 October 2026, Dan). */}
+        <span className="teacher-student__weekly"><Repeat size={12} strokeWidth={2.4} aria-hidden="true" />Weekly</span>
       </div> : null}
     </div>
-    {ready && !step ? <ul className="booking-payment-facts teacher-student__facts">
-      {student.email ? <li>{student.email}</li> : null}
-      <li>{student.nextLessonAt ? `Next lesson ${dateLabel(dateKey(new Date(student.nextLessonAt)), { weekday: "short", day: "numeric", month: "short" })}, ${formatSlotTime(student.nextLessonAt)}` : "No upcoming lesson"}</li>
-      {student.weekly ? <li>Weekly lessons</li> : null}
+    {/* Only what needs her eye: their email and next lesson are a press
+        away in Details and Lesson history (27 October 2026, Dan). */}
+    {ready && !step && (prices || student.unpaidUpcoming || student.dormant && student.dormantEmailedAt) ? <ul className="booking-payment-facts teacher-student__facts">
       {prices ? <li>{prices}</li> : null}
       {student.unpaidUpcoming ? <li>{student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} to be paid by hand</li> : null}
       {student.dormant && student.dormantEmailedAt ? <li>Come-back email sent {dateLabel(dateKey(new Date(student.dormantEmailedAt)), { day: "numeric", month: "short" })}</li> : null}
@@ -236,7 +242,6 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
       <div className="teacher-setup__body-heading">
         <h3 id={`${paneId}-heading`}>{step === "history" ? "Lesson history" : step === "email" || step === "details" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome" : step === "sign-in" ? "Sign in" : step === "come-back" ? `Come-back email to ${firstName(student)}` : "Saved card"}</h3>
         {help.length ? <ul className="booking-payment-facts teacher-setup__help">{help.map(text => <li key={text}>{text}</li>)}</ul> : null}
-        {statusStep && student.email ? <p className="teacher-setup__email">{student.email}</p> : null}
       </div>
       {step === "history" ? <>
         <div className="teacher-student__contact">
@@ -246,7 +251,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
             {student.nif ? <li>NIF {student.nif}</li> : null}
           </ul>
           <div className="teacher-student__contact-actions">
-            {!ready ? <button className="teacher-text-button" disabled={disabled} onClick={() => onSelect("details")} type="button">Edit details</button> : null}
+            {!ready ? <button className="button button--outline button--small" disabled={disabled} onClick={() => onSelect("details")} type="button">Edit details</button> : null}
             {dormantButton}
           </div>
         </div>

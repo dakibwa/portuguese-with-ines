@@ -755,7 +755,7 @@ function deferred<Props extends object>(fetchComponent: () => Promise<ComponentT
       return (
         <p className="booking-state-note" role="alert">
           This part of the page couldn&rsquo;t load.{" "}
-          <button className="text-action" onClick={() => setFailed(false)} type="button">
+          <button className="button button--outline button--small" onClick={() => setFailed(false)} type="button">
             Try again
           </button>
         </p>
@@ -2124,32 +2124,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setSelectedDate("");
     });
     if (!student) orientTo("booking-lessons-sign-in", true);
-  }
-
-  function resetJourneyToStart() {
-    closeManagedLesson();
-    setIntent("book");
-    setShowAccountSignIn(false);
-    setBookingKind("");
-    setLessonTypeId("");
-    setSelectedDate("");
-    setSelectedSlot("");
-    setSavedChoices([]);
-    setCalendarWeekCount(4);
-    setCalendarPageStart("");
-    setStep("day");
-    setPayment(null);
-    setPaymentError("");
-    setPaymentConsent(false);
-  }
-
-  function returnToJourneyStart() {
-    if (student) {
-      openLessonsJourney();
-      return;
-    }
-    transitionBooking(resetJourneyToStart);
-    orientTo("lesson-calendar");
   }
 
   function openAccountShortcut(section: AccountSection) {
@@ -3811,9 +3785,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           </section>
         ) : needsLessonsSignIn ? (
           <section className="booking-workflow-sign-in" id="booking-lessons-sign-in" tabIndex={-1}>
-            <button className="booking-back booking-back--tertiary" onClick={returnToJourneyStart} type="button">
-              <ArrowLeft size={16} aria-hidden="true" /> Back
-            </button>
+            {/* No Back above it: the header's Booking already starts a
+                booking afresh (27 October 2026, Dan: "is there even a purpose
+                in the back button?"). */}
             <AuthPanel
               heading="Your account"
               headingLevel={2}
@@ -4019,7 +3993,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 {returnCalendarWeekCount && !restrictedWeeks ? (
                   <button
                     aria-controls="booking-calendar-weeks"
-                    className="text-action unified-calendar__expand"
+                    className="button button--lilac button--small unified-calendar__expand"
                     disabled={manageWorking}
                     onClick={() => transitionBooking(() => setCalendarWeekCount(returnCalendarWeekCount))}
                     type="button"
@@ -4500,7 +4474,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         {showWorkflowCalendar && intent === "book" && !managed && !student && !returningDevice && !isConfirmingBooking ? (
           <p className="booking-returning">
             Already booked?{" "}
-            <button onClick={openLessonsJourney} type="button">Sign in</button>
+            <button className="button button--outline button--small" onClick={openLessonsJourney} type="button">Sign in</button>
           </p>
         ) : null}
 

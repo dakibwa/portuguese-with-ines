@@ -1,8 +1,7 @@
 .idioms-page { display: flex; flex-direction: column; min-height: 100svh; }
-.idioms-main { flex: 1; width: 100%; max-width: 110rem; margin-inline: auto; padding: clamp(1rem, 3vw, 3rem); }
+.idioms-main { flex: 1; width: 100%; max-width: 84rem; margin-inline: auto; padding: clamp(1rem, 3vw, 3rem); }
 .idioms-workspace { min-width: 0; }
 .idioms-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; color: var(--blue-deep); font-size: 0.85rem; }
-.idioms-toolbar > a { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 44px; color: inherit; text-underline-offset: 0.2em; }
 .idioms-account { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; font-weight: 600; }
 .idioms-account > span { overflow-wrap: anywhere; }
 .idioms-account .account-avatar { flex: 0 0 2rem; width: 2rem; height: 2rem; font-size: 0.85rem; }

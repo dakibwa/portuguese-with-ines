@@ -451,7 +451,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   with what she presses raised in cream inside them, as the student side's
   are (13 October 2026, Dan); the week's timetable keeps its own paper. They
   use the site's buttons: coral for the main action, outline for the other, a
-  quiet link for a rare one. Weekly hours is headed `Your weekly hours` with two dabs:
+  small outline or lilac button for a rare one (27 October 2026). Weekly hours is headed `Your weekly hours` with two dabs:
   tap or drag to mark when a lesson can start, and that it repeats every week.
 - `Edit weekly hours` in the Timetable opens the repeating weekly pattern in
   the same calendar. `View lessons` returns to the chosen week and day without
@@ -517,12 +517,18 @@ usual lesson starts and days off; avoid a wall of administration forms.
   do not repeat the next action as a top-right button or status beside the name.
   Explain what is outstanding inside the selected step, without vague ownership
   labels such as Yours or Theirs.
-  Completed onboarding becomes a normal row labelled Student, with their
-  details, next lesson and price. Its controls become Details, Price, Add a lesson
+  Completed onboarding becomes a normal card: their splat and name, a
+  `Weekly` tag in its top right corner when they have a weekly run, and only
+  the dabs that need her eye (27 October 2026, Dan). Its controls become Details, Price, Add a lesson
   and Lesson history, and, with an email, `Sign-in link`, whose panel holds
   `Send the link again`. No duplicate To do list or separate student profile popup.
-  The name and journey share one band where they fit. On small phones the steps
-  wrap beneath the name without horizontal scrolling. Opening a step keeps the
+  Student cards sit side by side according to the list's available width,
+  with one column on phones. An opened card spans the whole list so details,
+  lesson forms and history have room; closing it restores the compact card.
+  Keep their ranked reading order across each row. A closed card puts its
+  steps or places beneath the name, on a tablet's single column as well, so
+  nothing sits out past the last place; only an opened card on a wide list
+  shares one band. The steps wrap without horizontal scrolling. Opening a step keeps the
   student's name visible and places one X close control at the top right.
   The editor spans the row, and the selected step's
   heading and short bullet facts share a band with status actions. Details and
@@ -601,11 +607,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - Google Meet lives inside `Profile` (14 October 2026, Dan), in one card: the logo and `Connected as …` (or what
   it needs), two dabs (every lesson goes to her Google Calendar with its Meet
   link; move or cancel lessons here, not in Google), then `Open Google
-  Calendar` with `Reconnect Google Meet` as a quiet link, or a coral connect
+  Calendar` with a small `Reconnect Google Meet` button, or a coral connect
   when it needs her, and `Share your calendar` folded beneath. When the connection needs her, `Needs you` on her Timetable says so.
   Returning from Google opens Profile with the connection result. The same
   tab lets her request a confirmed sign-in email change or an emailed password
-  reset, using the existing account flows. Sign out stays at its foot and
+  reset, using the existing account flows. `Sign out` is a small button at the
+  top right of Your profile, beside her name (27 October 2026, Dan), and
   preserves the unsaved-hours warning. Account and Meet cards share a row
   where they fit and stack on a phone.
 - Every booked lesson shows its time, student and explicit `Online` or `In Porto`
@@ -638,7 +645,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - Add a student opens a short creation dialog with name, optional email,
     phone, NIF, prices and splat. Nothing is emailed. Next: their lessons closes
     the dialog and opens that student's lesson form in the Students list; the
-    lilac `No lessons yet` beside it opens their Welcome step instead (their
+    outline `No lessons yet` beside it opens their Welcome step instead (their
     Email step when none was given), where she still presses `Send welcome
     email` herself. A dialog opened from a timetable time offers only the lesson.
   - A free timetable time opens a student chooser. A past time offers only
@@ -666,12 +673,15 @@ usual lesson starts and days off; avoid a wall of administration forms.
     to Inês. With no lesson to come (16 October 2026, Inês) it is an
     invitation instead: `Book your next lesson with Inês`, the price dabs, no
     lesson list, and steps ending `Choose a day and time for your next
-    lesson.` behind `Sign in and book` (or `Sign in and add card` when a card
-    is asked for). A student free at every length is told there is no card to
-    add and nothing to pay. The Welcome and Sign-in panels say in their dabs
+    lesson.` behind `Choose a time` (`See your lessons` when they have lessons).
+    A student free at every length is told there is no card to add and nothing
+    to pay. It is often the first email a student has from the site, so it
+    says who sent it and why, and keeps passwords and cards out of its subject,
+    preheader and button: students found the earlier `Sign in and add card`
+    welcome in spam (27 October 2026). The Welcome and Sign-in panels say in their dabs
     which of these the email will be before she sends it.
   - Dormant (22 October 2026, Dan) is hers to set: `Mark as dormant` is a
-    lilac compact button beside the contact details in a student's profile,
+    small lilac button beside the contact details in a student's profile,
     offered only with no lesson to come, and `Mark as active` returns them.
     Marking sends nothing. Dormant students rest in a `Dormant · n` section
     beneath the list, by name, as ordinary rows labelled `Dormant` with no
@@ -702,10 +712,17 @@ usual lesson starts and days off; avoid a wall of administration forms.
   hides past the edge; wider, they share one row. Sign out is inside Profile.
 - A student's inline Lesson history shows
   upcoming lessons first, then past and cancelled, one card each with
-  the date and time on one line (the year only when it isn't this one), a pill
+  the date and time sharing a line where they fit (the year only when it isn't
+  this one), a pill
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
+  Each section uses a responsive grid of lesson cards: several across where
+  there is room, one column on phones. `Homework` sits at the top right beside
+  the date, with compact facts beneath, instead of taking another row at the
+  bottom. The date and time can wrap within the header; on very narrow cards
+  the button can wrap too, retaining a 44px target. Opening homework expands
+  that lesson across the full row; closing it returns the card to the grid.
   The Price control opens the two fields in place and says how many lessons to
   come moved to it, and `· standard` marks a length she hasn't priced.
   History includes older lessons outside the current week and follows the account
@@ -752,12 +769,15 @@ student picker below Your lessons. Drafts stay in her interface; there is no
 anonymous page or main-menu item.
 
 The painting and learning experience also has its own `/idioms/` page, with
-the shared site header and a full-width reading layout (14 October 2026, Dan).
+the shared site header and a reading layout capped at 84rem including its
+outer padding, so the content stays together on a wide desktop.
 Open full page leads there from an available painting card. It keeps the same
 account: Inês paints her draft collection locally; students use the existing
 published-expression access switch. Signed-out visitors sign in there. The
 page links back to her collection or the student's lessons, and does not add
 public access or a public navigation item.
+Her collection header also has a `View page` link beside `Add an expression`,
+opening `/idioms/` with the same signed-in account.
 
 - Use the same lilac sheet as Receipts, cream reading cards, Beth Ellen
   expression titles and Montserrat labels and content. Keep the latest bundle
@@ -789,10 +809,12 @@ public access or a public navigation item.
 - Each list card groups its small `Draft` or `Published` pill with the ↑↓
   arrows in its head. Facts keep their reading order and painted label dabs.
   At 27rem of inner card width the head sits level with the title at the top
-  right, and each label sits beside its value; narrower cards and the preview
-  keep labels above values:
-  `Ao pé da letra` (the literal translation, when there is one), `Quer dizer`
-  (the Portuguese meaning, a step larger than the rest) and `Em inglês`; then
+  right, and each visible label sits beside its value; narrower cards and the
+  preview keep labels above values. The literal translation, when present,
+  has no visible label in the collection, preview or painting; screen readers
+  use the clear Portuguese label `Tradução literal`, and its text uses the
+  full row. The meanings use `Quer dizer` (the Portuguese meaning,
+  a step larger than the rest) and `Em inglês`; then
   `Exemplo`/`Exemplos`, where the expression's own words are marked with a
   soft wash of the paint, taking in a verb the example has conjugated. Notes/origin and reference links
   open in a quiet disclosure. Optional themes use a lilac pill fill.
@@ -830,15 +852,19 @@ reading's title; the facts follow it.
 
 - No visible heading and no helper text (Dan: "do we even need the top
   stuff"). The section keeps `Uma expressão para ti` as a visually hidden
-  heading, so it is still named. At rest the sheet itself invites: the same
-  words as a small uppercase label at its top, in the waiting paint's
-  lettering colour, and `Paint it`. Once painted, the card is the whole
-  section, and it ends in one row at the foot of the facts at every width:
+  heading, so it is still named. Every visit starts with a blank cream canvas
+  and `Paint it`: no phrase hints, paint marks, meanings or fact labels are
+  visible before the press (27 October 2026, Dan). A returning student
+  repaints their saved expression on that first press without spending
+  another pick; `Paint another` asks for a new one. Once painted, the card is
+  the whole section, and it ends in a footer separated by a quiet rule:
   the reading's themes, then `Notas e origem` (when Inês has written notes or
   a source) and the compact `Paint another` at the row's end. The notes'
   toggle reads like the facts' labels, its chevron in the dabs' column when it
-  leads the row, and the notes open below the whole row, so opening them never
-  moves it. On a narrow column the row starts at the dabs' column and runs to
+  leads the row. On desktop the footer spans both reading columns; notes
+  open below the whole row with a comfortable line length, so opening them
+  never moves the action row or leaves an empty half beside the notes. On a
+  narrow column the row starts at the dabs' column and runs to
   the card's edge, so two short themes, or the notes' toggle, share it with
   the button; the toggle and the button drop beneath the themes together only
   for a longer set of themes, and only on the narrowest phones (320px) does the
@@ -851,7 +877,7 @@ reading's title; the facts follow it.
   carries ink `#1A3169` (5.4:1; cream on it would be 2.1:1). A new painting is
   never the colour of the last one painted on this device, nor of its family
   (blue or the two lavenders), so each one reads as a new colour. A
-  returning student sees their expression in the colour it was painted in,
+  returning student repaints their saved expression in its original colour,
   remembered on the device for each student as soon as the Worker has saved
   the pick (two students sharing a device keep their own colours), or else in
   a colour that expression always gets.
@@ -870,28 +896,24 @@ reading's title; the facts follow it.
   Nothing is ever cut: a phrase too long for every size takes as many lines as
   it needs at the smallest, and the sheet grows to hold them.
 - Composition: on a phone the sheet fills the cream card and the reading opens
-  beneath it. From a landscape phone up, two columns each run from the card's
-  top on their own: the painting with its example straight beneath it, and
-  beside it the facts with the themes and `Paint another` straight beneath
-  them. Neither column waits on the other, so the taller one never opens a
-  gap in the shorter, whose foot simply ends sooner. A painted card with a
-  one-line phrase fits a landscape phone's screen (667×375, 844×390). On a
-  very wide card the example moves up into a third column with the themes and
-  button beneath it, and all three columns start level. At rest the sheet
-  fills its column beside the facts still to come, with its wax and pool at
-  its top, where the paint will land: the paint lands where it stays and never
-  slides on the sheet. The painted sheet closes round its phrase as the
-  reading opens, only its foot rising, so a one-line phrase never sits in a
+  beneath it. From a landscape phone up, the painting with its example
+  straight beneath it sits beside the meanings. Both columns begin at the
+  top, and the footer follows the taller of them. Notes and the next-paint
+  action use that shared footer rather than extending only the right column
+  (27 October 2026, Dan: the layout should feel cleaner). Keep two reading
+  columns on larger screens as well. At rest the blank
+  sheet reserves room for the first strokes, with the button at the card's
+  foot. The paint lands where it stays and never slides on the sheet. The
+  painted sheet closes round its phrase as the reading opens, only its foot
+  rising, so a one-line phrase never sits in a
   tall empty sheet. Nothing above the section moves, and the card grows and
   shrinks smoothly below.
-- At rest a few real, unseen phrases are written in dark blue so they are
-  readable on the cream paper, and a flat pool of the next paint waits by the
-  margin. Beside the painting, the facts still to come wait in wax. Gouache is
-  matte: nothing glossy. Finished lettering stays cream on dark paint and dark
-  on lavender.
+- The idle canvas reveals nothing from the collection. The first paint
+  appears only after the press. Gouache is matte: nothing glossy. Finished
+  lettering stays cream on dark paint and dark on lavender.
 - The press starts the painting at once while the Worker picks and saves the
-  expression: a dab lands in the pool and spreads. On about one press in three
-  the wait becomes a near-miss: a thin dry brush starts the first word or two
+  expression: a dab lands on the blank sheet and spreads. On about one press
+  in three the wait becomes a near-miss: a thin dry brush starts the first word or two
   of an unseen phrase near the top, and a quick stroke of the real paint
   crosses it out, before the real phrase is painted. The near-miss is brushed
   in a wash the real paint stands out against (lavender behind the blues and
@@ -1131,7 +1153,8 @@ row wherever both fit. A first-time visitor sees
 no sign-in there, since booking asks for an account only at the confirmation;
 a quiet `Already booked? Sign in` line beneath the calendar still serves a
 student on a new browser. Signing in to view lessons shows the `Your account`
-card on its own, with a small `Back` above its corner. On wide screens the
+card on its own, with no `Back` above it: the header's `Booking` starts
+afresh (27 October 2026, Dan). On wide screens the
 groups carry small `Lesson`, `Where`, `Length` and `Repeat` labels; on a phone,
 upright or sideways, the options name themselves and the labels remain for
 assistive technology.
@@ -1307,16 +1330,16 @@ Preserve these desktop and mobile states:
   `Authorise payments` beside `Not now`. A wide card sets the lesson and dabs
   on the left and the agreement on the right, level in the middle; a phone
   reads them top to bottom. In Inês's lesson dialog a lesson a card now pays for
-  offers the `Already paid` tick (below). The sign-in panel's quiet links read `Email me a sign-in link` and
-  `I’ve forgotten my password` side by side; asking for a link is its own
+  offers the `Already paid` tick (below). The sign-in panel's small outline buttons read `Email a link` and
+  `Forgot password`, side by side down to a 360 px phone (27 October 2026, Dan); asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.
   Text fields are 44 px tall, the usual touch height. The change dialog is
   the same flat lilac as every dialog, so its sliders' tracks and free days
   are raised cream there exactly as on the booking sheet. The splat
   opens as a row of the site's own marks, all but the FAQ's question, with the
   initial first; choosing one saves it, and it shows wherever the name's menu
-  does. Saved names and splats update every account menu immediately. A small
-  `Sign out` waits at the card's foot, on the right. `Done
+  does. Saved names and splats update every account menu immediately.
+  `Sign out` waits at the card's top right, the size of every `Change`. `Done
   editing` returns to Your lessons. Its
   last item is the small `Have a code from Inês?` disclosure, one field with a blue `Add code`
   beside it that stays open for the second length's code, with any saved weekly
@@ -1673,8 +1696,8 @@ as a form:
   live in Your details. On a narrower card Past lessons and Your details
   centre their title above the name's menu, which holds the way back;
 - Your details lists the splat, name, email and NIF with a `Change`, or `Add
-  NIF`, beside each, opening one field at a time in place; a small `Sign out`
-  sits at its foot. A student can wear one of the site's splats beside their
+  NIF`, beside each, opening one field at a time in place; `Sign out`, the
+  same size, sits at its top right. A student can wear one of the site's splats beside their
   name instead of their initial (`students.mark`, migration 0022);
 - a signed-in student's Your lessons is drawn at once, before the account
   arrives: the places (or the name's place on a phone), Book, this month and
@@ -1741,9 +1764,10 @@ as a form:
   coral (12 October 2026, Dan: "can this be more beautiful"). Her form's
   email field suggests the students she already has, and choosing one fills
   in their name (`Already one of your students`): everything she does here
-  should take as few steps as it can. A lesson opens in the student's own dialog: status, the student,
-  the time in bold with its length and place beneath, then `Move lesson` in
-  coral beside `Cancel lesson`, with `Mark no-show` a quiet link below.
+  should take as few steps as it can. A lesson opens in the student's own dialog: the student
+  with its status beside their name, the time in bold with its length and place
+  beneath, the `Already paid` and `No-show` ticks as one pair, then `Move lesson`
+  in coral beside `Cancel lesson`.
   Confirming a change keeps to who and when (the Meet button, address and
   NIF step aside until `Back to lesson`): the question under a quiet rule,
   what it does as dabs (`Alex is emailed`, `It comes off your calendar`,
@@ -1838,7 +1862,7 @@ tools, again without new content:
   alone on their last line;
 - the account card's heading stays `Your account` whichever tab is chosen,
   since the tabs alone name the mode; only a `Sign in` heading follows the tab.
-  `I've forgotten my password` belongs to `I have an account` alone: someone
+  `Forgot password` belongs to `I have an account` alone: someone
   creating an account, including at the booking's `Almost there`, has no
   password to forget.
   Every sign-in card opens on one small full-colour mark centred above its
@@ -1877,19 +1901,75 @@ policy band follows the Worker's payment mode. Saved-card bookings say that the
 lesson price is charged after it, while changing or cancelling less than
 14 hours before it costs €5.
 
-Inês's lesson dialog is about the lesson: its status, the student's splat and
-name, the date in bold with the time beneath, then `Join Google Meet` as a solid
-blue button carrying Meet's own mark, and the lesson's dabs (place, length,
-price and how it is paid). `Move lesson` in coral and `Cancel lesson` in
-outline share a row while both labels fit, and `Mark no-show` is a quiet
-underlined link beneath them. Moving opens under its own `Move this lesson`
+Inês's lesson dialog is about the lesson, read top to bottom in one line of
+sight (27 October 2026, Dan: "feels awfully disjointed"): the student's splat
+and name with the status beside them, the date in bold with the time beneath,
+then `Join Google Meet` as a solid blue button carrying Meet's own mark, and the
+lesson's dabs (place, length, price and how it is paid). What she records sits
+together as one row of ticks, `Already paid` and `No-show` (named `Mark
+no-show` / `Undo no-show` for a screen reader), each the same capsule whose dab
+fills when ticked. Last, `Move lesson` in coral and `Cancel lesson` in outline
+share a row while both labels fit. Moving opens under its own `Move this lesson`
 heading, as cancelling does under `Cancel this lesson?`, with what happens as a
-dab (`Sam gets an email with the new time`). `Mark no-show` is live from the lesson's start until an hour after
-its end, and before that it shows greyed out with `Available 11:00–13:00`, so
+dab (`Sam gets an email with the new time`). `No-show` is live from the lesson's start until an hour after
+its end, and before that it shows greyed out with `Available 11:00–13:00` beneath, so
 she always knows where it is. The marked state stays reversible within the same
 window, the lesson is charged once it closes, and a no-show means only €5 is
 taken instead of the full price. Confirmations keep a `Back to lesson` button
 beside the confirming one.
+
+## Design once-over — 27 October 2026
+
+Dan asked for one consistent, beautiful pass over every student and teacher
+page, and for onboarding to feel easy:
+
+- no word on its own is an underlined button. A rare action (`Try again`,
+  `Clear`, `Sign out`, `Change email`, `Edit details`, `Mark as dormant`,
+  `Reconnect Google Meet`, the sign-in panel's other ways in) is the site's
+  small button: 40 px tall (44 px on touch), the compact label type, in
+  outline, or soft lilac where it adds something (`Show all`, `Add another
+  break`). It keeps its own width on a phone, where other buttons still run
+  full width. Disclosures that fold a rare choice away (`Set exact hours`,
+  a clash list's rest, Meet's note, `Have a code from Inês?`) are the same
+  small button and look pressed while open. Underlines stay for links inside sentences, the
+  footer's `Terms & privacy`, and emails; going back keeps the coral arrow;
+- a student's `Join Google Meet` in their lesson's dialog is the same raised
+  cream pill with Meet's mark as on their next lesson's card, never an
+  underlined line;
+- cards are filled, not left with a hole: `Set exact hours`, `Discard` and
+  `Save weekly hours` sit at the top beside `View lessons`, and the exact-time
+  editor opens as its own panel above the week (27 October 2026, Dan); a set-up student's controls carry
+  their icons and wrap three and two on a narrow card; lesson history puts its
+  heading and the student's contact on one row where there is room; a wide
+  `Add a lesson` runs its calendar the full height beside the choices; and
+  the footer of Inês's tabs meets the bottom of the window;
+- a phone's month pagers say `Sept 2026`, so the month and both arrows
+  share one row;
+- `Add a student` opens on just a name and an email; their phone, NIF,
+  price and splat are folded under one small `Phone, NIF, price and splat`
+  button, and the price can still be set from the start. It ends on coral
+  `Next: their lessons` over an outline `No lessons yet`.
+
+Dan's second look the same day ("lots of different things going on at the same
+time") took each busy place back to one voice:
+
+- signing in to see lessons is the account card alone, with no `Back` above
+  it; its other ways in are `Email a link` and `Forgot password`, side by side;
+- a set-up student's closed row is their splat and name, with a `Weekly` tag
+  in its corner when they have a weekly run. No `Student` label, email, next
+  lesson or weekly line: only what needs her eye stays as a dab (their own
+  price, lessons paid by hand, a come-back email sent);
+- Your details speaks at one size: every `Change`, `Add NIF`, `Sign out` and
+  `Have a code from Inês?` is the 14 px `Change` of a lesson row, and a long
+  email breaks after its `@`;
+- a student's Welcome, Sign-in and Saved card panels name the address as their
+  first dab (`Goes to sam@…`), never as a bare line after the dabs;
+- an expression's `Edit`, `Preview` and `Publish` are one family of lilac
+  buttons;
+- `Pay by card` states its fee once: `€5 to move or cancel less than 14 hours
+  before, or if you don’t show up`;
+- a past lesson's long date breaks before its year, never leaving the time on a
+  line of its own.
 
 ## Transactional emails — 16 October 2026
 

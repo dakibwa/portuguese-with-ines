@@ -145,7 +145,7 @@ try {
           if (action === "register") {
             await panel.getByRole("tab", { name: "Create an account", exact: true }).click();
             // Only someone signing in has a password to forget.
-            await expect(panel.getByRole("button", { name: /forgotten my password/ })).toHaveCount(0);
+            await expect(panel.getByRole("button", { name: "Forgot password", exact: true })).toHaveCount(0);
             await panel.getByLabel("Your name", { exact: true }).fill(student.name);
           }
           await panel.getByLabel("Email", { exact: true }).fill(student.email);
@@ -309,7 +309,7 @@ try {
         if (action === "replacement") {
           await replaceSession(state.page);
           await expect(state.page.locator(".account-menu__name").first()).toHaveText(replacementStudent.name);
-        } else if (action !== "success") await panel.getByRole("button", { name: /forgotten my password/ }).click();
+        } else if (action !== "success") await panel.getByRole("button", { name: "Forgot password", exact: true }).click();
         const response = state.page.waitForResponse("**/auth/google");
         waiting.resolve(); await response;
         await state.page.waitForLoadState("networkidle");
@@ -400,7 +400,7 @@ try {
       try {
         await state.page.goto(`${base}/book/?view=lessons`);
         const panel = state.page.locator(".auth-panel");
-        await panel.getByRole("button", { name: /forgotten my password/ }).click();
+        await panel.getByRole("button", { name: "Forgot password", exact: true }).click();
         await panel.getByLabel("Email", { exact: true }).fill(student.email);
         await panel.getByRole("button", { name: "Email me a reset link", exact: true }).click();
         await started.promise;

@@ -114,10 +114,11 @@ async function fixture(width, options = {}) {
     json: { lessonTypes: [], postpay: false },
   }));
   await page.route("**/me/recurring-rates", (route) => route.fulfill({ json: { rates: {} } }));
-  await page.route("**/availability?**", route => {
-    const query = new URL(route.request().url()).searchParams;
+  const availableTimes = route => {
+    const url = new URL(route.request().url());
+    const query = url.searchParams;
     const lessonType = query.get("lessonType");
-    state.availabilityReads.push(lessonType);
+    state.availabilityReads.push({ lessonType, path: url.pathname });
     const long = lessonType === "long";
     const date = "2026-09-30";
     const available = (query.get("from") ?? "") <= date && (query.get("to") ?? "") >= date;
@@ -127,7 +128,8 @@ async function fixture(width, options = {}) {
         endAt: long ? (state.conflictMoved ? "2026-09-30T19:00:00.000Z" : "2026-09-30T18:30:00.000Z") : "2026-09-30T17:00:00.000Z",
       }] } : {}, horizonDays: 56,
     } });
-  });
+  };
+  await page.route("**/availability?**", availableTimes);
   await page.route("**/auth/login", (route) => route.fulfill({
     json: { student: state.account, session: "isolated-teacher-fixture" },
   }));
@@ -162,6 +164,10 @@ async function fixture(width, options = {}) {
     const data = request.method() === "POST" ? request.postDataJSON() : null;
     const fail = (error) => route.fulfill({ status: 503, json: { error } });
     if (data) state.writes.push({ path, data });
+    if (path === "/admin/lesson-availability") {
+      assert.equal(request.headers().authorization, "Bearer isolated-teacher-fixture");
+      return availableTimes(route);
+    }
     if (path === "/admin/google-calendar") return route.fulfill({ json: { configured: false, connected: false, email: null, needsReconnect: false, pending: 0 } });
     if (path === "/admin/expressions" && request.method() === "GET") return route.fulfill({ json: { expressions: [{
       id: "original-1", expression: "Partir o coco a rir", meaningPt: "Rir muito.", meaningEn: "To split your sides laughing",
@@ -912,6 +918,9 @@ try {
   const addStudent = page.getByRole("dialog");
   await addStudent.getByLabel("Full name").fill("Ana Costa");
   await addStudent.getByLabel("Email").fill("ana@example.invalid");
+  // The rest is folded, so the form opens on just a name and an email.
+  await expect(addStudent.getByLabel(/^Phone/)).toBeHidden();
+  await addStudent.getByText("Phone, NIF, price and splat", { exact: true }).click();
   await addStudent.getByLabel(/^Phone/).fill("+351 912 345 678");
   await addStudent.getByLabel(/^NIF/).fill("123456789");
   await addStudent.getByRole("button", { name: "Bloom", exact: true }).click();
@@ -1048,7 +1057,7 @@ try {
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/bookings").at(-1).data, {
     studentId: "nora", lessonType: "long", startAt: "2026-09-30T17:30:00.000Z", location: "online", notes: "", expectedPriceCents: 3600,
   });
-  assert.ok(state.availabilityReads.includes("long"), "90-minute choices request 90-minute availability");
+  assert.ok(state.availabilityReads.some(read => read.lessonType === "long" && read.path === "/admin/lesson-availability"), "Her 90-minute choices use authenticated teacher availability");
   await expect(noraSetup.getByRole("status")).not.toContainText("emailed");
   assert.equal(state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length, 0, "Adding the lesson waits for Nora's welcome");
   await expect(noraSetup.getByRole("button", { name: "Welcome for Nora Lima", exact: true })).toBeDisabled();
@@ -1668,6 +1677,8 @@ try {
   // Closed to students, her try-out paints her drafts in her browser alone: nothing is written.
   await expect(expressions.page.getByText("Only you can see expressions for now.", { exact: false })).toBeVisible();
   const tryOut = expressions.page.getByRole("region", { name: "Uma expressão para ti", exact: true });
+  await expect(tryOut.getByRole("button", { name: "Paint it", exact: true })).toBeEnabled();
+  await expect(tryOut.locator(".expression-reading__text, .paint-sheet canvas")).toHaveCount(0);
   await tryOut.getByRole("button", { name: "Paint it", exact: true }).click();
   await expect(tryOut.getByRole("button", { name: "Paint another", exact: true })).toBeEnabled({ timeout: 10_000 });
   await expect(tryOut.getByRole("heading", { name: "Partir o coco a rir", exact: true })).toBeAttached();
@@ -1682,7 +1693,7 @@ try {
   const accountState = accountFixture.state;
   await accountPage.getByRole("tab", { name: "Profile", exact: true }).click();
   const account = accountPage.getByRole("region", { name: "Your profile", exact: true });
-  await account.getByRole("button", { name: "Send password reset link", exact: true }).click();
+  await account.getByRole("button", { name: "Send reset link", exact: true }).click();
   await expect(account.getByRole("status")).toContainText(teacher.email);
   assert.deepEqual(accountState.accountWrites.at(-1), { path: "/auth/forgot", data: { email: teacher.email } });
   await account.getByRole("button", { name: "Change email", exact: true }).click();

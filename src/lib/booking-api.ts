@@ -167,7 +167,7 @@ export function fetchAvailability(
   from: string,
   to: string,
   signal?: AbortSignal,
-  moving?: { manageToken?: string; seriesId?: string; session?: string }
+  moving?: { manageToken?: string; seriesId?: string; session?: string; teacher?: boolean }
 ) {
   const { path, session, key } = availabilityRequest(lessonType, from, to, moving);
   const cached = availabilityCache.get(key);
@@ -225,7 +225,7 @@ function availabilityRequest(
   lessonType: string,
   from: string,
   to: string,
-  moving?: { manageToken?: string; seriesId?: string; session?: string }
+  moving?: { manageToken?: string; seriesId?: string; session?: string; teacher?: boolean }
 ) {
   const query = new URLSearchParams({ lessonType, from, to });
   if (moving?.manageToken) query.set("manage", moving.manageToken);
@@ -233,7 +233,8 @@ function availabilityRequest(
   // Signed in, the student's own unfinished card-setup hold is not shown as
   // busy to them: their next booking replaces it. Anyone else still sees it.
   const session = moving?.session || readSession();
-  const path = `/availability?${query}`;
+  // Keep teacher slots behind the admin gate and in a separate cache entry.
+  const path = `${moving?.teacher ? "/admin/lesson-availability" : "/availability"}?${query}`;
   return { path, session, key: `${session} ${path}` };
 }
 
@@ -242,7 +243,7 @@ export function peekAvailability(
   lessonType: string,
   from: string,
   to: string,
-  moving?: { manageToken?: string; seriesId?: string; session?: string }
+  moving?: { manageToken?: string; seriesId?: string; session?: string; teacher?: boolean }
 ) {
   const entry = availabilityCache.get(availabilityRequest(lessonType, from, to, moving).key);
   return entry?.data && Date.now() - entry.at < AVAILABILITY_REUSE_MS ? entry.data : null;

@@ -180,7 +180,7 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
     <section aria-label={heading}>
       <h2 className="teacher-eyebrow">{heading}</h2>
       <ul className="teacher-lesson-cards">{(onSeeAll ? items.slice(0, SHOWN) : items).map(card)}</ul>
-      {onSeeAll && items.length > SHOWN ? <button className="teacher-text-button" onClick={onSeeAll} type="button">See all in Students</button> : null}
+      {onSeeAll && items.length > SHOWN ? <button className="button button--outline button--small" onClick={onSeeAll} type="button">See all in Students</button> : null}
     </section>
   </div>;
 }

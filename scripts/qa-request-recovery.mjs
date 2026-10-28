@@ -80,7 +80,7 @@ async function fixture(width, reply = async () => null) {
       return route.fulfill({ headers: cors, json: { ok: true } });
     }
     if (pathname === "/lesson-types") return route.fulfill({ headers: cors, json: { lessonTypes: types, postpay: false, paymentReady: true } });
-    if (pathname === "/availability") return route.fulfill({ headers: cors, json: { slotsByDate: {}, timeZone: "Europe/Lisbon", horizonDays: 84 } });
+    if (pathname === "/availability" || pathname === "/admin/lesson-availability") return route.fulfill({ headers: cors, json: { slotsByDate: {}, timeZone: "Europe/Lisbon", horizonDays: 84 } });
     if (pathname === "/bookings/next") return route.fulfill({ headers: cors, json: { booking: nextLesson, isPast: false, sameDayFeeApplies: false } });
     if (pathname === "/admin/availability") return route.fulfill({ headers: cors, json: { rules: [], exceptions: [] } });
     if (pathname === "/admin/students") return route.fulfill({ headers: cors, json: { students: [], cardsAccepted: false } });

@@ -1,5 +1,5 @@
 import { PAINTS, hash, type PaintKey } from "@/lib/expression-paint";
-import { blob, layoutPhrase, makeCanvas, paintBead, paintLetters, paintStroke, paintWax, rng, waxHeight, waxRows, type PhraseLine, type Rand, type Solid, type WaxMetrics } from "./paint-art";
+import { blob, layoutPhrase, makeCanvas, paintBead, paintLetters, paintStroke, rng, type PhraseLine, type Rand, type Solid, type WaxMetrics } from "./paint-art";
 
 const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
 const STROKE_EASE = "cubic-bezier(0.42, 0.04, 0.24, 1)";
@@ -122,7 +122,7 @@ type Art = {
 
 type Shown =
   | { kind: "none" }
-  | { kind: "rest"; paint: PaintKey; wax: string[] }
+  | { kind: "rest"; paint: PaintKey }
   | { kind: "show"; phrase: string; id: string; paint: PaintKey };
 
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
@@ -184,7 +184,6 @@ function div(className: string) {
  */
 export class Painter {
   private readonly root: HTMLElement;
-  private readonly wax: HTMLCanvasElement;
   private art: Art | null = null;
   private readonly anims = new Set<Animation>();
   private readonly waiters = new Set<() => void>();
@@ -217,9 +216,6 @@ export class Painter {
     const spring = getComputedStyle(document.documentElement).getPropertyValue("--motion-spring").trim();
     this.spring = spring && this.easingWorks(spring) ? spring : SPRING_FALLBACK;
     this.shaped = typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("clip-path", 'path("M0 0L1 0L1 1Z")');
-    this.wax = document.createElement("canvas");
-    this.wax.className = "paint-sheet__wax";
-    root.append(this.wax);
     this.m = this.measure();
     // Until the first painting is drawn, the example beside it waits under the sheet as it stands.
     this.sheetHeight(Math.round(root.getBoundingClientRect().height));
@@ -314,13 +310,10 @@ export class Painter {
     this.halt();
     this.art?.el.remove();
     this.art = null;
-    this.wax.remove();
   }
 
   /**
-   * The waiting sheet is at least as tall as its wax needs, and fills the
-   * height its place in the card gives it (beside the facts to come, it runs
-   * as deep as they do), its wax centred in it. Returns the height it takes.
+   * The blank waiting sheet fills the height its place in the card gives it.
    */
   private stretch(least: number) {
     this.root.style.height = "auto";
@@ -403,13 +396,9 @@ export class Painter {
     return canvas;
   }
 
-  /** The resting sheet's height: its label, the wax beneath it and a margin. The wax runs from `top` to `bottom`. */
-  private restHeight(phrases: string[]) {
-    const g = document.createElement("canvas").getContext("2d");
-    const rows = g ? waxRows(g, this.m.w, this.m, phrases, this.family).length : 3;
-    const top = Math.max(this.m.labelRoom, this.m.marginV);
-    const bottom = top + waxHeight(rows, this.m);
-    return { h: Math.round(bottom + this.m.marginV * 1.5), top, bottom };
+  /** Room for the first strokes, without drawing phrases or hints at rest. */
+  private restHeight() {
+    return Math.round(this.m.marginV * 2 + this.m.sizes[0][0] * 4);
   }
 
   /**
@@ -422,28 +411,11 @@ export class Painter {
     return Math.round(Math.max(marginV + 1.35 * sizes[0][0], labelRoom + poolSize * 0.42));
   }
 
-  private drawWax(phrases: string[], h: number, top: number, bottom: number) {
-    const { w } = this.m;
-    const width = Math.ceil(w * this.dpr);
-    const height = Math.ceil(h * this.dpr);
-    if (this.wax.width !== width || this.wax.height !== height) {
-      this.wax.width = width;
-      this.wax.height = height;
-      this.wax.style.width = `${w}px`;
-      this.wax.style.height = `${h}px`;
-    }
-    const g = this.wax.getContext("2d");
-    if (!g) return;
-    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    g.clearRect(0, 0, w, h);
-    paintWax(g, w, top, bottom, this.m, phrases, this.family, rng(hash(phrases.join("|")) || 11));
-  }
-
-  /** The waiting sheet: phrases faintly in wax, the next paint pooled by the margin. */
-  rest(paint: PaintKey, wax: string[], fade = false) {
+  /** The sheet stays blank until the learner chooses to paint. */
+  rest(paint: PaintKey, fade = false) {
     if (this.dead) return;
     this.halt();
-    this.shown = { kind: "rest", paint, wax };
+    this.shown = { kind: "rest", paint };
     this.paint = paint;
     this.render(fade);
   }
@@ -478,15 +450,9 @@ export class Painter {
     if (fade) this.retire(old);
     else old?.el.remove();
     if (shown.kind === "rest") {
-      // The wax and the pool wait at the sheet's top, however tall its place in the card makes it.
-      const { h: least, top, bottom } = this.restHeight(shown.wax);
-      const h = this.stretch(least);
-      this.drawWax(shown.wax, h, top, bottom);
-      delete this.wax.dataset.gone;
+      this.stretch(this.restHeight());
       this.placePool(art, this.m.poolX, this.poolRest());
-      this.restPool(art, shown.paint, hash(shown.paint) % 97);
     } else {
-      this.wax.dataset.gone = "";
       const R = rng(hash(shown.id));
       const plan = this.build(shown.phrase, R);
       this.setHeight(plan.hug);
@@ -501,7 +467,7 @@ export class Painter {
 
   /**
    * The press. A dab of the chosen paint lands in the pool and spreads while
-   * the reply is on its way; the wax (or the last painting) dries away. With a
+   * the reply is on its way; any last painting dries away. With a
    * `decoy`, a thin dry brush starts an unseen phrase near the top and a quick
    * strike crosses it out: a near-miss before the real phrase.
    */
@@ -513,7 +479,7 @@ export class Painter {
     this.paint = paint;
     this.spinAt = performance.now();
     // From here the sheet keeps the height it has, unless a phrase needs more.
-    this.setHeight(this.h || this.restHeight([]).h);
+    this.setHeight(this.h || this.restHeight());
     let art = waiting;
     if (!art) {
       this.retire(this.art);
@@ -522,8 +488,6 @@ export class Painter {
       this.placePool(art, this.m.poolX, this.poolRest());
     }
     this.shown = { kind: "none" };
-    // The wax waits while the reply is on its way, so the sheet is never bare:
-    // it dries away as the first stroke lands, or at once under a near-miss.
     const S = this.m.poolSize;
     const R = rng(hash(`dab${paint}${Math.round(this.spinAt)}`));
     const dab = this.dabCanvas(art, paint, R);
@@ -554,7 +518,6 @@ export class Painter {
     if (decoy && this.fontsReady) {
       try {
         this.nearMiss(art, decoy, paint);
-        this.wax.dataset.gone = "";
       } catch {
         this.decoy = null;
       }
@@ -910,7 +873,6 @@ export class Painter {
     // of the real phrase was no near-miss after all: it dries away at once.
     const missed = decoy && !normal(phrase).startsWith(normal(decoy.fragment)) ? decoy : null;
     const plan = this.build(phrase, R);
-    this.wax.dataset.gone = "";
     // At the sheet's top, where it stays: the paint never slides on the sheet.
     const y = m.marginV;
     // Grow now if the phrase needs it; a smaller one is painted where it is and settles later.

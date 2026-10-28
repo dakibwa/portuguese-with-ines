@@ -2767,14 +2767,22 @@ await accountPage.route("**/me/expressions/pick", route => {
 await accountPage.reload({ waitUntil: "domcontentloaded" });
 // The section keeps its name for assistive technology though its heading is not shown.
 const expressions = accountPage.getByRole("region", { name: "Uma expressão para ti", exact: true });
-await expressions.getByRole("button", { name: "Paint it", exact: true }).click();
-await expressions.locator(".expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
+async function paintBlankExpression() {
+  const paint = expressions.getByRole("button", { name: "Paint it", exact: true });
+  await paint.waitFor();
+  if (await expressions.locator(".expression-reading__text, .paint-sheet canvas").count()) {
+    throw new Error("An expression must start as a blank canvas, including on a return visit.");
+  }
+  await paint.click();
+  await expressions.locator(".expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
+}
+await paintBlankExpression();
 await expressions.getByRole("link", { name: "Open full page", exact: true }).click();
 await accountPage.waitForURL(/\/idioms\/$/);
 await accountPage.locator(".site-header").waitFor();
-await expressions.locator(".expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
+await paintBlankExpression();
 await accountPage.reload({ waitUntil: "domcontentloaded" });
-await expressions.locator(".expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
+await paintBlankExpression();
 if (await accountPage.getByRole("button", { name: "Paint another", exact: true }).count()) throw new Error("An exhausted collection must wait for new expressions.");
 await accountPage.getByRole("link", { name: "Your lessons", exact: true }).click();
 await accountPage.locator("#upcoming-lessons-heading").waitFor();

@@ -40,7 +40,8 @@ function pastTimes(day: string, today: string, chosen: string, now: number) {
  * quarter hour of a day already had, back a year (15 October 2026, Dan: she
  * records lessons that have happened).
  */
-export function LessonDatePicker({ lessonType, date, time, startAt = "", idPrefix, disabled, refresh = 0, onChange }: {
+export function LessonDatePicker({ token, lessonType, date, time, startAt = "", idPrefix, disabled, refresh = 0, onChange }: {
+  token: string;
   lessonType: string;
   date: string;
   time: string;
@@ -63,7 +64,7 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", idPrefi
   const calendar = useRef<HTMLDivElement>(null);
   const firstRead = useRef(true);
   const monthId = `${idPrefix}-month`;
-  const requestKey = `${lessonType}|${month}|${refresh}|${retry}`;
+  const requestKey = `${token}|${lessonType}|${month}|${refresh}|${retry}`;
   // A month wholly past has no free times to ask for.
   const pastMonth = month < currentMonth;
   const current = pastMonth ? { slots: {}, error: false } : reply?.key === requestKey ? reply : null;
@@ -85,7 +86,7 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", idPrefi
     if (pastMonth) return;
     const controller = new AbortController();
     if (firstRead.current) { forgetAvailability(); firstRead.current = false; }
-    fetchAvailability(lessonType, month, shiftDate(shiftMonth(month, 1), -1), controller.signal)
+    fetchAvailability(lessonType, month, shiftDate(shiftMonth(month, 1), -1), controller.signal, { session: token, teacher: true })
       .then(data => {
         if (!controller.signal.aborted) setReply({ key: requestKey, slots: data.slotsByDate, error: false });
       })
@@ -93,7 +94,7 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", idPrefi
         if (!controller.signal.aborted) setReply({ key: requestKey, slots: {}, error: true });
       });
     return () => controller.abort();
-  }, [lessonType, month, requestKey, pastMonth]);
+  }, [token, lessonType, month, requestKey, pastMonth]);
 
   function moveMonth(amount: number) {
     const next = shiftMonth(month, amount);
@@ -155,7 +156,7 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", idPrefi
         <h4>{dayInView ? dateLabel(date, { weekday: "short", day: "numeric", month: "short" }) : "Choose a day"}</h4>
         {loading ? <p role="status">Checking available times…</p> : current?.error ? <div className="teacher-inline-error" role="alert">
           <p>Available times couldn’t be checked.</p>
-          <button className="teacher-text-button" disabled={disabled} onClick={() => { forgetAvailability(); setRetry(value => value + 1); }} type="button">Try again</button>
+          <button className="button button--outline button--small" disabled={disabled} onClick={() => { forgetAvailability(); setRetry(value => value + 1); }} type="button">Try again</button>
         </div> : dayInView ? selectedTimes.length || gone.length ? <div className="teacher-lesson-picker__slots" aria-label={gone.length ? "Times in Porto" : "Available times in Porto"}>
           {/* Gone: any quarter hour, for a lesson she is recording. */}
           {gone.map(value => <button
@@ -176,7 +177,7 @@ export function LessonDatePicker({ lessonType, date, time, startAt = "", idPrefi
             onClick={() => onChange({ date: portoDateKey(new Date(slot.startAt)), time: formatSlotTime(slot.startAt), startAt: slot.startAt })}
             type="button"
           >{formatSlotTime(slot.startAt)}</button>)}
-        </div> : <p>No available times. Choose another day.</p> : <p>Choose a day to see its available times.</p>}
+        </div> : <p>No available times. Choose another day.</p> : <p>Its free times show here.</p>}
         {date && time ? <p className="teacher-lesson-picker__chosen">Chosen: <strong>{dateLabel(date, { day: "numeric", month: "short" })}, {time}</strong> · Porto time</p> : null}
       </div>
     </div>

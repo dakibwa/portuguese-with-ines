@@ -112,9 +112,15 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
   const locked = disabled || Boolean(busy);
   return (
     <section className="teacher-account" aria-labelledby="teacher-account-title">
+      {/* One line a detail, each with its own small button at the right, and
+          Sign out at the top right as on a student's Your details
+          (27 October 2026, Dan: one style, no holes). */}
       <div className="teacher-account__heading">
-        <h2 id="teacher-account-title">Your profile</h2>
-        <p>{student.name}</p>
+        <div>
+          <h2 id="teacher-account-title">Your profile</h2>
+          <p>{student.name}</p>
+        </div>
+        <button className="button button--outline button--small" disabled={locked} onClick={onSignOut} type="button">Sign out</button>
       </div>
       <div className="teacher-account__detail">
         <div className="teacher-account__line">
@@ -122,7 +128,7 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
             <h3>Sign-in email</h3>
             <p>{student.email}</p>
           </div>
-          {!editingEmail ? <button className="teacher-text-button" disabled={locked} onClick={() => { setEditingEmail(true); setEmail(""); setError(""); setNote(""); }} type="button">Change email</button> : null}
+          {!editingEmail ? <button className="button button--outline button--small" disabled={locked} onClick={() => { setEditingEmail(true); setEmail(""); setError(""); setNote(""); }} type="button">Change email</button> : null}
         </div>
         {editingEmail ? (
           <form className="teacher-form teacher-account__email" onSubmit={changeEmail}>
@@ -131,23 +137,24 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
             <p>Confirm the link sent to the new address to change where you sign in.</p>
             <div className="teacher-account__actions">
               <button className="button button--coral" disabled={locked || !email.trim() || email.trim().toLowerCase() === student.email.toLowerCase()} type="submit">{busy === "email" ? "Sending…" : "Send confirmation email"}</button>
-              <button className="teacher-text-button" disabled={locked} onClick={() => setEditingEmail(false)} type="button">Cancel</button>
+              <button className="button button--outline button--small" disabled={locked} onClick={() => setEditingEmail(false)} type="button">Cancel</button>
             </div>
           </form>
         ) : null}
         {emailPending ? <p className="teacher-account__waiting" role="status">Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.</p> : null}
       </div>
       <div className="teacher-account__detail">
-        <h3>Password</h3>
-        <p>A link to your sign-in email lets you choose a new password.</p>
-        <button className="button button--lilac" disabled={locked} onClick={() => void changePassword()} type="button">{busy === "password" ? "Sending…" : "Send password reset link"}</button>
+        <div className="teacher-account__line">
+          <div>
+            <h3>Password</h3>
+            <p>A link to your sign-in email lets you choose a new one.</p>
+          </div>
+          <button className="button button--outline button--small" disabled={locked} onClick={() => void changePassword()} type="button">{busy === "password" ? "Sending…" : "Send reset link"}</button>
+        </div>
       </div>
       {busy === "confirm" ? <p role="status">Confirming your sign-in email…</p> : null}
       {error ? <p className="teacher-account__error" role="alert">{error}</p> : null}
       {note ? <p className="teacher-account__note" role="status"><CheckCircle2 size={17} aria-hidden="true" />{note}</p> : null}
-      <div className="teacher-account__signout">
-        <button className="teacher-sign-out" disabled={locked} onClick={onSignOut} type="button">Sign out</button>
-      </div>
     </section>
   );
 }
