@@ -1279,7 +1279,7 @@ Preserve these desktop and mobile states:
   (`Save name`, `Send confirmation link`, `Save NIF`) and `Cancel`, and closes
   once saved; only an open email carries a short note, the NIF's purpose being
   in its label. A `Card` row follows the email where the site takes cards
-  (12 October 2026, Dan): `Saved`, `Only for lessons you book` or `Not
+  (12 October 2026, Dan): `Saved`, `Saved for lessons you book` or `Not
   added`, with `Change` or `Add card`; opening it shows the confirm step's
   dabbed terms in place (the two €5 fees among them) and `Agree & add
   card`, which goes to Stripe's page. While a lesson Inês added is still
@@ -1304,7 +1304,7 @@ Preserve these desktop and mobile states:
   `Porto time`, the price on the right), the confirm step's three dabs (when
   that lesson is charged, future lessons charged automatically, the €5 fee),
   then the agreement capsule with `Terms & privacy` inside it and
-  `Authorise payments` beside `Cancel`. A wide card sets the lesson and dabs
+  `Authorise payments` beside `Not now`. A wide card sets the lesson and dabs
   on the left and the agreement on the right, level in the middle; a phone
   reads them top to bottom. In Inês's lesson dialog a lesson a card now pays for
   offers the `Already paid` tick (below). The sign-in panel's quiet links read `Email me a sign-in link` and

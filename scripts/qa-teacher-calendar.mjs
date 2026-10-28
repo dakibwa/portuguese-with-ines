@@ -1681,7 +1681,7 @@ try {
   const accountPage = accountFixture.page;
   const accountState = accountFixture.state;
   await accountPage.getByRole("tab", { name: "Profile", exact: true }).click();
-  const account = accountPage.getByRole("region", { name: "Your account", exact: true });
+  const account = accountPage.getByRole("region", { name: "Your profile", exact: true });
   await account.getByRole("button", { name: "Send password reset link", exact: true }).click();
   await expect(account.getByRole("status")).toContainText(teacher.email);
   assert.deepEqual(accountState.accountWrites.at(-1), { path: "/auth/forgot", data: { email: teacher.email } });

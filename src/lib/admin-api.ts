@@ -185,7 +185,12 @@ async function adminRequest<T>(
   if (response.status === 401) forgetSession(token);
   if (!response.ok) {
     const error = isApiRecord(data) && typeof data.error === "string" ? data.error : "";
-    throw new AdminApiError(error || `Request failed (${response.status})`, response.status);
+    throw new AdminApiError(
+      error || (response.status === 401
+        ? "Your sign-in has ended. Please sign in again."
+        : `Something went wrong on our side (${response.status}). Please try again in a moment.`),
+      response.status,
+    );
   }
   if (!isApiRecord(data)) throw new Error(BOOKING_REPLY_ERROR);
   return data as T;

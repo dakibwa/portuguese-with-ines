@@ -110,24 +110,28 @@ export function LessonForm({
     onBusy?.(value);
   };
   const submit = (
-    <div className="teacher-manual-submit teacher-dialog-actions">
-      <button
-        className={`button button--${past ? "coral" : tone}`}
-        type="submit"
-        disabled={busy || !startAt}
-      >
-        {busy
-          ? "Adding…"
-          : past
-            ? "Add past lesson"
-            : `${weekly ? "Add weekly lessons" : "Add lesson"}${quiet ? "" : " and email student"}`}
-      </button>
-      {onCancel ? (
-        <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">
-          Cancel
+    <>
+      {!startAt && !busy ? <p className="teacher-field-optional" id={`${idPrefix}-needs-time`}>Choose a date and a time first.</p> : null}
+      <div className="teacher-manual-submit teacher-dialog-actions">
+        <button
+          className={`button button--${past ? "coral" : tone}`}
+          type="submit"
+          disabled={busy || !startAt}
+          aria-describedby={!startAt && !busy ? `${idPrefix}-needs-time` : undefined}
+        >
+          {busy
+            ? "Adding…"
+            : past
+              ? "Add past lesson"
+              : `${weekly ? "Add weekly lessons" : "Add lesson"}${quiet ? "" : " and email student"}`}
         </button>
-      ) : null}
-    </div>
+        {onCancel ? (
+          <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">
+            Cancel
+          </button>
+        ) : null}
+      </div>
+    </>
   );
   return (
     <>

@@ -222,7 +222,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
       <li>{student.nextLessonAt ? `Next lesson ${dateLabel(dateKey(new Date(student.nextLessonAt)), { weekday: "short", day: "numeric", month: "short" })}, ${formatSlotTime(student.nextLessonAt)}` : "No upcoming lesson"}</li>
       {student.weekly ? <li>Weekly lessons</li> : null}
       {prices ? <li>{prices}</li> : null}
-      {student.unpaidUpcoming ? <li>{student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} paid by hand</li> : null}
+      {student.unpaidUpcoming ? <li>{student.unpaidUpcoming === 1 ? "1 lesson" : `${student.unpaidUpcoming} lessons`} to be paid by hand</li> : null}
       {student.dormant && student.dormantEmailedAt ? <li>Come-back email sent {dateLabel(dateKey(new Date(student.dormantEmailedAt)), { day: "numeric", month: "short" })}</li> : null}
     </ul> : null}
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}

@@ -1471,7 +1471,7 @@ await accountPanel.locator("#account-past-lessons").waitFor({ state: "detached" 
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 
 const laterLessonsToggle = accountActions.getByRole("button", { name: /^Your lessons/ });
-if (!/3\s*$/.test((await laterLessonsToggle.innerText()).trim())) {
+if (!/3\s*upcoming$/.test((await laterLessonsToggle.innerText()).trim())) {
   throw new Error("The Your lessons badge should count each repeating schedule once, plus each one-off lesson.");
 }
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
@@ -2619,7 +2619,7 @@ if (
 }
 try {
   await accountPage.waitForFunction(
-    () => /12$/.test(document.querySelector("#account-menu button")?.textContent?.trim() ?? ""),
+    () => /12\s*upcoming$/.test(document.querySelector("#account-menu button")?.textContent?.trim() ?? ""),
     null,
     { timeout: 10_000 }
   );

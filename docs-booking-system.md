@@ -220,7 +220,7 @@ status:
 - The tick covers the lesson price only, not a late change fee.
 - The older `POST /admin/bookings/:id/paid-by-hand` (her lesson on a card,
   ticked) still answers for any open page, but the site no longer calls it.
-- Her student list's `paid by hand` count and the student's `Pay by card`
+- Her student list's `to be paid by hand` count and the student's `Pay by card`
   prompt leave ticked lessons out; emails show their price as `paid`.
 
 Cancelling a lesson never records a refund of money paid by hand. In Student

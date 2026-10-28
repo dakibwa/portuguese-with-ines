@@ -17,6 +17,7 @@ export default function ResetPasswordPage() {
       <AccountHero
         mark="/visuals/v2-splats/built-around-you-splat-v2.svg"
         title="New password"
+        intro="Choose a new password for your account."
       />
       <main className="manage-page" id="main-content">
         <ResetPassword />

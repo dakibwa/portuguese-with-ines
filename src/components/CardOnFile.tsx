@@ -82,9 +82,9 @@ export function CardTerms({ change = false, onCancel, bookingId = "", feeCents =
       >
         {busy ? (review?.savedCardKey ? "Authorising…" : "Opening…") : review?.savedCardKey ? "Authorise payments" : bookingId ? "Agree & confirm payments" : change ? "Agree & change card" : "Agree & add card"}
       </button>
-      {bookingId && error ? <button className="my-lessons__change" onClick={() => { setError(""); setReview(null); setBookingConsent(false); setAttempt(value => value + 1); }} type="button">Review again</button> : null}
+      {bookingId && error ? <button className="my-lessons__change" onClick={() => { setError(""); setReview(null); setBookingConsent(false); setAttempt(value => value + 1); }} type="button">Try again</button> : null}
       {onCancel ? (
-        <button className="my-lessons__change" disabled={busy} onClick={onCancel} type="button">Cancel</button>
+        <button className="my-lessons__change" disabled={busy} onClick={onCancel} type="button">{bookingId ? "Not now" : "Cancel"}</button>
       ) : null}
     </div>
   );

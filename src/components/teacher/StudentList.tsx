@@ -90,7 +90,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
     <NeedsYou {...noticeProps} heading="Check first" items={workspace.general} />
     {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={onRetry} type="button">Try again</button></div> : null}
     {!students && !error ? <p role="status">Loading your students…</p> : null}
-    {students && !students.length ? <p>No students yet.</p> : students && !shown.length && !resting.length ? <p>No students match.</p> : null}
+    {students && !students.length ? <p>No students yet. Press Add a student to set up your first.</p> : students && !shown.length && !resting.length ? <p role="status">No students match “{query.trim()}”.</p> : null}
     <ul className="teacher-setup-list teacher-students__unified">{shown.map(row)}</ul>
     {dormantCount ? <section className="teacher-dormant" aria-labelledby="teacher-dormant-title">
       <div className="teacher-dormant__bar">

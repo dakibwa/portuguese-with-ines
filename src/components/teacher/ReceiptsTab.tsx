@@ -87,12 +87,15 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `receipts-${month}.csv`;
+    const href = link.href;
     link.click();
-    URL.revokeObjectURL(link.href);
+    // Revoking in the same tick can cancel the download in Safari and Firefox.
+    window.setTimeout(() => URL.revokeObjectURL(href), 1000);
   }
 
   return (
     <section className="teacher-receipts" aria-labelledby="teacher-receipts-month">
+      <h2 className="visually-hidden">Receipts</h2>
       <div className="teacher-month-heading">
         <h3 id="teacher-receipts-month" aria-live="polite" ref={monthTitleRef} tabIndex={-1}>{monthName}</h3>
         <TeacherPager
@@ -130,6 +133,7 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
           {/* A plain table, one row per amount, so her automation can read
               it as well as she can; every row carries its id and figures. */}
           <table className="teacher-receipts__table">
+            <caption className="visually-hidden">Receipts for {monthName}</caption>
             <thead>
               <tr>
                 <th scope="col">Lesson</th>
@@ -137,7 +141,7 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
                 <th scope="col">NIF</th>
                 <th scope="col">For</th>
                 <th scope="col">Amount</th>
-                <th scope="col">Paid</th>
+                <th scope="col">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -157,8 +161,8 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
                   <td data-label="Student">{line.studentName}</td>
                   <td data-label="NIF">{line.nif || "Consumidor final"}</td>
                   <td data-label="For">{line.label}</td>
-                  <td data-label="Amount">{line.amountCents === null ? "—" : formatMoneyCents(line.amountCents)}</td>
-                  <td data-label="Paid"><span className={`teacher-receipts__state is-${line.ready ? "ready" : line.state}`}>{paidLabel(line)}</span></td>
+                  <td data-label="Amount">{line.amountCents === null ? "Not set yet" : formatMoneyCents(line.amountCents)}</td>
+                  <td data-label="Status"><span className={`teacher-receipts__state is-${line.ready ? "ready" : line.state}`}>{paidLabel(line)}</span></td>
                 </tr>
               ))}
             </tbody>

@@ -209,7 +209,7 @@ try {
     await expect(spent.page.getByRole("heading", { name: "Sign in by email" })).toBeVisible();
     await spent.page.locator(".auth-panel__form").getByLabel("Email").fill("rita@example.invalid");
     await spent.page.getByRole("button", { name: "Email me a sign-in link" }).click();
-    await expect(spent.page.locator(".auth-panel [role=status]")).toContainText("a link is on its way");
+    await expect(spent.page.locator(".auth-panel [role=status]")).toContainText("a sign-in link is on its way");
     assert.deepEqual(spent.posts.find((post) => post.endpoint === "/auth/email-link")?.body, { email: "rita@example.invalid" });
     await spent.page.getByRole("button", { name: "Back to signing in" }).click();
     await expect(spent.page.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
@@ -233,7 +233,7 @@ try {
         };
       });
       await blocked.page.getByRole("button", { name: "Sign in", exact: true }).click({ timeout: 15000 });
-      await expect(blocked.page.locator(".sign-in-link [role=alert]")).toContainText("This link has been used");
+      await expect(blocked.page.locator(".sign-in-link [role=alert]")).toContainText("this link has now been used");
       await expect(blocked.page.getByRole("button", { name: "Email me a new link", exact: true })).toBeVisible();
       assert.equal(await blocked.page.evaluate(() => localStorage.getItem("ines-student-session")), null);
       assert.deepEqual(blocked.errors, []);

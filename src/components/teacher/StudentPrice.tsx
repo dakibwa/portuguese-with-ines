@@ -65,10 +65,12 @@ const euroText = (cents: number) => (cents / 100).toFixed(cents % 100 ? 2 : 0);
  * own; once she types a 60-minute price the 90-minute field shows 1.5 times
  * it, which is what an empty 90 means (13 October 2026, Dan).
  */
-export function PriceFields({ draft, disabled, idPrefix, onChange }: {
+export function PriceFields({ draft, disabled, idPrefix, invalid, onChange }: {
   draft: PriceDraft;
   disabled?: boolean;
   idPrefix: string;
+  /** The price couldn't be read; its message carries `${idPrefix}-error`. */
+  invalid?: boolean;
   onChange: (draft: PriceDraft) => void;
 }) {
   return (
@@ -79,6 +81,8 @@ export function PriceFields({ draft, disabled, idPrefix, onChange }: {
           <span className="teacher-price-input">
             <span aria-hidden="true">€</span>
             <input
+              aria-describedby={invalid ? `${idPrefix}-error` : undefined}
+              aria-invalid={invalid || undefined}
               aria-label={`Price for ${minutes} minutes, in euros`}
               autoComplete="off"
               disabled={disabled}
@@ -152,7 +156,7 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
       {!labelledBy ? <h3 id={`${idPrefix}-title`}>Their price</h3> : null}
       {editing ? (
         <form className="teacher-form" noValidate onSubmit={(event) => { event.preventDefault(); void save(); }}>
-          <PriceFields draft={draft} disabled={busy} idPrefix={idPrefix} onChange={setDraft} />
+          <PriceFields draft={draft} disabled={busy} idPrefix={idPrefix} invalid={error === PRICE_RANGE_ERROR} onChange={setDraft} />
           <ul className="booking-payment-facts teacher-price__hint">
             <li>90 mins empty: 1.5× the 60-minute price.</li>
             <li>Both empty: standard prices.</li>
@@ -180,7 +184,7 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
           <button className="button button--lilac button--compact" onClick={() => { setEditing(true); setSaved(""); }} type="button">Change price</button>
         </div>
       )}
-      {error ? <p className="teacher-inline-error" role="alert">{error}</p> : null}
+      {error ? <p className="teacher-inline-error" id={`${idPrefix}-error`} role="alert">{error}</p> : null}
       {saved ? <p className="teacher-inline-success" role="status"><CheckCircle2 size={18} aria-hidden="true" />{saved}</p> : null}
     </section>
   );

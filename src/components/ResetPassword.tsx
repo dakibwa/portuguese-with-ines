@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Lock } from "lucide-react";
+import { SITE_BASE_PATH } from "@/lib/paths";
 import { readSession, resetPassword, SessionStorageError, storeSession } from "@/lib/auth-api";
 
 export function ResetPassword() {
@@ -9,6 +10,8 @@ export function ResetPassword() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
+  // The server turned the link down, so the only way on is a new one.
+  const [linkRefused, setLinkRefused] = useState(false);
   const [done, setDone] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [teacher, setTeacher] = useState(false);
@@ -16,6 +19,7 @@ export function ResetPassword() {
   const [busy, setBusy] = useState(false);
   const resetToken = useRef<string | null>(null);
   const resetRequest = useRef(0);
+  const fieldId = useId();
   useLayoutEffect(() => () => { resetRequest.current += 1; }, []);
 
   useEffect(() => {
@@ -41,6 +45,7 @@ export function ResetPassword() {
     const session = readSession();
     setBusy(true);
     setError("");
+    setLinkRefused(false);
 
     try {
       const result = await resetPassword(token, password);
@@ -62,6 +67,7 @@ export function ResetPassword() {
     } catch (caught) {
       if (request !== resetRequest.current) return;
       setError(caught instanceof Error ? caught.message : "That didn’t work. Please request a new link.");
+      setLinkRefused(true);
     } finally {
       if (request === resetRequest.current) setBusy(false);
     }
@@ -75,7 +81,7 @@ export function ResetPassword() {
           <strong>Your password has been changed.</strong>
           <p>
             {signedIn ? <>You&rsquo;re signed in. <a href={teacher ? "/schedule/?tab=profile" : "/book/?view=lessons"}>{teacher ? "Go to your profile" : "Go to your lessons"}</a>.</>
-              : storageNote || "You can use your new password next time you sign in."}
+              : storageNote || <>You can now <a href={`${SITE_BASE_PATH}/book/?view=lessons`}>sign in with your new password</a>.</>}
           </p>
         </div>
       </div>
@@ -91,27 +97,31 @@ export function ResetPassword() {
             New password
           </span>
           <input
+            aria-describedby={`${fieldId}-hint${error ? ` ${fieldId}-error` : ""}`}
+            aria-invalid={Boolean(error) || undefined}
             autoComplete="new-password"
             disabled={!token}
             minLength={8}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(event) => { setPassword(event.target.value); if (token && !linkRefused) setError(""); }}
             required
             type="password"
             value={password}
           />
-          <small>At least 8 characters.</small>
+          <small id={`${fieldId}-hint`}>At least 8 characters.</small>
         </label>
 
         <label>
           <span>
             <Lock size={16} aria-hidden="true" />
-            Again, to be sure
+            New password, again
           </span>
           <input
+            aria-describedby={error ? `${fieldId}-error` : undefined}
+            aria-invalid={Boolean(error) || undefined}
             autoComplete="new-password"
             disabled={!token}
             minLength={8}
-            onChange={(event) => setConfirm(event.target.value)}
+            onChange={(event) => { setConfirm(event.target.value); if (token && !linkRefused) setError(""); }}
             required
             type="password"
             value={confirm}
@@ -119,9 +129,16 @@ export function ResetPassword() {
         </label>
 
         {error ? (
-          <div className="booking-alert booking-alert--error" role="alert">
+          <div className="booking-alert booking-alert--error" id={`${fieldId}-error`} role="alert">
             <AlertCircle size={18} aria-hidden="true" />
-            <p>{error}</p>
+            <div className="booking-alert__body">
+              <p>{error}</p>
+              {!token || linkRefused ? (
+                <div className="booking-alert__actions">
+                  <a className="button button--outline button--compact" href={`${SITE_BASE_PATH}/book/?view=lessons`}>Ask for a new link</a>
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : null}
 

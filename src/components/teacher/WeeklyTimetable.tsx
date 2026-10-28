@@ -762,21 +762,21 @@ export function WeeklyTimetable({
           starts and their two dabs above say it all. */}
       {!editing ? (
         <div className="teacher-grid-footnote">
-          <div className="teacher-calendar-key" aria-label="Timetable key">
+          <div className="teacher-calendar-key" role="group" aria-label="Timetable key">
             <span>
-              <i className="teacher-key-starts" />
+              <i className="teacher-key-starts" aria-hidden="true" />
               Weekly hours
             </span>
             <span>
-              <i className="teacher-key-booked" />
+              <i className="teacher-key-booked" aria-hidden="true" />
               Booked
             </span>
             <span>
-              <i className="teacher-key-added" />
+              <i className="teacher-key-added" aria-hidden="true" />
               Added by you
             </span>
             <span>
-              <i className="teacher-key-off" />
+              <i className="teacher-key-off" aria-hidden="true" />
               Time off
             </span>
             <span>

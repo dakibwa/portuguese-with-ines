@@ -72,7 +72,7 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
       >
         <label>
           <span>Full name</span>
-          <input autoComplete="off" disabled={busy} onChange={set("name")} required type="text" value={details.name} />
+          <input autoCapitalize="words" autoComplete="off" disabled={busy} onChange={set("name")} required spellCheck={false} type="text" value={details.name} />
         </label>
         {/* A name is enough to start; she can add the rest later (13 October 2026, Dan). */}
         <label>
@@ -85,11 +85,11 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
         </label>
         <label>
           <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
-          <input autoComplete="off" disabled={busy} inputMode="numeric" onChange={set("nif")} type="text" value={details.nif} />
+          <input autoComplete="off" autoCorrect="off" disabled={busy} inputMode="numeric" onChange={set("nif")} spellCheck={false} type="text" value={details.nif} />
         </label>
         <fieldset className="teacher-profile__price">
           <legend>Their price <span className="teacher-field-optional">(optional, per lesson)</span></legend>
-          <PriceFields draft={prices} disabled={busy} idPrefix="teacher-student-price" onChange={setPrices} />
+          <PriceFields draft={prices} disabled={busy} idPrefix="teacher-student-price" invalid={error === PRICE_RANGE_ERROR} onChange={setPrices} />
         </fieldset>
         <div className="teacher-profile__splat">
           <span id="teacher-student-splat">Their splat <span className="teacher-field-optional">(optional)</span></span>
@@ -115,7 +115,7 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
           {offerNoLessons ? <button className="button button--lilac" disabled={busy} type="submit" value="welcome">No lessons yet</button> : null}
           <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">{cancelLabel}</button>
         </div>
-        {error ? <p className="teacher-inline-error" role="alert">{error}</p> : null}
+        {error ? <p className="teacher-inline-error" id="teacher-student-price-error" role="alert">{error}</p> : null}
       </form>
     </>
   );

@@ -217,8 +217,8 @@ try {
       await state.page.addInitScript(refuseSessionWrites);
       try {
         await state.page.goto(`${base}/reset-password/?token=isolated-reset-token`);
-        await state.page.locator(".auth-panel").getByLabel(/^New password/).fill("isolated-password");
-        await state.page.locator(".auth-panel").getByLabel("Again, to be sure", { exact: true }).fill("isolated-password");
+        await state.page.locator(".auth-panel").getByLabel(/^New password(?!, again)/).fill("isolated-password");
+        await state.page.locator(".auth-panel").getByLabel("New password, again", { exact: true }).fill("isolated-password");
         await state.page.getByRole("button", { name: "Save my new password", exact: true }).click();
         await expect(state.page.getByRole("status")).toContainText("Your password has been changed");
         await expect(state.page.getByRole("status")).not.toContainText("You’re signed in");
@@ -366,8 +366,8 @@ try {
       });
       try {
         await state.page.goto(`${base}/reset-password/?token=isolated-reset-token`);
-        await state.page.locator(".auth-panel").getByLabel(/^New password/).fill("isolated-password");
-        await state.page.locator(".auth-panel").getByLabel("Again, to be sure", { exact: true }).fill("isolated-password");
+        await state.page.locator(".auth-panel").getByLabel(/^New password(?!, again)/).fill("isolated-password");
+        await state.page.locator(".auth-panel").getByLabel("New password, again", { exact: true }).fill("isolated-password");
         await state.page.getByRole("button", { name: "Save my new password", exact: true }).click();
         await started.promise;
         if (action === "replacement") await replaceSession(state.page);
@@ -433,12 +433,12 @@ try {
         await settleNavigation(state.page);
         await state.page.goto(`${base}/reset-password/?token=isolated-reset-token`);
         await expect.poll(() => new URL(state.page.url()).search).toBe("");
-        await state.page.locator(".auth-panel").getByLabel(/^New password/).fill("isolated-password");
-        await state.page.locator(".auth-panel").getByLabel("Again, to be sure", { exact: true }).fill("different-password");
+        await state.page.locator(".auth-panel").getByLabel(/^New password(?!, again)/).fill("isolated-password");
+        await state.page.locator(".auth-panel").getByLabel("New password, again", { exact: true }).fill("different-password");
         await state.page.getByRole("button", { name: "Save my new password", exact: true }).click();
         await expect(state.page.locator(".booking-alert")).toContainText("don’t match");
         assert.equal(state.requests.length, 0);
-        await state.page.locator(".auth-panel").getByLabel("Again, to be sure", { exact: true }).fill("isolated-password");
+        await state.page.locator(".auth-panel").getByLabel("New password, again", { exact: true }).fill("isolated-password");
         await state.page.getByRole("button", { name: "Save my new password", exact: true }).click();
         await expect(state.page.locator(".booking-alert")).toContainText("link has expired");
         reject = false;

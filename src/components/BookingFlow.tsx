@@ -75,7 +75,7 @@ export function BookingFlow({ initialView = "book" }: { initialView?: BookingVie
                 <p>
                   Times will appear once booking is connected. In the meantime,{" "}
                   <a href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-                    message Inês
+                    message Inês<span className="visually-hidden"> (opens in a new tab)</span>
                   </a>{" "}
                   and she&rsquo;ll arrange a lesson with you.
                 </p>
