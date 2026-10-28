@@ -666,9 +666,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
     to Inês. With no lesson to come (16 October 2026, Inês) it is an
     invitation instead: `Book your next lesson with Inês`, the price dabs, no
     lesson list, and steps ending `Choose a day and time for your next
-    lesson.` behind `Sign in and book` (or `Sign in and add card` when a card
-    is asked for). A student free at every length is told there is no card to
-    add and nothing to pay. The Welcome and Sign-in panels say in their dabs
+    lesson.` behind `Choose a time` (`See your lessons` when they have lessons).
+    A student free at every length is told there is no card to add and nothing
+    to pay. It is often the first email a student has from the site, so it
+    says who sent it and why, and keeps passwords and cards out of its subject,
+    preheader and button: students found the earlier `Sign in and add card`
+    welcome in spam (27 October 2026). The Welcome and Sign-in panels say in their dabs
     which of these the email will be before she sends it.
   - Dormant (22 October 2026, Dan) is hers to set: `Mark as dormant` is a
     lilac compact button beside the contact details in a student's profile,

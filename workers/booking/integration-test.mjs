@@ -3988,7 +3988,7 @@ await test("she welcomes a student with no lessons: they are asked to book their
     assert.equal(free.email.subject, "Book your next lesson with Inês");
     assert.ok(free.email.text.includes("no card to add and nothing to pay"));
     assert.ok(!/add your card|add card/i.test(free.email.text), "no card step");
-    assert.ok(free.email.text.includes("Sign in and book"));
+    assert.ok(free.email.text.includes("Choose a time"));
   } finally {
     releaseEmail();
     forgetStudent("booker@example.invalid");
@@ -4837,7 +4837,9 @@ await test("her student list says who is in and who has a card, and she can send
     const [mail] = sentEmails.filter((entry) => entry.to[0] === "alice@example.invalid");
     // With no lesson to come, they are asked to book one, card first.
     assert.equal(mail.subject, "Book your next lesson with Inês");
-    assert.ok(["Three quick steps", "2. Add your card.", "Sign in and add card"].every((line) => mail.text.includes(line)), mail.text);
+    assert.ok(["Three quick steps", "2. Add your card.", "Choose a time"].every((line) => mail.text.includes(line)), mail.text);
+    // A first email that says "password" or puts the card in its button is read as phishing.
+    assert.ok(!/password|Sign in and add card/i.test(`${mail.subject}\n${mail.text}`), mail.text);
     assert.ok(signInLinkIn(mail));
     assert.equal((await call("/admin/students/alice/welcome", { user: "teacher" })).status, 200);
     assert.equal((await call("/admin/students/alice/welcome", { user: "teacher" })).status, 200);
@@ -5520,7 +5522,7 @@ await test("she marks students dormant and sends them her own come-back email, o
     assert.ok(email.text.includes("Olá Olga,\n\nIt’s been too long.\n\nSee you <b>soon</b>,\nInês"), email.text);
     assert.equal(email.text.split("Olá").length, 2, "her greeting is the only one");
     assert.ok(email.html.includes("&lt;b&gt;soon&lt;/b&gt;") && !email.html.includes("<b>soon"), "her words are text, never markup");
-    assert.ok(email.text.includes("Sign in and book"));
+    assert.ok(email.text.includes("Choose a time"));
     const link = signInLinkIn(email);
     assert.ok(link, "a student she never welcomed is given the one-click way in");
     assert.equal(db.prepare("SELECT awaiting_welcome FROM students WHERE id=?").get(old.id).awaiting_welcome, 0, "it counts as their welcome");

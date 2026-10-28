@@ -736,7 +736,7 @@ sees, books or is charged reads either.
   the same provider key, so a reply lost on the way never sends two.
 - **The email** (`dormantInvite`, 41) has her subject, `Book your next
   lesson`, and her message as plain text (the Worker adds no greeting of its
-  own), then `Sign in and book`, the one-click sign-in link (14 days, once) her welcome uses, and
+  own), then `Choose a time`, the one-click sign-in link (14 days, once) her welcome uses, and
   the welcome's footer. Replies go to her. A teacher who is also a student is
   never sent a sign-in link, so theirs is `Book a lesson`, to `/book/`. It is
   never held for a welcome: for someone she set up and never welcomed, it is
