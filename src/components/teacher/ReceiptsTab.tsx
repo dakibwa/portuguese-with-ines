@@ -132,7 +132,7 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
           {/* A plain table, one row per amount, so her automation can read
               it as well as she can; every row carries its id and figures. */}
           <table className="teacher-receipts__table">
-            <caption className="visually-hidden">Receipts for {monthName}</caption>
+            <caption className="visually-hidden">Receipts for {dateLabel(`${month}-01`, { month: "long", year: "numeric" })}</caption>
             <thead>
               <tr>
                 <th scope="col">Lesson</th>
