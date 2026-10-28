@@ -91,11 +91,20 @@ export function AccountMenu({
       setOpen(false);
       document.getElementById("account-menu-button")?.focus({ preventScroll: true });
     };
+    // Tabbing out of the dropdown closes it, as a press outside does. Focus
+    // going nowhere (a press Safari doesn't focus) is left to the pointer.
+    const closeOnFocusOut = (event: FocusEvent) => {
+      const next = event.relatedTarget as Node | null;
+      if (next && !menuRef.current?.contains(next)) setOpen(false);
+    };
+    const menu = menuRef.current;
     document.addEventListener("pointerdown", closeOnPointerDown);
     document.addEventListener("keydown", closeOnEscape);
+    menu?.addEventListener("focusout", closeOnFocusOut);
     return () => {
       document.removeEventListener("pointerdown", closeOnPointerDown);
       document.removeEventListener("keydown", closeOnEscape);
+      menu?.removeEventListener("focusout", closeOnFocusOut);
     };
   }, [open]);
 
@@ -149,7 +158,7 @@ export function AccountMenu({
         <div className={`account-menu__places account-menu__places--at-${shownPlace}`}>
           <span aria-hidden="true" className="account-menu__thumb" />
           <button aria-current={current === "upcoming" ? "true" : undefined} onClick={() => choose("upcoming")} type="button">
-            Your lessons {upcomingCount ? <span>{upcomingCount}</span> : null}
+            Your lessons {upcomingCount ? <span>{upcomingCount}<span className="visually-hidden"> upcoming</span></span> : null}
           </button>
           <button aria-current={current === "history" ? "true" : undefined} onClick={() => choose("history")} type="button">
             Past lessons

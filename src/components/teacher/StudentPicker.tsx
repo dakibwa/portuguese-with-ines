@@ -52,9 +52,9 @@ export function StudentPicker({ token, known, start, onSelect, onClose }: {
       {slot ? <p className="teacher-profile__when lesson-when"><span>{dateLabel(slot.date, { weekday: "long", day: "numeric", month: "long" })}</span><span className="lesson-when__time">{slot.time}</span></p> : null}
       <div className="teacher-profile__pick">
         <p className="teacher-eyebrow">Whose lesson?</p>
-        <ul className="teacher-profile__choices">
-          {[...known].sort((a, b) => a.name.localeCompare(b.name)).map(student => <li key={student.id}><button onClick={() => choose(student)} type="button"><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span>{student.name}</span></button></li>)}
-        </ul>
+        {known.length ? <ul className="teacher-profile__choices">
+          {[...known].sort((a, b) => a.name.localeCompare(b.name, "pt")).map(student => <li key={student.id}><button onClick={() => choose(student)} type="button"><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span>{student.name}</span></button></li>)}
+        </ul> : <p>No students yet. Add them first, then their lesson.</p>}
         <button className="button button--lilac teacher-profile__new" onClick={() => setAdding(true)} type="button"><UserPlus size={16} aria-hidden="true" />Add a new student</button>
       </div>
     </>}

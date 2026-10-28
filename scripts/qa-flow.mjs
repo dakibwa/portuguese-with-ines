@@ -1471,7 +1471,7 @@ await accountPanel.locator("#account-past-lessons").waitFor({ state: "detached" 
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 
 const laterLessonsToggle = accountActions.getByRole("button", { name: /^Your lessons/ });
-if (!/3\s*$/.test((await laterLessonsToggle.innerText()).trim())) {
+if (!/3\s*upcoming$/i.test((await laterLessonsToggle.innerText()).trim())) {
   throw new Error("The Your lessons badge should count each repeating schedule once, plus each one-off lesson.");
 }
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
@@ -1786,8 +1786,8 @@ await desktopManageDialog.getByRole("button", { name: "Change", exact: true }).c
 const desktopChangeDialog = accountPage.getByRole("dialog", { name: "Choose a new date and time", exact: true });
 await desktopChangeDialog.waitFor({ state: "visible" });
 await desktopChangeDialog.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
-await desktopManagePanel.getByRole("radio", { name: /^60 minutes/ }).waitFor();
-const ninetyMinuteChoice = desktopManagePanel.getByRole("radio", { name: /^90 minutes/ });
+await desktopManagePanel.getByRole("radio", { name: /^60-minute lesson/ }).waitFor();
+const ninetyMinuteChoice = desktopManagePanel.getByRole("radio", { name: /^90-minute lesson/ });
 await ninetyMinuteChoice.waitFor();
 await desktopManagePanel.getByRole("radio", { name: "Online", exact: true }).waitFor();
 const currentManagedTime = desktopManagePanel.locator(".slot-grid button.is-selected");
@@ -2183,8 +2183,8 @@ await mobileManageDialog.getByRole("button", { name: "Change", exact: true }).cl
 const mobileChangeDialog = accountPage.getByRole("dialog", { name: "Choose a new date and time", exact: true });
 await mobileChangeDialog.waitFor({ state: "visible" });
 await mobileChangeDialog.getByRole("heading", { name: "Choose a new date and time", exact: true }).waitFor();
-await mobileManagePanel.getByRole("radio", { name: /^60 minutes/ }).waitFor();
-await mobileManagePanel.getByRole("radio", { name: /^90 minutes/ }).waitFor();
+await mobileManagePanel.getByRole("radio", { name: /^60-minute lesson/ }).waitFor();
+await mobileManagePanel.getByRole("radio", { name: /^90-minute lesson/ }).waitFor();
 await waitForOrientation(accountPage);
 const mobileChangeLayout = await accountPage.evaluate(() => {
   const workspace = document.querySelector("#lesson-calendar")?.getBoundingClientRect();
@@ -2619,7 +2619,7 @@ if (
 }
 try {
   await accountPage.waitForFunction(
-    () => /12$/.test(document.querySelector("#account-menu button")?.textContent?.trim() ?? ""),
+    () => /12\s*upcoming$/i.test(document.querySelector("#account-menu button")?.textContent?.trim() ?? ""),
     null,
     { timeout: 10_000 }
   );

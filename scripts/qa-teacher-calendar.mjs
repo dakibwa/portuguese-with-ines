@@ -1681,7 +1681,7 @@ try {
   const accountPage = accountFixture.page;
   const accountState = accountFixture.state;
   await accountPage.getByRole("tab", { name: "Profile", exact: true }).click();
-  const account = accountPage.getByRole("region", { name: "Your account", exact: true });
+  const account = accountPage.getByRole("region", { name: "Your profile", exact: true });
   await account.getByRole("button", { name: "Send password reset link", exact: true }).click();
   await expect(account.getByRole("status")).toContainText(teacher.email);
   assert.deepEqual(accountState.accountWrites.at(-1), { path: "/auth/forgot", data: { email: teacher.email } });
@@ -1713,7 +1713,7 @@ try {
   const student = await fixture(390, { student: true });
   await student.page
     .getByRole("status")
-    .filter({ hasText: "this page is Inês’s" })
+    .filter({ hasText: "This page is for Inês" })
     .waitFor();
   await expect(student.page.locator(".teacher-workspace")).toHaveCount(0);
   assert.deepEqual(student.state.writes, []);

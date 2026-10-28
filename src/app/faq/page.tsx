@@ -145,6 +145,11 @@ const faqSections = [
         answer: `At least ${notice} before the lesson starts. For a lesson at 10:00 on Tuesday, book by 20:00 on Monday.`
       },
       {
+        question: "Which time zone are the times in?",
+        answer:
+          "Online lessons show in your own time zone, and lessons in Porto show in Porto time. The calendar always says which time it’s using."
+      },
+      {
         question: "Do I have to commit to a block of lessons?",
         answer:
           "No. You can book one lesson or keep the same time each week. There’s no block of lessons to pay for in advance."
@@ -181,7 +186,7 @@ const faqSections = [
       },
       {
         question: "How do I change or cancel a lesson?",
-        answer: `Open it from your lessons on the booking page, or use the link in your confirmation email. Change or cancel it at least ${notice} before it starts and there’s no charge.`
+        answer: `Open it from Your lessons on the booking page, or use the link in your confirmation email. Change or cancel it at least ${notice} before it starts and there’s no charge.`
       },
       {
         question: `What if my lesson is less than ${notice} away?`,
@@ -227,7 +232,7 @@ export default function FAQPage() {
           <h2>Ask me before you book.</h2>
           <div className="faq-contact__actions">
             <a className="button button--coral button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-              Message on WhatsApp
+              Message on WhatsApp<span className="visually-hidden"> (opens in a new tab)</span>
             </a>
             <Link className="button button--outline button--compact" href="/book/?view=book">
               Book a lesson

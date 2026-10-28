@@ -1009,6 +1009,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [recurringRates, setRecurringRates] = useState<Record<number, number>>({});
   const recurringRatesVersion = useRef(0);
   const [ratesError, setRatesError] = useState("");
+  const [ratesAttempt, setRatesAttempt] = useState(0);
   const [ratesReady, setRatesReady] = useState(false);
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
   const [lessonSeries, setLessonSeries] = useState<LessonSeries[]>([]);
@@ -1107,11 +1108,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       fetchRecurringRates(readSession()).then((data) => {
         if (active && version === recurringRatesVersion.current) { setRecurringRates(data.rates); setRatesReady(true); }
       }).catch(() => {
-        if (active && version === recurringRatesVersion.current) setRatesError("We couldn’t check your price. Please reload before booking.");
+        if (active && version === recurringRatesVersion.current) setRatesError("We couldn’t check your price just now.");
       });
     }
     return () => { active = false; };
-  }, [rateStudentId]);
+  }, [rateStudentId, ratesAttempt]);
 
   const managedDurationChoices = managed?.booking.lessonType.id === "trial"
     ? []
@@ -3366,7 +3367,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 </button>
               ) : null}
               <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-                Message Inês
+                Message Inês<span className="visually-hidden"> (opens in a new tab)</span>
               </a>
             </div>
           </div>
@@ -3503,7 +3504,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     <>
                       {managed.booking.status === "pending_payment" ? (
                         <div className="lesson-calendar__notice">
-                          <p>Checkout has not confirmed this lesson. Complete checkout, or choose your lessons again.</p>
+                          <p>This lesson isn’t booked yet, as your card wasn’t saved. Book it again to finish.</p>
                           <button className="button button--coral" onClick={() => {
                             closeManagedLesson();
                             startBookingJourney();
@@ -3687,8 +3688,21 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   <h2 id="lesson-manage-heading">That lesson couldn&rsquo;t be opened</h2>
                   <div className="booking-alert" role="alert">
                     <AlertCircle size={18} aria-hidden="true" />
-                    <p>{manageError || "Please try again."}</p>
+                    <div className="booking-alert__body">
+                      <p>{manageError || "Please try again."}</p>
+                      <div className="booking-alert__actions">
+                        <button className="button button--outline button--compact" onClick={() => void openManaged(managedToken, managedSeriesId)} type="button">
+                          Try again
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                  {/* An old or forwarded email link: signing in shows every lesson. */}
+                  {!student ? (
+                    <button className="button button--coral booking-confirm-button" onClick={openLessonsJourney} type="button">
+                      Sign in to see your lessons
+                    </button>
+                  ) : null}
                   <button className="button button--quiet lesson-manage-dialog__done" onClick={dismissManagedDialog} type="button">
                     Close
                   </button>
@@ -3703,7 +3717,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         {cardReturn ? (
           <div
             className={`booking-card-return booking-card-return--${cardReturn.state}`}
-            role="status"
+            role={cardReturn.state === "slow" ? "alert" : "status"}
           >
             {cardReturn.state === "confirmed" ? (
               <CheckCircle2 size={20} aria-hidden="true" />
@@ -3717,6 +3731,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   ? "You’re booked in. Your confirmation email is on its way."
                   : "We couldn’t confirm your booking yet. Please check your lessons, or message Inês."}
             </p>
+            {cardReturn.state === "slow" ? (
+              <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
+                Message Inês<span className="visually-hidden"> (opens in a new tab)</span>
+              </a>
+            ) : null}
             {cardReturn.state !== "confirming" ? (
               <button aria-label="Dismiss" className="booking-card-return__close" onClick={() => setCardReturn(null)} type="button">
                 <X size={18} aria-hidden="true" />
@@ -3777,7 +3796,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     } catch (caught) {
                       if (!current()) return;
                       setSignInLinkError(caught instanceof SessionStorageError
-                        ? `${caught.message} This link has been used; request a new one to sign in.`
+                        ? "Your browser couldn’t save your sign-in, and this link has now been used. Allow site storage, then ask for a new link below."
                         : caught instanceof Error ? caught.message : "That sign-in link couldn’t be used. Enter your email for a new one.");
                     } finally {
                       if (request === signInLinkRequest.current) setUsingSignInLink(false);
@@ -4237,7 +4256,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           key={type.id}
                         >
                           <input
-                            aria-label={`${type.duration_minutes} minutes · ${formatPriceCents(managedPriceOf(type))}`}
+                            aria-label={`${formatLessonDuration(type.duration_minutes)} lesson · ${formatPriceCents(managedPriceOf(type))}`}
                             checked={managedLessonTypeId === type.id}
                             disabled={manageWorking}
                             name="managed-lesson-duration"
@@ -4545,7 +4564,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     </button>
                   </div>
                 ) : checkingSession ? (
-                  <p className="booking-state-note">One moment…</p>
+                  <p className="booking-state-note" role="status">One moment…</p>
                 ) : !student ? (
                   <AuthPanel
                     heading="Almost there"
@@ -4559,7 +4578,19 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 ) : (
                   <form className="student-details-form" onSubmit={submit}>
                     {/* The price is in the length choice above ("60 mins · €25"). */}
-                    {ratesError ? <p className="booking-state-note" role="status">{ratesError}</p> : null}
+                    {ratesError ? (
+                      <div className="booking-alert" role="alert">
+                        <AlertCircle size={18} aria-hidden="true" />
+                        <div className="booking-alert__body">
+                          <p>{ratesError}</p>
+                          <div className="booking-alert__actions">
+                            <button className="button button--outline button--compact" onClick={() => setRatesAttempt((current) => current + 1)} type="button">
+                              Try again
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
 
                     <div className="booking-confirmation-columns">
                       <label className="booking-confirmation-notes">
@@ -4569,6 +4600,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         </span>
                         <textarea
                           disabled={submitting}
+                          maxLength={1000}
+                          name="notes"
                           onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
                           rows={1}
                           value={form.notes}
@@ -4579,14 +4612,28 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         {submitError ? (
                           <div className="booking-alert" role="alert">
                             <AlertCircle size={18} aria-hidden="true" />
-                            <p>{submitError}</p>
+                            <div className="booking-alert__body">
+                              <p>{submitError}</p>
+                              <div className="booking-alert__actions">
+                                <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
+                                  Message Inês<span className="visually-hidden"> (opens in a new tab)</span>
+                                </a>
+                              </div>
+                            </div>
                           </div>
                         ) : null}
 
                         {paymentConfigurationError && !freeLesson ? (
                           <div className="booking-alert" role="alert">
                             <AlertCircle size={18} aria-hidden="true" />
-                            <p>{paymentConfigurationError}</p>
+                            <div className="booking-alert__body">
+                              <p>{paymentConfigurationError}</p>
+                              <div className="booking-alert__actions">
+                                <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
+                                  Message Inês<span className="visually-hidden"> (opens in a new tab)</span>
+                                </a>
+                              </div>
+                            </div>
                           </div>
                         ) : null}
 
@@ -4655,7 +4702,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
                         {/* The final action names both the selection and the obligation
                             to pay, even though payment happens after the lesson. */}
-                        <button className="button button--coral booking-confirm-button" disabled={!canSubmit} type="submit">
+                        <button
+                          aria-describedby={needsPaymentConsent && !paymentConsent ? "booking-payment-summary" : undefined}
+                          className="button button--coral booking-confirm-button"
+                          disabled={!canSubmit}
+                          type="submit"
+                        >
                           {submitting
                             ? "Booking…"
                             : `${form.repeat === "once"

@@ -52,6 +52,8 @@ export function LessonDetails({
   );
   const [date, setDate] = useState(dateKey(new Date(booking.starts_at)));
   const [time, setTime] = useState(formatSlotTime(booking.starts_at));
+  // Pre-filled with the current slot: nothing to save until she changes it.
+  const unchanged = date === dateKey(new Date(booking.starts_at)) && time === formatSlotTime(booking.starts_at);
   const [cancelMessage, setCancelMessage] = useState("");
   const firstName = booking.student_name.split(" ")[0];
   // Set up by her and not welcomed yet: the site emails them nothing.
@@ -399,7 +401,7 @@ export function LessonDetails({
                   <button
                     className="button button--coral"
                     type="submit"
-                    disabled={busy}
+                    disabled={busy || unchanged}
                   >
                     {busy ? "Moving…" : "Save new time"}
                   </button>

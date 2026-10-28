@@ -628,9 +628,8 @@ export function TeacherSchedule() {
         <div className="booking-alert" role="status">
           <AlertCircle size={18} aria-hidden="true" />
           <p>
-            You&rsquo;re signed in as {me.name}, and this page is Inês&rsquo;s.
-            If it should be yours,{" "}
-            <a href={`${SITE_BASE_PATH}/book/?view=lessons`}>switch account</a>.
+            This page is for Inês, and you&rsquo;re signed in as {me.name}.{" "}
+            <a href={`${SITE_BASE_PATH}/book/?view=lessons`}>Go to your lessons</a>, or sign out there to sign in as Inês.
           </p>
         </div>
       );
@@ -679,7 +678,7 @@ export function TeacherSchedule() {
   return (
     <div className="teacher-workspace">
       <div className="teacher-tools-header">
-        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} needsCount={studentWork.attentionCount} onSelect={setActiveTab} />
+        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} needsCount={studentWork.attentionCount} onSelect={tab => { if (tab !== activeTab) { setStatus(""); setError(""); } setActiveTab(tab); }} />
         {/* Only for a teacher Inês has also added as a student (17 October 2026, Dan). */}
         {me?.alsoStudent ? (
           <a className="button button--outline button--compact teacher-my-lessons" href={`${SITE_BASE_PATH}/book/?view=lessons`}>My lessons</a>
@@ -756,7 +755,7 @@ export function TeacherSchedule() {
         </div>
         {editing && hoursDirty ? (
           <div className="teacher-hours-warning" aria-live="polite">
-            {bookingsLoading ? <p>Checking booked lessons…</p> : bookingsError ? <div role="alert"><p>Booked lessons could not be checked.</p><button className="teacher-text-button" onClick={() => void reloadBookings()} type="button">Try again</button></div> : affectedLessons.length ? <>
+            {bookingsLoading ? <p>Checking booked lessons…</p> : bookingsError ? <div role="alert"><p>Booked lessons couldn’t be checked.</p><button className="teacher-text-button" onClick={() => void reloadBookings()} type="button">Try again</button></div> : affectedLessons.length ? <>
               <p className="teacher-hours-warning__lead">
                 <AlertCircle size={16} aria-hidden="true" />
                 {affectedLessons.length === 1 ? "This lesson is" : `These ${affectedLessons.length} lessons are`} outside your new hours. {affectedLessons.length === 1 ? "It stays" : "They stay"} booked.
@@ -868,7 +867,7 @@ export function TeacherSchedule() {
           </div>
         ) : !bookingsLoading && !bookingsError && !weekCount ? (
           <p className="teacher-empty-week">
-            No lessons booked this week.
+            {weekEnd < today ? "No lessons that week." : "No lessons booked this week."}
           </p>
         ) : null}
       </section>

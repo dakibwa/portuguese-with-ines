@@ -140,10 +140,10 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
               );
             })}
           </div>
-          <div className="teacher-month-key" aria-label="Calendar key">
-            <span><i className="is-selected" /> Chosen</span>
-            <span><i className="is-off" /> Day off</span>
-            <span><i className="is-booked" /> Lesson booked</span>
+          <div className="teacher-month-key" role="group" aria-label="Calendar key">
+            <span><i className="is-selected" aria-hidden="true" /> Chosen</span>
+            <span><i className="is-off" aria-hidden="true" /> Day off</span>
+            <span><i className="is-booked" aria-hidden="true" /> Lesson booked</span>
           </div>
         </div>
 

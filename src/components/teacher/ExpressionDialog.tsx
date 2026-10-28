@@ -99,14 +99,14 @@ export function ExpressionDialog({ expression, preview, openToStudents, fallback
           <label className="expression-form__wide"><span>Example</span><textarea lang="pt-PT" value={draft.examples[0] ?? ""} maxLength={1200} rows={2} disabled={busy} onChange={(event) => example(0, event.target.value)} /></label>
           <label className="expression-form__wide"><span>Another example (optional)</span><textarea lang="pt-PT" value={draft.examples[1] ?? ""} maxLength={1200} rows={2} disabled={busy} onChange={(event) => example(1, event.target.value)} /></label>
           <label className="expression-form__wide"><span>Themes (optional, separated by commas)</span><input value={themes} maxLength={334} disabled={busy} onChange={(event) => setThemes(event.target.value)} /></label>
-          <details className="expression-form__more expression-form__wide">
+          <details className="expression-form__more expression-form__wide" open={Boolean(expression?.imageUrl || expression?.notes || expression?.literalEn || expression?.sourceUrl) || undefined}>
             <summary>Translation, notes and image</summary>
             <div>
               <label><span>Literal English translation (optional)</span><textarea lang="en" value={draft.literalEn} maxLength={500} rows={2} disabled={busy} onChange={(event) => edit("literalEn", event.target.value)} /></label>
               <label><span>Notes or origin (optional)</span><textarea lang="pt-PT" value={draft.notes} maxLength={2000} rows={3} disabled={busy} onChange={(event) => edit("notes", event.target.value)} /></label>
               <label><span>Reference link (optional)</span><input type="url" value={draft.sourceUrl} maxLength={2048} disabled={busy} onChange={(event) => edit("sourceUrl", event.target.value)} /></label>
               <label><span>Image on this website (optional)</span><input value={draft.imageUrl} placeholder="/visuals/expressions/name.webp" maxLength={2048} disabled={busy} onChange={(event) => edit("imageUrl", event.target.value)} /></label>
-              <label><span>Image description</span><input value={draft.imageAlt} maxLength={240} required={Boolean(draft.imageUrl)} disabled={busy} onChange={(event) => edit("imageAlt", event.target.value)} /></label>
+              <label><span>Image description (needed with an image)</span><input value={draft.imageAlt} maxLength={240} required={Boolean(draft.imageUrl)} disabled={busy} onChange={(event) => edit("imageAlt", event.target.value)} /></label>
             </div>
           </details>
           {error ? <p className="teacher-inline-error expression-form__wide" role="alert">{error}</p> : null}

@@ -229,7 +229,7 @@ try {
         await state.page.goto(`${base}/book/?manage=next`);
         const dialog = state.page.getByRole("dialog");
         await expect(dialog.getByText("Not confirmed", { exact: true })).toBeVisible();
-        await expect(dialog).toContainText("Checkout has not confirmed this lesson.");
+        await expect(dialog).toContainText("This lesson isn’t booked yet, as your card wasn’t saved.");
         await expect(dialog.getByText("Booked", { exact: true })).toHaveCount(0);
         await expect(dialog.getByRole("button", { name: /^(Change|Cancel|Manage weekly lessons)$/ })).toHaveCount(0);
         await expect(state.page.locator(".calendar-week button.has-booking")).toHaveCount(0);

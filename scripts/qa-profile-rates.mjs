@@ -215,8 +215,8 @@ try {
     await page.getByRole("dialog", { name: "Manage this lesson", exact: true }).getByRole("button", { name: "Change", exact: true }).click();
     const change = page.getByRole("dialog", { name: "Choose a new date and time", exact: true });
     // Each length carries its price: the lesson's own, then their price for 90.
-    await expect(change.getByRole("radio", { name: "60 minutes · €18", exact: true })).toBeChecked();
-    await change.getByRole("radio", { name: "90 minutes · €27", exact: true }).check();
+    await expect(change.getByRole("radio", { name: "60-minute lesson · €18", exact: true })).toBeChecked();
+    await change.getByRole("radio", { name: "90-minute lesson · €27", exact: true }).check();
     await expect(change.getByLabel(/your code/i)).toHaveCount(0);
     await expect(change.getByText(/Have a code|Apply and save rate/)).toHaveCount(0);
     await change.screenshot({ path: `${out}/change-length-${width}.png` });

@@ -218,7 +218,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
                 Book a lesson
               </a>
               <a className="button button--outline-light button--compact" href={CONTACT_WHATSAPP_URL} rel="noreferrer" target="_blank">
-                Message on WhatsApp
+                Message on WhatsApp<span className="visually-hidden"> (opens in a new tab)</span>
               </a>
             </div>
           </div>

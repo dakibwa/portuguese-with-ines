@@ -505,7 +505,7 @@ export function MyLessons({
     .filter((booking) => booking.status === "cancelled" || (booking.status === "confirmed" && Date.parse(booking.endAt) <= clock))
     .sort((a, b) => historyTime(b) - historyTime(a) || b.startAt.localeCompare(a.startAt));
 
-  if (loading) return section === "upcoming" ? null : <p className="booking-state-note">Loading your lessons…</p>;
+  if (loading) return section === "upcoming" ? null : <p className="booking-state-note" role="status">Loading your lessons…</p>;
 
   /*
    * An unreachable API leaves `student` null, which used to fall straight
@@ -685,7 +685,9 @@ export function MyLessons({
                   <span>Your name</span>
                   <input
                     autoComplete="name"
+                    maxLength={120}
                     onChange={(event) => setDetails((current) => ({ ...current, name: event.target.value }))}
+                    spellCheck={false}
                     value={details.name}
                   />
                 </label>
@@ -723,11 +725,14 @@ export function MyLessons({
                 <label>
                   <span>Email</span>
                   <input
+                    autoCapitalize="none"
                     autoComplete="email"
+                    autoCorrect="off"
                     onChange={(event) => {
                       emailDraftVersion.current += 1;
                       setDetails((current) => ({ ...current, email: event.target.value }));
                     }}
+                    spellCheck={false}
                     type="email"
                     value={details.email}
                   />
@@ -740,7 +745,7 @@ export function MyLessons({
                     disabled={emailBusy || !details.email.trim() || details.email.trim() === student.email}
                     type="submit"
                   >
-                    Send confirmation link
+                    {emailBusy ? "Sending…" : "Send confirmation link"}
                   </button>
                   <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
                 </div>
@@ -810,7 +815,7 @@ export function MyLessons({
               ) : (
                 <>
                   <span className={`my-lessons__fact-value${student.cardForAllLessons ? "" : " my-lessons__fact-value--empty"}`}>
-                    {student.cardForAllLessons ? "Saved" : student.hasCard ? "Only for lessons you book" : "Not added"}
+                    {student.cardForAllLessons ? "Saved" : student.hasCard ? "Saved for lessons you book" : "Not added"}
                   </span>
                   <button className="my-lessons__change" onClick={() => openDetail("card")} type="button">
                     {student.cardForAllLessons ? <>Change<span className="visually-hidden"> card</span></> : "Add card"}

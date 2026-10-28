@@ -83,6 +83,7 @@ export function GoogleSignInButton({
   const holder = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   const [available, setAvailable] = useState(false);
+  const [failed, setFailed] = useState(false);
   const mounted = useRef(false);
   const authRequest = useRef(0);
   useLayoutEffect(() => {
@@ -170,7 +171,9 @@ export function GoogleSignInButton({
         }
       })
       .catch(() => {
-        // Blocked or offline. The password form is right there.
+        // Blocked or offline. The password form is right there, so it takes
+        // this place rather than leaving the hidden frame's gap above it.
+        if (!cancelled) setFailed(true);
       });
 
     return () => {
@@ -179,7 +182,7 @@ export function GoogleSignInButton({
     };
   }, [handleCredential]);
 
-  if (!GOOGLE_CLIENT_ID) return null;
+  if (!GOOGLE_CLIENT_ID || failed) return null;
 
   return (
     <div className={available ? "google-signin" : "google-signin is-loading"}>

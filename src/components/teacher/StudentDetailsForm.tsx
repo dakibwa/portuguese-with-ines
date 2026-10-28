@@ -53,7 +53,7 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy, 
     >
       <label>
         <span>Full name</span>
-        <input autoComplete="off" autoFocus disabled={busy} onChange={set("name")} required type="text" value={details.name} />
+        <input autoCapitalize="words" autoComplete="off" autoFocus disabled={busy} onChange={set("name")} required spellCheck={false} type="text" value={details.name} />
       </label>
       <label>
         <span>
@@ -77,7 +77,7 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy, 
       </label>
       <label>
         <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
-        <input autoComplete="off" disabled={busy} inputMode="numeric" onChange={set("nif")} type="text" value={details.nif} />
+        <input autoComplete="off" autoCorrect="off" disabled={busy} inputMode="numeric" onChange={set("nif")} spellCheck={false} type="text" value={details.nif} />
       </label>
       <div className="teacher-dialog-actions">
         <button className="button button--coral" disabled={busy} type="submit">{busy ? "Saving…" : "Save details"}</button>

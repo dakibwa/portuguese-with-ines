@@ -205,13 +205,13 @@ try {
   assert.equal(await menu.locator(".nav-mobile__link").count(), 4);
   assert.deepEqual(
     (await menu.locator(".nav-mobile__cta a").allTextContents()).map((text) => text.trim()),
-    ["Book a lesson", "Message on WhatsApp"]
+    ["Book a lesson", "Message on WhatsApp (opens in a new tab)"]
   );
   // From Close back to the home link, then round to the last action and on.
   await page.keyboard.press("Shift+Tab");
   assert.equal(await page.evaluate(() => document.activeElement.getAttribute("aria-label")), "Português com a Inês, home");
   await page.keyboard.press("Shift+Tab");
-  assert.equal(await page.evaluate(() => document.activeElement.textContent.trim()), "Message on WhatsApp");
+  assert.equal(await page.evaluate(() => document.activeElement.textContent.trim()), "Message on WhatsApp (opens in a new tab)");
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement.getAttribute("aria-label")), "Português com a Inês, home");
   await page.screenshot({ path: `${out}/menu-mobile.png` });

@@ -111,9 +111,9 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
 
   const locked = disabled || Boolean(busy);
   return (
-    <section className="teacher-account" aria-label="Your account">
+    <section className="teacher-account" aria-labelledby="teacher-account-title">
       <div className="teacher-account__heading">
-        <h2>Your profile</h2>
+        <h2 id="teacher-account-title">Your profile</h2>
         <p>{student.name}</p>
       </div>
       <div className="teacher-account__detail">
