@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { ArrowDown, ArrowUp, Eye, Plus } from "lucide-react";
 import { ExpressionCard } from "@/components/expressions/ExpressionCard";
 import { TeacherExpressionTryOut } from "@/components/expressions/TeacherExpressionTryOut";
@@ -93,11 +94,17 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
           <dt>expressão idiomática <span>nome feminino</span></dt>
           <dd>Conjunto de palavras com um significado próprio, diferente do seu sentido literal.</dd>
         </dl>
-        <button className="button button--coral" ref={addButton} type="button" disabled={!expressions || busy}
-          onClick={() => setDialog({ expression: null, preview: false })}>
-          <Plus size={17} aria-hidden="true" />
-          Add an expression
-        </button>
+        <div className="teacher-expressions__intro-actions">
+          <Link className="button button--outline" href="/idioms/">
+            <Eye size={17} aria-hidden="true" />
+            View page
+          </Link>
+          <button className="button button--coral" ref={addButton} type="button" disabled={!expressions || busy}
+            onClick={() => setDialog({ expression: null, preview: false })}>
+            <Plus size={17} aria-hidden="true" />
+            Add an expression
+          </button>
+        </div>
       </div>
       {rows.length ? <TeacherExpressionTryOut accountId={accountId} rows={rows} token={token} /> : null}
       <ul className="booking-payment-facts teacher-expressions__help">

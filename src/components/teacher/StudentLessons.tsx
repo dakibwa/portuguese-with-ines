@@ -81,11 +81,17 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
     return (
       <li className={`teacher-history-lesson${cancelled || noShow ? " is-cancelled" : ""}`} key={booking.id}>
         <div className="teacher-history-lesson__top">
-          <strong>
-            {dateLabel(dateKey(starts), { weekday: "short", day: "numeric", month: "short", ...(starts.getFullYear() === thisYear ? {} : { year: "numeric" }) })}
-            <span> · {formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
-          </strong>
-          {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
+          <div className="teacher-history-lesson__when">
+            <strong>
+              {dateLabel(dateKey(starts), { weekday: "short", day: "numeric", month: "short", ...(starts.getFullYear() === thisYear ? {} : { year: "numeric" }) })}
+              <span> · {formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
+            </strong>
+            {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
+          </div>
+          {booking.student_id && !cancelled ? <button type="button" data-homework-exit className="teacher-text-button teacher-history-homework" disabled={homeworkBusy}
+            aria-expanded={homeworkId === booking.id} onClick={() => setHomeworkId(homeworkId === booking.id ? null : booking.id)}>
+            <BookOpen size={15} aria-hidden="true" />{homeworkId === booking.id ? "Close homework" : "Homework"}
+          </button> : null}
         </div>
         <ul className="booking-payment-facts teacher-history-lesson__facts">
           <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
@@ -94,10 +100,6 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
         {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
         {cancelled && paidByHand(booking) && booking.payment_status !== "refunded" ? <button className="teacher-text-button" type="button" disabled={homeworkBusy} onClick={() => onRecordRefund(booking)}>Record refund</button> : null}
-        {booking.student_id && !cancelled ? <button type="button" data-homework-exit className="teacher-text-button teacher-history-homework" disabled={homeworkBusy}
-          aria-expanded={homeworkId === booking.id} onClick={() => setHomeworkId(homeworkId === booking.id ? null : booking.id)}>
-          <BookOpen size={15} aria-hidden="true" />{homeworkId === booking.id ? "Close homework" : "Homework"}
-        </button> : null}
         {homeworkId === booking.id ? <TeacherHomework key={`${booking.id}-${token}`} bookingId={booking.id} token={token} onBusy={setHomeworkBusy} /> : null}
       </li>
     );

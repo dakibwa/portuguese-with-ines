@@ -521,7 +521,11 @@ usual lesson starts and days off; avoid a wall of administration forms.
   details, next lesson and price. Its controls become Details, Price, Add a lesson
   and Lesson history, and, with an email, `Sign-in link`, whose panel holds
   `Send the link again`. No duplicate To do list or separate student profile popup.
-  The name and journey share one band where they fit. On small phones the steps
+  Student cards sit side by side according to the list's available width,
+  with one column on phones. An opened card spans the whole list so details,
+  lesson forms and history have room; closing it restores the compact card.
+  Keep their ranked reading order across each row. The name and journey share
+  one band where they fit. On smaller cards the steps
   wrap beneath the name without horizontal scrolling. Opening a step keeps the
   student's name visible and places one X close control at the top right.
   The editor spans the row, and the selected step's
@@ -705,10 +709,17 @@ usual lesson starts and days off; avoid a wall of administration forms.
   hides past the edge; wider, they share one row. Sign out is inside Profile.
 - A student's inline Lesson history shows
   upcoming lessons first, then past and cancelled, one card each with
-  the date and time on one line (the year only when it isn't this one), a pill
+  the date and time sharing a line where they fit (the year only when it isn't
+  this one), a pill
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
+  Each section uses a responsive grid of lesson cards: several across where
+  there is room, one column on phones. `Homework` sits at the top right beside
+  the date, with compact facts beneath, instead of taking another row at the
+  bottom. The date and time can wrap within the header; on very narrow cards
+  the button can wrap too, retaining a 44px target. Opening homework expands
+  that lesson across the full row; closing it returns the card to the grid.
   The Price control opens the two fields in place and says how many lessons to
   come moved to it, and `· standard` marks a length she hasn't priced.
   History includes older lessons outside the current week and follows the account
@@ -755,12 +766,15 @@ student picker below Your lessons. Drafts stay in her interface; there is no
 anonymous page or main-menu item.
 
 The painting and learning experience also has its own `/idioms/` page, with
-the shared site header and a full-width reading layout (14 October 2026, Dan).
+the shared site header and a reading layout capped at 84rem including its
+outer padding, so the content stays together on a wide desktop.
 Open full page leads there from an available painting card. It keeps the same
 account: Inês paints her draft collection locally; students use the existing
 published-expression access switch. Signed-out visitors sign in there. The
 page links back to her collection or the student's lessons, and does not add
 public access or a public navigation item.
+Her collection header also has a `View page` link beside `Add an expression`,
+opening `/idioms/` with the same signed-in account.
 
 - Use the same lilac sheet as Receipts, cream reading cards, Beth Ellen
   expression titles and Montserrat labels and content. Keep the latest bundle
@@ -792,10 +806,12 @@ public access or a public navigation item.
 - Each list card groups its small `Draft` or `Published` pill with the ↑↓
   arrows in its head. Facts keep their reading order and painted label dabs.
   At 27rem of inner card width the head sits level with the title at the top
-  right, and each label sits beside its value; narrower cards and the preview
-  keep labels above values:
-  `Ao pé da letra` (the literal translation, when there is one), `Quer dizer`
-  (the Portuguese meaning, a step larger than the rest) and `Em inglês`; then
+  right, and each visible label sits beside its value; narrower cards and the
+  preview keep labels above values. The literal translation, when present,
+  has no visible label in the collection, preview or painting; screen readers
+  use the clear Portuguese label `Tradução literal`, and its text uses the
+  full row. The meanings use `Quer dizer` (the Portuguese meaning,
+  a step larger than the rest) and `Em inglês`; then
   `Exemplo`/`Exemplos`, where the expression's own words are marked with a
   soft wash of the paint, taking in a verb the example has conjugated. Notes/origin and reference links
   open in a quiet disclosure. Optional themes use a lilac pill fill.
@@ -833,15 +849,19 @@ reading's title; the facts follow it.
 
 - No visible heading and no helper text (Dan: "do we even need the top
   stuff"). The section keeps `Uma expressão para ti` as a visually hidden
-  heading, so it is still named. At rest the sheet itself invites: the same
-  words as a small uppercase label at its top, in the waiting paint's
-  lettering colour, and `Paint it`. Once painted, the card is the whole
-  section, and it ends in one row at the foot of the facts at every width:
+  heading, so it is still named. Every visit starts with a blank cream canvas
+  and `Paint it`: no phrase hints, paint marks, meanings or fact labels are
+  visible before the press (27 October 2026, Dan). A returning student
+  repaints their saved expression on that first press without spending
+  another pick; `Paint another` asks for a new one. Once painted, the card is
+  the whole section, and it ends in a footer separated by a quiet rule:
   the reading's themes, then `Notas e origem` (when Inês has written notes or
   a source) and the compact `Paint another` at the row's end. The notes'
   toggle reads like the facts' labels, its chevron in the dabs' column when it
-  leads the row, and the notes open below the whole row, so opening them never
-  moves it. On a narrow column the row starts at the dabs' column and runs to
+  leads the row. On desktop the footer spans both reading columns; notes
+  open below the whole row with a comfortable line length, so opening them
+  never moves the action row or leaves an empty half beside the notes. On a
+  narrow column the row starts at the dabs' column and runs to
   the card's edge, so two short themes, or the notes' toggle, share it with
   the button; the toggle and the button drop beneath the themes together only
   for a longer set of themes, and only on the narrowest phones (320px) does the
@@ -854,7 +874,7 @@ reading's title; the facts follow it.
   carries ink `#1A3169` (5.4:1; cream on it would be 2.1:1). A new painting is
   never the colour of the last one painted on this device, nor of its family
   (blue or the two lavenders), so each one reads as a new colour. A
-  returning student sees their expression in the colour it was painted in,
+  returning student repaints their saved expression in its original colour,
   remembered on the device for each student as soon as the Worker has saved
   the pick (two students sharing a device keep their own colours), or else in
   a colour that expression always gets.
@@ -873,28 +893,24 @@ reading's title; the facts follow it.
   Nothing is ever cut: a phrase too long for every size takes as many lines as
   it needs at the smallest, and the sheet grows to hold them.
 - Composition: on a phone the sheet fills the cream card and the reading opens
-  beneath it. From a landscape phone up, two columns each run from the card's
-  top on their own: the painting with its example straight beneath it, and
-  beside it the facts with the themes and `Paint another` straight beneath
-  them. Neither column waits on the other, so the taller one never opens a
-  gap in the shorter, whose foot simply ends sooner. A painted card with a
-  one-line phrase fits a landscape phone's screen (667×375, 844×390). On a
-  very wide card the example moves up into a third column with the themes and
-  button beneath it, and all three columns start level. At rest the sheet
-  fills its column beside the facts still to come, with its wax and pool at
-  its top, where the paint will land: the paint lands where it stays and never
-  slides on the sheet. The painted sheet closes round its phrase as the
-  reading opens, only its foot rising, so a one-line phrase never sits in a
+  beneath it. From a landscape phone up, the painting with its example
+  straight beneath it sits beside the meanings. Both columns begin at the
+  top, and the footer follows the taller of them. Notes and the next-paint
+  action use that shared footer rather than extending only the right column
+  (27 October 2026, Dan: the layout should feel cleaner). Keep two reading
+  columns on larger screens as well. At rest the blank
+  sheet reserves room for the first strokes, with the button at the card's
+  foot. The paint lands where it stays and never slides on the sheet. The
+  painted sheet closes round its phrase as the reading opens, only its foot
+  rising, so a one-line phrase never sits in a
   tall empty sheet. Nothing above the section moves, and the card grows and
   shrinks smoothly below.
-- At rest a few real, unseen phrases are written in dark blue so they are
-  readable on the cream paper, and a flat pool of the next paint waits by the
-  margin. Beside the painting, the facts still to come wait in wax. Gouache is
-  matte: nothing glossy. Finished lettering stays cream on dark paint and dark
-  on lavender.
+- The idle canvas reveals nothing from the collection. The first paint
+  appears only after the press. Gouache is matte: nothing glossy. Finished
+  lettering stays cream on dark paint and dark on lavender.
 - The press starts the painting at once while the Worker picks and saves the
-  expression: a dab lands in the pool and spreads. On about one press in three
-  the wait becomes a near-miss: a thin dry brush starts the first word or two
+  expression: a dab lands on the blank sheet and spreads. On about one press
+  in three the wait becomes a near-miss: a thin dry brush starts the first word or two
   of an unseen phrase near the top, and a quick stroke of the real paint
   crosses it out, before the real phrase is painted. The near-miss is brushed
   in a wash the real paint stands out against (lavender behind the blues and

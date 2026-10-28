@@ -1974,7 +1974,7 @@
 .teacher-manual-settings > .paid-tick {
   grid-column: 1 / -1;
 }
-@container setup-list (min-width: 58rem) {
+@container student-card (min-width: 58rem) {
   .teacher-setup__body .teacher-manual-form > .paid-tick { grid-column: 2; }
 }
 .teacher-lesson-place {
@@ -2437,15 +2437,17 @@
 /* One profile for a student, their card and its Add a lesson button, Add a
    student and a free time on her week all open (14 October 2026, Dan). */
 .teacher-profile { width: min(620px, calc(100vw - 2rem)); }
-.teacher-history-list { display: grid; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
-.teacher-history-lesson { padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
+/* Let the row's available width decide how many readable lesson cards fit. */
+.teacher-history-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); align-items: start; gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
+.teacher-history-lesson { min-width: 0; padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
 .teacher-history-lesson.is-cancelled { background: var(--lavender-pale, #f1eef7); }
 .teacher-history-lesson__top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.45rem; font-size: 0.8rem; }
+.teacher-history-lesson__when { display: flex; flex: 1 1 9rem; flex-direction: column; align-items: flex-start; gap: 0.35rem; min-width: 0; }
 .teacher-history-status { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); padding: 0.2rem 0.5rem; font: 600 0.65rem/1.4 var(--ui); }
 .teacher-history-status.is-muted { background: var(--lavender-soft); color: var(--ink); }
-.teacher-history-lesson__top strong span { font-weight: 500; }
+.teacher-history-lesson__top strong span { display: inline-block; font-weight: 500; white-space: nowrap; }
 /* The lesson's facts as a row of dabs. */
-.teacher-history-lesson__facts.booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.3rem 1.1rem; margin: 0.5rem 0 0; font-size: 0.74rem; }
+.teacher-history-lesson__facts.booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.25rem 0.85rem; margin: 0.35rem 0 0; font-size: 0.74rem; }
 /* Her message and their note read as the emails show a message: a lilac
    edge, a small label above. */
 .teacher-history-lesson__note { margin: 0.65rem 0 0; padding-left: 0.75rem; border-left: 3px solid var(--lavender); white-space: pre-wrap; overflow-wrap: anywhere; font: 400 0.75rem/1.5 var(--ui); }
@@ -2789,7 +2791,8 @@
 .teacher-expressions__intro dd { margin: 0.4rem 0 0; font-size: 0.88rem; line-height: 1.65; }
 /* The plus stands apart from its words, as on Add a student. JSX drops the
    space a line break between the icon and the label seems to give. */
-.teacher-expressions__intro > .button { flex: 0 1 auto; gap: 0.5rem; }
+.teacher-expressions__intro-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.teacher-expressions__intro-actions > .button { flex: 0 1 auto; gap: 0.5rem; }
 /* Her try-out is the students' own card, already on her lilac sheet: no second sheet round it. */
 .teacher-expressions > .student-expressions { margin: 0; padding: 0; border: 0; border-radius: 0; background: none; }
 /* Its button is the students' too (the booking journey's 0.7 rem, 700,
@@ -2845,7 +2848,8 @@
   .expression-form { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 480px) {
-  .teacher-expressions__intro > .button { width: 100%; }
+  .teacher-expressions__intro-actions { width: 100%; }
+  .teacher-expressions__intro-actions > .button { width: 100%; }
   .teacher-expression__actions .button { width: auto; flex: 1 1 auto; }
 }
 .teacher-receipts .teacher-month-heading {
@@ -2980,8 +2984,10 @@
 /* Needs you: her actions and each student's setup steps, 14 October. */
 .teacher-tab-count { display: inline-grid; place-items: center; min-width: 1.1rem; height: 1.1rem; padding-inline: 0.18rem; border-radius: var(--squiggle-chip); background: var(--coral-action); color: var(--paper-light); font-size: 0.63rem; line-height: 1; }
 .teacher-needs-you > section { display: grid; gap: 0.65rem; min-width: 0; }
-.teacher-setup-list { display: grid; gap: 0.5rem; list-style: none; padding: 0; margin: 0; container: setup-list / inline-size; }
-.teacher-setup { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 0.35rem; padding: 0.55rem 0.8rem; border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet); }
+/* Keep closed students compact, then give the selected profile the whole row. */
+.teacher-setup-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 28rem), 1fr)); align-items: start; gap: 0.75rem; list-style: none; padding: 0; margin: 0; container: setup-list / inline-size; }
+.teacher-setup { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 0.35rem; min-width: 0; padding: 0.55rem 0.8rem; border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet); container: student-card / inline-size; }
+.teacher-setup.is-open { grid-column: 1 / -1; }
 .teacher-setup__header { display: grid; grid-template-columns: minmax(9rem, 1fr) minmax(264px, 3fr) max-content; align-items: center; gap: 0.5rem; min-width: 0; }
 .teacher-setup__header:has(.teacher-setup__steps li:last-child:nth-child(5)) { grid-template-columns: minmax(9rem, 1fr) minmax(220px, 3fr) max-content; }
 .teacher-setup__profile { display: flex; align-items: center; gap: 0.6rem; border: 0; padding: 0; min-width: 0; text-align: left; background: none; color: inherit; font: inherit; cursor: pointer; }
@@ -3064,7 +3070,7 @@
 .teacher-setup__notice { grid-column: 1 / -1; margin: 0; }
 .teacher-setup__attention { grid-column: 1 / -1; min-width: 0; }
 .teacher-setup__body .teacher-setup__help { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0; font-size: 0.78rem; }
-@container setup-list (min-width: 58rem) {
+@container student-card (min-width: 58rem) {
   .teacher-setup__body .teacher-profile__form { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)) max-content; }
   .teacher-setup__body .teacher-profile__form .teacher-dialog-actions { grid-column: auto; }
   .teacher-setup__body .teacher-price .teacher-form { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) max-content; gap: 1rem; }
@@ -3079,20 +3085,20 @@
   .teacher-setup__body .teacher-manual-settings .segmented--four.segmented--position-2 .segmented__thumb { transform: translateY(calc(100% + 4px)); }
   .teacher-setup__body .teacher-manual-settings .segmented--four.segmented--position-3 .segmented__thumb { transform: translate(calc(100% + 4px), calc(100% + 4px)); }
 }
-@container setup-list (max-width: 32rem) {
+@container student-card (max-width: 42rem) {
   .teacher-setup__header,
   .teacher-setup__header:has(.teacher-setup__steps li:last-child:nth-child(5)) { grid-template-columns: minmax(0, 1fr) max-content; }
   .teacher-setup__action { grid-column: 2; grid-row: 1; }
   .teacher-setup__steps { grid-column: 1 / -1; grid-row: 2; }
 }
-@container setup-list (max-width: 30rem) {
+@container student-card (max-width: 30rem) {
   .teacher-setup__profile { gap: 0.45rem; font-size: 0.9rem; }
   .teacher-setup__action { gap: 0.35rem; }
   .teacher-setup--inline .teacher-setup__steps { gap: 0; }
   .teacher-setup--inline .teacher-setup__steps li { min-width: 0; font-size: 0.6rem; }
   .teacher-setup--inline .teacher-setup__steps button { width: 100%; padding-inline: 0.25rem; }
 }
-@container setup-list (max-width: 18rem) {
+@container student-card (max-width: 18rem) {
   .teacher-setup--inline .teacher-setup__steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
   .teacher-setup--inline .teacher-setup__steps:has(li:last-child:nth-child(5)) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
@@ -3180,11 +3186,12 @@
 :is(.teacher-come-back-default, .teacher-come-back) .teacher-dialog-actions { justify-self: end; }
 .teacher-come-back__wait { margin: 0; font-size: 0.78rem; }
 .teacher-come-back > .teacher-inline-error { margin: 0; }
-.teacher-student__history { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); align-items: start; gap: 1rem; min-width: 0; }
-.teacher-student__history > section { min-width: 0; }
-.teacher-student__history > section > h3 { margin: 0 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
-.teacher-student__history > section > h3 span { color: var(--lavender-ink); font-weight: 500; }
-@container setup-list (max-width: 32rem) {
+.teacher-student__history { min-width: 0; }
+.teacher-history { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+.teacher-history > section { min-width: 0; }
+.teacher-history > section > h3 { margin: 0 0 0.6rem; font: 600 0.85rem/1.5 var(--ui); }
+.teacher-history > section > h3 span { color: var(--lavender-ink); font-weight: 500; }
+@container student-card (max-width: 42rem) {
   .teacher-student__controls { grid-column: 1 / -1; grid-row: 2; }
   .teacher-student__controls button { padding-inline: 0.25rem; font-size: 0.65rem; }
 }
