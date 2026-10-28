@@ -4017,7 +4017,7 @@ await test("she welcomes a student with no lessons: they are asked to book their
   try {
     const priced = await welcomeOf("booker@example.invalid", { 60: 2500 });
     assert.equal(priced.email.subject, "Book your next lesson with Inês");
-    assert.ok(priced.email.text.includes("choose a time for your next lesson"), priced.email.text);
+    assert.match(priced.email.text, /choose a time for your next lesson/i);
     assert.ok(priced.email.text.includes("Choose a day and time for your next lesson."));
     assert.ok(!/Lesson · |Weekly · |And more/.test(priced.email.text), "no lesson list");
     assert.ok(priced.email.text.includes("€25 a lesson"), "their own price still shows");
@@ -4878,7 +4878,7 @@ await test("her student list says who is in and who has a card, and she can send
     // With no lesson to come, they are asked to book one, card first.
     assert.equal(mail.subject, "Book your next lesson with Inês");
     assert.ok(["Three quick steps", "2. Add your card.", "Choose a time"].every((line) => mail.text.includes(line)), mail.text);
-    // A first email that says "password" or puts the card in its button is read as phishing.
+    // The invitation keeps the account/payment mechanics in its numbered steps.
     assert.ok(!/password|Sign in and add card/i.test(`${mail.subject}\n${mail.text}`), mail.text);
     assert.ok(signInLinkIn(mail));
     assert.equal((await call("/admin/students/alice/welcome", { user: "teacher" })).status, 200);

@@ -36,7 +36,7 @@ export const FREE_LABEL = "Free";
  * still depends on the receiving provider.
  */
 const WELCOME_FOOTER = [
-  "You’re getting this because Inês added you as one of her students. Reply to write to her.",
+  "You’re getting this because Inês added you as one of her students.",
   "The button lasts 14 days.",
   "You can also open portuguesewithines.com yourself, press Sign in, then “Email me a sign-in link”.",
   "Reply to this email if you have a question for Inês."

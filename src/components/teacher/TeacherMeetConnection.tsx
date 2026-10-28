@@ -103,7 +103,7 @@ export function TeacherMeetConnection({ token, onConnectionChange }: { token: st
       </div>
       {!connection && !error ? <p role="status">Checking Google Meet…</p> : null}
       {feedback ? <p role="status">{feedback}</p> : null}
-      {error ? <div className="teacher-meet-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={() => setAttempt(value => value + 1)} type="button">Try again</button></div> : null}
+      {error ? <div className="teacher-meet-error" role="alert"><p>{error}</p><button className="button button--outline button--small" onClick={() => setAttempt(value => value + 1)} type="button">Try again</button></div> : null}
       {connection?.configured ? (
         <>
           <ul className="booking-payment-facts">
@@ -123,7 +123,7 @@ export function TeacherMeetConnection({ token, onConnectionChange }: { token: st
             {healthy ? (
               <>
                 <a className="button button--lilac" href="https://calendar.google.com/" target="_blank" rel="noopener noreferrer">Open Google Calendar</a>
-                <button className="teacher-text-button" disabled={busy} onClick={() => void connect()} type="button">
+                <button className="button button--outline button--small" disabled={busy} onClick={() => void connect()} type="button">
                   {busy ? "Opening Google…" : "Reconnect Google Meet"}
                 </button>
               </>

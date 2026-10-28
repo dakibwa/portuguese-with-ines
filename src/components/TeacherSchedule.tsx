@@ -83,6 +83,7 @@ export function TeacherSchedule() {
     () => (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7,
   );
   const [dayControlHost, setDayControlHost] = useState<HTMLDivElement | null>(null);
+  const [exactHost, setExactHost] = useState<HTMLDivElement | null>(null);
   const [activeTab, setActiveTab] = useState<TeacherTab>("week");
   const [editingHours, setEditingHours] = useState(false);
   const editing = activeTab === "week" && editingHours;
@@ -614,7 +615,7 @@ export function TeacherSchedule() {
       <div className="teacher-inline-error" role="alert">
         <p>{authError}</p>
         <button
-          className="teacher-text-button"
+          className="button button--outline button--small"
           type="button"
           onClick={() => setAuthAttempt((value) => value + 1)}
         >
@@ -653,7 +654,7 @@ export function TeacherSchedule() {
       <div className="teacher-inline-error" role="alert">
         <p>{scheduleError}</p>
         <button
-          className="teacher-text-button"
+          className="button button--outline button--small"
           type="button"
           onClick={() => setScheduleAttempt((value) => value + 1)}
         >
@@ -733,6 +734,35 @@ export function TeacherSchedule() {
               <li>Repeats every week</li>
             </ul>
           ) : null}
+          {/* Her hours' tools share the top row with the way back, so Save
+              is in view however long the day (27 October 2026, Dan). */}
+          {editing ? (
+            <div className="teacher-week-actions">
+              <div className="teacher-week-exact" ref={setExactHost} />
+              {/* Said to a screen reader; the coral Save already shows it. */}
+              <span className="teacher-save-note visually-hidden" aria-live="polite">
+                {hoursDirty ? "Not saved yet" : ""}
+              </span>
+              {hoursDirty ? (
+                <button
+                  className="button button--outline button--small"
+                  type="button"
+                  disabled={savingHours}
+                  onClick={() => setDraftHours(savedHours)}
+                >
+                  Discard
+                </button>
+              ) : null}
+              <button
+                className="button button--coral button--compact"
+                type="button"
+                disabled={savingHours || !hoursDirty || Boolean(invalidHours) || bookingsLoading || Boolean(bookingsError)}
+                onClick={() => void saveHours()}
+              >
+                {savingHours ? "Saving…" : "Save weekly hours"}
+              </button>
+            </div>
+          ) : null}
           <button
             className={`button ${editing ? "button--blue" : "button--lilac"} button--compact teacher-week-mode`}
             type="button"
@@ -755,7 +785,7 @@ export function TeacherSchedule() {
         </div>
         {editing && hoursDirty ? (
           <div className="teacher-hours-warning" aria-live="polite">
-            {bookingsLoading ? <p>Checking booked lessons…</p> : bookingsError ? <div role="alert"><p>Booked lessons couldn’t be checked.</p><button className="teacher-text-button" onClick={() => void reloadBookings()} type="button">Try again</button></div> : affectedLessons.length ? <>
+            {bookingsLoading ? <p>Checking booked lessons…</p> : bookingsError ? <div role="alert"><p>Booked lessons couldn’t be checked.</p><button className="button button--outline button--small" onClick={() => void reloadBookings()} type="button">Try again</button></div> : affectedLessons.length ? <>
               <p className="teacher-hours-warning__lead">
                 <AlertCircle size={16} aria-hidden="true" />
                 {affectedLessons.length === 1 ? "This lesson is" : `These ${affectedLessons.length} lessons are`} outside your new hours. {affectedLessons.length === 1 ? "It stays" : "They stay"} booked.
@@ -782,7 +812,7 @@ export function TeacherSchedule() {
           <div className="teacher-calendar-loading" role="alert">
             <p>{bookingsError}</p>
             <button
-              className="teacher-text-button"
+              className="button button--outline button--small"
               type="button"
               onClick={() => {
                 calendarTitleRef.current?.focus({ preventScroll: true });
@@ -803,6 +833,7 @@ export function TeacherSchedule() {
             disabled={savingHours}
             mobileDay={mobileDay}
             dayControlHost={dayControlHost}
+            exactHost={exactHost}
             status={
               editing ? null : (
                 <p
@@ -833,38 +864,10 @@ export function TeacherSchedule() {
             onSelectBooking={setSelectedBooking}
           />
         )}
-        {editing ? (
-          <div className="teacher-hours-save">
-            <div className="teacher-save-row">
-              {/* Said to a screen reader; the coral Save already shows it. */}
-              <span className="teacher-save-note visually-hidden" aria-live="polite">
-                {hoursDirty ? "Not saved yet" : ""}
-              </span>
-              {hoursDirty ? (
-                <button
-                  className="teacher-text-button"
-                  type="button"
-                  disabled={savingHours}
-                  onClick={() => setDraftHours(savedHours)}
-                >
-                  Discard
-                </button>
-              ) : null}
-              <button
-                className="button button--coral"
-                type="button"
-                disabled={savingHours || !hoursDirty || Boolean(invalidHours) || bookingsLoading || Boolean(bookingsError)}
-                onClick={() => void saveHours()}
-              >
-                {savingHours ? "Saving…" : "Save weekly hours"}
-              </button>
-            </div>
-            {invalidHours ? (
-              <p className="teacher-inline-error" role="alert">
-                {invalidHours}
-              </p>
-            ) : null}
-          </div>
+        {editing && invalidHours ? (
+          <p className="teacher-inline-error teacher-hours-invalid" role="alert">
+            {invalidHours}
+          </p>
         ) : !bookingsLoading && !bookingsError && !weekCount ? (
           <p className="teacher-empty-week">
             {weekEnd < today ? "No lessons that week." : "No lessons booked this week."}

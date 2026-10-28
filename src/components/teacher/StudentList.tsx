@@ -88,7 +88,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
       </button>
     </div>
     <NeedsYou {...noticeProps} heading="Check first" items={workspace.general} />
-    {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={onRetry} type="button">Try again</button></div> : null}
+    {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" onClick={onRetry} type="button">Try again</button></div> : null}
     {!students && !error ? <p role="status">Loading your students…</p> : null}
     {students && !students.length ? <p>No students yet. Press Add a student to set up your first.</p> : students && !shown.length && !resting.length ? <p role="status">No students match “{query.trim()}”.</p> : null}
     <ul className="teacher-setup-list teacher-students__unified">{shown.map(row)}</ul>

@@ -251,7 +251,7 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
           ) : actions}
         </div>
       ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
-      {!fullPage ? <p className="expression-page-link"><Link href="/idioms/">Open full page</Link></p> : null}
+      {!fullPage ? <p className="expression-page-link"><Link className="button button--outline button--small" href="/idioms/">Open full page</Link></p> : null}
     </section>
   );
 }

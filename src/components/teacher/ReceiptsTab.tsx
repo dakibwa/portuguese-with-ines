@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import { fetchReceipts, type ReceiptLine } from "@/lib/admin-api";
-import { TeacherPager } from "@/components/teacher/TeacherPager";
+import { MonthLabel, TeacherPager } from "@/components/teacher/TeacherPager";
 import { readSession } from "@/lib/auth-api";
 import { formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
@@ -79,7 +79,6 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
   const ready = lines.filter((line) => line.ready);
   const waiting = lines.filter((line) => !line.ready && line.state !== "refunded");
   const total = ready.reduce((sum, line) => sum + (line.amountCents ?? 0), 0);
-  const monthName = dateLabel(`${month}-01`, { month: "long", year: "numeric" });
 
   function download() {
     // The byte-order mark tells Excel it is UTF-8, so "João" doesn't come out garbled.
@@ -97,7 +96,7 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
     <section className="teacher-receipts" aria-labelledby="teacher-receipts-month">
       <h2 className="visually-hidden">Receipts</h2>
       <div className="teacher-month-heading">
-        <h3 id="teacher-receipts-month" aria-live="polite" ref={monthTitleRef} tabIndex={-1}>{monthName}</h3>
+        <h3 id="teacher-receipts-month" aria-live="polite" ref={monthTitleRef} tabIndex={-1}><MonthLabel month={`${month}-01`} /></h3>
         <TeacherPager
           unit="month"
           away={month !== thisMonth}
@@ -112,12 +111,12 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
       {error ? (
         <div className="teacher-inline-error" role="alert">
           <p>{error}</p>
-          <button className="teacher-text-button" onClick={() => setAttempt((value) => value + 1)} type="button">Try again</button>
+          <button className="button button--outline button--small" onClick={() => setAttempt((value) => value + 1)} type="button">Try again</button>
         </div>
       ) : !data ? (
         <p className="teacher-receipts__lead" role="status">Loading receipts…</p>
       ) : !lines.length ? (
-        <p className="teacher-receipts__lead">Nothing paid or due for {monthName} yet.</p>
+        <p className="teacher-receipts__lead">Nothing paid or due this month yet.</p>
       ) : (
         <>
           <div className="teacher-receipts__summary">

@@ -88,7 +88,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
             </strong>
             {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
           </div>
-          {booking.student_id && !cancelled ? <button type="button" data-homework-exit className="teacher-text-button teacher-history-homework" disabled={homeworkBusy}
+          {booking.student_id && !cancelled ? <button type="button" data-homework-exit className="teacher-history-homework" disabled={homeworkBusy}
             aria-expanded={homeworkId === booking.id} onClick={() => setHomeworkId(homeworkId === booking.id ? null : booking.id)}>
             <BookOpen size={15} aria-hidden="true" />{homeworkId === booking.id ? "Close homework" : "Homework"}
           </button> : null}
@@ -99,14 +99,14 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
         </ul>
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
         {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
-        {cancelled && paidByHand(booking) && booking.payment_status !== "refunded" ? <button className="teacher-text-button" type="button" disabled={homeworkBusy} onClick={() => onRecordRefund(booking)}>Record refund</button> : null}
+        {cancelled && paidByHand(booking) && booking.payment_status !== "refunded" ? <button className="button button--outline button--small" type="button" disabled={homeworkBusy} onClick={() => onRecordRefund(booking)}>Record refund</button> : null}
         {homeworkId === booking.id ? <TeacherHomework key={`${booking.id}-${token}`} bookingId={booking.id} token={token} onBusy={setHomeworkBusy} /> : null}
       </li>
     );
   }
 
   if (error) {
-    return <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="teacher-text-button" onClick={onRetry} type="button">Try again</button></div>;
+    return <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" onClick={onRetry} type="button">Try again</button></div>;
   }
   if (bookings === null) return <p role="status">Loading lesson history…</p>;
   if (bookings.length === 0) return <p className="teacher-history-empty">No lessons recorded yet.</p>;

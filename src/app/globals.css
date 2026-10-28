@@ -1125,43 +1125,6 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   letter-spacing: 0.14em;
 }
 
-.text-action {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  border-bottom: 1px solid rgba(26, 49, 105, 0.2);
-  font-family: var(--ui);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  transition: color 160ms ease-out, transform 160ms ease-out;
-}
-
-.text-action::after {
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  left: 0;
-  height: 2px;
-  background: var(--coral-action);
-  content: "";
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 420ms var(--motion-spring-firm);
-}
-
-.text-action:hover {
-  color: var(--coral-action);
-  transform: translateY(-2px);
-}
-
-.text-action:hover::after,
-.text-action:focus-visible::after {
-  transform: scaleX(1);
-}
-
 .eyebrow {
   color: var(--lavender-ink);
   font-family: var(--ui);
@@ -2687,31 +2650,28 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   border-radius: var(--squiggle-button-alt);
 }
 
-.booking-provider button.text-action {
-  min-height: 44px;
-  padding: 0.35rem 0.1rem 0.28rem;
-  font-family: var(--ui);
-  font-size: var(--booking-control-font-size);
-  font-weight: 700;
-  letter-spacing: var(--booking-control-tracking);
-  line-height: 1.2;
+/*
+ * The small button for a rare or second action beside a line of text
+ * (27 October 2026, Dan: no underlined one-word buttons). It is the site's
+ * button at Inês's compact size, outlined or lilac, so Sign out, Try again,
+ * Clear or Back reads as something to press, never as a stray underline.
+ * Declared after the booking grammar above so it holds inside booking too.
+ */
+.button--small,
+.booking-provider .button--small {
+  min-height: 40px;
+  padding: 0.55rem 1rem;
+  gap: 0.4rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  line-height: 1.15;
 }
 
-/* The underline sits under the word, not at the foot of its 44px box. */
-.booking-provider .text-action {
-  border-bottom: 0;
-  text-decoration: underline;
-  text-decoration-color: rgba(26, 49, 105, 0.3);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.3em;
-}
-
-.booking-provider .text-action::after {
-  display: none;
-}
-
-.booking-provider .text-action:hover {
-  text-decoration-color: currentColor;
+@media (pointer: coarse) {
+  .button--small,
+  .booking-provider .button--small {
+    min-height: 44px;
+  }
 }
 
 .booking-placeholder {
@@ -2775,8 +2735,7 @@ textarea,
   }
 }
 
-/* Signing in to see booked lessons is the account card on its own, with the
-   way back tucked above its corner. */
+/* Signing in to see booked lessons is the account card on its own. */
 .booking-workflow-sign-in {
   display: grid;
   width: min(460px, 100%);
@@ -2793,36 +2752,17 @@ textarea,
   margin: 0;
 }
 
-.booking-workflow-sign-in > .booking-back {
-  justify-self: start;
-}
-
 /* The quiet way in for a student booked on another browser: a first visit
    books first and makes an account at the end. */
 .booking-returning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem 0.75rem;
   margin: 1.1rem 0 0;
   color: var(--lavender-ink);
   font-size: 0.875rem;
-  text-align: center;
-}
-
-.booking-returning button {
-  min-height: 44px;
-  border: 0;
-  padding: 0 0.2rem;
-  background: none;
-  color: var(--coral-action);
-  cursor: pointer;
-  font: inherit;
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
-}
-
-.booking-returning button:hover,
-.booking-returning button:focus-visible {
-  color: #95301f;
 }
 
 /* Booking decisions animate only what they changed. Page-wide view snapshots
@@ -6011,58 +5951,21 @@ p.lesson-when > span {
   margin-bottom: 0.5rem;
 }
 
-/* Its links' own 44px boxes give the room below; a paragraph's margin
-   would add another line's worth before the card's mark. */
+/* Another way in, or a forgotten password: small outline buttons side by
+   side beneath the main action, wrapping together on the narrowest card. */
 .auth-panel__aside {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0 1.4rem;
-  margin: 0.9rem 0 -0.75rem;
-  text-align: center;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
 }
 
-.auth-panel__link {
-  position: relative;
-  display: inline-flex;
-  /* 21px was under every pointer-target guideline; the underline still sits
-     against the text, the box around it is just big enough to hit. */
-  min-height: 44px;
-  align-items: center;
-  border: 0;
-  padding: 0 0 2px;
-  background: transparent;
-  color: var(--lavender-ink);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.84rem;
-  transition: color 160ms ease;
-}
-
-/* The same coral underline that grows in on the nav links, so a text button
-   behaves like every other link on the site. */
-.auth-panel__link::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 1.5px;
-  background: var(--coral);
-  content: "";
-  transform: scaleX(0.4);
-  opacity: 0;
-  transition: opacity 200ms ease, transform 420ms var(--motion-spring-firm);
-}
-
-.auth-panel__link:hover,
-.auth-panel__link:focus-visible {
-  color: var(--coral-action);
-}
-
-.auth-panel__link:hover::after,
-.auth-panel__link:focus-visible::after {
-  opacity: 1;
-  transform: scaleX(1);
+/* Set a touch closer than other small buttons, so the pair keeps one row
+   down to a 360px phone. */
+.auth-panel .auth-panel__aside > .button {
+  padding-inline: 0.75rem;
+  letter-spacing: 0.1em;
 }
 
 /* The menu shares the header's geometry so its wordmark stays still. Only
@@ -6397,26 +6300,6 @@ p.lesson-when > span {
 }
 
 /* /my-lessons */
-
-/* .text-action was written for links, which have no border of their own. On a
-   <button> the user-agent border survives and the control renders as a box —
-   which is how "Edit details" ended up looking like a second Sign out. */
-button.text-action {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-bottom: 1px solid rgba(26, 49, 105, 0.2);
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--coral-action);
-}
 
 /*
  * On a narrower card the account's menu is the student's name, at the top of
@@ -6993,8 +6876,11 @@ button.text-action {
 }
 
 /* The small outline button every other card's Change is: the same edge, cut
-   and 14px label as the times panel's Change and a lesson row's. */
-.my-lessons__change {
+   and 14px label as the times panel's Change and a lesson row's. Sign out and
+   Have a code from Inês? take it too, so Your details speaks at one size
+   (27 October 2026, Dan). */
+.my-lessons__change,
+.my-lessons__code summary {
   min-height: 44px;
   justify-self: end;
   border: 1.5px solid rgba(26, 49, 105, 0.55);
@@ -7102,20 +6988,6 @@ button.text-action {
   }
 }
 
-/* On the narrowest phones an address, the one long value, broke mid-word
-   beside Change (`ana.martins@e` / `xample.invalid` at 320px,
-   `ana.martins@example.i` / `nvalid` at 390px). There its Change sits beside
-   its name instead, and the address takes the row's whole width beneath. */
-@container booking (max-width: 379.98px) {
-  .my-lessons__fact[data-field="email"] > .my-lessons__change {
-    grid-row: 1;
-  }
-
-  .my-lessons__fact[data-field="email"] > .my-lessons__fact-value {
-    grid-column: 1 / -1;
-  }
-}
-
 .my-lessons__avatar.account-avatar {
   width: 38px;
   height: 38px;
@@ -7214,27 +7086,8 @@ button.text-action {
    where Book stands on Your lessons (10 October 2026, at Dan's request). */
 .my-lessons__sign-out {
   grid-area: out;
-  min-height: 44px;
   justify-self: end;
   align-self: center;
-  border: 0;
-  padding: 0;
-  background: none;
-  color: var(--lavender-ink);
-  cursor: pointer;
-  font-family: var(--ui);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  text-underline-offset: 0.2em;
-  transition: color 160ms var(--motion-ease), text-decoration-color 160ms var(--motion-ease);
-}
-
-.my-lessons__sign-out:hover,
-.my-lessons__sign-out:focus-visible {
-  color: var(--coral-action);
-  text-decoration-color: currentColor;
 }
 
 /* A saved field's good news is the site's calm success panel, compact here
@@ -7369,6 +7222,8 @@ button.text-action {
 .lesson-calendar__lesson-copy > strong {
   font-family: var(--ui);
   font-size: 0.92rem;
+  /* A long date breaks before its year, never leaving the time alone. */
+  text-wrap: balance;
 }
 
 /* The status pill is a span here too, but keeps the pill's own size and
@@ -7568,22 +7423,23 @@ button.text-action {
   color: var(--coral-action);
 }
 
+/* The code's disclosure is a small outline button like the site's others,
+   never an underlined line (27 October 2026, Dan). */
 .my-lessons__code summary {
   display: inline-flex;
-  min-height: 44px;
   align-items: center;
-  color: var(--lavender-ink);
-  cursor: pointer;
-  font-family: var(--ui);
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  list-style: none;
+}
+
+.my-lessons__code summary::-webkit-details-marker {
+  display: none;
 }
 
 .my-lessons__code summary:hover,
-.my-lessons__code summary:focus-visible {
-  color: var(--coral-action);
+.my-lessons__code summary:focus-visible,
+.my-lessons__code[open] > summary {
+  border-color: var(--ink);
+  background: rgba(170, 164, 230, 0.2);
 }
 
 .my-lessons__code[open] > summary {
@@ -8228,10 +8084,6 @@ dialog[open]::backdrop {
   line-height: 1.5;
 }
 
-.calendar-booking-prompt__content > .text-action {
-  justify-self: start;
-}
-
 .calendar-booking-prompt__actions {
   display: flex;
   flex-wrap: wrap;
@@ -8714,7 +8566,8 @@ dialog[open]::backdrop {
     flex-basis: 218px;
   }
 
-  .button {
+  /* A small button stays the size of its words beside them. */
+  .button:where(:not(.button--small)) {
     width: 100%;
     min-height: 56px;
     padding-right: 1.4rem;
@@ -8934,16 +8787,6 @@ dialog[open]::backdrop {
     transition: none;
   }
 
-  .text-action,
-  .text-action:hover {
-    transform: none;
-    transition: color 160ms ease-out;
-  }
-
-  .text-action::after {
-    display: none;
-  }
-
   /*
    * The lift and slide affordances were still animating under reduced motion.
    * Colour changes are kept so the states remain distinguishable.
@@ -9001,20 +8844,25 @@ dialog[open]::backdrop {
   }
 }
 
-/* A lesson's join action stays with its date and location, including on phones. */
+/* A lesson's join action stays with its date and location, including on
+   phones: raised in cream with Meet's mark, as on the next lesson's card,
+   so joining reads as the action it is rather than an underline. */
 .meeting-link {
   display: inline-flex;
   width: fit-content;
   max-width: 100%;
   min-height: 44px;
   align-items: center;
-  gap: 0.4rem;
-  color: var(--blue-deep);
+  gap: 0.55rem;
+  border-radius: var(--squiggle-pill);
+  padding: 0.3rem 1rem 0.3rem 0.35rem;
+  background: var(--raised);
+  color: var(--ink);
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1.4;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
+  text-decoration: none;
+  transition: background 160ms ease, color 160ms ease;
 }
 
 .meeting-link svg {
@@ -9038,7 +8886,9 @@ dialog[open]::backdrop {
   height: auto;
 }
 
-.meeting-link:hover {
+.meeting-link:hover,
+.meeting-link:focus-visible {
+  background: #fff;
   color: var(--coral-action);
 }
 
@@ -9717,17 +9567,30 @@ dialog[open]::backdrop {
   margin: 0;
 }
 
-.card-prompt--review .card-prompt__body {
+/* Open, the terms and their buttons take the card's whole width under its
+   heading, as a payment approval's do, rather than a narrow column indented
+   under the icon (27 October 2026, Dan: no empty space). */
+.card-prompt--open .card-prompt__body {
   display: contents;
 }
 
-.card-prompt--review h3 {
+.card-prompt--open {
+  row-gap: 0.2rem;
+}
+
+.card-prompt--open h3,
+.card-prompt--open .card-prompt__body > p {
   grid-column: 2;
   align-self: center;
 }
 
-.card-prompt--review .card-terms {
+.card-prompt--open:not(.card-prompt--review) .card-prompt__icon {
+  grid-row: span 2;
+}
+
+.card-prompt--open .card-terms {
   grid-column: 1 / -1;
+  margin-top: 0.85rem;
 }
 
 /* A payment approval: the lesson's time tile and the confirm step's dabs,
@@ -9897,7 +9760,7 @@ dialog[open]::backdrop {
 .student-expressions:focus { outline: none; }
 .student-expressions { position: relative; container: expressions / inline-size; width: 100%; min-width: 0; margin-top: 1.5rem; padding: var(--pad-card); border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet); }
 .expression-page-link { display: flex; justify-content: flex-end; margin: 0.5rem 0 0; font-size: 0.78rem; }
-.expression-page-link a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blue-deep); text-underline-offset: 0.2em; }
+.expression-page-link a { text-decoration: none; }
 .expression-reading__note { margin: 0; font-size: 0.8rem; line-height: 1.6; text-wrap: balance; }
 .student-expressions > .expression-reading__note { text-align: center; }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { addStudent, type AdminStudent } from "@/lib/admin-api";
 import { STUDENT_MARKS } from "@/lib/student-marks";
@@ -27,6 +27,7 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
   const [prices, setPrices] = useState<PriceDraft>({ 60: "", 90: "" });
   const [busy, setBusyState] = useState(false);
   const [error, setError] = useState("");
+  const more = useRef<HTMLDetailsElement>(null);
   const setBusy = (value: boolean) => {
     setBusyState(value);
     onBusy(value);
@@ -48,6 +49,7 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
           const next = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "welcome" ? "welcome" : "lessons";
           const agreed = pricesFromDraft(prices, { keepEmpty: false });
           if (!agreed) {
+            if (more.current) more.current.open = true;
             setError(PRICE_RANGE_ERROR);
             return;
           }
@@ -79,41 +81,53 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
           <span>Email <span className="teacher-field-optional">(optional, their welcome needs one)</span></span>
           <input autoComplete="off" disabled={busy} onChange={set("email")} type="email" value={details.email} />
         </label>
-        <label>
-          <span>Phone <span className="teacher-field-optional">(optional)</span></span>
-          <input autoComplete="off" disabled={busy} onChange={set("phone")} type="tel" value={details.phone} />
-        </label>
-        <label>
-          <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
-          <input autoComplete="off" autoCorrect="off" disabled={busy} inputMode="numeric" onChange={set("nif")} spellCheck={false} type="text" value={details.nif} />
-        </label>
-        <fieldset className="teacher-profile__price">
-          <legend>Their price <span className="teacher-field-optional">(optional, per lesson)</span></legend>
-          <PriceFields draft={prices} disabled={busy} idPrefix="teacher-student-price" invalid={error === PRICE_RANGE_ERROR} onChange={setPrices} />
-        </fieldset>
-        <div className="teacher-profile__splat">
-          <span id="teacher-student-splat">Their splat <span className="teacher-field-optional">(optional)</span></span>
-          <div aria-labelledby="teacher-student-splat" className="my-lessons__marks" role="group">
-            {[{ id: "", label: "Their initial" }, ...STUDENT_MARKS].map((choice) => (
-              <button
-                aria-label={choice.label}
-                aria-pressed={details.mark === choice.id}
-                className="my-lessons__mark"
-                disabled={busy}
-                key={choice.id || "initial"}
-                onClick={() => setDetails((current) => ({ ...current, mark: choice.id }))}
-                type="button"
-              >
-                <AccountAvatar mark={choice.id} name={details.name.trim() || "?"} />
-              </button>
-            ))}
+        {/* Name and email are all most students need on day one, so the rest
+            waits, folded, a press away (27 October 2026, Dan: onboarding
+            should feel easy). Their price still goes in from the start. */}
+        <details className="teacher-profile__more" ref={more}>
+          <summary>Phone, NIF, price and splat</summary>
+          <div className="teacher-profile__more-body">
+            <label>
+              <span>Phone <span className="teacher-field-optional">(optional)</span></span>
+              <input autoComplete="off" disabled={busy} onChange={set("phone")} type="tel" value={details.phone} />
+            </label>
+            <label>
+              <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
+              <input autoComplete="off" autoCorrect="off" disabled={busy} inputMode="numeric" spellCheck={false} onChange={set("nif")} type="text" value={details.nif} />
+            </label>
+            <fieldset className="teacher-profile__price">
+              <legend>Their price <span className="teacher-field-optional">(optional, per lesson)</span></legend>
+              <PriceFields draft={prices} disabled={busy} idPrefix="teacher-student-price" invalid={error === PRICE_RANGE_ERROR} onChange={setPrices} />
+            </fieldset>
+            <div className="teacher-profile__splat">
+              <span id="teacher-student-splat">Their splat <span className="teacher-field-optional">(optional)</span></span>
+              <div aria-labelledby="teacher-student-splat" className="my-lessons__marks" role="group">
+                {[{ id: "", label: "Their initial" }, ...STUDENT_MARKS].map((choice) => (
+                  <button
+                    aria-label={choice.label}
+                    aria-pressed={details.mark === choice.id}
+                    className="my-lessons__mark"
+                    disabled={busy}
+                    key={choice.id || "initial"}
+                    onClick={() => setDetails((current) => ({ ...current, mark: choice.id }))}
+                    type="button"
+                  >
+                    <AccountAvatar mark={choice.id} name={details.name.trim() || "?"} />
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
+        </details>
+        {/* Two choices side by side, coral and outline: the dialog's own
+            close is the way out, so Add a student needs no Cancel beside them
+            (27 October 2026, Dan: one calm footer). */}
         <div className="teacher-dialog-actions">
           <button className="button button--coral" disabled={busy} type="submit" value="lessons">{busy ? "Adding…" : "Next: their lessons"}</button>
           {/* No lessons yet: their welcome asks them to book one (16 October 2026, Inês). */}
-          {offerNoLessons ? <button className="button button--lilac" disabled={busy} type="submit" value="welcome">No lessons yet</button> : null}
-          <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">{cancelLabel}</button>
+          {offerNoLessons
+            ? <button className="button button--outline" disabled={busy} type="submit" value="welcome">No lessons yet</button>
+            : <button className="button button--outline" disabled={busy} onClick={onCancel} type="button">{cancelLabel}</button>}
         </div>
         {error ? <p className="teacher-inline-error" id="teacher-student-price-error" role="alert">{error}</p> : null}
       </form>
