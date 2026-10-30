@@ -1773,7 +1773,7 @@ is live now, independent of payment mode.
 
 Stripe is used because Square does not serve Portugal and Stripe supports
 reusable cards with explicit off-session setup. A least-privilege `rk_test_`
-key is used for the sandbox journey; the account's general secret key never
+key is used for the test journey; the account's general secret key never
 belongs in the Worker.
 
 **The account structure** (chosen 28 August, provisioned 31 August 2026):
@@ -1788,16 +1788,33 @@ second settlement hop.
 off-session charges. Leave MB WAY and Multibanco off for this flow: neither is
 a substitute for the reusable card the later lesson and €5 policy charges use.
 
-**Sandbox proving ground**: `wrangler --env staging` deploys the separate
+**Test proving ground**: `wrangler --env staging` deploys the separate
 `ines-booking-staging` Worker and D1 database. It has `payment_mode=postpay`,
-uses Stripe sandbox credentials, and has `EMAIL_DRY_RUN=1`, so no message is
-actually delivered. The public site never points to it; local QA opts in with
+uses the main Stripe account's built-in **Test mode**, and has
+`EMAIL_DRY_RUN=1`, so no message is actually delivered. The public site never
+points to it; local QA opts in with
 `NEXT_PUBLIC_BOOKING_API_BASE_URL=https://ines-booking-staging.dakibwa.workers.dev`.
+Its frontend also needs that account's test publishable key and
+`NEXT_PUBLIC_STRIPE_EXPECTED_MODE=test`. Keep one live account and its built-in
+test mode for this business; do not create an additional Stripe sandbox for
+ordinary staging checks.
 Deploy it with:
 
 ```bash
 npx wrangler deploy --config workers/booking/wrangler.jsonc --env staging
 ```
+
+On 30 October 2026 staging moved from its separate Stripe sandbox to built-in
+test mode. Its restricted key grants Checkout Sessions, Payment Intents, and
+Charges and Refunds write access, plus Setup Intents read access. The test-mode
+`checkout.session.completed` webhook targets the staging Worker and keeps API
+version `2026-08-26.dahlia`. Hosted card setup through staging and its signed
+webhook were verified, followed by a successful EUR 1 test payment and full
+test refund using the replacement key. The old synthetic student's saved-card
+references were cleared because Stripe objects do not cross environments.
+The staging database, dry-run emails, and paused teacher notifications remain
+separate from production. The separate Stripe sandbox was then deleted. The
+September sandbox acceptance below is historical.
 
 The source-level `STRIPE_UI_MODE=embedded` setting maps to Stripe API
 2026-08-26.dahlia's `ui_mode=embedded_page`. Stripe.js still mounts the returned
