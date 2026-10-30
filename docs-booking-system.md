@@ -411,7 +411,7 @@ also outside this change. Students' own translations are below.
 ## Students' translations of an expression
 
 Added 30 October 2026 (Dan, for Inês). Under a painted expression, beside
-`Notas e origem`, a `Translations` toggle opens a panel the same way: hidden
+`Notas e/ou origem`, a `Translations` toggle opens a panel the same way: hidden
 until pressed, below the reading's last row, so opening it never moves the row.
 The panel loads on first open. Everyone reading sees the translations Inês has
 approved, as a language label and the text. A signed-in student can add their

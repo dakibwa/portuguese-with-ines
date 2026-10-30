@@ -825,7 +825,7 @@ opening `/idioms/` with the same signed-in account.
   Failed writes retain the draft. Discarding edits and deleting an expression
   each require an explicit confirmation. Stale versions never overwrite an edit.
 - Students' translations (30 October 2026): a `Translations` toggle beside
-  `Notas e origem` in the painted reading's foot row, the same quiet
+  `Notas e/ou origem` in the painted reading's foot row, the same quiet
   disclosure, opening its own panel below the row. Only translations Inês
   approved are shown, never with a name. Her `Translations to check` panel sits
   in the Expressions tab with a waiting count. See
