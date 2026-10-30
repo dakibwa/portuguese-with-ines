@@ -68,7 +68,7 @@ export function IdiomsExperience() {
 
   if (!BOOKING_CONFIGURED) return <p className="idioms-state">The booking service is not connected yet.</p>;
   if (!ready) return <p className="idioms-state" role="status">Opening expressions…</p>;
-  if (!token) return <AuthPanel heading="Sign in" headingLevel={2} intro="Sign in to paint and discover expressions." signInOnly onSignedIn={() => {}} />;
+  if (!token) return <AuthPanel heading="Sign in" headingLevel={2} intro="Sign in to paint and discover expressions, and to add your own translations." signInOnly onSignedIn={() => {}} />;
   if (error && checked === token) return <div className="idioms-state" role="alert"><p>{error}</p><button className="button button--outline button--compact" onClick={() => setAttempt((value) => value + 1)} type="button">Try again</button></div>;
   // A different account or a late response can never retain this account's draft collection.
   if (!account || account.token !== token) return <p className="idioms-state" role="status">Opening expressions…</p>;

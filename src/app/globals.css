@@ -9841,8 +9841,23 @@ dialog[open]::backdrop {
 .expression-card__notes-toggle { display: inline-flex; align-items: center; min-height: 48px; margin: 0; padding: 0; border: 0; background: none; color: var(--paint-ink, var(--blue-deep)); cursor: pointer; font: 700 0.66rem/1.5 var(--ui); letter-spacing: 0.11em; text-transform: uppercase; }
 .expression-card__notes-toggle::before { flex: none; width: 0.4rem; height: 0.4rem; margin: 0 0.5rem 0 0.15rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; content: ""; rotate: 45deg; translate: 0 -0.12rem; transition: rotate var(--motion-surface) var(--motion-ease), translate var(--motion-surface) var(--motion-ease); }
 .expression-card__notes-toggle[aria-expanded="true"]::before { rotate: 225deg; translate: 0 0.1rem; }
-.expression-card__foot[data-lead="notes"] .expression-card__notes-toggle::before { margin-inline: 0.3rem 0.9rem; }
+.expression-card__foot[data-lead="notes"] .expression-card__notes-toggle:first-child::before { margin-inline: 0.3rem 0.9rem; }
 .expression-card__foot + .expression-card__notes { margin-top: 0.1rem; }
+/* Students' translations, approved by Inês: a panel like the notes', with a small form for a student's own. */
+.expression-translations { display: grid; gap: 0.6rem; min-width: 0; }
+.expression-translations p { margin: 0; }
+.expression-translations__list { display: grid; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
+.expression-translations__list li { min-width: 0; overflow-wrap: anywhere; }
+.expression-translations__language { display: block; color: var(--paint-ink, var(--blue-deep)); font: 700 0.62rem/1.5 var(--ui); letter-spacing: 0.11em; text-transform: uppercase; }
+.expression-translations__form { display: grid; gap: 0.3rem; max-width: 32rem; min-width: 0; }
+.expression-translations__form label { margin-top: 0.3rem; font: 600 0.78rem/1.4 var(--ui); }
+.expression-translations__form :is(input, textarea) { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); padding: 0.55rem 0.75rem; background: var(--raised); color: inherit; font: inherit; }
+.expression-translations__form textarea { resize: vertical; }
+.expression-translations__left { font-size: 0.74rem; opacity: 0.8; }
+.expression-translations__form .button { justify-self: start; width: auto; min-height: 44px; margin-top: 0.3rem; }
+.expression-translations__form .booking-alert { margin: 0; }
+.expression-translations__error { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+.expression-translations a { display: inline; min-height: 0; }
 /* On a narrow column the row takes the card's whole width from the dabs'
    column, so a theme and the button share it; it wraps only for many themes. */
 .expression-reading__text .expression-card__foot { margin-inline: -1.6rem -0.75rem; }
@@ -9902,7 +9917,7 @@ dialog[open]::backdrop {
   .expression-reading__text > .expression-card__examples { grid-column: 1; grid-row: 1; align-self: start; margin: var(--paint-sheet-h) 0 0 var(--paint-text-x); padding: 0 0.5rem 1.25rem 0; }
   .expression-reading__text > .expression-card__extras { grid-column: 1 / -1; grid-row: 2; align-self: start; margin: 0 1.25rem; padding: 0.6rem 0 1rem; }
   .expression-reading__text .expression-card__foot { margin-inline: 0; }
-  .expression-reading__text .expression-card__foot[data-lead="notes"] .expression-card__notes-toggle::before { margin-inline: 0.15rem 0.6rem; }
+  .expression-reading__text .expression-card__foot[data-lead="notes"] .expression-card__notes-toggle:first-child::before { margin-inline: 0.15rem 0.6rem; }
   /* At rest only the paint button sits at the foot of the blank card. */
   .expression-reading[data-state="waiting"] > .paint-sheet { grid-row: 1 / -1; align-self: stretch; }
   .expression-reading > .expression-reading__actions { grid-column: 2; grid-row: 2; align-self: end; padding: 0.9rem 0.9rem 1rem 0; }

@@ -246,7 +246,7 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
               <h3 className="expression-reading__title">{expression.expression}</h3>
               <ExpressionMeanings item={expression} />
               <ExpressionExamples item={expression} />
-              <ExpressionExtras action={actions} image item={expression} />
+              <ExpressionExtras action={actions} image item={expression} translations={{ token, viewer: source ? "teacher" : "student" }} />
             </article>
           ) : actions}
         </div>

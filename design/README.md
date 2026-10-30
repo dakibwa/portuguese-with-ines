@@ -824,6 +824,12 @@ opening `/idioms/` with the same signed-in account.
   the same close button, backdrop dismissal, scroll lock and focus return.
   Failed writes retain the draft. Discarding edits and deleting an expression
   each require an explicit confirmation. Stale versions never overwrite an edit.
+- Students' translations (30 October 2026): a `Translations` toggle beside
+  `Notas e/ou origem` in the painted reading's foot row, the same quiet
+  disclosure, opening its own panel below the row. Only translations Inês
+  approved are shown, never with a name. Her `Translations to check` panel sits
+  in the Expressions tab with a waiting count. See
+  [the booking-system contract](../docs-booking-system.md#students-translations-of-an-expression).
 - `Preview as students see it` renders the same reading-card component, without
   teacher actions or publication pills. The surrounding private-preview note
   is for Inês only. Previewing a draft does not publish it.

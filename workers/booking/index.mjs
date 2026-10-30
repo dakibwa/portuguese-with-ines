@@ -75,6 +75,7 @@ import {
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
+import { approvedTranslations, pendingTranslationCount, submitTranslation, translationsMissing, translationsReview } from "./expression-translations.mjs";
 import { HomeworkProblem, HOMEWORK_PHOTO_BODY_LIMIT, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing, notifyHomeworkSubmissions } from "./homework.mjs";
 import { closedExpressions, expressionsOpenToStudents, pickExpression, studentExpressions } from "./student-expressions.mjs";
 import { findRecurringCode, studentRates, studentLessonType, lessonPriceSnapshot, lessonPriceSnapshotSql, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
@@ -93,7 +94,7 @@ function corsHeaders(request, env) {
     .filter(Boolean);
 
   const base = {
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Authorization",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin"
@@ -1971,6 +1972,8 @@ const worker = {
         );
       }
       if (request.method === "GET" && path === "/availability") return await handleAvailability(request, env, url);
+      const shownTranslations = path.match(/^\/expressions\/([^/]+)\/translations$/);
+      if (shownTranslations && request.method === "GET") return await handleShownTranslations(request, env, shownTranslations[1]);
 
       if (request.method === "POST" && path === "/stripe/webhook") return await handleStripeWebhook(request, env, ctx);
 
@@ -1994,6 +1997,8 @@ const worker = {
           (request.method === "POST" && path === "/me/expressions/pick")) {
         return await handleStudentExpressions(request, env);
       }
+      const newTranslation = path.match(/^\/me\/expressions\/([^/]+)\/translations$/);
+      if (newTranslation && request.method === "POST") return await handleNewTranslation(request, env, newTranslation[1]);
       if (path === "/me/recurring-rates" && ["GET", "POST"].includes(request.method)) {
         return await handleRecurringRates(request, env);
       }
@@ -5250,6 +5255,39 @@ async function handleStudentExpressions(request, env) {
   }
 }
 
+/** Approved translations only, for anyone reading a published expression; never who wrote them. */
+async function handleShownTranslations(request, env, expressionId) {
+  try {
+    return json(await approvedTranslations(env.DB, expressionId), 200, request, env);
+  } catch (error) {
+    if (error instanceof ExpressionProblem) return fail(error.message, error.status, request, env);
+    if (translationsMissing(error)) return fail("Translations are not ready yet. Please try again later.", 503, request, env);
+    throw error;
+  }
+}
+
+/** A student's own translation, waiting for Inês. Teachers review rather than add. */
+async function handleNewTranslation(request, env, expressionId) {
+  const student = await currentStudent(request, env);
+  if (!student) return fail("Please sign in.", 401, request, env);
+  if (student.role !== "student") return fail("Only students can add translations.", 403, request, env);
+  if (!expressionsOpenToStudents(env)) return fail("Expressions are not open yet.", 404, request, env);
+  try {
+    const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const authorization = {
+      sql: `EXISTS (SELECT 1 FROM students WHERE id = ? AND session_version = ? AND role = 'student')
+        AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`,
+      values: [student.id, student.session_version ?? 0, await sessionHash(bearer)]
+    };
+    const data = await submitTranslation(env.DB, student.id, expressionId, await readJson(request, 4096), authorization);
+    return json(data, 201, request, env);
+  } catch (error) {
+    if (error instanceof ExpressionProblem) return fail(error.message, error.status, request, env);
+    if (translationsMissing(error)) return fail("Translations are not ready yet. Please try again later.", 503, request, env);
+    throw error;
+  }
+}
+
 async function handleMe(request, env) {
   const student = await currentStudent(request, env);
   if (!student) return fail("Please sign in.", 401, request, env);
@@ -5786,12 +5824,25 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     try {
       const data = await expressionsRequest(env.DB, request.method, path, request.method === "POST" ? adminBody : {}, authorization);
       // Her copy follows the same switch as the students' picker.
-      if (path === "/admin/expressions" && request.method === "GET") data.openToStudents = expressionsOpenToStudents(env);
+      if (path === "/admin/expressions" && request.method === "GET") {
+        data.openToStudents = expressionsOpenToStudents(env);
+        data.pendingTranslations = await pendingTranslationCount(env.DB);
+      }
       return json(data, path === "/admin/expressions" && request.method === "POST" ? 201 : 200, request, env);
     } catch (error) {
       if (error instanceof ExpressionProblem) return fail(error.message, error.status, request, env);
       // An unreleased migration must not make the rest of her portal fail.
       if (String(error).includes("no such table: expressions")) return fail("The expressions collection is not ready yet. Please try again after the website update.", 503, request, env);
+      throw error;
+    }
+  }
+
+  if (path === "/admin/expression-translations" || path.startsWith("/admin/expression-translations/")) {
+    try {
+      return json(await translationsReview(env.DB, request.method, path, url, authorization), 200, request, env);
+    } catch (error) {
+      if (error instanceof ExpressionProblem) return fail(error.message, error.status, request, env);
+      if (translationsMissing(error)) return fail("Translations are not ready yet. Please try again after the website update.", 503, request, env);
       throw error;
     }
   }
