@@ -45,7 +45,7 @@ function Example({ text, phrase }: { text: string; phrase: string }) {
 /** What the words say, what they mean, and the English for it. Each value is a span, which a student's card turns to wax while it paints another. */
 export function ExpressionMeanings({ item }: { item: ExpressionInput }) {
   const facts = [
-    item.literalEn ? { key: "literal", label: "Tradução literal", text: item.literalEn, lang: "en" } : null,
+    item.literalEn ? { key: "literal", label: "Tradução à letra", text: item.literalEn, lang: "en" } : null,
     item.meaningPt ? { key: "meaning", label: "Quer dizer", text: item.meaningPt } : null,
     item.meaningEn ? { key: "english", label: "Em inglês", text: item.meaningEn, lang: "en" } : null,
   ].filter((fact) => fact !== null);
@@ -54,7 +54,7 @@ export function ExpressionMeanings({ item }: { item: ExpressionInput }) {
     <dl className="expression-card__meanings">
       {facts.map((fact) => (
         <div className="expression-card__fact" data-fact={fact.key} key={fact.key}>
-          <dt className={fact.key === "literal" ? "visually-hidden" : "expression-card__label"}>{fact.label}</dt>
+          <dt className="expression-card__label">{fact.label}</dt>
           <dd lang={fact.lang}><span className="expression-card__value">{fact.text}</span></dd>
         </div>
       ))}
@@ -100,7 +100,7 @@ export function ExpressionExtras({ item, image = false, action }: { item: Expres
       <Tags item={item} />
       {item.notes || item.sourceUrl ? (
         <details className="expression-card__notes">
-          <summary>Notas e origem</summary>
+          <summary>Notas e/ou origem</summary>
           <Notes item={item} />
         </details>
       ) : null}
@@ -127,7 +127,7 @@ function ReadingFoot({ item, picture, action }: { item: ExpressionInput; picture
         <div className="expression-card__foot-end">
           {notes ? (
             <button aria-controls={panel} aria-expanded={open} className="expression-card__notes-toggle" type="button" onClick={() => setOpen((value) => !value)}>
-              Notas e origem
+              Notas e/ou origem
             </button>
           ) : null}
           {action}

@@ -9693,8 +9693,8 @@ dialog[open]::backdrop {
 
 /* The reading card, the same in her collection, its preview and a student's
    own painting (13 October 2026): what the words say, what they mean and the
-   English for it, with the literal translation unlabelled and the meanings
-   under small labels after painted dabs; then the expression in use, its own
+   English for it, each under a small label after a painted dab
+   (the literal translation under `Tradução à letra`); then the expression in use, its own
    words marked in the paint. A student's card sets the paint (--paint, the
    colour its labels are written
    in, its two companions and its mark); elsewhere the site's deep blue,
@@ -9719,7 +9719,6 @@ dialog[open]::backdrop {
 .expression-card__fact:nth-child(3n + 3)::before { background: var(--paint-3, var(--coral)); rotate: 180deg; }
 .expression-card__examples::before { rotate: 330deg; }
 .expression-card__fact dd { margin: 0.18rem 0 0; font-size: 0.92rem; line-height: 1.55; white-space: pre-wrap; text-wrap: pretty; }
-.expression-card__fact > .visually-hidden + dd { grid-column: 1 / -1; margin-top: 0; }
 /* The meaning is what a student came for: a step larger than the rest. */
 .expression-card__fact[data-fact="meaning"] dd { font-size: 1.04rem; line-height: 1.5; }
 .expression-card__examples { margin-top: 1.15rem; }
