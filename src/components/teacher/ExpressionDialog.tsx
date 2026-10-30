@@ -103,7 +103,7 @@ export function ExpressionDialog({ expression, preview, openToStudents, fallback
             <summary>Translation, notes and image</summary>
             <div>
               <label><span>Literal English translation (optional)</span><textarea lang="en" value={draft.literalEn} maxLength={500} rows={2} disabled={busy} onChange={(event) => edit("literalEn", event.target.value)} /></label>
-              <label><span>Notes or origin (optional)</span><textarea lang="pt-PT" value={draft.notes} maxLength={2000} rows={3} disabled={busy} onChange={(event) => edit("notes", event.target.value)} /></label>
+              <label><span>Notes and/or origin (optional)</span><textarea lang="pt-PT" value={draft.notes} maxLength={2000} rows={3} disabled={busy} onChange={(event) => edit("notes", event.target.value)} /></label>
               <label><span>Reference link (optional)</span><input type="url" value={draft.sourceUrl} maxLength={2048} disabled={busy} onChange={(event) => edit("sourceUrl", event.target.value)} /></label>
               <label><span>Image on this website (optional)</span><input value={draft.imageUrl} placeholder="/visuals/expressions/name.webp" maxLength={2048} disabled={busy} onChange={(event) => edit("imageUrl", event.target.value)} /></label>
               <label><span>Image description (needed with an image)</span><input value={draft.imageAlt} maxLength={240} required={Boolean(draft.imageUrl)} disabled={busy} onChange={(event) => edit("imageAlt", event.target.value)} /></label>

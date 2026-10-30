@@ -809,11 +809,10 @@ opening `/idioms/` with the same signed-in account.
 - Each list card groups its small `Draft` or `Published` pill with the ↑↓
   arrows in its head. Facts keep their reading order and painted label dabs.
   At 27rem of inner card width the head sits level with the title at the top
-  right, and each visible label sits beside its value; narrower cards and the
-  preview keep labels above values. The literal translation, when present,
-  has no visible label in the collection, preview or painting; screen readers
-  use the clear Portuguese label `Tradução literal`, and its text uses the
-  full row. The meanings use `Quer dizer` (the Portuguese meaning,
+  right, and each label sits beside its value; narrower cards and the
+  preview keep labels above values: `Tradução à letra` (the literal
+  translation, when there is one; restored 30 October 2026 at Inês's request),
+  `Quer dizer` (the Portuguese meaning,
   a step larger than the rest) and `Em inglês`; then
   `Exemplo`/`Exemplos`, where the expression's own words are marked with a
   soft wash of the paint, taking in a verb the example has conjugated. Notes/origin and reference links
@@ -858,7 +857,7 @@ reading's title; the facts follow it.
   repaints their saved expression on that first press without spending
   another pick; `Paint another` asks for a new one. Once painted, the card is
   the whole section, and it ends in a footer separated by a quiet rule:
-  the reading's themes, then `Notas e origem` (when Inês has written notes or
+  the reading's themes, then `Notas e/ou origem` (when Inês has written notes or
   a source) and the compact `Paint another` at the row's end. The notes'
   toggle reads like the facts' labels, its chevron in the dabs' column when it
   leads the row. On desktop the footer spans both reading columns; notes
