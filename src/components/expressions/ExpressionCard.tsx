@@ -1,4 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
+import { ExpressionTranslations, type TranslationsViewer } from "@/components/expressions/ExpressionTranslations";
 import type { ExpressionInput } from "@/lib/expressions";
 import { publicAssetPath } from "@/lib/paths";
 
@@ -91,9 +92,9 @@ function Notes({ item }: { item: ExpressionInput }) {
  * card ends in one row instead: its themes, the notes' toggle and `action`
  * at the row's end (see ReadingFoot).
  */
-export function ExpressionExtras({ item, image = false, action }: { item: ExpressionInput; image?: boolean; action?: ReactNode }) {
+export function ExpressionExtras({ item, image = false, action, translations }: { item: ExpressionInput & { id?: string }; image?: boolean; action?: ReactNode; translations?: TranslationsViewer }) {
   const picture = image && item.imageUrl;
-  if (action) return <ReadingFoot action={action} item={item} picture={Boolean(picture)} />;
+  if (action) return <ReadingFoot action={action} item={item} picture={Boolean(picture)} translations={item.id ? translations : undefined} />;
   if (!item.tags.length && !item.notes && !item.sourceUrl && !picture) return null;
   return (
     <div className="expression-card__extras">
@@ -113,16 +114,19 @@ export function ExpressionExtras({ item, image = false, action }: { item: Expres
  * A student's reading ends in one row: its themes, then the notes' toggle and
  * the action, which keep together at the row's end and drop beneath the
  * themes only when the row has no room for them. The notes open below the
- * whole row, so opening them never moves the row.
+ * whole row, so opening them never moves the row. Students' translations
+ * open the same way, in their own panel beneath the notes.
  */
-function ReadingFoot({ item, picture, action }: { item: ExpressionInput; picture: boolean; action: ReactNode }) {
+function ReadingFoot({ item, picture, action, translations }: { item: ExpressionInput & { id?: string }; picture: boolean; action: ReactNode; translations?: TranslationsViewer }) {
   const [open, setOpen] = useState(false);
+  const [translationsOpen, setTranslationsOpen] = useState(false);
   const panel = useId();
+  const translationsPanel = useId();
   const notes = Boolean(item.notes || item.sourceUrl);
   return (
     <div className="expression-card__extras">
       {picture ? <ExpressionImage item={item} /> : null}
-      <div className="expression-card__foot" data-lead={item.tags.length ? "tags" : notes ? "notes" : undefined}>
+      <div className="expression-card__foot" data-lead={item.tags.length ? "tags" : notes || translations ? "notes" : undefined}>
         <Tags item={item} />
         <div className="expression-card__foot-end">
           {notes ? (
@@ -130,10 +134,16 @@ function ReadingFoot({ item, picture, action }: { item: ExpressionInput; picture
               Notas e/ou origem
             </button>
           ) : null}
+          {translations ? (
+            <button aria-controls={translationsPanel} aria-expanded={translationsOpen} className="expression-card__notes-toggle" lang="en" type="button" onClick={() => setTranslationsOpen((value) => !value)}>
+              Translations
+            </button>
+          ) : null}
           {action}
         </div>
       </div>
       {notes ? <div className="expression-card__notes" hidden={!open} id={panel}><Notes item={item} /></div> : null}
+      {translations && item.id ? <ExpressionTranslations expressionId={item.id} id={translationsPanel} open={translationsOpen} viewer={translations} /> : null}
     </div>
   );
 }

@@ -376,10 +376,42 @@ function expressionListReply(data: { expressions: Expression[] }) {
  * Her collection, and whether students can see it yet (the Worker's
  * EXPRESSIONS_FOR_STUDENTS switch), so her copy never promises what they see.
  */
-export async function fetchExpressions(token: string): Promise<{ expressions: Expression[]; openToStudents: boolean }> {
-  const data = await adminRequest<{ expressions: Expression[]; openToStudents?: unknown }>(token, "/admin/expressions");
+export async function fetchExpressions(token: string): Promise<{ expressions: Expression[]; openToStudents: boolean; pendingTranslations: number }> {
+  const data = await adminRequest<{ expressions: Expression[]; openToStudents?: unknown; pendingTranslations?: unknown }>(token, "/admin/expressions");
   // A Worker from before the switch has no field: it let students pick, so the copy says they can.
-  return { expressions: expressionListReply(data), openToStudents: typeof data.openToStudents === "boolean" ? data.openToStudents : true };
+  return {
+    expressions: expressionListReply(data),
+    openToStudents: typeof data.openToStudents === "boolean" ? data.openToStudents : true,
+    pendingTranslations: Number.isInteger(data.pendingTranslations) ? Number(data.pendingTranslations) : 0,
+  };
+}
+
+export type TranslationStatus = "pending" | "approved" | "rejected";
+/** A student's translation as Inês reviews it: their first name is hers alone, never shown publicly. */
+export type AdminTranslation = {
+  id: number;
+  expressionId: string;
+  expression: string;
+  language: string;
+  text: string;
+  status: TranslationStatus;
+  createdAt: string;
+  reviewedAt: string | null;
+  studentFirstName: string;
+};
+function isAdminTranslation(value: unknown): value is AdminTranslation {
+  return isApiRecord(value) && Number.isInteger(value.id) && isApiInstant(value.createdAt) &&
+    ["expressionId", "expression", "language", "text", "studentFirstName"].every((key) => typeof value[key] === "string") &&
+    ["pending", "approved", "rejected"].includes(value.status as string) && (value.reviewedAt === null || isApiInstant(value.reviewedAt));
+}
+export async function fetchTranslationsToReview(token: string, status: TranslationStatus = "pending") {
+  const data = await adminRequest<{ translations: unknown; pendingCount: unknown }>(token, `/admin/expression-translations?status=${status}`);
+  if (!Array.isArray(data.translations) || !data.translations.every(isAdminTranslation) || !Number.isInteger(data.pendingCount)) throw new Error(BOOKING_REPLY_ERROR);
+  return { translations: data.translations as AdminTranslation[], pendingCount: Number(data.pendingCount) };
+}
+export async function reviewTranslation(token: string, id: number, action: "approve" | "reject" | "delete") {
+  await adminRequest<{ ok: boolean }>(token, `/admin/expression-translations/${id}${action === "delete" ? "" : `/${action}`}`,
+    action === "delete" ? { method: "DELETE" } : { method: "POST", body: "{}" });
 }
 export function saveExpression(token: string, input: ExpressionInput, previous?: Expression) {
   return adminRequest<{ expression: Expression }>(token, `/admin/expressions${previous ? `/${encodeURIComponent(previous.id)}` : ""}`, {

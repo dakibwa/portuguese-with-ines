@@ -394,6 +394,23 @@ CREATE TABLE IF NOT EXISTS expression_picks (
   UNIQUE(student_id, request_id)
 );
 CREATE INDEX IF NOT EXISTS expression_picks_latest ON expression_picks(student_id, id DESC);
+
+-- Students' translations of an expression (migration 0037). Only those Inês
+-- approved are shown, and never with the student's name.
+CREATE TABLE IF NOT EXISTS expression_translations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  expression_id TEXT NOT NULL REFERENCES expressions(id) ON DELETE CASCADE,
+  student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  language TEXT NOT NULL CHECK (length(language) BETWEEN 1 AND 40),
+  text TEXT NOT NULL CHECK (length(text) BETWEEN 1 AND 500),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at TEXT NOT NULL,
+  reviewed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS expression_translations_shown ON expression_translations(expression_id, status, id);
+CREATE INDEX IF NOT EXISTS expression_translations_review ON expression_translations(status, id);
+CREATE UNIQUE INDEX IF NOT EXISTS expression_translations_one_pending
+  ON expression_translations(student_id, expression_id) WHERE status = 'pending';
 -- Lesson notes stay private. Only the reviewed, published sheet is shared.
 CREATE TABLE IF NOT EXISTS lesson_homework (
   booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,

@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, Eye, Plus } from "lucide-react";
 import { ExpressionCard } from "@/components/expressions/ExpressionCard";
 import { TeacherExpressionTryOut } from "@/components/expressions/TeacherExpressionTryOut";
 import { ExpressionDialog } from "@/components/teacher/ExpressionDialog";
+import { TranslationsReview } from "@/components/teacher/TranslationsReview";
 import { deleteExpression, fetchExpressions, publishExpression, reorderExpressions, saveExpression } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
 import { searchExpression, type Expression, type ExpressionInput } from "@/lib/expressions";
@@ -14,6 +15,8 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
   const [expressions, setExpressions] = useState<Expression[] | null>(null);
   /** Whether students can see expressions yet (the Worker's switch); unknown until the collection loads. */
   const [openToStudents, setOpenToStudents] = useState<boolean | null>(null);
+  /** Students' translations waiting for her, from the collection's own reply. */
+  const [pendingTranslations, setPendingTranslations] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -33,7 +36,7 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
     let current = true;
     setExpressions(null); setError("");
     fetchExpressions(token).then((collection) => {
-      if (current && readSession() === token) { setExpressions(collection.expressions); setOpenToStudents(collection.openToStudents); }
+      if (current && readSession() === token) { setExpressions(collection.expressions); setOpenToStudents(collection.openToStudents); setPendingTranslations(collection.pendingTranslations); }
     }).catch((caught) => {
       if (current && readSession() === token) setError(caught instanceof Error ? caught.message : "Expressions couldn’t be loaded.");
     });
@@ -121,6 +124,7 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
         </select></label>
         {filtered ? <button className="button button--outline button--compact" type="button" onClick={() => { setSearch(""); setTheme(""); }}>Clear filters</button> : null}
       </div>
+      {pendingTranslations !== null ? <TranslationsReview initialPending={pendingTranslations} token={token} /> : null}
       {notice ? <p className="teacher-inline-success" role="status">{notice}</p> : null}
       {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" disabled={busy} onClick={() => setAttempt((value) => value + 1)} type="button">Reload collection</button></div> : null}
       {!expressions && !error ? <p role="status">Loading expressions…</p> : null}

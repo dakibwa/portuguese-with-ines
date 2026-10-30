@@ -405,8 +405,58 @@ The content inventory, original schema and feature map are in
 page and optional home-page expression remain plan only. `/idioms/` is an
 authenticated painting page: teachers use their local try-out, students use the
 same feature-gated endpoints, and signed-out visitors sign in first. It adds no
-anonymous collection access or main-menu item. Multilingual student
-contributions and a weekly selection policy are also outside this change.
+anonymous collection access or main-menu item. A weekly selection policy is
+also outside this change. Students' own translations are below.
+
+## Students' translations of an expression
+
+Added 30 October 2026 (Dan, for Inês). Under a painted expression, beside
+`Notas e origem`, a `Translations` toggle opens a panel the same way: hidden
+until pressed, below the reading's last row, so opening it never moves the row.
+The panel loads on first open. Everyone reading sees the translations Inês has
+approved, as a language label and the text. A signed-in student can add their
+own in any language; it waits for Inês and is shown only once she approves it.
+Inês, trying an expression out, sees the approved list and a link to review
+them in her collection. Her `Expressions` tab has a `Translations to check`
+panel with the waiting count, each translation's expression, language, text,
+student first name and date, and Approve or Reject (Delete for approved or
+rejected ones). `GET /admin/expressions` also returns `pendingTranslations`.
+
+| Method and path | Who | Request and result |
+| --- | --- | --- |
+| `GET /expressions/:id/translations` | Anyone | `{ translations: [{ id, language, text, createdAt }] }`, approved only, oldest first, for a published expression; 404 for a draft or unknown id. Never a student's name or id. Not behind `EXPRESSIONS_FOR_STUDENTS`. |
+| `POST /me/expressions/:id/translations` | Signed-in `role = 'student'` | Only `{ language, text }`, each trimmed: language 1 to 40 characters, text 1 to 500. `{ status: "pending" }`, HTTP 201. |
+| `GET /admin/expression-translations?status=pending` | Admin | `pending` (default), `approved` or `rejected`, up to 200: `{ translations: [{ id, expressionId, expression, language, text, status, createdAt, reviewedAt, studentFirstName }], pendingCount }`. |
+| `POST /admin/expression-translations/:id/approve` and `/reject` | Admin | Sets `status` and `reviewed_at`; `{ ok: true, pendingCount }`. |
+| `DELETE /admin/expression-translations/:id` | Admin | Removes it; `{ ok: true, pendingCount }`. CORS now allows `DELETE`. |
+
+Admin means the usual `handleAdmin` path: `ADMIN_TOKEN`, or any signed-in
+account with `role = 'teacher'`, rechecked at each write. Adding is refused for
+a teacher with 403 (`Only students can add translations.`), including a
+teacher who is also a student, and with 404 while `EXPRESSIONS_FOR_STUDENTS`
+is not `"1"`, as the picker is. The insert is one conditional write: the
+expression is published, the student's session still stands and they have sent
+fewer than 10 in the last 24 hours (counted from the table, any status; 429
+otherwise). A student has at most one translation waiting per expression (409,
+`You’ve already sent a translation for this one. Inês will check it soon.`);
+once she approves or rejects it they can send another. Unknown body keys are
+refused. A missing table gives a controlled 503 on these endpoints only, and
+`pendingTranslations` reads 0, so her collection still loads. Nothing here
+sends email.
+
+Migration `0037-expression-translations.sql` adds `expression_translations`
+(mirrored in `schema.sql`): integer `id`, `expression_id` and `student_id`
+foreign keys that cascade on delete, `language` (1 to 40) and `text` (1 to 500)
+checked by length, `status` in `pending`, `approved`, `rejected` (default
+`pending`), `created_at` and `reviewed_at`. Indexes cover
+`(expression_id, status, id)` for the public list, `(status, id)` for her
+review, and a partial unique index on `(student_id, expression_id)` where
+`status = 'pending'`.
+
+**Ship order:** apply 0037 to staging and production D1, deploy the Worker,
+then merge the site. The Worker tolerates a missing table, but the site's
+panel needs the endpoints. The UI journey is `npm run test:expression-translations`
+with `QA_BASE_URL` pointing at a served build; its Worker replies are fixtures.
 
 ## Teacher calendar
 

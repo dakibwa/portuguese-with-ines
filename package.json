@@ -18,6 +18,7 @@
     "test:request-recovery": "node scripts/qa-request-recovery.mjs",
     "test:auth-recovery": "node scripts/qa-auth-recovery.mjs",
     "test:selection-calendar-recovery": "node scripts/qa-selection-calendar-recovery.mjs",
+    "test:expression-translations": "node scripts/qa-expression-translations.mjs",
     "deploy:cloudflare": "npm run check:fast && npm run check:release && wrangler pages deploy out --project-name=portuguese-with-ines --branch=main",
     "deploy:cloudflare:redirect": "wrangler pages deploy redirects/portuguescomaines.com --project-name=portugues-com-a-ines-redirect --branch=main",
     "worker:dev": "wrangler dev --config workers/booking/wrangler.jsonc",

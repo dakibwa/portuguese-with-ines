@@ -4843,6 +4843,65 @@ await test("expression picks stay closed until EXPRESSIONS_FOR_STUDENTS is \"1\"
   }
 });
 
+await test("students' translations wait for Inês, and only approved ones are shown, without names", async () => {
+  for (const file of ["0026-expressions.sql", "0027-expression-picks.sql", "0037-expression-translations.sql"]) db.exec(readFileSync(new URL(`./migrations/${file}`, import.meta.url), "utf8"));
+  for (const id of ["translator-a", "translator-b"]) { student(id); sessions[id] = await createSession(id, env.BOOKING_TOKEN_SECRET); }
+  db.prepare("UPDATE students SET name = 'Ana Sousa' WHERE id = 'translator-a'").run();
+  db.prepare("UPDATE expressions SET published = 1, examples = '[\"Exemplo.\"]' WHERE id = 'original-1'").run();
+  const send = (body, user = "translator-a", id = "original-1") => call(`/me/expressions/${id}/translations`, { user, body });
+  const shown = async (id = "original-1") => call(`/expressions/${id}/translations`, { method: "GET", user: null });
+  const review = (path, user = "teacher", method = "POST") => call(`/admin/expression-translations${path}`, { method, user });
+  try {
+    assert.equal((await send({ language: "English", text: "To laugh a lot" })).status, 404, "closed to students until EXPRESSIONS_FOR_STUDENTS is \"1\"");
+    env.EXPRESSIONS_FOR_STUDENTS = "1";
+    assert.equal((await send({ language: "English", text: "x" }, null)).status, 401);
+    const teacher = await send({ language: "English", text: "To laugh a lot" }, "teacher");
+    assert.equal(teacher.status, 403);
+    assert.equal((await teacher.json()).error, "Only students can add translations.");
+    for (const body of [{ language: " ", text: "ok" }, { language: "x".repeat(41), text: "ok" }, { language: "English", text: "x".repeat(501) },
+      { language: "English", text: "ok", studentId: "translator-b" }, { language: "English" }]) {
+      assert.equal((await send(body)).status, 400, JSON.stringify(body).slice(0, 60));
+    }
+    assert.equal((await send({ language: "English", text: "ok" }, "translator-a", "original-2")).status, 404, "drafts take no translations");
+    const sent = await send({ language: "  English ", text: " To split your sides " });
+    assert.equal(sent.status, 201);
+    assert.deepEqual(await sent.json(), { status: "pending" });
+    assert.equal((await send({ language: "French", text: "Mourir de rire" })).status, 409, "one waiting per student per expression");
+    assert.deepEqual((await (await shown()).json()).translations, [], "nothing shows before Inês approves");
+    assert.equal((await shown("original-2")).status, 404, "drafts are not public");
+
+    const listed = await review("?status=pending", "teacher", "GET");
+    const { translations, pendingCount } = await listed.json();
+    assert.equal(pendingCount, 1);
+    assert.equal((await (await call("/admin/expressions", { method: "GET", user: "teacher" })).json()).pendingTranslations, 1);
+    assert.deepEqual([translations[0].language, translations[0].text, translations[0].studentFirstName, translations[0].expression],
+      ["English", "To split your sides", "Ana", "Partir o coco a rir"]);
+    const id = translations[0].id;
+    for (const [path, method] of [["?status=pending", "GET"], [`/${id}/approve`, "POST"], [`/${id}`, "DELETE"]]) {
+      assert.equal((await review(path, "translator-a", method)).status, 401, "students cannot review");
+    }
+    assert.equal((await review(`/${id}/approve`)).status, 200);
+    const [approved] = (await (await shown()).json()).translations;
+    assert.deepEqual(Object.keys(approved).sort(), ["createdAt", "id", "language", "text"], "no student name or id in public");
+    assert.equal(approved.text, "To split your sides");
+
+    assert.equal((await send({ language: "French", text: "Mourir de rire" }, "translator-b")).status, 201);
+    const second = (await (await review("", "teacher", "GET")).json()).translations[0].id;
+    assert.equal((await review(`/${second}/reject`)).status, 200);
+    assert.equal((await (await shown()).json()).translations.length, 1, "rejected ones stay hidden");
+    assert.equal((await review(`/${id}`, "teacher", "DELETE")).status, 200);
+    assert.deepEqual((await (await shown()).json()).translations, []);
+    assert.equal((await review(`/${id}/approve`)).status, 404);
+
+    db.prepare(`INSERT INTO expression_translations (expression_id, student_id, language, text, status, created_at)
+      SELECT 'original-1', 'translator-b', 'X', 'y', 'rejected', ? FROM json_each('[1,2,3,4,5,6,7,8,9]')`).run(new Date().toISOString());
+    assert.equal((await send({ language: "German", text: "Sich totlachen" }, "translator-b")).status, 429, "ten a day each");
+  } finally {
+    delete env.EXPRESSIONS_FOR_STUDENTS;
+    db.exec("DELETE FROM expression_translations; DELETE FROM expression_picks; DELETE FROM expressions; DELETE FROM students WHERE id IN ('translator-a', 'translator-b');");
+  }
+});
+
 await test("her student list says who is in and who has a card, and she can send anyone a fresh way in", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('launch-check','launch-check-0000@example.invalid','Launch Verification','x','2026-09-05T08:56:55.286Z')").run();

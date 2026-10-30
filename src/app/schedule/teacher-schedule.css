@@ -3252,3 +3252,18 @@
   .teacher-student__controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.15rem 0.35rem; }
   .teacher-student__controls button { flex: 0 1 calc((100% - 0.7rem) / 3); padding-inline: 0.25rem; font-size: 0.68rem; }
 }
+
+/* Students' translations waiting for her (30 October 2026): one card per translation, refreshed after each action. */
+.teacher-translations { display: grid; gap: 0.75rem; min-width: 0; padding: 1.15rem 1.25rem 1.2rem; border-radius: var(--squiggle-field); background: var(--raised); }
+.teacher-translations__head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 0.5rem 1rem; }
+.teacher-translations__head h2 { display: inline-flex; align-items: center; gap: 0.55rem; margin: 0; font-size: 1.15rem; }
+.teacher-translations__count { display: inline-grid; place-items: center; min-width: 1.6rem; height: 1.6rem; padding-inline: 0.4rem; border-radius: 999px; background: var(--blue-deep); color: #fff; font: 700 0.78rem/1 var(--ui); }
+.teacher-translations__filter { min-width: 12rem; }
+.teacher-translations__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
+.teacher-translation { min-width: 0; padding: 0.9rem 1rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); overflow-wrap: anywhere; }
+.teacher-translation p { margin: 0 0 0.35rem; }
+.teacher-translation__expression { font-weight: 700; }
+.teacher-translation__language { display: block; font: 700 0.62rem/1.5 var(--ui); letter-spacing: 0.11em; text-transform: uppercase; }
+.teacher-translation__text { white-space: pre-wrap; }
+.teacher-translation__meta { font-size: 0.78rem; opacity: 0.8; }
+.teacher-translation .teacher-expression__actions { margin-top: 0.6rem; }
