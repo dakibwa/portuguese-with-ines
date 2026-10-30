@@ -416,6 +416,10 @@ until pressed, below the reading's last row, so opening it never moves the row.
 The panel loads on first open. Everyone reading sees the translations Inês has
 approved, as a language label and the text. A signed-in student can add their
 own in any language; it waits for Inês and is shown only once she approves it.
+The painting page needs an account, so a visitor who is signed out sees its
+sign-in panel, which says they can add translations once signed in. If a
+student's session has lapsed when they send one, the 401 forgets it and the
+page returns to that panel.
 Inês, trying an expression out, sees the approved list and a link to review
 them in her collection. Her `Expressions` tab has a `Translations to check`
 panel with the waiting count, each translation's expression, language, text,

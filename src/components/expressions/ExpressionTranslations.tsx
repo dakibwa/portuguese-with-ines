@@ -76,7 +76,7 @@ function TranslationsBody({ expressionId, viewer }: { expressionId: string; view
 function TranslationForm({ expressionId, token }: { expressionId: string; token: string }) {
   const [language, setLanguage] = useState("");
   const [text, setText] = useState("");
-  const [state, setState] = useState<"ready" | "sending" | "sent" | "signed-out">(token ? "ready" : "signed-out");
+  const [state, setState] = useState<"ready" | "sending" | "sent">("ready");
   const [error, setError] = useState("");
   const pending = useRef(false);
   const ids = useId();
@@ -92,7 +92,9 @@ function TranslationForm({ expressionId, token }: { expressionId: string; token:
       await sendTranslation(token, expressionId, { language: language.trim(), text: text.trim() });
       if (readSession() === token) setState("sent");
     } catch (caught) {
-      if (caught instanceof AuthApiError && caught.status === 401) { setState("signed-out"); return; }
+      // A lapsed session is forgotten by the API helper, and the page then asks
+      // them to sign in again, with a word about adding translations.
+      if (caught instanceof AuthApiError && caught.status === 401) { setState("ready"); return; }
       setState("ready");
       setError(caught instanceof Error ? caught.message : "Your translation couldn’t be sent. Please try again.");
     } finally {
@@ -101,9 +103,6 @@ function TranslationForm({ expressionId, token }: { expressionId: string; token:
   }
 
   if (state === "sent") return <p className="expression-translations__thanks" role="status">Thanks! Inês will check it before it appears.</p>;
-  if (state === "signed-out") {
-    return <p className="expression-translations__hint">Sign in to add your own translation. <Link href="/book/?view=lessons">Sign in</Link></p>;
-  }
   const left = TRANSLATION_LIMITS.text - text.length;
   return (
     <form className="expression-translations__form" onSubmit={(event) => void submit(event)}>
