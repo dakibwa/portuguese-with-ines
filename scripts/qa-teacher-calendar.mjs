@@ -175,6 +175,7 @@ async function fixture(width, options = {}) {
       notes: "", sourceUrl: "", tags: ["Humor"], imageUrl: "", imageAlt: "", published: 0, sortOrder: 0,
       createdAt: "2026-10-13T00:00:00.000Z", updatedAt: "2026-10-13T00:00:00.000Z",
     }], openToStudents: false } });
+    if (path === "/admin/expression-translations" && request.method() === "GET") return route.fulfill({ json: { translations: [], pendingCount: 0 } });
     if (path === "/admin/availability") {
       if (data) {
         if (state.failHours-- > 0)
