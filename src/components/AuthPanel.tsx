@@ -101,7 +101,7 @@ export function AuthPanel({
   const headingNamesTab = !heading || heading === "Sign in";
   const introText =
     mode === "forgot"
-      ? `Give us the email you sign in with and we’ll send you a link to choose a new password. ${RESET_LINK_LIFETIME}`
+      ? `Give us the email you booked with and we’ll send you a link to choose a new password. ${RESET_LINK_LIFETIME}`
       : mode === "link"
         ? `We’ll email you a link. Open it to sign in, no password needed. ${SIGN_IN_LINK_LIFETIME}`
       : mode === "register" && !keepCopy
@@ -131,19 +131,17 @@ export function AuthPanel({
 
     try {
       if (mode === "forgot") {
-        const email = form.email.trim();
-        await requestPasswordReset(email);
+        await requestPasswordReset(form.email.trim());
         if (request !== authRequest.current || readSession() !== session) return;
         setNoticeFrom("forgot");
-        setNotice(`If ${email} has an account, a reset link is on its way. If it isn’t in your inbox in a few minutes, please check your spam folder.`);
+        setNotice("If that email has an account, a reset link is on its way.");
         return;
       }
       if (mode === "link") {
-        const email = form.email.trim();
-        await requestSignInLink(email);
+        await requestSignInLink(form.email.trim());
         if (request !== authRequest.current || readSession() !== session) return;
         setNoticeFrom("link");
-        setNotice(`If ${email} has an account, a sign-in link is on its way. If it isn’t in your inbox in a few minutes, please check your spam folder.`);
+        setNotice("If you have an account, a link is on its way.");
         return;
       }
 
