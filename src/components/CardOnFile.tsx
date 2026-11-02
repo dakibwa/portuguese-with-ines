@@ -60,8 +60,10 @@ export type CardUpcoming = { key: string; when: string; amountCents: number; wee
  * short list a booking shows, and pressing the button is the agreement; the
  * card itself is entered on Stripe's page.
  */
-export function CardTerms({ change = false, setup = false, onCancel, bookingId = "", upcoming = [], feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
+export function CardTerms({ change = false, setup = false, onCancel, onSkip, bookingId = "", upcoming = [], feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
   change?: boolean; onCancel?: () => void;
+  /** Offered only once something has gone wrong, so a card that can't go ahead never keeps them from their lessons. */
+  onSkip?: () => void;
   /** Asking for a card on Your lessons: the approval card's layout, without lessons to pay now. */
   setup?: boolean;
   /** The lessons a payment approval link names, comma-separated. */
@@ -152,6 +154,7 @@ export function CardTerms({ change = false, setup = false, onCancel, bookingId =
       {onCancel ? (
         <button className="my-lessons__change" disabled={busy} onClick={onCancel} type="button">{approval ? "Not now" : "Cancel"}</button>
       ) : null}
+      {onSkip && error ? <button className="my-lessons__change" disabled={busy} onClick={onSkip} type="button">See your lessons</button> : null}
     </div>
   );
 
@@ -274,34 +277,30 @@ export function CardTerms({ change = false, setup = false, onCancel, bookingId =
 
 /**
  * On Your lessons, only while lessons Inês added are still paid to her by
- * hand, or when her payment link names lessons: one card above the calendar.
+ * hand, or when her payment link names lessons: one card, a step of its own
+ * before their lessons (2 November 2026, Dan: "card first"). There is no Not
+ * now; only a card that can't go ahead (the lessons already settled, cards
+ * switched off) offers their lessons instead, for that visit.
  */
 export function CardPrompt({ bookingId = "", upcoming = [], onOpenChange }: {
   bookingId?: string; upcoming?: CardUpcoming[];
-  /** Whether the card is open, on arrival and as it folds or opens, then false when it goes: open, it is a step of its own and Your lessons waits under it. */
+  /** Whether the card is showing: true on arrival, false once skipped after a failure or when it goes, so their lessons can wait for it. */
   onOpenChange?: (open: boolean) => void;
 }) {
-  // Open on arrival, the same card with or without lessons to pay now
-  // (2 November 2026, Dan); Not now folds it for this visit.
   const [open, setOpen] = useState(true);
   const report = useRef(onOpenChange);
   useLayoutEffect(() => { report.current = onOpenChange; });
   useLayoutEffect(() => { report.current?.(open); }, [open]);
   useLayoutEffect(() => () => report.current?.(false), []);
+  if (!open) return null;
   return (
-    <section aria-labelledby="card-prompt-heading" className={`card-prompt${open ? " card-prompt--open card-prompt--review" : ""}`}>
+    <section aria-labelledby="card-prompt-heading" className="card-prompt card-prompt--open card-prompt--review">
       <span aria-hidden="true" className="card-prompt__icon">
         <CreditCard size={20} />
       </span>
       <div className="card-prompt__body">
         <h3 id="card-prompt-heading">Confirm your card payments</h3>
-        {open ? (
-          <CardTerms key={bookingId} bookingId={bookingId} setup={!bookingId} upcoming={upcoming} onCancel={() => setOpen(false)} />
-        ) : (
-          <button className="button button--blue button--compact" onClick={() => setOpen(true)} type="button">
-            Review payments
-          </button>
-        )}
+        <CardTerms key={bookingId} bookingId={bookingId} setup={!bookingId} upcoming={upcoming} onSkip={() => setOpen(false)} />
       </div>
     </section>
   );

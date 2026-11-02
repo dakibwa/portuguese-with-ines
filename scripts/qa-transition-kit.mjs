@@ -97,6 +97,8 @@ try {
 
     const addCard = prompt.getByRole("button", { name: "Agree & add card" });
     await expect(addCard).toBeDisabled();
+    // Card first (2 November 2026, Dan): nothing lets them skip it.
+    await expect(prompt.getByRole("button", { name: "Not now" })).toHaveCount(0);
     await prompt.getByRole("button", { name: "I authorise card payments for my future lessons" }).click();
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/terms-${width}.png`, fullPage: false });
     await addCard.click();

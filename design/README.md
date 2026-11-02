@@ -1318,8 +1318,10 @@ Preserve these desktop and mobile states:
   weekly run or the lessons she added as dashed tiles, the fine print (the
   fee rule and `Already paid Inês for one? Tell her before agreeing.`), the
   agreement capsule `I authorise card payments for my future lessons`, then `Agree &
-  add card` and `Not now` (which folds it to `Review payments` for that
-  visit); back from Stripe it becomes `Card saved. You’re all set. Book, move
+  add card` alone: the card comes first, with no `Not now` (2 November 2026,
+  Dan: "card first"), and only a card that can't go ahead (its lessons
+  already settled, cards switched off) adds `See your lessons` beside the
+  error for that visit; back from Stripe it becomes `Card saved. You’re all set. Book, move
   or cancel your lessons below.` above their lessons and `Book`. Its words are as short and
   plain as they can be (12 October 2026, Dan: "the language here can be
   even more simple"), and so are the emails that bring students in.
@@ -1338,7 +1340,7 @@ Preserve these desktop and mobile states:
   lesson as the booking step's cream time tile (its splat, day and times,
   `Porto time`, the price on the right), then the fee rule as fine print
   over the agreement capsule with `Terms & privacy` inside it and
-  `Authorise payments` beside `Not now`. A wide card sets the lessons on the
+  `Authorise payments`. A wide card sets the lessons on the
   left and the fine print and agreement on the right, level in the middle; a phone
   reads them top to bottom. Several lessons Inês ticked (2 November 2026,
   Dan: "so they can backpay all the lessons") stack as the booking step's
