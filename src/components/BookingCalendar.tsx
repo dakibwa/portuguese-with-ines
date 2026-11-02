@@ -3784,18 +3784,23 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     try {
                       const result = await confirmSignInLink(pendingSignIn);
                       if (!current()) return;
-                      storeSession(result.session);
                       // Signed in either way; an address that can't be taken
                       // is asked for again on Your lessons, with the reason.
+                      // The address goes before the session is stored, so Your
+                      // lessons first renders already knowing it was sent and
+                      // never asks for it a second time.
+                      let sent: { studentId: string; email: string } | null = null;
                       if (signInAddEmail && !result.student.email) {
                         try {
-                          const sent = await requestEmailChange(result.session, welcomeEmail.trim());
-                          setWelcomeEmailSent({ studentId: result.student.id, email: sent.pending });
+                          const reply = await requestEmailChange(result.session, welcomeEmail.trim());
+                          sent = { studentId: result.student.id, email: reply.pending };
                         } catch {
-                          setWelcomeEmailSent(null);
+                          sent = null;
                         }
-                        if (request !== signInLinkRequest.current) return;
                       }
+                      storeSession(result.session);
+                      setWelcomeEmailSent(sent);
+                      if (request !== signInLinkRequest.current) return;
                       setPendingSignIn("");
                       enterLessons(result.student);
                     } catch (caught) {
