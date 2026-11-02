@@ -91,8 +91,10 @@ export function MyLessons({
   onStudentChange,
   onSelectSection,
   onSignOut,
+  onStepChange,
   openUpcomingRequest = 0,
   cardBookingId = "",
+  initialEmailPending = "",
   section = "upcoming"
 }: {
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
@@ -105,8 +107,13 @@ export function MyLessons({
   onStudentChange?: (fields: Partial<Student>) => void;
   onSelectSection?: (section: AccountSection) => void;
   onSignOut?: () => void;
+  /** True while a first-visit step (their email) has the page to itself, so
+   * the booking page holds their lessons back until it is done. */
+  onStepChange?: (step: boolean) => void;
   openUpcomingRequest?: number;
   cardBookingId?: string;
+  /** An address they gave on the welcome, waiting for its link. */
+  initialEmailPending?: string;
   section?: AccountSection;
 }) {
   const [student, setStudent] = useState<Student | null>(initialAccount?.student ?? null);
@@ -136,7 +143,7 @@ export function MyLessons({
   // Just chosen: the new splat lands in its row (11 October 2026, at Dan's
   // request: choosing one felt abrupt).
   const [markLanding, setMarkLanding] = useState(false);
-  const [emailPending, setEmailPending] = useState("");
+  const [emailPending, setEmailPending] = useState(initialEmailPending);
   const [emailBusy, setEmailBusy] = useState(false);
   const [detailsNote, setDetailsNote] = useState("");
   // The prices saved on the account, read each time the details open.
@@ -181,6 +188,16 @@ export function MyLessons({
     setLoading(false);
     setLoadError("");
   }, [initialAccount, student?.id]);
+
+  // One step to a screen on a first visit, their lessons last (2 November
+  // 2026, Dan: "surely they should type in email then go to the next page
+  // where they pay … then see the next lesson bit"). Told before paint, so the
+  // lessons never flash up under the step.
+  const emailStep = Boolean(student && !student.email && hasStudentSide(student) && !emailPending);
+  useLayoutEffect(() => {
+    onStepChange?.(emailStep);
+  }, [emailStep, onStepChange]);
+  useLayoutEffect(() => () => onStepChange?.(false), [onStepChange]);
 
   // A reload that lands while the details form is open must not replace what
   // the student is typing with the values it had before.
@@ -1004,7 +1021,7 @@ export function MyLessons({
       {/* One card at a time above their lessons (2 November 2026, Dan: "super
           smooth"): their email first, then the card to confirm, then a
           reminder to open the email's link if it is still waiting. */}
-      {needsEmail && !emailPending ? emailPrompt : cardPrompt ?? emailPrompt}
+      {emailStep ? emailPrompt : cardPrompt ?? emailPrompt}
       {alert}
     </>
   );

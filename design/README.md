@@ -1997,26 +1997,29 @@ gave an email, and only two had ever signed in.
   Sign in panels offer lilac `WhatsApp instead`. Keep the message short (Dan:
   "quite wordy and not in fitting with our super simple fresh design");
   the site does the teaching.
-- The welcome screen a link opens is that teaching, said once: the splat
-  mark and a handwritten `Welcome` (a plain card-style heading there read as
-  a regression, Dan, 2 November 2026), `Your lessons with Inês, all in one
-  place. No password needed.`, dabs (`Book new lessons yourself`, `Open a
-  lesson to move or cancel it`, then the rules) and coral `See my lessons`.
-  Nothing asks them to book what Inês has already booked.
+- Arriving is one step to a screen, nothing said twice, their lessons last
+  (Dan, 2 November 2026: "rather than repeated"). The welcome a link opens
+  keeps the splat mark and a handwritten `Welcome` (a plain card-style
+  heading there read as a regression), `Your lessons with Inês, all in one
+  place. No password needed.`, and, for a student with no email, `Your email`
+  with `So you can sign in on any phone or computer.` beneath, then coral `See
+  my lessons`, greyed until an address is typed. No dabs: the rules and what
+  they pay for are on the card page that follows. Nothing asks them to book
+  what Inês has already booked.
 - The rules read the same wherever a student meets them (2 November 2026,
   Dan): `Free to change or cancel a lesson up to 14 hours before` (the first
   four words bold in ink, since coral is for a charge) and `€5 to move or
   cancel later, or if you don’t show up` (the no-show part only where cards
   are taken), `Your card is charged at the end of each lesson`, and with no fee
-  `No fee to change or cancel, or for a missed lesson`. That covers the welcome
-  screen, the booking confirm step and its success, and the card terms.
-- One card at a time sits above a student's lessons. A student with no email
-  is asked for one first, before the card, with no skip (Dan, 2 November
-  2026: "they need to add an email"; it is their only way back in on another
-  device): `Add your email`, `So you can sign in on any phone or computer.`,
-  an email field and coral `Add email`. Then the card to confirm, then, while
-  the address waits, `Check your email` / `Open the link we sent to … on this
-  phone.` Their Details email row reads `Not added` with `Add email`.
+  `No fee to change or cancel, or for a missed lesson`. That covers the card
+  terms, and the booking confirm step and its success.
+- A student with no email must give one (Dan, 2 November 2026: "they need to
+  add an email"; it is their only way back in on another device), on the
+  welcome. If that didn't reach the Worker, Your lessons asks first, `Add
+  your email` with coral `Add email`, with their lessons held back until it
+  is sent. Then the card to confirm, then, while the address waits, `Check
+  your email` / `Open the link we sent to … on this phone.` Their Details
+  email row reads `Not added` with `Add email`.
 - Students' cards on a wide list each keep their own height, packed in
   columns, so a short card never leaves a hole under it.
 - `Time off`'s card lists what is `Coming up` (consecutive whole days as one

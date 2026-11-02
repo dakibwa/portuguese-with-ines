@@ -1467,8 +1467,8 @@ await test("moving a recurring sequence sends one updated calendar to each enabl
   );
   assert.ok(fixture.emailLog.every(({ dedupeKey }) => dedupeKey.endsWith(":2")));
   const message = JSON.parse(fixture.emailLog[0].request_json);
-  assert.match(message.text, /3 September[^\n]*— €15 · charged to your saved card after the lesson/);
-  assert.match(message.text, /10 September[^\n]*— €18 · charged to your saved card after the lesson/);
+  assert.match(message.text, /3 September[^\n]*— €15 · charged to your saved card at the end of the lesson/);
+  assert.match(message.text, /10 September[^\n]*— €18 · charged to your saved card at the end of the lesson/);
   assert.match(message.text, /17 September[^\n]*— €15 · paid/);
   assert.ok(!message.text.includes("€15 a lesson"), "different agreed prices and terms belong beside their own dates");
 });

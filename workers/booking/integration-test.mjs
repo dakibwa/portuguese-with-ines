@@ -4208,6 +4208,7 @@ await test("she makes a sign-in link to send on WhatsApp: nothing is emailed, an
     assert.equal(made.status, 200, await made.clone().text());
     const url = new URL((await made.json()).url);
     assert.equal(url.pathname, "/book/");
+    assert.equal(url.searchParams.get("addEmail"), "1", "with no address, the welcome asks for one");
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, emails, "no email sent or queued");
     const confirm = () => call("/auth/email-link/confirm", { user: null, body: { token: url.searchParams.get("signin") } });
     const login = await confirm();

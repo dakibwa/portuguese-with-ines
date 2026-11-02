@@ -1112,7 +1112,11 @@ async function issueSignInLink(env, student, minutes, authorization = null) {
     await authorization?.assert();
     throw new WelcomeChangedError("Their details have changed. Please reload before sending their welcome.");
   }
-  return { url: siteUrl(env, `/book/?signin=${encodeURIComponent(token)}`), nonce };
+  // With no address yet, the welcome asks for one beside its button (2
+  // November 2026, Dan): it is their only way back in on another device. Not
+  // a credential, only which welcome to show.
+  const ask = hasEmail(student) ? "" : "&addEmail=1";
+  return { url: siteUrl(env, `/book/?signin=${encodeURIComponent(token)}${ask}`), nonce };
 }
 
 /**

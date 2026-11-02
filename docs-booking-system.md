@@ -652,9 +652,13 @@ It is refused for a teacher account (409) and limited to ten an hour per
 student (429). Pressing `See my lessons` on it signs them in and, as any
 sign-in link does, sets `email_verified_at` and `last_login_at` even on the
 `no-email:` stand-in, so a student with no email can save a card (Stripe is
-given no address for them); Your lessons then asks for their email, which
-arrives through the usual `/me/email` confirmation link. A link made before an
-address change stops working, as a welcome's does.
+given no address for them). For a student with no email, every sign-in link
+ends `&addEmail=1` (not a credential, only which welcome to show), so the
+welcome asks for their address beside its button; the same press signs them
+in and requests the usual `/me/email` confirmation link, and Your lessons asks
+again, before anything else and with nothing beneath it, if that request
+failed or the link had no hint. A link made before an address change stops
+working, as a welcome's does.
 `POST /admin/students/:id/details` sets name, phone, NIF and splat at any time.
 It sets or corrects the email only while the student has never signed in (no
 password, Google link or sign-in); after that it answers 409 and the student
