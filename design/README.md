@@ -1320,12 +1320,13 @@ Preserve these desktop and mobile states:
   That success waits for verified current card permission; a return URL alone
   cannot hide `Add card`, and removing the card clears the success state.
   A sign-in link from an email opens on `Welcome`, `Sign in to see your
-  lessons. No password needed.` and one coral `Sign in`, spent only when
+  lessons. No password needed.` (a payment link: `Sign in to pay for your
+  lessons.`) and one coral `Sign in`, spent only when
   pressed, since mail scanners open links on their own; a spent link says so
   there and offers `Email me a new link`. The card terms add `Your upcoming
   lessons with Inês are charged to it, each after it ends` and `Already paid
   Inês for some? Tell her and she’ll take them off`; an open Card row also
-  offers `Remove card`. A payment approval link for one lesson Inês added
+  offers `Remove card`. A payment approval link for lessons Inês added
   opens the same card as `Confirm your card payments` (27 October 2026,
   Dan: "simple and beautiful", in the site's own styling and words): the
   lesson as the booking step's cream time tile (its splat, day and times,
@@ -1334,7 +1335,20 @@ Preserve these desktop and mobile states:
   then the agreement capsule with `Terms & privacy` inside it and
   `Authorise payments` beside `Not now`. A wide card sets the lesson and dabs
   on the left and the agreement on the right, level in the middle; a phone
-  reads them top to bottom. In Inês's lesson dialog a lesson a card now pays for
+  reads them top to bottom. Several lessons Inês ticked (2 November 2026,
+  Dan: "so they can backpay all the lessons") stack as the booking step's
+  chosen lessons do, each its own smaller tile with its own splat (the clock
+  named once, on the first), then `2 lessons` and their total; the first dab
+  reads `Each is charged to your saved card once you agree` and the capsule
+  `these and future lessons`. In her lesson dialog `Create payment link` asks
+  `Which lessons should Jess pay for?` with `Tick only lessons they haven’t
+  paid you for.`: one Already-paid-style capsule per unpaid lesson already
+  had (time on the left, price on the right), the opened one ticked, the
+  count and total beneath, `Create link` and `Cancel`. Ready, it says `Link
+  ready: 2 lessons, €30. Nothing sent or charged yet.` with blue `Send on
+  WhatsApp` and outline `Copy link`; the WhatsApp message is one short line
+  in her voice and the link (2 November 2026, Dan: not wordy). In Inês's
+  lesson dialog a lesson a card now pays for
   offers the `Already paid` tick (below). The sign-in panel's small outline buttons read `Email a link` and
   `Forgot password`, side by side down to a 360 px phone (27 October 2026, Dan); asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.

@@ -9965,3 +9965,68 @@ dialog[open]::backdrop {
   border-top: 1px solid var(--rule);
 }
 .teacher-card-link p { margin: 0; }
+
+/* The lessons she can tick into one link (2 November 2026): each the
+   Already paid tick's capsule, full width, its time on the left and its
+   price on the right, with their total beneath in the same columns. */
+.teacher-card-link__heading { font-weight: 700; }
+.teacher-card-link__hint { font-size: 0.82rem; opacity: 0.78; }
+.teacher-card-link__choices {
+  display: grid;
+  width: 100%;
+  gap: 0.45rem;
+  margin: 0.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.teacher-card-link .teacher-card-link__choice { width: 100%; }
+.teacher-card-link__when { white-space: nowrap; }
+.teacher-card-link__choice b,
+.teacher-card-link__total b {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.teacher-card-link__total {
+  display: flex;
+  width: 100%;
+  gap: 0.55rem;
+  padding: 0 1.05rem 0 0.7rem;
+  font: 600 0.82rem/1.3 var(--ui);
+}
+/* Side by side, as the dialog's own actions are. */
+.teacher-card-link__actions {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 0.65rem;
+}
+.teacher-card-link .teacher-card-link__actions > .button {
+  flex: 1 1 0;
+  width: auto;
+  min-width: fit-content;
+}
+
+/* Several lessons on one approval: the booking step's chosen-lesson tiles,
+   a little smaller so a backlog stays readable, then their total. */
+.card-terms__lessons {
+  display: grid;
+  gap: 0.6rem;
+}
+.card-terms__lessons .booking-chosen-lessons { gap: 0.45rem; }
+.card-terms__lessons .booking-selection-summary {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  padding-block: 0.45rem;
+}
+.card-terms__lessons .booking-selection-summary__mark {
+  width: 40px;
+  height: 40px;
+}
+.card-terms__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  padding-inline: var(--pad-card);
+  font: 600 0.9rem/1.3 var(--ui);
+}

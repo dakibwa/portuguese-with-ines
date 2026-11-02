@@ -7,6 +7,14 @@ import { openCardPage, previewCardBooking, readSession, type CardBooking } from 
 import { NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS } from "@/lib/config";
 import { formatMoneyCents, formatShortDay, formatSlotTime } from "@/lib/booking-api";
 
+/** Each lesson's tile its own mark, as the booking step's chosen lessons have. */
+const LESSON_MARKS = [
+  "/visuals/v2-splats/booking-availability-splat-v2.svg",
+  "/visuals/v2-splats/in-porto-or-online-splat-v2.svg",
+  "/visuals/v2-splats/one-to-one-splat-v2.svg",
+  "/visuals/v2-splats/real-life-splat-v2.svg",
+];
+
 /**
  * Saving a card from the account (12 October 2026, Dan): how a student Inês
  * brought onto the site pays for the lessons she adds. The terms are the same
@@ -14,32 +22,37 @@ import { formatMoneyCents, formatShortDay, formatSlotTime } from "@/lib/booking-
  * card itself is entered on Stripe's page.
  */
 export function CardTerms({ change = false, onCancel, bookingId = "", feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
-  change?: boolean; onCancel?: () => void; bookingId?: string;
+  change?: boolean; onCancel?: () => void;
+  /** The lessons a payment approval link names, comma-separated. */
+  bookingId?: string;
   /** The live late change fee and notice; the published terms until the account says. */
   feeCents?: number; noticeHours?: number;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [review, setReview] = useState<{ booking: CardBooking; savedCardKey: string; sameDayFeeCents: number; minimumNoticeHours: number } | null>(null);
+  const [review, setReview] = useState<{ bookings: CardBooking[]; savedCardKey: string; sameDayFeeCents: number; minimumNoticeHours: number } | null>(null);
   const [bookingConsent, setBookingConsent] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  // Whether the lesson's usual hour after it ends has passed, so agreeing
-  // is what lets it be charged.
-  const [chargedOnAgreement, setChargedOnAgreement] = useState(false);
+  // Whether each lesson's usual hour after it ends has passed, so agreeing
+  // is what lets it be charged: all of them, some or none.
+  const [chargedOnAgreement, setChargedOnAgreement] = useState<"all" | "some" | "none">("none");
   useEffect(() => {
     if (!bookingId) return;
     let active = true;
     const session = readSession();
-    void previewCardBooking(session, bookingId).then(data => {
+    void previewCardBooking(session, bookingId.split(",")).then(data => {
       if (!active || readSession() !== session) return;
       setReview(data);
-      setChargedOnAgreement(Date.parse(data.booking.endAt) + 60 * 60 * 1000 <= Date.now());
+      const ended = data.bookings.filter(booking => Date.parse(booking.endAt) + 60 * 60 * 1000 <= Date.now()).length;
+      setChargedOnAgreement(ended === data.bookings.length ? "all" : ended ? "some" : "none");
     }).catch(caught => {
       if (active && readSession() === session) setError(caught instanceof Error ? caught.message : "We couldn’t check this lesson. Please try again.");
     });
     return () => { active = false; };
   }, [bookingId, attempt]);
-  const selected = review?.booking;
+  const selected = review?.bookings[0];
+  const lessons = review?.bookings ?? [];
+  const several = lessons.length > 1;
   const fee = review?.sameDayFeeCents ?? feeCents;
   const notice = review?.minimumNoticeHours ?? noticeHours;
   const cardRequest = useRef(0);
@@ -54,7 +67,7 @@ export function CardTerms({ change = false, onCancel, bookingId = "", feeCents =
     setBusy(true);
     setError("");
     try {
-      const result = await openCardPage(session, selected, review?.savedCardKey);
+      const result = await openCardPage(session, lessons, review?.savedCardKey);
       if (!current()) return;
       window.location.assign("authorised" in result ? "/book/?view=lessons&card=authorised" : result.checkoutUrl);
     } catch (caught) {
@@ -89,31 +102,54 @@ export function CardTerms({ change = false, onCancel, bookingId = "", feeCents =
     </div>
   );
 
+  const tile = (lesson: CardBooking, index: number) => (
+    <div aria-label={several ? `Lesson ${index + 1}` : "This lesson"} className="booking-selection-summary card-terms__lesson" role="group">
+      <AssetMark asset={LESSON_MARKS[index % LESSON_MARKS.length]} className="booking-selection-summary__mark" />
+      <span className="booking-choice-summary__copy">
+        <strong>
+          <span>{formatShortDay(lesson.startAt)},</span> <span>{formatSlotTime(lesson.startAt)}–{formatSlotTime(lesson.endAt)}</span>
+        </strong>
+        {/* The clock named once, on the first, as the booking step does. */}
+        {index === 0 ? <small>Porto time</small> : null}
+      </span>
+      <b className="card-terms__price">{formatMoneyCents(lesson.amountCents)}</b>
+    </div>
+  );
+  const onAgreement = review?.savedCardKey ? "once you agree" : "once you add your card";
+
   /*
    * A payment approval link (27 October 2026, Dan: "simple and beautiful"),
    * in the booking confirm step's own words and marks: the lesson as its
    * time tile, then its dabs, then the agreement. On a wide card what is
-   * agreed sits on the left and agreeing on the right.
+   * agreed sits on the left and agreeing on the right. Several lessons Inês
+   * ticked (2 November 2026) stack as the booking step's chosen lessons do,
+   * with their total beneath.
    */
   if (bookingId) return (
     <div className="card-terms card-terms--approval">
-      {!selected && !error ? <p role="status">Checking your lesson…</p> : null}
+      {!selected && !error ? <p role="status">Checking your lessons…</p> : null}
       {selected ? (
         <div className="card-terms__summary" id="card-terms-summary">
-          <div aria-label="This lesson" className="booking-selection-summary card-terms__lesson" role="group">
-            <AssetMark asset="/visuals/v2-splats/booking-availability-splat-v2.svg" className="booking-selection-summary__mark" />
-            <span className="booking-choice-summary__copy">
-              <strong>
-                <span>{formatShortDay(selected.startAt)},</span> <span>{formatSlotTime(selected.startAt)}–{formatSlotTime(selected.endAt)}</span>
-              </strong>
-              <small>Porto time</small>
-            </span>
-            <b className="card-terms__price">{formatMoneyCents(selected.amountCents)}</b>
-          </div>
+          {several ? (
+            <div className="card-terms__lessons">
+              <ol aria-label="These lessons" className="booking-chosen-lessons">
+                {lessons.map((lesson, index) => <li key={lesson.id}>{tile(lesson, index)}</li>)}
+              </ol>
+              <p className="card-terms__total">
+                <span>{lessons.length} lessons</span>
+                <b className="card-terms__price">{formatMoneyCents(lessons.reduce((sum, lesson) => sum + lesson.amountCents, 0))}</b>
+              </p>
+            </div>
+          ) : tile(selected, 0)}
           <ul className="booking-payment-facts">
             <li>
-              This lesson is charged{review?.savedCardKey ? " to your saved card" : ""}{" "}
-              {!chargedOnAgreement ? "an hour after it ends" : review?.savedCardKey ? "once you agree" : "once you add your card"}
+              {several ? (
+                `Each is charged${review?.savedCardKey ? " to your saved card" : ""} ${chargedOnAgreement === "all" ? onAgreement
+                  : chargedOnAgreement === "some" ? `${onAgreement}, or an hour after it ends` : "an hour after it ends"}`
+              ) : <>
+                This lesson is charged{review?.savedCardKey ? " to your saved card" : ""}{" "}
+                {chargedOnAgreement === "none" ? "an hour after it ends" : onAgreement}
+              </>}
             </li>
             <li>Future lessons are charged automatically, an hour after each one</li>
             {fee ? (
@@ -137,7 +173,7 @@ export function CardTerms({ change = false, onCancel, bookingId = "", feeCents =
                 onClick={() => setBookingConsent(value => !value)}
               >
                 {bookingConsent ? <CheckCircle2 size={20} aria-hidden="true" /> : <Circle size={20} aria-hidden="true" />}
-                I authorise card payments for this and future lessons
+                I authorise card payments for {several ? "these" : "this"} and future lessons
               </button>
               <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">Terms &amp; privacy</a>
             </div>

@@ -103,29 +103,35 @@ try {
     assert.deepEqual(linked.errors, []);
     await linked.page.close();
 
-    // A named past lesson stays explicit and requires its own payment
+    // The past lessons Inês ticked stay explicit and require their own payment
     // agreement. Merely opening the personal link never starts card setup.
-    const approvedBooking = { id: "approved-past-lesson", reference: "PT-COMBINED", startAt: "2026-10-27T17:00:00.000Z", endAt: "2026-10-27T18:00:00.000Z", amountCents: 1500 };
+    const approvedBookings = [
+      { id: "approved-older-lesson", reference: "PT-OLDER", startAt: "2026-10-20T17:00:00.000Z", endAt: "2026-10-20T18:00:00.000Z", amountCents: 1500 },
+      { id: "approved-past-lesson", reference: "PT-COMBINED", startAt: "2026-10-27T17:00:00.000Z", endAt: "2026-10-27T18:00:00.000Z", amountCents: 1500 },
+    ];
     let combinedAuthorised = false;
-    const combined = await open(width, "/book/?signin=qa-combined-link&cardBooking=approved-past-lesson", {
+    const combined = await open(width, "/book/?signin=qa-combined-link&cardBooking=approved-older-lesson,approved-past-lesson", {
       now: "2026-10-27T20:00:00Z",
       me: { ...student, hasCard: true },
       reply: endpoint => {
         if (endpoint === "/auth/email-link/confirm") return { json: { student: { ...student, hasCard: true }, session: "qa-combined-session" } };
-        if (endpoint === "/me/card/preview") return { json: { booking: approvedBooking, savedCardKey: "qa-saved-card", sameDayFeeCents: 500, minimumNoticeHours: 14 } };
+        if (endpoint === "/me/card/preview") return { json: { booking: approvedBookings[0], bookings: approvedBookings, savedCardKey: "qa-saved-card", sameDayFeeCents: 500, minimumNoticeHours: 14 } };
         if (endpoint === "/me" && combinedAuthorised) return { json: { student: { ...student, hasCard: true, cardForAllLessons: true }, bookings: [added], series: [], cardsAccepted: true } };
         if (endpoint === "/me/card") { combinedAuthorised = true; return { json: { authorised: true } }; }
         return null;
       }
     });
     await expect(combined.page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(combined.page.getByText("Sign in to pay for your lessons.")).toBeVisible();
     assert.equal(combined.posts.length, 0);
     assert.ok(!combined.page.url().includes("signin="));
     await combined.page.getByRole("button", { name: "Sign in", exact: true }).click();
     const approval = combined.page.locator(".card-prompt");
-    await expect(approval).toContainText("€15");
+    await expect(approval.locator(".card-terms__total")).toHaveText("2 lessons€30");
+    assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card/preview")?.body, { bookingIds: ["approved-older-lesson", "approved-past-lesson"] });
     await combined.page.reload();
-    await expect(approval).toContainText("€15");
+    await expect(approval.locator(".card-terms__total")).toHaveText("2 lessons€30");
+    await expect(approval).toContainText("Each is charged to your saved card once you agree");
     const agree = approval.getByRole("button", { name: "Authorise payments" });
     await expect(agree).toBeDisabled();
     await approval.getByRole("link", { name: "Terms & privacy" }).click();
@@ -133,12 +139,12 @@ try {
     await expect(agree).toBeDisabled();
     assert.equal(combined.posts.filter(post => post.endpoint === "/me/card").length, 0);
     await approval.screenshot({ path: `tmp/qa/transition-kit/combined-${width}.png` });
-    await approval.getByRole("button", { name: "I authorise card payments for this and future lessons" }).click();
+    await approval.getByRole("button", { name: "I authorise card payments for these and future lessons" }).click();
     await expect(agree).toBeEnabled();
     assert.ok(await noOverflow(combined.page));
     await agree.click();
     await expect(combined.page.getByText("Payments authorised. You’re all set.")).toBeVisible();
-    assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card")?.body, { consent: true, booking: approvedBooking, bookingConsent: true, savedCardKey: "qa-saved-card" });
+    assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card")?.body, { consent: true, bookings: approvedBookings, bookingConsent: true, savedCardKey: "qa-saved-card" });
     assert.deepEqual(combined.errors, []);
     await combined.page.close();
 

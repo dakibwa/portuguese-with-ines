@@ -337,6 +337,13 @@ async function fixture(width, options = {}) {
       return route.fulfill({ json: { month, receipts,
         totals: { ready: ready.length, readyCents: ready.reduce((sum, line) => sum + line.amountCents, 0) } } });
     }
+    // A payment approval link: the lessons she can tick, then the link.
+    const cardLink = path.match(/^\/admin\/bookings\/([^/]+)\/card-link$/);
+    if (cardLink) {
+      if (data) return route.fulfill({ json: { url: `${base}/book/?signin=qa-card-link&cardBooking=${data.bookingIds.join(",")}` } });
+      const unpaid = (id, startAt) => ({ id, reference: `TEST-${id}`, startAt, endAt: new Date(Date.parse(startAt) + 5400000).toISOString(), amountCents: 2500 });
+      return route.fulfill({ json: { lessons: [unpaid(cardLink[1], "2026-09-08T13:00:00.000Z"), unpaid("earlier-unpaid", "2026-09-01T13:00:00.000Z")] } });
+    }
     const match = path.match(
       /^\/admin\/bookings\/([^/]+)\/(reschedule|cancel|no-show|paid|refund-by-hand)$/,
     );
@@ -1262,7 +1269,8 @@ try {
   await mkdir("tmp/qa/free-price", { recursive: true });
   for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
-    state.bookings.find(entry => entry.id === "next").student_id = "sam";
+    // A lesson she added, still to be paid to her directly.
+    Object.assign(state.bookings.find(entry => entry.id === "next"), { student_id: "sam", added_by_teacher: 1, payment_status: "not_required", amount_cents: 2500 });
     await page.getByRole("tab", { name: /^Students/ }).click();
     const alex = studentRow(page, "Alex");
     await alex.getByRole("button", { name: "Price for Alex", exact: true }).click();
@@ -1324,6 +1332,21 @@ try {
     };
     await openSam();
     const details = page.getByRole("dialog");
+    // Its payment approval link (2 November 2026): the lesson opened starts
+    // ticked, and another unpaid lesson joins only when she ticks it.
+    await details.getByRole("button", { name: "Create payment link", exact: true }).click();
+    const choices = details.getByRole("group", { name: "Which lessons should Sam pay for?", exact: true });
+    await expect(choices.getByRole("checkbox")).toHaveCount(2);
+    await expect(choices.getByRole("checkbox", { checked: true })).toHaveCount(1);
+    await choices.getByRole("checkbox", { checked: false }).click();
+    await expect(choices.locator(".teacher-card-link__total")).toHaveText("2 lessons€50");
+    await details.screenshot({ path: `tmp/qa/free-price/teacher-card-link-${width}.png` });
+    await choices.getByRole("button", { name: "Create link", exact: true }).click();
+    await expect.poll(() => state.writes.at(-1)).toEqual({ path: "/admin/bookings/next/card-link", data: { bookingIds: ["next", "earlier-unpaid"] } });
+    await expect(details).toContainText("Link ready: 2 lessons, €50. Nothing sent or charged yet.");
+    const message = new URL(await details.getByRole("link", { name: /^Send on WhatsApp/ }).getAttribute("href")).searchParams.get("text");
+    assert.match(message, /^Olá Sam! Here’s your link to pay by card for 2 lessons \(€50 in total\)\. It’s just for you:\n\S+cardBooking=next,earlier-unpaid$/);
+    await details.screenshot({ path: `tmp/qa/free-price/teacher-card-link-ready-${width}.png` });
     const detailTick = details.getByRole("checkbox", { name: "Already paid", exact: true });
     await expect(detailTick).toHaveAttribute("aria-checked", "false");
     await detailTick.click();

@@ -5,7 +5,6 @@ import { X, ArrowLeft, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
   addedByTeacher,
   cancelBookingAs,
-  createCardApprovalLink,
   rescheduleBookingAs,
   paidByHand,
   recordRefundByHand,
@@ -24,7 +23,7 @@ import { lockPageScroll } from "@/lib/scroll-lock";
 import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 import { TeacherHomework } from "@/components/homework/TeacherHomework";
 import { PaidTick } from "@/components/teacher/PaidTick";
-import { readSession } from "@/lib/auth-api";
+import { CardApprovalLink } from "@/components/teacher/CardApprovalLink";
 
 type Props = {
   booking: AdminBooking;
@@ -63,9 +62,6 @@ export function LessonDetails({
   const recorded = booking.payment_status === "recorded";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [cardLink, setCardLink] = useState("");
-  const [linkCopied, setLinkCopied] = useState(false);
-  const linkRequest = useRef(0);
   const noShowCloses = new Date(new Date(booking.ends_at).getTime() + NO_SHOW_WINDOW_HOURS_AFTER * 3_600_000);
   const canMarkAttendance =
     booking.payment_status === "scheduled" &&
@@ -117,7 +113,6 @@ export function LessonDetails({
     const dialog = dialogRef.current;
     dialog?.showModal();
     return () => {
-      linkRequest.current += 1;
       dialog?.close();
       releaseScroll();
       // Successful actions reload the timetable, removing its opener. Keep
@@ -300,27 +295,9 @@ export function LessonDetails({
             </div>
           ) : null}
           </div> : null}
-          {!ticked && !noEmail && addedByTeacher(booking) && booking.status === "confirmed" &&
+          {!ticked && addedByTeacher(booking) && booking.status === "confirmed" &&
             booking.payment_status === "not_required" && !noShow && !locked && !booking.charge_started_at && Boolean(booking.amount_cents && booking.amount_cents > 0) ? (
-            <div className="teacher-card-link">
-              <p>Let {firstName} approve this lesson and automatic payments for future lessons.</p>
-              {cardLink ? <>
-                <p role="status">{linkCopied ? "Link copied. Nothing has been emailed or charged." : "Link ready. Nothing has been emailed or charged."}</p>
-                <button className="button button--blue button--compact" type="button" onClick={async () => {
-                  try { await navigator.clipboard.writeText(cardLink); setLinkCopied(true); }
-                  catch { setError("The link couldn’t be copied. Please try again."); }
-                }}>Copy payment approval link</button>
-              </> : <button className="button button--blue button--compact" type="button" disabled={busy} onClick={async () => {
-                const request = ++linkRequest.current;
-                setBusy(true); setError("");
-                try {
-                  const url = await createCardApprovalLink(token, booking.id);
-                  if (request === linkRequest.current && readSession() === token) setCardLink(url);
-                } catch (caught) {
-                  if (request === linkRequest.current && readSession() === token) setError(caught instanceof Error ? caught.message : "The link couldn’t be created.");
-                } finally { if (request === linkRequest.current) setBusy(false); }
-              }}>{busy ? "Creating link…" : "Create payment approval link"}</button>}
-            </div>
+            <CardApprovalLink booking={booking} token={token} busy={busy} onBusy={setBusy} onError={setError} />
           ) : null}
         </>
       ) : null}

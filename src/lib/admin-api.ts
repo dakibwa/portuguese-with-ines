@@ -608,14 +608,39 @@ export function paidByHand(booking: Pick<AdminBooking, "payment_consent_version"
   return booking.payment_consent_version === "paid-by-hand";
 }
 
-/** Prepare the student's own review link. This never sends mail or starts card setup. */
-export function createCardApprovalLink(token: string, bookingId: string) {
+/** A lesson a payment approval link can name, as the Worker summarises it. */
+export type CardApprovalLesson = { id: string; reference: string; startAt: string; endAt: string; amountCents: number };
+
+function isCardApprovalLesson(value: unknown): value is CardApprovalLesson {
+  return isApiRecord(value) && typeof value.id === "string" && typeof value.reference === "string" &&
+    typeof value.startAt === "string" && Number.isFinite(Date.parse(value.startAt)) &&
+    typeof value.endAt === "string" && Number.isFinite(Date.parse(value.endAt)) &&
+    typeof value.amountCents === "number" && Number.isSafeInteger(value.amountCents) && value.amountCents > 0;
+}
+
+/**
+ * The lessons she can tick into one link (2 November 2026, Dan): the one
+ * opened and the student's other unpaid lessons already had, newest first.
+ */
+export function cardApprovalChoices(token: string, bookingId: string) {
+  return adminRequest<{ lessons: CardApprovalLesson[] }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/card-link`).then(data => {
+    if (!Array.isArray(data.lessons) || !data.lessons.every(isCardApprovalLesson) || !data.lessons.some(lesson => lesson.id === bookingId)) {
+      throw new Error(BOOKING_REPLY_ERROR);
+    }
+    return data.lessons;
+  });
+}
+
+/** Prepare the student's own review link for the lessons ticked. This never sends mail or starts card setup. */
+export function createCardApprovalLink(token: string, bookingId: string, bookingIds: string[] = [bookingId]) {
   return adminRequest<{ url: string }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/card-link`, {
-    method: "POST", body: JSON.stringify({}),
+    method: "POST", body: JSON.stringify({ bookingIds }),
   }).then(data => {
     const url = new URL(data.url);
+    const named = (url.searchParams.get("cardBooking") ?? "").split(",");
     if (![window.location.origin, "https://portuguesewithines.com"].includes(url.origin) ||
-        url.pathname !== "/book/" || !url.searchParams.get("signin") || url.searchParams.get("cardBooking") !== bookingId) {
+        url.pathname !== "/book/" || !url.searchParams.get("signin") ||
+        named.length !== bookingIds.length || !bookingIds.every(id => named.includes(id))) {
       throw new Error(BOOKING_REPLY_ERROR);
     }
     return data.url;

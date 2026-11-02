@@ -2474,53 +2474,76 @@ Provider references: [Calendar scopes](https://developers.google.com/workspace/c
 [event conferences](https://developers.google.com/workspace/calendar/api/guides/create-events),
 [OAuth production readiness](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview).
 
-### Approval for one unpaid lesson and future lessons — 27 October 2026
+### Approval for unpaid lessons and future lessons — 27 October 2026, several lessons 2 November 2026
 
-From an unpaid lesson's details, Inês can create and copy a payment approval
-link (`POST /admin/bookings/:id/card-link`). Creating it only issues the
-existing 14-day, one-use sign-in link; it sends no email, opens no Stripe
-session, and changes no booking or payment consent. It does not mark a first
-welcome as sent. The link names the selected booking with `cardBooking`.
+From an unpaid lesson's details, Inês can create a payment approval link
+(**Create payment link**). `GET /admin/bookings/:id/card-link` lists what she
+can tick into it: the lesson she opened and that student's other unpaid
+lessons she added that have already started, newest first, at most 20. The
+lesson she opened starts ticked; every other one only when she ticks it,
+because many past lessons were paid to her by hand without being marked
+**Already paid**. When nothing else is unpaid there is no list and the link
+is made at once. `POST /admin/bookings/:id/card-link` with `{ bookingIds }`
+(1 to 20 of that student's eligible lessons; without it, the lesson opened)
+issues the existing 14-day, one-use sign-in link. It sends no email, opens no
+Stripe session, and changes no booking or payment consent. It does not mark a
+first welcome as sent. The link names the ticked bookings, in time order,
+with `cardBooking=<id>,<id>…`. The same two routes by student
+(`/admin/students/:id/card-link`, where `bookingIds` is required) serve an
+invite that clears what a student owes in one link; there the list is only
+their unpaid lessons already had. A student without an email can have one too:
+she sends it on WhatsApp, and confirming its sign-in is what verifies the
+account before a card is saved.
 
-After signing in, the student reviews that lesson's date, time and price,
-then actively agrees to both that lesson and
-standing automatic payment for future lessons. Previewing is read-only
-(`POST /me/card/preview`); `POST /me/card` checks the reviewed snapshot and
-explicit lesson consent. A previously saved card is authorised in place:
-the student does not add it again or visit Stripe. Its opaque review key binds
-the approval to that saved card; the transaction rechecks the card, session,
-revocation and lesson snapshot before recording consent. A card removed or
-replaced, a revoked session, or a paid/edited lesson refuses the approval.
+After signing in, the student reviews each lesson's date, time and price and
+their total, then actively agrees to those lessons and standing automatic
+payment for future lessons. Previewing is read-only (`POST /me/card/preview`
+with `bookingIds`); a lesson Inês has since marked paid, cancelled or taken
+off is left out, so the student agrees only to what is shown. `POST /me/card`
+checks every reviewed snapshot (`bookings`, or `booking` for one) and explicit
+lesson consent; one changed lesson refuses the whole approval. A previously
+saved card is authorised in place: the student does not add it again or
+visit Stripe. Its opaque review key binds the approval to that saved card;
+the transaction rechecks the card, session, revocation and every lesson
+snapshot before recording consent. A card removed or replaced, a revoked
+session, or a paid/edited lesson refuses the approval.
 
 Without a saved card, Stripe setup collects one and only its verified
-completion schedules the selected lesson, including one that has started or
-ended. The webhook pins its amount and times and
-checks ownership, confirmed/unpaid status, attendance and card generations
-at the write. A changed, cancelled or already-paid lesson is skipped; no
-other past lesson is included. Future teacher-added lessons and active repeats
-use the existing standing consent. The existing hourly-after-end scheduler
-collects once due, or on its next tick after later card confirmation. Creating
-or viewing the link cannot take payment. Old welcome links retain their
-future-only behaviour. The lesson and card consent stay unchanged until the
-student completes their own approval (and Stripe setup if a card is needed).
+completion schedules the selected lessons, including ones that have started
+or ended. Each is pinned in the session's metadata as `approved_booking_<n>`
+(`id start end amount`); a setup opened before 2 November carries the older
+`approved_booking_id/amount/start/end` keys and is still honoured. The
+webhook checks ownership, confirmed/unpaid status, attendance, card
+generations and each snapshot at the write. A changed, cancelled or
+already-paid lesson is skipped; no other past lesson is included. Future
+teacher-added lessons and active repeats use the existing standing consent.
+The existing hourly-after-end scheduler collects each lesson on its own, with
+its own receipt email, once due, or on its next tick after later card
+confirmation. Creating or viewing the link cannot take payment. Old welcome
+links retain their future-only behaviour. The lessons and card consent stay
+unchanged until the student completes their own approval (and Stripe setup if
+a card is needed).
 
-Reuse this workflow whenever a student needs to authorise a teacher-added
-lesson that has already happened, including a student who already saved a
-card. Inês opens that unpaid lesson in her timetable, chooses **Create payment
-approval link**, then **Copy payment approval link**. The link can be shared
-privately through WhatsApp or email; creating it sends neither. Confirm any
-direct payment with Inês first and record it as **Already paid** instead of
-requesting another payment.
+Reuse this workflow whenever a student needs to authorise teacher-added
+lessons that have already happened, including a student who already saved a
+card. Inês opens an unpaid lesson in her timetable, chooses **Create payment
+link**, ticks the lessons they owe, then **Create link**, and sends it with
+**Send on WhatsApp** (a `wa.me` link to their phone when it is written in
+international form or as a Portuguese mobile, otherwise WhatsApp's own chat
+picker) or **Copy link**. The WhatsApp message is one short line in her voice
+with the lesson count and total, then the link; she can edit it before
+sending. Confirm any direct payment with Inês first and record it as
+**Already paid** instead of requesting another payment.
 
-The student signs in, reviews the selected lesson (its date, time and price)
-and three short lines (when that lesson is charged, future payments, and
-fees), ticks **I authorise card payments for this and
-future lessons**, then presses **Authorise payments**. **Terms & privacy**
-sits inside that agreement area and opens without ticking it. A saved card
-needs permission only; a missing card opens Stripe setup. Approval includes
-only the one named past lesson, never an unseen backlog. Repeat the same
-workflow for another unpaid past lesson when needed; future teacher-added
-lessons and recurring lessons then use the standing consent.
+The student signs in (`Sign in to pay for your lessons. No password
+needed.`), reviews the lessons (one time tile each, then their total) and
+three short lines (when they are charged, future payments, and fees), ticks
+**I authorise card payments for these and future lessons**, then presses
+**Authorise payments**. **Terms & privacy** sits inside that agreement area
+and opens without ticking it. A saved card needs permission only; a missing
+card opens Stripe setup. Approval includes only the lessons named, never an
+unseen backlog; future teacher-added lessons and recurring lessons then use
+the standing consent.
 
 For an assistant preparing this on Dan's behalf, create the link and a
 preview first, then ask Inês to approve the proposed student message. Keep
@@ -2528,4 +2551,4 @@ the private sign-in link out of screenshots and review drafts. Hold the
 student message until Inês approves, and never authorise payment on the
 student's behalf. Creating
 and reviewing the link cannot charge the card; the student's own completed
-approval lets the normal scheduler collect the named lesson when due.
+approval lets the normal scheduler collect the named lessons when due.
