@@ -136,10 +136,10 @@ try {
     assert.ok(!combined.page.url().includes("signin="));
     await combined.page.getByRole("button", { name: "Sign in", exact: true }).click();
     const approval = combined.page.locator(".card-prompt");
-    // What is charged now is the total; the rule is one line of fine print.
+    // What is charged now is the total; over the agreement, only the fee's two dabs.
     await expect(approval.locator(".card-terms__total")).toHaveText("Charged now€30");
     await expect(approval.locator(".card-terms__lessons--then")).toHaveText("Then after each lessonEvery Tuesday, 17:00€15");
-    await expect(approval.locator(".card-terms__rules")).toHaveText("Free to change or cancel a lesson up to 14 hours before. €5 to move or cancel later, or if you don’t show up.");
+    await expect(approval.locator(".card-terms__consent .booking-payment-facts li")).toHaveText(["Free to change or cancel a lesson up to 14 hours before", "€5 to move or cancel later, or if you don’t show up"]);
     assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card/preview")?.body, { bookingIds: ["approved-older-lesson", "approved-past-lesson"] });
     await combined.page.reload();
     await expect(approval.locator(".card-terms__total")).toHaveText("Charged now€30");

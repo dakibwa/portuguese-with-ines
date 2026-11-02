@@ -36,21 +36,6 @@ export function FeeFacts({ feeCents, noticeHours, noShow = true }: { feeCents: n
   </>;
 }
 
-/**
- * The same rule as a sentence of fine print, for the approval card, where
- * the lessons are the list (2 November 2026, Dan: "more tasteful … than a
- * big long list").
- */
-function FeeLine({ feeCents, noticeHours }: { feeCents: number; noticeHours: number }) {
-  if (!feeCents) return <p>No fee to change or cancel, or for a missed lesson.</p>;
-  return (
-    <p>
-      <strong>Free to change or cancel</strong> a lesson up to {noticeHours} hours before.{" "}
-      <strong className="is-fee">{formatMoneyCents(feeCents)}</strong> to move or cancel later, or if you don&rsquo;t show up.
-    </p>
-  );
-}
-
 /** Lessons still to come that the agreement will pay for: one weekly run, or one lesson, with the starts it covers. */
 export type CardUpcoming = { key: string; when: string; amountCents: number; weekly: boolean; startAts: string[] };
 
@@ -174,8 +159,9 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
    * as the booking step's time tiles, with what is charged now as their
    * total, then what is paid from then on, under a label that says when
    * (2 November 2026, Dan: make it obvious it covers their weekly lessons
-   * too). The rules are a line of fine print over the agreement rather than
-   * a list of dabs (2 November 2026, Dan: "more tasteful"). On a wide card
+   * too). Over the agreement, only the rules nothing above says, as the
+   * confirm step's dabs: the fee, two of them (2 November 2026, Dan: the list
+   * was too long, but "I liked the bullets they are cute"). On a wide card
    * what is agreed sits on the left and agreeing on the right.
    */
   const dueNow = chargedOnAgreement !== "none";
@@ -227,11 +213,10 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
       ) : null}
       <div className="card-terms__consent">
         {ready ? (
-          <div className="card-terms__rules" id="card-terms-rules">
-            {then.length ? null : <p>Future lessons are charged {CHARGED_EACH}.</p>}
-            <FeeLine feeCents={fee} noticeHours={notice} />
-            {bookingId ? null : <p>Already paid Inês for one? Tell her before agreeing.</p>}
-          </div>
+          <ul className="booking-payment-facts" id="card-terms-rules">
+            {then.length ? null : <li>Future lessons are charged {CHARGED_EACH}</li>}
+            <FeeFacts feeCents={fee} noticeHours={notice} />
+          </ul>
         ) : null}
         {ready ? (
           <div className="booking-agreement card-terms__agreement">
@@ -261,7 +246,6 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
     <div className="card-terms">
       <ul className="booking-payment-facts" id="card-terms-summary">
         <li>Future lessons are charged {CHARGED_EACH}</li>
-        <li>Already paid Inês for some? Tell her before agreeing</li>
         <li>Stripe keeps your card safe</li>
         <FeeFacts feeCents={fee} noticeHours={notice} />
         <li>

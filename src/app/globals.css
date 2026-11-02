@@ -10106,17 +10106,8 @@ dialog[open]::backdrop {
   color: var(--lavender-ink);
   font: 500 0.78rem/1.4 var(--ui);
 }
-/* The rules as fine print over the agreement, not a list of dabs
-   (2 November 2026, Dan: "more tasteful … than a big long list"): what is
-   free in the text's blue, the fee in coral, as the dabs had them. */
-.card-terms__rules {
-  display: grid;
-  gap: 0.35rem;
-  padding-inline: 0.15rem;
-  color: var(--lavender-ink);
-  font: 500 0.8rem/1.5 var(--ui);
-  text-wrap: pretty;
+/* The fee as the confirm step's dabs over the agreement, lined up with the
+   labels above. */
+.card-terms--approval .booking-payment-facts {
+  padding-left: 0.2rem;
 }
-.card-terms__rules p { margin: 0; }
-.card-terms__rules strong { color: var(--ink); font-weight: 700; }
-.card-terms__rules strong.is-fee { color: var(--coral-action); white-space: nowrap; }
