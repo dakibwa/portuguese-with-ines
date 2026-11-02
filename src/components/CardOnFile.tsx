@@ -15,6 +15,19 @@ const LESSON_MARKS = [
   "/visuals/v2-splats/real-life-splat-v2.svg",
 ];
 
+/**
+ * The change and no-show rule as two dabs, what is free first (2 November
+ * 2026, Dan: the same words across the site). `noShow` false leaves out the
+ * no-show, where nothing charges a card for one.
+ */
+export function FeeFacts({ feeCents, noticeHours, noShow = true }: { feeCents: number; noticeHours: number; noShow?: boolean }) {
+  if (!feeCents) return <li>No fee to change or cancel{noShow ? ", or for a missed lesson" : ""}</li>;
+  return <>
+    <li><strong className="is-free">Free</strong> to change or cancel a lesson up to {noticeHours} hours before</li>
+    <li><strong>{formatMoneyCents(feeCents)}</strong> to move or cancel later{noShow ? ", or if you don’t show up" : ""}</li>
+  </>;
+}
+
 /** Lessons still to come that the agreement will pay for: one weekly run, or one lesson, with the starts it covers. */
 export type CardUpcoming = { key: string; when: string; amountCents: number; weekly: boolean; startAts: string[] };
 
@@ -41,6 +54,8 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
   // Whether each lesson's usual hour after it ends has passed, so agreeing
   // is what lets it be charged: all of them, some or none.
   const [chargedOnAgreement, setChargedOnAgreement] = useState<"all" | "some" | "none">("none");
+  // What agreeing charges straight away: the lessons whose hour has passed.
+  const [dueNowCents, setDueNowCents] = useState(0);
   useEffect(() => {
     if (!bookingId) return;
     let active = true;
@@ -48,8 +63,9 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
     void previewCardBooking(session, bookingId.split(",")).then(data => {
       if (!active || readSession() !== session) return;
       setReview(data);
-      const ended = data.bookings.filter(booking => Date.parse(booking.endAt) + 60 * 60 * 1000 <= Date.now()).length;
-      setChargedOnAgreement(ended === data.bookings.length ? "all" : ended ? "some" : "none");
+      const ended = data.bookings.filter(booking => Date.parse(booking.endAt) + 60 * 60 * 1000 <= Date.now());
+      setChargedOnAgreement(ended.length === data.bookings.length ? "all" : ended.length ? "some" : "none");
+      setDueNowCents(ended.reduce((sum, booking) => sum + booking.amountCents, 0));
     }).catch(caught => {
       if (active && readSession() === session) setError(caught instanceof Error ? caught.message : "We couldn’t check this lesson. Please try again.");
     });
@@ -119,8 +135,6 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
       <b className="card-terms__price">{formatMoneyCents(lesson.amountCents)}</b>
     </div>
   );
-  const onAgreement = review?.savedCardKey ? "once you agree" : "once you add your card";
-  const saved = review?.savedCardKey ? " to your saved card" : "";
 
   /*
    * A payment approval link (27 October 2026, Dan: "simple and beautiful"),
@@ -136,7 +150,7 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
       {selected ? (
         <div className="card-terms__summary" id="card-terms-summary">
           <section aria-labelledby="card-terms-now" className="card-terms__lessons">
-            <p className="card-terms__label"><span id="card-terms-now">To pay now</span><small>Porto time</small></p>
+            <p className="card-terms__label"><span id="card-terms-now">{chargedOnAgreement === "none" ? "To pay" : "To pay now"}</span><small>Porto time</small></p>
             <ol className="booking-chosen-lessons">
               {lessons.map((lesson, index) => <li key={lesson.id}>{tile(lesson, index)}</li>)}
             </ol>
@@ -163,18 +177,20 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
               </ul>
             </section>
           ) : null}
+          {/* In Dan's words (2 November 2026): what is charged now, worked
+              out from the lessons shown; then later lessons; then what is
+              free and what costs the fee. "Now" is the hourly charge, so
+              within the hour; a lesson whose hour has not passed yet waits
+              for it. */}
           <ul className="booking-payment-facts">
             <li>
-              {several ? `Each is charged${saved} ${chargedOnAgreement === "all" ? onAgreement
-                : chargedOnAgreement === "some" ? `${onAgreement}, or an hour after it ends` : "an hour after it ends"}`
-                : `This lesson is charged${saved} ${chargedOnAgreement === "none" ? "an hour after it ends" : onAgreement}`}
+              {chargedOnAgreement === "none"
+                ? several ? "These lessons are charged after each one" : "This lesson is charged after it ends"
+                : <>You&rsquo;ll be charged <strong>{formatMoneyCents(dueNowCents)}</strong> now{chargedOnAgreement === "some"
+                  ? ", and the rest after each lesson" : several ? " for your outstanding lessons" : " for this lesson"}</>}
             </li>
-            <li>Future lessons are charged {then.length ? "" : "automatically, "}an hour after each one</li>
-            {fee ? <>
-              {/* What is free first, then what it costs (2 November 2026, Dan). */}
-              <li><strong className="is-free">Free</strong> to move or cancel up to {notice} hours before</li>
-              <li><strong>{formatMoneyCents(fee)}</strong> to move or cancel later, or if you don’t show up</li>
-            </> : <li>No fee to move or cancel, or for a missed lesson</li>}
+            <li>Future lessons are charged after each lesson</li>
+            <FeeFacts feeCents={fee} noticeHours={notice} />
           </ul>
         </div>
       ) : null}
@@ -206,15 +222,10 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
   return (
     <div className="card-terms">
       <ul className="booking-payment-facts" id="card-terms-summary">
-        <li>Your upcoming lessons with Inês are charged to it, each one hour after it ends, at the price in your bookings</li>
+        <li>Future lessons are charged after each lesson</li>
         <li>Already paid Inês for some? Tell her before agreeing</li>
         <li>Stripe keeps your card safe</li>
-        {/* The same fee lines as the payment approval card (27 October and
-            2 November 2026, Dan). */}
-        {fee ? <>
-          <li><strong className="is-free">Free</strong> to move or cancel up to {notice} hours before</li>
-          <li><strong>{formatMoneyCents(fee)}</strong> to move or cancel later, or if you don’t show up</li>
-        </> : <li>No fee to move or cancel, or for a missed lesson</li>}
+        <FeeFacts feeCents={fee} noticeHours={notice} />
         <li>
           The full rules are in{" "}
           <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">terms &amp; privacy</a>

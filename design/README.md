@@ -1344,7 +1344,7 @@ Preserve these desktop and mobile states:
   Inês added follow under `Then automatically`, each weekly run once as
   `Every Tuesday, 17:00` in a dashed tile with the weekly lilac repeat mark
   (Dan: make it obvious it covers their weekly lessons); the first dab reads
-  `Each is charged to your saved card once you agree` and the capsule
+  `You’ll be charged €45 now for your outstanding lessons` and the capsule
   `these and future lessons`. Inês gets the same tick list from an unpaid
   lesson's dialog (`Create payment link`, small outline, the opened lesson
   ticked) and from a student's card on Students (`Payment link`, nothing
@@ -1994,8 +1994,12 @@ time") took each busy place back to one voice:
 - an expression's `Edit`, `Preview` and `Publish` are one family of lilac
   buttons;
 - `Pay by card` and a payment approval state the fee once, as two dabs, the free
-  one first (2 November 2026, Dan): `**Free** to move or cancel up to 14 hours
-  before`, then `**€5** to move or cancel later, or if you don’t show up`;
+  one first (2 November 2026, Dan, the same words across the site): `**Free** to
+  change or cancel a lesson up to 14 hours before`, then `**€5** to move or
+  cancel later, or if you don’t show up`; above them, `Future lessons are
+  charged after each lesson` (the hourly charge runs an hour after the end, so
+  not "at the end"), and on an approval first `You’ll be charged **€45** now
+  for your outstanding lessons`, worked out from the lessons it shows;
 - a past lesson's long date breaks before its year, never leaving the time on a
   line of its own.
 

@@ -137,7 +137,7 @@ try {
     assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card/preview")?.body, { bookingIds: ["approved-older-lesson", "approved-past-lesson"] });
     await combined.page.reload();
     await expect(approval.locator(".card-terms__total")).toHaveText("Total€30");
-    await expect(approval).toContainText("Each is charged to your saved card once you agree");
+    await expect(approval).toContainText("You’ll be charged €30 now for your outstanding lessons");
     const agree = approval.getByRole("button", { name: "Authorise payments" });
     await expect(agree).toBeDisabled();
     await approval.getByRole("link", { name: "Terms & privacy" }).click();
