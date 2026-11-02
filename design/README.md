@@ -2010,12 +2010,13 @@ gave an email, and only two had ever signed in.
   are taken), `Your card is charged at the end of each lesson`, and with no fee
   `No fee to change or cancel, or for a missed lesson`. That covers the welcome
   screen, the booking confirm step and its success, and the card terms.
-- One card at a time sits above a student's lessons: the card to confirm
-  first, and only then, for a student with no email, `Add your email` (`So
-  you can always get back in.`, an email field and blue `Add email`) in the
-  same card shape. Once sent it reads `Check your email` / `Open the link we
-  sent to … on this phone.` Their Details email row reads `Not added` with
-  `Add email`.
+- One card at a time sits above a student's lessons. A student with no email
+  is asked for one first, before the card, with no skip (Dan, 2 November
+  2026: "they need to add an email"; it is their only way back in on another
+  device): `Add your email`, `So you can sign in on any phone or computer.`,
+  an email field and coral `Add email`. Then the card to confirm, then, while
+  the address waits, `Check your email` / `Open the link we sent to … on this
+  phone.` Their Details email row reads `Not added` with `Add email`.
 - Students' cards on a wide list each keep their own height, packed in
   columns, so a short card never leaves a hole under it.
 - `Time off`'s card lists what is `Coming up` (consecutive whole days as one

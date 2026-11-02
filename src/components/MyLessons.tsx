@@ -951,10 +951,12 @@ export function MyLessons({
   ) : null;
   const askForCard = !cardSaved && !cardChecking && cardsAccepted && hasStudentSide(student) &&
     student.cardForAllLessons === false && unpaidAdded > 0;
-  // Someone Inês let in from a WhatsApp link may have no email yet (2 November
-  // 2026, Dan); it is how they sign in again, so it is asked for here, once,
-  // after the card: never a second card beside it (Dan: one single process).
-  const emailPrompt = !student.email && hasStudentSide(student) ? (
+  // Someone Inês let in from a WhatsApp link may have no email yet. It is
+  // their only way back in on another phone, so it is the first thing asked,
+  // before the card, with no skip (2 November 2026, Dan: "they need to add an
+  // email then yeah that's fine"). Never a second card beside another.
+  const needsEmail = !student.email && hasStudentSide(student);
+  const emailPrompt = needsEmail ? (
     <section aria-labelledby="email-prompt-heading" className={`card-prompt email-prompt${emailPending ? "" : " card-prompt--open"}`}>
       <span aria-hidden="true" className="card-prompt__icon">
         <Mail size={20} />
@@ -965,7 +967,7 @@ export function MyLessons({
           <p>Open the link we sent to <strong>{emailPending}</strong> on this phone.</p>
         ) : (
           <>
-            <p>So you can always get back in.</p>
+            <p>So you can sign in on any phone or computer.</p>
             <form
               className="email-prompt__form"
               onSubmit={(event) => {
@@ -986,7 +988,7 @@ export function MyLessons({
                   value={details.email}
                 />
               </label>
-              <button className="button button--blue button--compact" disabled={emailBusy || !details.email.trim()} type="submit">
+              <button className="button button--coral button--compact" disabled={emailBusy || !details.email.trim()} type="submit">
                 {emailBusy ? "Sending…" : "Add email"}
               </button>
             </form>
@@ -1000,8 +1002,9 @@ export function MyLessons({
     <>
       {cardNote}
       {/* One card at a time above their lessons (2 November 2026, Dan: "super
-          smooth"): the card to confirm first, then the email ask. */}
-      {cardPrompt ?? emailPrompt}
+          smooth"): their email first, then the card to confirm, then a
+          reminder to open the email's link if it is still waiting. */}
+      {needsEmail && !emailPending ? emailPrompt : cardPrompt ?? emailPrompt}
       {alert}
     </>
   );
