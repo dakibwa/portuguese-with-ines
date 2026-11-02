@@ -3620,6 +3620,11 @@ await test("a prepared card link needs the student's approval and covers exactly
     assert.deepEqual(choices.lessons.map((lesson) => lesson.id), [selected, ticked, otherPast]);
     const owed = await (await call(`/admin/students/${id}/card-link`, { method: "GET", user: "teacher" })).json();
     assert.deepEqual(owed.lessons.map((lesson) => lesson.id), [selected, ticked, otherPast], "the same list by student, for her invite");
+    // Her Students card reads the same lessons as what is still to settle.
+    const listed = async () => (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).students.find((entry) => entry.id === id);
+    db.prepare("DELETE FROM sign_in_links WHERE student_id=?").run(id);
+    const before = await listed();
+    assert.deepEqual([before.unpaidPast, before.unpaidPastCents], [3, 4500], "her card counts the lessons a link could ask for");
     assert.equal((await call(`/admin/bookings/${selected}/card-link`, { user: "teacher", body: { bookingIds: [selected, someoneElse] } })).status, 409,
       "another student's lesson cannot ride along");
     const prepared = await call(`/admin/bookings/${selected}/card-link`, { user: "teacher", body: { bookingIds: [selected, ticked] } });
@@ -3627,6 +3632,7 @@ await test("a prepared card link needs the student's approval and covers exactly
     const url = new URL((await prepared.json()).url);
     assert.equal(url.searchParams.get("cardBooking"), `${ticked},${selected}`);
     assert.ok(url.searchParams.get("signin"));
+    assert.deepEqual([before.invitedAt, typeof (await listed()).invitedAt], [null, "string"], "the link shows as sent on her card");
     assert.equal(checkoutRequests.length, stripeCount, "creating a link does not even create a Stripe session");
     assert.equal(charges.length, chargeCount);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, emailCount, "no email sent or queued");

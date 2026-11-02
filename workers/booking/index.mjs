@@ -1472,14 +1472,24 @@ async function teacherStudentList(env) {
        (SELECT COUNT(*) FROM bookings b WHERE b.student_id = s.id AND b.status = 'confirmed' AND b.ends_at > ?
           AND b.added_by_teacher = 1 AND b.payment_status = 'not_required'
           AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}') AS unpaid_upcoming,
-       (SELECT COUNT(*) FROM booking_series bs WHERE bs.student_id = s.id AND bs.status = 'active') AS weekly
+       (SELECT COUNT(*) FROM booking_series bs WHERE bs.student_id = s.id AND bs.status = 'active') AS weekly,
+       -- What a payment link could still ask them for: the lessons she added
+       -- that have begun, not paid by card or ticked paid by hand (2 November
+       -- 2026, Dan: everyone pays what is still open). Some were paid in cash
+       -- and never ticked, so she reads it as still to settle, not a debt.
+       (SELECT COUNT(*) FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
+          WHERE b.student_id = s.id AND b.starts_at <= ? AND ${CARD_LESSON_TERMS}) AS unpaid_past,
+       (SELECT COALESCE(SUM(COALESCE(b.amount_cents, l.price_cents)), 0) FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
+          WHERE b.student_id = s.id AND b.starts_at <= ? AND ${CARD_LESSON_TERMS}) AS unpaid_past_cents,
+       -- Their newest way in still unspent: a welcome, invite or payment link.
+       (SELECT MAX(created_at) FROM sign_in_links sl WHERE sl.student_id = s.id AND sl.expires_at > ?) AS invited_at
      FROM students s WHERE ${studentLikeSql("s")}
        -- The opt-in live check's throwaway accounts (scripts/qa-recurring-rates)
        -- can never be a student of hers.
        AND s.email NOT LIKE 'launch-check-%@example.invalid'
      ORDER BY s.name COLLATE NOCASE`
   )
-    .bind(now, now)
+    .bind(now, now, now, now, now)
     .all();
   /*
    * Two things that used to be emails to her and are now cards in Needs you
@@ -1529,6 +1539,9 @@ async function teacherStudentList(env) {
     cardForAllLessons: Boolean(row.has_card && row.card_consent_at),
     nextLessonAt: row.next_lesson_at ?? null,
     unpaidUpcoming: Number(row.unpaid_upcoming ?? 0),
+    unpaidPast: Number(row.unpaid_past ?? 0),
+    unpaidPastCents: Number(row.unpaid_past_cents ?? 0),
+    invitedAt: row.invited_at ?? null,
     weekly: Number(row.weekly ?? 0),
     dormant: Boolean(row.dormant),
     dormantEmailedAt: row.dormant_emailed_at ?? null,
@@ -1551,10 +1564,12 @@ async function teacherStudentList(env) {
  * within D1's 100 bound values.
  */
 const MAX_CARD_LESSONS = 20;
-const CARD_LESSON_SQL = `b.student_id = ? AND b.added_by_teacher = 1 AND b.status = 'confirmed'
+/** A lesson she added that a card can still pay for: `b` the booking, `l` its lesson type. */
+const CARD_LESSON_TERMS = `b.added_by_teacher = 1 AND b.status = 'confirmed'
   AND b.payment_status = 'not_required' AND b.charge_started_at IS NULL AND b.attendance_status = 'expected'
   AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
   AND COALESCE(b.amount_cents, l.price_cents) > 0`;
+const CARD_LESSON_SQL = `b.student_id = ? AND ${CARD_LESSON_TERMS}`;
 
 /** Distinct booking ids, from a list or a link's comma-separated value; null when any is malformed. */
 function cardBookingIds(value) {
