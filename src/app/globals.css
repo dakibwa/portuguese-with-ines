@@ -7410,6 +7410,11 @@ p.lesson-when > span {
   color: var(--coral-action);
   white-space: nowrap;
 }
+/* What costs nothing is bold in the text's own blue; coral is for a charge. */
+.booking-payment-facts strong.is-free {
+  color: var(--ink);
+  white-space: normal;
+}
 
 .booking-payment-facts a {
   color: inherit;
@@ -9623,10 +9628,6 @@ dialog[open]::backdrop {
   font-variant-numeric: tabular-nums;
 }
 
-.card-terms--approval .booking-payment-facts {
-  padding-left: 0.2rem;
-}
-
 .card-terms__agreement {
   margin-top: 0;
 }
@@ -9955,13 +9956,158 @@ dialog[open]::backdrop {
   }
 }
 
-/* A prepared approval stays separate from the teacher's paid-by-hand control. */
+/* A prepared approval stays separate from the teacher's paid-by-hand
+   control: a rule above, and the dialog's quieter small type. */
 .teacher-card-link {
   display: grid;
   justify-items: start;
-  gap: 0.6rem;
-  margin-block: 1rem;
-  padding-block: 1rem;
+  gap: 0.5rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--rule);
 }
-.teacher-card-link p { margin: 0; }
+.teacher-card-link p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+/* On Students it is the panel's whole body, under the panel's heading. */
+.teacher-card-link--panel {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* The lessons she can tick into one link (2 November 2026): each the
+   Already paid tick's capsule, one line a lesson, the time on the left and
+   the price on the right; the total is on the button (Dan: "less spread
+   out"). */
+.teacher-card-link .teacher-card-link__heading {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.teacher-card-link .teacher-card-link__hint { opacity: 0.78; }
+.teacher-card-link__heading + .teacher-card-link__hint { margin-top: -0.35rem; }
+.teacher-card-link__choices {
+  display: grid;
+  width: 100%;
+  max-width: 28rem;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.teacher-card-link .teacher-card-link__choice {
+  width: 100%;
+  min-height: 36px;
+  padding-block: 0.3rem;
+}
+.teacher-card-link__when {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teacher-card-link__choice b {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+/* Side by side, as the dialog's own actions are. */
+.teacher-card-link__actions {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 28rem;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+.teacher-card-link .teacher-card-link__actions > .button {
+  flex: 1 1 0;
+  width: auto;
+  min-width: fit-content;
+}
+
+/* What an approval pays for (2 November 2026, Dan: "always fits on the
+   same line"): what is paid now as the booking step's chosen-lesson tiles,
+   a little smaller, one line each with Porto time named once over them,
+   with a receipt's total under the prices; then what is paid automatically
+   from then on, each weekly run once, in dashed tiles as something still to
+   come. */
+.card-terms__lessons {
+  display: grid;
+  gap: 0.45rem;
+}
+.card-terms__lessons .booking-chosen-lessons { gap: 0.4rem; }
+.card-terms__lessons .booking-selection-summary {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  min-height: 52px;
+  padding-block: 0.4rem;
+}
+.card-terms__lessons .booking-selection-summary__mark {
+  width: 36px;
+  height: 36px;
+}
+.card-terms__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  padding-inline: 0.15rem;
+  color: var(--ink);
+  font: 700 0.7rem/1.2 var(--ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.card-terms__label small {
+  color: var(--lavender-ink);
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.card-terms__when {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ink);
+  font: 600 0.92rem/1.25 var(--ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-terms__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.1rem 0 0;
+  border-top: 1px solid var(--rule-soft);
+  padding: 0.55rem var(--pad-card) 0;
+  font: 600 0.9rem/1.3 var(--ui);
+}
+.card-terms__lessons--then {
+  margin-top: 0.2rem;
+}
+.card-terms__lessons .card-terms__lesson--then {
+  border-style: dashed;
+  background: transparent;
+}
+.card-terms__then-mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: var(--squiggle-thumb);
+  background: var(--weekly);
+  color: var(--blue);
+}
+/* When a lesson not yet due is charged, quietly under its total. */
+.card-terms__note {
+  margin: 0;
+  padding-inline: var(--pad-card);
+  color: var(--lavender-ink);
+  font: 500 0.78rem/1.4 var(--ui);
+}
+/* The fee as the confirm step's dabs over the agreement, lined up with the
+   labels above. */
+.card-terms--approval .booking-payment-facts {
+  padding-left: 0.2rem;
+}

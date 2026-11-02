@@ -3728,7 +3728,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="auth-panel__mark" />
               <h2>Welcome</h2>
               <p className="auth-panel__intro">
-                Sign in to see your lessons. No password needed.
+                {/* A payment approval link says what it is for (2 November 2026). */}
+                {cardBookingId ? "Sign in to pay for your lessons." : "Sign in to see your lessons."} No password needed.
                 {/* Someone else's account open on this device: say what the press does. */}
                 {student ? ` You’re signed in as ${student.name}; this switches to the account the email was sent to.` : null}
               </p>
