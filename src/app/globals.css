@@ -5654,11 +5654,18 @@ p.lesson-when > span {
   opacity: 0.82;
 }
 
-/* Arriving from a link: the same card as the payment card that follows, at
-   the width it will have, laid out as it is (how the page works as two dabs,
-   the one button beside them on a wide card, under them on a phone). */
-.booking-workflow-sign-in--welcome {
-  width: 100%;
+/* Arriving from a link, how the page works, as three dabs: left-aligned in
+   the centred card, at the intro's size, then the one button. */
+.sign-in-link .auth-panel__intro {
+  margin-bottom: 1rem;
+}
+
+.sign-in-link__steps {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 1.5rem;
+  font-size: 0.93rem;
+  text-align: left;
 }
 
 /*
@@ -9533,7 +9540,6 @@ dialog[open]::backdrop {
   gap: 0.5rem;
 }
 
-.card-prompt h2,
 .card-prompt h3 {
   margin: 0;
   font: 600 1rem/1.4 var(--ui);
@@ -9630,7 +9636,6 @@ dialog[open]::backdrop {
   row-gap: 0.2rem;
 }
 
-.card-prompt--open h2,
 .card-prompt--open h3,
 .card-prompt--open .card-prompt__body > p {
   grid-column: 2;

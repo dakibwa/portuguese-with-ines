@@ -1997,23 +1997,19 @@ gave an email, and only two had ever signed in.
   Sign in panels offer lilac `WhatsApp instead`. Keep the message short (Dan:
   "quite wordy and not in fitting with our super simple fresh design");
   the site does the teaching.
-- Arriving is one short process in one card style (Dan: onboarding as "the
-  same single process", so it is simple): the welcome card, then `Confirm
-  your card payments`, then their lessons. The welcome is the card prompt's
-  own shell at the same place and width, its lavender icon circle, `Welcome`
-  and `Your lessons with Inês, all in one place. No password needed.` beside
-  it, two dabs (`Book new lessons yourself`, `Open a lesson to move or cancel
-  it`) and coral `See my lessons`, beside the dabs on a wide card and under
-  them on a phone, as the payment card's action sits. The rules are said
-  once, on the card they agree to, not on both. Nothing asks them to book
-  what Inês has already booked.
+- The welcome screen a link opens is that teaching, said once: the splat
+  mark and a handwritten `Welcome` (a plain card-style heading there read as
+  a regression, Dan, 2 November 2026), `Your lessons with Inês, all in one
+  place. No password needed.`, dabs (`Book new lessons yourself`, `Open a
+  lesson to move or cancel it`, then the rules) and coral `See my lessons`.
+  Nothing asks them to book what Inês has already booked.
 - The rules read the same wherever a student meets them (2 November 2026,
   Dan): `Free to change or cancel a lesson up to 14 hours before` (the first
   four words bold in ink, since coral is for a charge) and `€5 to move or
   cancel later, or if you don’t show up` (the no-show part only where cards
   are taken), `Your card is charged at the end of each lesson`, and with no fee
-  `No fee to change or cancel, or for a missed lesson`. That covers the card
-  terms, and the booking confirm step and its success.
+  `No fee to change or cancel, or for a missed lesson`. That covers the welcome
+  screen, the booking confirm step and its success, and the card terms.
 - One card at a time sits above a student's lessons: the card to confirm
   first, and only then, for a student with no email, `Add your email` (`So
   you can always get back in.`, an email field and blue `Add email`) in the
