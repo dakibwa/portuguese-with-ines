@@ -2048,11 +2048,12 @@ gave an email, and only two had ever signed in.
   the total and the panel says `Asks them to pay €45 for 3 lessons. Nothing
   is charged until they agree.` A lesson paid in cash is ticked `Already
   paid` in their profile instead, and leaves what is open.
-- The welcome screen a link opens is that teaching, said once: `Welcome`,
-  `Your lessons with Inês, all in one place. No password needed.`, dabs
-  (`Book new lessons yourself`, `Open a lesson to move or cancel it`, then the
-  rules) and coral `See my lessons`. Nothing asks them to book what Inês has
-  already booked.
+- The welcome screen a link opens is that teaching, said once: the splat
+  mark and a handwritten `Welcome` (a plain card-style heading there read as
+  a regression, Dan, 2 November 2026), `Your lessons with Inês, all in one
+  place. No password needed.`, dabs (`Book new lessons yourself`, `Open a
+  lesson to move or cancel it`, then the rules) and coral `See my lessons`.
+  Nothing asks them to book what Inês has already booked.
 - The rules read the same wherever a student meets them (2 November 2026,
   Dan): `Free to change or cancel a lesson up to 14 hours before` (the first
   four words bold in ink, since coral is for a charge) and `€5 to move or
@@ -2060,11 +2061,12 @@ gave an email, and only two had ever signed in.
   are taken), `Your card is charged at the end of each lesson`, and with no fee
   `No fee to change or cancel, or for a missed lesson`. That covers the welcome
   screen, the booking confirm step and its success, and the card terms.
-- On Your lessons, a student with no email sees `Pay by card` and `Add your
-  email` (`So you can always get back in.`, an email field and blue `Add
-  email`) as two rows of one sheet card, never two cards pushing their lessons
-  down; once sent it reads `Check your email` / `Open the link we sent to … on
-  this phone.` Their Details email row reads `Not added` with `Add email`.
+- One card at a time sits above a student's lessons: the card to confirm
+  first, and only then, for a student with no email, `Add your email` (`So
+  you can always get back in.`, an email field and blue `Add email`) in the
+  same card shape. Once sent it reads `Check your email` / `Open the link we
+  sent to … on this phone.` Their Details email row reads `Not added` with
+  `Add email`.
 - Students' cards on a wide list each keep their own height, packed in
   columns, so a short card never leaves a hole under it.
 - `Time off`'s card lists what is `Coming up` (consecutive whole days as one
