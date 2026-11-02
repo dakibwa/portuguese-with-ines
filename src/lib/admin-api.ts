@@ -608,6 +608,22 @@ export function paidByHand(booking: Pick<AdminBooking, "payment_consent_version"
   return booking.payment_consent_version === "paid-by-hand";
 }
 
+/**
+ * A sign-in link for her to send the student herself, on WhatsApp or anywhere
+ * (2 November 2026, Dan). Nothing is emailed; it works once, for two weeks.
+ */
+export function createInviteLink(token: string, studentId: string) {
+  return adminRequest<{ url: string }>(token, `/admin/students/${encodeURIComponent(studentId)}/invite-link`, {
+    method: "POST", body: JSON.stringify({}),
+  }).then(data => {
+    const url = new URL(data.url);
+    if (![window.location.origin, "https://portuguesewithines.com"].includes(url.origin) || url.pathname !== "/book/" || !url.searchParams.get("signin")) {
+      throw new Error(BOOKING_REPLY_ERROR);
+    }
+    return data.url;
+  });
+}
+
 /** Prepare the student's own review link. This never sends mail or starts card setup. */
 export function createCardApprovalLink(token: string, bookingId: string) {
   return adminRequest<{ url: string }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/card-link`, {

@@ -17,6 +17,7 @@ import {
   Clock3,
   Globe,
   CircleX,
+  Mail,
   MessageSquareText,
   Plus,
   Repeat,
@@ -39,7 +40,7 @@ const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/c
 const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons));
 if (typeof window !== "undefined" && readSession()) void loadAccountControls();
 import { LessonMark } from "@/components/LessonMarks";
-import { clearSession, confirmSignInLink, fetchMe, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, SessionStorageError, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
+import { clearSession, confirmSignInLink, fetchMe, requestEmailChange, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, SessionStorageError, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { SITE_BASE_PATH } from "@/lib/paths";
@@ -956,6 +957,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // A link from an email waits for a press: mail scanners open links on
   // their own, and spending a one-time link on arrival let them use it up.
   const [pendingSignIn, setPendingSignIn] = useState("");
+  // Your lessons holds back while a first-visit step (their email) is open.
+  const [accountStep, setAccountStep] = useState(false);
+  // A link for someone with no email asks for one on the welcome itself (2
+  // November 2026, Dan: "the welcome thing with add your email below if they
+  // haven't added it"), and Your lessons is told it has gone.
+  const [signInAddEmail, setSignInAddEmail] = useState(false);
+  const [welcomeEmail, setWelcomeEmail] = useState("");
+  const [welcomeEmailSent, setWelcomeEmailSent] = useState<{ studentId: string; email: string } | null>(null);
   const [usingSignInLink, setUsingSignInLink] = useState(false);
   // Back from saving a card with Stripe: the booking confirms by webhook, so
   // say what is happening until it shows up.
@@ -1280,7 +1289,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     }
     const signInToken = params.get("signin") ?? "";
     if (signInToken) {
+      setSignInAddEmail(params.get("addEmail") === "1");
       params.delete("signin");
+      params.delete("addEmail");
       params.set("view", "lessons");
       window.history.replaceState({}, "", `/book/?${params}`);
       setPendingSignIn(signInToken);
@@ -1891,9 +1902,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // lessons filling in when the account arrives (LessonsLoading).
   const lessonsLoading = checkingSession && hasStoredSession && !managed && Boolean(todayKey) &&
     (intent === "choose" || intent === "lessons");
+  const welcomeEmailReady = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(welcomeEmail.trim());
   const showWorkflowCalendar =
     !pendingSignIn &&
     !lessonsLoading &&
+    // A first-visit step has Your lessons to itself until it is done.
+    !(intent === "lessons" && accountStep) &&
     !isConfirmingBooking &&
     !needsLessonsSignIn &&
     ((intent === "lessons" && accountView === "upcoming") ||
@@ -3221,11 +3235,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               {lessonType?.price_cents === 0 ? (
                 <li>Please give Inês {noticeHours} hours&rsquo; notice to move or cancel</li>
               ) : lateFeeCents === 0 ? (
-                <li>Free to change or cancel</li>
+                <li>No fee to change or cancel, or for a missed lesson</li>
               ) : (
                 <>
-                  <li>Free to change or cancel until {noticeHours} hours before</li>
-                  <li><strong>{formatMoneyCents(lateFeeCents)}</strong> after that</li>
+                  <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
+                  <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later{postpay ? <>, or if you don&rsquo;t show up</> : null}</li>
                 </>
               )}
             </ul>
@@ -3359,6 +3373,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               key={student.id}
               clock={clock}
               cardBookingId={pendingSignIn ? "" : cardBookingId}
+              initialEmailPending={welcomeEmailSent?.studentId === student.id ? welcomeEmailSent.email : ""}
               initialAccount={loadedAccount?.student.id === student.id ? loadedAccount : null}
               onRatesChange={(rates) => {
                 // A code saved under Edit details prices the next weekly booking.
@@ -3374,6 +3389,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               }}
               onSelectSection={openAccountView}
               onSignOut={signOut}
+              onStepChange={setAccountStep}
               openUpcomingRequest={upcomingRequestKey}
               section={intent === "lessons" ? accountView : "upcoming"}
             />
@@ -3727,10 +3743,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             <div className="auth-panel sign-in-link">
               <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="auth-panel__mark" />
               <h2>Welcome</h2>
+              {/* What the page is for, said once. The rules and what they pay
+                  for come on the next page, not here as well (2 November 2026,
+                  Dan: "rather than repeated"). */}
               <p className="auth-panel__intro">
-                Sign in to see your lessons. No password needed.
+                Your lessons with Inês, all in one place. No password needed.
                 {/* Someone else's account open on this device: say what the press does. */}
-                {student ? ` You’re signed in as ${student.name}; this switches to the account the email was sent to.` : null}
+                {student ? ` You’re signed in as ${student.name}; this switches to the account the link was sent for.` : null}
               </p>
               {signInLinkError ? (
                 <div className="booking-alert booking-alert--error" role="alert">
@@ -3752,10 +3771,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   {student ? "Back to your lessons" : "Email me a new link"}
                 </button>
               ) : (
-                <button
-                  className="button button--coral booking-confirm-button"
-                  disabled={usingSignInLink}
-                  onClick={async () => {
+                <form
+                  className="sign-in-link__form"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    if (usingSignInLink || (signInAddEmail && !welcomeEmailReady)) return;
                     const request = ++signInLinkRequest.current;
                     const session = readSession();
                     const page = window.location.pathname;
@@ -3764,7 +3784,23 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     try {
                       const result = await confirmSignInLink(pendingSignIn);
                       if (!current()) return;
+                      // Signed in either way; an address that can't be taken
+                      // is asked for again on Your lessons, with the reason.
+                      // The address goes before the session is stored, so Your
+                      // lessons first renders already knowing it was sent and
+                      // never asks for it a second time.
+                      let sent: { studentId: string; email: string } | null = null;
+                      if (signInAddEmail && !result.student.email) {
+                        try {
+                          const reply = await requestEmailChange(result.session, welcomeEmail.trim());
+                          sent = { studentId: result.student.id, email: reply.pending };
+                        } catch {
+                          sent = null;
+                        }
+                      }
                       storeSession(result.session);
+                      setWelcomeEmailSent(sent);
+                      if (request !== signInLinkRequest.current) return;
                       setPendingSignIn("");
                       enterLessons(result.student);
                     } catch (caught) {
@@ -3776,10 +3812,33 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       if (request === signInLinkRequest.current) setUsingSignInLink(false);
                     }
                   }}
-                  type="button"
                 >
-                  {usingSignInLink ? "Signing in…" : "Sign in"}
-                </button>
+                  {signInAddEmail ? (
+                    <label>
+                      <span><Mail size={16} aria-hidden="true" />Your email</span>
+                      <input
+                        aria-describedby="sign-in-link-email-why"
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        autoCorrect="off"
+                        onChange={(event) => setWelcomeEmail(event.target.value)}
+                        placeholder="you@example.com"
+                        required
+                        spellCheck={false}
+                        type="email"
+                        value={welcomeEmail}
+                      />
+                      <small id="sign-in-link-email-why">So you can sign in on any phone or computer.</small>
+                    </label>
+                  ) : null}
+                  <button
+                    className="button button--coral booking-confirm-button"
+                    disabled={usingSignInLink || (signInAddEmail && !welcomeEmailReady)}
+                    type="submit"
+                  >
+                    {usingSignInLink ? "Signing in…" : "See my lessons"}
+                  </button>
+                </form>
               )}
             </div>
           </section>
@@ -4623,26 +4682,27 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           ) : postpay ? (
                             <>
                               <li>No payment is taken now</li>
-                              <li>Your card is charged after each lesson</li>
-                              {/* Each fee as briefly as it can be said; when it is charged,
-                                  and that a no-show costs it instead of the lesson, are in
-                                  the terms the agreement links (10 October 2026, at Dan's
-                                  request). */}
+                              <li>Your card is charged at the end of each lesson</li>
+                              {/* The rules in Dan's words, the same on every page
+                                  (2 November 2026); when a fee is charged, and that a
+                                  no-show costs it instead of the lesson, are in the
+                                  terms the agreement links. */}
                               {lateFeeCents ? <>
+                                <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
                                 <li>
-                                  <strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel less than {noticeHours} hours before
+                                  <strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later, or if you don&rsquo;t show up
                                 </li>
-                                <li>
-                                  <strong>{formatMoneyCents(lateFeeCents)}</strong> if you don’t show up to a lesson
-                                </li>
-                              </> : <li>No fee to move or cancel, or for a missed lesson</li>}
+                              </> : <li>No fee to change or cancel, or for a missed lesson</li>}
                             </>
                           ) : (
                             <>
                               <li>Pay Inês on the lesson day</li>
-                              {lateFeeCents ? <li>
-                                <strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel less than {noticeHours} hours before
-                              </li> : null}
+                              {/* Paid in person, a missed lesson is the lesson itself, so
+                                  only the late change has a fee here. */}
+                              {lateFeeCents ? <>
+                                <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
+                                <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later</li>
+                              </> : null}
                             </>
                           )}
                           {form.repeat === null ? <li>Ongoing lessons repeat until you stop them</li> : null}

@@ -52,6 +52,8 @@ Inês on /schedule                     (her own account, role=teacher)
   → GET  /admin/receipts?month=YYYY-MM               every amount paid or due for a Porto month's lessons,
                                                      with the NIF to issue to (her Receipts tab and automation)
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
+  → POST /admin/students/:id/invite-link             make a sign-in link for her to send on WhatsApp;
+                                                     nothing emailed (ten an hour per student)
   → POST /admin/students/:id/dormant                 mark them dormant, or active again; nothing emailed
   → GET/POST /admin/dormant-email                    the default each come-back email starts from
   → POST /admin/students/:id/dormant-email           send one dormant student theirs, at most once a day
@@ -640,6 +642,23 @@ first. The stand-in never leaves the database (`workers/booking/no-email.mjs`):
   show `""` for it.
 
 `POST /admin/students/:id/welcome` is refused (400) until she gives an email.
+Her way to them instead is the WhatsApp invite (2 November 2026, Dan: most of
+her students never gave an email, and only two had signed in):
+`POST /admin/students/:id/invite-link` makes the same one-click sign-in link a
+welcome carries (14 days, single use, issued under the welcome's authorization
+so a teacher session can make it), returns `{ url }` and sends nothing; her page
+puts it after her own words in a `wa.me` link she sends from WhatsApp herself.
+It is refused for a teacher account (409) and limited to ten an hour per
+student (429). Pressing `See my lessons` on it signs them in and, as any
+sign-in link does, sets `email_verified_at` and `last_login_at` even on the
+`no-email:` stand-in, so a student with no email can save a card (Stripe is
+given no address for them). For a student with no email, every sign-in link
+ends `&addEmail=1` (not a credential, only which welcome to show), so the
+welcome asks for their address beside its button; the same press signs them
+in and requests the usual `/me/email` confirmation link, and Your lessons asks
+again, before anything else and with nothing beneath it, if that request
+failed or the link had no hint. A link made before an address change stops
+working, as a welcome's does.
 `POST /admin/students/:id/details` sets name, phone, NIF and splat at any time.
 It sets or corrects the email only while the student has never signed in (no
 password, Google link or sign-in); after that it answers 409 and the student
@@ -896,13 +915,13 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   links in emails Inês causes last 14 days. A link is signed like a reset under
   its own prefix, and its `sign_in_links` row is the record that it is unspent:
   `POST /auth/email-link/confirm` deletes the row first, so of two clicks one
-  signs in (the page calls it only when the student presses `Sign in`, so a
+  signs in (the page calls it only when the student presses `See my lessons`, so a
   mail scanner opening the link spends nothing), and only while the account still has the address the link was sent
   to. A link proves the address. On an account that was registered with a
   password and never proven, it makes a Google first link's transition: the
   password, other sessions and any pending reset or address change go. Teacher
   accounts are never sent one. `/book/?signin=` takes the link out of the
-  address bar at once and shows `Sign in`; pressing it opens `Your lessons`,
+  address bar at once and shows `See my lessons`; pressing it opens `Your lessons`,
   and a spent or expired link opens the panel on asking for a new one.
 - **An address counts as proven once it has received mail.**
   `students.email_verified_at` (migration 0020) is set by any Google sign-in,
@@ -1158,7 +1177,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   runs in setup mode, so no money is taken while the run is booked. The whole
   run is held until its webhook proves a reusable card exists, then every
   occurrence becomes `scheduled`. The minute cron charges an occurrence
-  only once its no-show window has closed, an hour after `ends_at` (see
+  when it ends, on the first sweep at or after `ends_at` (see
   *The no-show policy*). Open-ended top-ups inherit the same consent
   and scheduled state. A declined charge marks the row `payment_due` and emails
   the student a hosted pay-now link; Inês sees it as a Needs you card until it
@@ -1538,17 +1557,18 @@ than presenting the first lesson's price as the price of every lesson.
 
 For a confirmed saved-card lesson, the teacher schedule's lesson dialog offers
 a `No-show` tick beside `Already paid` (its accessible name `Mark no-show`)
-from the scheduled start until **an hour after the scheduled end** (Dan,
-22 October 2026, shortened from six hours; `NO_SHOW_WINDOW_HOURS` in
-`policy.mjs`), so Inês can record
-it after the lesson rather than during it. The same control can undo the mark
-during that window. `POST /admin/bookings/:id/no-show` (`{ "noShow": false }`
-undoes) accepts the change only inside that window and only while
-`payment_status = 'scheduled'`; from an hour after the end it answers 409.
+from the scheduled start until **the scheduled end** (Dan, 2 November 2026:
+"charged at the time of when the lessons ends"; it was an hour after the end
+from 22 October, and six hours before that; `NO_SHOW_WINDOW_HOURS = 0` in
+`policy.mjs`). So Inês marks a no-show while the lesson is on, typically a few
+minutes in, and ticks `Already paid` for a cash lesson before it ends. The same
+control can undo the mark during that window. `POST /admin/bookings/:id/no-show`
+(`{ "noShow": false }` undoes) accepts the change only inside that window and
+only while `payment_status = 'scheduled'`; from the end it answers 409.
 Because a no-show changes the amount, the lesson's own charge waits for the
 window to close: nothing about the lesson's payment — the charge attempt, the
 move off `scheduled`, the receipt, a declined card's pay-now email — happens
-before `ends_at` plus an hour. The charge sweep then claims the row as
+before `ends_at`. The charge sweep then claims the row as
 `processing` before reading attendance, so the teacher decision cannot race the
 PaymentIntent. Until the charge, a lesson inside the window is still an
 ordinary `scheduled` one, so Inês's own move and cancel still reach it.
@@ -1556,8 +1576,8 @@ Attendance writes also require the original lesson version and times. Moving an
 uncharged scheduled lesson to a genuinely different time clears its old no-show;
 a same-time edit and already committed payment retain attendance evidence.
 
-- **Expected attendance** charges the booked lesson price an hour after
-  `ends_at`, on the first minute sweep once the window has closed.
+- **Expected attendance** charges the booked lesson price at `ends_at`, on
+  the first minute sweep at or after it.
 - **No-show** charges €5 at the same point, instead of the booked lesson price.
 - If Inês configures that fee to zero, the Worker settles the zero obligation
   without a Stripe request, receipt or payment-recovery link. The lesson keeps
@@ -1794,12 +1814,12 @@ With `postpay` and Stripe configured:
 
 **The after-lesson policy** (Dan, 1 September 2026, `policy.mjs` is the single
 home): booking saves a card but takes no money. A scheduled row charges its
-booked amount only once its no-show window has closed, an hour after
-`ends_at` (Dan, 22 October 2026). Moving or cancelling at least 14 hours
+booked amount when the lesson ends, at `ends_at` (Dan, 2 November 2026; an
+hour after it from 22 October). Moving or cancelling at least 14 hours
 before the lesson is free; doing either later schedules one €5 action fee and
 prevents the full price from charging if the lesson was cancelled (the 14-hour
 rule, Dan, 21 September 2026). A no-show recorded between the lesson's start
-and an hour after its end changes the end charge from the booked price to €5.
+and its end changes the end charge from the booked price to €5.
 Inês is never charged a fee for a move or cancellation she makes. Older `paid`
 rows retain their earlier lock/refund promise inside the window; `not_required` rows keep
 their original pay-in-person terms. The card itself never touches the database
@@ -1960,8 +1980,8 @@ keep their original parameters.
   old tab open. `same_day_change` is never set on a paid row.
 - **Scheduled saved-card booking**: students may move or cancel right up to the
   lesson start. A change inside the window atomically schedules one €5 charge
-  to the saved card. A move keeps the later full lesson charge, due an hour
-  after the new end; a cancellation removes the full lesson charge. Once the fee is paid,
+  to the saved card. A move keeps the later full lesson charge, due at the
+  new end; a cancellation removes the full lesson charge. Once the fee is paid,
   the student and Inês are each emailed once; hers is the fiscal reminder.
 - **Stripe**: the off-session PaymentIntent is described as `Late lesson change
   fee · <reference>` and a recovery Checkout names the product `Late lesson

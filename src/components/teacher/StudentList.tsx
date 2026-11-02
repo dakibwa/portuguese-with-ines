@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Mail, UserPlus } from "lucide-react";
 import { DefaultComeBackEmail } from "@/components/teacher/DormantEmail";
 import { NeedsYou } from "@/components/teacher/NeedsYou";
@@ -9,6 +9,41 @@ import type { AdminBooking, AdminStudent } from "@/lib/admin-api";
 import type { StudentWorkspaceRow, studentWorkspace } from "@/lib/teacher-calendar";
 
 export type StudentOpenRequest = StudentRowSelection & { key: number };
+
+/**
+ * Two across, cards of different heights leave no hole under the shorter one
+ * (2 November 2026, Dan: no holes): with two or more columns each card spans
+ * as many 2 px rows as it is tall, so the next card rises into whichever
+ * column ends first, still in ranked order. One column is left alone.
+ */
+function useMasonry() {
+  const stop = useRef<(() => void) | null>(null);
+  return useCallback((ul: HTMLUListElement | null) => {
+    stop.current?.();
+    stop.current = null;
+    if (!ul || typeof ResizeObserver === "undefined") return;
+    const ROW = 2;
+    const place = () => {
+      const style = getComputedStyle(ul);
+      const columns = style.gridTemplateColumns.split(" ").filter(Boolean).length;
+      const gap = parseFloat(style.columnGap) || 0;
+      const masonry = columns > 1;
+      ul.classList.toggle("is-masonry", masonry);
+      for (const item of Array.from(ul.children) as HTMLElement[]) {
+        item.style.gridRowEnd = masonry ? `span ${Math.ceil((item.getBoundingClientRect().height + gap) / ROW)}` : "";
+      }
+    };
+    const sizes = new ResizeObserver(() => place());
+    // The cards alone are watched: a change of columns changes their widths,
+    // and watching the list too would answer its own growth.
+    const watch = () => { sizes.disconnect(); for (const item of Array.from(ul.children)) sizes.observe(item); };
+    const children = new MutationObserver(() => { watch(); place(); });
+    children.observe(ul, { childList: true });
+    watch();
+    place();
+    stop.current = () => { sizes.disconnect(); children.disconnect(); };
+  }, []);
+}
 
 /** One student, one row: setup becomes their regular profile when complete. */
 export function StudentList({ token, students, workspace, error, sending, request, onAddStudent, onStudentsChanged, onWelcome, onMeet, onView, onRetry }: {
@@ -26,6 +61,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
   onRetry: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const activeList = useMasonry();
+  const restingList = useMasonry();
   const [expanded, setExpanded] = useState<StudentRowSelection | null>(null);
   const [busyStudent, setBusyStudent] = useState("");
   const [editingDefault, setEditingDefault] = useState(false);
@@ -91,7 +128,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
     {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" onClick={onRetry} type="button">Try again</button></div> : null}
     {!students && !error ? <p role="status">Loading your students…</p> : null}
     {students && !students.length ? <p>No students yet. Press Add a student to set up your first.</p> : students && !shown.length && !resting.length ? <p role="status">No students match “{query.trim()}”.</p> : null}
-    <ul className="teacher-setup-list teacher-students__unified">{shown.map(row)}</ul>
+    <ul className="teacher-setup-list teacher-students__unified" ref={activeList}>{shown.map(row)}</ul>
     {dormantCount ? <section className="teacher-dormant" aria-labelledby="teacher-dormant-title">
       <div className="teacher-dormant__bar">
         <h3 className="teacher-eyebrow" id="teacher-dormant-title">Dormant · {dormantCount}</h3>
@@ -101,7 +138,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
       </div>
       {editingDefault ? <DefaultComeBackEmail token={token} onSaved={() => { setEditingDefault(false); setDefaultSaved(true); setDefaultVersion(value => value + 1); }} onClose={() => setEditingDefault(false)} /> : null}
       {defaultSaved ? <p className="teacher-inline-success" role="status"><Check size={15} aria-hidden="true" />Saved. Each come-back email now starts from it.</p> : null}
-      {resting.length ? <ul className="teacher-setup-list teacher-students__unified">{resting.map(row)}</ul> : null}
+      {resting.length ? <ul className="teacher-setup-list teacher-students__unified" ref={restingList}>{resting.map(row)}</ul> : null}
     </section> : null}
   </section>;
 }

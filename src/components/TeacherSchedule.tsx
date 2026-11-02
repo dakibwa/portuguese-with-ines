@@ -704,7 +704,7 @@ export function TeacherSchedule() {
       ) : null}
       {!editing && bookingsShown ? (
         <NeedsYou
-          items={needs.filter(item => !["email", "lessons", "welcome"].includes(item.kind))}
+          items={needs.filter(item => !["lessons", "welcome"].includes(item.kind))}
           sending={welcoming}
           onMeet={() => {
             document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true });
@@ -937,8 +937,9 @@ export function TeacherSchedule() {
           if (readSession() !== token) return;
           setStudents(current => current ? { ...current, list: [...current.list.filter(entry => entry.id !== student.id), student] } : { list: [student], cardsAccepted: false });
           setStudentPicker(null);
-          // With no lessons yet she goes to their welcome, which needs an email first.
-          openStudent(student, next === "welcome" ? student.email ? "welcome" : "email" : "lessons", slot);
+          // With no lessons yet she goes to their way in: the welcome email, or
+          // with no email, their WhatsApp invite (2 November 2026, Dan).
+          openStudent(student, next === "welcome" ? student.email ? "welcome" : "invite" : "lessons", slot);
           void reloadStudents();
         }}
         onClose={() => setStudentPicker(null)}

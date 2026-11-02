@@ -1112,7 +1112,11 @@ async function issueSignInLink(env, student, minutes, authorization = null) {
     await authorization?.assert();
     throw new WelcomeChangedError("Their details have changed. Please reload before sending their welcome.");
   }
-  return { url: siteUrl(env, `/book/?signin=${encodeURIComponent(token)}`), nonce };
+  // With no address yet, the welcome asks for one beside its button (2
+  // November 2026, Dan): it is their only way back in on another device. Not
+  // a credential, only which welcome to show.
+  const ask = hasEmail(student) ? "" : "&addEmail=1";
+  return { url: siteUrl(env, `/book/?signin=${encodeURIComponent(token)}${ask}`), nonce };
 }
 
 /**
@@ -2098,10 +2102,11 @@ const worker = {
 
 /**
  * Charge only once the lesson's no-show window has closed, NO_SHOW_WINDOW_HOURS
- * elapsed hours after its scheduled end: until then Inês may still record a
- * no-show, which changes the amount. All instants are stored in UTC after being
- * resolved from Porto wall-clock time, so a 17:00–18:00 lesson is due an hour
- * after 18:00 Porto time across both winter and summer time.
+ * elapsed hours after its scheduled end (none since 2 November 2026: the
+ * lesson's end): until then Inês may still record a no-show, which changes the
+ * amount. All instants are stored in UTC after being resolved from Porto
+ * wall-clock time, so a 17:00–18:00 lesson is due at 18:00 Porto time across
+ * both winter and summer time, on the first minute sweep after it.
  *
  * A decline is a fact of card networks, not an exception: the lesson stays
  * confirmed, the student gets a pay-now link, Inês gets a note, and the row
@@ -2234,6 +2239,7 @@ export function noShowProblem(row, now = new Date()) {
   if (now < new Date(row.starts_at)) return "Wait until the lesson starts before marking a no-show.";
   // The lesson's charge waits for this window, so the two never overlap.
   if (now.getTime() >= Date.parse(row.ends_at) + NO_SHOW_WINDOW_HOURS * 3600000) {
+    if (!NO_SHOW_WINDOW_HOURS) return "Attendance can be changed until the lesson ends, and it has ended.";
     const span = NO_SHOW_WINDOW_HOURS === 1 ? "an hour" : `${NO_SHOW_WINDOW_HOURS} hours`;
     return `Attendance can be changed until ${span} after the lesson ends, and that time has passed.`;
   }
@@ -6186,6 +6192,22 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     await owner.assert();
     const link = await issueSignInLink(env, student, WELCOME_LINK_MINUTES, owner);
     return json({ url: `${link.url}&cardBooking=${encodeURIComponent(row.id)}`, booking: cardBookingSummary(row) }, 200, request, env);
+  }
+
+  // A way in for her to send herself, on WhatsApp or anywhere (2 November
+  // 2026, Dan): nothing is emailed, so it also reaches someone with no email
+  // yet, who adds their own once in. The link signs them in once, within two
+  // weeks, and only while their account is as it was when she made it.
+  const inviteLink = path.match(/^\/admin\/students\/([^/]+)\/invite-link$/);
+  if (inviteLink && request.method === "POST") {
+    const student = await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(inviteLink[1]).first();
+    if (!student) return fail("That student could not be found.", 404, request, env);
+    if (student.role === "teacher") return fail("They already sign in as a teacher, so there is no link to send.", 409, request, env);
+    if (!await takeRateLimit(env, `invite-link:${student.id}`, 10, 3600)) return fail("Please wait before creating another link.", 429, request, env);
+    const owner = welcomeAuthorization(env, student, authorization);
+    await owner.assert();
+    const link = await issueSignInLink(env, student, WELCOME_LINK_MINUTES, owner);
+    return json({ url: link.url }, 200, request, env);
   }
 
   // Her welcome for a student: their one-click way in and the lessons she has

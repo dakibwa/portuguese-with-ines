@@ -2601,7 +2601,7 @@ await test("emails keep an agreed rate's cents instead of rounding to whole euro
     delete env.RESEND_API_KEY;
   }
   const email = sentEmails.find((sent) => sent.to[0] === "cents-rate@example.invalid");
-  assert.match(email.text, /^Price: €22\.50 a lesson · charged to your saved card after each lesson$/m);
+  assert.match(email.text, /^Price: €22\.50 a lesson · charged to your saved card at the end of each lesson$/m);
 });
 
 await test("moving a recurrence leaves a lesson inside 14 hours where it is and moves the rest together", async () => {
@@ -3240,12 +3240,13 @@ await test("a session presented as a manage link opens nothing, even a row keyed
     db.prepare("DELETE FROM bookings WHERE id=?").run(signed);
   }
 });
-await test("Inês can record a no-show until an hour after the lesson ends, and no lesson is charged before then", async () => {
+await test("Inês can record a no-show until the lesson ends, when it is charged, and not before", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
-  // It is 10:00: one lesson ended 59 minutes ago, one 61 minutes ago, one 55 minutes ago.
-  booking("absent-in-time", { start: "2026-09-05T08:01:00.000Z", end: "2026-09-05T09:01:00.000Z" });
-  booking("absent-too-late", { start: "2026-09-05T07:59:00.000Z", end: "2026-09-05T08:59:00.000Z" });
-  booking("attended-recently", { start: "2026-09-05T08:05:00.000Z", end: "2026-09-05T09:05:00.000Z" });
+  // It is 10:00 (charged at the end since 2 November 2026, Dan): one lesson
+  // ends at 10:30, one ended a minute ago, one ends at 10:05.
+  booking("absent-in-time", { start: "2026-09-05T09:30:00.000Z", end: "2026-09-05T10:30:00.000Z" });
+  booking("absent-too-late", { start: "2026-09-05T08:59:00.000Z", end: "2026-09-05T09:59:00.000Z" });
+  booking("attended-recently", { start: "2026-09-05T09:05:00.000Z", end: "2026-09-05T10:05:00.000Z" });
   const mark = (id, noShow = true) => call(`/admin/bookings/${id}/no-show`, { user: "teacher", body: { noShow } });
   const charged = (id) => charges.filter((charge) => charge.key.includes(`:${id}:`)).map((charge) => charge.amount);
   const status = (id) => db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(id).payment_status;
@@ -3256,31 +3257,39 @@ await test("Inês can record a no-show until an hour after the lesson ends, and 
   assert.equal((await mark("absent-in-time")).status, 200);
   const tooLate = await mark("absent-too-late");
   assert.equal(tooLate.status, 409);
-  assert.match(await tooLate.text(), /until an hour after the lesson ends/);
+  assert.match(await tooLate.text(), /until the lesson ends/);
   assert.equal(db.prepare("SELECT attendance_status FROM bookings WHERE id='absent-too-late'").get().attendance_status, "expected");
 
   await chargeDueLessons(env);
-  await chargeDueLessons(env, new Date("2026-09-05T10:00:59.999Z"));
-  assert.deepEqual(charged("absent-in-time"), [], "nothing is attempted while the no-show can still change");
+  await chargeDueLessons(env, new Date("2026-09-05T10:04:59.999Z"));
+  assert.deepEqual(charged("absent-in-time"), [], "nothing is attempted while the lesson is still on");
   assert.deepEqual(charged("attended-recently"), []);
   assert.deepEqual([status("absent-in-time"), status("attended-recently")], ["scheduled", "scheduled"]);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log WHERE booking_id IN ('absent-in-time','attended-recently')").get().n, 0, "no receipt or payment email yet");
-  assert.deepEqual(charged("absent-too-late"), [1500], "an unmarked lesson whose window has closed is charged the full price");
+  assert.deepEqual(charged("absent-too-late"), [1500], "an unmarked lesson that has ended is charged the full price");
 
-  await chargeDueLessons(env, new Date("2026-09-05T10:01:00.000Z"));
-  assert.deepEqual(charged("absent-in-time"), [500], "the no-show fee, once its window closes");
+  await chargeDueLessons(env, new Date("2026-09-05T10:05:00.000Z"));
+  assert.deepEqual(charged("attended-recently"), [1500], "charged the minute it ends");
+  await chargeDueLessons(env, new Date("2026-09-05T10:29:59.999Z"));
+  assert.deepEqual(charged("absent-in-time"), []);
+  await chargeDueLessons(env, new Date("2026-09-05T10:30:00.000Z"));
+  assert.deepEqual(charged("absent-in-time"), [500], "the no-show fee, when the lesson ends");
   assert.equal(status("absent-in-time"), "paid");
   assert.equal((await mark("absent-in-time", false)).status, 409, "and attendance is settled with it");
-  await chargeDueLessons(env, new Date("2026-09-05T10:04:59.999Z"));
-  assert.deepEqual(charged("attended-recently"), []);
-  await chargeDueLessons(env, new Date("2026-09-05T10:05:00.000Z"));
-  assert.deepEqual(charged("attended-recently"), [1500]);
 
+  const attendance = (id) => ({ ...db.prepare("SELECT attendance_status,no_show_marked_at FROM bookings WHERE id=?").get(id) });
+  const move = (id, startAt) => call(`/admin/bookings/${id}/reschedule`, { user: "teacher", body: { startAt } });
+  const committed = attendance("absent-in-time");
+  assert.equal((await move("absent-in-time", "2027-02-11T10:00:00.000Z")).status, 200);
+  assert.deepEqual(attendance("absent-in-time"), committed, "attendance already charged keeps its payment evidence");
+  assert.equal(db.prepare("SELECT charged_cents FROM bookings WHERE id='absent-in-time'").get().charged_cents, 500);
+
+  // Only a lesson still on can be marked, so the ones above would clash with
+  // the same-time save below. They are done with; clear them from the hour.
+  db.prepare("UPDATE bookings SET status='cancelled' WHERE id IN ('absent-too-late','attended-recently')").run();
   booking("absent-move", { start: "2026-09-05T09:05:00.000Z", end: "2026-09-05T10:05:00.000Z" });
   assert.equal((await mark("absent-move")).status, 200);
-  const attendance = (id) => ({ ...db.prepare("SELECT attendance_status,no_show_marked_at FROM bookings WHERE id=?").get(id) });
   const marked = attendance("absent-move");
-  const move = (id, startAt) => call(`/admin/bookings/${id}/reschedule`, { user: "teacher", body: { startAt } });
   const unchanged = await move("absent-move", "2026-09-05T09:05:00.000Z");
   assert.equal(unchanged.status, 200, await unchanged.clone().text());
   assert.deepEqual(attendance("absent-move"), marked, "saving the same time preserves attendance");
@@ -3288,11 +3297,6 @@ await test("Inês can record a no-show until an hour after the lesson ends, and 
   assert.equal(moved.status, 200, await moved.clone().text());
   assert.deepEqual(attendance("absent-move"), { attendance_status: "expected", no_show_marked_at: null }, "the new lesson time starts with expected attendance");
   assert.deepEqual({ ...db.prepare("SELECT payment_status,amount_cents FROM bookings WHERE id='absent-move'").get() }, { payment_status: "scheduled", amount_cents: 1500 }, "its full price remains to be charged");
-
-  const committed = attendance("absent-in-time");
-  assert.equal((await move("absent-in-time", "2027-02-11T10:00:00.000Z")).status, 200);
-  assert.deepEqual(attendance("absent-in-time"), committed, "attendance already charged keeps its payment evidence");
-  assert.equal(db.prepare("SELECT charged_cents FROM bookings WHERE id='absent-in-time'").get().charged_cents, 500);
 
   booking("absent-move-race", { start: "2026-09-05T09:05:00.000Z", end: "2026-09-05T10:05:00.000Z" });
   beforeRun = sql => {
@@ -3303,7 +3307,7 @@ await test("Inês can record a no-show until an hour after the lesson ends, and 
   assert.equal((await mark("absent-move-race")).status, 409, "an attendance request that loses a move race is rejected");
   assert.deepEqual(attendance("absent-move-race"), { attendance_status: "expected", no_show_marked_at: null });
 
-  booking("absent-zero", { start: "2026-09-05T08:01:00.000Z", end: "2026-09-05T09:01:00.000Z" });
+  booking("absent-zero", { start: "2026-09-05T09:30:00.000Z", end: "2026-09-05T10:30:00.000Z" });
   assert.equal((await mark("absent-zero")).status, 200);
   try {
     const configured = await call("/admin/settings", { user: "teacher", body: { settings: { same_day_change_fee_cents: 0 } } });
@@ -3311,7 +3315,7 @@ await test("Inês can record a no-show until an hour after the lesson ends, and 
     booking("action-zero", { payment: "not_required" });
     db.prepare("UPDATE bookings SET same_day_change=1,same_day_fee_status='scheduled',same_day_fee_cents=0 WHERE id='action-zero'").run();
     const checkouts = checkoutRequests.length;
-    await chargeDueLessons(env, new Date("2026-09-05T10:01:00.000Z"));
+    await chargeDueLessons(env, new Date("2026-09-05T10:30:00.000Z"));
     await chargeDueSameDayFees(env);
     assert.deepEqual({ ...db.prepare("SELECT payment_status,amount_cents,charged_cents,charge_request FROM bookings WHERE id='absent-zero'").get() },
       { payment_status: "free", amount_cents: 1500, charged_cents: 0, charge_request: null }, "a zero no-show fee leaves nothing to collect, and keeps the booked price on record");
@@ -3640,10 +3644,10 @@ await test("a prepared card link needs the student's approval and covers exactly
     assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(otherPast).payment_status, "not_required");
     assert.equal(db.prepare("SELECT automatic_payment FROM booking_series WHERE student_id=?").get(id).automatic_payment, 1);
     assert.equal(charges.length, chargeCount, "the webhook schedules; it does not take a payment");
-    await chargeDueLessons(env, new Date("2026-10-27T18:59:59Z"));
-    assert.equal(charges.filter(charge => charge.key.includes(selected)).length, 0, "the one-hour delay is preserved");
-    await chargeDueLessons(env, new Date("2026-10-27T19:00:01Z"));
-    await chargeDueLessons(env, new Date("2026-10-27T19:01:00Z"));
+    // The lesson has ended, so the next sweep takes it (charged at the end
+    // since 2 November 2026), and only once.
+    await chargeDueLessons(env, new Date("2026-10-27T18:30:00Z"));
+    await chargeDueLessons(env, new Date("2026-10-27T18:31:00Z"));
     assert.deepEqual(charges.filter(charge => charge.key.includes(selected)).map(charge => charge.amount), [1500], "exactly the authorised amount, once");
 
     for (const change of ["paid", "moved", "repriced", "cancelled"]) {
@@ -4193,6 +4197,33 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     forgetStudent("dina@example.invalid");
     db.prepare("DELETE FROM student_recurring_rates WHERE student_id IN (SELECT id FROM students WHERE name IN (?, ?))").run(isolated, full);
     db.prepare("DELETE FROM students WHERE name IN (?, ?)").run(isolated, full);
+  }
+});
+await test("she makes a sign-in link to send on WhatsApp: nothing is emailed, and a student with no email gets in once and can add a card", async () => {
+  try {
+    const { student } = await (await call("/admin/students", { user: "teacher", body: { name: "Wanda Whats" } })).json();
+    const emails = db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n;
+    assert.equal((await call(`/admin/students/${student.id}/invite-link`)).status, 401);
+    const made = await call(`/admin/students/${student.id}/invite-link`, { user: "teacher", body: {} });
+    assert.equal(made.status, 200, await made.clone().text());
+    const url = new URL((await made.json()).url);
+    assert.equal(url.pathname, "/book/");
+    assert.equal(url.searchParams.get("addEmail"), "1", "with no address, the welcome asks for one");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, emails, "no email sent or queued");
+    const confirm = () => call("/auth/email-link/confirm", { user: null, body: { token: url.searchParams.get("signin") } });
+    const login = await confirm();
+    assert.equal(login.status, 200, await login.clone().text());
+    assert.equal((await login.json()).student.email, "", "the stand-in never reaches them");
+    assert.equal((await confirm()).status, 400, "only once");
+    const row = db.prepare("SELECT last_login_at, email_verified_at FROM students WHERE id=?").get(student.id);
+    assert.ok(row.last_login_at && row.email_verified_at, "signed in, and able to save a card");
+    // A link made before their details changed no longer opens.
+    const stale = new URL((await (await call(`/admin/students/${student.id}/invite-link`, { user: "teacher", body: {} })).json()).url);
+    assert.equal((await call(`/admin/students/${student.id}/details`, { user: "teacher", body: { name: "Wanda Whats", email: "wanda@example.invalid" } })).status, 409, "signed in, the address is theirs to give");
+    db.prepare("UPDATE students SET email='wanda@example.invalid' WHERE id=?").run(student.id);
+    assert.equal((await call("/auth/email-link/confirm", { user: null, body: { token: stale.searchParams.get("signin") } })).status, 400);
+  } finally {
+    db.prepare("DELETE FROM students WHERE name = 'Wanda Whats'").run();
   }
 });
 await test("her price for a student prices their lessons, and only lessons nothing is settled on follow a change", async () => {

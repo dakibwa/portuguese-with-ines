@@ -1005,6 +1005,14 @@
   grid-column: 1/-1;
   margin-top: 0.25rem;
 }
+/* Why the action is greyed, said quietly just above it, at the size of the
+   form's other notes rather than a paragraph's. */
+.teacher-manual-hint {
+  grid-column: 1/-1;
+  margin: 0 0 -0.85rem;
+  color: var(--lavender-ink);
+  font: 500 0.78rem/1.5 var(--ui);
+}
 .teacher-inline-error,
 .teacher-inline-notice,
 .teacher-inline-success {
@@ -2045,6 +2053,9 @@
    the text at the card's full width. */
 .teacher-needs-you .teacher-lesson-card { flex-wrap: wrap; }
 .teacher-needs-you .teacher-lesson-card__who { flex: 999 1 11rem; text-wrap: pretty; }
+/* A title that wraps breaks evenly ("Jessica Riley / added a card"), never
+   leaving two words alone on its second line. */
+.teacher-needs-you .teacher-lesson-card__who > strong { text-wrap: balance; }
 .teacher-needs-you__keep { white-space: nowrap; }
 .teacher-needs-you .teacher-lesson-card .button { flex: 1 0 auto; }
 .teacher-timeoff-dialog h2 { margin-right: 2.5rem; }
@@ -2092,6 +2103,9 @@
   font: 600 1rem/1.5 var(--ui);
   letter-spacing: -0.02em;
 }
+/* "November 2026" is one name: on a phone it stays on one line beside the
+   arrows rather than breaking the year under the month. */
+.teacher-month-heading h3 { white-space: nowrap; }
 .teacher-month-label--short { display: none; }
 @media (max-width: 480px) {
   .teacher-month-heading { flex-wrap: nowrap; }
@@ -2265,11 +2279,42 @@
   min-width: fit-content;
   gap: 0.5rem;
 }
-/* With nothing chosen it is only a hint, not a card. */
-.teacher-timeoff-selection:not(.has-days) {
+/* With nothing chosen and nothing off ahead it is only a hint, not a card. */
+.teacher-timeoff-selection:not(.has-days):not(.has-upcoming) {
   border-color: transparent;
   background: transparent;
 }
+/* With nothing chosen the card lists the time off ahead, each stretch a cream
+   row like a booked lesson's, so the column beside the month is never empty
+   (2 November 2026). Tapping one chooses its days. */
+.teacher-timeoff-upcoming {
+  display: grid;
+  gap: 0.45rem;
+}
+.teacher-timeoff-upcoming .teacher-eyebrow { margin: 0; }
+.teacher-timeoff-upcoming ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.teacher-timeoff-upcoming button {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--squiggle-field);
+  padding: 0.6rem 0.9rem;
+  background: var(--paper-light);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.teacher-timeoff-upcoming button:hover { border-color: var(--rule); }
+.teacher-timeoff-upcoming strong { font: 600 0.88rem/1.35 var(--ui); }
+.teacher-timeoff-upcoming span { color: var(--lavender-ink); font: 400 0.75rem/1.4 var(--ui); }
+.teacher-timeoff-upcoming__more { margin: 0; color: var(--lavender-ink); font: 400 0.75rem/1.4 var(--ui); }
 /* What changed reads from the left with its tick, as under the week. */
 .teacher-timeoff-selection .teacher-save-state {
   justify-content: flex-start;
@@ -2463,7 +2508,12 @@
 .teacher-profile { width: min(620px, calc(100vw - 2rem)); }
 /* Let the row's available width decide how many readable lesson cards fit. */
 .teacher-history-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); align-items: start; gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
-.teacher-history-lesson { min-width: 0; padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
+.teacher-history-lesson { container-type: inline-size; min-width: 0; padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
+.teacher-history-lesson__time > i { font-style: normal; }
+@container (max-width: 23.5rem) {
+  .teacher-history-lesson__top strong .teacher-history-lesson__time { display: block; }
+  .teacher-history-lesson__time > i { display: none; }
+}
 .teacher-history-lesson.is-cancelled { background: var(--lavender-pale, #f1eef7); }
 .teacher-history-lesson__top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.45rem; font-size: 0.8rem; }
 .teacher-history-lesson__when { display: flex; flex: 1 1 9rem; flex-direction: column; align-items: flex-start; gap: 0.35rem; min-width: 0; }
@@ -3026,6 +3076,9 @@
 .teacher-setup-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 28rem), 1fr)); align-items: start; gap: 0.75rem; list-style: none; padding: 0; margin: 0; container: setup-list / inline-size; }
 .teacher-setup { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 0.35rem; min-width: 0; padding: 0.55rem 0.8rem; border: 1px solid var(--rule); border-radius: var(--squiggle-panel); background: var(--sheet); container: student-card / inline-size; }
 .teacher-setup.is-open { grid-column: 1 / -1; }
+/* Masonry two across (StudentList's useMasonry): each card spans its height in
+   2 px rows, its span carrying the gap beneath it. */
+.teacher-setup-list.is-masonry { grid-auto-rows: 2px; row-gap: 0; margin-bottom: -0.75rem; }
 .teacher-setup__header { display: grid; grid-template-columns: minmax(9rem, 1fr) minmax(264px, 3fr) max-content; align-items: center; gap: 0.5rem; min-width: 0; }
 .teacher-setup__header:has(.teacher-setup__steps li:last-child:nth-child(5)) { grid-template-columns: minmax(9rem, 1fr) minmax(220px, 3fr) max-content; }
 .teacher-setup__profile { display: flex; align-items: center; gap: 0.6rem; border: 0; padding: 0; min-width: 0; text-align: left; background: none; color: inherit; font: inherit; cursor: pointer; }
@@ -3238,6 +3291,11 @@
 /* Her whole email shows where the browser can grow a field to its words. */
 :is(.teacher-come-back-default, .teacher-come-back) textarea { resize: vertical; line-height: 1.6; field-sizing: content; min-height: 12rem; max-height: 70vh; }
 :is(.teacher-come-back-default, .teacher-come-back) .teacher-dialog-actions { justify-self: end; }
+/* A WhatsApp invite reads as a come-back email does: its message, then its
+   two buttons at the right (2 November 2026). */
+.teacher-invite textarea { resize: vertical; line-height: 1.6; field-sizing: content; min-height: 6rem; max-height: 50vh; }
+.teacher-invite .teacher-dialog-actions { justify-self: end; }
+.teacher-invite__making { margin: 0; font-size: 0.78rem; color: var(--lavender-ink); }
 .teacher-come-back__wait { margin: 0; font-size: 0.78rem; }
 .teacher-come-back > .teacher-inline-error { margin: 0; }
 .teacher-student__history { min-width: 0; }

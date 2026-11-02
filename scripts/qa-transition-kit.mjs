@@ -84,7 +84,7 @@ try {
     assert.ok(!linked.page.url().includes("signin="), "the link leaves the address bar at once");
     assert.equal(linked.posts.filter((post) => post.endpoint === "/auth/email-link/confirm").length, 0, "nothing is spent on arrival");
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/link-${width}.png`, fullPage: false });
-    await linked.page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await linked.page.getByRole("button", { name: "See my lessons", exact: true }).click();
     const prompt = linked.page.locator(".card-prompt");
     await expect(prompt.getByRole("heading", { name: "Pay by card" })).toBeVisible({ timeout: 15000 });
     await expect(prompt).toContainText("Add your card once and you’re set.");
@@ -121,7 +121,7 @@ try {
     await expect(combined.page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible({ timeout: 15000 });
     assert.equal(combined.posts.length, 0);
     assert.ok(!combined.page.url().includes("signin="));
-    await combined.page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await combined.page.getByRole("button", { name: "See my lessons", exact: true }).click();
     const approval = combined.page.locator(".card-prompt");
     await expect(approval).toContainText("€15");
     await combined.page.reload();
@@ -161,7 +161,7 @@ try {
       },
     });
     try {
-      await interrupted.page.getByRole("button", { name: "Sign in", exact: true }).click({ timeout: 15000 });
+      await interrupted.page.getByRole("button", { name: "See my lessons", exact: true }).click({ timeout: 15000 });
       await linkStarted.promise;
       await interrupted.page.evaluate(() => {
         localStorage.setItem("ines-student-session", "qa-newer-session");
@@ -169,7 +169,7 @@ try {
       });
       const linkResponse = interrupted.page.waitForResponse("**/auth/email-link/confirm");
       linkWaiting.resolve(); await linkResponse;
-      await expect(interrupted.page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
+      await expect(interrupted.page.getByRole("button", { name: "See my lessons", exact: true })).toBeEnabled();
       assert.equal(await interrupted.page.evaluate(() => localStorage.getItem("ines-student-session")), "qa-newer-session");
 
       // Remove the welcome surface by returning to the account in a fresh
@@ -201,7 +201,7 @@ try {
         return null;
       },
     });
-    await spent.page.getByRole("button", { name: "Sign in", exact: true }).click({ timeout: 15000 });
+    await spent.page.getByRole("button", { name: "See my lessons", exact: true }).click({ timeout: 15000 });
     // The landing says why and offers the way on, never a dead end.
     await expect(spent.page.locator(".sign-in-link [role=alert]")).toContainText("already been used");
     await spent.page.getByRole("button", { name: "Email me a new link", exact: true }).click();
@@ -232,7 +232,7 @@ try {
           return nativeSet.call(this, key, value);
         };
       });
-      await blocked.page.getByRole("button", { name: "Sign in", exact: true }).click({ timeout: 15000 });
+      await blocked.page.getByRole("button", { name: "See my lessons", exact: true }).click({ timeout: 15000 });
       await expect(blocked.page.locator(".sign-in-link [role=alert]")).toContainText("this link has now been used");
       await expect(blocked.page.getByRole("button", { name: "Email me a new link", exact: true })).toBeVisible();
       assert.equal(await blocked.page.evaluate(() => localStorage.getItem("ines-student-session")), null);

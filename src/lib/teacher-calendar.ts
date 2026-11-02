@@ -388,7 +388,6 @@ export const NEEDS_YOU_AHEAD_DAYS = 7;
 export type NeedsYouItem =
   | { kind: "meet"; key: "meet"; reconnect: boolean }
   | { kind: "payment"; key: string; review: PaymentReview; part: "lesson" | "fee" | "refund" }
-  | { kind: "email"; key: string; student: AdminStudent }
   | { kind: "lessons"; key: string; student: AdminStudent }
   | { kind: "welcome"; key: string; student: AdminStudent; at?: string | null }
   | { kind: "changed"; key: string; booking: AdminBooking; count: number; first: boolean }
@@ -412,12 +411,16 @@ export type StudentSetup = {
 };
 
 /** A past lesson counts too; her students do not need a future booking to stay set up. */
-const hasLessons = (student: AdminStudent) => Boolean(student.hasLessons || student.nextLessonAt || student.upcoming || student.weekly);
+export const hasLessons = (student: AdminStudent) => Boolean(student.hasLessons || student.nextLessonAt || student.upcoming || student.weekly);
 
 /** New setup suggests the lesson before the email, without requiring one; completed steps stay editable. */
 export function gettingStarted(students: AdminStudent[], cardsAccepted = true): StudentSetup[] {
   return students.flatMap((student) => {
     const email = Boolean(student.email && !student.email.startsWith(NO_EMAIL_YET));
+    // No email is a way of being set up, not a step left undone (2 November
+    // 2026, Dan): most of her students pay her in person and never gave one.
+    // Their card is the usual one, with a WhatsApp invite as their way in.
+    if (!email) return [];
     const steps: StudentSetup["steps"] = [
       { id: "price", label: "Price", done: true },
       { id: "lessons", label: "Lessons", done: hasLessons(student) },
@@ -487,7 +490,7 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
   const general: NeedsYouItem[] = [];
   for (const item of items) {
     // These are the row's setup steps, rather than duplicate task cards.
-    if (item.kind === "email" || item.kind === "lessons" || item.kind === "welcome") continue;
+    if (item.kind === "lessons" || item.kind === "welcome") continue;
     const booking = item.kind === "payment" ? byBooking.get(item.review.id) : "booking" in item ? item.booking : undefined;
     const row = "student" in item ? byId.get(item.student.id)
       : booking && (booking.student_id ? byId.get(booking.student_id) : byEmail.get(realEmail(booking.student_email)));
@@ -579,9 +582,8 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
   for (const student of students) {
     const email = student.email ?? "";
     const time = Date.parse(student.nextLessonAt ?? "") || Infinity;
-    if (!email || email.startsWith(NO_EMAIL_YET))
-      timed.push({ time, changed: 0, item: { kind: "email", key: `email:${student.id}`, student } });
-    else if (student.awaitingWelcome)
+    // No email is not a to-do (2 November 2026, Dan); a welcome is, once there is one.
+    if (email && !email.startsWith(NO_EMAIL_YET) && student.awaitingWelcome)
       timed.push({ time, changed: 0, item: { kind: "welcome", key: `welcome:${student.id}`, student, at: student.nextLessonAt } });
     if (!hasLessons(student))
       timed.push({ time, changed: 0, item: { kind: "lessons", key: `lessons:${student.id}`, student } });

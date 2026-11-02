@@ -410,7 +410,8 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
   ];
   const items = needsYou({ now, meet, payments: [{ id: "p1", reference: "REVIEW-1", payment_status: "processing" }], students, lessons, cancellations });
   assert.deepEqual(new Set(items.map(item => item.key)), new Set([
-    "meet", "payment:p1", "first:first-soon", "welcome:Ana", "welcome:Kai", "email:Bea", "email:Cal", "changed:changed-recent", "changed:w1", "cancelled:c1", "changed:first-changed", "changed:added-changed", "cancelled:r1",
+    // No email is not a to-do (2 November 2026, Dan): Bea and Cal wait on nothing.
+    "meet", "payment:p1", "first:first-soon", "welcome:Ana", "welcome:Kai", "changed:changed-recent", "changed:w1", "cancelled:c1", "changed:first-changed", "changed:added-changed", "cancelled:r1",
   ]));
   const changes = items.filter(item => item.kind === "changed");
   assert.equal(changes[0].key, "changed:first-changed", "newest student changes lead older ones");
@@ -453,7 +454,7 @@ test("a declined card and a card just added are Needs you cards on the student's
   assert.deepEqual(workspace.rows.map((row) => [row.student.id, row.items.length]), [["ana", 2], ["kai", 1], ["dot", 0]]);
 });
 
-test("setup suggests lessons before email and student steps without requiring them, while completed steps stay editable", () => {
+test("setup suggests lessons before student steps without requiring them, completed steps stay editable, and no email counts as set up", () => {
   const student = (id, extra) => ({ id, name: id, email: `${id}@example.invalid`, signedIn: false, hasCard: false, hasLessons: true, awaitingWelcome: true, ...extra });
   const students = [
     student("email", { email: "" }),
@@ -466,34 +467,30 @@ test("setup suggests lessons before email and student steps without requiring th
     student("past", { awaitingWelcome: false, signedIn: true, hasCard: true, nextLessonAt: null }),
   ];
   const setup = gettingStarted(students);
+  // No email is not a step left undone (2 November 2026, Dan): their card is the usual one, with a WhatsApp invite.
   assert.deepEqual(setup.map(row => [row.student.id, row.next, row.owner]), [
-    ["email", "email", "Yours"], ["lessons", "lessons", "Yours"], ["welcome", "welcome", "Yours"], ["far", "welcome", "Yours"],
+    ["lessons", "lessons", "Yours"], ["welcome", "welcome", "Yours"], ["far", "welcome", "Yours"],
     ["sign-in", "sign-in", "Theirs"], ["card", "card", "Theirs"],
   ]);
   assert.deepEqual(setup[0].steps.map(step => step.id), ["price", "lessons", "email", "welcome", "sign-in", "card"]);
   assert.deepEqual(setup.map(row => row.steps.map(step => step.done)), [
-    [true, true, false, false, false, false], [true, false, true, false, false, false],
+    [true, false, true, false, false, false],
     [true, true, true, false, false, false], [true, true, true, false, false, false],
     [true, true, true, true, false, false], [true, true, true, true, true, false],
   ]);
   const by = (row, id) => row.steps.find(step => step.id === id);
-  const nameOnly = gettingStarted([student("name-only", { email: "", hasLessons: false })])[0];
-  assert.equal(nameOnly.next, "lessons", "standard prices are ready, so the first lesson is suggested before the email");
-  assert.equal(by(nameOnly, "lessons").lockedReason, undefined);
-  // A lesson is never required (16 October 2026, Inês): the email is open, and only it holds the welcome.
-  assert.equal(by(nameOnly, "email").lockedReason, undefined);
-  assert.ok(nameOnly.steps.filter(step => ["welcome", "sign-in", "card"].includes(step.id)).every(step => step.lockedReason === "Add an email first."));
-  assert.equal(by(setup[1], "welcome").lockedReason, undefined, "a student with an email and no lessons can be welcomed");
-  assert.equal(by(setup[1], "sign-in").lockedReason, "Send the welcome email first.");
-  assert.ok(by(setup[0], "welcome").lockedReason);
-  assert.ok(by(setup[2], "sign-in").lockedReason);
-  assert.ok(by(setup[4], "card").lockedReason);
+  assert.deepEqual(gettingStarted([student("name-only", { email: "", hasLessons: false })]), [], "a name alone is a student, not setup");
+  // A lesson is never required (16 October 2026, Inês).
+  assert.equal(by(setup[0], "welcome").lockedReason, undefined, "a student with an email and no lessons can be welcomed");
+  assert.equal(by(setup[0], "sign-in").lockedReason, "Send the welcome email first.");
+  assert.ok(by(setup[1], "sign-in").lockedReason);
+  assert.ok(by(setup[3], "card").lockedReason);
   // Once welcomed, booking is theirs: no lessons holds nothing open.
   const welcomedNoLessons = gettingStarted([student("welcomed", { hasLessons: false, awaitingWelcome: false })])[0];
   assert.equal(welcomedNoLessons.next, "sign-in");
   assert.deepEqual(gettingStarted([student("legacy", { hasLessons: false, awaitingWelcome: undefined, signedIn: true, hasCard: true })]), [], "signed in with a card and no lessons is a student, not setup");
   const tasks = needsYou({ now: new Date("2026-10-14T10:00:00Z"), meet: null, payments: [], students, lessons: [], cancellations: [] });
-  assert.deepEqual(new Set(tasks.map(item => item.key)), new Set(["welcome:far", "email:email", "lessons:lessons", "welcome:lessons", "welcome:welcome"]));
+  assert.deepEqual(new Set(tasks.map(item => item.key)), new Set(["welcome:far", "lessons:lessons", "welcome:lessons", "welcome:welcome"]));
   assert.ok(tasks.every(item => setup.some(row => row.student.id === item.student.id && row.owner === "Yours")), "the tab count excludes waiting on them");
   assert.deepEqual(gettingStarted([student("cards-off", { awaitingWelcome: false, signedIn: true })], false), [], "cards switched off do not hold setup open");
   assert.deepEqual(gettingStarted([student("free", { awaitingWelcome: false, signedIn: true, prices: { 60: 0, 90: 0 } })]), [], "a student free at every length has no card to add");
@@ -503,8 +500,9 @@ test("setup suggests lessons before email and student steps without requiring th
     ready("regular", { name: "Alex" }),
     student("waiting", { awaitingWelcome: false }),
     ready("first"),
-    student("setup-later", { email: "", nextLessonAt: "2026-10-20T10:00:00Z" }),
-    student("setup-soon", { email: "", nextLessonAt: "2026-10-15T10:00:00Z" }),
+    student("setup-later", { nextLessonAt: "2026-10-20T10:00:00Z" }),
+    student("setup-soon", { nextLessonAt: "2026-10-15T10:00:00Z" }),
+    student("no-email", { email: "", awaitingWelcome: true, signedIn: false, hasCard: false, nextLessonAt: "2026-10-16T10:00:00Z" }),
     ready("changed-old"),
     ready("changed-new"),
     ready("payment", { name: "Same Name" }),
@@ -524,7 +522,7 @@ test("setup suggests lessons before email and student steps without requiring th
   ];
   const setupTasks = needsYou({ now: new Date("2026-10-14T10:00:00Z"), meet: null, payments: [], students: workspaceStudents, lessons: [], cancellations: [] });
   const workspace = studentWorkspace(workspaceStudents, [...setupTasks, ...operational], true, [paymentBooking, paymentBookingTwo]);
-  assert.deepEqual(workspace.rows.map(row => row.student.id), ["payment", "changed-new", "changed-old", "setup-soon", "setup-later", "first", "waiting", "regular", "same-name"]);
+  assert.deepEqual(workspace.rows.map(row => row.student.id), ["payment", "changed-new", "changed-old", "setup-soon", "setup-later", "first", "waiting", "no-email", "regular", "same-name"]);
   assert.equal(new Set(workspace.rows.map(row => row.student.id)).size, workspaceStudents.length, "each student has one row");
   assert.deepEqual(workspace.rows.find(row => row.student.id === "payment").items.map(item => item.key), ["payment:pay-one", "payment:pay-two"], "student identity wins over a mismatched email");
   assert.ok(workspace.rows.every(row => row.items.every(item => !["email", "lessons", "welcome"].includes(item.kind))), "setup actions are not repeated as task cards");
