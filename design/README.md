@@ -1997,23 +1997,29 @@ gave an email, and only two had ever signed in.
   Sign in panels offer lilac `WhatsApp instead`. Keep the message short (Dan:
   "quite wordy and not in fitting with our super simple fresh design");
   the site does the teaching.
-- The welcome screen a link opens is that teaching, said once: `Welcome`,
-  `Your lessons with Inês, all in one place. No password needed.`, dabs
-  (`Book new lessons yourself`, `Open a lesson to move or cancel it`, then the
-  rules) and coral `See my lessons`. Nothing asks them to book what Inês has
-  already booked.
+- Arriving is one short process in one card style (Dan: onboarding as "the
+  same single process", so it is simple): the welcome card, then `Confirm
+  your card payments`, then their lessons. The welcome is the card prompt's
+  own shell at the same place and width, its lavender icon circle, `Welcome`
+  and `Your lessons with Inês, all in one place. No password needed.` beside
+  it, two dabs (`Book new lessons yourself`, `Open a lesson to move or cancel
+  it`) and coral `See my lessons`, beside the dabs on a wide card and under
+  them on a phone, as the payment card's action sits. The rules are said
+  once, on the card they agree to, not on both. Nothing asks them to book
+  what Inês has already booked.
 - The rules read the same wherever a student meets them (2 November 2026,
   Dan): `Free to change or cancel a lesson up to 14 hours before` (the first
   four words bold in ink, since coral is for a charge) and `€5 to move or
   cancel later, or if you don’t show up` (the no-show part only where cards
   are taken), `Your card is charged at the end of each lesson`, and with no fee
-  `No fee to change or cancel, or for a missed lesson`. That covers the welcome
-  screen, the booking confirm step and its success, and the card terms.
-- On Your lessons, a student with no email sees `Pay by card` and `Add your
-  email` (`So you can always get back in.`, an email field and blue `Add
-  email`) as two rows of one sheet card, never two cards pushing their lessons
-  down; once sent it reads `Check your email` / `Open the link we sent to … on
-  this phone.` Their Details email row reads `Not added` with `Add email`.
+  `No fee to change or cancel, or for a missed lesson`. That covers the card
+  terms, and the booking confirm step and its success.
+- One card at a time sits above a student's lessons: the card to confirm
+  first, and only then, for a student with no email, `Add your email` (`So
+  you can always get back in.`, an email field and blue `Add email`) in the
+  same card shape. Once sent it reads `Check your email` / `Open the link we
+  sent to … on this phone.` Their Details email row reads `Not added` with
+  `Add email`.
 - Students' cards on a wide list each keep their own height, packed in
   columns, so a short card never leaves a hole under it.
 - `Time off`'s card lists what is `Coming up` (consecutive whole days as one

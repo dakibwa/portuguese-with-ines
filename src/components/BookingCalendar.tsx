@@ -9,6 +9,7 @@ import { flushSync } from "react-dom";
 import {
   AlertCircle,
   ArrowLeft,
+  CalendarCheck,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -3723,78 +3724,85 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         {lessonsLoading && !pendingSignIn ? <LessonsLoading todayKey={viewTodayKey || todayKey} /> : null}
 
         {pendingSignIn ? (
-          <section className="booking-workflow-sign-in" id="booking-lessons-sign-in" tabIndex={-1}>
-            <div className="auth-panel sign-in-link">
-              <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="auth-panel__mark" />
-              <h2>Welcome</h2>
-              {/* What the page is for, as a student Inês set up first hears of
-                  it, and how it now works (2 November 2026, Dan: "we want
-                  basically students to … use the website to book/change/amend
-                  all future lessons, if that requires some teaching that's
-                  fine"). Three dabs, said once, where they arrive. */}
-              <p className="auth-panel__intro">
-                Your lessons with Inês, all in one place. No password needed.
-                {/* Someone else's account open on this device: say what the press does. */}
-                {student ? ` You’re signed in as ${student.name}; this switches to the account the link was sent for.` : null}
-              </p>
-              <ul className="booking-payment-facts sign-in-link__steps">
-                <li>Book new lessons yourself</li>
-                <li>Open a lesson to move or cancel it</li>
-                {/* Dan's words for the rules, the same wherever they're said (2 November 2026). */}
-                {lateFeeCents === 0 ? <li>No fee to change or cancel, or for a missed lesson</li> : <>
-                  <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
-                  <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later{postpay ? <>, or if you don&rsquo;t show up</> : null}</li>
-                </>}
-              </ul>
-              {signInLinkError ? (
-                <div className="booking-alert booking-alert--error" role="alert">
-                  <AlertCircle size={18} aria-hidden="true" />
-                  <p>{signInLinkError}</p>
+          <section className="booking-workflow-sign-in booking-workflow-sign-in--welcome" id="booking-lessons-sign-in" tabIndex={-1}>
+            {/* The same single card as the payment card that follows it, so
+                arriving reads as one short process: this card, then theirs,
+                then their lessons (2 November 2026: Dan asked for onboarding
+                to be the same single process, in style at least, so it is
+                simple). It says how the site now works (Dan: students "use
+                the website to book/change/amend all future lessons"); the
+                rules come once, on the card they agree to. */}
+            <div className="card-prompt card-prompt--open sign-in-link">
+              <span aria-hidden="true" className="card-prompt__icon">
+                <CalendarCheck size={20} />
+              </span>
+              <div className="card-prompt__body">
+                <h2>Welcome</h2>
+                <p>
+                  Your lessons with Inês, all in one place. No password needed.
+                  {/* Someone else's account open on this device: say what the press does. */}
+                  {student ? ` You’re signed in as ${student.name}; this switches to the account the link was sent for.` : null}
+                </p>
+              </div>
+              <div className="card-terms card-terms--approval">
+                <ul className="booking-payment-facts">
+                  <li>Book new lessons yourself</li>
+                  <li>Open a lesson to move or cancel it</li>
+                </ul>
+                <div className="card-terms__consent">
+                  {signInLinkError ? (
+                    <div className="booking-alert booking-alert--error" role="alert">
+                      <AlertCircle size={18} aria-hidden="true" />
+                      <p>{signInLinkError}</p>
+                    </div>
+                  ) : null}
+                  <div className="my-lessons__edit-actions">
+                    {signInLinkError ? (
+                      <button
+                        className="button button--coral"
+                        onClick={() => {
+                          setPendingSignIn("");
+                          // Signed out, the panel opens on asking for a new link.
+                          if (student) setSignInLinkError("");
+                          else setShowAccountSignIn(true);
+                        }}
+                        type="button"
+                      >
+                        {student ? "Back to your lessons" : "Email me a new link"}
+                      </button>
+                    ) : (
+                      <button
+                        className="button button--coral"
+                        disabled={usingSignInLink}
+                        onClick={async () => {
+                          const request = ++signInLinkRequest.current;
+                          const session = readSession();
+                          const page = window.location.pathname;
+                          const current = () => request === signInLinkRequest.current && readSession() === session && window.location.pathname === page;
+                          setUsingSignInLink(true);
+                          try {
+                            const result = await confirmSignInLink(pendingSignIn);
+                            if (!current()) return;
+                            storeSession(result.session);
+                            setPendingSignIn("");
+                            enterLessons(result.student);
+                          } catch (caught) {
+                            if (!current()) return;
+                            setSignInLinkError(caught instanceof SessionStorageError
+                              ? "Your browser couldn’t save your sign-in, and this link has now been used. Allow site storage, then ask for a new link below."
+                              : caught instanceof Error ? caught.message : "That sign-in link couldn’t be used. Enter your email for a new one.");
+                          } finally {
+                            if (request === signInLinkRequest.current) setUsingSignInLink(false);
+                          }
+                        }}
+                        type="button"
+                      >
+                        {usingSignInLink ? "Signing in…" : "See my lessons"}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ) : null}
-              {signInLinkError ? (
-                <button
-                  className="button button--coral booking-confirm-button"
-                  onClick={() => {
-                    setPendingSignIn("");
-                    // Signed out, the panel opens on asking for a new link.
-                    if (student) setSignInLinkError("");
-                    else setShowAccountSignIn(true);
-                  }}
-                  type="button"
-                >
-                  {student ? "Back to your lessons" : "Email me a new link"}
-                </button>
-              ) : (
-                <button
-                  className="button button--coral booking-confirm-button"
-                  disabled={usingSignInLink}
-                  onClick={async () => {
-                    const request = ++signInLinkRequest.current;
-                    const session = readSession();
-                    const page = window.location.pathname;
-                    const current = () => request === signInLinkRequest.current && readSession() === session && window.location.pathname === page;
-                    setUsingSignInLink(true);
-                    try {
-                      const result = await confirmSignInLink(pendingSignIn);
-                      if (!current()) return;
-                      storeSession(result.session);
-                      setPendingSignIn("");
-                      enterLessons(result.student);
-                    } catch (caught) {
-                      if (!current()) return;
-                      setSignInLinkError(caught instanceof SessionStorageError
-                        ? "Your browser couldn’t save your sign-in, and this link has now been used. Allow site storage, then ask for a new link below."
-                        : caught instanceof Error ? caught.message : "That sign-in link couldn’t be used. Enter your email for a new one.");
-                    } finally {
-                      if (request === signInLinkRequest.current) setUsingSignInLink(false);
-                    }
-                  }}
-                  type="button"
-                >
-                  {usingSignInLink ? "Signing in…" : "See my lessons"}
-                </button>
-              )}
+              </div>
             </div>
           </section>
         ) : needsLessonsSignIn ? (

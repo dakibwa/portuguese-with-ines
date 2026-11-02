@@ -5654,18 +5654,11 @@ p.lesson-when > span {
   opacity: 0.82;
 }
 
-/* Arriving from a link, how the page works, as three dabs: left-aligned in
-   the centred card, at the intro's size, then the one button. */
-.sign-in-link .auth-panel__intro {
-  margin-bottom: 1rem;
-}
-
-.sign-in-link__steps {
-  width: fit-content;
-  max-width: 100%;
-  margin: 0 auto 1.5rem;
-  font-size: 0.93rem;
-  text-align: left;
+/* Arriving from a link: the same card as the payment card that follows, at
+   the width it will have, laid out as it is (how the page works as two dabs,
+   the one button beside them on a wide card, under them on a phone). */
+.booking-workflow-sign-in--welcome {
+  width: 100%;
 }
 
 /*
@@ -9540,6 +9533,7 @@ dialog[open]::backdrop {
   gap: 0.5rem;
 }
 
+.card-prompt h2,
 .card-prompt h3 {
   margin: 0;
   font: 600 1rem/1.4 var(--ui);
@@ -9575,27 +9569,6 @@ dialog[open]::backdrop {
   .card-prompt__body > .card-terms {
     grid-column: 1 / -1;
   }
-}
-
-/* Card and email together are one sheet, its two rows parted by a rule. */
-.account-prompts {
-  margin-bottom: 1rem;
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-panel);
-  padding-inline: var(--pad-card);
-  background: var(--sheet);
-}
-
-.account-prompts > .card-prompt {
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  padding-inline: 0;
-  background: none;
-}
-
-.account-prompts > .card-prompt + .card-prompt {
-  border-top: 1px solid var(--rule-soft);
 }
 
 /* Add your email, for a student let in from a WhatsApp link: the card
@@ -9657,6 +9630,7 @@ dialog[open]::backdrop {
   row-gap: 0.2rem;
 }
 
+.card-prompt--open h2,
 .card-prompt--open h3,
 .card-prompt--open .card-prompt__body > p {
   grid-column: 2;

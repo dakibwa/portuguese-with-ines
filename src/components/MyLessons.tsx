@@ -952,7 +952,8 @@ export function MyLessons({
   const askForCard = !cardSaved && !cardChecking && cardsAccepted && hasStudentSide(student) &&
     student.cardForAllLessons === false && unpaidAdded > 0;
   // Someone Inês let in from a WhatsApp link may have no email yet (2 November
-  // 2026, Dan); it is how they sign in again, so it is asked for here, once.
+  // 2026, Dan); it is how they sign in again, so it is asked for here, once,
+  // after the card: never a second card beside it (Dan: one single process).
   const emailPrompt = !student.email && hasStudentSide(student) ? (
     <section aria-labelledby="email-prompt-heading" className={`card-prompt email-prompt${emailPending ? "" : " card-prompt--open"}`}>
       <span aria-hidden="true" className="card-prompt__icon">
@@ -998,10 +999,9 @@ export function MyLessons({
   return (
     <>
       {cardNote}
-      {/* Arriving from Inês's WhatsApp link with both still to do, the card
-          and the email are one card with two rows, not two cards pushing
-          their lessons down (2 November 2026, Dan: "super smooth"). */}
-      {cardPrompt && emailPrompt ? <div className="account-prompts">{cardPrompt}{emailPrompt}</div> : cardPrompt ?? emailPrompt}
+      {/* One card at a time above their lessons (2 November 2026, Dan: "super
+          smooth"): the card to confirm first, then the email ask. */}
+      {cardPrompt ?? emailPrompt}
       {alert}
     </>
   );
