@@ -7410,6 +7410,10 @@ p.lesson-when > span {
   color: var(--coral-action);
   white-space: nowrap;
 }
+/* What costs nothing is bold in the text's own blue; coral is for a charge. */
+.booking-payment-facts strong.is-free {
+  color: var(--ink);
+}
 
 .booking-payment-facts a {
   color: inherit;

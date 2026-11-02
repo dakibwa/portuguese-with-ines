@@ -170,11 +170,11 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
                 : `This lesson is charged${saved} ${chargedOnAgreement === "none" ? "an hour after it ends" : onAgreement}`}
             </li>
             <li>Future lessons are charged {then.length ? "" : "automatically, "}an hour after each one</li>
-            {fee ? (
-              <li>
-                <strong>{formatMoneyCents(fee)}</strong> to move or cancel less than {notice} hours before, or if you don’t show up
-              </li>
-            ) : <li>No fee to move or cancel, or for a missed lesson</li>}
+            {fee ? <>
+              {/* What is free first, then what it costs (2 November 2026, Dan). */}
+              <li><strong className="is-free">Free</strong> to move or cancel up to {notice} hours before</li>
+              <li><strong>{formatMoneyCents(fee)}</strong> to move or cancel later, or if you don’t show up</li>
+            </> : <li>No fee to move or cancel, or for a missed lesson</li>}
           </ul>
         </div>
       ) : null}
@@ -209,13 +209,12 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
         <li>Your upcoming lessons with Inês are charged to it, each one hour after it ends, at the price in your bookings</li>
         <li>Already paid Inês for some? Tell her before agreeing</li>
         <li>Stripe keeps your card safe</li>
-        {/* One fee line, as the payment approval card has (27 October 2026,
-            Dan: fewer lines, the same terms). */}
-        {fee ? (
-          <li>
-            <strong>{formatMoneyCents(fee)}</strong> to move or cancel less than {notice} hours before, or if you don’t show up
-          </li>
-        ) : <li>No fee to move or cancel, or for a missed lesson</li>}
+        {/* The same fee lines as the payment approval card (27 October and
+            2 November 2026, Dan). */}
+        {fee ? <>
+          <li><strong className="is-free">Free</strong> to move or cancel up to {notice} hours before</li>
+          <li><strong>{formatMoneyCents(fee)}</strong> to move or cancel later, or if you don’t show up</li>
+        </> : <li>No fee to move or cancel, or for a missed lesson</li>}
         <li>
           The full rules are in{" "}
           <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">terms &amp; privacy</a>

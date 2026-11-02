@@ -1993,8 +1993,9 @@ time") took each busy place back to one voice:
   first dab (`Goes to sam@…`), never as a bare line after the dabs;
 - an expression's `Edit`, `Preview` and `Publish` are one family of lilac
   buttons;
-- `Pay by card` states its fee once: `€5 to move or cancel less than 14 hours
-  before, or if you don’t show up`;
+- `Pay by card` and a payment approval state the fee once, as two dabs, the free
+  one first (2 November 2026, Dan): `**Free** to move or cancel up to 14 hours
+  before`, then `**€5** to move or cancel later, or if you don’t show up`;
 - a past lesson's long date breaks before its year, never leaving the time on a
   line of its own.
 
