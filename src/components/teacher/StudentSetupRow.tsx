@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { CalendarPlus, Check, Clock3, Euro, History, KeyRound, LockKeyhole, Mail, MessageCircle, Repeat, UserRound, X } from "lucide-react";
+import { CalendarPlus, Check, Clock3, CreditCard, Euro, History, KeyRound, LockKeyhole, Mail, MessageCircle, Repeat, UserRound, X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
+import { CardApprovalLink } from "@/components/teacher/CardApprovalLink";
 import { ComeBackEmail, firstName } from "@/components/teacher/DormantEmail";
 import { LessonForm } from "@/components/teacher/LessonForm";
 import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
@@ -14,7 +15,7 @@ import { dateKey, dateLabel, hasLessons, type StudentSetup, type StudentSetupSte
 import { formatPriceCents } from "@/lib/booking-api";
 import { defaultStudentMark } from "@/lib/student-marks";
 
-export type StudentPanel = StudentSetupStep | "history" | "details" | "come-back" | "invite";
+export type StudentPanel = StudentSetupStep | "history" | "details" | "come-back" | "invite" | "card-link";
 export type StudentRowSelection = { studentId: string; panel: StudentPanel; date?: string; time?: string; homeworkId?: string; homeworkRequestKey?: number };
 
 /** The same row holds setup, then the student’s ongoing details and lessons. */
@@ -42,9 +43,12 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   const steps = setup?.steps ?? [];
   const next = setup?.next;
   const ready = !setup;
+  // A free student has nothing to pay, by link or otherwise.
+  const free = student.prices?.[60] === 0 && student.prices?.[90] === 0;
   // A come-back email is only for someone still dormant, with an address.
   const step = requestedStep === "come-back" && !(student.dormant && student.email) ? null
     : requestedStep === "invite" && student.email ? null
+    : requestedStep === "card-link" ? free ? null : requestedStep
     : requestedStep === "history" || requestedStep === "details" || ready
       ? requestedStep : steps.find(entry => entry.id === requestedStep && !entry.lockedReason)?.id ?? null;
   // Beside an email, a status step offers the same way in on WhatsApp.
@@ -77,7 +81,6 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
   const waitingOnStudent = next === "sign-in" || next === "card";
   // What the email she is about to send says (16 October 2026, Inês): with no
   // lesson to come it asks them to book one; a free student is asked for no card.
-  const free = student.prices?.[60] === 0 && student.prices?.[90] === 0;
   const comeBackSent = student.dormantEmailedAt ? dateLabel(dateKey(new Date(student.dormantEmailedAt)), { day: "numeric", month: "short" }) : "";
   // Where it goes is the first dab, not a bare line after them (27 October 2026).
   const emailSays = student.email ? [
@@ -185,7 +188,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     type="button"
   >{sending === student.id ? "Sending…" : again ? "Send the link again" : "Send welcome email"}<span className="visually-hidden"> to {student.name}</span></button>;
 
-  const profilePanel = ready || step === "history" || step === "details";
+  const profilePanel = ready || step === "history" || step === "details" || step === "card-link";
   // Each with its mark above its name, as the setup steps are, so a set-up
   // student's row reads as the same kind of control (27 October 2026, Dan).
   const controls = [
@@ -194,6 +197,8 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     // it; a dormant student's come-back email carries one already.
     // With no email, the way in goes on WhatsApp (2 November 2026, Dan).
     ...(!student.email ? [["invite", "WhatsApp invite", MessageCircle] as const] : student.dormant ? [["come-back", "Come-back email", Mail] as const] : [["sign-in", "Sign-in link", KeyRound] as const]),
+    // Their past lessons still owed, ticked into one link (2 November 2026, Dan).
+    ...(free ? [] : [["card-link", "Payment link", CreditCard] as const]),
   ] as const;
   const prices = ([60, 90] as const).filter(minutes => student.prices?.[minutes] !== undefined)
     .map(minutes => `${minutes} mins · ${formatPriceCents(student.prices![minutes]!)}`).join(", ");
@@ -211,7 +216,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
         type="button"
       ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{ready && student.dormant ? <span className="teacher-student__label">Dormant</span> : null}</span></button>
       {ready ? <div className="teacher-student__controls" aria-label={`${student.name}’s profile sections`}>
-        {controls.map(([panel, label, Icon]) => <button aria-controls={paneId} aria-expanded={step === panel} aria-label={`${label} for ${student.name}`} disabled={disabled} key={panel} onClick={() => { setNotice(""); onSelect(step === panel ? null : panel); }} type="button"><i aria-hidden="true"><Icon size={14} strokeWidth={2.2} /></i><span>{label}</span></button>)}
+        {controls.map(([panel, label, Icon]) => <button aria-controls={paneId} aria-expanded={step === panel} aria-label={`${label} for ${student.name}`} disabled={disabled} key={panel} onClick={() => { setNotice(""); setProblem(""); onSelect(step === panel ? null : panel); }} type="button"><i aria-hidden="true"><Icon size={14} strokeWidth={2.2} /></i><span>{label}</span></button>)}
       </div> : <ol className="teacher-setup__steps">
         {steps.map(entry => <li className={entry.done ? "is-done" : entry.lockedReason ? "is-locked" : entry.id === next ? waitingOnStudent ? "is-waiting" : "is-next" : ""} key={entry.id} aria-current={entry.id === next ? "step" : undefined}>
           <button
@@ -249,7 +254,7 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
     </div> : null}
     {step ? <div className={`teacher-setup__body${statusStep ? " teacher-setup__body--status" : ""}`} id={paneId} aria-label={`${student.name}’s ${profilePanel ? "profile" : "setup"}`} role="region" ref={body} tabIndex={-1}>
       <div className="teacher-setup__body-heading">
-        <h3 id={`${paneId}-heading`}>{step === "history" ? "Lesson history" : step === "email" || step === "details" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome" : step === "sign-in" ? "Sign in" : step === "come-back" ? `Come-back email to ${firstName(student)}` : step === "invite" ? `WhatsApp ${firstName(student)}` : "Saved card"}</h3>
+        <h3 id={`${paneId}-heading`}>{step === "history" ? "Lesson history" : step === "email" || step === "details" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson" : step === "welcome" ? "Welcome" : step === "sign-in" ? "Sign in" : step === "come-back" ? `Come-back email to ${firstName(student)}` : step === "invite" ? `WhatsApp ${firstName(student)}` : step === "card-link" ? "Payment link" : "Saved card"}</h3>
         {help.length ? <ul className="booking-payment-facts teacher-setup__help">{help.map(text => <li key={text}>{text}</li>)}</ul> : null}
       </div>
       {step === "history" ? <>
@@ -261,6 +266,8 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
           </ul>
           <div className="teacher-student__contact-actions">
             {!ready ? <button className="button button--outline button--small" disabled={disabled} onClick={() => onSelect("details")} type="button">Edit details</button> : null}
+            {/* Also here for someone still being set up, who has no controls row. */}
+            {!ready && !free ? <button className="button button--outline button--small" disabled={disabled} onClick={() => onSelect("card-link")} type="button">Payment link</button> : null}
             {dormantButton}
           </div>
         </div>
@@ -299,7 +306,10 @@ export function StudentSetupRow({ student, setup, token, step: requestedStep, da
         onBusy={setBusy}
         student={student}
         token={token}
-      /> : step === "lessons" ? <>
+      /> : step === "card-link" ? <>
+        {problem ? <p className="teacher-inline-error" role="alert">{problem}</p> : null}
+        <CardApprovalLink key={`${student.id}-card-link`} busy={disabled} onBusy={setBusy} onCancel={close} onError={setProblem} student={student} token={token} />
+      </> : step === "lessons" ? <>
         <LessonForm
           key={`${student.id}-${date ?? ""}-${time ?? ""}`}
           date={date}

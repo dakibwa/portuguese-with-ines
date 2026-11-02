@@ -3733,7 +3733,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   all future lessons, if that requires some teaching that's
                   fine"). Three dabs, said once, where they arrive. */}
               <p className="auth-panel__intro">
-                Your lessons with Inês, all in one place. No password needed.
+                {/* A payment approval link says what it is for (2 November 2026). */}
+                {cardBookingId ? "Sign in to pay for your lessons." : "Your lessons with Inês, all in one place."} No password needed.
                 {/* Someone else's account open on this device: say what the press does. */}
                 {student ? ` You’re signed in as ${student.name}; this switches to the account the link was sent for.` : null}
               </p>

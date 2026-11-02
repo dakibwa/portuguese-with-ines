@@ -276,12 +276,18 @@ export function confirmSignInLink(token: string) {
  */
 export type CardBooking = { id: string; reference: string; startAt: string; endAt: string; amountCents: number };
 
-export function previewCardBooking(token: string, bookingId: string) {
-  return post<{ booking: CardBooking; savedCardKey: string; sameDayFeeCents: number; minimumNoticeHours: number }>("/me/card/preview", { bookingId }, token).then(data => {
-    const booking = data.booking;
-    if (typeof data.savedCardKey !== "string" || !booking || booking.id !== bookingId || typeof booking.reference !== "string" ||
-        !Number.isFinite(Date.parse(booking.startAt)) || !Number.isFinite(Date.parse(booking.endAt)) ||
-        !Number.isSafeInteger(booking.amountCents) || booking.amountCents <= 0 ||
+/**
+ * The lessons a payment approval link names, as they stand now: one, or
+ * several Inês ticked (2 November 2026). Any she has since marked paid or
+ * cancelled are left out, so the student agrees only to what is shown.
+ */
+export function previewCardBooking(token: string, bookingIds: string[]) {
+  return post<{ bookings: CardBooking[]; savedCardKey: string; sameDayFeeCents: number; minimumNoticeHours: number }>("/me/card/preview", { bookingIds }, token).then(data => {
+    const bookings = data.bookings;
+    if (typeof data.savedCardKey !== "string" || !Array.isArray(bookings) || !bookings.length ||
+        !bookings.every(booking => booking && bookingIds.includes(booking.id) && typeof booking.reference === "string" &&
+          Number.isFinite(Date.parse(booking.startAt)) && Number.isFinite(Date.parse(booking.endAt)) &&
+          Number.isSafeInteger(booking.amountCents) && booking.amountCents > 0) ||
         !Number.isFinite(data.sameDayFeeCents) || !Number.isFinite(data.minimumNoticeHours)) {
       throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
     }
@@ -289,9 +295,9 @@ export function previewCardBooking(token: string, bookingId: string) {
   });
 }
 
-export function openCardPage(token: string, booking?: CardBooking, savedCardKey?: string) {
+export function openCardPage(token: string, bookings: CardBooking[] = [], savedCardKey?: string) {
   return post<{ checkoutUrl?: string; authorised?: boolean }>("/me/card", {
-    consent: true, ...(booking ? { booking, bookingConsent: true, ...(savedCardKey ? { savedCardKey } : {}) } : {})
+    consent: true, ...(bookings.length ? { bookings, bookingConsent: true, ...(savedCardKey ? { savedCardKey } : {}) } : {})
   }, token).then((data) => {
     if (data.authorised === true) return { authorised: true as const };
     if (typeof data.checkoutUrl !== "string" || !/^https:\/\//.test(data.checkoutUrl)) throw new AuthApiError(BOOKING_REPLY_ERROR, 502);
