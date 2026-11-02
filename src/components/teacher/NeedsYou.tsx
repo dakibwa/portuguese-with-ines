@@ -128,10 +128,6 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
       action = <button className="button button--lilac button--compact" type="button" onClick={() => onStudent(student)}>
         {count ? "See lessons" : "Open"}<span className="visually-hidden"> for {student.name}</span>
       </button>;
-    } else if (item.kind === "email") {
-      who = `${item.student.name} needs an email address`;
-      detail = "Their welcome waits for their email";
-      action = studentAction(item.student, "email");
     } else if (item.kind === "lessons") {
       who = `${item.student.name} has no lessons yet`;
       detail = "Add a lesson or their weekly lessons";

@@ -127,9 +127,9 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
       {pendingTranslations !== null ? <TranslationsReview initialPending={pendingTranslations} token={token} /> : null}
       {notice ? <p className="teacher-inline-success" role="status">{notice}</p> : null}
       {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" disabled={busy} onClick={() => setAttempt((value) => value + 1)} type="button">Reload collection</button></div> : null}
-      {!expressions && !error ? <p role="status">Loading expressions…</p> : null}
-      {expressions && !rows.length ? <p>Your collection is empty. Add your first expression.</p> : null}
-      {rows.length > 0 && !visible.length ? <p role="status">No expressions match those filters.</p> : null}
+      {!expressions && !error ? <p className="teacher-expressions__hint" role="status">Loading expressions…</p> : null}
+      {expressions && !rows.length ? <p className="teacher-expressions__hint">Your collection is empty. Add your first expression.</p> : null}
+      {rows.length > 0 && !visible.length ? <p className="teacher-expressions__hint" role="status">No expressions match those filters.</p> : null}
       {filtered && visible.length ? <p className="teacher-expressions__hint">Clear the filters to change the order.</p> : null}
       <div className="teacher-expressions__list">
         {visible.map((item) => {

@@ -4195,6 +4195,32 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     db.prepare("DELETE FROM students WHERE name IN (?, ?)").run(isolated, full);
   }
 });
+await test("she makes a sign-in link to send on WhatsApp: nothing is emailed, and a student with no email gets in once and can add a card", async () => {
+  try {
+    const { student } = await (await call("/admin/students", { user: "teacher", body: { name: "Wanda Whats" } })).json();
+    const emails = db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n;
+    assert.equal((await call(`/admin/students/${student.id}/invite-link`)).status, 401);
+    const made = await call(`/admin/students/${student.id}/invite-link`, { user: "teacher", body: {} });
+    assert.equal(made.status, 200, await made.clone().text());
+    const url = new URL((await made.json()).url);
+    assert.equal(url.pathname, "/book/");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, emails, "no email sent or queued");
+    const confirm = () => call("/auth/email-link/confirm", { user: null, body: { token: url.searchParams.get("signin") } });
+    const login = await confirm();
+    assert.equal(login.status, 200, await login.clone().text());
+    assert.equal((await login.json()).student.email, "", "the stand-in never reaches them");
+    assert.equal((await confirm()).status, 400, "only once");
+    const row = db.prepare("SELECT last_login_at, email_verified_at FROM students WHERE id=?").get(student.id);
+    assert.ok(row.last_login_at && row.email_verified_at, "signed in, and able to save a card");
+    // A link made before their details changed no longer opens.
+    const stale = new URL((await (await call(`/admin/students/${student.id}/invite-link`, { user: "teacher", body: {} })).json()).url);
+    assert.equal((await call(`/admin/students/${student.id}/details`, { user: "teacher", body: { name: "Wanda Whats", email: "wanda@example.invalid" } })).status, 409, "signed in, the address is theirs to give");
+    db.prepare("UPDATE students SET email='wanda@example.invalid' WHERE id=?").run(student.id);
+    assert.equal((await call("/auth/email-link/confirm", { user: null, body: { token: stale.searchParams.get("signin") } })).status, 400);
+  } finally {
+    db.prepare("DELETE FROM students WHERE name = 'Wanda Whats'").run();
+  }
+});
 await test("her price for a student prices their lessons, and only lessons nothing is settled on follow a change", async () => {
   try {
     const add = (body) => call("/admin/students", { user: "teacher", body });

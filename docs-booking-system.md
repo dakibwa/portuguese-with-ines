@@ -52,6 +52,8 @@ Inês on /schedule                     (her own account, role=teacher)
   → GET  /admin/receipts?month=YYYY-MM               every amount paid or due for a Porto month's lessons,
                                                      with the NIF to issue to (her Receipts tab and automation)
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
+  → POST /admin/students/:id/invite-link             make a sign-in link for her to send on WhatsApp;
+                                                     nothing emailed (ten an hour per student)
   → POST /admin/students/:id/dormant                 mark them dormant, or active again; nothing emailed
   → GET/POST /admin/dormant-email                    the default each come-back email starts from
   → POST /admin/students/:id/dormant-email           send one dormant student theirs, at most once a day
@@ -640,6 +642,19 @@ first. The stand-in never leaves the database (`workers/booking/no-email.mjs`):
   show `""` for it.
 
 `POST /admin/students/:id/welcome` is refused (400) until she gives an email.
+Her way to them instead is the WhatsApp invite (2 November 2026, Dan: most of
+her students never gave an email, and only two had signed in):
+`POST /admin/students/:id/invite-link` makes the same one-click sign-in link a
+welcome carries (14 days, single use, issued under the welcome's authorization
+so a teacher session can make it), returns `{ url }` and sends nothing; her page
+puts it after her own words in a `wa.me` link she sends from WhatsApp herself.
+It is refused for a teacher account (409) and limited to ten an hour per
+student (429). Pressing `See my lessons` on it signs them in and, as any
+sign-in link does, sets `email_verified_at` and `last_login_at` even on the
+`no-email:` stand-in, so a student with no email can save a card (Stripe is
+given no address for them); Your lessons then asks for their email, which
+arrives through the usual `/me/email` confirmation link. A link made before an
+address change stops working, as a welcome's does.
 `POST /admin/students/:id/details` sets name, phone, NIF and splat at any time.
 It sets or corrects the email only while the student has never signed in (no
 password, Google link or sign-in); after that it answers 409 and the student
@@ -896,13 +911,13 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   links in emails Inês causes last 14 days. A link is signed like a reset under
   its own prefix, and its `sign_in_links` row is the record that it is unspent:
   `POST /auth/email-link/confirm` deletes the row first, so of two clicks one
-  signs in (the page calls it only when the student presses `Sign in`, so a
+  signs in (the page calls it only when the student presses `See my lessons`, so a
   mail scanner opening the link spends nothing), and only while the account still has the address the link was sent
   to. A link proves the address. On an account that was registered with a
   password and never proven, it makes a Google first link's transition: the
   password, other sessions and any pending reset or address change go. Teacher
   accounts are never sent one. `/book/?signin=` takes the link out of the
-  address bar at once and shows `Sign in`; pressing it opens `Your lessons`,
+  address bar at once and shows `See my lessons`; pressing it opens `Your lessons`,
   and a spent or expired link opens the panel on asking for a new one.
 - **An address counts as proven once it has received mail.**
   `students.email_verified_at` (migration 0020) is set by any Google sign-in,

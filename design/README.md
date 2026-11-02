@@ -521,7 +521,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   `Weekly` tag in its top right corner when they have a weekly run, and only
   the dabs that need her eye (27 October 2026, Dan). Its controls become Details, Price, Add a lesson
   and Lesson history, and, with an email, `Sign-in link`, whose panel holds
-  `Send the link again`. No duplicate To do list or separate student profile popup.
+  `Send the link again`; without one, `WhatsApp invite` (2 November 2026). No duplicate To do list or separate student profile popup.
   Student cards sit side by side according to the list's available width,
   with one column on phones. An opened card spans the whole list so details,
   lesson forms and history have room; closing it restores the compact card.
@@ -646,8 +646,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
     phone, NIF, prices and splat. Nothing is emailed. Next: their lessons closes
     the dialog and opens that student's lesson form in the Students list; the
     outline `No lessons yet` beside it opens their Welcome step instead (their
-    Email step when none was given), where she still presses `Send welcome
-    email` herself. A dialog opened from a timetable time offers only the lesson.
+    WhatsApp invite when no email was given), where she still presses `Send
+    welcome email` or `Send on WhatsApp` herself. A dialog opened from a timetable time offers only the lesson.
   - A free timetable time opens a student chooser. A past time offers only
     `Add a lesson here`, never time off. Choosing or creating the
     student closes the chooser, switches to Students and opens their lesson
@@ -1319,8 +1319,8 @@ Preserve these desktop and mobile states:
   even more simple"), and so are the emails that bring students in.
   That success waits for verified current card permission; a return URL alone
   cannot hide `Add card`, and removing the card clears the success state.
-  A sign-in link from an email opens on `Welcome`, `Sign in to see your
-  lessons. No password needed.` and one coral `Sign in`, spent only when
+  A sign-in link from an email or WhatsApp opens on `Welcome` (see 2 November
+  2026 below for its words) and one coral `See my lessons`, spent only when
   pressed, since mail scanners open links on their own; a spent link says so
   there and offers `Email me a new link`. The card terms add `Your upcoming
   lessons with Inês are charged to it, each after it ends` and `Already paid
@@ -1975,6 +1975,53 @@ time") took each busy place back to one voice:
   before, or if you don’t show up`;
 - a past lesson's long date breaks before its year, never leaving the time on a
   line of its own.
+
+## Students on WhatsApp, and a tighter pass — 2 November 2026
+
+Dan's goal: "clear up admin burden". Students pay what is still open and from
+now on book, move and cancel their own lessons; most of Inês's students never
+gave an email, and only two had ever signed in.
+
+- A student with no email is set up, not unfinished: the usual card, no
+  stepper, and the Students badge counts only real to-dos. Their way in is
+  `WhatsApp invite`, whose panel is headed `WhatsApp Marta` with one dab,
+  `Signs them in once, within 14 days.`, a two-line Message she can edit
+  (`Olá Marta! From now on you can book, move or cancel your lessons with me
+  here:`, or for a dormant student `Whenever you’d like another lesson, you
+  can book one here:`), the link on its own line after her words, an outline
+  `Copy` and coral `Send on WhatsApp`. That opens WhatsApp to their number
+  when it is certain (written with `+` or `00`, or a nine-digit Portuguese
+  mobile), otherwise WhatsApp's own chooser, so it never goes to a stranger.
+  Nothing is emailed, and nothing is sent until she presses Send in
+  WhatsApp. A student with an email still has their emails; their Welcome and
+  Sign in panels offer lilac `WhatsApp instead`. Keep the message short (Dan:
+  "quite wordy and not in fitting with our super simple fresh design");
+  the site does the teaching.
+- The welcome screen a link opens is that teaching, said once: `Welcome`,
+  `Your lessons with Inês, all in one place. No password needed.`, three dabs
+  (`Book new lessons yourself`, `Open a lesson to move or cancel it`, `Free to
+  change up to 14 hours before`) and coral `See my lessons`. Nothing asks them
+  to book what Inês has already booked.
+- On Your lessons, a student with no email sees `Pay by card` and `Add your
+  email` (`So you can always get back in.`, an email field and blue `Add
+  email`) as two rows of one sheet card, never two cards pushing their lessons
+  down; once sent it reads `Check your email` / `Open the link we sent to … on
+  this phone.` Their Details email row reads `Not added` with `Add email`.
+- Students' cards on a wide list each keep their own height, packed in
+  columns, so a short card never leaves a hole under it.
+- `Time off`'s card lists what is `Coming up` (consecutive whole days as one
+  line, `Wed 25 Nov – Fri 27 Nov` / `3 days off`; hours as `Off 09:00–12:00`),
+  the next few and `And 3 more later on`; tapping one chooses it.
+- `Receipts` opens on last month during the first ten days of a month when
+  last month still has receipts to issue and this one has none yet.
+- Notes and empty states speak at the hint size, never a paragraph's:
+  `Choose a date and a time first.` sits small just above the greyed action;
+  `Nothing to check just now.` and `Your collection is empty.` match the
+  dabs around them. `November 2026` stays on one line beside its arrows; a
+  wrapped Needs-you title breaks evenly (`Jessica Riley / added a card`); in
+  Lesson history a date reads `Tue 5 Jan`, adding its year only beyond six
+  months, and its time shares the line on a wide card or sits beneath it,
+  without the dot, on a narrow one, so `· 18:00` never starts a line.
 
 ## Transactional emails — 16 October 2026
 

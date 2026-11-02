@@ -294,6 +294,9 @@ async function fixture(width, options = {}) {
     }
     // Her come-back email's words for dormant students.
     if (path === "/admin/dormant-email") return route.fulfill({ json: data ?? { subject: "It’s been a while!", message: "Book a lesson on my new website.\n\nInês" } });
+    // Her WhatsApp invite: a sign-in link for her to send herself, nothing emailed.
+    const invite = path.match(/^\/admin\/students\/([^/]+)\/invite-link$/);
+    if (invite) return route.fulfill({ json: { url: `https://portuguesewithines.com/book/?signin=invite-${invite[1]}` } });
     // Their welcome, details, price, dormant mark and come-back email: each answers as the Worker does.
     const studentRoute = path.match(/^\/admin\/students\/([^/]+)\/(welcome|details|prices|dormant|dormant-email)$/);
     if (studentRoute) {
@@ -994,26 +997,26 @@ try {
   await expect(dormant).toHaveCount(0);
   await alex.getByRole("button", { name: "Close", exact: true }).click();
 
-  // Her setup follows price, lessons, email and welcome. Later unfinished
-  // steps stay closed, though no lesson closes one; completed steps can still be corrected.
+  // With no email Nora is already set up (2 November 2026, Dan: most of her
+  // students never gave one): the usual card, whose way in is a WhatsApp
+  // invite Inês sends herself. Nothing is emailed and no setup steps show.
   const noraSetup = students.locator(".teacher-setup").filter({ hasText: "Nora Lima" });
   const setupForm = noraSetup.getByRole("region", { name: "Nora Lima’s setup", exact: true });
-  await expect(noraSetup.getByRole("button", { name: "Email for Nora Lima", exact: true })).toBeEnabled();
-  for (const label of ["Welcome", "Sign in", "Card"])
-    await expect(noraSetup.getByRole("button", { name: `${label} for Nora Lima`, exact: true })).toBeDisabled();
-  await noraSetup.getByRole("button", { name: "Open Nora Lima’s profile", exact: true }).click();
   const noraProfile = noraSetup.getByRole("region", { name: "Nora Lima’s profile", exact: true });
-  await noraProfile.getByRole("button", { name: "Edit details", exact: true }).click();
-  await expect(noraProfile.getByLabel(/^Email/)).toBeEnabled();
-  await noraSetup.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(noraSetup.getByRole("button", { name: "Welcome for Nora Lima", exact: true })).toHaveCount(0);
+  await noraSetup.getByRole("button", { name: "WhatsApp invite for Nora Lima", exact: true }).click();
+  await expect(noraProfile.getByRole("link", { name: /^Send on WhatsApp/ })).toHaveAttribute("href",
+    /^https:\/\/wa\.me\/\?text=Ol%C3%A1%20Nora!.+%0Ahttps%3A%2F%2Fportuguesewithines\.com%2Fbook%2F%3Fsignin%3Dinvite-nora$/);
+  assert.deepEqual(state.writes.filter(entry => entry.path.startsWith("/admin/students/nora/")).map(entry => entry.path),
+    ["/admin/students/nora/invite-link"], "The invite makes a link and emails nothing");
 
   await noraSetup.getByRole("button", { name: "Price for Nora Lima", exact: true }).click();
-  await setupForm.getByLabel("Price for 60 minutes, in euros", { exact: true }).fill("24");
-  await setupForm.getByRole("button", { name: "Save price", exact: true }).click();
+  await noraProfile.getByLabel("Price for 60 minutes, in euros", { exact: true }).fill("24");
+  await noraProfile.getByRole("button", { name: "Save price", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/nora/prices").at(-1)?.data).toEqual({ prices: { 60: 2400, 90: null } });
-  await noraSetup.getByRole("button", { name: "Lessons for Nora Lima", exact: true }).click();
-  await expect(setupForm.getByRole("radio", { name: "60 mins, €24" })).toBeVisible();
-  const picker = setupForm.getByRole("group", { name: "Choose a date and time", exact: true });
+  await noraSetup.getByRole("button", { name: "Add a lesson for Nora Lima", exact: true }).click();
+  await expect(noraProfile.getByRole("radio", { name: "60 mins, €24" })).toBeVisible();
+  const picker = noraProfile.getByRole("group", { name: "Choose a date and time", exact: true });
   // Earlier days are hers to choose too, for a lesson already had (15 October 2026).
   const todayChoice = picker.getByRole("button", { name: "Monday 7 September", exact: true });
   await todayChoice.press("ArrowLeft");
@@ -1022,54 +1025,53 @@ try {
   await picker.getByRole("button", { name: "Thursday 27 August", exact: true }).click();
   // Any quarter hour, weekly hours or not; then only its length and adding it.
   await picker.getByRole("button", { name: "09:30 Porto time, already past", exact: true }).click();
-  await expect(setupForm.getByRole("radio", { name: "Weekly", exact: true })).toHaveCount(0);
+  await expect(noraProfile.getByRole("radio", { name: "Weekly", exact: true })).toHaveCount(0);
   // A record shows only its lengths, never a price; where it was, and whether
   // it is already paid, are hers to say (16 October 2026).
-  await expect(setupForm.getByRole("radio", { name: "60 mins", exact: true })).toBeVisible();
-  await expect(setupForm.locator(".teacher-manual-price")).toHaveCount(0);
-  await setupForm.getByRole("radio", { name: "In Porto", exact: true }).check();
-  const pastTick = setupForm.getByRole("checkbox", { name: "Already paid", exact: true });
+  await expect(noraProfile.getByRole("radio", { name: "60 mins", exact: true })).toBeVisible();
+  await expect(noraProfile.locator(".teacher-manual-price")).toHaveCount(0);
+  await noraProfile.getByRole("radio", { name: "In Porto", exact: true }).check();
+  const pastTick = noraProfile.getByRole("checkbox", { name: "Already paid", exact: true });
   await expect(pastTick).toHaveAttribute("aria-checked", "false");
   await pastTick.click();
   await expect(pastTick).toHaveAttribute("aria-checked", "true");
-  await setupForm.getByRole("button", { name: "Add past lesson", exact: true }).click();
+  await noraProfile.getByRole("button", { name: "Add past lesson", exact: true }).click();
   await expect(noraSetup.getByRole("status")).toContainText("27 Aug, 09:30 · recorded · paid");
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/bookings").at(-1).data, {
     studentId: "nora", lessonType: "single", startAt: "2026-08-27T08:30:00.000Z", location: "porto", notes: "", expectedPriceCents: 2400, paid: true,
   });
-  await noraSetup.getByRole("button", { name: "Lessons for Nora Lima", exact: true }).click();
+  await noraSetup.getByRole("button", { name: "Add a lesson for Nora Lima", exact: true }).click();
   await picker.getByRole("button", { name: "Next month", exact: true }).click();
   await picker.getByRole("button", { name: "Previous month", exact: true }).click();
   await picker.getByRole("button", { name: "Wednesday 30 September", exact: true }).click();
   await picker.getByRole("button", { name: "17:00 Porto time", exact: true }).click();
   // A different length needs that length's availability and a new time choice.
-  await setupForm.getByRole("radio", { name: "90 mins, €36", exact: true }).check();
-  await expect(setupForm.getByRole("button", { name: "Add lesson", exact: true })).toBeDisabled();
+  await noraProfile.getByRole("radio", { name: "90 mins, €36", exact: true }).check();
+  await expect(noraProfile.getByRole("button", { name: "Add lesson", exact: true })).toBeDisabled();
   await picker.getByRole("button", { name: "18:00 Porto time", exact: true }).click();
   state.failCreate = 1;
   const beforeConflict = state.writes.filter(entry => entry.path === "/admin/bookings").length;
-  await setupForm.getByRole("button", { name: "Add lesson", exact: true }).click();
-  await expect(setupForm.getByRole("alert")).toContainText("That time has just been taken");
-  await expect(setupForm.getByRole("button", { name: "Add lesson", exact: true })).toBeDisabled();
+  await noraProfile.getByRole("button", { name: "Add lesson", exact: true }).click();
+  await expect(noraProfile.getByRole("alert")).toContainText("That time has just been taken");
+  await expect(noraProfile.getByRole("button", { name: "Add lesson", exact: true })).toBeDisabled();
   await picker.getByRole("button", { name: "18:30 Porto time", exact: true }).click();
   assert.equal(state.writes.filter(entry => entry.path === "/admin/bookings").length, beforeConflict + 1, "A conflict does not automatically create another lesson");
-  await setupForm.getByRole("button", { name: "Add lesson", exact: true }).click();
+  await noraProfile.getByRole("button", { name: "Add lesson", exact: true }).click();
   await expect(noraSetup.getByRole("status")).toContainText("30 Sept, 18:30");
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/bookings").at(-1).data, {
     studentId: "nora", lessonType: "long", startAt: "2026-09-30T17:30:00.000Z", location: "online", notes: "", expectedPriceCents: 3600,
   });
   assert.ok(state.availabilityReads.some(read => read.lessonType === "long" && read.path === "/admin/lesson-availability"), "Her 90-minute choices use authenticated teacher availability");
   await expect(noraSetup.getByRole("status")).not.toContainText("emailed");
-  assert.equal(state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length, 0, "Adding the lesson waits for Nora's welcome");
-  await expect(noraSetup.getByRole("button", { name: "Welcome for Nora Lima", exact: true })).toBeDisabled();
+  assert.equal(state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length, 0, "A lesson for a student with no email emails nobody");
   // The completed price remains editable after a lesson exists.
   await noraSetup.getByRole("button", { name: "Price for Nora Lima", exact: true }).click();
-  await expect(setupForm.getByLabel("Price for 60 minutes, in euros", { exact: true })).toHaveValue("24");
+  await expect(noraProfile.getByLabel("Price for 60 minutes, in euros", { exact: true })).toHaveValue("24");
   await noraSetup.getByRole("button", { name: "Close", exact: true }).click();
 
-  await noraSetup.getByRole("button", { name: "Email for Nora Lima", exact: true }).click();
-  await expect(setupForm.getByLabel(/^Email/)).toBeFocused();
-  await setupForm.getByLabel(/^Email/).fill("nora@example.invalid");
+  // Once she has an email, her welcome and the steps after it follow.
+  await noraSetup.getByRole("button", { name: "Details for Nora Lima", exact: true }).click();
+  await noraProfile.getByLabel(/^Email/).fill("nora@example.invalid");
   // A background read started before the save must not replace its newer data.
   let releaseOlderStudents;
   state.studentsGate = new Promise(resolve => { releaseOlderStudents = resolve; });
@@ -1087,11 +1089,10 @@ try {
   await expect.poll(() => state.studentsReads).toBeGreaterThan(beforeStudentsRead);
   const isStudentRead = response => new URL(response.url()).pathname === "/admin/students" && response.request().method() === "GET";
   const savedStudents = page.waitForResponse(isStudentRead);
-  await setupForm.getByRole("button", { name: "Save details", exact: true }).click();
+  await noraProfile.getByRole("button", { name: "Save details", exact: true }).click();
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/students/nora/details").at(-1).data,
     { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "" });
-  await expect(setupForm).toBeHidden();
-  await expect(noraSetup.getByRole("button", { name: "Email for Nora Lima", exact: true })).toBeFocused();
+  await expect(noraProfile).toBeHidden();
   await (await savedStudents).finished();
   const olderStudents = page.waitForResponse(isStudentRead);
   releaseOlderStudents();

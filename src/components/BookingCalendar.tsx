@@ -3727,11 +3727,21 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             <div className="auth-panel sign-in-link">
               <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="auth-panel__mark" />
               <h2>Welcome</h2>
+              {/* What the page is for, as a student Inês set up first hears of
+                  it, and how it now works (2 November 2026, Dan: "we want
+                  basically students to … use the website to book/change/amend
+                  all future lessons, if that requires some teaching that's
+                  fine"). Three dabs, said once, where they arrive. */}
               <p className="auth-panel__intro">
-                Sign in to see your lessons. No password needed.
+                Your lessons with Inês, all in one place. No password needed.
                 {/* Someone else's account open on this device: say what the press does. */}
-                {student ? ` You’re signed in as ${student.name}; this switches to the account the email was sent to.` : null}
+                {student ? ` You’re signed in as ${student.name}; this switches to the account the link was sent for.` : null}
               </p>
+              <ul className="booking-payment-facts sign-in-link__steps">
+                <li>Book new lessons yourself</li>
+                <li>Open a lesson to move or cancel it</li>
+                <li>{lateFeeCents === 0 ? "Free to change or cancel" : `Free to change up to ${noticeHours}\u00a0hours before`}</li>
+              </ul>
               {signInLinkError ? (
                 <div className="booking-alert booking-alert--error" role="alert">
                   <AlertCircle size={18} aria-hidden="true" />
@@ -3778,7 +3788,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   }}
                   type="button"
                 >
-                  {usingSignInLink ? "Signing in…" : "Sign in"}
+                  {usingSignInLink ? "Signing in…" : "See my lessons"}
                 </button>
               )}
             </div>

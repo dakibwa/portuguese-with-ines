@@ -6188,6 +6188,22 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     return json({ url: `${link.url}&cardBooking=${encodeURIComponent(row.id)}`, booking: cardBookingSummary(row) }, 200, request, env);
   }
 
+  // A way in for her to send herself, on WhatsApp or anywhere (2 November
+  // 2026, Dan): nothing is emailed, so it also reaches someone with no email
+  // yet, who adds their own once in. The link signs them in once, within two
+  // weeks, and only while their account is as it was when she made it.
+  const inviteLink = path.match(/^\/admin\/students\/([^/]+)\/invite-link$/);
+  if (inviteLink && request.method === "POST") {
+    const student = await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(inviteLink[1]).first();
+    if (!student) return fail("That student could not be found.", 404, request, env);
+    if (student.role === "teacher") return fail("They already sign in as a teacher, so there is no link to send.", 409, request, env);
+    if (!await takeRateLimit(env, `invite-link:${student.id}`, 10, 3600)) return fail("Please wait before creating another link.", 429, request, env);
+    const owner = welcomeAuthorization(env, student, authorization);
+    await owner.assert();
+    const link = await issueSignInLink(env, student, WELCOME_LINK_MINUTES, owner);
+    return json({ url: link.url }, 200, request, env);
+  }
+
   // Her welcome for a student: their one-click way in and the lessons she has
   // added, the first email the site sends someone she set up. Also a fresh
   // link for someone who lost theirs (12 October 2026, Dan).

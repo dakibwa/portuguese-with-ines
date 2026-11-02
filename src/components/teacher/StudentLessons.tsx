@@ -50,7 +50,9 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
   const upcoming = upcomingLessons(bookings ?? [], now);
   const past = (bookings ?? []).filter(booking => booking.status === "cancelled" || Date.parse(booking.ends_at) <= now)
     .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
-  const thisYear = new Date(now).getFullYear();
+  // Within half a year either way the year is plain from the month; further
+  // off, say it.
+  const nearby = (date: Date) => Math.abs(date.getTime() - now) < 183 * 86_400_000;
 
   /**
    * One card per lesson: when, then a few quiet facts. A pill only for what
@@ -83,8 +85,11 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
         <div className="teacher-history-lesson__top">
           <div className="teacher-history-lesson__when">
             <strong>
-              {dateLabel(dateKey(starts), { weekday: "short", day: "numeric", month: "short", ...(starts.getFullYear() === thisYear ? {} : { year: "numeric" }) })}
-              <span> · {formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
+              {/* "Tue 5 Jan" reads the same with a year or without. The time
+                  shares its line on a wide card and has its own, without the
+                  dot, on a narrow one, so "· 18:00" never starts a line. */}
+              {dateLabel(dateKey(starts), { weekday: "short", day: "numeric", month: "short", ...(nearby(starts) ? {} : { year: "numeric" }) }).replace(",", "")}
+              {" "}<span className="teacher-history-lesson__time"><i aria-hidden="true">· </i><span className="visually-hidden">, </span>{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
             </strong>
             {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
           </div>
