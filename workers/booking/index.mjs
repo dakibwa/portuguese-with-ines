@@ -2098,10 +2098,11 @@ const worker = {
 
 /**
  * Charge only once the lesson's no-show window has closed, NO_SHOW_WINDOW_HOURS
- * elapsed hours after its scheduled end: until then Inês may still record a
- * no-show, which changes the amount. All instants are stored in UTC after being
- * resolved from Porto wall-clock time, so a 17:00–18:00 lesson is due an hour
- * after 18:00 Porto time across both winter and summer time.
+ * elapsed hours after its scheduled end (none since 2 November 2026: the
+ * lesson's end): until then Inês may still record a no-show, which changes the
+ * amount. All instants are stored in UTC after being resolved from Porto
+ * wall-clock time, so a 17:00–18:00 lesson is due at 18:00 Porto time across
+ * both winter and summer time, on the first minute sweep after it.
  *
  * A decline is a fact of card networks, not an exception: the lesson stays
  * confirmed, the student gets a pay-now link, Inês gets a note, and the row
@@ -2234,6 +2235,7 @@ export function noShowProblem(row, now = new Date()) {
   if (now < new Date(row.starts_at)) return "Wait until the lesson starts before marking a no-show.";
   // The lesson's charge waits for this window, so the two never overlap.
   if (now.getTime() >= Date.parse(row.ends_at) + NO_SHOW_WINDOW_HOURS * 3600000) {
+    if (!NO_SHOW_WINDOW_HOURS) return "Attendance can be changed until the lesson ends, and it has ended.";
     const span = NO_SHOW_WINDOW_HOURS === 1 ? "an hour" : `${NO_SHOW_WINDOW_HOURS} hours`;
     return `Attendance can be changed until ${span} after the lesson ends, and that time has passed.`;
   }

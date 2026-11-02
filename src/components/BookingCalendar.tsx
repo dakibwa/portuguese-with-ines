@@ -3224,7 +3224,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 <li>No fee to change or cancel, or for a missed lesson</li>
               ) : (
                 <>
-                  <li>Free to change or cancel a lesson up to {noticeHours}&nbsp;hours before</li>
+                  <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
                   <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later{postpay ? <>, or if you don&rsquo;t show up</> : null}</li>
                 </>
               )}
@@ -3742,7 +3742,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 <li>Open a lesson to move or cancel it</li>
                 {/* Dan's words for the rules, the same wherever they're said (2 November 2026). */}
                 {lateFeeCents === 0 ? <li>No fee to change or cancel, or for a missed lesson</li> : <>
-                  <li>Free to change or cancel a lesson up to {noticeHours}&nbsp;hours before</li>
+                  <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
                   <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later{postpay ? <>, or if you don&rsquo;t show up</> : null}</li>
                 </>}
               </ul>
@@ -4637,13 +4637,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           ) : postpay ? (
                             <>
                               <li>No payment is taken now</li>
-                              <li>Your card is charged after each lesson</li>
+                              <li>Your card is charged at the end of each lesson</li>
                               {/* The rules in Dan's words, the same on every page
                                   (2 November 2026); when a fee is charged, and that a
                                   no-show costs it instead of the lesson, are in the
                                   terms the agreement links. */}
                               {lateFeeCents ? <>
-                                <li>Free to change or cancel a lesson up to {noticeHours}&nbsp;hours before</li>
+                                <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
                                 <li>
                                   <strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later, or if you don&rsquo;t show up
                                 </li>
@@ -4655,7 +4655,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                               {/* Paid in person, a missed lesson is the lesson itself, so
                                   only the late change has a fee here. */}
                               {lateFeeCents ? <>
-                                <li>Free to change or cancel a lesson up to {noticeHours}&nbsp;hours before</li>
+                                <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
                                 <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later</li>
                               </> : null}
                             </>

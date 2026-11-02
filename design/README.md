@@ -1916,8 +1916,8 @@ no-show` / `Undo no-show` for a screen reader), each the same capsule whose dab
 fills when ticked. Last, `Move lesson` in coral and `Cancel lesson` in outline
 share a row while both labels fit. Moving opens under its own `Move this lesson`
 heading, as cancelling does under `Cancel this lesson?`, with what happens as a
-dab (`Sam gets an email with the new time`). `No-show` is live from the lesson's start until an hour after
-its end, and before that it shows greyed out with `Available 11:00–13:00` beneath, so
+dab (`Sam gets an email with the new time`). `No-show` is live from the lesson's start until its end
+(2 November 2026), and before that it shows greyed out with `Available 11:00–12:00` beneath, so
 she always knows where it is. The marked state stays reversible within the same
 window, the lesson is charged once it closes, and a no-show means only €5 is
 taken instead of the full price. Confirmations keep a `Back to lesson` button
@@ -2003,9 +2003,10 @@ gave an email, and only two had ever signed in.
   rules) and coral `See my lessons`. Nothing asks them to book what Inês has
   already booked.
 - The rules read the same wherever a student meets them (2 November 2026,
-  Dan): `Free to change or cancel a lesson up to 14 hours before` and `€5 to
-  move or cancel later, or if you don’t show up` (the no-show part only where
-  cards are taken), `Your card is charged after each lesson`, and with no fee
+  Dan): `Free to change or cancel a lesson up to 14 hours before` (the first
+  four words bold in ink, since coral is for a charge) and `€5 to move or
+  cancel later, or if you don’t show up` (the no-show part only where cards
+  are taken), `Your card is charged at the end of each lesson`, and with no fee
   `No fee to change or cancel, or for a missed lesson`. That covers the welcome
   screen, the booking confirm step and its success, and the card terms.
 - On Your lessons, a student with no email sees `Pay by card` and `Add your
