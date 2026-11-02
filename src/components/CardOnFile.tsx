@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Circle, CreditCard, Repeat } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
 import { openCardPage, previewCardBooking, readSession, type CardBooking } from "@/lib/auth-api";
-import { NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS } from "@/lib/config";
+import { NO_SHOW_WINDOW_HOURS_AFTER, NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS } from "@/lib/config";
 import { formatMoneyCents, formatShortDay, formatSlotTime } from "@/lib/booking-api";
 
 /** Each lesson's tile its own mark, as the booking step's chosen lessons have. */
@@ -23,7 +23,7 @@ const LESSON_MARKS = [
 export function FeeFacts({ feeCents, noticeHours, noShow = true }: { feeCents: number; noticeHours: number; noShow?: boolean }) {
   if (!feeCents) return <li>No fee to change or cancel{noShow ? ", or for a missed lesson" : ""}</li>;
   return <>
-    <li><strong className="is-free">Free</strong> to change or cancel a lesson up to {noticeHours} hours before</li>
+    <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours} hours before</li>
     <li><strong>{formatMoneyCents(feeCents)}</strong> to move or cancel later{noShow ? ", or if you don’t show up" : ""}</li>
   </>;
 }
@@ -51,8 +51,8 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
   const [review, setReview] = useState<{ bookings: CardBooking[]; savedCardKey: string; sameDayFeeCents: number; minimumNoticeHours: number } | null>(null);
   const [bookingConsent, setBookingConsent] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  // Whether each lesson's usual hour after it ends has passed, so agreeing
-  // is what lets it be charged: all of them, some or none.
+  // Whether each lesson's charge time (the end of its no-show window) has
+  // passed, so agreeing is what lets it be charged: all of them, some or none.
   const [chargedOnAgreement, setChargedOnAgreement] = useState<"all" | "some" | "none">("none");
   // What agreeing charges straight away: the lessons whose hour has passed.
   const [dueNowCents, setDueNowCents] = useState(0);
@@ -63,7 +63,7 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
     void previewCardBooking(session, bookingId.split(",")).then(data => {
       if (!active || readSession() !== session) return;
       setReview(data);
-      const ended = data.bookings.filter(booking => Date.parse(booking.endAt) + 60 * 60 * 1000 <= Date.now());
+      const ended = data.bookings.filter(booking => Date.parse(booking.endAt) + NO_SHOW_WINDOW_HOURS_AFTER * 60 * 60 * 1000 <= Date.now());
       setChargedOnAgreement(ended.length === data.bookings.length ? "all" : ended.length ? "some" : "none");
       setDueNowCents(ended.reduce((sum, booking) => sum + booking.amountCents, 0));
     }).catch(caught => {

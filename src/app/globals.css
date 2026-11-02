@@ -7413,6 +7413,7 @@ p.lesson-when > span {
 /* What costs nothing is bold in the text's own blue; coral is for a charge. */
 .booking-payment-facts strong.is-free {
   color: var(--ink);
+  white-space: normal;
 }
 
 .booking-payment-facts a {

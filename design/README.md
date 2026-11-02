@@ -1994,8 +1994,8 @@ time") took each busy place back to one voice:
 - an expression's `Edit`, `Preview` and `Publish` are one family of lilac
   buttons;
 - `Pay by card` and a payment approval state the fee once, as two dabs, the free
-  one first (2 November 2026, Dan, the same words across the site): `**Free** to
-  change or cancel a lesson up to 14 hours before`, then `**€5** to move or
+  one first (2 November 2026, Dan, the same words across the site): `**Free to
+  change or cancel** a lesson up to 14 hours before`, then `**€5** to move or
   cancel later, or if you don’t show up`; above them, `Future lessons are
   charged after each lesson` (the hourly charge runs an hour after the end, so
   not "at the end"), and on an approval first `You’ll be charged **€45** now
