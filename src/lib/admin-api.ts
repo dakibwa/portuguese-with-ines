@@ -26,6 +26,11 @@ export type AdminStudent = {
   upcoming?: number;
   /** Lessons to come that are still paid to her by hand. */
   unpaidUpcoming?: number;
+  /** Lessons she added that have begun, not on a card and not ticked paid by hand: what a payment link could still ask for. */
+  unpaidPast?: number;
+  unpaidPastCents?: number;
+  /** When their newest unspent sign-in link (welcome, invite or payment link) was made. */
+  invitedAt?: string | null;
   /** Active weekly slots. */
   weekly?: number;
   /** She marked them dormant and they have had no lesson since (migration 0036). */

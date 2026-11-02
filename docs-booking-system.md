@@ -237,13 +237,21 @@ provider call. This is Dan's confirmed receipt rule (18 October 2026).
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
-still paid by hand, and any weekly slot. `Students` on `/schedule` puts
-those who still need to sign in or add a card first, each with
-`Send welcome email` (`POST /admin/students/:id/welcome`, three an hour per
+still paid by hand, and any weekly slot. It also gives `unpaidPast` and
+`unpaidPastCents`, the past lessons she added that a payment link can still
+ask for (the same rule `GET …/card-link` lists them by: confirmed, expected,
+nothing charged, not ticked paid, a price above €0), and `invitedAt`, when the
+newest of their sign-in links still unspent and unexpired was made (`null`
+once each is used or expired), so her list can say `Link sent 5 Sept` (2
+November 2026). `Students` on `/schedule` groups them by whose move it is:
+`To do` (her link to send), `Waiting on them` (a link out, not yet used) and
+`All set` (signed in, card saved, nothing open), after `Needs you`. Her link is
+a WhatsApp message, or for someone with an email `Email instead`, which is the
+welcome email (`POST /admin/students/:id/welcome`, three an hour per
 student). It is only ever sent by her press: nothing sends it on its own.
 Concurrent first-welcome requests share one durable delivery key and original
-sign-in link. Retries preserve that exact request; explicit `Send the link again`
-still creates a fresh link. The recipient's captured address and account version
+sign-in link. Retries preserve that exact request; `Email instead` for
+someone already welcomed still creates a fresh link. The recipient's captured address and account version
 must match at link creation, email dispatch and the final welcome-state update.
 A student needs no lesson to be welcomed (16 October 2026, Inês); with no
 lesson to come the email invites them to sign in and book their next one,
@@ -561,10 +569,12 @@ Lessons only belong to students (13 October 2026, Dan: no loose lessons).
 `POST /admin/bookings` names the student by `studentId` (their account, which
 works for a student with no email yet) or, for older callers, by `email`; one
 who isn't on the site is refused ("Add them as a student first.", 404), and
-students come from `POST /admin/students`. Each student's row is their profile
-through onboarding and regular use (14 October 2026, Dan). Its name opens
-all-time lesson history in place; details, price and lesson creation use the
-same row. Completed setup becomes normal profile controls. A new student or a
+students come from `POST /admin/students`. Each student's card is their profile
+from their first invite to regular use (14 October 2026, Dan; 2 November 2026).
+Its name opens their details, prices and all-time lesson history in place;
+editing details, price and lesson creation use the same card. A past lesson she
+added and nothing charged can be ticked paid there (`POST
+/admin/bookings/:id/paid`), which takes it out of `unpaidPast`. A new student or a
 free timetable time can start in the creation/student-choice dialog, then opens
 the chosen row's lesson calendar with the selected date and time preserved.
 History matches the linked student ID first and only falls back to an exact
@@ -690,7 +700,7 @@ It is built in the browser by the pure `needsYou()` in
   and the Stripe payment intent ids, for `Open in Stripe` (a link to the
   payment when the id looks like `pi_…`, otherwise to Stripe's payments list);
 - `GET /admin/students` (`awaitingWelcome`, `nextLessonAt`, `email`, `signedIn`,
-  `hasCard`, `hasLessons` and existing prices);
+  `hasCard`, `hasLessons`, `unpaidPast`, `invitedAt` and existing prices);
 - `GET /admin/google-calendar`, for Meet needing to be connected or
   reconnected.
 
@@ -2506,9 +2516,10 @@ Stripe session, and changes no booking or payment consent. It does not mark a
 first welcome as sent. The link names the ticked bookings, in time order,
 with `cardBooking=<id>,<id>…`. The same two routes by student
 (`/admin/students/:id/card-link`, where `bookingIds` is required) serve the
-**Payment link** panel on a student's card in Students, and an invite that
-clears what a student owes in one link; there the list is only their unpaid
-lessons already had, and nothing starts ticked. A student without an email can have one too:
+invite on a student's card in Students (`Invite`, `Ask to pay`), which clears
+what a student owes in one link; there the list is only their unpaid lessons
+already had, and nothing starts ticked. With nothing ticked, or nothing open,
+the invite is a plain sign-in link (`POST /admin/students/:id/invite-link`). A student without an email can have one too:
 she sends it on WhatsApp, and confirming its sign-in is what verifies the
 account before a card is saved.
 

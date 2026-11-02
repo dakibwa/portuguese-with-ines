@@ -19,7 +19,7 @@ import {
   lessonStarts,
   mondayOf,
   needsYou,
-  gettingStarted,
+  studentProgress,
   studentWorkspace,
   paintHours,
   removeSpan,
@@ -451,58 +451,37 @@ test("a declined card and a card just added are Needs you cards on the student's
   assert.deepEqual(items.map((item) => item.key), ["declined:b1:lesson", "declined:b1:fee", "card:kai"], "money first, as payments are");
   const workspace = studentWorkspace(students, items, true, []);
   assert.equal(workspace.general.length, 0);
-  assert.deepEqual(workspace.rows.map((row) => [row.student.id, row.items.length]), [["ana", 2], ["kai", 1], ["dot", 0]]);
+  assert.deepEqual(workspace.sections.needs.map((row) => [row.student.id, row.items.length]), [["ana", 2], ["kai", 1]]);
 });
 
-test("setup suggests lessons before student steps without requiring them, completed steps stay editable, and no email counts as set up", () => {
-  const student = (id, extra) => ({ id, name: id, email: `${id}@example.invalid`, signedIn: false, hasCard: false, hasLessons: true, awaitingWelcome: true, ...extra });
-  const students = [
-    student("email", { email: "" }),
-    student("lessons", { hasLessons: false }),
-    student("welcome", { nextLessonAt: null }),
-    student("far", { nextLessonAt: "2027-01-01T10:00:00Z" }),
-    student("sign-in", { awaitingWelcome: false }),
-    student("card", { awaitingWelcome: false, signedIn: true }),
-    student("self-booked", { awaitingWelcome: undefined, signedIn: true, hasCard: true }),
-    student("past", { awaitingWelcome: false, signedIn: true, hasCard: true, nextLessonAt: null }),
-  ];
-  const setup = gettingStarted(students);
-  // No email is not a step left undone (2 November 2026, Dan): their card is the usual one, with a WhatsApp invite.
-  assert.deepEqual(setup.map(row => [row.student.id, row.next, row.owner]), [
-    ["lessons", "lessons", "Yours"], ["welcome", "welcome", "Yours"], ["far", "welcome", "Yours"],
-    ["sign-in", "sign-in", "Theirs"], ["card", "card", "Theirs"],
-  ]);
-  assert.deepEqual(setup[0].steps.map(step => step.id), ["price", "lessons", "email", "welcome", "sign-in", "card"]);
-  assert.deepEqual(setup.map(row => row.steps.map(step => step.done)), [
-    [true, false, true, false, false, false],
-    [true, true, true, false, false, false], [true, true, true, false, false, false],
-    [true, true, true, true, false, false], [true, true, true, true, true, false],
-  ]);
-  const by = (row, id) => row.steps.find(step => step.id === id);
-  assert.deepEqual(gettingStarted([student("name-only", { email: "", hasLessons: false })]), [], "a name alone is a student, not setup");
-  // A lesson is never required (16 October 2026, Inês).
-  assert.equal(by(setup[0], "welcome").lockedReason, undefined, "a student with an email and no lessons can be welcomed");
-  assert.equal(by(setup[0], "sign-in").lockedReason, "Send the welcome email first.");
-  assert.ok(by(setup[1], "sign-in").lockedReason);
-  assert.ok(by(setup[3], "card").lockedReason);
-  // Once welcomed, booking is theirs: no lessons holds nothing open.
-  const welcomedNoLessons = gettingStarted([student("welcomed", { hasLessons: false, awaitingWelcome: false })])[0];
-  assert.equal(welcomedNoLessons.next, "sign-in");
-  assert.deepEqual(gettingStarted([student("legacy", { hasLessons: false, awaitingWelcome: undefined, signedIn: true, hasCard: true })]), [], "signed in with a card and no lessons is a student, not setup");
-  const tasks = needsYou({ now: new Date("2026-10-14T10:00:00Z"), meet: null, payments: [], students, lessons: [], cancellations: [] });
-  assert.deepEqual(new Set(tasks.map(item => item.key)), new Set(["welcome:far", "lessons:lessons", "welcome:lessons", "welcome:welcome"]));
-  assert.ok(tasks.every(item => setup.some(row => row.student.id === item.student.id && row.owner === "Yours")), "the tab count excludes waiting on them");
-  assert.deepEqual(gettingStarted([student("cards-off", { awaitingWelcome: false, signedIn: true })], false), [], "cards switched off do not hold setup open");
-  assert.deepEqual(gettingStarted([student("free", { awaitingWelcome: false, signedIn: true, prices: { 60: 0, 90: 0 } })]), [], "a student free at every length has no card to add");
+test("each student has three checks and one next step, grouped by whose move it is", () => {
+  const student = (id, extra) => ({ id, name: id, email: `${id}@example.invalid`, signedIn: false, hasCard: false, cardForAllLessons: false, hasLessons: true, ...extra });
+  const sent = "2026-10-10T10:00:00Z";
+  const step = (extra, cards = true) => {
+    const { signedIn, card, openLessons, openCents, invitedAt, stage, next } = studentProgress(student("x", extra), cards);
+    return [signedIn, card, openLessons, openCents, invitedAt, stage, next];
+  };
+  // Not in yet: theirs to open once she has sent their link. Owing comes
+  // after signing in, since the one link signs them in to pay.
+  assert.deepEqual(step({ unpaidPast: 2, unpaidPastCents: 5000 }), [false, false, 2, 5000, null, "todo", "invite"]);
+  assert.deepEqual(step({ invitedAt: sent }), [false, false, 0, 0, sent, "waiting", "invite"]);
+  assert.deepEqual(step({ signedIn: true, unpaidPast: 1, unpaidPastCents: 2500 }), [true, false, 1, 2500, null, "todo", "pay"]);
+  assert.deepEqual(step({ signedIn: true }), [true, false, 0, 0, null, "todo", "card"]);
+  // A link left unused never holds back someone already all set.
+  assert.deepEqual(step({ signedIn: true, cardForAllLessons: true, invitedAt: sent }), [true, true, 0, 0, sent, "set", null]);
+  // With cards switched off, or free at every length, there is no card or debt to chase.
+  assert.deepEqual(step({ signedIn: true, unpaidPast: 2, unpaidPastCents: 5000 }, false), [true, null, 0, 0, null, "set", null]);
+  assert.deepEqual(step({ signedIn: true, prices: { 60: 0, 90: 0 } }), [true, null, 0, 0, null, "set", null]);
 
-  const ready = (id, extra = {}) => student(id, { awaitingWelcome: false, signedIn: true, hasCard: true, ...extra });
+  const ready = (id, extra = {}) => student(id, { signedIn: true, hasCard: true, cardForAllLessons: true, ...extra });
   const workspaceStudents = [
     ready("regular", { name: "Alex" }),
-    student("waiting", { awaitingWelcome: false }),
+    student("waiting", { invitedAt: sent }),
     ready("first"),
-    student("setup-later", { nextLessonAt: "2026-10-20T10:00:00Z" }),
-    student("setup-soon", { nextLessonAt: "2026-10-15T10:00:00Z" }),
-    student("no-email", { email: "", awaitingWelcome: true, signedIn: false, hasCard: false, nextLessonAt: "2026-10-16T10:00:00Z" }),
+    student("todo-later", { nextLessonAt: "2026-10-20T10:00:00Z", awaitingWelcome: true }),
+    student("todo-soon", { nextLessonAt: "2026-10-15T10:00:00Z" }),
+    student("no-email", { email: "", awaitingWelcome: true, hasLessons: false, nextLessonAt: "2026-10-16T10:00:00Z" }),
+    ready("owes", { unpaidPast: 1, unpaidPastCents: 2500 }),
     ready("changed-old"),
     ready("changed-new"),
     ready("payment", { name: "Same Name" }),
@@ -522,24 +501,30 @@ test("setup suggests lessons before student steps without requiring them, comple
   ];
   const setupTasks = needsYou({ now: new Date("2026-10-14T10:00:00Z"), meet: null, payments: [], students: workspaceStudents, lessons: [], cancellations: [] });
   const workspace = studentWorkspace(workspaceStudents, [...setupTasks, ...operational], true, [paymentBooking, paymentBookingTwo]);
-  assert.deepEqual(workspace.rows.map(row => row.student.id), ["payment", "changed-new", "changed-old", "setup-soon", "setup-later", "first", "waiting", "no-email", "regular", "same-name"]);
-  assert.equal(new Set(workspace.rows.map(row => row.student.id)).size, workspaceStudents.length, "each student has one row");
-  assert.deepEqual(workspace.rows.find(row => row.student.id === "payment").items.map(item => item.key), ["payment:pay-one", "payment:pay-two"], "student identity wins over a mismatched email");
-  assert.ok(workspace.rows.every(row => row.items.every(item => !["email", "lessons", "welcome"].includes(item.kind))), "setup actions are not repeated as task cards");
+  const ids = rows => rows.map(row => row.student.id);
+  // Each student once: what needs her, her move, theirs, then everyone all set.
+  assert.deepEqual(Object.fromEntries(Object.entries(workspace.sections).map(([key, rows]) => [key, ids(rows)])), {
+    needs: ["payment", "changed-new", "changed-old", "first"],
+    todo: ["todo-soon", "no-email", "todo-later", "owes"],
+    waiting: ["waiting"],
+    set: ["regular", "same-name"],
+  });
+  assert.deepEqual(workspace.allSet, { done: 6, total: 11 }, "all set counts every active student whose checks are done");
+  assert.deepEqual(workspace.sections.needs[0].items.map(item => item.key), ["payment:pay-one", "payment:pay-two"], "student identity wins over a mismatched email");
+  assert.ok(Object.values(workspace.sections).flat().every(row => row.items.every(item => !["lessons", "welcome"].includes(item.kind))), "a card's own next step is never a task card too");
   assert.deepEqual(workspace.general.map(item => item.key), ["meet", "payment:unmatched"], "an unresolved payment never guesses by name");
   const unknownOwner = studentWorkspace(workspaceStudents, [{ kind: "payment", key: "payment:unknown-owner", review: { id: "unknown-owner" }, part: "lesson" }], true,
     [booking("unknown-owner", "another-account", "payment@example.invalid")]);
   assert.deepEqual(unknownOwner.general.map(item => item.key), ["payment:unknown-owner"], "a booking with an explicit unknown owner never falls back to someone else's email");
-  assert.equal(workspace.attentionCount, 8, "count each actionable student once, plus general warnings; waiting on the student does not count");
-  assert.equal(workspace.rows.find(row => row.student.id === "regular").setup, undefined, "a past confirmed lesson and standard prices remain complete");
-  assert.equal(studentWorkspace([ready("cards-off", { hasCard: false })], [], false, []).attentionCount, 0);
-  // Dormant students rest apart by name, with no setup to nag about, unless something of theirs needs her.
+  assert.equal(workspace.attentionCount, 6, "each student who needs her once, plus general warnings; her own next steps are on their cards");
+  // Dormant students rest apart by name, unless something of theirs needs her.
   const changedDormant = { kind: "changed", key: "changed:dormant", booking: booking("dormant", "dormant-changed", "", { student_changed_at: "2026-10-14T09:00:00Z" }), count: 1 };
   const resting = studentWorkspace([...workspaceStudents, student("zed", { name: "Zed", email: "", dormant: true }), ready("dormant-changed", { dormant: true })],
     [...setupTasks, ...operational, changedDormant], true, [paymentBooking, paymentBookingTwo]);
-  assert.deepEqual(resting.dormant.map(row => [row.student.id, row.setup]), [["zed", undefined]]);
-  assert.ok(resting.rows.some(row => row.student.id === "dormant-changed"), "a dormant student with something new stays where she will see it");
-  assert.equal(resting.attentionCount, workspace.attentionCount + 1, "only the change counts, never a dormant student's setup");
+  assert.deepEqual(ids(resting.dormant), ["zed"]);
+  assert.ok(ids(resting.sections.needs).includes("dormant-changed"), "a dormant student with something new stays where she will see it");
+  assert.equal(resting.attentionCount, workspace.attentionCount + 1, "only the change counts, never a dormant student's checks");
+  assert.deepEqual(resting.allSet, workspace.allSet, "dormant students are not counted as all set or not");
 });
 
 test("a teacher who is also a student opens Your lessons only when asked; every other teacher opens the schedule", () => {

@@ -3,7 +3,7 @@
 import { type ReactNode } from "react";
 import type { AdminBooking, AdminStudent } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
-import { dateKey, dateLabel, type NeedsYouItem, type StudentSetup } from "@/lib/teacher-calendar";
+import { dateKey, dateLabel, type NeedsYouItem } from "@/lib/teacher-calendar";
 
 const SHOWN = 3;
 
@@ -56,13 +56,11 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
 }) {
   if (!items.length) return null;
 
-  function studentAction(student: AdminStudent, next: StudentSetup["next"]) {
-    if (next === "email" || next === "lessons") return <button className="button button--coral button--compact" type="button" onClick={() => {
-      onStudent(student, next === "email");
-    }}>{next === "email" ? "Add email" : "Add a lesson"}<span className="visually-hidden"> for {student.name}</span></button>;
-    const again = next !== "welcome";
-    return <button className={`button button--${again ? "lilac" : "coral"} button--compact`} type="button" disabled={Boolean(sending) || !student.email} onClick={() => onWelcome(student, again)}>
-      {sending === student.id ? "Sending…" : again ? "Send the link again" : "Send welcome email"}<span className="visually-hidden"> to {student.name}</span>
+  function studentAction(student: AdminStudent, next: "lessons" | "welcome") {
+    if (next === "lessons") return <button className="button button--coral button--compact" type="button" onClick={() => onStudent(student)}>
+      Add a lesson<span className="visually-hidden"> for {student.name}</span></button>;
+    return <button className="button button--coral button--compact" type="button" disabled={Boolean(sending) || !student.email} onClick={() => onWelcome(student)}>
+      {sending === student.id ? "Sending…" : "Send welcome email"}<span className="visually-hidden"> to {student.name}</span>
     </button>;
   }
 

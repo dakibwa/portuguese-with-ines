@@ -1,6 +1,7 @@
 "use client";
 
-import { addedByTeacher, paidByHand, type AdminBooking } from "@/lib/admin-api";
+import { addedByTeacher, paidByHand, setLessonPaid, type AdminBooking } from "@/lib/admin-api";
+import { PaidTick } from "@/components/teacher/PaidTick";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { useEffect, useState } from "react";
@@ -34,7 +35,7 @@ export function upcomingLessons(bookings: AdminBooking[], now: number) {
  * and cancelled, reading the records from the start of time rather than the
  * visible week.
  */
-export function StudentLessons({ bookings, error, now, onRetry, token, requestedHomeworkId, onRecordRefund }: {
+export function StudentLessons({ bookings, error, now, onRetry, token, requestedHomeworkId, onRecordRefund, onPaid }: {
   token: string;
   requestedHomeworkId?: string;
   /** Null until they have been read. */
@@ -43,9 +44,13 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
   now: number;
   onRetry: () => void;
   onRecordRefund: (booking: AdminBooking) => void;
+  /** A past lesson ticked or unticked Already paid. */
+  onPaid?: (booking: AdminBooking) => void;
 }) {
   const [homeworkId, setHomeworkId] = useState<string | null>(null);
   const [homeworkBusy, setHomeworkBusy] = useState(false);
+  const [paying, setPaying] = useState("");
+  const [paidError, setPaidError] = useState<{ id: string; message: string } | null>(null);
   useEffect(() => { if (requestedHomeworkId) setHomeworkId(requestedHomeworkId); }, [requestedHomeworkId]);
   const upcoming = upcomingLessons(bookings ?? [], now);
   const past = (bookings ?? []).filter(booking => booking.status === "cancelled" || Date.parse(booking.ends_at) <= now)
@@ -71,8 +76,16 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
       : booking.same_day_fee_status === "payment_due" ? "Change fee due"
         : booking.same_day_fee_status === "scheduled" ? "Change fee scheduled"
           : booking.same_day_fee_status === "processing" ? "Change fee processing" : "";
+    /*
+     * A lesson she added that has been and is still open: paid in cash, she
+     * ticks it here, so what they still owe reads true (2 November 2026,
+     * Dan: everyone pays what is open). Ticked, it can be unticked again.
+     */
+    const settle = !cancelled && Date.parse(booking.starts_at) <= now && addedByTeacher(booking) && booking.attendance_status === "expected" &&
+      (paidByHand(booking) || (booking.payment_status === "not_required" && !booking.charge_started_at));
     // A cancelled lesson's money only matters if some moved.
-    const payment = cancelled && !paidByHand(booking) && !["paid", "refunded"].includes(booking.payment_status) ? "" : paymentLabel(booking);
+    // Where the tick shows, it says how it was paid.
+    const payment = settle || (cancelled && !paidByHand(booking) && !["paid", "refunded"].includes(booking.payment_status)) ? "" : paymentLabel(booking);
     const facts = [
       formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000) }),
       payment,
@@ -102,6 +115,21 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
           <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
           {facts.map(fact => <li key={fact}>{fact}</li>)}
         </ul>
+        {settle ? <div className="teacher-history-lesson__paid">
+          <PaidTick checked={paidByHand(booking)} disabled={Boolean(paying) || homeworkBusy} onChange={async (paid) => {
+            setPaying(booking.id);
+            setPaidError(null);
+            try {
+              const { booking: updated } = await setLessonPaid(token, booking.id, paid);
+              onPaid?.(updated);
+            } catch (caught) {
+              setPaidError({ id: booking.id, message: caught instanceof Error ? caught.message : "This lesson couldn’t be updated." });
+            } finally {
+              setPaying("");
+            }
+          }} />
+          {paidError?.id === booking.id ? <p className="teacher-inline-error" role="alert">{paidError.message}</p> : null}
+        </div> : null}
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
         {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
         {cancelled && paidByHand(booking) && booking.payment_status !== "refunded" ? <button className="button button--outline button--small" type="button" disabled={homeworkBusy} onClick={() => onRecordRefund(booking)}>Record refund</button> : null}

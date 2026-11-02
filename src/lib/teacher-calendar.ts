@@ -401,79 +401,73 @@ export type NeedsYouItem =
 /** Students she set up with no email hold this in place of one; nothing is ever shown or sent to it. */
 const NO_EMAIL_YET = "no-email:";
 
-export type StudentSetupStep = "email" | "price" | "lessons" | "welcome" | "sign-in" | "card";
-
-export type StudentSetup = {
-  student: AdminStudent;
-  steps: { id: StudentSetupStep; label: string; done: boolean; lockedReason?: string }[];
-  next: Exclude<StudentSetupStep, "price">;
-  owner: "Yours" | "Theirs";
-};
-
 /** A past lesson counts too; her students do not need a future booking to stay set up. */
 export const hasLessons = (student: AdminStudent) => Boolean(student.hasLessons || student.nextLessonAt || student.upcoming || student.weekly);
 
-/** New setup suggests the lesson before the email, without requiring one; completed steps stay editable. */
-export function gettingStarted(students: AdminStudent[], cardsAccepted = true): StudentSetup[] {
-  return students.flatMap((student) => {
-    const email = Boolean(student.email && !student.email.startsWith(NO_EMAIL_YET));
-    // No email is a way of being set up, not a step left undone (2 November
-    // 2026, Dan): most of her students pay her in person and never gave one.
-    // Their card is the usual one, with a WhatsApp invite as their way in.
-    if (!email) return [];
-    const steps: StudentSetup["steps"] = [
-      { id: "price", label: "Price", done: true },
-      { id: "lessons", label: "Lessons", done: hasLessons(student) },
-      { id: "email", label: "Email", done: email },
-      { id: "welcome", label: "Welcome", done: email && !student.awaitingWelcome },
-      { id: "sign-in", label: "Sign in", done: Boolean(student.signedIn) },
-      // A student whose every length is free has no card to add (16 October 2026).
-      ...(cardsAccepted && !(student.prices?.[60] === 0 && student.prices?.[90] === 0)
-        ? [{ id: "card" as const, label: "Card", done: Boolean(student.hasCard) }] : []),
-    ];
-    // Lessons are optional (16 October 2026, Inês): a student with none yet
-    // can still be given an email and welcomed, to book their own. Lessons
-    // lead while she is still setting them up, and once welcomed an empty
-    // Lessons step is theirs to fill, so it holds nothing open.
-    const welcomed = steps.find((step) => step.id === "welcome")!.done;
-    const index = steps.findIndex((step) => !step.done && !(welcomed && step.id === "lessons"));
-    if (index < 0) return [];
-    const next = steps[index].id as StudentSetup["next"];
-    const blocking = steps.findIndex((step) => !step.done && step.id !== "lessons");
-    const prerequisite: Record<StudentSetupStep, string> = {
-      price: "Set a price first.",
-      lessons: "Add a lesson first.",
-      email: "Add an email first.",
-      welcome: "Send the welcome email first.",
-      "sign-in": "Waiting for the student to sign in.",
-      card: "Waiting for the student to add a card.",
-    };
-    for (let later = blocking + 1; blocking >= 0 && later < steps.length; later++) {
-      if (!steps[later].done && steps[later].id !== "lessons") steps[later].lockedReason = prerequisite[steps[blocking].id];
-    }
-    return [{ student, steps, next, owner: next === "sign-in" || next === "card" ? "Theirs" as const : "Yours" as const }];
-  });
+/** Every length free: nothing to pay, so no card to ask for. */
+export const paysNothing = (student: AdminStudent) => student.prices?.[60] === 0 && student.prices?.[90] === 0;
+
+/** Whose move it is: hers, theirs (a link is out), or nobody's. */
+export type StudentStage = "todo" | "waiting" | "set";
+/** What her one button does: sign them in, ask for their card, or ask for what is still open. */
+export type StudentNext = "invite" | "card" | "pay";
+
+/**
+ * How far a student has got with the website (2 November 2026, Dan: "get
+ * everyone logged in, pay for previous lessons and able to book their own
+ * lessons"). Three checks, not six steps: signed in, a card for her lessons,
+ * and nothing still open. Price, lessons and email are never steps; a card
+ * and what is open only count where cards are taken and they pay something.
+ */
+export type StudentProgress = {
+  signedIn: boolean;
+  /** Null when there is no card to ask for. */
+  card: boolean | null;
+  /** Lessons she added that have begun and no card or tick has settled. */
+  openLessons: number;
+  openCents: number;
+  /** Their newest way in still unspent. */
+  invitedAt: string | null;
+  stage: StudentStage;
+  next: StudentNext | null;
+};
+
+export function studentProgress(student: AdminStudent, cardsAccepted: boolean): StudentProgress {
+  const cardAsked = cardsAccepted && !paysNothing(student);
+  const signedIn = Boolean(student.signedIn);
+  const card = cardAsked ? Boolean(student.cardForAllLessons) : null;
+  const openLessons = cardAsked ? student.unpaidPast ?? 0 : 0;
+  const openCents = openLessons ? student.unpaidPastCents ?? 0 : 0;
+  const invitedAt = student.invitedAt ?? null;
+  const next: StudentNext | null = !signedIn ? "invite" : openLessons ? "pay" : card === false ? "card" : null;
+  // A link they have yet to open leaves the next move theirs.
+  const stage: StudentStage = !next ? "set" : invitedAt ? "waiting" : "todo";
+  return { signedIn, card, openLessons, openCents, invitedAt, stage, next };
 }
 
 export type StudentWorkspaceRow = {
   student: AdminStudent;
-  setup?: StudentSetup;
+  progress: StudentProgress;
   items: NeedsYouItem[];
 };
 
+export type StudentSection = "needs" | StudentStage;
+
 /**
- * One student once: her operational work first, then setup and the students
- * already ready. Dormant students (22 October 2026, Dan) rest apart, by name,
- * with no setup to nag about, unless something of theirs needs her.
+ * One student once, in the first group that fits: something of theirs needs
+ * her, then her move, theirs, and the students already all set. Dormant
+ * students (22 October 2026, Dan) rest apart, by name, unless something of
+ * theirs needs her.
  */
 export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[], cardsAccepted: boolean, bookings: AdminBooking[]): {
-  rows: StudentWorkspaceRow[];
+  sections: Record<StudentSection, StudentWorkspaceRow[]>;
   dormant: StudentWorkspaceRow[];
   general: NeedsYouItem[];
   attentionCount: number;
+  /** Active students all set, of all active students. */
+  allSet: { done: number; total: number };
 } {
-  const setup = new Map(gettingStarted(students.filter(student => !student.dormant), cardsAccepted).map(row => [row.student.id, row]));
-  const rows: StudentWorkspaceRow[] = students.map(student => ({ student, setup: setup.get(student.id), items: [] }));
+  const rows: StudentWorkspaceRow[] = students.map(student => ({ student, progress: studentProgress(student, cardsAccepted), items: [] }));
   const byId = new Map(rows.map(row => [row.student.id, row]));
   const byBooking = new Map(bookings.map(booking => [booking.id, booking]));
   const byEmail = new Map<string, StudentWorkspaceRow | null>();
@@ -489,7 +483,7 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
 
   const general: NeedsYouItem[] = [];
   for (const item of items) {
-    // These are the row's setup steps, rather than duplicate task cards.
+    // A missing lesson or welcome is the card's own next step, never a task card.
     if (item.kind === "lessons" || item.kind === "welcome") continue;
     const booking = item.kind === "payment" ? byBooking.get(item.review.id) : "booking" in item ? item.booking : undefined;
     const row = "student" in item ? byId.get(item.student.id)
@@ -506,26 +500,35 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
     if (row.items.some(item => item.kind === "payment" || item.kind === "declined")) return 0;
     if (row.items.some(item => item.kind === "changed" || item.kind === "cancelled")) return 1;
     if (row.student.homeworkToReview?.length) return 1.5;
-    if (row.setup?.owner === "Yours") return 2;
-    if (row.items.some(item => item.kind === "first" || item.kind === "card")) return 3;
-    return row.setup ? 4 : 5;
+    return row.items.length ? 3 : 4;
   };
   const latestChange = (row: StudentWorkspaceRow) => Math.max(0, ...row.items.map(item =>
     item.kind === "changed" ? stamp(item.booking.student_changed_at, 0) : item.kind === "cancelled" ? stamp(item.booking.cancelled_at, 0) : 0));
   const nextLesson = (row: StudentWorkspaceRow) => Math.min(stamp(row.student.nextLessonAt), ...row.items.map(item =>
     item.kind === "first" ? stamp(item.booking.starts_at) : Infinity));
+  // Within a group, the student whose lesson comes soonest first, then by name.
   rows.sort((a, b) => priority(a) - priority(b)
     || (priority(a) === 1 ? latestChange(b) - latestChange(a) : 0)
     || nextLesson(a) - nextLesson(b)
     || a.student.name.localeCompare(b.student.name)
     || a.student.id.localeCompare(b.student.id));
 
-  const resting = (row: StudentWorkspaceRow) => Boolean(row.student.dormant && !row.items.length && !row.student.homeworkToReview?.length);
+  const needsHer = (row: StudentWorkspaceRow) => Boolean(row.items.length || row.student.homeworkToReview?.length);
+  const sections: Record<StudentSection, StudentWorkspaceRow[]> = { needs: [], todo: [], waiting: [], set: [] };
+  const dormant: StudentWorkspaceRow[] = [];
+  for (const row of rows) {
+    if (needsHer(row)) sections.needs.push(row);
+    else if (row.student.dormant) dormant.push(row);
+    else sections[row.progress.stage].push(row);
+  }
+  const active = rows.filter(row => !row.student.dormant);
   return {
-    rows: rows.filter(row => !resting(row)),
-    dormant: rows.filter(resting).sort((a, b) => a.student.name.localeCompare(b.student.name) || a.student.id.localeCompare(b.student.id)),
+    sections,
+    dormant: dormant.sort((a, b) => a.student.name.localeCompare(b.student.name) || a.student.id.localeCompare(b.student.id)),
     general,
-    attentionCount: general.length + rows.filter(row => row.items.length || row.setup?.owner === "Yours" || row.student.homeworkToReview?.length).length,
+    // Only what needs her: an invite still to send is a group of its own, not a badge.
+    attentionCount: general.length + sections.needs.length,
+    allSet: { done: active.filter(row => row.progress.stage === "set").length, total: active.length },
   };
 }
 
