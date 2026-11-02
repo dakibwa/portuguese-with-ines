@@ -1314,9 +1314,10 @@ Preserve these desktop and mobile states:
   paid to her by hand, Your lessons opens with one sheet card above the
   calendar, the same card a payment link opens (2 November 2026, Dan: "just
   have it as one single thing"): a card icon in a lilac disc, `Confirm your
-  card payments`, `Paid automatically` with `Porto time` over their weekly
-  run or the lessons she added as dashed tiles, the dabs, the agreement
-  capsule `I authorise card payments for my future lessons`, then `Agree &
+  card payments`, `Paid after each lesson` with `Porto time` over their
+  weekly run or the lessons she added as dashed tiles, the fine print (the
+  fee rule and `Already paid Inês for one? Tell her before agreeing.`), the
+  agreement capsule `I authorise card payments for my future lessons`, then `Agree &
   add card` and `Not now` (which folds it to `Review payments` for that
   visit); back from Stripe it becomes `Card saved. You’re all set. Book, move
   or cancel your lessons below.` above their lessons and `Book`. Its words are as short and
@@ -1335,22 +1336,25 @@ Preserve these desktop and mobile states:
   opens the same card as `Confirm your card payments` (27 October 2026,
   Dan: "simple and beautiful", in the site's own styling and words): the
   lesson as the booking step's cream time tile (its splat, day and times,
-  `Porto time`, the price on the right), the confirm step's three dabs (when
-  that lesson is charged, future lessons charged automatically, the €5 fee),
-  then the agreement capsule with `Terms & privacy` inside it and
-  `Authorise payments` beside `Not now`. A wide card sets the lesson and dabs
-  on the left and the agreement on the right, level in the middle; a phone
+  `Porto time`, the price on the right), then the fee rule as fine print
+  over the agreement capsule with `Terms & privacy` inside it and
+  `Authorise payments` beside `Not now`. A wide card sets the lessons on the
+  left and the fine print and agreement on the right, level in the middle; a phone
   reads them top to bottom. Several lessons Inês ticked (2 November 2026,
   Dan: "so they can backpay all the lessons") stack as the booking step's
   chosen lessons do, each a smaller tile with its own splat, one line each
   (day and start, never wrapped; Dan: "always fits on the same line") under
-  a `To pay now` label that names `Porto time` once for every tile, then a
-  receipt's ruled `Total` under the prices. Their lessons still to come that
-  Inês added follow under `Then automatically`, each weekly run once as
+  an `Outstanding lessons` label that names `Porto time` once for every tile,
+  then a receipt's ruled `Charged now €45` under the prices, worked out from
+  the lessons whose charge time has passed (`Total` with `Charged after each
+  lesson` under it while none has). Their lessons still to come that
+  Inês added follow under `Then after each lesson`, each weekly run once as
   `Every Tuesday, 17:00` in a dashed tile with the weekly lilac repeat mark
-  (Dan: make it obvious it covers their weekly lessons); the first dab reads
-  `You’ll be charged €45 now for your outstanding lessons` and the capsule
-  `these and future lessons`. Inês gets the same tick list from an unpaid
+  (Dan: make it obvious it covers their weekly lessons), and the capsule
+  reads `these and future lessons`. The rules are never a list of dabs here
+  (2 November 2026, Dan: "more tasteful … than a big long list"): the
+  labels and total say what is charged and when, and the fee is one
+  sentence of small lilac fine print over the capsule. Inês gets the same tick list from an unpaid
   lesson's dialog (`Create payment link`, small outline, the opened lesson
   ticked) and from a student's card on Students (`Payment link`, nothing
   ticked): `Tick what Jess still owes` and `Their future lessons then go on
@@ -1998,13 +2002,13 @@ time") took each busy place back to one voice:
   first dab (`Goes to sam@…`), never as a bare line after the dabs;
 - an expression's `Edit`, `Preview` and `Publish` are one family of lilac
   buttons;
-- The card prompt and a payment approval state the fee once, as two dabs, the free
-  one first (2 November 2026, Dan, the same words across the site): `**Free to
-  change or cancel** a lesson up to 14 hours before`, then `**€5** to move or
-  cancel later, or if you don’t show up`; above them, `Future lessons are
-  charged after each lesson` (the hourly charge runs an hour after the end, so
-  not "at the end"), and on an approval first `You’ll be charged **€45** now
-  for your outstanding lessons`, worked out from the lessons it shows;
+- the card prompt and a payment approval state the fee once, the free part
+  first (2 November 2026, Dan, the same words across the site): `**Free to
+  change or cancel** a lesson up to 14 hours before. **€5** to move or cancel
+  later, or if you don’t show up.` as fine print over the agreement; the
+  Card row's terms keep them as two dabs. When lessons are charged follows the
+  charge window: `after each lesson` while the hourly charge runs an hour
+  after the end, `at the end of each lesson` once that window is nothing;
 - a past lesson's long date breaks before its year, never leaving the time on a
   line of its own.
 
