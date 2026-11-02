@@ -1311,10 +1311,15 @@ Preserve these desktop and mobile states:
   added`, with `Change` or `Add card`; opening it shows the confirm step's
   dabbed terms in place (the two €5 fees among them) and `Agree & add
   card`, which goes to Stripe's page. While a lesson Inês added is still
-  paid to her by hand, Your lessons carries one quiet sheet card above the
-  calendar: a card icon in a lilac disc, `Pay by card`, `Add your card once
-  and you’re set.` and `Add card`, nothing more; back from Stripe it becomes
-  `Card saved. You’re all set.` Its words are as short and
+  paid to her by hand, Your lessons opens with one sheet card above the
+  calendar, the same card a payment link opens (2 November 2026, Dan: "just
+  have it as one single thing"): a card icon in a lilac disc, `Confirm your
+  card payments`, `Paid automatically` with `Porto time` over their weekly
+  run or the lessons she added as dashed tiles, the dabs, the agreement
+  capsule `I authorise card payments for my future lessons`, then `Agree &
+  add card` and `Not now` (which folds it to `Review payments` for that
+  visit); back from Stripe it becomes `Card saved. You’re all set. Book, move
+  or cancel your lessons below.` above their lessons and `Book`. Its words are as short and
   plain as they can be (12 October 2026, Dan: "the language here can be
   even more simple"), and so are the emails that bring students in.
   That success waits for verified current card permission; a return URL alone
@@ -1993,7 +1998,7 @@ time") took each busy place back to one voice:
   first dab (`Goes to sam@…`), never as a bare line after the dabs;
 - an expression's `Edit`, `Preview` and `Publish` are one family of lilac
   buttons;
-- `Pay by card` and a payment approval state the fee once, as two dabs, the free
+- The card prompt and a payment approval state the fee once, as two dabs, the free
   one first (2 November 2026, Dan, the same words across the site): `**Free to
   change or cancel** a lesson up to 14 hours before`, then `**€5** to move or
   cancel later, or if you don’t show up`; above them, `Future lessons are

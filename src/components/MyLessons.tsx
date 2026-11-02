@@ -944,7 +944,7 @@ export function MyLessons({
   const cardNote = cardAdded ? (
     <div className="booking-outcome card-added" role="status">
       {cardSaved ? <CheckCircle2 size={20} aria-hidden="true" /> : <AlertCircle size={20} aria-hidden="true" />}
-      <p>{cardSaved ? <>{cardAuthorised ? "Payments authorised." : "Card saved."} You&rsquo;re all set.</> : cardChecking ? "We’re confirming your saved card…" : "Your card hasn’t been confirmed yet. You can try adding it again."}</p>
+      <p>{cardSaved ? <>{cardAuthorised ? "Payments authorised." : "Card saved."} You&rsquo;re all set. Book, move or cancel your lessons below.</> : cardChecking ? "We’re confirming your saved card…" : "Your card hasn’t been confirmed yet. You can try adding it again."}</p>
     </div>
   ) : null;
   const askForCard = !cardSaved && !cardChecking && cardsAccepted && hasStudentSide(student) &&
@@ -953,7 +953,7 @@ export function MyLessons({
   // it covers their weekly lessons too): each weekly run once, as its day and
   // Porto time, and any single lesson Inês added still to come.
   const upcomingAdded: CardUpcoming[] = [];
-  if (cardBookingId) {
+  if (cardBookingId || askForCard) {
     for (const booking of bookings
       .filter((entry) => Date.parse(entry.startAt) > clock && entry.status === "confirmed" && entry.addedByTeacher && entry.paymentStatus === "not_required" && !entry.paidByHand)
       .sort((a, b) => a.startAt.localeCompare(b.startAt))) {

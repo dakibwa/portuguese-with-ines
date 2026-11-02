@@ -37,8 +37,10 @@ export type CardUpcoming = { key: string; when: string; amountCents: number; wee
  * short list a booking shows, and pressing the button is the agreement; the
  * card itself is entered on Stripe's page.
  */
-export function CardTerms({ change = false, onCancel, bookingId = "", upcoming = [], feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
+export function CardTerms({ change = false, setup = false, onCancel, bookingId = "", upcoming = [], feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
   change?: boolean; onCancel?: () => void;
+  /** Asking for a card on Your lessons: the approval card's layout, without lessons to pay now. */
+  setup?: boolean;
   /** The lessons a payment approval link names, comma-separated. */
   bookingId?: string;
   /** Their lessons still to come that Inês added, which the agreement then pays for. */
@@ -77,13 +79,17 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
   // A future lesson the link names is paid now, so it is not listed again.
   const paidNow = new Set(lessons.map(lesson => lesson.startAt));
   const then = upcoming.filter(entry => entry.startAts.some(start => !paidNow.has(start))).slice(0, 3);
+  // One card whether or not Inês ticked lessons (2 November 2026, Dan: "just
+  // have it as one single thing"): only changing a saved card keeps the list.
+  const approval = Boolean(bookingId) || setup;
+  const ready = bookingId ? Boolean(selected) : true;
   const fee = review?.sameDayFeeCents ?? feeCents;
   const notice = review?.minimumNoticeHours ?? noticeHours;
   const cardRequest = useRef(0);
   useLayoutEffect(() => () => { cardRequest.current += 1; }, []);
 
   async function open() {
-    if (busy || (bookingId && (!selected || !bookingConsent))) return;
+    if (busy || (approval && (!ready || !bookingConsent))) return;
     const request = ++cardRequest.current;
     const session = readSession();
     const page = window.location.pathname;
@@ -113,7 +119,7 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
       <button
         aria-describedby="card-terms-summary"
         className="button button--coral"
-        disabled={busy || Boolean(bookingId && (!selected || !bookingConsent))}
+        disabled={busy || (approval && (!ready || !bookingConsent))}
         onClick={() => void open()}
         type="button"
       >
@@ -121,7 +127,7 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
       </button>
       {bookingId && error ? <button className="my-lessons__change" onClick={() => { setError(""); setReview(null); setBookingConsent(false); setAttempt(value => value + 1); }} type="button">Try again</button> : null}
       {onCancel ? (
-        <button className="my-lessons__change" disabled={busy} onClick={onCancel} type="button">{bookingId ? "Not now" : "Cancel"}</button>
+        <button className="my-lessons__change" disabled={busy} onClick={onCancel} type="button">{approval ? "Not now" : "Cancel"}</button>
       ) : null}
     </div>
   );
@@ -144,12 +150,12 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
    * covers their weekly lessons too), then the dabs and the agreement. On a
    * wide card what is agreed sits on the left and agreeing on the right.
    */
-  if (bookingId) return (
+  if (approval) return (
     <div className="card-terms card-terms--approval">
-      {!selected && !error ? <p role="status">Checking your lessons…</p> : null}
-      {selected ? (
+      {!ready && !error ? <p role="status">Checking your lessons…</p> : null}
+      {ready ? (
         <div className="card-terms__summary" id="card-terms-summary">
-          <section aria-labelledby="card-terms-now" className="card-terms__lessons">
+          {lessons.length ? <section aria-labelledby="card-terms-now" className="card-terms__lessons">
             <p className="card-terms__label"><span id="card-terms-now">{chargedOnAgreement === "none" ? "To pay" : "To pay now"}</span><small>Porto time</small></p>
             <ol className="booking-chosen-lessons">
               {lessons.map((lesson, index) => <li key={lesson.id}>{tile(lesson, index)}</li>)}
@@ -160,10 +166,11 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
                 <b className="card-terms__price">{formatMoneyCents(lessons.reduce((sum, lesson) => sum + lesson.amountCents, 0))}</b>
               </p>
             ) : null}
-          </section>
+          </section> : null}
           {then.length ? (
             <section aria-labelledby="card-terms-then" className="card-terms__lessons card-terms__lessons--then">
-              <p className="card-terms__label"><span id="card-terms-then">Then automatically</span></p>
+              {lessons.length ? <p className="card-terms__label"><span id="card-terms-then">Then automatically</span></p>
+                : <p className="card-terms__label"><span id="card-terms-then">Paid automatically</span><small>Porto time</small></p>}
               <ul className="booking-chosen-lessons">
                 {then.map(lesson => (
                   <li key={lesson.key}>
@@ -183,19 +190,20 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
               within the hour; a lesson whose hour has not passed yet waits
               for it. */}
           <ul className="booking-payment-facts">
-            <li>
+            {bookingId ? <li>
               {chargedOnAgreement === "none"
                 ? several ? "These lessons are charged after each one" : "This lesson is charged after it ends"
                 : <>You&rsquo;ll be charged <strong>{formatMoneyCents(dueNowCents)}</strong> now{chargedOnAgreement === "some"
                   ? ", and the rest after each lesson" : several ? " for your outstanding lessons" : " for this lesson"}</>}
-            </li>
+            </li> : null}
             <li>Future lessons are charged after each lesson</li>
+            {bookingId ? null : <li>Already paid Inês for some? Tell her before agreeing</li>}
             <FeeFacts feeCents={fee} noticeHours={notice} />
           </ul>
         </div>
       ) : null}
       <div className="card-terms__consent">
-        {selected ? (
+        {ready ? (
           <div className="booking-agreement card-terms__agreement">
             <div className={`booking-agreement__control${bookingConsent ? " is-agreed" : ""}`}>
               <button
@@ -207,7 +215,7 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
                 onClick={() => setBookingConsent(value => !value)}
               >
                 {bookingConsent ? <CheckCircle2 size={20} aria-hidden="true" /> : <Circle size={20} aria-hidden="true" />}
-                I authorise card payments for {several ? "these" : "this"} and future lessons
+                {bookingId ? `I authorise card payments for ${several ? "these" : "this"} and future lessons` : "I authorise card payments for my future lessons"}
               </button>
               <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">Terms &amp; privacy</a>
             </div>
@@ -239,23 +247,24 @@ export function CardTerms({ change = false, onCancel, bookingId = "", upcoming =
 
 /**
  * On Your lessons, only while lessons Inês added are still paid to her by
- * hand: one quiet card above the calendar asking once, in her words.
+ * hand, or when her payment link names lessons: one card above the calendar.
  */
 export function CardPrompt({ bookingId = "", upcoming = [] }: { bookingId?: string; upcoming?: CardUpcoming[] }) {
-  const [open, setOpen] = useState(Boolean(bookingId));
+  // Open on arrival, the same card with or without lessons to pay now
+  // (2 November 2026, Dan); Not now folds it for this visit.
+  const [open, setOpen] = useState(true);
   return (
-    <section aria-labelledby="card-prompt-heading" className={`card-prompt${open ? " card-prompt--open" : ""}${bookingId && open ? " card-prompt--review" : ""}`}>
+    <section aria-labelledby="card-prompt-heading" className={`card-prompt${open ? " card-prompt--open card-prompt--review" : ""}`}>
       <span aria-hidden="true" className="card-prompt__icon">
         <CreditCard size={20} />
       </span>
       <div className="card-prompt__body">
-        <h3 id="card-prompt-heading">{bookingId ? "Confirm your card payments" : "Pay by card"}</h3>
-        {bookingId ? null : <p>Add your card once and you&rsquo;re set.</p>}
+        <h3 id="card-prompt-heading">Confirm your card payments</h3>
         {open ? (
-          <CardTerms key={bookingId} bookingId={bookingId} upcoming={upcoming} onCancel={() => setOpen(false)} />
+          <CardTerms key={bookingId} bookingId={bookingId} setup={!bookingId} upcoming={upcoming} onCancel={() => setOpen(false)} />
         ) : (
           <button className="button button--blue button--compact" onClick={() => setOpen(true)} type="button">
-            {bookingId ? "Review payments" : "Add card"}
+            Review payments
           </button>
         )}
       </div>

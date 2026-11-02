@@ -86,18 +86,20 @@ try {
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/link-${width}.png`, fullPage: false });
     await linked.page.getByRole("button", { name: "Sign in", exact: true }).click();
     const prompt = linked.page.locator(".card-prompt");
-    await expect(prompt.getByRole("heading", { name: "Pay by card" })).toBeVisible({ timeout: 15000 });
-    await expect(prompt).toContainText("Add your card once and you’re set.");
+    // One card, as a payment link's is (2 November 2026, Dan: "one single thing").
+    await expect(prompt.getByRole("heading", { name: "Confirm your card payments" })).toBeVisible({ timeout: 15000 });
+    await expect(prompt.locator(".card-terms__lessons--then")).toContainText("Paid automatically");
     assert.equal(await linked.page.evaluate(() => localStorage.getItem("ines-student-session")), "qa-link-session");
     assert.deepEqual(linked.posts.filter((post) => post.endpoint === "/auth/email-link/confirm").map((post) => post.body), [{ token: "qa-good-link" }]);
     await expect(linked.page.getByRole("heading", { name: "Your account" })).toHaveCount(0);
     assert.ok(await noOverflow(linked.page), `no sideways scroll at ${width}px`);
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/prompt-${width}.png`, fullPage: false });
 
-    await prompt.getByRole("button", { name: "Add card" }).click();
-    await expect(prompt.locator(".booking-payment-facts")).toBeVisible();
+    const addCard = prompt.getByRole("button", { name: "Agree & add card" });
+    await expect(addCard).toBeDisabled();
+    await prompt.getByRole("button", { name: "I authorise card payments for my future lessons" }).click();
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/terms-${width}.png`, fullPage: false });
-    await prompt.getByRole("button", { name: "Agree & add card" }).click();
+    await addCard.click();
     await linked.page.waitForURL(/checkout\.stripe\.com/);
     assert.deepEqual(linked.posts.find((post) => post.endpoint === "/me/card")?.body, { consent: true });
     assert.deepEqual(linked.errors, []);
@@ -188,7 +190,7 @@ try {
       // document. The newer session is retained by this tab.
       await interrupted.page.goto(`${base}/book/?view=lessons`);
       const interruptedPrompt = interrupted.page.locator(".card-prompt");
-      await interruptedPrompt.getByRole("button", { name: "Add card", exact: true }).click({ timeout: 15000 });
+      await interruptedPrompt.getByRole("button", { name: "I authorise card payments for my future lessons" }).click({ timeout: 15000 });
       await interruptedPrompt.getByRole("button", { name: "Agree & add card", exact: true }).click();
       await cardStarted.promise;
       await interrupted.page.locator(".site-header__brand").click();
