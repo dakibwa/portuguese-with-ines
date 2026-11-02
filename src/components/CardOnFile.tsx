@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Circle, CreditCard } from "lucide-react";
+import { AlertCircle, CheckCircle2, Circle, CreditCard, Repeat } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
 import { openCardPage, previewCardBooking, readSession, type CardBooking } from "@/lib/auth-api";
 import { NOTICE_HOURS, SAME_DAY_RESCHEDULE_FEE_CENTS } from "@/lib/config";
@@ -15,16 +15,21 @@ const LESSON_MARKS = [
   "/visuals/v2-splats/real-life-splat-v2.svg",
 ];
 
+/** Lessons still to come that the agreement will pay for: one weekly run, or one lesson, with the starts it covers. */
+export type CardUpcoming = { key: string; when: string; amountCents: number; weekly: boolean; startAts: string[] };
+
 /**
  * Saving a card from the account (12 October 2026, Dan): how a student Inês
  * brought onto the site pays for the lessons she adds. The terms are the same
  * short list a booking shows, and pressing the button is the agreement; the
  * card itself is entered on Stripe's page.
  */
-export function CardTerms({ change = false, onCancel, bookingId = "", feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
+export function CardTerms({ change = false, onCancel, bookingId = "", upcoming = [], feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
   change?: boolean; onCancel?: () => void;
   /** The lessons a payment approval link names, comma-separated. */
   bookingId?: string;
+  /** Their lessons still to come that Inês added, which the agreement then pays for. */
+  upcoming?: CardUpcoming[];
   /** The live late change fee and notice; the published terms until the account says. */
   feeCents?: number; noticeHours?: number;
 }) {
@@ -53,6 +58,9 @@ export function CardTerms({ change = false, onCancel, bookingId = "", feeCents =
   const selected = review?.bookings[0];
   const lessons = review?.bookings ?? [];
   const several = lessons.length > 1;
+  // A future lesson the link names is paid now, so it is not listed again.
+  const paidNow = new Set(lessons.map(lesson => lesson.startAt));
+  const then = upcoming.filter(entry => entry.startAts.some(start => !paidNow.has(start))).slice(0, 3);
   const fee = review?.sameDayFeeCents ?? feeCents;
   const notice = review?.minimumNoticeHours ?? noticeHours;
   const cardRequest = useRef(0);
@@ -102,56 +110,66 @@ export function CardTerms({ change = false, onCancel, bookingId = "", feeCents =
     </div>
   );
 
+  // One line each, the day and start (2 November 2026, Dan: "always fits on
+  // the same line"); Porto time is named once, over the list.
   const tile = (lesson: CardBooking, index: number) => (
     <div aria-label={several ? `Lesson ${index + 1}` : "This lesson"} className="booking-selection-summary card-terms__lesson" role="group">
       <AssetMark asset={LESSON_MARKS[index % LESSON_MARKS.length]} className="booking-selection-summary__mark" />
-      <span className="booking-choice-summary__copy">
-        <strong>
-          <span>{formatShortDay(lesson.startAt)},</span> <span>{formatSlotTime(lesson.startAt)}–{formatSlotTime(lesson.endAt)}</span>
-        </strong>
-        {/* The clock named once, on the first, as the booking step does. */}
-        {index === 0 ? <small>Porto time</small> : null}
-      </span>
+      <strong className="card-terms__when">{formatShortDay(lesson.startAt)}, {formatSlotTime(lesson.startAt)}</strong>
       <b className="card-terms__price">{formatMoneyCents(lesson.amountCents)}</b>
     </div>
   );
   const onAgreement = review?.savedCardKey ? "once you agree" : "once you add your card";
+  const saved = review?.savedCardKey ? " to your saved card" : "";
 
   /*
    * A payment approval link (27 October 2026, Dan: "simple and beautiful"),
-   * in the booking confirm step's own words and marks: the lesson as its
-   * time tile, then its dabs, then the agreement. On a wide card what is
-   * agreed sits on the left and agreeing on the right. Several lessons Inês
-   * ticked (2 November 2026) stack as the booking step's chosen lessons do,
-   * with their total beneath.
+   * in the booking confirm step's own words and marks: what is paid now as
+   * the booking step's time tiles with their total, then what is paid
+   * automatically from then on (2 November 2026, Dan: make it obvious it
+   * covers their weekly lessons too), then the dabs and the agreement. On a
+   * wide card what is agreed sits on the left and agreeing on the right.
    */
   if (bookingId) return (
     <div className="card-terms card-terms--approval">
       {!selected && !error ? <p role="status">Checking your lessons…</p> : null}
       {selected ? (
         <div className="card-terms__summary" id="card-terms-summary">
-          {several ? (
-            <div className="card-terms__lessons">
-              <ol aria-label="These lessons" className="booking-chosen-lessons">
-                {lessons.map((lesson, index) => <li key={lesson.id}>{tile(lesson, index)}</li>)}
-              </ol>
+          <section aria-labelledby="card-terms-now" className="card-terms__lessons">
+            <p className="card-terms__label"><span id="card-terms-now">To pay now</span><small>Porto time</small></p>
+            <ol className="booking-chosen-lessons">
+              {lessons.map((lesson, index) => <li key={lesson.id}>{tile(lesson, index)}</li>)}
+            </ol>
+            {several ? (
               <p className="card-terms__total">
-                <span>{lessons.length} lessons</span>
+                <span>Total</span>
                 <b className="card-terms__price">{formatMoneyCents(lessons.reduce((sum, lesson) => sum + lesson.amountCents, 0))}</b>
               </p>
-            </div>
-          ) : tile(selected, 0)}
+            ) : null}
+          </section>
+          {then.length ? (
+            <section aria-labelledby="card-terms-then" className="card-terms__lessons card-terms__lessons--then">
+              <p className="card-terms__label"><span id="card-terms-then">Then automatically</span></p>
+              <ul className="booking-chosen-lessons">
+                {then.map(lesson => (
+                  <li key={lesson.key}>
+                    <div className="booking-selection-summary card-terms__lesson card-terms__lesson--then">
+                      <span aria-hidden="true" className="card-terms__then-mark">{lesson.weekly ? <Repeat size={16} strokeWidth={2.4} /> : <CreditCard size={16} />}</span>
+                      <strong className="card-terms__when">{lesson.when}</strong>
+                      <b className="card-terms__price">{formatMoneyCents(lesson.amountCents)}</b>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           <ul className="booking-payment-facts">
             <li>
-              {several ? (
-                `Each is charged${review?.savedCardKey ? " to your saved card" : ""} ${chargedOnAgreement === "all" ? onAgreement
-                  : chargedOnAgreement === "some" ? `${onAgreement}, or an hour after it ends` : "an hour after it ends"}`
-              ) : <>
-                This lesson is charged{review?.savedCardKey ? " to your saved card" : ""}{" "}
-                {chargedOnAgreement === "none" ? "an hour after it ends" : onAgreement}
-              </>}
+              {several ? `Each is charged${saved} ${chargedOnAgreement === "all" ? onAgreement
+                : chargedOnAgreement === "some" ? `${onAgreement}, or an hour after it ends` : "an hour after it ends"}`
+                : `This lesson is charged${saved} ${chargedOnAgreement === "none" ? "an hour after it ends" : onAgreement}`}
             </li>
-            <li>Future lessons are charged automatically, an hour after each one</li>
+            <li>Future lessons are charged {then.length ? "" : "automatically, "}an hour after each one</li>
             {fee ? (
               <li>
                 <strong>{formatMoneyCents(fee)}</strong> to move or cancel less than {notice} hours before, or if you don’t show up
@@ -213,7 +231,7 @@ export function CardTerms({ change = false, onCancel, bookingId = "", feeCents =
  * On Your lessons, only while lessons Inês added are still paid to her by
  * hand: one quiet card above the calendar asking once, in her words.
  */
-export function CardPrompt({ bookingId = "" }: { bookingId?: string }) {
+export function CardPrompt({ bookingId = "", upcoming = [] }: { bookingId?: string; upcoming?: CardUpcoming[] }) {
   const [open, setOpen] = useState(Boolean(bookingId));
   return (
     <section aria-labelledby="card-prompt-heading" className={`card-prompt${open ? " card-prompt--open" : ""}${bookingId && open ? " card-prompt--review" : ""}`}>
@@ -224,7 +242,7 @@ export function CardPrompt({ bookingId = "" }: { bookingId?: string }) {
         <h3 id="card-prompt-heading">{bookingId ? "Confirm your card payments" : "Pay by card"}</h3>
         {bookingId ? null : <p>Add your card once and you&rsquo;re set.</p>}
         {open ? (
-          <CardTerms key={bookingId} bookingId={bookingId} onCancel={() => setOpen(false)} />
+          <CardTerms key={bookingId} bookingId={bookingId} upcoming={upcoming} onCancel={() => setOpen(false)} />
         ) : (
           <button className="button button--blue button--compact" onClick={() => setOpen(true)} type="button">
             {bookingId ? "Review payments" : "Add card"}

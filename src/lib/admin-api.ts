@@ -618,13 +618,23 @@ function isCardApprovalLesson(value: unknown): value is CardApprovalLesson {
     typeof value.amountCents === "number" && Number.isSafeInteger(value.amountCents) && value.amountCents > 0;
 }
 
+/** Whose unpaid lessons a link is for: from a lesson she opened, or from the student's card on Students. */
+export type CardApprovalTarget = { bookingId: string } | { studentId: string };
+
+function cardLinkPath(target: CardApprovalTarget) {
+  return "bookingId" in target
+    ? `/admin/bookings/${encodeURIComponent(target.bookingId)}/card-link`
+    : `/admin/students/${encodeURIComponent(target.studentId)}/card-link`;
+}
+
 /**
- * The lessons she can tick into one link (2 November 2026, Dan): the one
- * opened and the student's other unpaid lessons already had, newest first.
+ * The lessons she can tick into one link (2 November 2026, Dan), newest
+ * first: the student's unpaid lessons already had, and the one opened.
  */
-export function cardApprovalChoices(token: string, bookingId: string) {
-  return adminRequest<{ lessons: CardApprovalLesson[] }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/card-link`).then(data => {
-    if (!Array.isArray(data.lessons) || !data.lessons.every(isCardApprovalLesson) || !data.lessons.some(lesson => lesson.id === bookingId)) {
+export function cardApprovalChoices(token: string, target: CardApprovalTarget) {
+  return adminRequest<{ lessons: CardApprovalLesson[] }>(token, cardLinkPath(target)).then(data => {
+    if (!Array.isArray(data.lessons) || !data.lessons.every(isCardApprovalLesson) ||
+        ("bookingId" in target && !data.lessons.some(lesson => lesson.id === target.bookingId))) {
       throw new Error(BOOKING_REPLY_ERROR);
     }
     return data.lessons;
@@ -632,8 +642,8 @@ export function cardApprovalChoices(token: string, bookingId: string) {
 }
 
 /** Prepare the student's own review link for the lessons ticked. This never sends mail or starts card setup. */
-export function createCardApprovalLink(token: string, bookingId: string, bookingIds: string[] = [bookingId]) {
-  return adminRequest<{ url: string }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/card-link`, {
+export function createCardApprovalLink(token: string, target: CardApprovalTarget, bookingIds: string[]) {
+  return adminRequest<{ url: string }>(token, cardLinkPath(target), {
     method: "POST", body: JSON.stringify({ bookingIds }),
   }).then(data => {
     const url = new URL(data.url);

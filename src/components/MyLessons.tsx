@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AlertCircle, CheckCircle2, CircleX } from "lucide-react";
 import { AccountAvatar, AccountMenu, AccountSignature, type AccountSection } from "@/components/AccountMenu";
 import { AuthPanel } from "@/components/AuthPanel";
-import { CardPrompt, CardTerms } from "@/components/CardOnFile";
+import { CardPrompt, CardTerms, type CardUpcoming } from "@/components/CardOnFile";
 import { LessonMark } from "@/components/LessonMarks";
 import {
   confirmEmailChange,
@@ -25,6 +25,7 @@ import {
   formatLongDate,
   formatMoneyCents,
   formatPriceCents,
+  formatShortDay,
   formatSlotTime,
   formatTimeIn,
   redeemRecurringRate
@@ -36,6 +37,7 @@ import { StudentHomework } from "@/components/homework/StudentHomework";
 
 /** The two lengths a code from Inês can set a weekly price for. */
 const RATE_LENGTHS = [60, 90] as const;
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function accountDetails(student?: Student | null) {
   return { name: student?.name ?? "", email: student?.email ?? "", nif: student?.nif ?? "" };
@@ -947,10 +949,28 @@ export function MyLessons({
   ) : null;
   const askForCard = !cardSaved && !cardChecking && cardsAccepted && hasStudentSide(student) &&
     student.cardForAllLessons === false && unpaidAdded > 0;
+  // What agreeing goes on to pay for (2 November 2026, Dan: make it obvious
+  // it covers their weekly lessons too): each weekly run once, as its day and
+  // Porto time, and any single lesson Inês added still to come.
+  const upcomingAdded: CardUpcoming[] = [];
+  if (cardBookingId) {
+    for (const booking of bookings
+      .filter((entry) => Date.parse(entry.startAt) > clock && entry.status === "confirmed" && entry.addedByTeacher && entry.paymentStatus === "not_required" && !entry.paidByHand)
+      .sort((a, b) => a.startAt.localeCompare(b.startAt))) {
+      const run = booking.seriesId ? series.find((entry) => entry.id === booking.seriesId) : undefined;
+      const key = run ? `series:${run.id}` : `booking:${booking.reference}`;
+      const known = upcomingAdded.find((entry) => entry.key === key);
+      if (known) { known.startAts.push(booking.startAt); continue; }
+      upcomingAdded.push({
+        key, weekly: Boolean(run), startAts: [booking.startAt], amountCents: booking.lessonType.priceCents,
+        when: run ? `Every ${WEEKDAYS[run.weekday]}, ${formatSlotTime(booking.startAt)}` : `${formatShortDay(booking.startAt)}, ${formatSlotTime(booking.startAt)}`
+      });
+    }
+  }
   return (
     <>
       {cardNote}
-      {cardBookingId || askForCard ? <CardPrompt key={cardBookingId} bookingId={cardBookingId} /> : null}
+      {cardBookingId || askForCard ? <CardPrompt key={cardBookingId} bookingId={cardBookingId} upcoming={upcomingAdded} /> : null}
       {alert}
     </>
   );

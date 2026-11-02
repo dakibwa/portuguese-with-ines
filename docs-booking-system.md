@@ -2489,14 +2489,16 @@ issues the existing 14-day, one-use sign-in link. It sends no email, opens no
 Stripe session, and changes no booking or payment consent. It does not mark a
 first welcome as sent. The link names the ticked bookings, in time order,
 with `cardBooking=<id>,<id>…`. The same two routes by student
-(`/admin/students/:id/card-link`, where `bookingIds` is required) serve an
-invite that clears what a student owes in one link; there the list is only
-their unpaid lessons already had. A student without an email can have one too:
+(`/admin/students/:id/card-link`, where `bookingIds` is required) serve the
+**Payment link** panel on a student's card in Students, and an invite that
+clears what a student owes in one link; there the list is only their unpaid
+lessons already had, and nothing starts ticked. A student without an email can have one too:
 she sends it on WhatsApp, and confirming its sign-in is what verifies the
 account before a card is saved.
 
 After signing in, the student reviews each lesson's date, time and price and
-their total, then actively agrees to those lessons and standing automatic
+their total, and sees the lessons still to come that Inês added (each weekly
+run once) that the same agreement then pays for, then actively agrees to those lessons and standing automatic
 payment for future lessons. Previewing is read-only (`POST /me/card/preview`
 with `bookingIds`); a lesson Inês has since marked paid, cancelled or taken
 off is left out, so the student agrees only to what is shown. `POST /me/card`

@@ -1337,16 +1337,24 @@ Preserve these desktop and mobile states:
   on the left and the agreement on the right, level in the middle; a phone
   reads them top to bottom. Several lessons Inês ticked (2 November 2026,
   Dan: "so they can backpay all the lessons") stack as the booking step's
-  chosen lessons do, each its own smaller tile with its own splat (the clock
-  named once, on the first), then `2 lessons` and their total; the first dab
-  reads `Each is charged to your saved card once you agree` and the capsule
-  `these and future lessons`. In her lesson dialog `Create payment link` asks
-  `Which lessons should Jess pay for?` with `Tick only lessons they haven’t
-  paid you for.`: one Already-paid-style capsule per unpaid lesson already
-  had (time on the left, price on the right), the opened one ticked, the
-  count and total beneath, `Create link` and `Cancel`. Ready, it says `Link
-  ready: 2 lessons, €30. Nothing sent or charged yet.` with blue `Send on
-  WhatsApp` and outline `Copy link`; the WhatsApp message is one short line
+  chosen lessons do, each a smaller tile with its own splat, one line each
+  (day and start, never wrapped; Dan: "always fits on the same line") under
+  a `To pay now` label that names `Porto time` once for every tile, then a
+  receipt's ruled `Total` under the prices. Their lessons still to come that
+  Inês added follow under `Then automatically`, each weekly run once as
+  `Every Tuesday, 17:00` in a dashed tile with the weekly lilac repeat mark
+  (Dan: make it obvious it covers their weekly lessons); the first dab reads
+  `Each is charged to your saved card once you agree` and the capsule
+  `these and future lessons`. Inês gets the same tick list from an unpaid
+  lesson's dialog (`Create payment link`, small outline, the opened lesson
+  ticked) and from a student's card on Students (`Payment link`, nothing
+  ticked): `Tick what Jess still owes` and `Their future lessons then go on
+  the card too.` over one-line Already-paid-style capsules (day and start on
+  the left, price on the right), with the total on the button, `Create link
+  for €30`, beside `Cancel` (Dan: "less spread out"; a separate count and
+  total line read as stray). Ready, it says `Link ready: 2 lessons, €30.
+  Nothing sent or charged yet.` with blue `Send on WhatsApp` and outline
+  `Copy link`; the WhatsApp message is one short line
   in her voice and the link (2 November 2026, Dan: not wordy). In Inês's
   lesson dialog a lesson a card now pays for
   offers the `Already paid` tick (below). The sign-in panel's small outline buttons read `Email a link` and

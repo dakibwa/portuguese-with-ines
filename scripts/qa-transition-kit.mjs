@@ -109,6 +109,10 @@ try {
       { id: "approved-older-lesson", reference: "PT-OLDER", startAt: "2026-10-20T17:00:00.000Z", endAt: "2026-10-20T18:00:00.000Z", amountCents: 1500 },
       { id: "approved-past-lesson", reference: "PT-COMBINED", startAt: "2026-10-27T17:00:00.000Z", endAt: "2026-10-27T18:00:00.000Z", amountCents: 1500 },
     ];
+    // What agreeing then pays for (2 November 2026, Dan): their weekly run once.
+    const weekly = { ...added, reference: "PT-WEEKLY", startAt: "2026-11-03T17:00:00.000Z", endAt: "2026-11-03T18:00:00.000Z", seriesId: "qa-weekly",
+      lessonType: { ...added.lessonType, priceCents: 1500 } };
+    const weeklyRun = { id: "qa-weekly", weekday: 2, minuteOfDay: 1020, occurrences: null, openEnded: true, upcoming: 4 };
     let combinedAuthorised = false;
     const combined = await open(width, "/book/?signin=qa-combined-link&cardBooking=approved-older-lesson,approved-past-lesson", {
       now: "2026-10-27T20:00:00Z",
@@ -117,6 +121,7 @@ try {
         if (endpoint === "/auth/email-link/confirm") return { json: { student: { ...student, hasCard: true }, session: "qa-combined-session" } };
         if (endpoint === "/me/card/preview") return { json: { booking: approvedBookings[0], bookings: approvedBookings, savedCardKey: "qa-saved-card", sameDayFeeCents: 500, minimumNoticeHours: 14 } };
         if (endpoint === "/me" && combinedAuthorised) return { json: { student: { ...student, hasCard: true, cardForAllLessons: true }, bookings: [added], series: [], cardsAccepted: true } };
+        if (endpoint === "/me") return { json: { student: { ...student, hasCard: true }, bookings: [added, weekly, { ...weekly, reference: "PT-WEEKLY2", startAt: "2026-11-10T17:00:00.000Z", endAt: "2026-11-10T18:00:00.000Z" }], series: [weeklyRun], sameDayFeeCents: 500, cardsAccepted: true } };
         if (endpoint === "/me/card") { combinedAuthorised = true; return { json: { authorised: true } }; }
         return null;
       }
@@ -127,10 +132,11 @@ try {
     assert.ok(!combined.page.url().includes("signin="));
     await combined.page.getByRole("button", { name: "Sign in", exact: true }).click();
     const approval = combined.page.locator(".card-prompt");
-    await expect(approval.locator(".card-terms__total")).toHaveText("2 lessons€30");
+    await expect(approval.locator(".card-terms__total")).toHaveText("Total€30");
+    await expect(approval.locator(".card-terms__lessons--then")).toHaveText("Then automaticallyEvery Tuesday, 17:00€15");
     assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card/preview")?.body, { bookingIds: ["approved-older-lesson", "approved-past-lesson"] });
     await combined.page.reload();
-    await expect(approval.locator(".card-terms__total")).toHaveText("2 lessons€30");
+    await expect(approval.locator(".card-terms__total")).toHaveText("Total€30");
     await expect(approval).toContainText("Each is charged to your saved card once you agree");
     const agree = approval.getByRole("button", { name: "Authorise payments" });
     await expect(agree).toBeDisabled();
