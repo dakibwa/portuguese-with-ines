@@ -3221,11 +3221,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               {lessonType?.price_cents === 0 ? (
                 <li>Please give Inês {noticeHours} hours&rsquo; notice to move or cancel</li>
               ) : lateFeeCents === 0 ? (
-                <li>Free to change or cancel</li>
+                <li>No fee to change or cancel, or for a missed lesson</li>
               ) : (
                 <>
-                  <li>Free to change or cancel until {noticeHours} hours before</li>
-                  <li><strong>{formatMoneyCents(lateFeeCents)}</strong> after that</li>
+                  <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
+                  <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later{postpay ? <>, or if you don&rsquo;t show up</> : null}</li>
                 </>
               )}
             </ul>
@@ -3727,11 +3727,26 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             <div className="auth-panel sign-in-link">
               <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="auth-panel__mark" />
               <h2>Welcome</h2>
+              {/* What the page is for, as a student Inês set up first hears of
+                  it, and how it now works (2 November 2026, Dan: "we want
+                  basically students to … use the website to book/change/amend
+                  all future lessons, if that requires some teaching that's
+                  fine"). Three dabs, said once, where they arrive. */}
               <p className="auth-panel__intro">
-                Sign in to see your lessons. No password needed.
+                {/* A payment approval link says what it is for (2 November 2026). */}
+                {cardBookingId ? "Sign in to pay for your lessons." : "Your lessons with Inês, all in one place."} No password needed.
                 {/* Someone else's account open on this device: say what the press does. */}
-                {student ? ` You’re signed in as ${student.name}; this switches to the account the email was sent to.` : null}
+                {student ? ` You’re signed in as ${student.name}; this switches to the account the link was sent for.` : null}
               </p>
+              <ul className="booking-payment-facts sign-in-link__steps">
+                <li>Book new lessons yourself</li>
+                <li>Open a lesson to move or cancel it</li>
+                {/* Dan's words for the rules, the same wherever they're said (2 November 2026). */}
+                {lateFeeCents === 0 ? <li>No fee to change or cancel, or for a missed lesson</li> : <>
+                  <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
+                  <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later{postpay ? <>, or if you don&rsquo;t show up</> : null}</li>
+                </>}
+              </ul>
               {signInLinkError ? (
                 <div className="booking-alert booking-alert--error" role="alert">
                   <AlertCircle size={18} aria-hidden="true" />
@@ -3778,7 +3793,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   }}
                   type="button"
                 >
-                  {usingSignInLink ? "Signing in…" : "Sign in"}
+                  {usingSignInLink ? "Signing in…" : "See my lessons"}
                 </button>
               )}
             </div>
@@ -4623,26 +4638,27 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           ) : postpay ? (
                             <>
                               <li>No payment is taken now</li>
-                              <li>Your card is charged after each lesson</li>
-                              {/* Each fee as briefly as it can be said; when it is charged,
-                                  and that a no-show costs it instead of the lesson, are in
-                                  the terms the agreement links (10 October 2026, at Dan's
-                                  request). */}
+                              <li>Your card is charged at the end of each lesson</li>
+                              {/* The rules in Dan's words, the same on every page
+                                  (2 November 2026); when a fee is charged, and that a
+                                  no-show costs it instead of the lesson, are in the
+                                  terms the agreement links. */}
                               {lateFeeCents ? <>
+                                <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
                                 <li>
-                                  <strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel less than {noticeHours} hours before
+                                  <strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later, or if you don&rsquo;t show up
                                 </li>
-                                <li>
-                                  <strong>{formatMoneyCents(lateFeeCents)}</strong> if you don’t show up to a lesson
-                                </li>
-                              </> : <li>No fee to move or cancel, or for a missed lesson</li>}
+                              </> : <li>No fee to change or cancel, or for a missed lesson</li>}
                             </>
                           ) : (
                             <>
                               <li>Pay Inês on the lesson day</li>
-                              {lateFeeCents ? <li>
-                                <strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel less than {noticeHours} hours before
-                              </li> : null}
+                              {/* Paid in person, a missed lesson is the lesson itself, so
+                                  only the late change has a fee here. */}
+                              {lateFeeCents ? <>
+                                <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
+                                <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later</li>
+                              </> : null}
                             </>
                           )}
                           {form.repeat === null ? <li>Ongoing lessons repeat until you stop them</li> : null}

@@ -9,7 +9,7 @@ export function TermsPrivacyInformation() {
       <h2>Payments</h2>
       <ul>
         <li>No payment is taken when you book.</li>
-        <li><strong>Automatic payment.</strong> Securely save a card to confirm your booking. Stripe charges it after each lesson and collects any fees automatically.</li>
+        <li><strong>Automatic payment.</strong> Securely save a card to confirm your booking. Stripe charges it at the end of each lesson and collects any fees automatically.</li>
         <li>Each weekly lesson is paid separately. Prepaid bookings follow the rules shown in your calendar.</li>
       </ul>
 
