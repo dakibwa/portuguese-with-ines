@@ -1998,10 +1998,16 @@ gave an email, and only two had ever signed in.
   "quite wordy and not in fitting with our super simple fresh design");
   the site does the teaching.
 - The welcome screen a link opens is that teaching, said once: `Welcome`,
-  `Your lessons with Inês, all in one place. No password needed.`, three dabs
-  (`Book new lessons yourself`, `Open a lesson to move or cancel it`, `Free to
-  change up to 14 hours before`) and coral `See my lessons`. Nothing asks them
-  to book what Inês has already booked.
+  `Your lessons with Inês, all in one place. No password needed.`, dabs
+  (`Book new lessons yourself`, `Open a lesson to move or cancel it`, then the
+  rules) and coral `See my lessons`. Nothing asks them to book what Inês has
+  already booked.
+- The rules read the same wherever a student meets them (2 November 2026,
+  Dan): `Free to change or cancel a lesson up to 14 hours before` and `€5 to
+  move or cancel later, or if you don’t show up` (the no-show part only where
+  cards are taken), `Your card is charged after each lesson`, and with no fee
+  `No fee to change or cancel, or for a missed lesson`. That covers the welcome
+  screen, the booking confirm step and its success, and the card terms.
 - On Your lessons, a student with no email sees `Pay by card` and `Add your
   email` (`So you can always get back in.`, an email field and blue `Add
   email`) as two rows of one sheet card, never two cards pushing their lessons
