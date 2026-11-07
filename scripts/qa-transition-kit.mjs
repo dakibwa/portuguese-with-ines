@@ -330,6 +330,7 @@ try {
     });
     await expect(painting.page.locator(".site-header")).toBeVisible();
     await painting.page.getByRole("button", { name: "Paint it", exact: true }).click();
+    await painting.page.getByRole("button", { name: "Show meaning", exact: true }).click();
     await expect(painting.page.locator(".expression-card")).toContainText(draft.meaningPt);
     await expect(painting.page.getByRole("link", { name: "Expressions collection", exact: true })).toHaveAttribute("href", /\/schedule\/\?tab=expressions$/);
     assert.ok(!painting.reads.includes("/me/expressions"), "a teacher's page must not spend a student pick");

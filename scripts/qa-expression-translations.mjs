@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 
-// One UI journey for students' translations: a student sends one, Inês
-// approves it, and then it shows to everyone reading the expression. Every
+// One UI journey for students' own versions of an expression ("Noutras
+// línguas", stored as translations): a student sends one, Inês approves it,
+// and then it shows to everyone reading the expression. Every
 // Worker request is a fixture. Real SQL, the one-waiting rule, the daily limit,
 // privacy and who may review are proven in workers/booking/integration-test.mjs.
 const base = process.env.QA_BASE_URL;
@@ -74,23 +75,23 @@ try {
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
 
-    // A student paints their expression and opens Translations: nothing yet.
+    // A student paints their expression and opens its meaning: Inês's notes
+    // and the other languages are among its facts, with nothing at the foot.
     async function openTranslations() {
       await page.goto(`${base}/idioms/`);
       await page.getByRole("button", { name: "Paint it", exact: true }).click();
+      await page.getByRole("button", { name: "Show meaning", exact: true }).click();
       const card = page.locator(".expression-reading__text");
       await card.getByRole("heading", { name: expression.expression }).waitFor();
-      const toggle = card.getByRole("button", { name: "Translations", exact: true });
-      const before = await toggle.boundingBox();
-      await toggle.click();
-      await expect(toggle).toHaveAttribute("aria-expanded", "true");
-      assert.deepEqual(await toggle.boundingBox(), before, "opening the panel never moves the row");
+      await expect(card.locator(".expression-card__meanings")).toContainText(expression.notes);
+      await expect(card.locator(".expression-card__foot").getByRole("button")).toHaveCount(0);
       return card.locator(".expression-translations");
     }
     let panel = await openTranslations();
-    await expect(panel).toContainText("No translations yet. Be the first to add one.");
+    await expect(panel).toContainText("Do you say it another way in your language?");
+    await panel.getByRole("button", { name: "Add yours", exact: true }).click();
     await panel.getByLabel("Language", { exact: true }).fill("English");
-    await panel.getByLabel("Translation", { exact: true }).fill("To laugh your head off");
+    await panel.getByLabel("How you say it", { exact: true }).fill("To laugh your head off");
     await expect(panel).toContainText("478 characters left");
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scroll on a phone");
     await panel.screenshot({ path: `${output}/student-form-${width}.png` });
@@ -123,5 +124,5 @@ try {
     assert.deepEqual(errors, []);
     await context.close();
   }
-  console.log("Expression translations passed: a student sends one from the Translations panel without moving the row, Inês sees the waiting count and approves it, and it then shows without a name; desktop and phone.");
+  console.log("Expression translations passed: a student opens the meaning on the second press, sends their own version from Noutras línguas, Inês sees the waiting count and approves it, and it then shows without a name; desktop and phone.");
 } finally { await browser.close(); }

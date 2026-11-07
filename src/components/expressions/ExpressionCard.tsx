@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { ExpressionTranslations, type TranslationsViewer } from "@/components/expressions/ExpressionTranslations";
 import type { ExpressionInput } from "@/lib/expressions";
 import { publicAssetPath } from "@/lib/paths";
@@ -43,12 +43,17 @@ function Example({ text, phrase }: { text: string; phrase: string }) {
   return <>{text.slice(0, found[0])}<mark className="expression-card__phrase">{text.slice(found[0], found[1])}</mark>{text.slice(found[1])}</>;
 }
 
-/** What the words say, what they mean, and the English for it. Each value is a span, which a student's card turns to wax while it paints another. */
+/**
+ * What the words say, what they mean, the English for it, and Inês's notes on
+ * it or its origin. Each value is a span, which a student's card turns to wax
+ * while it paints another.
+ */
 export function ExpressionMeanings({ item }: { item: ExpressionInput }) {
   const facts = [
     item.literalEn ? { key: "literal", label: "Tradução à letra", text: item.literalEn, lang: "en" } : null,
     item.meaningPt ? { key: "meaning", label: "Quer dizer", text: item.meaningPt } : null,
     item.meaningEn ? { key: "english", label: "Em inglês", text: item.meaningEn, lang: "en" } : null,
+    item.notes || item.sourceUrl ? { key: "notes", label: "Notas e/ou origem", text: item.notes, link: item.sourceUrl } : null,
   ].filter((fact) => fact !== null);
   if (!facts.length) return null;
   return (
@@ -56,7 +61,10 @@ export function ExpressionMeanings({ item }: { item: ExpressionInput }) {
       {facts.map((fact) => (
         <div className="expression-card__fact" data-fact={fact.key} key={fact.key}>
           <dt className="expression-card__label">{fact.label}</dt>
-          <dd lang={fact.lang}><span className="expression-card__value">{fact.text}</span></dd>
+          <dd lang={"lang" in fact ? fact.lang : undefined}>
+            {fact.text ? <span className="expression-card__value">{fact.text}</span> : null}
+            {"link" in fact && fact.link ? <a className="expression-card__source" href={fact.link} target="_blank" rel="noreferrer">Consultar referência</a> : null}
+          </dd>
         </div>
       ))}
     </dl>
@@ -74,76 +82,46 @@ export function ExpressionExamples({ item }: { item: ExpressionInput }) {
   );
 }
 
-function Tags({ item }: { item: ExpressionInput }) {
-  return item.tags.length ? <ul className="expression-card__tags" aria-label="Temas">{item.tags.map((tag) => <li key={tag}>{tag}</li>)}</ul> : null;
-}
-
-function Notes({ item }: { item: ExpressionInput }) {
-  return (
-    <>
-      {item.notes ? <p>{item.notes}</p> : null}
-      {item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noreferrer">Consultar referência</a> : null}
-    </>
-  );
-}
-
 /**
- * Its themes, Inês's notes and source, and an optional picture. A student's
- * card ends in one row instead: its themes, the notes' toggle and `action`
- * at the row's end (see ReadingFoot).
+ * A student's reading beside the painting: the expression in use, then its
+ * versions in other languages, where a student can add their own.
  */
-export function ExpressionExtras({ item, image = false, action, translations }: { item: ExpressionInput & { id?: string }; image?: boolean; action?: ReactNode; translations?: TranslationsViewer }) {
-  const picture = image && item.imageUrl;
-  if (action) return <ReadingFoot action={action} item={item} picture={Boolean(picture)} translations={item.id ? translations : undefined} />;
-  if (!item.tags.length && !item.notes && !item.sourceUrl && !picture) return null;
+export function ExpressionUsage({ item, translations }: { item: ExpressionInput & { id?: string }; translations?: TranslationsViewer }) {
   return (
-    <div className="expression-card__extras">
-      <Tags item={item} />
-      {item.notes || item.sourceUrl ? (
-        <details className="expression-card__notes">
-          <summary>Notas e/ou origem</summary>
-          <Notes item={item} />
-        </details>
-      ) : null}
-      {picture ? <ExpressionImage item={item} /> : null}
+    <div className="expression-reading__usage">
+      <ExpressionExamples item={item} />
+      {translations && item.id ? <ExpressionTranslations expressionId={item.id} viewer={translations} /> : null}
     </div>
   );
 }
 
+function Tags({ item }: { item: ExpressionInput }) {
+  return item.tags.length ? <ul className="expression-card__tags" aria-label="Temas">{item.tags.map((tag) => <li key={tag}>{tag}</li>)}</ul> : null;
+}
+
 /**
- * A student's reading ends in one row: its themes, then the notes' toggle and
- * the action, which keep together at the row's end and drop beneath the
- * themes only when the row has no room for them. The notes open below the
- * whole row, so opening them never moves the row. Students' translations
- * open the same way, in their own panel beneath the notes.
+ * Its themes and an optional picture. A student's card ends in one row
+ * instead: its themes, and `action` at the row's end, which drops beneath
+ * them only when the row has no room for it.
  */
-function ReadingFoot({ item, picture, action, translations }: { item: ExpressionInput & { id?: string }; picture: boolean; action: ReactNode; translations?: TranslationsViewer }) {
-  const [open, setOpen] = useState(false);
-  const [translationsOpen, setTranslationsOpen] = useState(false);
-  const panel = useId();
-  const translationsPanel = useId();
-  const notes = Boolean(item.notes || item.sourceUrl);
-  return (
-    <div className="expression-card__extras">
-      {picture ? <ExpressionImage item={item} /> : null}
-      <div className="expression-card__foot" data-lead={item.tags.length ? "tags" : notes || translations ? "notes" : undefined}>
-        <Tags item={item} />
-        <div className="expression-card__foot-end">
-          {notes ? (
-            <button aria-controls={panel} aria-expanded={open} className="expression-card__notes-toggle" type="button" onClick={() => setOpen((value) => !value)}>
-              Notas e/ou origem
-            </button>
-          ) : null}
-          {translations ? (
-            <button aria-controls={translationsPanel} aria-expanded={translationsOpen} className="expression-card__notes-toggle" lang="en" type="button" onClick={() => setTranslationsOpen((value) => !value)}>
-              Translations
-            </button>
-          ) : null}
-          {action}
+export function ExpressionExtras({ item, image = false, action }: { item: ExpressionInput; image?: boolean; action?: ReactNode }) {
+  const picture = image && item.imageUrl;
+  if (action) {
+    return (
+      <div className="expression-card__extras">
+        {picture ? <ExpressionImage item={item} /> : null}
+        <div className="expression-card__foot">
+          <Tags item={item} />
+          <div className="expression-card__foot-end">{action}</div>
         </div>
       </div>
-      {notes ? <div className="expression-card__notes" hidden={!open} id={panel}><Notes item={item} /></div> : null}
-      {translations && item.id ? <ExpressionTranslations expressionId={item.id} id={translationsPanel} open={translationsOpen} viewer={translations} /> : null}
+    );
+  }
+  if (!item.tags.length && !picture) return null;
+  return (
+    <div className="expression-card__extras">
+      <Tags item={item} />
+      {picture ? <ExpressionImage item={item} /> : null}
     </div>
   );
 }

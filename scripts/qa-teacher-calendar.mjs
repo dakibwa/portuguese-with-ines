@@ -1681,6 +1681,7 @@ try {
   await expect(tryOut.getByRole("button", { name: "Paint it", exact: true })).toBeEnabled();
   await expect(tryOut.locator(".expression-reading__text, .paint-sheet canvas")).toHaveCount(0);
   await tryOut.getByRole("button", { name: "Paint it", exact: true }).click();
+  await tryOut.getByRole("button", { name: "Show meaning", exact: true }).click({ timeout: 10_000 });
   await expect(tryOut.getByRole("button", { name: "Paint another", exact: true })).toBeEnabled({ timeout: 10_000 });
   await expect(tryOut.getByRole("heading", { name: "Partir o coco a rir", exact: true })).toBeAttached();
   assert.deepEqual(expressions.state.writes, []);

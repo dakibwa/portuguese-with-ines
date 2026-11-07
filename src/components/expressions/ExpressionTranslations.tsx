@@ -16,20 +16,11 @@ const LANGS: Record<string, string> = {
 };
 
 /**
- * Students' own translations, approved by Inês, in a panel below the
- * reading's last row like its notes. Nothing is fetched until it first opens.
+ * "Noutras línguas": the expression as students say it in their own
+ * languages, approved by Inês, one of the reading's own facts. A student can
+ * add theirs; it waits for her before anyone sees it.
  */
-export function ExpressionTranslations({ expressionId, id, open, viewer }: { expressionId: string; id: string; open: boolean; viewer: TranslationsViewer }) {
-  const [opened, setOpened] = useState(open);
-  if (open && !opened) setOpened(true);
-  return (
-    <div className="expression-card__notes expression-translations" hidden={!open} id={id} lang="en">
-      {opened ? <TranslationsBody expressionId={expressionId} viewer={viewer} /> : null}
-    </div>
-  );
-}
-
-function TranslationsBody({ expressionId, viewer }: { expressionId: string; viewer: TranslationsViewer }) {
+export function ExpressionTranslations({ expressionId, viewer }: { expressionId: string; viewer: TranslationsViewer }) {
   const [rows, setRows] = useState<ExpressionTranslation[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [unpublished, setUnpublished] = useState(false);
@@ -45,30 +36,46 @@ function TranslationsBody({ expressionId, viewer }: { expressionId: string; view
     return () => { current = false; };
   }, [expressionId, attempt]);
 
-  // Her drafts have no translations yet: students only see published expressions.
-  if (unpublished) return <p>Translations appear here once this expression is published.</p>;
   return (
-    <>
-      {loadError ? (
+    <div className="expression-translations" lang="en">
+      <h4 className="expression-card__label" lang="pt-PT">Noutras línguas</h4>
+      {/* Her drafts have none yet: students only see published expressions. */}
+      {unpublished ? <p>Students’ own versions appear here once this expression is published.</p> : loadError ? (
         <div className="expression-translations__error" role="alert">
           <p>{loadError}</p>
           <button className="button button--outline button--compact" type="button" onClick={() => setAttempt((value) => value + 1)}>Try again</button>
         </div>
-      ) : !rows ? <p role="status">Loading translations…</p> : rows.length ? (
+      ) : !rows ? <p role="status">Loading…</p> : rows.length ? (
         <ul className="expression-translations__list">
           {rows.map((row) => (
             <li key={row.id}>
               <span className="expression-translations__language">{row.language}</span>
-              <p lang={LANGS[row.language.trim().toLowerCase()]}>{row.text}</p>
+              <p lang={LANGS[row.language.trim().toLowerCase()]}><span className="expression-card__value">{row.text}</span></p>
             </li>
           ))}
         </ul>
-      ) : <p>{viewer.viewer === "teacher" ? "No translations yet." : "No translations yet. Be the first to add one."}</p>}
-      {viewer.viewer === "teacher" ? (
+      ) : <p>{viewer.viewer === "teacher" ? "None yet." : "Do you say it another way in your language?"}</p>}
+      {unpublished ? null : viewer.viewer === "teacher" ? (
         <p className="expression-translations__hint">
-          Students can add their own translations here. <Link href="/schedule/?tab=expressions">Review them in your collection.</Link>
+          Students can add their own here. <Link href="/schedule/?tab=expressions">Review them in your collection.</Link>
         </p>
-      ) : <TranslationForm expressionId={expressionId} token={viewer.token} />}
+      ) : <AddVersion expressionId={expressionId} token={viewer.token} />}
+    </div>
+  );
+}
+
+/** A quiet "Add yours" opens the student's small form in place. */
+function AddVersion({ expressionId, token }: { expressionId: string; token: string }) {
+  const [open, setOpen] = useState(false);
+  const form = useId();
+  return (
+    <>
+      <button aria-controls={form} aria-expanded={open} className="expression-card__toggle expression-translations__add" type="button" onClick={() => setOpen((value) => !value)}>
+        Add yours
+      </button>
+      <div className="expression-translations__adding" hidden={!open} id={form}>
+        <TranslationForm expressionId={expressionId} token={token} />
+      </div>
     </>
   );
 }
@@ -84,7 +91,7 @@ function TranslationForm({ expressionId, token }: { expressionId: string; token:
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending.current) return;
-    if (!language.trim() || !text.trim()) { setError("Please add the language and your translation."); return; }
+    if (!language.trim() || !text.trim()) { setError("Please add the language and your version."); return; }
     pending.current = true;
     setState("sending");
     setError("");
@@ -96,7 +103,7 @@ function TranslationForm({ expressionId, token }: { expressionId: string; token:
       // them to sign in again, with a word about adding translations.
       if (caught instanceof AuthApiError && caught.status === 401) { setState("ready"); return; }
       setState("ready");
-      setError(caught instanceof Error ? caught.message : "Your translation couldn’t be sent. Please try again.");
+      setError(caught instanceof Error ? caught.message : "Yours couldn’t be sent. Please try again.");
     } finally {
       pending.current = false;
     }
@@ -106,11 +113,10 @@ function TranslationForm({ expressionId, token }: { expressionId: string; token:
   const left = TRANSLATION_LIMITS.text - text.length;
   return (
     <form className="expression-translations__form" onSubmit={(event) => void submit(event)}>
-      <p className="expression-translations__intro">Add how you would say it in your language.</p>
       <label htmlFor={`${ids}-language`}>Language</label>
       <input autoComplete="off" id={`${ids}-language`} list={`${ids}-languages`} maxLength={TRANSLATION_LIMITS.language} required value={language} onChange={(event) => setLanguage(event.target.value)} />
       <datalist id={`${ids}-languages`}>{SUGGESTIONS.map((item) => <option key={item} value={item} />)}</datalist>
-      <label htmlFor={`${ids}-text`}>Translation</label>
+      <label htmlFor={`${ids}-text`}>How you say it</label>
       <textarea aria-describedby={`${ids}-left`} id={`${ids}-text`} maxLength={TRANSLATION_LIMITS.text} required rows={3} value={text} onChange={(event) => setText(event.target.value)} />
       <p className="expression-translations__left" id={`${ids}-left`}>{left === 1 ? "1 character left" : `${left} characters left`}</p>
       {error ? <p className="booking-alert" role="alert">{error}</p> : null}
