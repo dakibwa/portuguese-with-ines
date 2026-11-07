@@ -50,6 +50,7 @@ try {
         assert.equal(viewer.role, "student", "only a student sends a translation");
         const body = request.postDataJSON();
         assert.deepEqual(Object.keys(body).sort(), ["language", "text"]);
+        assert.equal(body.language, "English", "the form asks no language: it is the device's");
         translations.push({ id: translations.length + 1, ...body, status: "pending", createdAt: new Date().toISOString() });
         return json({ status: "pending" }, 201);
       }
@@ -84,13 +85,12 @@ try {
       const card = page.locator(".expression-reading__text");
       await card.getByRole("heading", { name: expression.expression }).waitFor();
       await expect(card.locator(".expression-card__meanings")).toContainText(expression.notes);
-      await expect(card.locator(".expression-card__foot").getByRole("button")).toHaveCount(0);
+      await expect(card.getByRole("button")).toHaveText(["Add yours"]);
       return card.locator(".expression-translations");
     }
     let panel = await openTranslations();
     await expect(panel).toContainText("Do you say it another way in your language?");
     await panel.getByRole("button", { name: "Add yours", exact: true }).click();
-    await panel.getByLabel("Language", { exact: true }).fill("English");
     await panel.getByLabel("How you say it", { exact: true }).fill("To laugh your head off");
     await expect(panel).toContainText("478 characters left");
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scroll on a phone");
@@ -119,7 +119,7 @@ try {
     await expect(panel.locator(".expression-translations__list li")).toHaveCount(1);
     await expect(panel.locator(".expression-translations__list")).toContainText("To laugh your head off");
     await expect(panel.locator(".expression-translations__list")).not.toContainText("Ana");
-    await expect(panel.locator(".expression-translations__list p")).toHaveAttribute("lang", "en");
+    await expect(panel.locator(".expression-translations__list .expression-card__value")).toHaveAttribute("lang", "en");
     await panel.screenshot({ path: `${output}/student-approved-${width}.png` });
     assert.deepEqual(errors, []);
     await context.close();

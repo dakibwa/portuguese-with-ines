@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { ExpressionTranslations, type TranslationsViewer } from "@/components/expressions/ExpressionTranslations";
 import type { ExpressionInput } from "@/lib/expressions";
 import { publicAssetPath } from "@/lib/paths";
@@ -45,15 +44,15 @@ function Example({ text, phrase }: { text: string; phrase: string }) {
 
 /**
  * What the words say, what they mean, the English for it, and Inês's notes on
- * it or its origin. Each value is a span, which a student's card turns to wax
- * while it paints another.
+ * it or its origin, all in one type style. Each value is a span, which a
+ * student's card turns to wax while it paints another.
  */
 export function ExpressionMeanings({ item }: { item: ExpressionInput }) {
   const facts = [
     item.literalEn ? { key: "literal", label: "Tradução à letra", text: item.literalEn, lang: "en" } : null,
     item.meaningPt ? { key: "meaning", label: "Quer dizer", text: item.meaningPt } : null,
     item.meaningEn ? { key: "english", label: "Em inglês", text: item.meaningEn, lang: "en" } : null,
-    item.notes || item.sourceUrl ? { key: "notes", label: "Notas e/ou origem", text: item.notes, link: item.sourceUrl } : null,
+    item.notes ? { key: "notes", label: "Notas e/ou origem", text: item.notes } : null,
   ].filter((fact) => fact !== null);
   if (!facts.length) return null;
   return (
@@ -61,10 +60,7 @@ export function ExpressionMeanings({ item }: { item: ExpressionInput }) {
       {facts.map((fact) => (
         <div className="expression-card__fact" data-fact={fact.key} key={fact.key}>
           <dt className="expression-card__label">{fact.label}</dt>
-          <dd lang={"lang" in fact ? fact.lang : undefined}>
-            {fact.text ? <span className="expression-card__value">{fact.text}</span> : null}
-            {"link" in fact && fact.link ? <a className="expression-card__source" href={fact.link} target="_blank" rel="noreferrer">Consultar referência</a> : null}
-          </dd>
+          <dd lang={"lang" in fact ? fact.lang : undefined}><span className="expression-card__value">{fact.text}</span></dd>
         </div>
       ))}
     </dl>
@@ -95,38 +91,17 @@ export function ExpressionUsage({ item, translations }: { item: ExpressionInput 
   );
 }
 
-function Tags({ item }: { item: ExpressionInput }) {
+export function ExpressionTags({ item }: { item: ExpressionInput }) {
   return item.tags.length ? <ul className="expression-card__tags" aria-label="Temas">{item.tags.map((tag) => <li key={tag}>{tag}</li>)}</ul> : null;
 }
 
-/**
- * Its themes and an optional picture. A student's card ends in one row
- * instead: its themes, and `action` at the row's end, which drops beneath
- * them only when the row has no room for it.
- */
-export function ExpressionExtras({ item, image = false, action }: { item: ExpressionInput; image?: boolean; action?: ReactNode }) {
-  const picture = image && item.imageUrl;
-  if (action) {
-    return (
-      <div className="expression-card__extras">
-        {picture ? <ExpressionImage item={item} /> : null}
-        <div className="expression-card__foot">
-          <Tags item={item} />
-          <div className="expression-card__foot-end">{action}</div>
-        </div>
-      </div>
-    );
-  }
-  if (!item.tags.length && !picture) return null;
-  return (
-    <div className="expression-card__extras">
-      <Tags item={item} />
-      {picture ? <ExpressionImage item={item} /> : null}
-    </div>
-  );
+/** Its themes in her collection and preview. A student's card shows them above its facts instead. */
+function ExpressionExtras({ item }: { item: ExpressionInput }) {
+  if (!item.tags.length) return null;
+  return <div className="expression-card__extras"><ExpressionTags item={item} /></div>;
 }
 
-function ExpressionImage({ item }: { item: ExpressionInput }) {
+export function ExpressionImage({ item }: { item: ExpressionInput }) {
   // Optional local WebP images are authored outside the editor.
   // eslint-disable-next-line @next/next/no-img-element
   return <img className="expression-card__image" src={publicAssetPath(item.imageUrl)} alt={item.imageAlt} loading="lazy" />;

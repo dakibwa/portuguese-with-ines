@@ -812,12 +812,13 @@ opening `/idioms/` with the same signed-in account.
   right, and each label sits beside its value; narrower cards and the
   preview keep labels above values: `Tradução à letra` (the literal
   translation, when there is one; restored 30 October 2026 at Inês's request),
-  `Quer dizer` (the Portuguese meaning,
-  a step larger than the rest) and `Em inglês`; then
+  `Quer dizer` (the Portuguese meaning) and `Em inglês`; then
   `Exemplo`/`Exemplos`, where the expression's own words are marked with a
   soft wash of the paint, taking in a verb the example has conjugated.
-  Notes/origin are one of the facts, `Notas e/ou origem`, with the reference
-  link beneath them, never a disclosure (7 November 2026, Dan). Optional
+  Notes/origin are one of the facts, `Notas e/ou origem`, never a
+  disclosure, and the reference link is not shown (7 November 2026, Dan;
+  the editor still keeps it). Every value shares one type style, the
+  meaning included (7 November 2026, Dan: "same font styles"). Optional
   themes use a lilac pill fill.
 - Reuse blue for Edit, soft lilac for Preview and publication changes, coral
   for saving, and outline for Cancel/Done. Up/down buttons reorder the whole
@@ -830,8 +831,9 @@ opening `/idioms/` with the same signed-in account.
   rid of the notes and translations at the bottom, they can go in main
   bullets"): `Noutras línguas` is one of the painted reading's facts, after
   its examples, listing each version's language and text. A student's quiet
-  `Add yours` opens a small form in place (`Language`, `How you say it`,
-  `Send to Inês`). Only versions Inês approved are shown, never with a name.
+  `Add yours` opens a small form in place: only `How you say it` and
+  `Send to Inês` (7 November 2026, Dan: no language box); the language is
+  taken from their device's language setting. Only versions Inês approved are shown, never with a name.
   Her `Translations to check` panel sits in the Expressions tab with a
   waiting count. See
   [the booking-system contract](../docs-booking-system.md#students-translations-of-an-expression).
@@ -871,17 +873,14 @@ then reads `Show meaning`, and its second press opens the facts beneath it
   another pick; `Paint another` asks for a new one. Painted, the card holds
   the painting and `Show meaning` beneath it (beside it from a landscape
   phone up), exactly where `Paint it` stood. Opened, the card is the whole
-  section: the facts (`Notas e/ou origem` among them), then the examples and
-  `Noutras línguas`, and it ends in a footer separated by a quiet rule: the
-  reading's themes and the compact `Paint another` at the row's end, with no
-  toggles. On desktop the footer spans both reading columns. On a narrow
-  column the row starts at the dabs' column and runs to the card's edge, so
-  two short themes share it with the button; the button drops beneath the
-  themes only for a longer set of themes, and only on the narrowest phones
-  (320px) does it take a line of its own. The button keeps the width of its
-  longest label where it stands (`Show meaning` beneath the painting,
-  `Paint another` in the footer), so `Painting…` and `Try again` never
-  reflow it; it stays a 48px target and never becomes a full-width slab.
+  section: the reading's themes head its facts (`Notas e/ou origem` among
+  them), then come the examples and `Noutras línguas`, each version followed
+  quietly by its language, all in one rhythm. There is no footer band, rule
+  or toggle row (7 November 2026, Dan: "no need for the divider"):
+  `Paint another` ends the card at its foot, in the same place as `Paint it`
+  and `Show meaning`. The one button keeps the width of its longest label,
+  so `Painting…`, `Show meaning` and `Try again` never reflow it; it stays a
+  48px target and never becomes a full-width slab.
 - Colour: each painting uses the site's paints, every one with lettering
   clear of AA: dark blue `#203E82`, coral `#B43A26` and
   lavender ink `#554F91` carry cream `#FBF4E5` lettering; lavender `#AAA4E6`
@@ -907,11 +906,11 @@ then reads `Show meaning`, and its second press opens the facts beneath it
   Nothing is ever cut: a phrase too long for every size takes as many lines as
   it needs at the smallest, and the sheet grows to hold them.
 - Composition: on a phone the sheet fills the cream card and the reading opens
-  beneath it. From a landscape phone up, the painting with its example and
-  `Noutras línguas` straight beneath it sits beside the meanings and notes. Both columns begin at the
-  top, and the footer follows the taller of them. Notes and the next-paint
-  action use that shared footer rather than extending only the right column
-  (27 October 2026, Dan: the layout should feel cleaner). Keep two reading
+  beneath it: themes, facts, example, other languages, then the button at
+  the right. From a landscape phone up, the painting with its example and
+  `Noutras línguas` straight beneath it sits beside the themes and facts.
+  Both columns begin at the top; the button ends the facts' column at the
+  card's foot, level with the end of the taller column. Keep two reading
   columns on larger screens as well. At rest the blank
   sheet reserves room for the first strokes, with the button at the card's
   foot. The paint lands where it stays and never slides on the sheet, and the
@@ -948,7 +947,7 @@ then reads `Show meaning`, and its second press opens the facts beneath it
   at rest. `Paint another`
   brings the sheet into view and the last reading waits in wax where it
   stands, out of reach: its labels and dabs stay, taking the new paint's
-  colours, its words dry to wax lines and its themes and notes fade, while
+  colours, its words dry to wax lines and its themes and `Add yours` fade, while
   the button reads `Painting…` and the focus waits on the section. The card
   never shortens while it paints, and grows
   smoothly only when a longer phrase needs the room, so nothing below jumps

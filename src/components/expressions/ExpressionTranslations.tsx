@@ -8,12 +8,26 @@ import { fetchTranslations, sendTranslation, TRANSLATION_LIMITS, type Expression
 /** Who is reading: a student can add their own; Inês, trying it out, is pointed to her review. */
 export type TranslationsViewer = { token: string; viewer: "student" | "teacher" };
 
-const SUGGESTIONS = ["English", "Spanish", "French", "German", "Italian", "Dutch", "Polish", "Ukrainian", "Chinese", "Japanese"];
 /** The `lang` of a translation, only when its language is plainly one of these. */
 const LANGS: Record<string, string> = {
   english: "en", spanish: "es", french: "fr", german: "de", italian: "it", dutch: "nl",
   polish: "pl", ukrainian: "uk", chinese: "zh", japanese: "ja", portuguese: "pt",
 };
+
+/**
+ * The student's own language, as their device names it: the form asks only
+ * how they say it, and each version still carries a language for its label.
+ */
+function deviceLanguage() {
+  const code = (typeof navigator === "undefined" ? "" : navigator.language || "").split("-")[0].toLowerCase();
+  try {
+    const name = code ? new Intl.DisplayNames(["en"], { type: "language" }).of(code) : "";
+    if (name && name.toLowerCase() !== code) return name.slice(0, TRANSLATION_LIMITS.language);
+  } catch {
+    // Without language names the version is simply filed as another language.
+  }
+  return "Other";
+}
 
 /**
  * "Noutras línguas": the expression as students say it in their own
@@ -49,8 +63,8 @@ export function ExpressionTranslations({ expressionId, viewer }: { expressionId:
         <ul className="expression-translations__list">
           {rows.map((row) => (
             <li key={row.id}>
+              <span className="expression-card__value" lang={LANGS[row.language.trim().toLowerCase()]}>{row.text}</span>
               <span className="expression-translations__language">{row.language}</span>
-              <p lang={LANGS[row.language.trim().toLowerCase()]}><span className="expression-card__value">{row.text}</span></p>
             </li>
           ))}
         </ul>
@@ -81,7 +95,6 @@ function AddVersion({ expressionId, token }: { expressionId: string; token: stri
 }
 
 function TranslationForm({ expressionId, token }: { expressionId: string; token: string }) {
-  const [language, setLanguage] = useState("");
   const [text, setText] = useState("");
   const [state, setState] = useState<"ready" | "sending" | "sent">("ready");
   const [error, setError] = useState("");
@@ -91,12 +104,12 @@ function TranslationForm({ expressionId, token }: { expressionId: string; token:
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending.current) return;
-    if (!language.trim() || !text.trim()) { setError("Please add the language and your version."); return; }
+    if (!text.trim()) { setError("Please add how you say it."); return; }
     pending.current = true;
     setState("sending");
     setError("");
     try {
-      await sendTranslation(token, expressionId, { language: language.trim(), text: text.trim() });
+      await sendTranslation(token, expressionId, { language: deviceLanguage(), text: text.trim() });
       if (readSession() === token) setState("sent");
     } catch (caught) {
       // A lapsed session is forgotten by the API helper, and the page then asks
@@ -113,9 +126,6 @@ function TranslationForm({ expressionId, token }: { expressionId: string; token:
   const left = TRANSLATION_LIMITS.text - text.length;
   return (
     <form className="expression-translations__form" onSubmit={(event) => void submit(event)}>
-      <label htmlFor={`${ids}-language`}>Language</label>
-      <input autoComplete="off" id={`${ids}-language`} list={`${ids}-languages`} maxLength={TRANSLATION_LIMITS.language} required value={language} onChange={(event) => setLanguage(event.target.value)} />
-      <datalist id={`${ids}-languages`}>{SUGGESTIONS.map((item) => <option key={item} value={item} />)}</datalist>
       <label htmlFor={`${ids}-text`}>How you say it</label>
       <textarea aria-describedby={`${ids}-left`} id={`${ids}-text`} maxLength={TRANSLATION_LIMITS.text} required rows={3} value={text} onChange={(event) => setText(event.target.value)} />
       <p className="expression-translations__left" id={`${ids}-left`}>{left === 1 ? "1 character left" : `${left} characters left`}</p>

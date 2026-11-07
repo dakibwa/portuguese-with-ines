@@ -2836,7 +2836,6 @@
 /* Its button is the students' too (the booking journey's 0.7 rem, 700,
    0.12 em, at 48 px), not her denser schedule button. */
 .teacher-expressions .expression-reading__actions .button { min-height: 48px; padding: 0.72rem 1.6rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; line-height: 1.2; }
-.teacher-expressions .expression-card__foot .button { padding-inline: 0.8rem; letter-spacing: 0.1em; }
 .teacher-expressions .expression-reading__actions .button:disabled { opacity: 0.55; }
 .teacher-expressions .teacher-expressions__help { margin: 0; font-size: 0.8rem; }
 .teacher-expressions__filters { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; gap: 0.75rem; }
@@ -2856,7 +2855,6 @@
   .teacher-expression .expression-card__title { margin-bottom: 0.7rem; padding-right: var(--expression-head-room, 10.5rem); text-wrap: balance; }
   .teacher-expression .expression-card__meanings { gap: 0.55rem; }
   .teacher-expression :is(.expression-card__fact, .expression-card__examples) { display: grid; grid-template-columns: 7.75rem minmax(0, 1fr); column-gap: 1rem; align-items: start; --lead: 0.22rem; }
-  .teacher-expression [data-fact="meaning"] { --lead: 0.29rem; }
   .teacher-expression .expression-card__examples { --lead: 0.24rem; margin-top: 0.55rem; }
   .teacher-expression .expression-card__label { padding-top: var(--lead); }
   .teacher-expression .expression-card__label::before { top: calc(0.02rem + var(--lead)); }

@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ExpressionExtras, ExpressionMeanings, ExpressionUsage } from "@/components/expressions/ExpressionCard";
+import { ExpressionImage, ExpressionMeanings, ExpressionTags, ExpressionUsage } from "@/components/expressions/ExpressionCard";
 import { ExpressionPainting, type ExpressionPaintingHandle, type PaintingStart } from "@/components/expressions/ExpressionPainting";
 import { FACTS_OPEN, OPEN_EASE, openDuration } from "@/components/expressions/painter";
 import { AuthApiError, readSession } from "@/lib/auth-api";
@@ -232,15 +232,16 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
   const start: PaintingStart = expression
     ? { kind: "show", phrase: expression.expression, id: expression.id, paint: paints.shown ?? paints.next }
     : { kind: "rest", paint: paints.shown ?? paints.next };
-  // Beneath the sheet until the reading opens, then beside its themes.
+  // One button, at the card's foot in every state, so it never moves under the student.
   const painted = Boolean(expression && !reading);
   const actions = (
     <div className="expression-reading__actions" lang="en">
       {canPaint || painted ? (
         <button className="button button--coral button--compact expression-reading__go" disabled={Boolean(busy)} ref={button} type="button" onClick={painted ? showMeaning : () => void pick()}>
           <span>{busy ? "Painting…" : error ? "Try again" : painted ? "Show meaning" : reading ? "Paint another" : "Paint it"}</span>
-          {/* The button keeps the width of its longest label where it stands, so nothing reflows as it changes. */}
-          <span aria-hidden="true" className="expression-reading__go-sizer">{reading ? "Paint another" : "Show meaning"}</span>
+          {/* The button keeps the width of its longest labels, so nothing reflows as it changes. */}
+          <span aria-hidden="true" className="expression-reading__go-sizer">Show meaning</span>
+          <span aria-hidden="true" className="expression-reading__go-sizer">Paint another</span>
         </button>
       ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
       {error ? <p className="booking-alert" role="alert">{error}</p> : null}
@@ -267,11 +268,15 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
             // While another is painted, the last reading waits in wax where it stands, out of reach.
             <article className="expression-card expression-reading__text" inert={Boolean(busy)} key={reading.id} lang="pt-PT" ref={result} tabIndex={-1}>
               <h3 className="expression-reading__title">{reading.expression}</h3>
-              <ExpressionMeanings item={reading} />
+              <div className="expression-reading__facts">
+                <ExpressionTags item={reading} />
+                <ExpressionMeanings item={reading} />
+                {reading.imageUrl ? <ExpressionImage item={reading} /> : null}
+              </div>
               <ExpressionUsage item={reading} translations={{ token, viewer: source ? "teacher" : "student" }} />
-              <ExpressionExtras action={actions} image item={reading} />
             </article>
-          ) : actions}
+          ) : null}
+          {actions}
         </div>
       ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
       {!fullPage ? <p className="expression-page-link"><Link className="button button--outline button--small" href="/idioms/">Open full page</Link></p> : null}
