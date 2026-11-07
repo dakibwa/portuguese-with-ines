@@ -873,8 +873,8 @@ then reads `Show meaning`, and its second press opens the facts beneath it
   another pick; `Paint another` asks for a new one. Painted, the card holds
   the painting and `Show meaning` beneath it (beside it from a landscape
   phone up), exactly where `Paint it` stood. Opened, the card is the whole
-  section: the reading's themes head its facts (`Notas e/ou origem` among
-  them), then come the examples and `Noutras línguas`, each version followed
+  section: its facts (`Notas e/ou origem` among them), then the examples
+  and `Noutras línguas`, each version followed
   quietly by its language, all in one rhythm. There is no footer band, rule
   or toggle row (7 November 2026, Dan: "no need for the divider"):
   `Paint another` ends the card at its foot, in the same place as `Paint it`
@@ -906,9 +906,11 @@ then reads `Show meaning`, and its second press opens the facts beneath it
   Nothing is ever cut: a phrase too long for every size takes as many lines as
   it needs at the smallest, and the sheet grows to hold them.
 - Composition: on a phone the sheet fills the cream card and the reading opens
-  beneath it: themes, facts, example, other languages, then the button at
-  the right. From a landscape phone up, the painting with its example and
-  `Noutras línguas` straight beneath it sits beside the themes and facts.
+  beneath it: facts, example, other languages, then the button at the
+  right. A student's card shows no theme pills (7 November 2026, Dan); they
+  stay in Inês's collection, where she filters by them. From a landscape
+  phone up, the painting with its example and `Noutras línguas` straight
+  beneath it sits beside the facts.
   Both columns begin at the top; the button ends the facts' column at the
   card's foot, level with the end of the taller column. Keep two reading
   columns on larger screens as well. At rest the blank
@@ -947,7 +949,7 @@ then reads `Show meaning`, and its second press opens the facts beneath it
   at rest. `Paint another`
   brings the sheet into view and the last reading waits in wax where it
   stands, out of reach: its labels and dabs stay, taking the new paint's
-  colours, its words dry to wax lines and its themes and `Add yours` fade, while
+  colours, its words dry to wax lines and `Add yours` fades, while
   the button reads `Painting…` and the focus waits on the section. The card
   never shortens while it paints, and grows
   smoothly only when a longer phrase needs the room, so nothing below jumps

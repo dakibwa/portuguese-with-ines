@@ -91,11 +91,11 @@ export function ExpressionUsage({ item, translations }: { item: ExpressionInput 
   );
 }
 
-export function ExpressionTags({ item }: { item: ExpressionInput }) {
+function ExpressionTags({ item }: { item: ExpressionInput }) {
   return item.tags.length ? <ul className="expression-card__tags" aria-label="Temas">{item.tags.map((tag) => <li key={tag}>{tag}</li>)}</ul> : null;
 }
 
-/** Its themes in her collection and preview. A student's card shows them above its facts instead. */
+/** Its themes, in her collection and preview only: a student's card shows none (7 November 2026, Dan). */
 function ExpressionExtras({ item }: { item: ExpressionInput }) {
   if (!item.tags.length) return null;
   return <div className="expression-card__extras"><ExpressionTags item={item} /></div>;

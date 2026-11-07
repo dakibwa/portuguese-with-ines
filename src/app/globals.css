@@ -9798,15 +9798,13 @@ dialog[open]::backdrop {
   box-decoration-break: clone;
 }
 .expression-reading[data-busy] .expression-card__phrase { background: none; }
-.expression-reading__text :is(.expression-card__tags, .expression-card__image, .expression-translations__language, .expression-translations > :not(.expression-card__label, .expression-translations__list)) { transition: opacity 220ms var(--motion-ease); }
-.expression-reading[data-busy] .expression-reading__text :is(.expression-card__tags, .expression-card__image, .expression-translations__language, .expression-translations > :not(.expression-card__label, .expression-translations__list)) { opacity: 0; }
+.expression-reading__text :is(.expression-card__image, .expression-translations__language, .expression-translations > :not(.expression-card__label, .expression-translations__list)) { transition: opacity 220ms var(--motion-ease); }
+.expression-reading[data-busy] .expression-reading__text :is(.expression-card__image, .expression-translations__language, .expression-translations > :not(.expression-card__label, .expression-translations__list)) { opacity: 0; }
 .expression-reading__text { padding: 0.15rem 1.25rem 1rem var(--paint-text-x); background: none; outline: none; }
 .expression-reading__text :is(.expression-card__fact, .expression-card__examples, .expression-translations) { padding-left: 0; }
 .expression-reading__text :is(.expression-card__fact, .expression-card__examples, .expression-translations)::before { left: -1.6rem; }
 .expression-reading__text .expression-card__fact dd { max-width: 72ch; }
-/* Its themes head the facts; every fact, example and version keeps one rhythm. */
-.expression-reading__facts > .expression-card__tags { gap: 0.3rem; margin: 0 0 0.95rem; }
-.expression-reading__facts .expression-card__tags li { padding-inline: 0.55rem; white-space: nowrap; }
+/* Every fact, example and version keeps one rhythm. */
 .expression-reading__text > .expression-reading__usage { margin-top: 0.95rem; }
 .expression-reading__usage > * + * { margin-top: 0.95rem; }
 .expression-reading__usage > :first-child { margin-top: 0; }
@@ -9888,7 +9886,7 @@ dialog[open]::backdrop {
 }
 
 /* The painting, with its examples and other languages beneath it, sits
-   beside the themes and facts; the button ends the facts' column at the
+   beside the facts; the button ends the facts' column at the
    card's foot, with no rule or footer band (7 November 2026, Dan). */
 @property --paint-sheet-h {
   syntax: "<length>";

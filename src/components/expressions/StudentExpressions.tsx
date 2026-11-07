@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ExpressionImage, ExpressionMeanings, ExpressionTags, ExpressionUsage } from "@/components/expressions/ExpressionCard";
+import { ExpressionImage, ExpressionMeanings, ExpressionUsage } from "@/components/expressions/ExpressionCard";
 import { ExpressionPainting, type ExpressionPaintingHandle, type PaintingStart } from "@/components/expressions/ExpressionPainting";
 import { FACTS_OPEN, OPEN_EASE, openDuration } from "@/components/expressions/painter";
 import { AuthApiError, readSession } from "@/lib/auth-api";
@@ -269,7 +269,6 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
             <article className="expression-card expression-reading__text" inert={Boolean(busy)} key={reading.id} lang="pt-PT" ref={result} tabIndex={-1}>
               <h3 className="expression-reading__title">{reading.expression}</h3>
               <div className="expression-reading__facts">
-                <ExpressionTags item={reading} />
                 <ExpressionMeanings item={reading} />
                 {reading.imageUrl ? <ExpressionImage item={reading} /> : null}
               </div>
