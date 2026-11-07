@@ -9850,14 +9850,28 @@ dialog[open]::backdrop {
 .expression-translations__form .booking-alert { margin: 0; }
 .expression-translations__error { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
 .expression-translations a { display: inline; min-height: 0; }
+/* "Show meaning": as the card opens, each fact rises in after the last, in
+   reading order (both columns together on a wide card), and the button
+   follows at the foot, so nothing arrives in one block (7 November 2026,
+   Dan: "animated as it comes in"). */
 @media (prefers-reduced-motion: no-preference) {
-  .expression-reading__text > :not(h3) { animation: expression-fact-in 560ms var(--motion-ease) backwards; }
-  .expression-reading__text > :nth-child(3) { animation-delay: 90ms; }
-  .expression-reading__text .expression-card__fact:nth-child(2) { animation: expression-fact-in 560ms var(--motion-ease) 50ms backwards; }
-  .expression-reading__text .expression-card__fact:nth-child(3) { animation: expression-fact-in 560ms var(--motion-ease) 100ms backwards; }
+  .expression-reading__text :is(.expression-card__fact, .expression-card__examples, .expression-translations, .expression-card__image) {
+    animation: expression-fact-in 640ms var(--motion-ease) backwards;
+    animation-delay: calc(var(--fact-i, 0) * 85ms);
+  }
+  .expression-reading__text .expression-card__fact:nth-child(2) { --fact-i: 1; }
+  .expression-reading__text .expression-card__fact:nth-child(3) { --fact-i: 2; }
+  .expression-reading__text .expression-card__fact:nth-child(4) { --fact-i: 3; }
+  .expression-reading__text :is(.expression-card__examples, .expression-card__image) { --fact-i: 4; }
+  .expression-reading__text .expression-translations { --fact-i: 5; }
+  .expression-reading[data-state="read"] > .expression-reading__actions { animation: expression-fact-in 560ms var(--motion-ease) 320ms backwards; }
+  @container expressions (min-width: 34rem) {
+    .expression-reading__text .expression-card__examples { --fact-i: 1; }
+    .expression-reading__text .expression-translations { --fact-i: 2; }
+  }
 }
 @keyframes expression-fact-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(10px); }
 }
 
 /* The sheet. Its layers are built and moved by the painter (painter.ts),

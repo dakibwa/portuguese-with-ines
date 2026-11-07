@@ -4,10 +4,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ExpressionImage, ExpressionMeanings, ExpressionUsage } from "@/components/expressions/ExpressionCard";
 import { ExpressionPainting, type ExpressionPaintingHandle, type PaintingStart } from "@/components/expressions/ExpressionPainting";
-import { FACTS_OPEN, OPEN_EASE, openDuration } from "@/components/expressions/painter";
+import { OPEN_EASE, openDuration } from "@/components/expressions/painter";
 import { AuthApiError, readSession } from "@/lib/auth-api";
 import { chooseDecoy, nextPaint, paintFor, rememberPaint, type PaintKey } from "@/lib/expression-paint";
 import { workerExpressions, type ExpressionSource, type StudentExpressions as Collection } from "@/lib/student-expressions-api";
+import { prefetchTranslations } from "@/lib/expression-translations-api";
 
 /** The colour the shown expression was painted in, and the one waiting for the next. */
 type Paints = { shown: PaintKey | null; next: PaintKey };
@@ -16,6 +17,16 @@ const TITLE = "Uma expressão para ti";
 const EXHAUSTED = "You’ve explored every expression. Come back when Inês adds more.";
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * The opening reading comes into view in the same motion as it opens: the
+ * page scrolls only as far as its foot needs, and never past the card's top.
+ */
+function reveal(element: HTMLElement, height: number, still: boolean) {
+  const top = element.getBoundingClientRect().top;
+  const by = Math.min(top + height + 16 - window.innerHeight, top - 16);
+  if (by > 0) window.scrollBy({ top: by, behavior: still ? "instant" : "smooth" });
+}
 
 /**
  * "Uma expressão para ti": the first press repaints a saved expression, or
@@ -62,7 +73,6 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
   const settling = useRef(false);
   /** A failed press: the button takes the focus back once it can be pressed again. */
   const refocus = useRef(false);
-  const settle = useRef(0);
   const canUpdate = () => active.current && readSession() === token;
 
   useEffect(() => {
@@ -86,7 +96,6 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
     return () => {
       current = false;
       active.current = false;
-      window.clearTimeout(settle.current);
     };
   }, [studentId, token, source, fullPage, loadAttempt]);
 
@@ -97,27 +106,25 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
     const from = before.current;
     before.current = null;
     const element = card.current;
-    const closeSheet = settling.current ? painting.current?.settle() : undefined;
+    // Only the second press settles the sheet: the reading is opening.
+    const opening = settling.current;
+    const closeSheet = opening ? painting.current?.settle() : undefined;
     settling.current = false;
     if (from === null || !element || reducedMotion()) {
       closeSheet?.();
+      if (opening && element) reveal(element, element.getBoundingClientRect().height, true);
       return;
     }
     const to = element.getBoundingClientRect().height;
     const duration = openDuration(Math.abs(to - from));
     closeSheet?.(duration);
     if (Math.abs(to - from) >= 1) element.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration, easing: OPEN_EASE });
+    if (opening) reveal(element, to, false);
   }, [resized]);
 
-  // The opened reading takes the focus as its facts follow the paint.
+  // The opened reading takes the focus as its facts follow one another in.
   useLayoutEffect(() => {
-    if (!open) return;
-    result.current?.focus({ preventScroll: true });
-    const still = reducedMotion();
-    window.clearTimeout(settle.current);
-    settle.current = window.setTimeout(() => {
-      if (active.current) card.current?.scrollIntoView({ block: "nearest", behavior: still ? "instant" : "smooth" });
-    }, still ? 0 : FACTS_OPEN);
+    if (open) result.current?.focus({ preventScroll: true });
   }, [open]);
 
   // Once painted, the button waits for its second press; after a failed press
@@ -169,6 +176,8 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
       if (picked) {
         // A return visit can repaint the saved expression in this same colour.
         rememberPaint(studentId, picked.id, paint);
+        // Its other languages load while it paints, so the reading opens whole.
+        prefetchTranslations(picked.id);
         if (still) painting.current?.show(picked.expression, picked.id, paint);
         else await painting.current?.land(picked.expression, picked.id);
         if (!canUpdate()) return;

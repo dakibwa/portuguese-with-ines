@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { AuthApiError, readSession } from "@/lib/auth-api";
-import { fetchTranslations, sendTranslation, TRANSLATION_LIMITS, type ExpressionTranslation } from "@/lib/expression-translations-api";
+import { fetchTranslations, loadedTranslations, prefetchTranslations, sendTranslation, TRANSLATION_LIMITS, type ExpressionTranslation } from "@/lib/expression-translations-api";
 
 /** Who is reading: a student can add their own; Inês, trying it out, is pointed to her review. */
 export type TranslationsViewer = { token: string; viewer: "student" | "teacher" };
@@ -35,14 +35,15 @@ function deviceLanguage() {
  * add theirs; it waits for her before anyone sees it.
  */
 export function ExpressionTranslations({ expressionId, viewer }: { expressionId: string; viewer: TranslationsViewer }) {
-  const [rows, setRows] = useState<ExpressionTranslation[] | null>(null);
+  const [rows, setRows] = useState<ExpressionTranslation[] | null>(() => loadedTranslations(expressionId));
   const [loadError, setLoadError] = useState("");
   const [unpublished, setUnpublished] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let current = true;
     setLoadError("");
-    fetchTranslations(expressionId).then((value) => { if (current) setRows(value); }).catch((caught) => {
+    // Usually already loaded while the expression painted; "Try again" asks afresh.
+    (attempt ? fetchTranslations(expressionId) : prefetchTranslations(expressionId)).then((value) => { if (current) setRows(value); }).catch((caught) => {
       if (!current) return;
       if (caught instanceof AuthApiError && caught.status === 404) setUnpublished(true);
       else setLoadError(caught instanceof Error ? caught.message : "The translations couldn’t be loaded.");

@@ -919,7 +919,13 @@ then reads `Show meaning`, and its second press opens the facts beneath it
   card keeps its size while `Show meaning` waits. The painted sheet closes
   round its phrase as the reading opens, only its foot rising, so a one-line
   phrase never sits in a tall empty sheet beside the facts. Nothing above the section moves, and the card grows and
-  shrinks smoothly below.
+  shrinks smoothly below. As it opens, each fact rises gently in after the
+  last, in reading order (both columns together on a wide card), and
+  `Paint another` follows at the foot, so nothing arrives as one block (7
+  November 2026, Dan: "animated as it comes in"). The page scrolls in the
+  same motion, only as far as the card's foot needs and never past its top.
+  The other languages load while the expression paints, so the reading
+  opens whole.
 - The idle canvas reveals nothing from the collection. The first paint
   appears only after the press. Gouache is matte: nothing glossy. Finished
   lettering stays cream on dark paint and dark on lavender.
