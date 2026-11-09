@@ -21,7 +21,7 @@ const LESSON_MARKS = [
  * after it today, at its end once the window is nothing (2 November 2026,
  * Dan: "charged at the time of when the lessons ends").
  */
-const CHARGED_EACH = NO_SHOW_WINDOW_HOURS_AFTER ? "after each lesson" : "at the end of each lesson";
+export const CHARGED_EACH = NO_SHOW_WINDOW_HOURS_AFTER ? "after each lesson" : "at the end of each lesson";
 const CHARGED_IT = NO_SHOW_WINDOW_HOURS_AFTER ? "after it ends" : "when it ends";
 
 /**

@@ -582,7 +582,8 @@ who isn't on the site is refused ("Add them as a student first.", 404), and
 students come from `POST /admin/students`. Each student's card is their profile
 from their first invite to regular use (14 October 2026, Dan; 2 November 2026).
 Its name opens their details, prices and all-time lesson history in place;
-editing details, price and lesson creation use the same card. A past lesson she
+the student fills the Students view, and `All students` returns to the lanes.
+Editing details, price and lesson creation use the same card. A past lesson she
 added and nothing charged can be ticked paid there (`POST
 /admin/bookings/:id/paid`), which takes it out of `unpaidPast`. A new student or a
 free timetable time can start in the creation/student-choice dialog, then opens
@@ -2646,6 +2647,23 @@ the invite is a plain sign-in link (`POST /admin/students/:id/invite-link`). A s
 she sends it on WhatsApp, and confirming its sign-in is what verifies the
 account before a card is saved.
 
+While she ticks, the invite panel on Students says what is owed now apart from
+what agreeing would also do (9 November 2026), so she does not send a link
+whose reach she cannot see: `Owed now` is the ticked total, charged once they
+agree; `Future lessons` are not owed yet, and are the lessons she added, still
+to come, with nothing settled on them (confirmed, `not_required`, not paid by
+hand, not already charging), which agreeing puts on their card, charged at the
+end of each lesson (each weekly run once, as its usual day and time, its price
+per lesson, or the range where its weeks differ, how many lessons run to when
+and how many weeks were moved; never a row a week). They are read
+from the existing `GET /admin/bookings?from=<now>`, matched to the student by
+`student_id` and, only for an older lesson with no account, by exact email;
+never by name. If that read fails the panel says so, offers a read-only `Check
+again`, and still makes the link.
+Nothing ticked says the link only signs them in, with nothing to agree to,
+because that path is `invite-link`, not an approval. Making or sending the
+link charges and agrees to nothing, and the ticked ids it names are unchanged.
+
 After signing in, the student reviews each lesson's date, time and price and
 their total, and sees the lessons still to come that Inês added (each weekly
 run once) that the same agreement then pays for, then actively agrees to those lessons and standing automatic
@@ -2684,7 +2702,8 @@ link**, ticks the lessons they owe, then **Create link**, and sends it with
 international form or as a Portuguese mobile, otherwise WhatsApp's own chat
 picker) or **Copy link**. The WhatsApp message is one short line in her voice
 with the lesson count and total, then the link; she can edit it before
-sending. Confirm any direct payment with Inês first and record it as
+sending. From the invite on Students it adds `If you agree, your future
+lessons are then charged to your card at the end of each lesson.` Confirm any direct payment with Inês first and record it as
 **Already paid** instead of requesting another payment.
 
 The student signs in (`Sign in to pay for your lessons. No password

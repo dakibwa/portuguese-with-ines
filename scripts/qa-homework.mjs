@@ -103,7 +103,12 @@ try {
     await page.getByRole("tab", { name: /^Students/ }).click();
     await page.getByRole("button", { name: "Open Ana Martins’s profile", exact: true }).click();
     // Homework is written from the lesson's own row on their profile.
-    await page.getByRole("button", { name: /^Add notes · / }).click();
+    // Notes are a small pencil that sits above the lesson's stretched day button.
+    const notesPencil = page.getByRole("button", { name: /^Add notes · / });
+    await notesPencil.scrollIntoViewIfNeeded();
+    const pencilBox = await notesPencil.boundingBox();
+    assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest("button")?.getAttribute("aria-label")?.startsWith("Add notes"), { x: pencilBox.x + pencilBox.width / 2, y: pencilBox.y + pencilBox.height / 2 }), true, "The notes pencil is pressable over the lesson tile");
+    await notesPencil.click();
     const editor = page.locator(".teacher-homework");
     const shot = name => editor.screenshot({ path: `${output}/teacher-${name}-${width}.png` });
     const heading = name => expect(editor.locator(".homework-step__head h4")).toHaveText(name);
@@ -138,10 +143,12 @@ try {
     await heading("Ready");
     await expect(editor.locator(".homework-summary")).toHaveCount(3);
     await shot("04-ready");
-    // Unread photos are unsaved work: leaving asks first.
-    page.once("dialog", dialog => dialog.dismiss());
-    await page.getByRole("button", { name: "Close homework", exact: true }).click();
-    await expect(editor.locator(".homework-summary").first()).toContainText("2 photos");
+    // Both the notes close and the focused student's way back protect unread photos.
+    for (const exit of ["Close homework", "All students"]) {
+      page.once("dialog", dialog => dialog.dismiss());
+      await page.getByRole("button", { name: exit, exact: true }).click();
+      await expect(editor.locator(".homework-summary").first()).toContainText("2 photos");
+    }
     // One press reads both pages and makes the draft, with gentle progress meanwhile.
     slow = true;
     await editor.getByRole("button", { name: "Generate homework", exact: true }).click();

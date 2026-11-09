@@ -646,6 +646,17 @@ export function paidByHand(booking: Pick<AdminBooking, "payment_consent_version"
 }
 
 /**
+ * Whether a booking is this student's: by their account, and only for an older
+ * lesson with no account by the exact email. A name never identifies anyone.
+ */
+export function isStudentsBooking(booking: Pick<AdminBooking, "student_id" | "student_email">, student: Pick<AdminStudent, "id" | "email">) {
+  const email = student.email?.trim().toLowerCase() ?? "";
+  return booking.student_id
+    ? booking.student_id === student.id
+    : Boolean(email) && booking.student_email.trim().toLowerCase() === email;
+}
+
+/**
  * A sign-in link for her to send the student herself, on WhatsApp or anywhere
  * (2 November 2026, Dan). Nothing is emailed; it works once, for two weeks.
  */

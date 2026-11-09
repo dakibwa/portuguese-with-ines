@@ -2,10 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Mail, MessageCircle } from "lucide-react";
+import { CHARGED_EACH } from "@/components/CardOnFile";
 import { firstName } from "@/components/teacher/DormantEmail";
-import { cardApprovalChoices, createCardApprovalLink, createInviteLink, type AdminStudent, type CardApprovalLesson } from "@/lib/admin-api";
+import { priceFor } from "@/components/teacher/StudentPrice";
+import { upcomingEntries, upcomingLessons, usualWeek } from "@/components/teacher/StudentLessons";
+import { addedByTeacher, cardApprovalChoices, createCardApprovalLink, createInviteLink, fetchBookings, isStudentsBooking, paidByHand, type AdminBooking, type AdminStudent, type CardApprovalLesson } from "@/lib/admin-api";
+import { readSession } from "@/lib/auth-api";
 import { formatMoneyCents, formatShortDay, formatSlotTime } from "@/lib/booking-api";
-import type { StudentProgress } from "@/lib/teacher-calendar";
+import { dateKey, dateLabel, type StudentProgress } from "@/lib/teacher-calendar";
 
 /**
  * The number WhatsApp's link wants: international, digits only. A number she
@@ -23,13 +27,17 @@ export function whatsAppNumber(phone: string) {
 
 const sum = (lessons: CardApprovalLesson[]) => lessons.reduce((total, lesson) => total + lesson.amountCents, 0);
 
+/** What a link with lessons ticked asks them to agree to besides those lessons: the Worker puts their other lessons she added on the card as well. */
+const AGREEMENT = `If you agree, your future lessons are then charged to your card ${CHARGED_EACH}.`;
+
 /**
  * Her words to them, hers to change before it goes, and short (2 November
  * 2026, Dan: "quite wordy"). Someone not yet in hears what changes: from now
  * on they book, move and cancel themselves (Dan: "we want to clear up admin
- * burden"); lessons she ticked are named by their total. Someone already in
- * is asked only for what is missing. The welcome screen the link opens
- * teaches the rest, and the link goes at the end on its own.
+ * burden"); lessons she ticked are named by their total, and that agreeing
+ * puts their future lessons on the card too. Someone already in is asked only
+ * for what is missing. The welcome screen the link opens teaches the rest,
+ * and the link goes at the end on its own.
  */
 export function inviteMessage(student: AdminStudent, progress?: Pick<StudentProgress, "card">, lessons: CardApprovalLesson[] = []) {
   const first = firstName(student);
@@ -37,10 +45,93 @@ export function inviteMessage(student: AdminStudent, progress?: Pick<StudentProg
   const owed = lessons.length === 1 ? `your lesson on ${formatShortDay(lessons[0].startAt)} (${total})` : `the ${lessons.length} lessons still open (${total})`;
   if (student.dormant) return `Olá ${first}! Whenever you’d like another lesson, you can book one here:`;
   if (!student.signedIn) return lessons.length
-    ? `Olá ${first}! From now on you can book, move or cancel your lessons with me here, and pay for ${owed}:`
+    ? `Olá ${first}! From now on you can book, move or cancel your lessons with me here, and pay for ${owed}. ${AGREEMENT}`
     : `Olá ${first}! From now on you can book, move or cancel your lessons with me here:`;
-  if (lessons.length) return `Olá ${first}! Here’s your link to pay by card for ${owed}:`;
+  if (lessons.length) return `Olá ${first}! Here’s your link to pay by card for ${owed}. ${AGREEMENT}`;
   return progress?.card === false ? `Olá ${first}! Here’s your link to add a card for your lessons:` : `Olá ${first}! Here’s your link to sign in:`;
+}
+
+/** A lesson, or a weekly run once, that agreeing puts on their card. */
+type FutureLine = { key: string; when: string; price: string; span: string; moved: string };
+type Future = { status: "loading" | "failed" } | { status: "ready"; lines: FutureLine[] };
+/** Lines shown before the rest fold into a count. */
+const FUTURE_SHOWN = 3;
+
+/**
+ * What agreeing puts on their card besides the lessons ticked, as the Worker
+ * does when they agree: lessons she added, still to come, with nothing settled
+ * on them (not paid, not paid by hand, not charging). Weekly runs read once,
+ * by their usual week, saying how many weeks sit at another time and, where
+ * the weeks differ in price, the range rather than one price for them all;
+ * never a row for every week.
+ */
+function futureLines(student: AdminStudent, bookings: AdminBooking[], now: number): FutureLine[] {
+  const onCard = bookings.filter(booking => isStudentsBooking(booking, student) && booking.status === "confirmed" && addedByTeacher(booking) &&
+    booking.payment_status === "not_required" && !paidByHand(booking) && !booking.charge_started_at && Date.parse(booking.starts_at) > now);
+  const cents = (booking: AdminBooking) => {
+    const minutes = Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000);
+    return booking.amount_cents ?? (minutes === 60 || minutes === 90 ? priceFor(student, minutes) : 0);
+  };
+  const price = (lessons: AdminBooking[]) => {
+    const amounts = lessons.map(cents);
+    const low = Math.min(...amounts);
+    const high = Math.max(...amounts);
+    if (!high) return "";
+    return low === high ? `${formatMoneyCents(high)} a lesson` : `${formatMoneyCents(low)}–${formatMoneyCents(high)} a lesson, prices differ`;
+  };
+  return upcomingEntries(upcomingLessons(onCard, now), now).map(entry => {
+    if (!("run" in entry)) {
+      const { booking } = entry;
+      return { key: booking.id, when: `${formatShortDay(booking.starts_at)}, ${formatSlotTime(booking.starts_at)}`, price: price([booking]), span: "", moved: "" };
+    }
+    const { pattern, moved } = usualWeek(entry.run.lessons);
+    const last = entry.run.lessons[entry.run.lessons.length - 1];
+    return {
+      key: `run-${entry.run.id}`,
+      when: `Every ${dateLabel(dateKey(new Date(pattern.starts_at)), { weekday: "long" })}, ${formatSlotTime(pattern.starts_at)}–${formatSlotTime(pattern.ends_at)}`,
+      price: price(entry.run.lessons),
+      span: `${entry.run.lessons.length} lessons to ${formatShortDay(last.starts_at)}`,
+      moved: moved ? `${moved === 1 ? "1 week" : `${moved} weeks`} moved` : "",
+    };
+  });
+}
+
+/**
+ * Before the link is made and in its summary: what is owed now apart from what
+ * they would agree to for the lessons still to come. The ticked lessons are
+ * charged once they agree; the future ones are not owed yet; and making or
+ * sending the link agrees to and charges nothing.
+ */
+function ApprovalTerms({ first, owed, future, showOwed, onRetry }: { first: string; owed: CardApprovalLesson[]; future: Future; showOwed: boolean; onRetry: () => void }) {
+  const later = future.status === "ready" && future.lines.length
+    ? <>
+      Not owed yet. If {first} agrees, these go on their card, charged {CHARGED_EACH}:
+      <ul>{future.lines.slice(0, FUTURE_SHOWN).map(line => <li key={line.key}>
+        <strong>{line.when}</strong>{line.price ? ` · ${line.price}` : ""}{line.span || line.moved ? <span> · {[line.span, line.moved].filter(Boolean).join(", ")}</span> : null}
+      </li>)}</ul>
+      {future.lines.length > FUTURE_SHOWN ? <>and {future.lines.length - FUTURE_SHOWN} more.</> : null}
+    </>
+    : future.status === "loading" ? "Checking their upcoming lessons…"
+    : future.status === "failed" ? <>
+      Their upcoming lessons couldn’t be checked, so what goes on their card besides the lessons ticked isn’t shown. If {first} agrees, lessons you add go on their card, charged {CHARGED_EACH}.
+      {" "}<button className="button button--outline button--small" onClick={onRetry} type="button">Check again</button>
+    </>
+    : <>None booked yet. If {first} agrees, lessons you add go on their card, charged {CHARGED_EACH}.</>;
+  return <div className="teacher-invite__terms">
+    <dl>
+      {showOwed ? <div>
+        <dt>Owed now</dt>
+        <dd>{owed.length
+          ? `${formatMoneyCents(sum(owed))} for the ${owed.length === 1 ? "1 lesson" : `${owed.length} lessons`} ticked, charged once ${first} agrees.`
+          : `Nothing ticked: this link only signs ${first} in, with no payment to agree to.`}</dd>
+      </div> : null}
+      {owed.length ? <div>
+        <dt>Future lessons</dt>
+        <dd>{later}</dd>
+      </div> : null}
+    </dl>
+    {showOwed && owed.length ? <p>Nothing is charged until {first} agrees. Making or sending the link doesn’t agree to anything for them.</p> : null}
+  </div>;
 }
 
 /**
@@ -75,7 +166,10 @@ export function WhatsAppInvite({ student, token, progress, sending, onBusy, onEm
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
   const [copied, setCopied] = useState(false);
+  const [future, setFuture] = useState<Future>({ status: "loading" });
   const started = useRef(false);
+  const alive = useRef(false);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   async function run<T>(work: () => Promise<T>, fallback: string) {
     setBusy(true);
@@ -103,7 +197,21 @@ export function WhatsAppInvite({ student, token, progress, sending, onBusy, onEm
     onLink?.();
   }
 
+  // Read only, and apart from the tick list: if it can't be read the list and
+  // the link still work, and the words say so.
+  async function loadFuture() {
+    setFuture({ status: "loading" });
+    const now = Date.now();
+    try {
+      const { bookings } = await fetchBookings(token, new Date(now).toISOString());
+      if (alive.current && readSession() === token) setFuture({ status: "ready", lines: futureLines(student, bookings, now) });
+    } catch {
+      if (alive.current && readSession() === token) setFuture({ status: "failed" });
+    }
+  }
+
   async function load() {
+    void loadFuture();
     const lessons = await run(() => cardApprovalChoices(token, { studentId: student.id }), "Their unpaid lessons couldn’t be loaded.");
     if (!lessons) return;
     setChoices(lessons);
@@ -134,6 +242,7 @@ export function WhatsAppInvite({ student, token, progress, sending, onBusy, onEm
   if (!link && choices?.length) {
     const chosen = choices.filter(lesson => ticked.includes(lesson.id));
     return <div className="teacher-card-link teacher-card-link--panel teacher-invite__owed" role="group" aria-labelledby={`invite-owed-${student.id}`}>
+      <div className="teacher-invite__owed-pick">
       <p className="teacher-card-link__hint"><span id={`invite-owed-${student.id}`}>Tick what {first} still owes</span>. Leave any paid in cash.</p>
       <ul className="teacher-card-link__choices">
         {choices.map(lesson => {
@@ -154,6 +263,8 @@ export function WhatsAppInvite({ student, token, progress, sending, onBusy, onEm
           </li>;
         })}
       </ul>
+      </div>
+      <ApprovalTerms first={first} future={future} owed={chosen} showOwed onRetry={() => void loadFuture()} />
       {error}
       <div className="teacher-card-link__actions">
         <button className="button button--coral button--small" disabled={busy} onClick={() => void make(chosen)} type="button">
@@ -173,6 +284,7 @@ export function WhatsAppInvite({ student, token, progress, sending, onBusy, onEm
     {link.lessons.length ? <p className="teacher-invite__owes" role="status">
       <Check size={15} aria-hidden="true" />Asks them to pay {formatMoneyCents(sum(link.lessons))} for {link.lessons.length === 1 ? "1 lesson" : `${link.lessons.length} lessons`}. Nothing is charged until they agree.
     </p> : null}
+    {link.lessons.length ? <ApprovalTerms first={first} future={future} owed={link.lessons} showOwed={false} onRetry={() => void loadFuture()} /> : null}
     <label>
       <span>Message</span>
       <textarea maxLength={1000} onChange={event => { setCopied(false); setMessage(event.target.value); }} rows={2} value={message} />

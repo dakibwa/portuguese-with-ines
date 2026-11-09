@@ -6,8 +6,8 @@ import { updateStudentDetails, type AdminStudent } from "@/lib/admin-api";
 /**
  * All of a student's details together, filled in or corrected after she set
  * them up, from a name alone if that was all she had (13 October 2026, Dan:
- * "she can build upon that"). It opens in place from Edit details on their
- * profile (14 October 2026, Dan). Their email is how they sign in, so it is
+ * "she can build upon that"). It opens in place from a pencil on their
+ * profile (14 October 2026, Dan), on the field that pencil is for. Their email is how they sign in, so it is
  * hers to give only until they first do; after that they change it from their
  * account. It is never needed for her to add their lessons.
  */
@@ -53,7 +53,7 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy, 
     >
       <label>
         <span>Full name</span>
-        <input autoCapitalize="words" autoComplete="off" autoFocus disabled={busy} onChange={set("name")} required spellCheck={false} type="text" value={details.name} />
+        <input autoCapitalize="words" autoComplete="off" autoFocus disabled={busy} name="name" onChange={set("name")} required spellCheck={false} type="text" value={details.name} />
       </label>
       <label>
         <span>
@@ -65,6 +65,7 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy, 
         <input
           autoComplete="off"
           disabled={busy || student.signedIn || Boolean(emailLockedReason)}
+          name="email"
           onChange={set("email")}
           required={emailRequired || Boolean(student.email)}
           type="email"
@@ -73,11 +74,11 @@ export function StudentDetailsForm({ token, student, onSaved, onCancel, onBusy, 
       </label>
       <label>
         <span>Phone <span className="teacher-field-optional">(optional)</span></span>
-        <input autoComplete="off" disabled={busy} onChange={set("phone")} type="tel" value={details.phone} />
+        <input autoComplete="off" disabled={busy} name="phone" onChange={set("phone")} type="tel" value={details.phone} />
       </label>
       <label>
         <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
-        <input autoComplete="off" autoCorrect="off" disabled={busy} inputMode="numeric" onChange={set("nif")} spellCheck={false} type="text" value={details.nif} />
+        <input autoComplete="off" autoCorrect="off" disabled={busy} inputMode="numeric" name="nif" onChange={set("nif")} spellCheck={false} type="text" value={details.nif} />
       </label>
       <div className="teacher-dialog-actions">
         <button className="button button--coral" disabled={busy} type="submit">{busy ? "Saving…" : "Save details"}</button>
