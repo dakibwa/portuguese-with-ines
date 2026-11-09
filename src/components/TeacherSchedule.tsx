@@ -12,7 +12,7 @@ import { StudentPicker, type StudentPickerStart } from "@/components/teacher/Stu
 import { StudentList, type StudentOpenRequest } from "@/components/teacher/StudentList";
 import { NextLesson } from "@/components/teacher/NextLesson";
 import { NeedsYou } from "@/components/teacher/NeedsYou";
-import { TeacherPager } from "@/components/teacher/TeacherPager";
+import { MonthLabel, TeacherPager } from "@/components/teacher/TeacherPager";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
@@ -726,7 +726,7 @@ export function TeacherSchedule() {
               <h2 id="teacher-week-title" ref={calendarTitleRef} tabIndex={-1}>
                 {editing
                   ? "Your weekly hours"
-                  : dateLabel(weekStart, { month: "long", year: "numeric" })}
+                  : <MonthLabel month={weekStart} />}
               </h2>
             </div>
           </div>

@@ -3378,17 +3378,19 @@ textarea,
   margin-bottom: 0;
 }
 
-/* The trial's length is fixed: one option, already chosen, in the same control. */
-.segmented.segmented--single {
-  grid-template-columns: minmax(0, 1fr);
+/* A fixed trial length is a fact, leaving the blue fill for real choices. */
+.booking-bar__group--fixed {
+  flex-grow: 1;
 }
 
-.segmented--single .segmented__thumb {
-  width: calc(100% - 8px);
-}
-
-.segmented--single label {
-  cursor: default;
+.booking-bar__fixed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--booking-control-height);
+  margin: 0;
+  color: var(--ink);
+  font: 600 0.875rem/1.5 var(--ui);
 }
 
 @container booking (min-width: 700px) {
@@ -3533,6 +3535,10 @@ textarea,
 
   .booking-bar__group {
     flex-basis: 100%;
+  }
+
+  .booking-bar__fixed {
+    min-height: 24px;
   }
 
   /* "Sign in" says enough beside the heading on a phone. */
@@ -5299,24 +5305,20 @@ p.lesson-when > span {
   }
 }
 
-/* On a phone the booking calendar does as Your lessons does: its header names
-   the months and every 1st carries its own, so the seven days take the card's
-   whole width rather than giving a column to OCT OCT OCT NOV (13 October
-   2026, Dan: the same logic on every screen). */
-@container booking (max-width: 519.98px) {
-  .unified-calendar--booking .calendar-weekdays,
-  .unified-calendar--booking .calendar-week {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-  }
+/* The heading names the months and every 1st names its own: seven days take
+   the card's width, without repeating the month beside every week. */
+.unified-calendar--booking .calendar-weekdays,
+.unified-calendar--booking .calendar-week {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
 
-  .unified-calendar--booking .calendar-weekdays__corner,
-  .unified-calendar--booking .calendar-week__month {
-    display: none;
-  }
+.unified-calendar--booking .calendar-weekdays__corner,
+.unified-calendar--booking .calendar-week__month {
+  display: none;
+}
 
-  .unified-calendar--booking .calendar-week button em.calendar-week__first {
-    display: block;
-  }
+.unified-calendar--booking .calendar-week button em.calendar-week__first {
+  display: block;
 }
 
 /* Sits above the tiles rather than under them. */

@@ -1708,16 +1708,16 @@
   }
 }
 
-/* The selected date already names the phone's day. Keep its switch beside
-   the month, with one row of dates directly above the lesson grid. */
+/* Month and navigation share a row; the two availability controls pair up
+   below, so Edit weekly hours never sits alone on a half-empty row. */
 @media (max-width: 600px) {
   .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto 36px 36px;
-    grid-template-areas: "title day previous next" "mode mode current current";
+    grid-template-areas: "title current previous next" "mode mode day day";
     gap: 0.4rem;
   }
-  .teacher-week-day-control { display: flex; grid-area: day; }
+  .teacher-week-day-control { display: flex; grid-area: day; justify-self: end; }
   .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-week-mode { justify-self: start; }
   .teacher-week-day-control .teacher-day-toggle { padding-inline: 0.3rem; font-size: 0.7rem; }
   .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-pager { display: contents; }
@@ -1803,6 +1803,9 @@
 }
 .teacher-meet-attention {
   font: 600 0.75rem/1.5 var(--ui);
+}
+.teacher-meet-setup {
+  color: var(--lavender-ink);
 }
 .teacher-meet p {
   margin: 0;
@@ -2586,7 +2589,7 @@
   border: 1px solid var(--rule);
   border-radius: var(--squiggle-field, 12px);
   padding: 0 0.75rem;
-  background: var(--sheet);
+  background: var(--raised);
   font: inherit;
   font-size: 0.86rem;
 }

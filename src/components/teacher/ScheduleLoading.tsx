@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
-import { dateLabel } from "@/lib/teacher-calendar";
+import { MonthLabel } from "@/components/teacher/TeacherPager";
 
 const noChange = () => () => {};
 
@@ -29,7 +29,7 @@ export function WeekLoading({ weekStart }: { weekStart: string }) {
         <div className="teacher-week-toolbar">
           <div className="teacher-week-title">
             <div className="teacher-week-heading">
-              <h2>{awake ? dateLabel(weekStart, { month: "long", year: "numeric" }) : "\u00a0"}</h2>
+              <h2>{awake ? <MonthLabel month={weekStart} /> : "\u00a0"}</h2>
             </div>
           </div>
           <span className="button button--lilac button--compact teacher-week-mode">Edit weekly hours</span>
