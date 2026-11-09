@@ -3291,3 +3291,13 @@
 .teacher-translation__text { white-space: pre-wrap; }
 .teacher-translation__meta { font-size: 0.78rem; opacity: 0.8; }
 .teacher-translation .teacher-expression__actions { margin-top: 0.6rem; }
+/* A weekly run as one card in a student's lessons (9 November 2026, Dan),
+   in the dashed tile the payment card gives a run; its weeks follow it as
+   ordinary lesson cards once opened. */
+.teacher-history-run { border-style: dashed; border-color: var(--lavender); }
+.teacher-history-run .teacher-history-lesson__top strong { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0 0.35rem; }
+.teacher-history-run__mark { flex: none; color: var(--blue); }
+.teacher-history-run__span { margin: 0.35rem 0 0; color: var(--lavender-ink); font: 500 0.74rem/1.4 var(--ui); }
+.teacher-history-run__span > span { white-space: nowrap; }
+.teacher-history-run__toggle svg { transition: rotate var(--motion-surface, 200ms) var(--motion-ease, ease); }
+.teacher-history-run__toggle[aria-expanded="true"] svg { rotate: 180deg; }

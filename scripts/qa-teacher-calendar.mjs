@@ -1410,6 +1410,9 @@ try {
       { ...lesson("legacy", "Sam Known", "2026-08-01T09:00:00Z"), student_email: "SAM@example.invalid", payment_status: "paid" },
       { ...lesson("other", "Sam Known", "2026-08-02T09:00:00Z"), student_id: "someone-else", student_email: "sam@example.invalid", notes: "ANOTHER ACCOUNT MUST NOT APPEAR" },
       { ...lesson("checkout", "Sam Known", "2026-09-12T09:00:00Z"), student_id: "sam", status: "pending_payment", payment_status: "pending", notes: "UNFINISHED CHECKOUT MUST NOT APPEAR" },
+      // A weekly run reads as one card, its weeks opened on request.
+      ...["2026-09-15T08:30:00Z", "2026-09-22T08:30:00Z", "2026-09-29T08:30:00Z"].map((start, week) =>
+        ({ ...lesson(`weekly-${week}`, "Sam Known", start, "porto"), student_id: "sam", series_id: "sam-weekly", added_by_teacher: 1, payment_status: "not_required" })),
     ];
     await page.getByRole("tab", { name: /^Students/ }).click();
     const open = page.getByRole("button", { name: "Open Sam Known’s profile", exact: true });
@@ -1417,9 +1420,19 @@ try {
     await page.keyboard.press("Enter");
     const samRow = studentRow(page, "Sam Known");
     const history = samRow.getByRole("region", { name: "Sam Known’s profile", exact: true });
-    await expect(history.getByRole("heading", { name: "Upcoming · 2" })).toBeVisible();
+    await expect(history.getByRole("heading", { name: "Upcoming · 5" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 4" })).toBeVisible();
-    await expect(history.locator(".teacher-history-lesson")).toHaveCount(6);
+    await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
+    const run = history.locator(".teacher-history-run");
+    await expect(run).toContainText("Every Tuesday");
+    await expect(run).toContainText("09:30–10:30");
+    await expect(run).toContainText("3 weeks, Tue 15 Sept to Tue 29 Sept");
+    await expect(run).toContainText("In Porto");
+    await run.getByRole("button", { name: "Show weeks", exact: true }).click();
+    await expect(history.locator(".teacher-history-lesson")).toHaveCount(10);
+    await expect(history.locator(".teacher-history-lesson").filter({ hasText: "Tue 22 Sept" })).toHaveCount(1);
+    await run.getByRole("button", { name: "Hide weeks", exact: true }).click();
+    await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
     await expect(history).toContainText("12 Dec 2025");
     await expect(history).toContainText("Payment arranged directly");
     await expect(history).toContainText("Refunded");
@@ -1432,7 +1445,7 @@ try {
     assert.ok(state.historyReads > 0, "History requests all dates, separately from the current week");
     await expect(history).toContainText("Happening now");
     await page.clock.fastForward(46 * 60_000);
-    await expect(history.getByRole("heading", { name: "Upcoming · 1" })).toBeVisible();
+    await expect(history.getByRole("heading", { name: "Upcoming · 4" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 5" })).toBeVisible();
     await expect(history).not.toContainText("Happening now");
     await history.getByRole("button", { name: "Edit details for Sam Known", exact: true }).click();
@@ -1458,7 +1471,7 @@ try {
     await expect(history).not.toContainText("No lessons recorded");
     state.failHistory = false;
     await history.getByRole("button", { name: "Try again", exact: true }).click();
-    await expect(history.locator(".teacher-history-lesson")).toHaveCount(6);
+    await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
     await samRow.getByRole("button", { name: "Close", exact: true }).click();
     // Closing a slow request and opening another account cannot cross the histories.
     let release;
