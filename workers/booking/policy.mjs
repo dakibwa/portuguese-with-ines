@@ -17,6 +17,15 @@
 
 import { dateKey, homeZone } from "./time.mjs";
 import { currentTutor } from "./tutor.mjs";
+import { firstLessonOnly } from "./lesson-type.mjs";
+
+/** New platform lessons keep their agreed terms. Older D1 rows use the legacy settings. */
+export function bookingSettings(row, settings) {
+  return row?.policy_notice_hours === undefined || row?.policy_notice_hours === null ? settings : {
+    ...settings, minimumNoticeHours: row.policy_notice_hours,
+    sameDayChangeFeeCents: row.policy_fee_cents ?? settings.sameDayChangeFeeCents
+  };
+}
 
 /** The wording a booking made under the 14-hour rule consents to. */
 export const PAYMENT_CONSENT_VERSION = "2026-09-21-fourteen-hours-v1";
@@ -51,6 +60,7 @@ const LESSON_DAY_CONSENT_VERSIONS = new Set(["2026-09-01-after-lesson-v1"]);
 
 /** True when moving or cancelling now falls inside the fee window. */
 export function isLateChange(row, now = new Date(), noticeHours = currentTutor().defaults.noticeHours) {
+  noticeHours = row.policy_notice_hours ?? noticeHours;
   const start = new Date(row.starts_at);
   const late = start.getTime() - now.getTime() < noticeHours * 3600000;
   if (!LESSON_DAY_CONSENT_VERSIONS.has(row.payment_consent_version)) return late;
@@ -62,7 +72,7 @@ export function changePolicy(row, now = new Date(), noticeHours = currentTutor()
   const scheduled = row.payment_status === "scheduled" || row.payment_status === "processing";
   // A free lesson has nothing to take a fee from and no card behind it
   // (16 October 2026): it can change as late as any other, with no fee.
-  const free = row.payment_status === "free";
+  const free = row.payment_status === "free" || (row.policy_notice_hours !== undefined && row.amount_cents === 0);
   const late = isLateChange(row, now, noticeHours);
 
   return {
@@ -106,7 +116,7 @@ export function planSeriesCancellation(rows, now = new Date(), noticeHours = cur
  */
 export function lessonTypeChangeProblem(row, currentLessonType, nextLessonType, tutor = currentTutor()) {
   if (currentLessonType.id === nextLessonType.id) return "";
-  if (currentLessonType.id === "trial" || nextLessonType.id === "trial") {
+  if (firstLessonOnly(currentLessonType) || firstLessonOnly(nextLessonType)) {
     return "A trial lesson can't be changed into another lesson length. Choose a new date and time, or cancel it and book another lesson.";
   }
 

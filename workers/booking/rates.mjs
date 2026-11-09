@@ -1,3 +1,4 @@
+import { currentTutor } from "./tutor.mjs";
 /**
  * The code catalogue is a private Worker binding, never a shipped asset.
  *
@@ -47,13 +48,27 @@ export function withDerived(rates) {
 }
 
 export async function studentLessonType(env, studentId, lessonType) {
+  if (env.TUTOR?.platform) {
+    if (lessonType.student_price_applies === 0 || !studentId) return lessonType;
+    const own = await env.DB.prepare("SELECT amount_cents FROM student_lesson_rates WHERE student_id=? AND lesson_type_id=?").bind(studentId, lessonType.id).first();
+    const initial = own ? {} : await studentRates(env, studentId);
+    return { ...lessonType, price_cents: own?.amount_cents ?? initial[lessonType.duration_minutes] ?? lessonType.price_cents };
+  }
   if (lessonType.id === "trial" || !studentId) return lessonType;
   const rates = await studentRates(env, studentId);
   return { ...lessonType, price_cents: rates[lessonType.duration_minutes] ?? lessonType.price_cents };
 }
 
 /** A new lesson may use its quote only while that effective price still holds. */
-export function lessonPriceSnapshotSql() {
+export function lessonPriceSnapshotSql(snapshot) {
+  if (currentTutor().platform && snapshot?.seriesPrice) return `EXISTS (SELECT 1 FROM booking_series WHERE id=? AND student_id=? AND lesson_type_id=? AND policy_price_cents=? AND status='active')`;
+  if (currentTutor().platform) return `EXISTS (SELECT 1 FROM lesson_types quoted_type WHERE quoted_type.id = ?
+    AND (CASE WHEN quoted_type.student_price_applies=0 THEN quoted_type.price_cents ELSE COALESCE(
+      (SELECT COALESCE(
+        (SELECT amount_cents FROM student_lesson_rates WHERE student_id=quoted_student.id AND lesson_type_id=quoted_type.id),
+        (SELECT amount_cents FROM student_recurring_rates WHERE student_id=quoted_student.id AND duration_minutes=quoted_type.duration_minutes),
+        CASE WHEN quoted_type.duration_minutes=90 THEN (SELECT ROUND(amount_cents*1.5) FROM student_recurring_rates WHERE student_id=quoted_student.id AND duration_minutes=60) END)
+       FROM (SELECT COALESCE(?,?) AS id) quoted_student),quoted_type.price_cents) END)=?)`;
   return `EXISTS (SELECT 1 FROM lesson_types quoted_type WHERE quoted_type.id = ?
     AND (CASE WHEN quoted_type.id = 'trial' THEN quoted_type.price_cents ELSE COALESCE(
       (SELECT amount_cents FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = quoted_type.duration_minutes),

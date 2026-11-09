@@ -41,6 +41,7 @@ import {
   PAID_BY_HAND_MARK,
   PAYMENT_CONSENT_VERSION,
   STUDENT_CARD_CONSENT_VERSION,
+  bookingSettings,
   changePolicy,
   lessonTypeChangeProblem,
   planSeriesCancellation
@@ -73,6 +74,7 @@ import {
   zonedToUtc
 } from "./time.mjs";
 import { asTutor, currentTutor, tutorOf } from "./tutor.mjs";
+import { firstLessonOnly, canRepeat } from "./lesson-type.mjs";
 import { envForTutor, everyTutor, tutorForRequest } from "./directory.mjs";
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
@@ -201,6 +203,7 @@ function cleanText(value, maxLength) {
 
 /** Public shape of a booking. Never leaks another student's details. */
 function publicBooking(row, lessonType, settings) {
+  settings = bookingSettings(row, settings);
   return {
     reference: row.reference,
     status: row.status,
@@ -215,6 +218,7 @@ function publicBooking(row, lessonType, settings) {
     notes: row.notes,
     rescheduleCount: row.reschedule_count,
     sameDayFeeCents: settings.sameDayChangeFeeCents,
+    minimumNoticeHours: settings.minimumNoticeHours,
     sameDayFeeAutomatic: row.payment_status === "scheduled" || row.payment_status === "processing",
     paymentStatus: row.payment_status,
     amountCents: row.amount_cents
@@ -227,6 +231,7 @@ function publicBooking(row, lessonType, settings) {
  * own name, being a different thing rather than a different length.
  */
 function lessonName(lessonType) {
+  if (currentTutor().platform) return lessonType.name;
   return lessonType.id === "trial" ? lessonType.name : `${lessonType.duration_minutes}-minute lesson`;
 }
 
@@ -350,6 +355,7 @@ function emailIncludedMeeting(result, row, allowAlreadySent = false) {
  * Kept in one place so a change to wording cannot drift between the two sides.
  */
 async function notify(env, { event, row, lessonType, settings, manageUrl, previousStartsAt, previousLessonType, byTeacher = false, welcome = null }) {
+  settings = bookingSettings(row, settings);
   const held = byTeacher && await awaitingWelcomeAt(env, row.student_email);
   const notifyingSequence = row.sequence;
   const notifyingStatus = row.status;
@@ -441,7 +447,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
     lesson: lessonLine(lessonType), lessonName: lessonName(lessonType), place: placeLabel(row),
     meetingUrl: meetingUrl(row), reference: row.reference
   };
-  const policyArgs = { notice, fee, manageUrl: event === "cancelled" ? "" : manageUrl };
+  const policyArgs = { notice, fee, noShowText: noShowWording(row), manageUrl: event === "cancelled" ? "" : manageUrl };
 
   const student = event === "booked"
     ? studentBooked({ tutor: tutorOf(env),
@@ -567,6 +573,7 @@ const REMINDER_BATCH = 6;
 const REMINDER_RETRY_MINUTES = 5;
 
 function reminderEmail({ tutor, row, lessonType, settings, manageUrl, meetingLink, meetComing }) {
+  settings = bookingSettings(row, settings);
   const start = new Date(row.starts_at);
   const zone = lessonZone(row);
   return lessonReminder({ tutor,
@@ -592,7 +599,7 @@ function reminderEmail({ tutor, row, lessonType, settings, manageUrl, meetingLin
 export async function sendLessonReminders(env, now = new Date()) {
   const settings = await loadSettings(env);
   const hour = 3600000;
-  const earliest = new Date(now.getTime() + settings.minimumNoticeHours * hour).toISOString();
+  const earliest = new Date(now.getTime() + (tutorOf(env).platform ? 0 : settings.minimumNoticeHours) * hour).toISOString();
   const latest = new Date(now.getTime() + REMINDER_LEAD_HOURS * hour).toISOString();
   if (earliest >= latest) return;
   const retryAfter = new Date(now.getTime() - REMINDER_RETRY_MINUTES * 60000).toISOString();
@@ -776,7 +783,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   const common = {
     tutor: tutorOf(env), lengthChanged, minutes: lessonType.duration_minutes,
     lesson: lessonLine(lessonType), lessonName: lessonName(lessonType), place: placeLabel(first),
-    notice: `${settings.minimumNoticeHours} hours`, fee: formatEuros(settings.sameDayChangeFeeCents)
+    noShowText:noShowWording(first),
+    notice: `${bookingSettings(first,settings).minimumNoticeHours} hours`, fee: formatEuros(bookingSettings(first,settings).sameDayChangeFeeCents)
   };
   const studentFacts = {
     ...common, first: first.student_name.split(" ")[0], byTeacher, welcome, price,
@@ -890,13 +898,13 @@ function prepareSlotClaim(env, { columns, values, startAt, endAt, studentId = nu
        WHERE (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))
          AND starts_at < ?
          AND ends_at > ?
-     ) AND (? != 'trial' OR ? IS NULL OR NOT EXISTS (
+     ) AND (${tutorOf(env).platform ? "NOT EXISTS (SELECT 1 FROM lesson_types WHERE id=? AND first_lesson_only=1)" : "? != 'trial'"} OR ? IS NULL OR NOT EXISTS (
        SELECT 1 FROM bookings prior WHERE prior.student_id = ? AND prior.status != 'cancelled'
      )) AND (? IS NULL OR EXISTS (SELECT 1 FROM booking_series WHERE id = ? AND status = 'active'))
      ${seriesSnapshot ? `AND EXISTS (SELECT 1 FROM booking_series WHERE id = ? AND ${SERIES_FILL_GUARD})` : ""}
      ${standingCardStudent ? `AND ${standingCardSnapshotSql()}` : ""}
      ${sessionIdentity ? `AND ${studentSessionSql()}` : ""}
-     ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}
+     ${priceSnapshot ? `AND ${lessonPriceSnapshotSql(priceSnapshot)}` : ""}
      ${authorization ? `AND (${authorization.sql})` : ""}
      ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}
      ${minimumNoticeHours !== null ? "AND ? >= ?" : ""}`
@@ -1544,7 +1552,13 @@ async function teacherStudentList(env) {
   const { results: rates } = await env.DB.prepare("SELECT student_id, duration_minutes, amount_cents FROM student_recurring_rates").all();
   const own = {};
   for (const rate of rates ?? []) (own[rate.student_id] ??= {})[rate.duration_minutes] = rate.amount_cents;
+  const ownLesson = {};
+  if (tutorOf(env).platform) {
+    const {results: perLesson} = await env.DB.prepare("SELECT student_id,lesson_type_id,amount_cents FROM student_lesson_rates").all();
+    for (const rate of perLesson ?? []) (ownLesson[rate.student_id] ??= {})[rate.lesson_type_id] = rate.amount_cents;
+  }
   return (results ?? []).map((row) => ({
+    ...(tutorOf(env).platform ? {lessonPrices:ownLesson[row.id] || {}} : {}),
     id: row.id,
     name: row.name,
     email: hasEmail(row) ? row.email : "",
@@ -2175,7 +2189,7 @@ const worker = {
     // The tutor this request belongs to, and their own database and secrets.
     // Inês's requests keep the deploy's env exactly as it was. Everything the
     // request does, including work it leaves running, runs as that tutor's.
-    const own = await envForTutor(env, tutorForRequest(request));
+    const own = env.TUTOR?.platform ? env : await envForTutor(env, tutorForRequest(request));
     return asTutor(own.TUTOR, () => answer(request, own, ctx));
   },
 
@@ -2188,6 +2202,7 @@ const worker = {
    * bookings is the kind of thing that is impossible to reason about later.
    */
   async scheduled(event, env, ctx) {
+    if (env.TUTOR?.platform) return asTutor(env.TUTOR, () => sweep(event,env,ctx));
     // Each tutor's sweeps run on their own database, one after another's start.
     for (const own of await everyTutor(env)) asTutor(own.TUTOR, () => sweep(event, own, ctx));
   }
@@ -2342,12 +2357,21 @@ export async function chargeDueLessons(env, now = new Date()) {
   }
 }
 
+function noShowWording(row) {
+  if (row.policy_no_show === undefined) return undefined;
+  return row.policy_no_show === "full" ? "A missed lesson costs its agreed lesson price." : row.policy_no_show === "fixed" ? `A missed lesson costs ${formatEuros(row.policy_no_show_cents ?? 0)}, up to the agreed lesson price.` : "There is no charge for a missed lesson.";
+}
+
 /** Pure money decision shared with tests; the database claim happens first. */
 export function lessonChargePlan(row, lessonType, settings) {
   const noShow = row.attendance_status === "no_show";
+  const price = row.amount_cents ?? lessonType.price_cents;
+  const noShowCents = row.policy_no_show === "none" ? 0 : row.policy_no_show === "full" ? price
+    : row.policy_no_show === "fixed" ? Math.min(price, row.policy_no_show_cents ?? 0)
+      : settings.sameDayChangeFeeCents;
   return {
     noShow,
-    amountCents: noShow ? settings.sameDayChangeFeeCents : (row.amount_cents ?? lessonType.price_cents),
+    amountCents: noShow ? noShowCents : price,
     purpose: noShow ? "no-show" : "lesson"
   };
 }
@@ -3017,8 +3041,8 @@ async function handleCreate(request, env, ctx) {
   if (wantsRepeat && repeatWeeks === undefined) {
     return fail(`Choose ${SERIES_LENGTHS.join(", ")} weeks, or every week.`, 400, request, env);
   }
-  if (wantsRepeat && lessonType.id === "trial") return fail("A trial is one first lesson and cannot repeat.", 400, request, env);
-  const selection = bookingSelection(body, { recurring: wantsRepeat, durationMinutes: lessonType.duration_minutes, trial: lessonType.id === "trial", tutor: tutorOf(env) });
+  if (wantsRepeat && !canRepeat(lessonType)) return fail("A trial is one first lesson and cannot repeat.", 400, request, env);
+  const selection = bookingSelection(body, { recurring: wantsRepeat, durationMinutes: lessonType.duration_minutes, trial: firstLessonOnly(lessonType), tutor: tutorOf(env) });
   if (selection.error) return fail(selection.error, 400, request, env);
   body.startAt = selection.starts[0];
   lessonType = await studentLessonType(env, student.id, lessonType);
@@ -3039,7 +3063,7 @@ async function handleCreate(request, env, ctx) {
   // cancelled has started; a cancelled trial that never happened doesn't count
   // against booking another. (Dan, 28 August 2026.) An unfinished card setup
   // the student could still complete counts: it may yet become that lesson.
-  if (lessonType.id === "trial") {
+  if (firstLessonOnly(lessonType)) {
     const prior = await env.DB.prepare(
       "SELECT COUNT(*) AS n FROM bookings WHERE student_id = ? AND status != 'cancelled'"
     )
@@ -3526,7 +3550,7 @@ function seriesFillValues(series) {
 function prepareSeriesBookmark(env, series, key, now, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null) {
   return env.DB.prepare(`UPDATE booking_series SET filled_to = ?, updated_at = ? WHERE id = ? AND ${SERIES_FILL_GUARD}
     ${sessionIdentity ? `AND ${studentSessionSql()}` : ""}
-    ${priceSnapshot ? `AND ${lessonPriceSnapshotSql()}` : ""}
+    ${priceSnapshot ? `AND ${lessonPriceSnapshotSql(priceSnapshot)}` : ""}
     ${authorization ? `AND (${authorization.sql})` : ""}
     ${availabilityRevision !== null ? `AND ${availabilityRevisionSql()}` : ""}`)
     .bind(key, now.toISOString(), series.id, ...seriesFillValues(series), ...(sessionIdentity ?? []), ...(priceSnapshot ?? []), ...(authorization?.values ?? []),
@@ -3603,8 +3627,13 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
   // New bookings retain the quote already accepted. A nightly extension takes
   // a fresh price, then binds it to both its occurrence and its bookmark.
   if (!priceSnapshot) {
-    lessonType = await studentLessonType(env, student.id, lessonType);
-    priceSnapshot = lessonPriceSnapshot(student.id, lessonType);
+    if (tutorOf(env).platform && series.policy_price_cents != null) {
+      lessonType = {...lessonType,price_cents:series.policy_price_cents};
+      priceSnapshot=Object.assign([series.id,student.id,lessonType.id,series.policy_price_cents],{seriesPrice:true});
+    } else {
+      lessonType = await studentLessonType(env, student.id, lessonType);
+      priceSnapshot = lessonPriceSnapshot(student.id, lessonType);
+    }
   }
   const teacher = Boolean(series.added_by_teacher);
   const checkedSettings = await loadSettings(env);
@@ -4172,7 +4201,7 @@ async function handleGetBooking(request, env, token) {
   if (!row) return fail("That booking link is not valid.", 404, request, env);
 
   const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
-  const settings = await loadSettings(env);
+  const settings = bookingSettings(row, await loadSettings(env));
 
   const policy = changePolicy(row, new Date(), settings.minimumNoticeHours);
 
@@ -4209,7 +4238,7 @@ async function handleReschedule(request, env, ctx, token) {
 
   // Only an older already-paid lesson is locked. A current saved-card lesson
   // stays changeable and the EUR 5 fee is charged below.
-  const settings = await loadSettings(env);
+  const settings = bookingSettings(row, await loadSettings(env));
   let policy = changePolicy(row, now, settings.minimumNoticeHours);
   if (policy.locked) {
     return fail(
@@ -4475,7 +4504,7 @@ async function handleCancel(request, env, ctx, token) {
   if (new Date(row.starts_at) <= now) {
     return fail(`That lesson has already started. Please email ${tutorOf(env).shortName}.`, 409, request, env);
   }
-  const settings = await loadSettings(env);
+  const settings = bookingSettings(row, await loadSettings(env));
   const body = await readJson(request);
   now = new Date();
   let policy = changePolicy(row, now, settings.minimumNoticeHours);
@@ -5462,7 +5491,9 @@ async function handleMe(request, env) {
         priceCents: row.amount_cents ?? row.price_cents
       },
       isPast: new Date(row.ends_at) <= now,
-      sameDayFeeApplies: changePolicy(row, now, settings.minimumNoticeHours).feeApplies && settings.sameDayChangeFeeCents > 0,
+      sameDayFeeApplies: changePolicy(row, now, settings.minimumNoticeHours).feeApplies && bookingSettings(row, settings).sameDayChangeFeeCents > 0,
+      sameDayFeeCents: bookingSettings(row, settings).sameDayChangeFeeCents,
+      minimumNoticeHours: bookingSettings(row, settings).minimumNoticeHours,
       sameDayFeeAutomatic: row.payment_status === "scheduled" || row.payment_status === "processing",
       changeLocked: changePolicy(row, now, settings.minimumNoticeHours).locked,
       paymentStatus: row.payment_status,
@@ -6015,7 +6046,7 @@ async function teacherCancelFollowing(request, env, ctx, row, message, authoriza
 /** Why a lesson keeps its length when she changes it, in a few words, or "". */
 function lengthKeptReason(row, currentLessonType, lessonType, amountCents) {
   if (!lessonTypeChangeProblem(row, currentLessonType, lessonType) && !freeLengthProblem(row, amountCents) && !row.charge_started_at) return "";
-  if (currentLessonType.id === "trial") return "it's a trial lesson";
+  if (firstLessonOnly(currentLessonType)) return "it's a trial lesson";
   if (row.payment_status === "paid" || row.payment_consent_version === PAID_BY_HAND_MARK) return "it's already paid";
   if (row.payment_status === "payment_due") return "it has a payment due";
   if (row.payment_status === FREE) return "it's free";
@@ -6032,13 +6063,14 @@ function lengthKeptReason(row, currentLessonType, lessonType, amountCents) {
  * too, so weeks added to it later are booked at it.
  */
 async function teacherChangeLength(request, env, ctx, bookingId, body, authorization) {
+  if (tutorOf(env).platform) return fail("The student can change their lesson type from Your lessons after reviewing the new price.",409,request,env);
   const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(bookingId).first();
   if (!row || row.status !== "confirmed") return fail("That lesson could not be found.", 404, request, env);
   if (Date.parse(row.starts_at) <= Date.now()) return fail("A lesson already had keeps its length.", 409, request, env);
   const following = body.following === true;
   if (following && !row.series_id) return fail("This lesson isn't part of a weekly run.", 400, request, env);
   const lessonType = await loadLessonType(env, cleanText(body.lessonType, 40));
-  if (!lessonType || lessonType.id === "trial") return fail("Choose 60 or 90 minutes.", 400, request, env);
+  if (!lessonType || !canRepeat(lessonType)) return fail("Choose 60 or 90 minutes.", 400, request, env);
   const amountCents = (await studentLessonType(env, row.student_id, lessonType)).price_cents;
   if (body.expectedPriceCents !== amountCents) {
     return fail("Their price for that length has changed. Please reload and check it.", 409, request, env);
@@ -6756,7 +6788,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     if (wantsRepeat && repeatWeeks === undefined) {
       return fail(`Choose ${SERIES_LENGTHS.join(", ")} weeks, or every week.`, 400, request, env);
     }
-    if (wantsRepeat && lessonType.id === "trial") return fail("A trial is one first lesson and cannot repeat.", 400, request, env);
+    if (wantsRepeat && !canRepeat(lessonType)) return fail("A trial is one first lesson and cannot repeat.", 400, request, env);
 
     const start = new Date(body.startAt);
     if (Number.isNaN(start.getTime())) return fail("That time could not be understood.", 400, request, env);

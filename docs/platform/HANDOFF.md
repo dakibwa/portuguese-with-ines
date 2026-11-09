@@ -3,6 +3,15 @@
 This file is for picking the platform work back up in a new session. It was last
 brought up to date on 9 November 2026.
 
+**Current implementation:** Dan chose **Vowel** and asked for all ten layouts
+and optional teacher portrait uploads. The separate Worker and setup/dashboard
+apps are implemented on `codex/vowel-platform`; public sign-up and live
+providers are off. Read [VOWEL.md](./VOWEL.md) for current code, checks and the
+activation requirements. The older gap list below describes the Inês/D1 path;
+Vowel handles snapshots, no-show rules, reminders, arbitrary lesson lengths,
+Connect routing and curriculum in its separate storage path. No live data has
+been moved.
+
 Dan's idea is to turn this repository, the booking site and Worker behind
 Português com a Inês, into a platform that language tutors anywhere can run
 their own site on. Inês's own site moves onto the platform, free. Read this
@@ -214,8 +223,10 @@ Numbers in brackets are the systems map's findings.
 
 ## Open questions for Dan
 
-- The platform's name and domain ([brand/README.md](./brand/README.md)).
-- Which of the 10 template concepts to keep ([templates.md](./templates.md)).
+- The name is Vowel; its domain remains undecided. Both vowel.app and vowel.ai
+  are registered, and Vowel LMS is an existing education product. See the
+  [brand status](./brand/README.md).
+- All ten template concepts are implemented; no selection is pending.
 - Whether Workers Paid is on, which decides the sweep cost above.
 - From the systems map: packages paid up front and paying before a first lesson
   (not in the plan yet), and whether WhatsApp messages for students without

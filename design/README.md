@@ -2352,3 +2352,13 @@ were moved on 2026-07-24 to:
 
 That folder is an archive for provenance only. Do not use anything in it as a
 design source unless Dan explicitly asks to revisit a named archived item.
+
+## Vowel platform entry points
+
+Vowel has a separate exercise-book identity and per-tutor template skins under
+`src/vowel/`. Its green, paper and serif styles do not replace this site's
+approved Inês direction. The ten template compositions and palettes remain
+independent; the shared booking and diary controls use each tutor's tokens.
+Words, prices and rules in previews come from the draft; published tutor pages
+use their published record and tutor store. Portrait uploads are optional,
+with an initial fallback. See [the Vowel contract](../docs/platform/VOWEL.md).

@@ -1,11 +1,11 @@
 "use client";
 
-import { IN_PERSON } from "@/lib/tutor";
+import { IN_PERSON, IS_PLATFORM_TUTOR, TUTOR_LOCATION_OPTIONS } from "@/lib/tutor";
 import { useState } from "react";
 import { Globe, UserRound } from "lucide-react";
 import { AdminApiError, createBookingFor, type AdminStudent } from "@/lib/admin-api";
-import { forgetAvailability, formatPriceCents, portoTimeToUtc } from "@/lib/booking-api";
-import { lessonProducts } from "@/lib/lesson-products";
+import { forgetAvailability, formatPriceCents, portoTimeToUtc, canRepeat, studentPriceApplies } from "@/lib/booking-api";
+import { lessonProducts, staticLessonTypes } from "@/lib/lesson-products";
 import { priceFor } from "@/components/teacher/StudentPrice";
 import { dateLabel } from "@/lib/teacher-calendar";
 import { LessonDatePicker } from "@/components/teacher/LessonDatePicker";
@@ -89,7 +89,7 @@ export function LessonForm({
   /** Re-read a student's price after the server refuses an obsolete quote. */
   onRefresh?: () => void;
 }) {
-  const [lesson, setLesson] = useState({ ...empty, date, time });
+  const [lesson, setLesson] = useState({ ...empty, date, time, ...(IS_PLATFORM_TUTOR ? {lessonType:staticLessonTypes.find(type => type.id !== "trial")?.id || staticLessonTypes[0]?.id || "",location:TUTOR_LOCATION_OPTIONS[0] || "online"} : {}) });
   const quiet = Boolean(student.awaitingWelcome);
   const [openedAt] = useState(() => Date.now());
   const startAt = startOf(lesson.date, lesson.time, lesson.startAt);
@@ -99,7 +99,10 @@ export function LessonForm({
   // a lesson already had is one too.
   const weekly = lesson.repeat !== "once" && !past;
   const [paid, setPaid] = useState(false);
-  const cents = lesson.lessonType === "trial" ? trialPrice : priceFor(student, lesson.lessonType === "long" ? 90 : 60);
+  const selectedType = staticLessonTypes.find(type => type.id === lesson.lessonType);
+  const typePrice = (type: typeof staticLessonTypes[number]) => studentPriceApplies(type) ? student.lessonPrices?.[type.id] ?? student.prices?.[type.duration_minutes as 60 | 90] ?? type.price_cents : type.price_cents;
+  const cents = IS_PLATFORM_TUTOR && selectedType ? typePrice(selectedType) : lesson.lessonType === "trial" ? trialPrice : priceFor(student, lesson.lessonType === "long" ? 90 : 60);
+  const choices: [string,string,number][] = IS_PLATFORM_TUTOR ? staticLessonTypes.map(type => [type.id,type.name,typePrice(type)]) : [["trial", "Trial", trialPrice], ["single", "60 mins", priceFor(student, 60)], ["long", "90 mins", priceFor(student, 90)]];
   // One lesson with something to pay; a weekly run is ticked lesson by lesson.
   const tickable = !weekly && cents > 0;
   const [busy, setBusyState] = useState(false);
@@ -183,18 +186,18 @@ export function LessonForm({
           <fieldset className="teacher-manual-choice">
             <legend>Lesson</legend>
             <div
-              className={`segmented segmented--three segmented--position-${["trial", "single", "long"].indexOf(lesson.lessonType)}`}
+              className={`segmented segmented--three segmented--position-${choices.findIndex(choice => choice[0] === lesson.lessonType)}`}
             >
               <span aria-hidden="true" className="segmented__thumb" />
               {/* Each length carries what this student pays for it (13 October 2026, Dan). */}
-              {([["trial", "Trial", trialPrice], ["single", "60 mins", priceFor(student, 60)], ["long", "90 mins", priceFor(student, 90)]] as const).map(([value, label, cents]) => (
+              {choices.map(([value, label, cents]) => (
                 <label className={lesson.lessonType === value ? "is-active" : ""} key={value}>
                   <input
                     aria-label={past ? label : `${label}, ${formatPriceCents(cents)}`}
                     checked={lesson.lessonType === value}
                     disabled={busy}
                     name={`${idPrefix}-lesson`}
-                    onChange={() => setLesson({ ...lesson, lessonType: value, ...(lesson.startAt ? { time: "", startAt: "" } : {}), ...(value === "trial" ? { repeat: "once" as Repeat } : {}) })}
+                    onChange={() => setLesson({ ...lesson, lessonType: value, ...(lesson.startAt ? { time: "", startAt: "" } : {}), ...((IS_PLATFORM_TUTOR ? !canRepeat(staticLessonTypes.find(type => type.id === value)!) : value === "trial") ? { repeat: "once" as Repeat } : {}) })}
                     type="radio"
                     value={value}
                   />
@@ -214,7 +217,7 @@ export function LessonForm({
             <legend>Where</legend>
             <div className={`segmented segmented--${lesson.location}`}>
               <span aria-hidden="true" className="segmented__thumb" />
-              {([["online", "Online"], ["porto", IN_PERSON]] as const).map(([value, label]) => (
+              {([["online", "Online"], ["porto", IN_PERSON]] as const).filter(([value]) => TUTOR_LOCATION_OPTIONS.includes(value)).map(([value, label]) => (
                 <label className={lesson.location === value ? "is-active" : ""} key={value}>
                   <input
                     aria-label={label}
@@ -239,7 +242,7 @@ export function LessonForm({
           {past ? <>{tick}{submit}</> : null}
           {/* A student she sees every week is set up once, as a student books a
               weekly slot (12 October 2026, Dan). A trial is one first lesson. */}
-          {lesson.lessonType !== "trial" && !past ? (
+          {(IS_PLATFORM_TUTOR ? Boolean(selectedType && canRepeat(selectedType)) : lesson.lessonType !== "trial") && !past ? (
             <fieldset className="teacher-manual-choice">
               <legend>How often</legend>
               <div className={`segmented${lesson.repeat === "once" ? "" : " segmented--second"}`}>

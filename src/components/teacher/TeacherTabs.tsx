@@ -1,8 +1,9 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { IS_PLATFORM_TUTOR, TUTOR_HAS_EXPRESSIONS } from "@/lib/tutor";
 
-const tabs = [
+const allTabs = [
   { id: "students", label: "Students" },
   { id: "week", label: "Timetable" },
   { id: "time-off", label: "Time off" },
@@ -10,6 +11,7 @@ const tabs = [
   { id: "expressions", label: "Expressions" },
   { id: "profile", label: "Profile" },
 ] as const;
+const tabs = allTabs.filter(tab => tab.id !== "expressions" || TUTOR_HAS_EXPRESSIONS).map(tab => ({ ...tab, label: IS_PLATFORM_TUTOR && tab.id === "receipts" ? "Payments" : tab.label }));
 
 export type TeacherTab = (typeof tabs)[number]["id"];
 

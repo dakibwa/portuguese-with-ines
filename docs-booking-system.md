@@ -2377,6 +2377,14 @@ updates by the UID, and students and receipts quote the reference.
 
 ### More than one tutor
 
+**Vowel (9 November 2026):** the self-serve platform now has a separate Worker
+and per-tutor SQLite Durable Objects. It reuses these handlers with an explicit
+platform tutor env, stores booking/series terms and agreed weekly prices, and
+uses verified Connect-account routing. This section describes the existing
+Inês/D1 deployment, which is retained. See [Vowel](docs/platform/VOWEL.md) for
+the new runtime and activation gates. No production D1 migration is required
+for the new Worker, and no existing tutor has been migrated.
+
 One Worker can serve several tutors. `workers/booking/directory.mjs` lists them
 (`TUTORS`), and each has their own D1 database, bound under the name in their
 record's `database`. Inês's is `DB`, as it always was.

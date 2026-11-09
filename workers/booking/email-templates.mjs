@@ -84,7 +84,7 @@ export function priceValue({ tutor = currentTutor(), terms, amount, run = false 
  * a fee the note above it states.
  *   free · paid (locks inside the window) · card · unpaid · again (no fee to name)
  */
-function policyFooter(policy, { notice, fee, run = false, tutor }) {
+function policyFooter(policy, { notice, fee, run = false, tutor, noShowText }) {
   const lesson = run ? "any lesson" : "the lesson";
   const before = run ? `${notice} before it` : `${notice} before the lesson`;
   switch (policy) {
@@ -92,7 +92,7 @@ function policyFooter(policy, { notice, fee, run = false, tutor }) {
       ? [`Please give ${tutor.shortName} at least ${notice}' notice to move or cancel a lesson.`]
       : ["Need to change it? Use the link above.", `Please give ${tutor.shortName} at least ${notice}' notice.`];
     case "paid": return [`Move or cancel ${lesson} free until ${before}.`, "After that, it can’t be changed or refunded."];
-    case "card": return [`Move or cancel ${lesson} free until ${before}.`, `After that, moving or cancelling costs ${fee}.`, `A no-show costs ${fee} instead of the lesson price.`];
+    case "card": return [`Move or cancel ${lesson} free until ${before}.`, `After that, moving or cancelling costs ${fee}.`, noShowText || `A no-show costs ${fee} instead of the lesson price.`];
     case "unpaid": return run
       ? [`Moving or cancelling a lesson is free until ${before}; after that it costs ${fee}.`]
       : ["Need to change it? Use the link above.", `It’s free until ${before}; after that it costs ${fee}.`];
@@ -178,7 +178,7 @@ function lessonRows({ lesson, place, meetingUrl, reference, price, cancelled = f
  * Inês set up a plain weekly slot, repeats, occurrences, skippedNote }.
  */
 export function studentBooked({ tutor = currentTutor(), first, byTeacher, welcome = null, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
-  price, policy, paid = false, notice, fee, manageUrl, lessonsUrl, run = null }) {
+  price, policy, paid = false, notice, fee, noShowText, manageUrl, lessonsUrl, run = null }) {
   if (!run) {
     return {
       subject: byTeacher ? `${tutor.shortName} has booked your ${tutor.language.name} lesson — ${shortWhen}` : `Your ${tutor.language.name} lesson is booked — ${shortWhen}`,
@@ -196,7 +196,7 @@ export function studentBooked({ tutor = currentTutor(), first, byTeacher, welcom
         action: welcome ? welcomeAction(welcome) : manageUrl ? { label: MANAGE_LABEL, url: manageUrl } : null,
         footer: welcome
           ? [policy === "free" ? `Please give ${tutor.shortName} at least ${notice}' notice to change it.` : `It’s free to change until ${notice} before the lesson; after that it costs ${fee}.`, ...welcomeFooter(tutor)]
-          : policyFooter(policy, { notice, fee, tutor })
+          : policyFooter(policy, { notice, fee, tutor, noShowText })
       }
     };
   }
@@ -235,7 +235,7 @@ export function studentBooked({ tutor = currentTutor(), first, byTeacher, welcom
       rows,
       steps: welcome ? welcomeSteps(welcome) : null,
       action: welcome ? welcomeAction(welcome) : { label: ALL_LESSONS_LABEL, url: lessonsUrl },
-      footer: welcome ? [...policyFooter(policy, { notice, fee, run: true, tutor }), ...welcomeFooter(tutor)] : policyFooter(policy, { notice, fee, run: true, tutor })
+      footer: welcome ? [...policyFooter(policy, { notice, fee, run: true, tutor, noShowText }), ...welcomeFooter(tutor)] : policyFooter(policy, { notice, fee, run: true, tutor, noShowText })
     }
   };
 }
@@ -341,7 +341,7 @@ export function lessonReminder({ tutor = currentTutor(), first, lessonName, less
 
 /** 11 12 15 — a student's lesson (or weekly run) has moved or changed length. */
 export function studentMoved({ tutor = currentTutor(), first, byTeacher, lengthChanged = false, minutes, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
-  price, lateNote = "", policy, notice, fee, manageUrl, lessonsUrl, welcome = null, run = null }) {
+  price, lateNote = "", policy, notice, fee, noShowText, manageUrl, lessonsUrl, welcome = null, run = null }) {
   if (run) {
     // Inês changed how long they are (9 November 2026, Dan), at the same times.
     const longer = byTeacher && lengthChanged;
@@ -357,7 +357,7 @@ export function studentMoved({ tutor = currentTutor(), first, byTeacher, lengthC
         hero: when,
         rows: [...runRows({ lesson, place, price, repeats: run.repeats, occurrences: run.occurrences }), ...keptRows(run.kept)],
         action: welcome ? welcomeAction(welcome) : { label: ALL_LESSONS_LABEL, url: lessonsUrl },
-        footer: welcome ? [...policyFooter(policy, { notice, fee, run: true, tutor }), ...welcomeFooter(tutor)] : policyFooter(policy, { notice, fee, run: true, tutor })
+        footer: welcome ? [...policyFooter(policy, { notice, fee, run: true, tutor, noShowText }), ...welcomeFooter(tutor)] : policyFooter(policy, { notice, fee, run: true, tutor, noShowText })
       }
     };
   }
@@ -381,7 +381,7 @@ export function studentMoved({ tutor = currentTutor(), first, byTeacher, lengthC
       rows: lessonRows({ lesson, place, meetingUrl, reference, price }),
       action: manageUrl ? { label: MANAGE_LABEL, url: manageUrl } : null,
       // A late move on a saved card states its fee in the note, so the footer adds only what it doesn't say.
-      footer: byTeacher ? `No charge for a change ${tutor.pronouns.subject} makes.` : policy === "late" ? "This fee applies once per lesson." : policyFooter(policy, { notice, fee, tutor })
+      footer: byTeacher ? `No charge for a change ${tutor.pronouns.subject} makes.` : policy === "late" ? "This fee applies once per lesson." : policyFooter(policy, { notice, fee, tutor, noShowText })
     }
   };
 }

@@ -1,4 +1,5 @@
 "use client";
+import { IS_PLATFORM_TUTOR } from "@/lib/tutor";
 
 import { useRef, useState } from "react";
 import { AccountAvatar } from "@/components/AccountMenu";
@@ -85,20 +86,20 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
             waits, folded, a press away (27 October 2026, Dan: onboarding
             should feel easy). Their price still goes in from the start. */}
         <details className="teacher-profile__more" ref={more}>
-          <summary>Phone, NIF, price and splat</summary>
+          <summary>{IS_PLATFORM_TUTOR ? "Phone and student mark" : "Phone, NIF, price and splat"}</summary>
           <div className="teacher-profile__more-body">
             <label>
               <span>Phone <span className="teacher-field-optional">(optional)</span></span>
               <input autoComplete="off" disabled={busy} onChange={set("phone")} type="tel" value={details.phone} />
             </label>
-            <label>
+            {!IS_PLATFORM_TUTOR && <label>
               <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
               <input autoComplete="off" autoCorrect="off" disabled={busy} inputMode="numeric" spellCheck={false} onChange={set("nif")} type="text" value={details.nif} />
-            </label>
-            <fieldset className="teacher-profile__price">
+            </label>}
+            {!IS_PLATFORM_TUTOR && <fieldset className="teacher-profile__price">
               <legend>Their price <span className="teacher-field-optional">(optional, per lesson)</span></legend>
               <PriceFields draft={prices} disabled={busy} idPrefix="teacher-student-price" invalid={error === PRICE_RANGE_ERROR} onChange={setPrices} />
-            </fieldset>
+            </fieldset>}
             <div className="teacher-profile__splat">
               <span id="teacher-student-splat">Their splat <span className="teacher-field-optional">(optional)</span></span>
               <div aria-labelledby="teacher-student-splat" className="my-lessons__marks" role="group">

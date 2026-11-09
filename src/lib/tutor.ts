@@ -7,6 +7,8 @@
 import record from "../../tutors/ines/tutor.json";
 
 export const TUTOR = record;
+export const IS_PLATFORM_TUTOR = false;
+export const TUTOR_HAS_EXPRESSIONS = record.features.expressions;
 
 /** "Inês": how the site and its tools name the tutor. */
 export const TUTOR_NAME = record.shortName;
@@ -28,3 +30,7 @@ export const LANGUAGE_CODE = record.language.code;
 export const TUTOR_SUBJECT = record.pronouns.subject;
 export const TUTOR_OBJECT = record.pronouns.object;
 export const TUTOR_POSSESSIVE = record.pronouns.possessive;
+
+export const TUTOR_LOCATION_OPTIONS: ("online" | "porto")[] = ["online", "porto"];
+
+export const PLATFORM_DASHBOARD_URL = "/dashboard/";

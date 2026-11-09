@@ -1,5 +1,6 @@
 "use client";
 
+import { IS_PLATFORM_TUTOR, PLATFORM_DASHBOARD_URL } from "@/lib/tutor";
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { EditValue } from "@/components/teacher/EditControls";
@@ -84,6 +85,7 @@ export function PriceFields({ draft, disabled, idPrefix, invalid, onChange }: {
   invalid?: boolean;
   onChange: (draft: PriceDraft) => void;
 }) {
+  if (IS_PLATFORM_TUTOR) return <p>Offer a lesson price from Students in your Vowel dashboard. Your student reviews it before it changes.</p>;
   return (
     <div className="teacher-price-fields">
       {LENGTHS.map((minutes) => (
@@ -173,6 +175,7 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
     }
   }
 
+  if (IS_PLATFORM_TUTOR) return <p><a href={`${PLATFORM_DASHBOARD_URL}?tab=students`}>Offer a price in Vowel</a>. Your student accepts before their bookings change.</p>;
   return (
     <section className="teacher-price" ref={section} aria-labelledby={labelledBy ?? `${idPrefix}-title`}>
       {!labelledBy ? <h3 id={`${idPrefix}-title`}>Their price</h3> : null}

@@ -1,6 +1,7 @@
 "use client";
 
 import { BOOKING_API_BASE_URL } from "@/lib/config";
+import { TUTOR } from "@/lib/tutor";
 import type { BookingStatus } from "@/lib/booking-api";
 import { BOOKING_REPLY_ERROR, isApiLesson, isApiRecord } from "@/lib/api-response";
 
@@ -66,15 +67,16 @@ export type LessonSeries = {
   upcoming: number;
 };
 
-const SESSION_KEY = "ines-student-session";
+const SESSION_SCOPE = TUTOR.id === "ines" ? "ines" : `vowel-${TUTOR.id}`;
+const SESSION_KEY = `${SESSION_SCOPE}-student-session`;
 // Outlives the session: a student with a booked lesson has signed in here.
-const RETURNING_KEY = "ines-returning-student";
-export const SESSION_CHANGE_EVENT = "ines:student-session-change";
+const RETURNING_KEY = `${SESSION_SCOPE}-returning-student`;
+export const SESSION_CHANGE_EVENT = `${SESSION_SCOPE}:student-session-change`;
 // The account as last read, so Your lessons opens at once on a return visit
 // while the page asks again (11 October 2026, at Dan's request: as near
 // instant as it can be). It belongs to the session that read it, lasts a
 // week at most and goes with signing out.
-const ACCOUNT_KEY = "ines-account-snapshot";
+const ACCOUNT_KEY = `${SESSION_SCOPE}-account-snapshot`;
 const ACCOUNT_MAX_AGE_MS = 7 * 86_400_000;
 
 export class SessionStorageError extends Error {

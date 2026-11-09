@@ -1,4 +1,5 @@
 "use client";
+import { IS_PLATFORM_TUTOR } from "@/lib/tutor";
 
 import { FormEvent, type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Lock, Mail, ReceiptText, UserRound } from "lucide-react";
@@ -301,7 +302,7 @@ export function AuthPanel({
           </label>
         ) : null}
 
-        {mode === "register" ? (
+        {mode === "register" && !IS_PLATFORM_TUTOR ? (
           <label>
             <span>
               <ReceiptText size={16} aria-hidden="true" />
