@@ -16,6 +16,14 @@ const LESSON_MARKS = [
 ];
 
 /**
+ * When a lesson is charged, in words that follow the charge window: an hour
+ * after it today, at its end once the window is nothing (2 November 2026,
+ * Dan: "charged at the time of when the lessons ends").
+ */
+const CHARGED_EACH = NO_SHOW_WINDOW_HOURS_AFTER ? "after each lesson" : "at the end of each lesson";
+const CHARGED_IT = NO_SHOW_WINDOW_HOURS_AFTER ? "after it ends" : "when it ends";
+
+/**
  * The change and no-show rule as two dabs, what is free first (2 November
  * 2026, Dan: the same words across the site). `noShow` false leaves out the
  * no-show, where nothing charges a card for one.
@@ -37,8 +45,10 @@ export type CardUpcoming = { key: string; when: string; amountCents: number; wee
  * short list a booking shows, and pressing the button is the agreement; the
  * card itself is entered on Stripe's page.
  */
-export function CardTerms({ change = false, setup = false, onCancel, bookingId = "", upcoming = [], feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
+export function CardTerms({ change = false, setup = false, onCancel, onSkip, bookingId = "", upcoming = [], feeCents = SAME_DAY_RESCHEDULE_FEE_CENTS, noticeHours = NOTICE_HOURS }: {
   change?: boolean; onCancel?: () => void;
+  /** Offered only once something has gone wrong, so a card that can't go ahead never keeps them from their lessons. */
+  onSkip?: () => void;
   /** Asking for a card on Your lessons: the approval card's layout, without lessons to pay now. */
   setup?: boolean;
   /** The lessons a payment approval link names, comma-separated. */
@@ -117,7 +127,7 @@ export function CardTerms({ change = false, setup = false, onCancel, bookingId =
   const actions = (
     <div className="my-lessons__edit-actions">
       <button
-        aria-describedby="card-terms-summary"
+        aria-describedby={approval ? "card-terms-summary card-terms-rules" : "card-terms-summary"}
         className="button button--coral"
         disabled={busy || (approval && (!ready || !bookingConsent))}
         onClick={() => void open()}
@@ -129,6 +139,7 @@ export function CardTerms({ change = false, setup = false, onCancel, bookingId =
       {onCancel ? (
         <button className="my-lessons__change" disabled={busy} onClick={onCancel} type="button">{approval ? "Not now" : "Cancel"}</button>
       ) : null}
+      {onSkip && error ? <button className="my-lessons__change" disabled={busy} onClick={onSkip} type="button">See your lessons</button> : null}
     </div>
   );
 
@@ -144,33 +155,47 @@ export function CardTerms({ change = false, setup = false, onCancel, bookingId =
 
   /*
    * A payment approval link (27 October 2026, Dan: "simple and beautiful"),
-   * in the booking confirm step's own words and marks: what is paid now as
-   * the booking step's time tiles with their total, then what is paid
-   * automatically from then on (2 November 2026, Dan: make it obvious it
-   * covers their weekly lessons too), then the dabs and the agreement. On a
-   * wide card what is agreed sits on the left and agreeing on the right.
+   * in the booking confirm step's own words and marks: what is outstanding
+   * as the booking step's time tiles, with what is charged now as their
+   * total, then what is paid from then on, under a label that says when
+   * (2 November 2026, Dan: make it obvious it covers their weekly lessons
+   * too). Over the agreement, only the rules nothing above says, as the
+   * confirm step's dabs: the fee, two of them (2 November 2026, Dan: the list
+   * was too long, but "I liked the bullets they are cute"). On a wide card
+   * what is agreed sits on the left and agreeing on the right.
    */
+  const dueNow = chargedOnAgreement !== "none";
+  // "Now" is the hourly charge, so within the hour; a lesson whose hour has
+  // not passed yet waits for it.
+  const caption = chargedOnAgreement === "some" ? `The rest is charged ${CHARGED_EACH}`
+    : dueNow ? "" : `Charged ${several ? CHARGED_EACH : CHARGED_IT}`;
   if (approval) return (
     <div className="card-terms card-terms--approval">
       {!ready && !error ? <p role="status">Checking your lessons…</p> : null}
       {ready ? (
         <div className="card-terms__summary" id="card-terms-summary">
           {lessons.length ? <section aria-labelledby="card-terms-now" className="card-terms__lessons">
-            <p className="card-terms__label"><span id="card-terms-now">{chargedOnAgreement === "none" ? "To pay" : "To pay now"}</span><small>Porto time</small></p>
+            <p className="card-terms__label">
+              <span id="card-terms-now">{dueNow ? several ? "Outstanding lessons" : "Outstanding lesson" : "To pay"}</span>
+              <small>Porto time</small>
+            </p>
             <ol className="booking-chosen-lessons">
               {lessons.map((lesson, index) => <li key={lesson.id}>{tile(lesson, index)}</li>)}
             </ol>
-            {several ? (
+            {several || dueNow ? (
               <p className="card-terms__total">
-                <span>Total</span>
-                <b className="card-terms__price">{formatMoneyCents(lessons.reduce((sum, lesson) => sum + lesson.amountCents, 0))}</b>
+                <span>{dueNow ? "Charged now" : "Total"}</span>
+                <b className="card-terms__price">{formatMoneyCents(dueNow ? dueNowCents : lessons.reduce((sum, lesson) => sum + lesson.amountCents, 0))}</b>
               </p>
             ) : null}
+            {caption ? <p className="card-terms__note">{caption}</p> : null}
           </section> : null}
           {then.length ? (
             <section aria-labelledby="card-terms-then" className="card-terms__lessons card-terms__lessons--then">
-              {lessons.length ? <p className="card-terms__label"><span id="card-terms-then">Then automatically</span></p>
-                : <p className="card-terms__label"><span id="card-terms-then">Paid automatically</span><small>Porto time</small></p>}
+              <p className="card-terms__label">
+                <span id="card-terms-then">{lessons.length ? `Then ${CHARGED_EACH}` : `Paid ${CHARGED_EACH}`}</span>
+                {lessons.length ? null : <small>Porto time</small>}
+              </p>
               <ul className="booking-chosen-lessons">
                 {then.map(lesson => (
                   <li key={lesson.key}>
@@ -184,25 +209,15 @@ export function CardTerms({ change = false, setup = false, onCancel, bookingId =
               </ul>
             </section>
           ) : null}
-          {/* In Dan's words (2 November 2026): what is charged now, worked
-              out from the lessons shown; then later lessons; then what is
-              free and what costs the fee. "Now" is the hourly charge, so
-              within the hour; a lesson whose hour has not passed yet waits
-              for it. */}
-          <ul className="booking-payment-facts">
-            {bookingId ? <li>
-              {chargedOnAgreement === "none"
-                ? several ? "These lessons are charged after each one" : "This lesson is charged after it ends"
-                : <>You&rsquo;ll be charged <strong>{formatMoneyCents(dueNowCents)}</strong> now{chargedOnAgreement === "some"
-                  ? ", and the rest after each lesson" : several ? " for your outstanding lessons" : " for this lesson"}</>}
-            </li> : null}
-            <li>Future lessons are charged after each lesson</li>
-            {bookingId ? null : <li>Already paid Inês for some? Tell her before agreeing</li>}
-            <FeeFacts feeCents={fee} noticeHours={notice} />
-          </ul>
         </div>
       ) : null}
       <div className="card-terms__consent">
+        {ready ? (
+          <ul className="booking-payment-facts" id="card-terms-rules">
+            {then.length ? null : <li>Future lessons are charged {CHARGED_EACH}</li>}
+            <FeeFacts feeCents={fee} noticeHours={notice} />
+          </ul>
+        ) : null}
         {ready ? (
           <div className="booking-agreement card-terms__agreement">
             <div className={`booking-agreement__control${bookingConsent ? " is-agreed" : ""}`}>
@@ -210,7 +225,7 @@ export function CardTerms({ change = false, setup = false, onCancel, bookingId =
                 className="booking-agreement__button"
                 type="button"
                 aria-pressed={bookingConsent}
-                aria-describedby="card-terms-summary"
+                aria-describedby="card-terms-summary card-terms-rules"
                 disabled={busy}
                 onClick={() => setBookingConsent(value => !value)}
               >
@@ -230,8 +245,7 @@ export function CardTerms({ change = false, setup = false, onCancel, bookingId =
   return (
     <div className="card-terms">
       <ul className="booking-payment-facts" id="card-terms-summary">
-        <li>Future lessons are charged after each lesson</li>
-        <li>Already paid Inês for some? Tell her before agreeing</li>
+        <li>Future lessons are charged {CHARGED_EACH}</li>
         <li>Stripe keeps your card safe</li>
         <FeeFacts feeCents={fee} noticeHours={notice} />
         <li>
@@ -247,26 +261,30 @@ export function CardTerms({ change = false, setup = false, onCancel, bookingId =
 
 /**
  * On Your lessons, only while lessons Inês added are still paid to her by
- * hand, or when her payment link names lessons: one card above the calendar.
+ * hand, or when her payment link names lessons: one card, a step of its own
+ * before their lessons (2 November 2026, Dan: "card first"). There is no Not
+ * now; only a card that can't go ahead (the lessons already settled, cards
+ * switched off) offers their lessons instead, for that visit.
  */
-export function CardPrompt({ bookingId = "", upcoming = [] }: { bookingId?: string; upcoming?: CardUpcoming[] }) {
-  // Open on arrival, the same card with or without lessons to pay now
-  // (2 November 2026, Dan); Not now folds it for this visit.
+export function CardPrompt({ bookingId = "", upcoming = [], onOpenChange }: {
+  bookingId?: string; upcoming?: CardUpcoming[];
+  /** Whether the card is showing: true on arrival, false once skipped after a failure or when it goes, so their lessons can wait for it. */
+  onOpenChange?: (open: boolean) => void;
+}) {
   const [open, setOpen] = useState(true);
+  const report = useRef(onOpenChange);
+  useLayoutEffect(() => { report.current = onOpenChange; });
+  useLayoutEffect(() => { report.current?.(open); }, [open]);
+  useLayoutEffect(() => () => report.current?.(false), []);
+  if (!open) return null;
   return (
-    <section aria-labelledby="card-prompt-heading" className={`card-prompt${open ? " card-prompt--open card-prompt--review" : ""}`}>
+    <section aria-labelledby="card-prompt-heading" className="card-prompt card-prompt--open card-prompt--review">
       <span aria-hidden="true" className="card-prompt__icon">
         <CreditCard size={20} />
       </span>
       <div className="card-prompt__body">
         <h3 id="card-prompt-heading">Confirm your card payments</h3>
-        {open ? (
-          <CardTerms key={bookingId} bookingId={bookingId} setup={!bookingId} upcoming={upcoming} onCancel={() => setOpen(false)} />
-        ) : (
-          <button className="button button--blue button--compact" onClick={() => setOpen(true)} type="button">
-            Review payments
-          </button>
-        )}
+        <CardTerms key={bookingId} bookingId={bookingId} setup={!bookingId} upcoming={upcoming} onSkip={() => setOpen(false)} />
       </div>
     </section>
   );
