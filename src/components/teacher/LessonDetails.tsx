@@ -18,6 +18,10 @@ import {
 } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatMoneyCents, formatPriceCents, formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
 import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
+
+// When a card is charged, in the words the student reads (CardOnFile): at the
+// lesson's end while the no-show window is nothing, after it once there is one.
+const CHARGED = NO_SHOW_WINDOW_HOURS_AFTER ? "after the lesson" : "at the end of the lesson";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { AssetMark } from "@/components/BrandMarks";
 import { studentMark } from "@/lib/student-marks";
@@ -176,7 +180,7 @@ export function LessonDetails({
     refunded: "refunded",
     payment_due: "payment due",
     processing: "payment processing",
-    scheduled: "charged to their card after the lesson",
+    scheduled: `charged to their card ${CHARGED}`,
     pending: "waiting for their card",
     not_required: "to pay you directly",
     recorded: "recorded",
@@ -355,7 +359,7 @@ export function LessonDetails({
                   onChanged(next
                     ? "Marked as already paid. It won’t be charged, and it’s in Receipts as paid by hand."
                     : updated.payment_status === "scheduled"
-                      ? "No longer marked paid. It’s charged to their card after the lesson."
+                      ? `No longer marked paid. It’s charged to their card ${CHARGED}.`
                       : updated.payment_status === "recorded"
                         ? "No longer marked paid. It stays as a record only."
                         : updated.payment_status === "free"

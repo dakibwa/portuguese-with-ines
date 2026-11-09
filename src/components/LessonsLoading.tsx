@@ -31,6 +31,7 @@ export function LessonsLoading({ todayKey }: { todayKey: string }) {
             <div className="lessons-loading__places">
               <span className="is-current">Your lessons</span>
               <span>Past lessons</span>
+              <span>Homework</span>
               <span>Edit details</span>
             </div>
             <span className="lessons-loading__name" />
