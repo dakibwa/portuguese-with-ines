@@ -951,6 +951,8 @@ export function TeacherSchedule() {
         <LessonDetails
           key={selectedBooking.id}
           booking={selectedBooking}
+          weekly={selectedBooking.series_id ? bookings.filter((lesson) => lesson.series_id === selectedBooking.series_id) : undefined}
+          student={students?.list.find((entry) => entry.id === selectedBooking.student_id)}
           token={token}
           now={now}
           afterChangeFocusRef={calendarTitleRef}
