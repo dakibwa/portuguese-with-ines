@@ -8,9 +8,15 @@ const config = [
   // tmp/ is gitignored scratch — QA scripts, prototype builds, screenshots. It
   // never ships, and a stray built bundle in there was failing the lint gate on
   // rules that have nothing to do with this codebase.
-  { ignores: [".next/**", "node_modules/**", ".data/**", "out/**", "tmp/**", "**/.wrangler/**"] },
+  { ignores: [".next/**", "node_modules/**", ".data/**", "out/**", "dist/**", "tmp/**", "**/.wrangler/**"] },
   ...nextVitals,
   ...nextTypescript,
+  {
+    files: ["src/vowel/**"],
+    // These entries are browser apps built with esbuild, outside Next's router
+    // and image server. Keep React's checks and use native links and images.
+    rules: {"@next/next/no-img-element":"off", "@next/next/no-location-assign-relative-destination":"off"}
+  },
   {
     rules: {
       "react-hooks/set-state-in-effect": "off"

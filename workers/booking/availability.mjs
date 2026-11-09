@@ -125,7 +125,7 @@ export async function loadSettings(env) {
     // at booking and charges it only when the lesson ends. The retired
     // 'prepay' value remains readable only so a half-finished rollout fails
     // visibly rather than silently behaving as pay-in-person.
-    paymentMode: ["postpay", "prepay"].includes(settings.payment_mode) ? settings.payment_mode : "off",
+    paymentMode: env.TUTOR?.platform && env.VOWEL_MANUAL_BOOKING === "1" ? "off" : ["postpay", "prepay"].includes(settings.payment_mode) ? settings.payment_mode : "off",
     teacherName: settings.teacher_name || tutorOf(env).name,
     teacherEmail: settings.teacher_email || "",
     replyToEmail: settings.reply_to_email || ""
@@ -138,7 +138,7 @@ export async function loadLessonType(env, id) {
 
 export async function listLessonTypes(env) {
   const { results } = await env.DB.prepare(
-    "SELECT id, slug, name, description, duration_minutes, price_cents FROM lesson_types WHERE active = 1 ORDER BY sort_order"
+    `SELECT id, slug, name, description, duration_minutes, price_cents${env.TUTOR?.platform ? ", first_lesson_only, can_repeat, student_price_applies" : ""} FROM lesson_types WHERE active = 1 ORDER BY sort_order`
   ).all();
   return results ?? [];
 }

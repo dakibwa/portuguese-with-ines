@@ -1,0 +1,32 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "vowel",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../../dist/vowel",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "TUTOR_DIRECTORY", "class_name": "TutorDirectory" },
+      { "name": "TUTOR_STORES", "class_name": "TutorStore" },
+    ],
+  },
+  "exports": {
+    "TutorDirectory": { "type": "durable-object", "storage": "sqlite" },
+    "TutorStore": { "type": "durable-object", "storage": "sqlite" },
+  },
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "VOWEL_SIGNUPS_ENABLED": "0",
+    "VOWEL_EMAIL_ENABLED": "0",
+    "VOWEL_AI_ENABLED": "0",
+    "VOWEL_AI_MONTHLY_LIMIT": "200",
+    "VOWEL_STRIPE_EXPECTED_MODE": "test",
+    "VOWEL_GOOGLE_CALENDAR_ENABLED": "0",
+  },
+}

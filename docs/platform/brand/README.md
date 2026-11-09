@@ -1,6 +1,15 @@
 # Tutor platform: name and brand
 
-Status on 9 November 2026: **the name is not picked.** The brand direction below is a draft made under the working name Chapeau, which Dan has since ruled out. Read this before any naming, logo or visual work on the platform, and update it when Dan decides something.
+Status on 9 November 2026: **Dan chose Vowel** and asked for the build. The
+implementation uses the exercise-book direction: green, paper, serif display
+and plain interface type. The earlier Chapeau material below is historical
+brand exploration, and its vowel/accent icon is reused with the Vowel wordmark.
+
+**Domain and naming checks:** both `vowel.app` and `vowel.ai` are registered.
+[Vowel LMS](https://vowellms.com/) already operates in education. The shortlist's
+earlier “no teaching product found” claim was incomplete and is superseded by
+this finding. Vowel is Dan's chosen implementation name; launch clearance and
+a domain are still unresolved. See [VOWEL.md](../VOWEL.md).
 
 The platform is the white-label site, booking and payments product for language tutors that this repository is growing into (see the build plan in the project memory: Inês's site becomes its first tutor, free; €25 a month flat, no commission; 10 layouts × 10 colour sets for tutors' own sites).
 
@@ -16,7 +25,8 @@ The platform is the white-label site, booking and payments product for language 
 
 ### Shortlist (round 2, sent to Dan 9 Nov 2026, ~14:30)
 
-No product in teaching, tutoring or booking was found under any of these six (searched 9 Nov 2026).
+Historical shortlist research follows. It missed Vowel LMS; use the current
+status above, not this table, for launch decisions.
 
 | Word | Language | What it means for tutors | Namesakes found |
 |---|---|---|---|

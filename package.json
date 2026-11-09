@@ -34,22 +34,33 @@
     "test:teacher-calendar": "node --experimental-strip-types --test scripts/test-teacher-calendar.mjs",
     "build:email-banner": "node scripts/build-email-banner.mjs",
     "build:email-icons": "node scripts/build-email-icons.mjs",
-    "build:og-image": "node scripts/build-og-image.mjs"
+    "build:og-image": "node scripts/build-og-image.mjs",
+    "build:vowel": "node scripts/build-vowel.mjs",
+    "vowel:dev": "wrangler dev --config workers/vowel/wrangler.jsonc --port 8788",
+    "vowel:dry-run": "npm run build:vowel && wrangler deploy --config workers/vowel/wrangler.jsonc --dry-run",
+    "vowel:deploy": "npm run build:vowel && wrangler deploy --config workers/vowel/wrangler.jsonc",
+    "test:vowel": "node scripts/test-vowel.mjs",
+    "test:vowel:runtime": "node scripts/test-vowel-runtime.mjs"
   },
   "dependencies": {
+    "@stripe/connect-js": "^3.5.0",
     "lucide-react": "^1.14.0",
-    "next": "16.3.8",
+    "next": "16.4.5",
+    "qrcode": "^1.5.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "stripe": "^23.1.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.0",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.5",
     "typescript": "^5",
-    "wrangler": "^4.145.0"
+    "wrangler": "^4.159.0"
   }
 }

@@ -1,4 +1,4 @@
-import { HOME_CLOCK } from "@/lib/tutor";
+import { HOME_CLOCK, IS_PLATFORM_TUTOR } from "@/lib/tutor";
 import { forgetSession, readSession } from "@/lib/auth-api";
 import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, formatMoney } from "@/lib/config";
 import { BOOKING_REPLY_ERROR, isApiAmount, isApiInstant, isApiLesson, isApiRecord as isRecord } from "@/lib/api-response";
@@ -11,7 +11,14 @@ export type LessonType = {
   description: string;
   duration_minutes: number;
   price_cents: number;
+  first_lesson_only?: number;
+  can_repeat?: number;
+  student_price_applies?: number;
 };
+
+export const firstLessonOnly = (type: {id: string; first_lesson_only?: number}) => type.first_lesson_only === undefined ? type.id === "trial" : Boolean(type.first_lesson_only);
+export const canRepeat = (type: LessonType) => type.can_repeat === undefined ? type.id !== "trial" : Boolean(type.can_repeat);
+export const studentPriceApplies = (type: LessonType) => type.student_price_applies === undefined ? type.id !== "trial" : Boolean(type.student_price_applies);
 
 export type Slot = { startAt: string; endAt: string };
 
@@ -43,6 +50,7 @@ export type Booking = {
   notes: string;
   rescheduleCount: number;
   sameDayFeeCents: number;
+  minimumNoticeHours?: number;
   sameDayFeeAutomatic?: boolean;
   /** Automatic-payment states appear once Stripe is on; older bookings say 'not_required'. */
   paymentStatus?: "not_required" | "pending" | "scheduled" | "processing" | "paid" | "payment_due" | "refunded" | "recorded" | "free";
@@ -291,7 +299,7 @@ export function previewSeries(
   }>("/bookings/series/preview", {
     method: "POST",
     ...(session ? { headers: { Authorization: `Bearer ${session}` } } : {}),
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ ...payload, ...(typeof window !== "undefined" && window.vowelPaymentPreference ? { paymentPreference: window.vowelPaymentPreference } : {}) })
   }).then((data) => {
     if (!Array.isArray(data.bookable) || !data.bookable.every(isApiInstant) ||
       !Array.isArray(data.skipped) || !data.skipped.every(isApiInstant)) unreadableReply();
@@ -331,7 +339,7 @@ export function createBooking(
   }>("/bookings", {
     method: "POST",
     headers: { Authorization: `Bearer ${session}` },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ ...payload, ...(typeof window !== "undefined" && window.vowelPaymentPreference ? { paymentPreference: window.vowelPaymentPreference } : {}) })
   }).then((data) => {
     validateBookingReply(data);
     if ([data.checkoutClientSecret, data.checkoutUrl, data.manageUrl, data.manageToken].some((value) => value !== undefined && (typeof value !== "string" || !value)) ||
@@ -352,15 +360,16 @@ function validSelectionDates(value: unknown) {
     (value.weeks === null || (Number.isInteger(value.weeks) && Number(value.weeks) > 0));
 }
 
-function validateRates<T extends { rates: Record<number, number> }>(data: T) {
+function validateRates<T extends { rates: Record<number, number>; byLesson?: Record<string, number> }>(data: T) {
   if (!isRecord(data.rates) || !Object.values(data.rates).every((cents) =>
     typeof cents === "number" && Number.isFinite(cents) && cents >= 0
   )) unreadableReply();
+  if (data.byLesson !== undefined && (!isRecord(data.byLesson) || !Object.values(data.byLesson).every(isApiAmount))) unreadableReply();
   return data;
 }
 
 export function fetchRecurringRates(session: string) {
-  return request<{ rates: Record<number, number> }>("/me/recurring-rates", {
+  return request<{ rates: Record<number, number>; byLesson?: Record<string, number> }>("/me/recurring-rates", {
     headers: { Authorization: `Bearer ${session}` }
   }).then(validateRates);
 }
@@ -511,7 +520,7 @@ export function formatBookedLessonLabel(lessonType: {
   name: string;
   durationMinutes: number;
 }) {
-  return lessonType.id === "trial" ? lessonType.name : `${lessonType.durationMinutes} mins`;
+  return IS_PLATFORM_TUTOR ? `${lessonType.name} · ${lessonType.durationMinutes} mins` : lessonType.id === "trial" ? lessonType.name : `${lessonType.durationMinutes} mins`;
 }
 
 export function portoDateKey(date: Date) {

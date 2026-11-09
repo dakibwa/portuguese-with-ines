@@ -1,9 +1,12 @@
+import { TUTOR } from "@/lib/tutor";
+import { SITE_BASE_PATH } from "@/lib/paths";
 import { BOOKING_API_BASE_URL } from "@/lib/config";
 import { forgetSession } from "@/lib/auth-api";
 import { BOOKING_REPLY_ERROR, isApiInstant, isApiRecord } from "@/lib/api-response";
 import { isExpression, type Expression, type ExpressionInput } from "@/lib/expressions";
 
 export type AdminStudent = {
+  lessonPrices?: Record<string, number>;
   id: string;
   name: string;
   /** Empty when she set them up from a name alone and has not given one yet; the Worker never sends its stand-in. */
@@ -69,6 +72,9 @@ export type AvailabilityException = {
   weekday?: number | null;
 };
 export type AdminBooking = {
+  policy_no_show?: "none" | "fixed" | "full";
+  policy_no_show_cents?: number;
+  policy_fee_cents?: number;
   id: string;
   student_id?: string | null;
   reference: string;
@@ -301,7 +307,7 @@ function validStudent(value: unknown): value is AdminStudent {
     !["signedIn", "awaitingWelcome", "hasCard", "hasLessons", "cardForAllLessons", "dormant"].every(key => value[key] === undefined || typeof value[key] === "boolean") ||
     !["upcoming", "unpaidUpcoming", "weekly"].every(key => value[key] === undefined || (Number.isInteger(value[key]) && Number(value[key]) >= 0)) ||
     !(value.nextLessonAt == null || isApiInstant(value.nextLessonAt)) || !(value.dormantEmailedAt == null || isApiInstant(value.dormantEmailedAt))) return false;
-  for (const key of ["prices", "ownPrices"]) {
+  for (const key of ["prices", "ownPrices", "lessonPrices"]) {
     const prices = value[key];
     if (prices !== undefined && (!isApiRecord(prices) || !Object.values(prices).every(amount => Number.isInteger(amount) && Number(amount) >= 0))) return false;
   }
@@ -665,7 +671,7 @@ export function createInviteLink(token: string, studentId: string) {
     method: "POST", body: JSON.stringify({}),
   }).then(data => {
     const url = new URL(data.url);
-    if (![window.location.origin, "https://portuguesewithines.com"].includes(url.origin) || url.pathname !== "/book/" || !url.searchParams.get("signin")) {
+    if (![window.location.origin, new URL(TUTOR.site.url).origin].includes(url.origin) || ![`${SITE_BASE_PATH}/book/`, `${new URL(TUTOR.site.url).pathname.replace(/\/$/, "")}/book/`].includes(url.pathname) || !url.searchParams.get("signin")) {
       throw new Error(BOOKING_REPLY_ERROR);
     }
     return data.url;
@@ -712,8 +718,8 @@ export function createCardApprovalLink(token: string, target: CardApprovalTarget
   }).then(data => {
     const url = new URL(data.url);
     const named = (url.searchParams.get("cardBooking") ?? "").split(",");
-    if (![window.location.origin, "https://portuguesewithines.com"].includes(url.origin) ||
-        url.pathname !== "/book/" || !url.searchParams.get("signin") ||
+    if (![window.location.origin, new URL(TUTOR.site.url).origin].includes(url.origin) ||
+        ![`${SITE_BASE_PATH}/book/`, `${new URL(TUTOR.site.url).pathname.replace(/\/$/, "")}/book/`].includes(url.pathname) || !url.searchParams.get("signin") ||
         named.length !== bookingIds.length || !bookingIds.every(id => named.includes(id))) {
       throw new Error(BOOKING_REPLY_ERROR);
     }

@@ -23,6 +23,7 @@ function stripeHeaders(env, { contentType = false, idempotencyKey = "" } = {}) {
   return {
     Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
     "Stripe-Version": API_VERSION,
+    ...(env.STRIPE_ACCOUNT ? { "Stripe-Account": env.STRIPE_ACCOUNT } : {}),
     ...(contentType ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
     ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {})
   };

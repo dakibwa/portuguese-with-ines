@@ -35,6 +35,15 @@ responsive states, retained business-card references, production-asset
 boundary, and location of superseded work. The production interface is
 code-native and the published site is where that contract is accepted.
 
+## Vowel teaching platform
+
+The self-serve platform offshoot is **Vowel**. It has its own Worker, per-tutor
+SQLite Durable Objects, ten site layouts, optional teacher portraits, setup
+and dashboard apps, direct lesson payments and separate €25 monthly billing.
+Its activation switches are off; Inês keeps her existing deployment and D1.
+See [the implementation and activation guide](docs/platform/VOWEL.md) for
+commands, verification, domain status and the remaining provider setup.
+
 ## Asset weight
 
 `public/visuals/` assets are sized to the slot they render into, not to their

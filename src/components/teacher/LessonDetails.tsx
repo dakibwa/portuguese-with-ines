@@ -1,6 +1,6 @@
 "use client";
 
-import { IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
+import { IS_PLATFORM_TUTOR, IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { X, ArrowLeft, Check, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
@@ -317,7 +317,7 @@ export function LessonDetails({
         onChanged(
           noShow
             ? "No-show removed. The lesson price will be charged as normal."
-            : `Marked as a no-show. Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the lesson price.`,
+            : IS_PLATFORM_TUTOR ? "Marked as a no-show. This lesson keeps its agreed missed-lesson rule." : `Marked as a no-show. Only ${SAME_DAY_FEE_LABEL} will be charged, instead of the lesson price.`,
         );
       } else if (action === "refund") {
         await recordRefundByHand(token, booking.id);
@@ -481,7 +481,7 @@ export function LessonDetails({
         <p className="teacher-history-lesson__note teacher-lesson-note"><span>Their note</span>{booking.notes}</p>
       ) : null}
       {noShow ? (
-        <p className="teacher-inline-notice">No-show · {SAME_DAY_FEE_LABEL} after this lesson</p>
+        <p className="teacher-inline-notice">No-show · {(booking.policy_no_show === "none" ? "No charge" : booking.policy_no_show === "full" ? "Agreed lesson price" : booking.policy_no_show === "fixed" ? formatPriceCents(Math.min(booking.amount_cents ?? 0,booking.policy_no_show_cents ?? 0)) : SAME_DAY_FEE_LABEL)} after this lesson</p>
       ) : null}
       {booking.same_day_fee_status === "paid" ? (
         <p className="teacher-inline-notice">{SAME_DAY_FEE_LABEL} late change fee paid</p>
@@ -512,7 +512,7 @@ export function LessonDetails({
           >
             {inline ? "Move or cancel" : "Move lesson"}
           </button>
-          {toCome && booking.lesson_type_id !== "trial" ? (
+          {toCome && !IS_PLATFORM_TUTOR && booking.lesson_type_id !== "trial" ? (
             <button
               className={routine("button button--outline")}
               type="button"
@@ -713,7 +713,7 @@ export function LessonDetails({
                 ) : noShow ? (
                   <li>{firstName} is charged the lesson price as normal</li>
                 ) : (
-                  <li>{firstName} is charged only {SAME_DAY_FEE_LABEL}, instead of the lesson price</li>
+                  <li>{IS_PLATFORM_TUTOR ? "This lesson keeps the missed-lesson rule agreed when it was booked." : <>{firstName} is charged only {SAME_DAY_FEE_LABEL}, instead of the lesson price</>}</li>
                 )}
               </ul>
               {action === "cancel" && !awaiting && !recorded ? (

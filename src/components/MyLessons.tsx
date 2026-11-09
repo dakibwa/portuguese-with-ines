@@ -1,5 +1,7 @@
 "use client";
 
+import { IS_PLATFORM_TUTOR } from "@/lib/tutor";
+
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Mail } from "lucide-react";
 import { AccountAvatar, AccountMenu, type AccountSection } from "@/components/AccountMenu";
@@ -794,7 +796,7 @@ export function MyLessons({
             </div>
           ) : null}
 
-          <div className="my-lessons__fact" data-field="nif">
+          {!IS_PLATFORM_TUTOR && <div className="my-lessons__fact" data-field="nif">
             {openField === "nif" ? (
               <form
                 className="my-lessons__edit"
@@ -837,13 +839,13 @@ export function MyLessons({
                 </button>
               </>
             )}
-          </div>
+          </div>}
         </div>
 
         {/* Only some students have a code, so nothing here suggests they should:
             saved rates appear once there is one, and the field stays behind a
             small disclosure, as it does when booking. */}
-        <div className="my-lessons__rates">
+        {!IS_PLATFORM_TUTOR && <div className="my-lessons__rates">
           {rates && RATE_LENGTHS.some((minutes) => rates[minutes] !== undefined) ? (
             <ul aria-label="Your prices" className="my-lessons__rates-list">
               {RATE_LENGTHS.filter((minutes) => rates[minutes] !== undefined).map((minutes) => (
@@ -887,7 +889,7 @@ export function MyLessons({
               Your code sets your price for lessons of that length, including ones already booked.
             </p>
           </details>
-        </div>
+        </div>}
 
         {detailsNote ? (
           <div className="booking-outcome my-lessons__details-outcome" role="status">

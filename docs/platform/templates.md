@@ -7,8 +7,12 @@ Status note for whoever picks this up next. Last updated 9 November 2026.
 - **Done: concepts.** Ten layouts and ten colour sets are drawn as working previews. Each one is filled with a made-up tutor in a different language and shown at desktop (1280) and phone (390) width.
   - Source: [templates/ten-layouts.html](./templates/ten-layouts.html). It is one self-contained page; open it in a browser.
   - Published preview: https://claude.ai/artifact/HbyncsUc7WFBsorVgj5LEA. It is private to Dan's account.
-- **Waiting on Dan:** which layouts to keep, swap or drop. Nothing has been built into the real site yet, so `src/` is unchanged.
-- **Not started:** building the chosen layouts as real components that read the tutor record (see "Next steps").
+- **Implemented:** Dan chose all ten for Vowel. The Worker renderer in
+  `workers/vowel/site-render.mjs` and styles in `src/vowel/` read a tutor record,
+  render live setup previews and use the shared booking UI. Ten palettes work
+  independently of layout. Teacher portraits are optional and included.
+- **Activation pending:** provider configuration and a domain; see
+  [VOWEL.md](./VOWEL.md). The concept page below remains reference material.
 
 Dan's brief (9 Nov 2026): the templates "should all be quite distinct but have character in their own regard", and "we should cover most peoples tastes". They are the visible answer to competitors that "look like AI slop", so quality comes before quantity.
 

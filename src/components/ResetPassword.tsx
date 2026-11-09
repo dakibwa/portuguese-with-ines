@@ -80,7 +80,7 @@ export function ResetPassword() {
         <div>
           <strong>Your password has been changed.</strong>
           <p>
-            {signedIn ? <>You&rsquo;re signed in. <a href={teacher ? "/schedule/?tab=profile" : "/book/?view=lessons"}>{teacher ? "Go to your profile" : "Go to your lessons"}</a>.</>
+            {signedIn ? <>You&rsquo;re signed in. <a href={teacher ? `${SITE_BASE_PATH}/schedule/?tab=profile` : `${SITE_BASE_PATH}/book/?view=lessons`}>{teacher ? "Go to your profile" : "Go to your lessons"}</a>.</>
               : storageNote || <>You can now <a href={`${SITE_BASE_PATH}/book/?view=lessons`}>sign in with your new password</a>.</>}
           </p>
         </div>
