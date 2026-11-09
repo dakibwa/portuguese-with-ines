@@ -15,6 +15,7 @@ import { TeacherPager } from "@/components/teacher/TeacherPager";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
+import { ScheduleLoading, WeekLoading } from "@/components/teacher/ScheduleLoading";
 import { ReceiptsTab } from "@/components/teacher/ReceiptsTab";
 import { ExpressionsTab } from "@/components/teacher/ExpressionsTab";
 import {
@@ -607,12 +608,10 @@ export function TeacherSchedule() {
         The booking service is not connected yet.
       </p>
     );
+  // From the first paint until her week is ready, one held schedule stands
+  // in its place, rather than a line of words for each step (ScheduleLoading).
   if (checking)
-    return (
-      <p className="teacher-loading" role="status">
-        Opening your schedule…
-      </p>
-    );
+    return <ScheduleLoading current={activeTab} onSelect={setActiveTab} weekStart={weekStart} />;
   if (authError)
     return (
       <div className="teacher-inline-error" role="alert">
@@ -666,11 +665,7 @@ export function TeacherSchedule() {
       </div>
     );
   if (!initialised)
-    return (
-      <p className="teacher-loading" role="status">
-        Loading your weekly hours…
-      </p>
-    );
+    return <ScheduleLoading current={activeTab} onSelect={setActiveTab} weekStart={weekStart} />;
 
   function signOut() {
     if (savingDays || savingHours || accountBusy) return;
@@ -701,7 +696,10 @@ export function TeacherSchedule() {
       ) : null}
 
       <div className="teacher-tools-panel" id="teacher-tools-panel" role="tabpanel" aria-labelledby={`teacher-tab-${activeTab}`} tabIndex={0}>
-      {activeTab === "week" ? <>
+      {/* The first week's lessons are still on their way: the held week stays,
+          so her next lesson and the week arrive together, nothing pushed down. */}
+      {activeTab === "week" && !editing && !bookingsShown && !bookingsError ? <WeekLoading weekStart={weekStart} /> : null}
+      {activeTab === "week" && (editing || bookingsShown || bookingsError) ? <>
       {!editing && bookingsShown ? (
         <NextLesson bookings={bookings} now={now} onOpen={setSelectedBooking} />
       ) : null}
@@ -807,11 +805,7 @@ export function TeacherSchedule() {
             </> : null}
           </div>
         ) : null}
-        {!editing && bookingsLoading && !bookingsShown ? (
-          <p className="teacher-calendar-loading" role="status">
-            Loading this week&rsquo;s lessons…
-          </p>
-        ) : !editing && bookingsError ? (
+        {!editing && bookingsError ? (
           <div className="teacher-calendar-loading" role="alert">
             <p>{bookingsError}</p>
             <button

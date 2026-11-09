@@ -46,6 +46,27 @@
   --booked: #f9ddcc;
   --weekly: #d2cce6;
   /*
+   * The colours the design system lists as "set in code" (9 November 2026),
+   * named once here so every button, menu and dialog draws from the same
+   * value rather than its own copy of it.
+   */
+  --coral-pressed: #95301f;
+  --lilac-pressed: #cdc8f1;
+  /* Words that warn, where coral would miss 4.5:1 on a pale wash. */
+  --warning-ink: #a73523;
+  /* A control's edge that must be seen: 3.1:1 on paper. */
+  --outline-edge: rgba(26, 49, 105, 0.55);
+  --outline-light-edge: rgba(245, 236, 217, 0.62);
+  --hover-wash: rgba(170, 164, 230, 0.2);
+  /* Second lines on blue: 4.6:1 on --blue-deep. */
+  --lilac-on-blue: rgba(220, 216, 245, 0.72);
+  --shadow-dialog: 0 24px 65px rgba(26, 49, 105, 0.26);
+  --shadow-menu: 0 14px 30px rgba(17, 31, 72, 0.3);
+  --shadow-lift-coral: 0 12px 22px -14px rgba(149, 48, 31, 0.75);
+  --shadow-lift-blue: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
+  --shadow-lift-lilac: 0 12px 22px -14px rgba(85, 79, 145, 0.6);
+  --shadow-raised: 0 1px 2px rgba(26, 49, 105, 0.25);
+  /*
    * "Thumbprint" — one hand, scaled to each thing it lands on rather than ten
    * unrelated shapes. Every corner differs from its neighbours the way her
    * splats and lettering do, and opposite corners are mirrored on the second
@@ -77,6 +98,21 @@
      line; and one for every dialog, the student's and Inês's alike. */
   --pad-card: clamp(1rem, 2.4vw, 1.5rem);
   --pad-dialog: clamp(1.25rem, 4vw, 1.7rem);
+  /* The design system's twelve spacing steps (9 November 2026), named so new
+     work picks a step rather than a value of its own; older rules move onto
+     them as they are touched. */
+  --gap-hair: 0.3rem;
+  --gap-label: 0.35rem;
+  --gap-chip: 0.4rem;
+  --gap-row: 0.5rem;
+  --gap-pair: 0.6rem;
+  --gap-actions: 0.65rem;
+  --gap-list: 0.75rem;
+  --gap-card: 0.85rem;
+  --gap-block: 1rem;
+  --gap-panel: 1.25rem;
+  --gap-wide: 1.5rem;
+  --gap-section: 2rem;
   --header-height: 108px;
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-route: 240ms;
@@ -943,7 +979,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  transition: color 200ms ease;
+  transition: color var(--motion-surface) var(--motion-ease);
 }
 
 /* The current page and the one pointed at read in coral, with no line
@@ -965,7 +1001,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   padding: 0 1.35rem;
   background: var(--blue-deep);
   color: var(--paper-light);
-  transition: background 200ms ease;
+  transition: background var(--motion-surface) var(--motion-ease);
 }
 
 .site-nav__link--book:hover .site-nav__book {
@@ -1025,8 +1061,8 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 
 /* Lifted, the filled buttons cast a soft shadow in their own colour. */
 .button--coral:hover {
-  background: #95301f;
-  box-shadow: 0 12px 22px -14px rgba(149, 48, 31, 0.75);
+  background: var(--coral-pressed);
+  box-shadow: var(--shadow-lift-coral);
 }
 
 .button--blue {
@@ -1036,7 +1072,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 
 .button--blue:hover {
   background: var(--ink);
-  box-shadow: 0 12px 22px -14px rgba(26, 49, 105, 0.7);
+  box-shadow: var(--shadow-lift-blue);
 }
 
 /*
@@ -1051,8 +1087,8 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 }
 
 .button--lilac:hover {
-  background: #cdc8f1;
-  box-shadow: 0 12px 22px -14px rgba(85, 79, 145, 0.6);
+  background: var(--lilac-pressed);
+  box-shadow: var(--shadow-lift-lilac);
 }
 
 /* Until it can act, a filled button is the same quiet outline as the booking's
@@ -1077,7 +1113,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
  * keeps a pair of buttons from looking stamped out of one mould.
  */
 .button--outline {
-  border: 1.5px solid rgba(26, 49, 105, 0.55);
+  border: 1.5px solid var(--outline-edge);
   border-radius: var(--squiggle-button-alt);
   background: transparent;
   color: var(--ink);
@@ -1086,11 +1122,11 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 .button--outline:hover,
 .button--outline:focus-visible {
   border-color: var(--ink);
-  background: rgba(170, 164, 230, 0.2);
+  background: var(--hover-wash);
 }
 
 .button--outline-light {
-  border: 1.5px solid rgba(245, 236, 217, 0.62);
+  border: 1.5px solid var(--outline-light-edge);
   border-radius: var(--squiggle-button-alt);
   background: rgba(245, 236, 217, 0.05);
   color: var(--paper);
@@ -1782,8 +1818,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   padding: clamp(1.4rem, 2.2vw, 1.9rem) clamp(1.4rem, 2.3vw, 2.1rem) clamp(1.5rem, 2.3vw, 2rem);
   background-color: var(--paper-light);
   transition:
-    background-color 220ms ease,
-    border-color 220ms ease;
+    background-color var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
 }
 
 .lesson-product--trial {
@@ -1899,7 +1934,7 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 
 .lesson-product:hover .lesson-product__link.button--coral,
 .lesson-product:focus-within .lesson-product__link.button--coral {
-  background: #95301f;
+  background: var(--coral-pressed);
 }
 
 .lesson-product:hover .lesson-product__link.button--outline,
@@ -2730,8 +2765,23 @@ textarea,
    fold instead of showing for a moment and then dropping away. Without
    scripts nothing arrives, so nothing is held. */
 @media (scripting: enabled) {
-  .booking-state-note--initial {
+  .booking-state-note--initial,
+  /* The same before the page's script has woken, when the stage is still
+     empty: otherwise the footer shows near the top first (9 Nov 2026). */
+  .booking-stage:empty {
     min-height: 700px;
+  }
+
+  /* A student's banner is settled before the first paint (markAccount), so
+     their stage holds Your lessons' own height instead. */
+  html[data-booking-account] .booking-stage:empty {
+    min-height: 590px;
+  }
+
+  @container booking (min-width: 1100px) {
+    html[data-booking-account] .booking-stage:empty {
+      min-height: 490px;
+    }
   }
 }
 
@@ -2816,13 +2866,13 @@ textarea,
   letter-spacing: 0.06em;
   white-space: nowrap;
   text-transform: uppercase;
-  transition: background 160ms ease, color 160ms ease;
+  transition: background var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease);
 }
 
 .booking-back:hover,
 .booking-back:focus-visible {
   background: var(--coral-action);
-  color: #fff;
+  color: var(--paper-light);
 }
 
 /* Navigation back within the same surface is tertiary, not another large
@@ -2838,7 +2888,7 @@ textarea,
 .booking-provider .booking-back--tertiary:hover,
 .booking-provider .booking-back--tertiary:focus-visible {
   background: transparent;
-  color: #95301f;
+  color: var(--coral-pressed);
 }
 
 /* The control sits beside the heading rather than above it, which cost a whole
@@ -2932,7 +2982,7 @@ textarea,
   text-align: left;
   text-transform: uppercase;
   gap: 0.75rem;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
 }
 
 .booking-add-lesson__mark {
@@ -3015,7 +3065,7 @@ textarea,
   justify-self: end;
   min-height: 44px;
   margin-left: auto;
-  border: 1.5px solid rgba(26, 49, 105, 0.55);
+  border: 1.5px solid var(--outline-edge);
   border-radius: var(--squiggle-button-alt);
   padding: 0.4rem 1rem;
   background: transparent;
@@ -3027,13 +3077,13 @@ textarea,
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
 }
 
 .booking-provider button.booking-choice-summary__change:hover,
 .booking-provider button.booking-choice-summary__change:focus-visible {
   border-color: var(--ink);
-  background: rgba(170, 164, 230, 0.2);
+  background: var(--hover-wash);
   color: var(--ink);
 }
 
@@ -3804,9 +3854,9 @@ textarea,
   border: 0;
   border-radius: 50%;
   background: var(--blue);
-  color: #fff;
+  color: var(--paper-light);
   cursor: pointer;
-  transition: background 120ms ease, opacity 120ms ease;
+  transition: background var(--motion-surface) var(--motion-ease), opacity var(--motion-surface) var(--motion-ease);
 }
 
 /* Drawn at 36px, but a finger's 44px answers: the reach is invisible. */
@@ -3820,7 +3870,7 @@ textarea,
 .calendar-pager__step:hover:not(:disabled),
 .calendar-pager__step:focus-visible {
   background: var(--blue-deep);
-  color: #fff;
+  color: var(--paper-light);
 }
 
 .calendar-pager__step:disabled {
@@ -3838,7 +3888,7 @@ textarea,
   border-radius: 999px;
   padding: 0 4px;
   background: var(--coral-action);
-  color: #fff;
+  color: var(--paper-light);
   font-family: var(--ui);
   font-size: 0.6rem;
   font-weight: 700;
@@ -3860,7 +3910,7 @@ textarea,
 .unified-calendar .calendar-week button.has-booking.has-weekly-booking:hover,
 .unified-calendar .calendar-week button.has-booking.has-weekly-booking:focus-visible {
   background: var(--lavender-ink);
-  color: #fff;
+  color: var(--paper-light);
 }
 
 .unified-calendar .calendar-week button.has-booking:not(.has-weekly-booking) .calendar-booking-times .is-weekly {
@@ -3877,7 +3927,7 @@ textarea,
    separate row to say it. */
 .unified-calendar--overview .calendar-week button.has-booking.is-next {
   background: var(--coral-action);
-  color: #fff;
+  color: var(--paper-light);
 }
 
 .unified-calendar--overview .calendar-week button.has-booking.has-weekly-booking.is-next {
@@ -3909,12 +3959,12 @@ textarea,
   display: grid;
   width: max-content;
   max-width: min(260px, 70vw);
-  border: 1px solid rgba(220, 216, 245, 0.72);
+  border: 1px solid var(--lilac-on-blue);
   border-radius: var(--squiggle-field);
   padding: 0.62rem 0.8rem;
   /* Solid, unlike the ? tip's, since it lies over other days' dates. */
   background: var(--ink);
-  box-shadow: 0 14px 30px rgba(17, 31, 72, 0.3);
+  box-shadow: var(--shadow-menu);
   color: var(--paper-light);
   font-family: var(--body);
   font-size: 0.76rem;
@@ -3981,8 +4031,8 @@ textarea,
   left: calc(50% - 5px);
   width: 10px;
   height: 10px;
-  border-right: 1px solid rgba(220, 216, 245, 0.72);
-  border-bottom: 1px solid rgba(220, 216, 245, 0.72);
+  border-right: 1px solid var(--lilac-on-blue);
+  border-bottom: 1px solid var(--lilac-on-blue);
   background: var(--ink);
   content: "";
   opacity: 0;
@@ -3996,8 +4046,8 @@ textarea,
   top: calc(100% + 5px);
   bottom: auto;
   border: 0;
-  border-top: 1px solid rgba(220, 216, 245, 0.72);
-  border-left: 1px solid rgba(220, 216, 245, 0.72);
+  border-top: 1px solid var(--lilac-on-blue);
+  border-left: 1px solid var(--lilac-on-blue);
 }
 
 .calendar-week button:focus-visible > .calendar-lesson-tip,
@@ -4136,7 +4186,7 @@ textarea,
 .unified-calendar .calendar-week button.has-booking:focus-visible,
 .unified-calendar .calendar-week button.has-booking.is-selected {
   background: var(--coral-action);
-  color: #fff;
+  color: var(--paper-light);
 }
 
 .unified-calendar .calendar-week button small {
@@ -4271,7 +4321,7 @@ textarea,
      they start where every dialog's content does. */
   padding: calc(var(--pad-dialog) - var(--pad-card));
   background: var(--dialog-surface);
-  box-shadow: 0 24px 65px rgba(26, 49, 105, 0.26);
+  box-shadow: var(--shadow-dialog);
   outline: 0;
   transform: translate(-50%, -50%);
   animation: dialog-fade-in var(--motion-dialog) ease-out both;
@@ -4334,7 +4384,7 @@ textarea,
   border-radius: var(--squiggle-panel);
   padding: var(--pad-dialog);
   background: var(--dialog-surface);
-  box-shadow: 0 24px 65px rgba(26, 49, 105, 0.26);
+  box-shadow: var(--shadow-dialog);
   outline: 0;
   gap: 0.75rem;
   animation: dialog-fade-in var(--motion-dialog) ease-out both;
@@ -4771,7 +4821,7 @@ p.lesson-when > span {
   border-radius: var(--squiggle-pill);
   padding: 0.16rem 0.45rem;
   background: var(--coral-action);
-  color: #fff;
+  color: var(--paper-light);
   gap: 0.22rem;
   font-family: var(--ui);
   font-size: 0.56rem;
@@ -5186,7 +5236,7 @@ p.lesson-when > span {
   color: inherit;
   cursor: pointer;
   font-size: clamp(0.9rem, 1.6vw, 1.05rem);
-  transition: background 120ms ease, color 120ms ease;
+  transition: background var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease);
 }
 
 .calendar-week button:disabled {
@@ -6195,7 +6245,7 @@ p.lesson-when > span {
   border-bottom: 1px solid var(--rule-soft);
   color: var(--green-deep);
   gap: 1rem;
-  transition: color 160ms ease;
+  transition: color var(--motion-surface) var(--motion-ease);
 }
 
 .nav-mobile__mark {
@@ -6335,9 +6385,13 @@ p.lesson-when > span {
   font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.25;
-  transition: background 160ms var(--motion-ease);
+  transition: background var(--motion-surface) var(--motion-ease);
 }
 
+/* Pointed at or open, the cream pill brightens to white. The hover wash was
+   tried here (9 November 2026) and sank the pill into its lilac card, so
+   this is the one control that keeps white: the only step lighter than
+   its cream. */
 .account-menu__toggle:hover,
 .account-menu__toggle:focus-visible,
 .account-menu__toggle[aria-expanded="true"] {
@@ -6353,7 +6407,7 @@ p.lesson-when > span {
   place-items: center;
   border-radius: 50%;
   background: var(--blue);
-  color: #fff;
+  color: var(--paper-light);
   font-family: var(--ui);
   font-size: 0.8rem;
   font-weight: 700;
@@ -6653,11 +6707,11 @@ p.lesson-when > span {
   top: calc(100% + 0.35rem);
   left: 0;
   width: min(300px, calc(100vw - 5rem));
-  border: 1px solid rgba(220, 216, 245, 0.72);
+  border: 1px solid var(--lilac-on-blue);
   border-radius: var(--squiggle-field);
   padding: 0.62rem 0.76rem;
   background: rgba(26, 49, 105, 0.97);
-  box-shadow: 0 14px 30px rgba(17, 31, 72, 0.3);
+  box-shadow: var(--shadow-menu);
   color: var(--paper-light);
   font-family: var(--body);
   font-size: 0.72rem;
@@ -6686,8 +6740,8 @@ p.lesson-when > span {
   left: calc(50% - 5px);
   width: 9px;
   height: 9px;
-  border-top: 1px solid rgba(220, 216, 245, 0.72);
-  border-left: 1px solid rgba(220, 216, 245, 0.72);
+  border-top: 1px solid var(--lilac-on-blue);
+  border-left: 1px solid var(--lilac-on-blue);
   background: rgba(26, 49, 105, 0.97);
   content: "";
   opacity: 0;
@@ -6889,7 +6943,7 @@ p.lesson-when > span {
 .my-lessons__code summary {
   min-height: 44px;
   justify-self: end;
-  border: 1.5px solid rgba(26, 49, 105, 0.55);
+  border: 1.5px solid var(--outline-edge);
   border-radius: var(--squiggle-button-alt);
   padding: 0.4rem 1rem;
   background: transparent;
@@ -6907,7 +6961,7 @@ p.lesson-when > span {
 .my-lessons__change:hover,
 .my-lessons__change:focus-visible {
   border-color: var(--ink);
-  background: rgba(170, 164, 230, 0.2);
+  background: var(--hover-wash);
 }
 
 .my-lessons__change:focus-visible {
@@ -7172,7 +7226,7 @@ p.lesson-when > span {
 .lesson-calendar .calendar-week button.has-booking:focus-visible,
 .lesson-calendar .calendar-week button.has-booking.is-selected {
   background: var(--coral-action);
-  color: #fff;
+  color: var(--paper-light);
 }
 
 .lesson-calendar .calendar-week button small {
@@ -7456,7 +7510,7 @@ p.lesson-when > span {
 .my-lessons__code summary:focus-visible,
 .my-lessons__code[open] > summary {
   border-color: var(--ink);
-  background: rgba(170, 164, 230, 0.2);
+  background: var(--hover-wash);
 }
 
 .my-lessons__code[open] > summary {
@@ -7963,7 +8017,7 @@ p.lesson-when > span {
 /* The same outline as every other secondary action: a quieter name for the
    same button, so Keep lesson and Manage weekly lessons match in one dialog. */
 .button--quiet {
-  border: 1.5px solid rgba(26, 49, 105, 0.55);
+  border: 1.5px solid var(--outline-edge);
   border-radius: var(--squiggle-button-alt);
   background: transparent;
   color: var(--ink);
@@ -7973,7 +8027,7 @@ p.lesson-when > span {
 .button--quiet:hover,
 .button--quiet:focus-visible {
   border-color: var(--ink);
-  background: rgba(170, 164, 230, 0.2);
+  background: var(--hover-wash);
 }
 
 /* Good news is a calm lavender panel in the fields' hand with a tick, never a
@@ -8040,7 +8094,7 @@ dialog[open]::backdrop {
   border-radius: var(--squiggle-panel);
   padding: 0;
   background: var(--dialog-surface);
-  box-shadow: 0 24px 65px rgba(26, 49, 105, 0.26);
+  box-shadow: var(--shadow-dialog);
   color: var(--ink);
   overflow: hidden;
 }
@@ -8284,7 +8338,7 @@ dialog[open]::backdrop {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
 }
 
 .site-footer__menu:hover,
@@ -8812,7 +8866,7 @@ dialog[open]::backdrop {
   .button:hover,
   .button:active:not(:disabled) {
     transform: none;
-    transition: background 160ms ease, color 160ms ease;
+    transition: background var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease);
   }
 
   .nav-mobile__link::after,
@@ -8879,7 +8933,7 @@ dialog[open]::backdrop {
   font-weight: 700;
   line-height: 1.4;
   text-decoration: none;
-  transition: background 160ms ease, color 160ms ease;
+  transition: background var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease);
 }
 
 .meeting-link svg {
@@ -8903,10 +8957,12 @@ dialog[open]::backdrop {
   height: auto;
 }
 
+/* The Meet pill answers as Inês's `Join Meet` does (9 November 2026): one
+   pill, one hover, never a jump to pure white. */
 .meeting-link:hover,
 .meeting-link:focus-visible {
-  background: #fff;
-  color: var(--coral-action);
+  background: var(--coral-action);
+  color: var(--paper-light);
 }
 
 /* Moving between Your lessons, Past lessons and Your details, the card's
@@ -8954,7 +9010,9 @@ dialog[open]::backdrop {
 @container booking (min-width: 1100px) {
   .lessons-loading__places {
     display: inline-grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* The account menu's four places: Your lessons, Past lessons, Homework
+       and Edit details, so nothing shuffles when the real one arrives. */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     border-radius: var(--squiggle-tabs);
     padding: 4px;
     background: var(--raised);
@@ -8978,7 +9036,7 @@ dialog[open]::backdrop {
 
   .lessons-loading__places > .is-current {
     background: var(--green);
-    color: #fff;
+    color: var(--paper-light);
     opacity: 1;
   }
 
@@ -9200,8 +9258,8 @@ dialog[open]::backdrop {
 
   .lesson-overview__next .meeting-link:hover,
   .lesson-overview__next .meeting-link:focus-visible {
-    background: #fff;
-    color: var(--coral-action);
+    background: var(--coral-action);
+    color: var(--paper-light);
   }
 
   /* The loading card holds its lines where the words will be and its turning
