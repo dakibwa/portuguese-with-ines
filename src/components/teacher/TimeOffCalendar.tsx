@@ -9,6 +9,7 @@ import { TimeOffDayDialog } from "@/components/teacher/TimeOffDayDialog";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 
 function monthStart(date: string) { return `${date.slice(0, 7)}-01`; }
+function shortDate(date: string) { return dateLabel(date, { weekday: "short", day: "numeric", month: "short" }); }
 function shiftMonth(month: string, amount: number) {
   const date = new Date(`${month}T12:00:00Z`);
   date.setUTCMonth(date.getUTCMonth() + amount);
@@ -72,6 +73,28 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
   const toTake = chosen.filter(date => !off.has(date)).length;
   const firstFocus = dates.includes(focused) && focused >= today ? focused : dates.find(date => date >= today && date.startsWith(month.slice(0, 7)));
   const unchecked = bookingsLoading || Boolean(bookingsError);
+  // With nothing chosen the card lists what is already off (2 November 2026):
+  // consecutive days off read as one stretch, and tapping one chooses its days.
+  const upcoming = useMemo(() => {
+    const dates = [...new Set(exceptions
+      .filter(exception => exception.kind === "blocked" && exception.weekday == null && exception.date && exception.date >= today)
+      .map(exception => exception.date as string))].sort();
+    const rows: { dates: string[]; detail: string; note: string }[] = [];
+    for (const date of dates) {
+      const last = rows.at(-1);
+      if (off.has(date) && last && last.detail !== "hours" && shiftDate(last.dates.at(-1)!, 1) === date) { last.dates.push(date); continue; }
+      rows.push({ dates: [date], detail: off.has(date) ? "day" : "hours", note: off.get(date) ?? "" });
+    }
+    return rows.map(row => ({
+      ...row,
+      label: row.dates.length > 1
+        ? `${shortDate(row.dates[0])} – ${shortDate(row.dates.at(-1)!)}`
+        : shortDate(row.dates[0]),
+      detail: row.detail === "hours"
+        ? `Off ${dateBlocks(exceptions, row.dates[0]).map(spanLabel).join(", ")}`
+        : row.dates.length > 1 ? `${row.dates.length} days off` : "Day off",
+    }));
+  }, [exceptions, off, today]);
 
   function moveMonth(amount: number) {
     const next = shiftMonth(month, amount);
@@ -147,11 +170,31 @@ export function TimeOffCalendar({ today, exceptions, bookings, bookingsLoading, 
           </div>
         </div>
 
-        <div className={`teacher-timeoff-selection${chosen.length ? " has-days" : ""}`}>
+        <div className={`teacher-timeoff-selection${chosen.length ? " has-days" : upcoming.length ? " has-upcoming" : ""}`}>
           <div className="teacher-timeoff-selection-heading">
             <h3 aria-live="polite">{chosen.length ? `${chosen.length} ${chosen.length === 1 ? "day" : "days"} chosen` : "Tap the days you want off"}</h3>
             {chosen.length ? <button className="button button--outline button--small" disabled={busy} onClick={() => setSelected(new Set())} type="button">Clear</button> : null}
           </div>
+          {!chosen.length && upcoming.length ? (
+            <div className="teacher-timeoff-upcoming">
+              <p className="teacher-eyebrow">Coming up</p>
+              <ul>
+                {upcoming.slice(0, 6).map(row => (
+                  <li key={row.dates[0]}>
+                    <button
+                      disabled={busy}
+                      onClick={() => { setMonth(monthStart(row.dates[0])); setFocused(row.dates[0]); setSelected(new Set(row.dates)); }}
+                      type="button"
+                    >
+                      <strong>{row.label}</strong>
+                      <span>{[row.detail, row.note].filter((part, index, parts) => part && parts.findIndex(other => other.toLowerCase() === part.toLowerCase()) === index).join(" · ")}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {upcoming.length > 6 ? <p className="teacher-timeoff-upcoming__more">And {upcoming.length - 6} more later on</p> : null}
+            </div>
+          ) : null}
           {chosen.length ? (
             <ul className="teacher-selected-days">
               {chosen.map(date => <li key={date}><button aria-label={`Remove ${dateLabel(date)}`} disabled={busy} onClick={() => toggle(date)} type="button">{dateLabel(date, { day: "numeric", month: "short" })}<span aria-hidden="true">×</span></button></li>)}

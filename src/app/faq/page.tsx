@@ -163,7 +163,7 @@ const faqSections = [
       {
         question: "How do I pay?",
         answer:
-          "You’ll securely save a card when you book. Nothing is charged at booking. Your card is charged automatically after each lesson."
+          "You’ll securely save a card when you book. Nothing is charged at booking. Your card is charged automatically at the end of each lesson."
       },
       {
         question: "How much does a lesson cost?",

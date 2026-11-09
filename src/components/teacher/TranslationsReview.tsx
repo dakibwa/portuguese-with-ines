@@ -64,8 +64,8 @@ export function TranslationsReview({ token, initialPending }: { token: string; i
       <p className="teacher-expressions__hint">Students add their own translations of an expression. Only the ones you approve are shown, and never with their name.</p>
       {notice ? <p className="teacher-inline-success" role="status">{notice}</p> : null}
       {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" disabled={busy} onClick={() => { setError(""); setAttempt((value) => value + 1); }} type="button">Reload</button></div> : null}
-      {!rows && !error ? <p role="status">Loading translations…</p> : null}
-      {rows && !rows.length ? <p>{status === "pending" ? "Nothing to check just now." : status === "approved" ? "No approved translations yet." : "No rejected translations."}</p> : null}
+      {!rows && !error ? <p className="teacher-expressions__hint" role="status">Loading translations…</p> : null}
+      {rows && !rows.length ? <p className="teacher-expressions__hint">{status === "pending" ? "Nothing to check just now." : status === "approved" ? "No approved translations yet." : "No rejected translations."}</p> : null}
       {rows?.length ? (
         <ul className="teacher-translations__list">
           {rows.map((row) => (

@@ -63,17 +63,36 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
   const [attempt, setAttempt] = useState(0);
   const monthTitleRef = useRef<HTMLHeadingElement>(null);
 
+  // Receipts are issued once a month is over: early in a month with nothing
+  // to issue yet, the tab opens on the month just ended when that one has
+  // receipts waiting (2 November 2026). Only on opening, never as she pages.
+  const opened = useRef(false);
+  const lastMonth = useRef<{ month: string; receipts: ReceiptLine[] } | null>(null);
   useEffect(() => {
     let active = true;
     setData(null);
     setError("");
-    fetchReceipts(token, month)
-      .then((result) => { if (active && readSession() === token) setData(result); })
+    (async () => {
+      const cached = lastMonth.current;
+      lastMonth.current = null;
+      if (cached?.month === month) return cached;
+      const result = await fetchReceipts(token, month);
+      if (opened.current || month !== thisMonth || Number(today.slice(8, 10)) > 10 || result.receipts.some((line) => line.ready)) return result;
+      const previous = await fetchReceipts(token, shiftMonth(month, -1)).catch(() => null);
+      return previous?.receipts.some((line) => line.ready) ? previous : result;
+    })()
+      .then((result) => {
+        if (!active || readSession() !== token) return;
+        opened.current = true;
+        if (result.month === month) { setData(result); return; }
+        lastMonth.current = result;
+        setMonth(result.month);
+      })
       .catch((caught) => {
         if (active && readSession() === token) setError(caught instanceof Error ? caught.message : "Receipts couldn’t be loaded.");
       });
     return () => { active = false; };
-  }, [token, month, attempt]);
+  }, [token, month, attempt, thisMonth, today]);
 
   const lines = data?.month === month ? data.receipts : [];
   const ready = lines.filter((line) => line.ready);

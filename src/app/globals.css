@@ -5654,6 +5654,20 @@ p.lesson-when > span {
   opacity: 0.82;
 }
 
+/* Arriving from a link, how the page works, as three dabs: left-aligned in
+   the centred card, at the intro's size, then the one button. */
+.sign-in-link .auth-panel__intro {
+  margin-bottom: 1rem;
+}
+
+.sign-in-link__steps {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 1.5rem;
+  font-size: 0.93rem;
+  text-align: left;
+}
+
 /*
  * Google's button is Google's. What is ours is the frame around it — coral
  * outline, white fill, her corner shape — which is as far as this can go
@@ -7409,6 +7423,17 @@ p.lesson-when > span {
 .booking-payment-facts strong {
   color: var(--coral-action);
   white-space: nowrap;
+}
+/* What costs nothing is bold in the text's own blue; coral is for a charge. */
+.booking-payment-facts strong.is-free {
+  color: var(--ink);
+  white-space: normal;
+}
+
+/* What costs nothing is bold in the text's own blue; coral is for a charge. */
+.booking-payment-facts strong.is-free {
+  color: var(--ink);
+  white-space: normal;
 }
 
 .booking-payment-facts a {
@@ -9557,6 +9582,44 @@ dialog[open]::backdrop {
   }
 }
 
+/* Add your email, for a student let in from a WhatsApp link: the card
+   prompt's own shape, its address and button on one row where they fit. */
+/* Open, its address takes the card's whole width beneath the line, as a
+   card's terms do, never a column indented under the icon. */
+.email-prompt .email-prompt__form {
+  grid-column: 1 / -1;
+  margin-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.email-prompt__form label {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.email-prompt__form input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-field);
+  padding: 0.55rem 0.85rem;
+  background: var(--raised);
+  font: inherit;
+}
+
+.email-prompt__form input:focus-visible {
+  border: 2px solid var(--blue-deep);
+  outline: 0;
+  box-shadow: none;
+}
+
+.email-prompt__form .button {
+  flex: 0 0 auto;
+}
+
 .card-terms {
   display: grid;
   gap: 0.75rem;
@@ -9955,13 +10018,145 @@ dialog[open]::backdrop {
   }
 }
 
-/* A prepared approval stays separate from the teacher's paid-by-hand control. */
+/* A prepared approval stays separate from the teacher's paid-by-hand
+   control: a rule above, and the dialog's quieter small type. */
 .teacher-card-link {
   display: grid;
   justify-items: start;
-  gap: 0.6rem;
-  margin-block: 1rem;
-  padding-block: 1rem;
+  gap: 0.5rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--rule);
 }
-.teacher-card-link p { margin: 0; }
+.teacher-card-link p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+/* On Students it is the panel's whole body, under the panel's heading. */
+.teacher-card-link--panel {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* The lessons she can tick into one link (2 November 2026): each the
+   Already paid tick's capsule, one line a lesson, the time on the left and
+   the price on the right; the total is on the button (Dan: "less spread
+   out"). */
+.teacher-card-link .teacher-card-link__heading {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.teacher-card-link .teacher-card-link__hint { opacity: 0.78; }
+.teacher-card-link__heading + .teacher-card-link__hint { margin-top: -0.35rem; }
+.teacher-card-link__choices {
+  display: grid;
+  width: 100%;
+  max-width: 28rem;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.teacher-card-link .teacher-card-link__choice {
+  width: 100%;
+  min-height: 36px;
+  padding-block: 0.3rem;
+}
+.teacher-card-link__when {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teacher-card-link__choice b {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+/* Side by side, as the dialog's own actions are. */
+.teacher-card-link__actions {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 28rem;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+.teacher-card-link .teacher-card-link__actions > .button {
+  flex: 1 1 0;
+  width: auto;
+  min-width: fit-content;
+}
+
+/* What an approval pays for (2 November 2026, Dan: "always fits on the
+   same line"): what is paid now as the booking step's chosen-lesson tiles,
+   a little smaller, one line each with Porto time named once over them,
+   with a receipt's total under the prices; then what is paid automatically
+   from then on, each weekly run once, in dashed tiles as something still to
+   come. */
+.card-terms__lessons {
+  display: grid;
+  gap: 0.45rem;
+}
+.card-terms__lessons .booking-chosen-lessons { gap: 0.4rem; }
+.card-terms__lessons .booking-selection-summary {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  min-height: 52px;
+  padding-block: 0.4rem;
+}
+.card-terms__lessons .booking-selection-summary__mark {
+  width: 36px;
+  height: 36px;
+}
+.card-terms__label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  padding-inline: 0.15rem;
+  color: var(--ink);
+  font: 700 0.7rem/1.2 var(--ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.card-terms__label small {
+  color: var(--lavender-ink);
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.card-terms__when {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ink);
+  font: 600 0.92rem/1.25 var(--ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-terms__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.1rem 0 0;
+  border-top: 1px solid var(--rule-soft);
+  padding: 0.55rem var(--pad-card) 0;
+  font: 600 0.9rem/1.3 var(--ui);
+}
+.card-terms__lessons--then {
+  margin-top: 0.2rem;
+}
+.card-terms__lessons .card-terms__lesson--then {
+  border-style: dashed;
+  background: transparent;
+}
+.card-terms__then-mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: var(--squiggle-thumb);
+  background: var(--weekly);
+  color: var(--blue);
+}

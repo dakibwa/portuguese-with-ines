@@ -15,11 +15,13 @@ type History = {
 };
 
 /** All of this student's lessons, independent of the visible timetable week. */
-export function StudentHistory({ student, token, refresh = 0, homeworkId }: {
+export function StudentHistory({ student, token, refresh = 0, homeworkId, onPaidChanged }: {
   student: AdminStudent;
   token: string;
   refresh?: number;
   homeworkId?: string;
+  /** A past lesson ticked paid or unticked here, so their card's checks follow. */
+  onPaidChanged?: () => void;
 }) {
   const [history, setHistory] = useState<History | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -71,6 +73,10 @@ export function StudentHistory({ student, token, refresh = 0, homeworkId }: {
       now={now}
       onRetry={() => { setHistory(null); setAttempt(value => value + 1); }}
       onRecordRefund={booking => { setNotice(""); setRefund(booking); }}
+      onPaid={updated => {
+        setHistory(current => current && current.bookings ? { ...current, bookings: current.bookings.map(booking => booking.id === updated.id ? { ...booking, ...updated } : booking) } : current);
+        onPaidChanged?.();
+      }}
     />
     {refund ? <LessonDetails booking={refund} token={token} now={new Date(now)} initialAction="refund" afterChangeFocusRef={historyRef}
       onClose={() => setRefund(null)} onChanged={message => {
