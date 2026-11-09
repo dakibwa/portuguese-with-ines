@@ -661,6 +661,14 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - Details contains full name, email, phone and NIF, with one Save details
     action. A student who has signed in changes their own email. A missing
     lesson never locks the email field (16 October 2026, Inês). Price uses the same editable rate form as onboarding.
+  - Their lessons read Upcoming, then Past & cancelled. A weekly run's weeks
+    still to come are one dashed card (9 November 2026, Dan: "just have them
+    all as one card and you can expand out"): the weekly repeat mark, `Every
+    Wednesday · 09:30–10:30`, `12 weeks, Wed 18 Nov to Wed 3 Feb`, the facts
+    its weeks share, and lilac `Show weeks`, which lists each week as its own
+    card after it. A week moved off the usual slot is counted on the run's
+    card. A lesson on now, a run with one week left and past lessons stay
+    single cards.
   - Add a lesson opens the calendar in the row. Length, location, weekly repeat
     and available times use the full row width as described above. A successful
     addition closes the form and leaves a short confirmation in that row.
