@@ -1968,7 +1968,10 @@ summary {
   }
   .vo-dashboard-nav > a,
   .vo-dashboard-nav > .vo-text-button {
-    display: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    margin-right: 16px;
   }
   .vo-dashboard-nav > small {
     font-size: 10px;
