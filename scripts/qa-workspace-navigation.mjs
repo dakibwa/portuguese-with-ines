@@ -18,10 +18,11 @@ let bookings = Array.from({ length: 12 }, (_, index) => ({
 bookings[0].status = "confirmed";
 bookings[1] = { ...bookings[1], isPast: false, startAt: "2026-11-05T16:00:00Z", endAt: "2026-11-05T17:00:00Z", cancelledAt: "2026-09-03T18:00:00Z" };
 bookings[2] = { ...bookings[2], isPast: false, startAt: "2026-09-07T16:00:00Z", endAt: "2026-09-07T17:00:00Z", cancelledAt: "2026-09-05T09:00:00Z" };
-const expectedHistory = [2, 0, 1, ...Array.from({ length: 9 }, (_, index) => index + 3)].map(index => `Reference PREVIEW-${index}`);
+const expectedHistory = [2, 0, 1, ...Array.from({ length: 9 }, (_, index) => index + 3)].map(index => new Date(bookings[index].startAt).toISOString());
 await context.addInitScript(() => localStorage.setItem("ines-student-session", "navigation-fixture"));
 let accountLoads = 0;
 await context.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
+await context.route("**/me/homework", route => route.fulfill({ json: { homework: [] } }));
 await context.route("**/me", route => {
   if (route.request().method() === "GET") accountLoads += 1;
   return route.fulfill({
@@ -114,19 +115,17 @@ try {
     if ([1920, 390].includes(width)) await page.screenshot({ path: `${out}/upcoming-${width}.png`, fullPage: true });
   }
 
+  // Past lessons sit beneath the calendar on the same card: the latest few,
+  // then the rest on request, newest first by when each ended or was
+  // cancelled (9 November 2026, Dan: one simple schedule).
   await page.setViewportSize({ width: 1920, height: 1100 });
-  await accountAction("Past lessons");
-  await accountAction("Past lessons");
-  await page.locator("#account-past-lessons").waitFor();
-  assert.equal(await page.locator("#lesson-calendar").count(), 0, "History must not retain the future calendar");
-  // Past lessons takes the lessons card's place, at its width.
-  const history = await page.locator("#account-past-lessons").boundingBox();
-  aligned(history.width, layouts[0].calendar.width, "History uses the lessons card's width");
+  const history = page.locator("#lesson-calendar #account-past-lessons");
+  await history.getByRole("button", { name: "6 earlier lessons", exact: true }).click();
   await settle();
   await page.screenshot({ path: `${out}/history-desktop.png`, fullPage: true });
   for (const width of [1920, 390]) {
     await page.setViewportSize({ width, height: width < 500 ? 844 : 1100 });
-    assert.deepEqual(await page.locator("#account-past-lessons .history-lesson-card__reference").allTextContents(), expectedHistory,
+    assert.deepEqual(await history.locator(".past-lesson time").evaluateAll(times => times.map(time => new Date(time.dateTime).toISOString())), expectedHistory,
       "History uses the latest completion or cancellation, not future cancelled lesson dates");
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   }
@@ -297,6 +296,7 @@ try {
   });
   const abroadLessons = [abroadLesson("ABROAD-ONLINE", "online", "2026-09-09T16:00:00Z"), abroadLesson("ABROAD-PORTO", "porto", "2026-09-16T09:00:00Z")];
   await abroad.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
+  await abroad.route("**/me/homework", route => route.fulfill({ json: { homework: [] } }));
   await abroad.route("**/me", route => route.fulfill({
     contentType: "application/json",
     body: JSON.stringify({ student: { ...student, timezone: "America/Los_Angeles" }, bookings: abroadLessons, series: [], sameDayFeeCents: 500 })

@@ -69,6 +69,7 @@ async function fixture(width, reply = async () => null) {
     const answer = await reply(pathname, request);
     if (answer) return route.fulfill({ headers: cors, ...answer });
     if (pathname === "/me/expressions") return route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } });
+    if (pathname === "/me/homework") return route.fulfill({ json: { homework: [] } });
     if (pathname === "/me") {
       const replacement = request.headers().authorization === `Bearer ${newSession}`;
       return route.fulfill({ headers: cors, json: { student: replacement ? replacementStudent : student, bookings: replacement ? [] : [nextLesson], series: [], sameDayFeeCents: 500 } });
@@ -122,11 +123,6 @@ try {
       ? { json: { student, bookings: [running], series: [], sameDayFeeCents: 500 } }
       : path === "/bookings/next" ? { json: { booking: running, isPast: true, sameDayFeeApplies: false } } : null);
     const { page } = state;
-    async function chooseSection(name) {
-      const toggle = page.locator("#account-menu-button");
-      if (await toggle.isVisible()) await toggle.click();
-      await page.getByRole("button", { name, exact: true }).click();
-    }
     try {
       await page.clock.install({ time: new Date("2026-09-14T10:00:00Z") });
       await page.goto(`${base}/book/?view=lessons`);
@@ -137,11 +133,11 @@ try {
         await expect(page.locator(".lesson-manage-dialog .meeting-link")).toBeVisible();
         await page.getByRole("button", { name: "Close lesson management", exact: true }).click();
       }
-      await chooseSection("Past lessons");
-      await expect(page.locator(".history-lesson-card")).toHaveCount(0);
+      // Beneath the calendar, a lesson joins Past lessons once it has ended.
+      await expect(page.locator("#account-past-lessons .past-lesson")).toHaveCount(0);
       await expect(page.locator(".account-menu__places button").first()).toHaveText(/Your lessons\s*1/);
       await page.clock.fastForward(31 * 60_000);
-      await expect(page.locator(".history-lesson-card")).toHaveCount(1);
+      await expect(page.locator("#account-past-lessons .past-lesson")).toHaveCount(1);
       await expect(page.locator(".account-menu__places button").first()).toHaveText("Your lessons");
       assert.deepEqual(state.errors, []);
     } finally { await state.context.close(); }
@@ -237,11 +233,9 @@ try {
         await expect(dialog).toHaveCount(0);
         await expect(state.page.getByRole("radio", { name: "Single", exact: true })).toBeChecked();
         await openLessonsFromBooking(state.page);
-        const toggle = state.page.locator("#account-menu-button");
-        if (await toggle.isVisible()) await toggle.click();
-        await state.page.locator("#account-menu").getByRole("button", { name: "Past lessons", exact: true }).click();
-        await expect(state.page.locator("#account-past-lessons")).toBeVisible();
-        await expect(state.page.locator(".history-lesson-card")).toHaveCount(0);
+        // A lesson never booked is not a past lesson either.
+        await expect(state.page.locator("#upcoming-lessons-heading")).toBeAttached();
+        await expect(state.page.locator("#account-past-lessons .past-lesson")).toHaveCount(0);
         assert.deepEqual(state.errors, []);
       } finally { await state.context.close(); }
     }

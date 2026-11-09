@@ -28,6 +28,7 @@ import {
 import { AssetMark } from "@/components/BrandMarks";
 import { AccountMenu, AccountSignature, type AccountSection } from "@/components/AccountMenu";
 import { CalendarBookingPrompt } from "@/components/CalendarBookingPrompt";
+import { PastLessons } from "@/components/PastLessons";
 /*
  * Loaded when it is needed, not before. The sign-in panel — with the Google
  * button, the segmented tabs and the whole account form behind it — is only
@@ -871,6 +872,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [step, setStep] = useState<Step>("day");
   const [intent, setIntent] = useState<BookingIntent>("choose");
   const [accountView, setAccountView] = useState<AccountSection>("upcoming");
+  // The lesson whose homework is open, chosen from its row on Your lessons.
+  const [homeworkId, setHomeworkId] = useState("");
   /*
    * Seeded from the published lesson copy so the three cards are in the static
    * HTML and on screen at first paint. Before this the first step was an empty
@@ -3267,7 +3270,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     orientTo("account-controls");
     if (section !== "profile") {
       window.requestAnimationFrame(() =>
-        document.getElementById(section === "history" ? "account-past-lessons" : section === "homework" ? "account-homework" : "upcoming-lessons-heading")?.focus({ preventScroll: true })
+        document.getElementById(section === "homework" ? "account-homework" : "upcoming-lessons-heading")?.focus({ preventScroll: true })
       );
     }
   }
@@ -3319,7 +3322,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           lessons={(bookingsByDate[bookingPromptDate] ?? []).map((booking) => ({
             key: booking.reference,
             title: lessonTime(booking.startAt, zoneOf(booking)),
-            detail: `${formatBookedLessonLabel(booking.lessonType)} · ${booking.location === "porto" ? "In Porto" : "Online"}${isWeeklyLesson(booking) ? " · Weekly" : ""}${freeMark(booking.paymentStatus)}`,
+            detail: `${formatBookedLessonLabel(booking.lessonType)} · ${booking.location === "porto" ? IN_PERSON : "Online"}${isWeeklyLesson(booking) ? " · Weekly" : ""}${freeMark(booking.paymentStatus)}`,
             mark: (
               <LessonMark
                 className="lesson-calendar__mark"
@@ -3392,6 +3395,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               onSignOut={signOut}
               onStepChange={setAccountStep}
               openUpcomingRequest={upcomingRequestKey}
+              homeworkId={homeworkId}
               section={intent === "lessons" ? accountView : "upcoming"}
             />
           </div>
@@ -4250,6 +4254,19 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             </div>
             {loadingSlots ? <p className="booking-state-note">Checking what&rsquo;s free…</p> : null}
             {noFreeTimes ? <p className="booking-state-note">No free times in these weeks.</p> : null}
+            {/* One schedule: what is to come on the calendar, what has been
+                beneath it, each with its homework at the end of its row. */}
+            {isLessonsCalendarOverview && student ? (
+              <PastLessons
+                bookings={myBookings}
+                clock={clock}
+                onOpenHomework={(id) => {
+                  setHomeworkId(id);
+                  openAccountView("homework");
+                }}
+                zone={studentZone}
+              />
+            ) : null}
           </div>
 
           {!isLessonsCalendarOverview ? (
@@ -4437,7 +4454,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         <span aria-hidden="true" className="unified-calendar__date-short">
                           {formatShortDay(`${selectedDate}T12:00:00Z`)}{" "}
                           {studentClockDiffers
-                            ? `· ${viewZone === BOOKING_TIME_ZONE ? "Porto time" : viewZoneName}`
+                            ? `· ${viewZone === BOOKING_TIME_ZONE ? HOME_CLOCK : viewZoneName}`
                             : selectedDate.slice(0, 4)}
                         </span>
                       </>
