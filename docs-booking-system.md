@@ -1778,6 +1778,8 @@ acknowledges the privacy notice. The final button states both the lesson count
 and the obligation to pay. The toggle still sends the existing `paymentConsent`
 boolean; payment amounts, timing, enforcement and the monetary agreement version
 are unchanged. Reading the combined notice preserves the selection and agreement.
+From homework it also preserves the open worksheet and unsaved answers;
+opening the notice neither saves answers nor navigates away.
 The underlined terms text inside the agreement opens the dialog independently
 of the toggle. The page shows one payment summary, without a separate reading
 link or repeated authorisation sentence. Escape, the close button or clicking

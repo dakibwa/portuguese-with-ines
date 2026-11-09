@@ -44,7 +44,8 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
     const warn = (event: BeforeUnloadEvent) => { if (unsaved.current) event.preventDefault(); };
     // Next's header links do not unload the document. Save before following one.
     const followLink = (event: MouseEvent) => {
-      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      // A terms/privacy link already opened its dialog instead of navigating.
+      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
       if (!link || link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
       const destination = new URL(link.href);

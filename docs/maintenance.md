@@ -30,9 +30,9 @@ For performance changes, keep the route, viewport, cache state, network/CPU
 conditions and fixture data comparable before and after. Record measured
 results rather than claiming a speedup from a source change alone.
 
-**Latest checkpoint:** the fourth pass below fixes early request failures and
-the blank calendar after a first successful account retry. Continue measuring
-remaining booking work and review a different failure/authorization path next.
+**Latest checkpoint:** the fifth pass below keeps a student's unsaved homework
+in place while reading terms/privacy. Continue measuring remaining booking work
+and rotate into a different failure/authorization path next.
 
 ## 9 November 2026 — setup and Next.js security update
 
@@ -341,3 +341,69 @@ before/after evidence is under `/workspace/scratch/ines-pass4-*`.
    the current student-dashboard work and checking for newer PRs first.
 3. Keep the scoped dependency override under review until upstream supports
    the patched range directly; audit when dependency state changes.
+
+## 9 November 2026 — read terms without leaving unsaved homework
+
+**Source baseline:** maintenance head
+`20c8fa7175b119baeabb2f108d7a2f93752bde0f`; main remains at
+`b7209cffd5c47858678c6daf86a2928bc9eef144`, already incorporated. Continue in
+[PR 190](https://github.com/dakibwa/portuguese-with-ines/pull/190).
+
+### Confirmed finding and fix
+
+Opening homework from `/book/?view=lessons`, typing an unsaved answer and
+following the footer's **Terms & privacy** link caused a document navigation
+to `/book/#terms-privacy`, leaving the worksheet. The policy handler had
+already prevented navigation and opened its modal, but the homework's
+capture-phase save-before-navigation handler ignored `event.defaultPrevented`
+and followed the link anyway.
+
+The homework handler now respects an already-handled click. Reading the notice
+keeps the worksheet, URL and draft unchanged, without an answer-save request.
+An ordinary site link still saves before leaving, and a failed save still
+retains the draft.
+
+PR 197 is actively restructuring the same student view. Its current patch
+retains this navigation handler unchanged. This fix is limited to that handler
+and additive journey assertions; a detached three-way apply check against PR
+197 head `159075a3a28581a5aba74cb911b84a158bb13cc6` applied both files cleanly.
+That check establishes patch compatibility, not runtime validation of the
+unmerged redesign.
+
+### Validation and coverage
+
+- Extended the existing `qa-homework.mjs` journey at 1280/390px. After typing
+  an unsaved answer it opens the actual policy dialog, verifies the same URL
+  and zero additional answer writes, closes the dialog, checks focus returns
+  to its opener and verifies the draft remains editable/unsaved.
+- Before the fix the new assertion failed: the actual URL became
+  `/book/#terms-privacy` instead of `/book/?view=lessons`.
+- `QA_BASE_URL=http://localhost:3000 node scripts/qa-homework.mjs`: passed
+  after the fix on desktop and phone. The same journey still covers explicit
+  saves, reload recovery, student submission, private automatic marks, teacher
+  review/approval, returned feedback, printing, a refused save that keeps the
+  draft, and ordinary site navigation that saves before leaving. API/provider
+  responses are isolated fixtures; no real student work or paid AI calls were
+  used.
+- `npm run typecheck`, focused ESLint of the student homework component and
+  its journey, and `git diff --check`: passed.
+- Source review of the homework Worker path checked current-session gating,
+  published-only responses, matching homework/booking ownership and guarded
+  progress writes. No Worker change was justified, so its integration suite
+  was not rerun; this source review is not a complete security assessment.
+- Validation used `next dev` with localhost API/QA public configuration.
+  The development-only type-path rewrite was restored after stopping it. No
+  release build, live probe, database migration or production deployment was
+  performed. This pass makes no new speed or animation-smoothness claim.
+
+Before/after logs are in `/workspace/scratch/ines-pass5-homework-*.log`.
+
+### Next priorities
+
+1. Profile an actual booking date/time selection before changing more rendering
+   work; measure repeat visits without interception if investigating caching.
+2. Recheck current main and PR 197 before another account/homework change.
+   Rotate to a separate failure or authorization path rather than overlapping
+   the student redesign.
+3. Revisit the scoped dependency override when its upstream range changes;
+   rerun audits when dependency state changes.
