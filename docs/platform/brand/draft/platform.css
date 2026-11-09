@@ -1,0 +1,495 @@
+@import url("https://fonts.googleapis.com/css2?family=Brygada+1918:ital,wght@0,400..700;1,400..700&family=Commissioner:wght@400..700&display=swap");
+/* Draft platform stylesheet, made under the working name Chapeau (9 Nov 2026); the name is not picked.
+   Unfinished: the base, type, buttons, fields, chips, sign-up steps, cards, rows, pills, notices,
+   milestone message with the hat tip, paper marks (ruled page, margin line, highlighter, correction),
+   price card, email and the "Site by" line are written but have not been rendered or checked yet.
+   Colour, space, radius, shadow and motion come from tokens.json by name (as CSS variables of the
+   same names, e.g. var(--pen)); type sizes are written out exactly as tokens.json has them.
+   Every class starts ch- (rename with the name). The ds-* section at the end only frames design-system cards. */
+
+/* ---------- Base ---------- */
+
+.ch {
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 25px;
+  font-variant-numeric: tabular-nums;
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+.ch *, .ch *::before, .ch *::after { box-sizing: border-box; }
+.ch :where(h1, h2, h3, h4, p, ul, ol, dl, dd, figure, blockquote) { margin: 0; padding: 0; }
+.ch :where(ul, ol) { list-style: none; }
+.ch :where(button, input, select, textarea) { font: inherit; color: inherit; }
+.ch :where(button) { background: none; border: 0; padding: 0; cursor: pointer; }
+.ch ::selection { background: var(--select); }
+.ch :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* A page of the platform: paper, with the gutter. Narrow below 600px of its own width. */
+.ch-page {
+  container-type: inline-size;
+  background: var(--paper);
+  padding: var(--space-6);
+}
+@container (max-width: 599px) {
+  .ch-page > .ch-gutter { padding-inline: var(--space-4); }
+}
+
+/* ---------- Type ---------- */
+
+.ch-display-xl { font: 600 72px/68px var(--font-display); letter-spacing: -0.02em; }
+.ch-display { font: 600 48px/50px var(--font-display); letter-spacing: -0.015em; }
+.ch-title { font: 600 30px/34px var(--font-display); letter-spacing: -0.01em; }
+.ch-heading { font: 600 22px/28px var(--font-display); }
+.ch-milestone-title { font: 600 19px/25px var(--font-display); }
+.ch-note { font: italic 500 17px/23px var(--font-display); color: var(--pen); }
+.ch-lead { font: 400 19px/29px var(--font-ui); }
+.ch-body { font: 400 16px/25px var(--font-ui); }
+.ch-label { font: 600 15px/20px var(--font-ui); }
+.ch-meta { font: 400 14px/20px var(--font-ui); color: var(--pencil); }
+.ch-legend {
+  font: 600 11.5px/16px var(--font-ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pencil);
+}
+.ch-colophon { font: 500 12.5px/16px var(--font-ui); letter-spacing: 0.02em; }
+@container (max-width: 599px) {
+  .ch-display-xl { font-size: 44px; line-height: 46px; }
+  .ch-display { font-size: 36px; line-height: 40px; }
+}
+
+/* Links in running text are underlined: pen and ink are both dark, so colour alone can't tell them. */
+.ch-link {
+  color: var(--pen);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color var(--dur-shade) var(--ease-plain);
+}
+.ch-link:hover { color: var(--pen-deep); text-decoration-thickness: 2px; }
+
+/* ---------- Pen glyphs: the tick, the caret, the cross ---------- */
+
+.ch-glyph {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ch-tick { color: var(--pen); }
+
+/* ---------- Buttons ---------- */
+
+.ch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  font: 600 15px/20px var(--font-ui);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--dur-shade) var(--ease-plain),
+              border-color var(--dur-shade) var(--ease-plain),
+              color var(--dur-shade) var(--ease-plain);
+}
+.ch-btn--primary { background: var(--pen); color: var(--on-pen); }
+.ch-btn--primary:hover, .ch-btn--primary:active, .ch-btn--primary.is-hover { background: var(--pen-deep); }
+.ch-btn--second { background: var(--sheet); border-color: var(--edge); color: var(--ink); }
+.ch-btn--second:hover, .ch-btn--second:active, .ch-btn--second.is-hover { border-color: var(--ink); }
+.ch-btn--quiet { min-height: 44px; padding: 0 var(--space-1); color: var(--pen); }
+.ch-btn--quiet:hover, .ch-btn--quiet:active, .ch-btn--quiet.is-hover {
+  color: var(--pen-deep);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+.ch-btn--big { min-height: 52px; padding: 0 24px; font-size: 16px; }
+.ch-btn--wide { width: 100%; }
+.ch-btn.is-focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+.ch-btn--icon { width: 44px; padding: 0; color: var(--pencil); }
+.ch-btn--icon:hover { color: var(--ink); }
+
+/* ---------- Fields ---------- */
+
+.ch-field { display: grid; gap: 6px; }
+.ch-field__label { font: 600 15px/20px var(--font-ui); color: var(--ink); }
+.ch-field__box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: var(--sheet);
+  border: 1px solid var(--edge);
+  border-radius: var(--r-sm);
+  transition: border-color var(--dur-shade) var(--ease-plain);
+}
+.ch-field__box:hover { border-color: var(--pencil); }
+.ch-field__box:focus-within, .ch-field__box.is-focus { border-color: var(--pen); box-shadow: inset 0 0 0 1px var(--pen); }
+.ch-field__input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 400 16px/25px var(--font-ui);
+  color: var(--ink);
+  outline: none;
+}
+.ch-field__input:focus-visible { outline: none; }
+.ch-field__affix { font: 400 16px/25px var(--font-ui); color: var(--pencil); white-space: nowrap; }
+.ch-field__error { display: flex; align-items: flex-start; gap: 6px; font: 500 14px/20px var(--font-ui); color: var(--danger); }
+.ch-field__error .ch-glyph { width: 16px; height: 16px; margin-top: 2px; }
+.ch-field--error .ch-field__box { border-color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+
+/* Choice chips: a few answers to one question. Chosen is pen-wash, a pen edge and a tick. */
+.ch-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  background: var(--sheet);
+  border: 1px solid var(--edge);
+  border-radius: var(--r-sm);
+  font: 500 15px/20px var(--font-ui);
+  color: var(--ink);
+  transition: border-color var(--dur-shade) var(--ease-plain), background-color var(--dur-shade) var(--ease-plain);
+}
+.ch-chip:hover { border-color: var(--pencil); }
+.ch-chip .ch-glyph { display: none; width: 16px; height: 16px; margin-left: -4px; }
+.ch-chip[aria-pressed="true"] { background: var(--pen-wash); border-color: var(--pen); color: var(--pen); font-weight: 600; }
+.ch-chip[aria-pressed="true"] .ch-glyph { display: inline-block; }
+.ch-group { display: grid; gap: var(--space-3); border: 0; margin: 0; padding: 0; min-width: 0; }
+.ch-group > legend { padding: 0; margin-bottom: var(--space-3); font: 600 15px/20px var(--font-ui); }
+
+/* ---------- Sign-up ---------- */
+
+.ch-steps { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.ch-steps__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--r-sm);
+  font: 600 14px/20px var(--font-ui);
+  color: var(--pencil);
+}
+.ch-steps__step .ch-glyph { width: 16px; height: 16px; color: var(--pen); }
+.ch-steps__step.is-done { color: var(--ink); }
+.ch-steps__step[aria-current="step"] { background: var(--pen-wash); color: var(--pen); }
+.ch-steps__count { display: none; }
+.ch-signup { display: grid; gap: var(--space-6); max-width: 680px; }
+.ch-signup__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.ch-signup__q { display: grid; gap: var(--space-6); }
+.ch-signup__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-5); border-top: 1px solid var(--rule); }
+@container (max-width: 599px) {
+  .ch-steps__step:not([aria-current="step"]) { display: none; }
+  .ch-steps__count { display: inline; }
+  .ch-signup { gap: var(--space-5); }
+  .ch-signup__q { gap: var(--space-5); }
+}
+
+/* ---------- Cards and rows (the tutor's dashboard) ---------- */
+
+.ch-card {
+  background: var(--sheet);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-5);
+}
+.ch-card__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-3); margin-bottom: var(--space-3); }
+.ch-card__head > p { flex-basis: 100%; }
+@container (max-width: 599px) {
+  .ch-card { padding: var(--space-4); }
+}
+
+/* A row of a setting: its legend, its value and its action on one line. */
+.ch-rows { display: grid; }
+.ch-row {
+  display: grid;
+  grid-template-columns: minmax(118px, 30%) 1fr auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-1) 0;
+  border-top: 1px solid var(--rule);
+}
+.ch-row__value { font: 400 16px/25px var(--font-ui); }
+.ch-row__action { justify-self: end; }
+
+/* A lesson: who, then when with its status beside it. */
+.ch-lessons { display: grid; }
+.ch-lesson {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule);
+}
+.ch-lesson__who { font: 600 16px/25px var(--font-ui); }
+.ch-lesson__when { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); font: 400 14px/20px var(--font-ui); color: var(--pencil); }
+
+.ch-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--r-pill);
+  font: 600 12.5px/16px var(--font-ui);
+  white-space: nowrap;
+}
+.ch-pill .ch-glyph { width: 13px; height: 13px; stroke-width: 2.4; }
+.ch-pill--paid { padding-left: 7px; border: 1px solid var(--rule); color: var(--ink); }
+.ch-pill--paid .ch-glyph { color: var(--pen); }
+.ch-pill--due { background: var(--warn-wash); color: var(--warn); }
+.ch-pill--failed { background: var(--danger-wash); color: var(--danger); }
+
+/* ---------- Notices ---------- */
+
+.ch-notice {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--r-md);
+}
+.ch-notice__title { font: 600 16px/25px var(--font-ui); }
+.ch-notice__body { font: 400 15px/23px var(--font-ui); color: var(--ink); }
+.ch-notice--warn { background: var(--warn-wash); }
+.ch-notice--warn .ch-notice__title { color: var(--warn); }
+.ch-notice--danger { background: var(--danger-wash); }
+.ch-notice--danger .ch-notice__title { color: var(--danger); }
+.ch-notice .ch-btn--quiet { color: var(--ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+@container (max-width: 599px) {
+  .ch-notice { grid-template-columns: 1fr; }
+  .ch-notice .ch-btn--quiet { justify-self: start; min-height: 36px; }
+}
+
+/* ---------- Milestone message, with the hat tip ---------- */
+
+.ch-milestone {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: start;
+  gap: var(--space-4);
+  max-width: 440px;
+  padding: var(--space-4) var(--space-3) var(--space-4) var(--space-4);
+  background: var(--sheet);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lift);
+  animation: ch-rise var(--dur-step) var(--ease-plain) both;
+}
+.ch-milestone__mark { display: block; width: 48px; height: 48px; overflow: visible; }
+.ch-milestone__text { display: grid; gap: 2px; padding-top: 1px; }
+.ch-milestone__body { font: 400 15px/23px var(--font-ui); color: var(--ink); }
+.ch-milestone .ch-btn--icon { width: 36px; min-height: 36px; margin: -6px -2px 0 0; }
+.ch-hat { transform-box: fill-box; transform-origin: 18% 100%; }
+.ch-tip .ch-hat { animation: ch-tip var(--dur-tip) var(--ease-tip) 260ms both; }
+.ch-tip:hover .ch-hat { animation: ch-tip-again var(--dur-tip) var(--ease-tip) both; }
+@keyframes ch-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes ch-tip {
+  0% { transform: none; }
+  45% { transform: translateY(-12%) rotate(-14deg); }
+  100% { transform: none; }
+}
+@keyframes ch-tip-again {
+  0% { transform: none; }
+  45% { transform: translateY(-12%) rotate(-14deg); }
+  100% { transform: none; }
+}
+
+/* ---------- Paper marks (marketing pages, milestones, the shared-link picture) ---------- */
+
+/* A ruled page: rule lines at rule-pitch, the red margin hairline at its left. */
+.ch-ruled-page { position: relative; padding-left: calc(var(--margin-x, 56px) + var(--space-6)); }
+.ch-ruled-page::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--margin-x, 56px);
+  width: 1px;
+  background: var(--margin);
+}
+@container (max-width: 599px) {
+  .ch-ruled-page { --margin-x: 12px; padding-left: 28px; }
+}
+/* Text written on the rules: the line height is the pitch and each baseline sits on a rule. */
+.ch-on-rules {
+  font: 400 19px/var(--rule-pitch) var(--font-ui);
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--rule-pitch) - 1px), var(--rule) calc(var(--rule-pitch) - 1px), var(--rule) var(--rule-pitch));
+  background-position: 0 -7px;
+  background-repeat: repeat;
+  padding-bottom: 7px;
+}
+
+/* The highlighter: one stroke of marker behind the one word that matters on a screen. */
+.ch-hl { position: relative; z-index: 0; color: var(--on-marker); white-space: nowrap; }
+.ch-hl::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0.2em -0.12em 0.04em -0.14em;
+  background: var(--marker);
+  border-radius: var(--r-xs);
+  transform: rotate(-1.2deg) skewX(-8deg);
+}
+
+/* The correction: a word struck in pen, the insert mark (the chapeau) and the right words above it. */
+.ch-fix { white-space: nowrap; }
+.ch-fix del {
+  color: var(--pencil);
+  text-decoration: line-through;
+  text-decoration-color: var(--pen);
+  text-decoration-thickness: 0.07em;
+}
+.ch-fix__at { position: relative; display: inline-block; width: 0.42em; height: 1em; vertical-align: baseline; }
+.ch-fix__caret {
+  position: absolute;
+  left: 50%;
+  bottom: -0.2em;
+  width: 0.42em;
+  height: 0.36em;
+  transform: translateX(-50%);
+  fill: none;
+  stroke: var(--pen);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+.ch-fix ins {
+  position: absolute;
+  left: 50%;
+  bottom: 0.88em;
+  transform: translateX(-46%) rotate(-2deg);
+  font: italic 500 max(17px, 0.5em)/1 var(--font-display);
+  letter-spacing: 0;
+  color: var(--pen);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* A margin note: a few words in pen beside a figure. */
+.ch-margin-note { font: italic 500 17px/23px var(--font-display); color: var(--pen); }
+
+/* ---------- Platform home ---------- */
+
+.ch-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 44px; }
+.ch-top__nav { display: flex; align-items: center; gap: var(--space-5); }
+.ch-top__nav a { font: 500 15px/20px var(--font-ui); color: var(--ink); text-decoration: none; }
+.ch-top__nav a:hover { color: var(--pen); }
+.ch-lockup { display: block; height: 30px; width: auto; }
+.ch-hero { display: grid; gap: var(--space-5); padding: var(--space-8) 0 var(--space-7); }
+.ch-hero h1 { padding-top: 0.5em; max-width: 13em; }
+.ch-hero .ch-on-rules { max-width: 30em; }
+.ch-hero__act { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); padding-top: var(--space-2); }
+.ch-hero__price { display: flex; align-items: baseline; gap: var(--space-3); font: 600 16px/25px var(--font-ui); }
+@container (max-width: 599px) {
+  .ch-top__nav a:not(.ch-top__keep) { display: none; }
+  .ch-lockup { height: 26px; }
+  .ch-hero { gap: var(--space-4); padding: var(--space-6) 0 var(--space-6); }
+  .ch-hero .ch-on-rules { font-size: 17px; }
+  .ch-hero__act .ch-btn { width: 100%; }
+  .ch-hero__price { flex-direction: column; gap: 0; }
+}
+
+/* ---------- Price ---------- */
+
+.ch-price { display: grid; gap: var(--space-5); max-width: 420px; padding: var(--space-6); }
+.ch-price__head { display: grid; gap: var(--space-2); }
+.ch-price__list { display: grid; gap: var(--space-3); padding-top: var(--space-5); border-top: 1px solid var(--rule); }
+.ch-price__list li { display: grid; grid-template-columns: 20px 1fr; gap: var(--space-3); align-items: start; }
+.ch-price__list .ch-glyph { width: 20px; height: 20px; margin-top: 2px; stroke-width: 2.25; }
+.ch-price__foot { display: grid; gap: var(--space-3); }
+@container (max-width: 599px) {
+  .ch-price { padding: var(--space-5) var(--space-4); }
+}
+
+/* ---------- Email to a tutor ---------- */
+
+.ch-email { max-width: 600px; margin: 0 auto; display: grid; gap: var(--space-4); }
+.ch-email__head { padding: 0 var(--space-5); }
+.ch-email__head img, .ch-email__head svg { display: block; height: 24px; width: auto; }
+.ch-email__body { display: grid; gap: var(--space-4); padding: var(--space-6) var(--space-5); background: var(--sheet); border-radius: var(--r-md); border-top: 3px solid var(--tile); }
+.ch-email__facts { display: grid; gap: var(--space-1); padding: var(--space-3) 0; border-block: 1px solid var(--rule); }
+.ch-email__fact { display: grid; grid-template-columns: 92px 1fr; align-items: baseline; gap: var(--space-3); padding: 6px 0; }
+.ch-email__foot { padding: 0 var(--space-5); font: 400 13px/19px var(--font-ui); color: var(--pencil); }
+.ch-email__foot a { color: var(--pencil); }
+@container (max-width: 599px) {
+  .ch-email__body { padding: var(--space-5) var(--space-4); }
+  .ch-email__head, .ch-email__foot { padding: 0 var(--space-4); }
+}
+
+/* ---------- The colophon on a tutor's site ---------- */
+
+.ch-siteby {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 12.5px/16px var(--font-ui);
+  letter-spacing: 0.02em;
+  color: inherit;
+  text-decoration: none;
+}
+.ch-siteby svg { width: 14px; height: 14px; flex: none; fill: currentColor; }
+.ch-siteby:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- The logo, inline (so it follows the theme) ---------- */
+
+.ch-logo-tile { fill: var(--tile); }
+.ch-logo-e { fill: var(--on-tile); }
+.ch-logo-hat { fill: var(--marker); }
+.ch-logo-word { fill: var(--ink); }
+.ch-logo-ring { fill: none; stroke: var(--on-tile); stroke-opacity: 0.35; stroke-width: 3; }
+.ch-mark--paper .ch-logo-e { fill: var(--ink); }
+.ch-mark--paper .ch-logo-hat { fill: var(--pen); }
+[data-theme="dark"] .ch-mark--paper .ch-logo-hat { fill: var(--marker); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ch *, .ch *::before, .ch *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------- Card frame (design system only; the platform never uses ds-*) ---------- */
+
+html:has(> body > .ds-preview),
+html:has(> body > .ds-preview) > body { margin: 0; background: var(--paper); }
+.ds-preview { padding: 24px; }
+.ds-preview.ch-page { padding: 24px; }
+.ds-split { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 32px; }
+.ds-laptop { flex: 1 1 560px; min-width: 0; }
+.ds-phone { flex: 0 0 390px; width: 390px; }
+.ds-frame {
+  container-type: inline-size;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.ds-frame--pad { padding: var(--space-6); }
+.ds-phone .ds-frame--pad { padding: var(--space-4); }
+.ds-cap { display: block; margin: 0 0 var(--space-2); font: 600 11.5px/16px var(--font-ui); letter-spacing: 0.12em; text-transform: uppercase; color: var(--pencil); }
+.ds-stack { display: grid; gap: var(--space-5); }
+.ds-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-6); }
