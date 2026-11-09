@@ -4,7 +4,8 @@ import { addedByTeacher, paidByHand, setLessonPaid, type AdminBooking } from "@/
 import { PaidTick } from "@/components/teacher/PaidTick";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { ChevronDown, Repeat } from "lucide-react";
 
 function paymentLabel(booking: AdminBooking) {
   if (booking.payment_status === "refunded") return "Refunded";
@@ -28,6 +29,35 @@ export function upcomingLessons(bookings: AdminBooking[], now: number) {
     .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
 }
 
+/** A weekly run's weeks still to come, soonest first. */
+type WeeklyRun = { id: string; lessons: AdminBooking[] };
+
+/**
+ * Upcoming lessons with each weekly run's weeks gathered into one entry, at
+ * its first week (9 November 2026, Dan: "just have them all as one card and
+ * you can expand out"). A run with a single week left, and a lesson on now,
+ * stay lessons of their own.
+ */
+type UpcomingEntry = { booking: AdminBooking } | { run: WeeklyRun };
+
+export function upcomingEntries(upcoming: AdminBooking[], now: number): UpcomingEntry[] {
+  const inRun = (booking: AdminBooking) => booking.series_id && Date.parse(booking.starts_at) > now ? booking.series_id : "";
+  const runs = new Map<string, AdminBooking[]>();
+  for (const booking of upcoming) {
+    const id = inRun(booking);
+    if (id) runs.set(id, [...(runs.get(id) ?? []), booking]);
+  }
+  const placed = new Set<string>();
+  return upcoming.flatMap((booking): UpcomingEntry[] => {
+    const id = inRun(booking);
+    const lessons = id ? runs.get(id) ?? [] : [];
+    if (lessons.length < 2) return [{ booking }];
+    if (placed.has(id)) return [];
+    placed.add(id);
+    return [{ run: { id, lessons } }];
+  });
+}
+
 /**
  * A student's lessons beneath their profile: the ones to come, then the past
  * and cancelled, reading the records from the start of time rather than the
@@ -46,7 +76,9 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
 }) {
   const [paying, setPaying] = useState("");
   const [paidError, setPaidError] = useState<{ id: string; message: string } | null>(null);
+  const [openRuns, setOpenRuns] = useState<string[]>([]);
   const upcoming = upcomingLessons(bookings ?? [], now);
+  const entries = upcomingEntries(upcoming, now);
   const past = (bookings ?? []).filter(booking => booking.status === "cancelled" || Date.parse(booking.ends_at) <= now)
     .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
   // Within half a year either way the year is plain from the month; further
@@ -58,7 +90,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
    * breaks the pattern (cancelled, no-show, happening now), since the section
    * already says upcoming or past.
    */
-  function lessonRow(booking: AdminBooking) {
+  function lessonRow(booking: AdminBooking, id?: string) {
     const cancelled = booking.status === "cancelled";
     const noShow = booking.attendance_status === "no_show";
     const starts = new Date(booking.starts_at);
@@ -88,7 +120,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
       changeFee,
     ].filter(Boolean);
     return (
-      <li className={`teacher-history-lesson${cancelled || noShow ? " is-cancelled" : ""}`} key={booking.id}>
+      <li className={`teacher-history-lesson${cancelled || noShow ? " is-cancelled" : ""}`} id={id} key={booking.id}>
         <div className="teacher-history-lesson__top">
           <div className="teacher-history-lesson__when">
             <strong>
@@ -127,6 +159,62 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
     );
   }
 
+  /**
+   * A weekly run as one card, in the dashed tile the payment card gives a
+   * run: the usual day and time, how many weeks and until when, and the
+   * facts its weeks share. Opening it lists each week as its own card.
+   */
+  function runRow(run: WeeklyRun) {
+    const open = openRuns.includes(run.id);
+    const slot = (booking: AdminBooking) => `${dateLabel(dateKey(new Date(booking.starts_at)), { weekday: "long" })} ${formatSlotTime(booking.starts_at)}–${formatSlotTime(booking.ends_at)} ${booking.location}`;
+    // Its usual week is the slot most of its weeks keep; a week moved off it
+    // is counted, and shows as itself once the run is open.
+    const tally = new Map<string, number>();
+    for (const lesson of run.lessons) tally.set(slot(lesson), (tally.get(slot(lesson)) ?? 0) + 1);
+    const usual = [...tally].sort((a, b) => b[1] - a[1])[0][0];
+    const pattern = run.lessons.find(lesson => slot(lesson) === usual)!;
+    const moved = run.lessons.length - (tally.get(usual) ?? 0);
+    const first = run.lessons[0];
+    const last = run.lessons[run.lessons.length - 1];
+    const day = (booking: AdminBooking) => {
+      const starts = new Date(booking.starts_at);
+      return dateLabel(dateKey(starts), { weekday: "short", day: "numeric", month: "short", ...(nearby(starts) ? {} : { year: "numeric" }) }).replace(",", "");
+    };
+    const payments = new Set(run.lessons.map(paymentLabel));
+    const facts = [
+      formatBookedLessonLabel({ id: pattern.lesson_type_id ?? "", name: pattern.lesson_name, durationMinutes: Math.round((Date.parse(pattern.ends_at) - Date.parse(pattern.starts_at)) / 60000) }),
+      payments.size === 1 ? [...payments][0] : "",
+      run.lessons.every(addedByTeacher) ? "Added by you" : "",
+      moved ? `${moved === 1 ? "One week" : `${moved} weeks`} at another time` : "",
+    ].filter(Boolean);
+    const weeksId = `teacher-history-run-${run.id}`;
+    return (
+      <Fragment key={`run-${run.id}`}>
+        <li className={`teacher-history-lesson teacher-history-run${open ? " is-open" : ""}`}>
+          <div className="teacher-history-lesson__top">
+            <div className="teacher-history-lesson__when">
+              <strong>
+                <Repeat className="teacher-history-run__mark" size={14} strokeWidth={2.4} aria-hidden="true" />
+                Every {dateLabel(dateKey(new Date(pattern.starts_at)), { weekday: "long" })}
+                {" "}<span className="teacher-history-lesson__time"><i aria-hidden="true">· </i><span className="visually-hidden">, </span>{formatSlotTime(pattern.starts_at)}–{formatSlotTime(pattern.ends_at)}</span>
+              </strong>
+            </div>
+            <button type="button" className="teacher-history-homework teacher-history-run__toggle" aria-expanded={open} aria-controls={open ? weeksId : undefined}
+              onClick={() => setOpenRuns(current => open ? current.filter(id => id !== run.id) : [...current, run.id])}>
+              <ChevronDown size={15} aria-hidden="true" />{open ? "Hide weeks" : "Show weeks"}
+            </button>
+          </div>
+          <p className="teacher-history-run__span">{run.lessons.length} weeks, <span>{day(first)} to {day(last)}</span></p>
+          <ul className="booking-payment-facts teacher-history-lesson__facts">
+            <li>{pattern.location === "porto" ? "In Porto" : "Online"}</li>
+            {facts.map(fact => <li key={fact}>{fact}</li>)}
+          </ul>
+        </li>
+        {open ? run.lessons.map(lesson => <Fragment key={lesson.id}>{lessonRow(lesson, lesson === first ? weeksId : undefined)}</Fragment>) : null}
+      </Fragment>
+    );
+  }
+
   if (error) {
     return <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" onClick={onRetry} type="button">Try again</button></div>;
   }
@@ -134,8 +222,8 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
   if (bookings.length === 0) return <p className="teacher-history-empty">No lessons recorded yet.</p>;
   return (
     <>
-      {upcoming.length ? <section aria-labelledby="teacher-history-upcoming"><h3 id="teacher-history-upcoming">Upcoming <span>· {upcoming.length}</span></h3><ul className="teacher-history-list">{upcoming.map(lessonRow)}</ul></section> : null}
-      {past.length ? <section aria-labelledby="teacher-history-past"><h3 id="teacher-history-past">Past &amp; cancelled <span>· {past.length}</span></h3><ul className="teacher-history-list">{past.map(lessonRow)}</ul></section> : null}
+      {upcoming.length ? <section aria-labelledby="teacher-history-upcoming"><h3 id="teacher-history-upcoming">Upcoming <span>· {upcoming.length}</span></h3><ul className="teacher-history-list">{entries.map(entry => "run" in entry ? runRow(entry.run) : lessonRow(entry.booking))}</ul></section> : null}
+      {past.length ? <section aria-labelledby="teacher-history-past"><h3 id="teacher-history-past">Past &amp; cancelled <span>· {past.length}</span></h3><ul className="teacher-history-list">{past.map(booking => lessonRow(booking))}</ul></section> : null}
     </>
   );
 }
