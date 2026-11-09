@@ -1,3 +1,9 @@
+// Imported straight from the record, not through @/lib/tutor: the calendar
+// tests load this file in plain Node, which knows no "@/" paths.
+import tutor from "../../tutors/ines/tutor.json" with { type: "json" };
+
+const TUTOR_CITY = tutor.place.city;
+
 /** Convert a real wall-clock minute to UTC, rejecting dates/times it cannot name. */
 export function wallTimeToUtc(dateKey: string, time: string, timeZone: string, originalInstant?: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
@@ -34,7 +40,7 @@ export function wallTimeToUtc(dateKey: string, time: string, timeZone: string, o
   const instant = naive - offsetAt(firstPass);
   // Spring's missing hour is not a different appointment to silently book.
   if (wallAt(instant) !== naive) {
-    throw new Error("That time does not exist in Porto because the clocks change. Choose another time.");
+    throw new Error(`That time does not exist in ${TUTOR_CITY} because the clocks change. Choose another time.`);
   }
   return new Date(instant).toISOString();
 }

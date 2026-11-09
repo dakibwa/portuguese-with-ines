@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { ArrowLeft, CheckCircle2, Send } from "lucide-react";
 import { readSession } from "@/lib/auth-api";
 import { fetchHomeworkSheet, saveHomeworkAnswers, type HomeworkProgress, type StudentHomeworkData } from "@/lib/homework-api";
+import { TUTOR_NAME, TUTOR_SUBJECT } from "@/lib/tutor";
 import { HomeworkSplat } from "./HomeworkArt";
 import { HomeworkWorksheet } from "./HomeworkWorksheet";
 
@@ -87,7 +88,7 @@ export function StudentHomework({ bookingId, leaveGuard, onBack }: {
       if (!active.current || readSession() !== token) return false;
       unsaved.current = false;
       setDraft(progress); setSelected({ ...selected, progress });
-      setNotice(submit ? "Sent to Inês. Your feedback appears here after she approves it." : "Answers saved.");
+      setNotice(submit ? `Sent to ${TUTOR_NAME}. Your feedback appears here after ${TUTOR_SUBJECT} approves it.` : "Answers saved.");
       return true;
     } catch (error) { if (active.current) setError((error as Error).message); return false; }
     finally { if (active.current) setBusy(false); }
@@ -101,32 +102,32 @@ export function StudentHomework({ bookingId, leaveGuard, onBack }: {
           onBack();
         }}><ArrowLeft size={16} aria-hidden="true" />Your lessons</button>
         {submission ? <span className={`homework-status homework-status--${awaitingReview ? "sent" : "returned"}`}>
-          {awaitingReview ? <Send size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}{awaitingReview ? "Sent to Inês" : "Done"}
+          {awaitingReview ? <Send size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}{awaitingReview ? `Sent to ${TUTOR_NAME}` : "Done"}
         </span> : <span className="homework-status homework-status--quiet">{dirty ? "Unsaved answers" : draft.updatedAt ? "Saved" : "Ready to start"}</span>}
       </div>
       {error ? <p className="homework-error" role="alert">{error}</p> : null}
       {/* Approved by Inês: as plain a Done as she sees on her side. */}
       {submission?.returnedAt && !changedSinceSubmission ? <div className="homework-done">
         <span className="homework-done__dab" aria-hidden="true"><CheckCircle2 size={26} /></span>
-        <span className="homework-done__text"><strong>Done</strong><small>Inês has checked it</small></span>
+        <span className="homework-done__text"><strong>Done</strong><small>{TUTOR_NAME} has checked it</small></span>
         <HomeworkSplat seed={`${selected.bookingId}-done`} className="homework-done__mark" />
       </div> : null}
       <HomeworkWorksheet key={selected.bookingId} {...selected} answers={draft.answers} disabled={busy || awaitingReview}
         marks={submission?.returnedAt ? submission.marks : undefined} markedAnswers={submission?.answers} onViewChange={setView}
         onAnswer={(id, answer) => setDraft({ ...draft, answers: { ...draft.answers, [id]: answer } })} />
       {view === "online" ? <div className="homework-save">
-        <p role="status">{busy ? "Saving your work and preparing it for Inês…" : notice || (awaitingReview
-          ? "Inês is checking your work. Your answers are saved."
+        <p role="status">{busy ? `Saving your work and preparing it for ${TUTOR_NAME}…` : notice || (awaitingReview
+          ? `${TUTOR_NAME} is checking your work. Your answers are saved.`
           : submission?.returnedAt ? "You can change your answers and send them again."
-          : selected.aiMarking ? "Inês checks your answers before you see any feedback. Anthropic’s Claude suggests marks for written answers, so keep personal details out."
-          : "Inês checks your answers and sends you feedback here.")}</p>
+          : selected.aiMarking ? `${TUTOR_NAME} checks your answers before you see any feedback. Anthropic’s Claude suggests marks for written answers, so keep personal details out.`
+          : `${TUTOR_NAME} checks your answers and sends you feedback here.`)}</p>
         <div className="homework-save__actions">
           {awaitingReview ? <button type="button" className="button button--outline" disabled={busy} onClick={() => void refresh()}>Check for feedback</button> : <>
             <button type="button" className="button button--outline" disabled={busy || !dirty} onClick={() => void save()}>Save answers</button>
-            <button type="button" className="button button--coral" disabled={busy || !answered || Boolean(submission && !changedSinceSubmission)} onClick={() => void save(true)}>{busy ? "Sending…" : submission ? "Send again" : "Submit to Inês"}</button>
+            <button type="button" className="button button--coral" disabled={busy || !answered || Boolean(submission && !changedSinceSubmission)} onClick={() => void save(true)}>{busy ? "Sending…" : submission ? "Send again" : `Submit to ${TUTOR_NAME}`}</button>
           </>}
         </div>
-      </div> : <p className="homework-help homework-help--paper">Paper answers aren’t marked automatically. To send them to Inês, type them in Do online.</p>}
+      </div> : <p className="homework-help homework-help--paper">Paper answers aren’t marked automatically. To send them to {TUTOR_NAME}, type them in Do online.</p>}
     </> : error ? <>
       <div className="homework-toolbar">
         <button type="button" className="homework-back" onClick={onBack}><ArrowLeft size={16} aria-hidden="true" />Your lessons</button>

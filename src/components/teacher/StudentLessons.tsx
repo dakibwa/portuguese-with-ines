@@ -7,6 +7,7 @@ import { PaidTick } from "@/components/teacher/PaidTick";
 import { addedByTeacher, paidByHand, setLessonPaid, type AdminBooking, type NoteHomework, type StudentNoteLesson } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
+import { IN_PERSON } from "@/lib/tutor";
 
 function paymentLabel(booking: AdminBooking) {
   if (booking.payment_status === "refunded") return "Refunded";
@@ -59,7 +60,7 @@ export function upcomingEntries(upcoming: AdminBooking[], now: number): Upcoming
   });
 }
 
-const place = (booking: AdminBooking) => booking.location === "porto" ? "In Porto" : "Online";
+const place = (booking: AdminBooking) => booking.location === "porto" ? IN_PERSON : "Online";
 const lessonLength = (booking: AdminBooking) => formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000) });
 
 /*

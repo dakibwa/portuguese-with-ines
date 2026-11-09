@@ -6,6 +6,7 @@ import { readSession, type MyBooking } from "@/lib/auth-api";
 import { clockDiffersFromPorto, formatBookedLessonLabel, formatShortDay, formatSlotTime, formatTimeIn } from "@/lib/booking-api";
 import { BOOKING_TIME_ZONE } from "@/lib/config";
 import { fetchHomework, type HomeworkSummary } from "@/lib/homework-api";
+import { IN_PERSON, LANGUAGE_CODE, TUTOR_NAME } from "@/lib/tutor";
 
 /** The latest few, then the rest on request, so a long history stays short. */
 const SHOWN = 6;
@@ -121,14 +122,14 @@ export function PastLessons({ bookings, clock, onOpenHomework, zone }: {
                 onClick={() => onOpenHomework(row.homework!.bookingId)}
               >
                 {state === "returned" ? <CheckCircle2 size={15} aria-hidden="true" /> : state === "sent" ? <Send size={14} aria-hidden="true" /> : null}
-                {state === "returned" ? "Done" : state === "sent" ? "With Inês" : state === "started" ? "Continue" : "Start"}
+                {state === "returned" ? "Done" : state === "sent" ? `With ${TUTOR_NAME}` : state === "started" ? "Continue" : "Start"}
                 <span className="visually-hidden"> homework: {row.homework.title}</span>
                 {state === "new" || state === "started" ? <ArrowRight size={15} aria-hidden="true" /> : null}
               </button> : null}
           </div>
           <div className="past-lesson__line past-lesson__facts">
-            <span>{row.length} · {row.location === "porto" ? "In Porto" : "Online"}</span>
-            {row.homework ? <span className="past-lesson__title" lang="pt-PT">{row.homework.title}</span> : null}
+            <span>{row.length} · {row.location === "porto" ? IN_PERSON : "Online"}</span>
+            {row.homework ? <span className="past-lesson__title" lang={LANGUAGE_CODE}>{row.homework.title}</span> : null}
           </div>
         </li>;
       })}

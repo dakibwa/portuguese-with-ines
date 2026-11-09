@@ -1,3 +1,4 @@
+import { LANGUAGE_CODE } from "@/lib/tutor";
 import { ExpressionTranslations, type TranslationsViewer } from "@/components/expressions/ExpressionTranslations";
 import type { ExpressionInput } from "@/lib/expressions";
 import { publicAssetPath } from "@/lib/paths";
@@ -17,8 +18,8 @@ function sameStem(a: string, b: string) {
  * conjugated. Nothing is marked for a match of a lone short word.
  */
 export function findPhrase(example: string, phrase: string): [number, number] | null {
-  const said = [...example.matchAll(WORD)].map((match) => ({ word: match[0].toLocaleLowerCase("pt-PT"), start: match.index ?? 0, end: (match.index ?? 0) + match[0].length }));
-  const words = [...phrase.matchAll(WORD)].map((match) => match[0].toLocaleLowerCase("pt-PT"));
+  const said = [...example.matchAll(WORD)].map((match) => ({ word: match[0].toLocaleLowerCase(LANGUAGE_CODE), start: match.index ?? 0, end: (match.index ?? 0) + match[0].length }));
+  const words = [...phrase.matchAll(WORD)].map((match) => match[0].toLocaleLowerCase(LANGUAGE_CODE));
   let best = { i: 0, j: 0, k: 0 };
   for (let i = 0; i < said.length; i++) {
     for (let j = 0; j < words.length; j++) {
@@ -114,7 +115,7 @@ export function ExpressionImage({ item }: { item: ExpressionInput }) {
  */
 export function ExpressionCard({ expression: item }: { expression: ExpressionInput }) {
   return (
-    <article className="expression-card" lang="pt-PT">
+    <article className="expression-card" lang={LANGUAGE_CODE}>
       <h3 className="expression-card__title">{item.expression}</h3>
       {item.imageUrl ? <ExpressionImage item={item} /> : null}
       <ExpressionMeanings item={item} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { LANGUAGE_CODE } from "@/lib/tutor";
 import { useEffect, useRef, useState } from "react";
 import { fetchTranslationsToReview, reviewTranslation, type AdminTranslation, type TranslationStatus } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
@@ -70,7 +71,7 @@ export function TranslationsReview({ token, initialPending }: { token: string; i
         <ul className="teacher-translations__list">
           {rows.map((row) => (
             <li className="teacher-translation" data-translation-id={row.id} key={row.id}>
-              <p className="teacher-translation__expression" lang="pt-PT">{row.expression}</p>
+              <p className="teacher-translation__expression" lang={LANGUAGE_CODE}>{row.expression}</p>
               <p className="teacher-translation__text"><span className="teacher-translation__language">{row.language}</span>{row.text}</p>
               <p className="teacher-translation__meta">From {row.studentFirstName}, {dateLabel(row.createdAt)}</p>
               <div className="teacher-expression__actions">

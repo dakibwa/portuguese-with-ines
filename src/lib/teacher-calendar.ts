@@ -1,3 +1,7 @@
+// Imported straight from the record, not through @/lib/tutor: the calendar
+// tests load this file in plain Node, which knows no "@/" paths.
+import tutor from "../../tutors/ines/tutor.json" with { type: "json" };
+
 import type {
   AdminBooking,
   AdminStudent,
@@ -6,6 +10,8 @@ import type {
   GoogleMeetConnection,
   PaymentReview,
 } from "./admin-api";
+
+const TUTOR_TIME_ZONE = tutor.place.timeZone;
 
 export const WEEKDAYS = [
   { value: 1, name: "Monday", short: "Mon" },
@@ -22,7 +28,7 @@ export type WeekHours = Record<number, TeachingWindow[]>;
 
 export function dateKey(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Lisbon",
+    timeZone: TUTOR_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -277,7 +283,7 @@ export function weeklyBlocks(
 
 function localMinute(value: string) {
   const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Lisbon",
+    timeZone: TUTOR_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",

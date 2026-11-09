@@ -8,6 +8,8 @@
  * even before the signature check.
  */
 
+import { currentTutor } from "./tutor.mjs";
+
 const encoder = new TextEncoder();
 const keyCache = new Map();
 
@@ -78,13 +80,14 @@ export function safeEqual(a, b) {
 }
 
 /**
- * Short human reference for emails and her calendar: "PT-7QK4M2".
+ * Short human reference for emails and her calendar: "PT-7QK4M2", the prefix
+ * from the tutor record.
  * Ambiguous glyphs (0/O, 1/I) are excluded so it survives being read aloud.
  */
-export function bookingReference() {
+export function bookingReference(prefix = currentTutor().bookings.referencePrefix) {
   const alphabet = "ACDEFGHJKLMNPQRSTUVWXYZ2345679";
   const random = crypto.getRandomValues(new Uint8Array(6));
   let reference = "";
   for (const byte of random) reference += alphabet[byte % alphabet.length];
-  return `PT-${reference}`;
+  return `${prefix}-${reference}`;
 }

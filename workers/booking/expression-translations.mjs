@@ -1,4 +1,5 @@
 import { ExpressionProblem } from "./expressions.mjs";
+import { currentTutor } from "./tutor.mjs";
 
 /*
  * Students' own translations of an expression (30 October 2026, Dan, for
@@ -41,7 +42,7 @@ export async function approvedTranslations(db, expressionId) {
  * limit and their session still stands, or nothing is saved. The unique index
  * keeps one translation waiting per student per expression.
  */
-export async function submitTranslation(db, studentId, expressionId, body, authorization = null) {
+export async function submitTranslation(db, studentId, expressionId, body, authorization = null, tutor = currentTutor()) {
   if (!EXPRESSION_ID.test(expressionId)) problem("That expression was not found.", 404);
   if (Object.keys(body).some((key) => !["language", "text"].includes(key))) problem("Please send just the language and your translation.");
   const language = field(body, "language", "language");
@@ -57,7 +58,7 @@ export async function submitTranslation(db, studentId, expressionId, body, autho
         AND (${authorization?.sql ?? "1"})`)
       .bind(studentId, language, text, now.toISOString(), expressionId, studentId, since, DAILY_TRANSLATIONS, ...(authorization?.values ?? [])).run();
   } catch (error) {
-    if (String(error).includes("UNIQUE constraint failed")) problem("You’ve already sent a translation for this one. Inês will check it soon.", 409);
+    if (String(error).includes("UNIQUE constraint failed")) problem(`You’ve already sent a translation for this one. ${tutor.shortName} will check it soon.`, 409);
     throw error;
   }
   if (result.meta.changes) return { status: "pending" };

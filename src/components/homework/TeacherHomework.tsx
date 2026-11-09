@@ -1,5 +1,6 @@
 "use client";
 
+import { LANGUAGE, LANGUAGE_CODE, LANGUAGE_VARIETY } from "@/lib/tutor";
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Camera, Sparkles, CheckCircle2, ChevronDown, Image as ImageIcon, Lock, PenLine, Plus, RotateCcw, Send, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { HOMEWORK_PHOTO_LIMIT, prepareHomeworkPhoto, teacherHomeworkRequest, transcribeHomeworkPhotos, type HomeworkSheet, type TeacherHomeworkData, type HomeworkMark } from "@/lib/homework-api";
@@ -313,7 +314,7 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
           answers={draft.progress.submission?.answers ?? (draft.publishedAt ? draft.progress.answers : undefined)}
           marks={draft.progress.submission?.marks} markedAnswers={draft.progress.submission?.answers} preview tools={draft.publishedAt ? undefined : draftTools} />}
       {draft.publishedAt ? returned ? null : <p className="homework-help homework-help--state">{draft.progress.updatedAt ? `${firstName} has started.` : `Waiting for ${firstName}.`}</p> : <div className="homework-publish">
-        <label><input type="checkbox" checked={reviewed} disabled={Boolean(busy)} onChange={event => setReviewed(event.target.checked)} />I checked the Portuguese and the answers</label>
+        <label><input type="checkbox" checked={reviewed} disabled={Boolean(busy)} onChange={event => setReviewed(event.target.checked)} />I checked the {LANGUAGE} and the answers</label>
         <button type="button" className="button button--coral" disabled={Boolean(busy) || !reviewed} onClick={() => void run("publish")}>{busy === "publish" ? "Publishing…" : "Publish for student"}</button>
       </div>}
     </> : null}
@@ -404,28 +405,28 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
     </div>
     <fieldset className="homework-review__sheet" disabled={busy || marking}>
       {sheet.sections.map((section, index) => <section key={index}>
-        <h5 lang="pt-PT"><HomeworkSplat seed={sheet.title} offset={index + 1} className="homework-section-mark" /><span className="homework-num" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><span className="homework-section-title">{section.title}</span></h5>
-        <p className="homework-review__instruction" lang="pt-PT">{section.instruction}</p>
+        <h5 lang={LANGUAGE_CODE}><HomeworkSplat seed={sheet.title} offset={index + 1} className="homework-section-mark" /><span className="homework-num" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><span className="homework-section-title">{section.title}</span></h5>
+        <p className="homework-review__instruction" lang={LANGUAGE_CODE}>{section.instruction}</p>
         {section.questions.map((question, qi) => {
           const mark = marks[question.id] ?? { status: "review", feedback: "", source: "pending" };
           const feedback = feedbackOf(mark);
           const edit = (value: Partial<HomeworkMark>) => { setOpened(list => list.includes(question.id) ? list : [...list, question.id]); onChange({ ...marks, [question.id]: { ...mark, feedback, source: "teacher", ...value } }); };
           const name = `${id}-${question.id}`;
           const unresolved = unresolvedMark(mark);
-          const prompt = <p className="homework-review__prompt" lang="pt-PT"><span className="homework-dab" aria-hidden="true">{qi + 1}</span><span className="visually-hidden">{qi + 1}. </span>{question.prompt}</p>;
-          const answer = <p className="homework-review__answer" lang="pt-PT">{answers[question.id] || <em lang="en">No answer</em>}</p>;
+          const prompt = <p className="homework-review__prompt" lang={LANGUAGE_CODE}><span className="homework-dab" aria-hidden="true">{qi + 1}</span><span className="visually-hidden">{qi + 1}. </span>{question.prompt}</p>;
+          const answer = <p className="homework-review__answer" lang={LANGUAGE_CODE}>{answers[question.id] || <em lang="en">No answer</em>}</p>;
           if (!unresolved && !opened.includes(question.id)) return <div className={`homework-review__question homework-review__question--folded homework-review__question--${mark.status}`} key={question.id}>
             <div className="homework-review__work">{prompt}{answer}</div>
             <div className="homework-review__verdict">
               <span className="homework-review__status">{mark.status === "correct" ? <><CheckCircle2 size={15} aria-hidden="true" />Correct</> : <><RotateCcw size={15} aria-hidden="true" />Try again</>}</span>
-              <p lang="pt-PT">{feedback}</p>
+              <p lang={LANGUAGE_CODE}>{feedback}</p>
               <button type="button" className="homework-link" aria-label={`Change mark for ${section.title}, question ${qi + 1}`} onClick={() => setOpened(list => [...list, question.id])}>Change</button>
             </div>
           </div>;
           return <div className={`homework-review__question${unresolved ? " is-open" : ""}`} key={question.id}>
             <div className="homework-review__work">
               {prompt}{answer}
-              <details><summary>Answer guide</summary><p lang="pt-PT">{question.answer}</p>{question.explanation ? <p lang="pt-PT">{question.explanation}</p> : null}</details>
+              <details><summary>Answer guide</summary><p lang={LANGUAGE_CODE}>{question.answer}</p>{question.explanation ? <p lang={LANGUAGE_CODE}>{question.explanation}</p> : null}</details>
             </div>
             <div className="homework-review__mark">
               <fieldset className="homework-review__choice">
@@ -437,8 +438,8 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
                   </label>)}
                 </div>
               </fieldset>
-              <label className="homework-review__feedback">Feedback <small>In European Portuguese</small>
-                <textarea lang="pt-PT" rows={2} maxLength={800} value={feedback} placeholder="Ex.: Muito bem! O teu pedido está claro." onChange={event => edit({ feedback: event.target.value })} /></label>
+              <label className="homework-review__feedback">Feedback <small>In {LANGUAGE_VARIETY}</small>
+                <textarea lang={LANGUAGE_CODE} rows={2} maxLength={800} value={feedback} placeholder="Ex.: Muito bem! O teu pedido está claro." onChange={event => edit({ feedback: event.target.value })} /></label>
             </div>
           </div>;
         })}

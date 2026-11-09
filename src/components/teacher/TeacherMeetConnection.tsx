@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND } from "@/lib/tutor";
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { readSession } from "@/lib/auth-api";
@@ -134,7 +135,7 @@ export function TeacherMeetConnection({ token, onConnectionChange }: { token: st
             )}
           </div>
           {connection.connected ? (
-            <details className="teacher-meet-note"><summary>Share your calendar</summary><p>In Google Calendar, open “Português com a Inês — lessons” → Settings and sharing → Add people.</p></details>
+            <details className="teacher-meet-note"><summary>Share your calendar</summary><p>In Google Calendar, open “{BRAND} — lessons” → Settings and sharing → Add people.</p></details>
           ) : null}
         </>
       ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { HOME_CLOCK, TUTOR_CITY } from "@/lib/tutor";
 import { useEffect, useRef, useState } from "react";
 import { TeacherPager } from "@/components/teacher/TeacherPager";
 import { fetchAvailability, forgetAvailability, formatSlotTime, portoDateKey, portoTimeToUtc, type AvailabilityResponse } from "@/lib/booking-api";
@@ -150,17 +151,17 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
             type="button"
           ><span className="teacher-month-date">{Number(key.slice(-2))}</span>{slots[key]?.length ? <span className="teacher-month-booked" aria-hidden="true" /> : null}</button>)}
         </div>
-        <p className="teacher-lesson-picker__key"><i aria-hidden="true" />Times available · Porto time</p>
+        <p className="teacher-lesson-picker__key"><i aria-hidden="true" />Times available · {HOME_CLOCK}</p>
       </div>
       <div className="teacher-lesson-picker__times" aria-live="polite">
         <h4>{dayInView ? dateLabel(date, { weekday: "short", day: "numeric", month: "short" }) : "Choose a day"}</h4>
         {loading ? <p role="status">Checking available times…</p> : current?.error ? <div className="teacher-inline-error" role="alert">
           <p>Available times couldn’t be checked.</p>
           <button className="button button--outline button--small" disabled={disabled} onClick={() => { forgetAvailability(); setRetry(value => value + 1); }} type="button">Try again</button>
-        </div> : dayInView ? selectedTimes.length || gone.length ? <div className="teacher-lesson-picker__slots" aria-label={gone.length ? "Times in Porto" : "Available times in Porto"}>
+        </div> : dayInView ? selectedTimes.length || gone.length ? <div className="teacher-lesson-picker__slots" aria-label={gone.length ? `Times in ${TUTOR_CITY}` : `Available times in ${TUTOR_CITY}`}>
           {/* Gone: any quarter hour, for a lesson she is recording. */}
           {gone.map(value => <button
-            aria-label={`${value} Porto time, already past`}
+            aria-label={`${value} ${HOME_CLOCK}, already past`}
             aria-pressed={!startAt && time === value}
             className="teacher-lesson-picker__slot is-past"
             disabled={disabled}
@@ -169,7 +170,7 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
             type="button"
           >{value}</button>)}
           {selectedTimes.map(slot => <button
-            aria-label={`${formatSlotTime(slot.startAt)} Porto time`}
+            aria-label={`${formatSlotTime(slot.startAt)} ${HOME_CLOCK}`}
             aria-pressed={startAt ? slot.startAt === startAt : time === formatSlotTime(slot.startAt)}
             className="teacher-lesson-picker__slot"
             disabled={disabled}
@@ -178,7 +179,7 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
             type="button"
           >{formatSlotTime(slot.startAt)}</button>)}
         </div> : <p>No available times. Choose another day.</p> : <p>Its free times show here.</p>}
-        {date && time ? <p className="teacher-lesson-picker__chosen">Chosen: <strong>{dateLabel(date, { day: "numeric", month: "short" })}, {time}</strong> · Porto time</p> : null}
+        {date && time ? <p className="teacher-lesson-picker__chosen">Chosen: <strong>{dateLabel(date, { day: "numeric", month: "short" })}, {time}</strong> · {HOME_CLOCK}</p> : null}
       </div>
     </div>
   </fieldset>;

@@ -1,3 +1,4 @@
+import { LANGUAGE_CODE } from "@/lib/tutor";
 import { PAINTS, hash, type PaintKey } from "@/lib/expression-paint";
 import { blob, layoutPhrase, makeCanvas, paintBead, paintLetters, paintStroke, rng, type PhraseLine, type Rand, type Solid, type WaxMetrics } from "./paint-art";
 
@@ -126,7 +127,7 @@ type Shown =
   | { kind: "show"; phrase: string; id: string; paint: PaintKey };
 
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
-const normal = (value: string) => value.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-PT").replace(/[^\p{L}\p{N} ]/gu, "").trim();
+const normal = (value: string) => value.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase(LANGUAGE_CODE).replace(/[^\p{L}\p{N} ]/gu, "").trim();
 const DURATIONS: Record<number, number[]> = { 1: [700], 2: [560, 470], 3: [480, 420, 390], 4: [370, 330, 320, 310] };
 /** Each line's stroke; a phrase of many lines shares about the time four take. */
 const durationsFor = (n: number) => DURATIONS[n] ?? Array.from({ length: n }, () => Math.max(150, Math.round(1330 / n)));

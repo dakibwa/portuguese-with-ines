@@ -93,6 +93,22 @@ request only competes with the fonts for no gain.
 - [design/README.md](./design/README.md) is the canonical visual and interaction
   contract. Read it before changing anything visual, keep it aligned with the
   code in the same change, and verify the result on the published site.
+- **Who the tutor is lives in one record**, [tutors/ines/tutor.json](./tutors/ines/tutor.json):
+  name, pronouns, brand, the language taught and its phrases, city, clock,
+  currency, domain, sender address, booking reference prefix and calendar UID
+  domain, and the default rules. The Worker reads it through
+  `workers/booking/tutor.mjs` and the site through `src/lib/tutor.ts`, so
+  shared pages, tools and emails never spell Inês, Porto or Portuguese out.
+  This is the first step of serving several tutors from this code (9 November
+  2026, Dan). Her own pages' words (home, approach, lessons, FAQ, terms,
+  privacy) are still written in their pages until each tutor's content has a
+  file of its own. Day-to-day rules (notice, prices, buffer, horizon, fee)
+  stay in the Worker's settings and lesson types, which win over the record's
+  defaults. The Worker already serves any tutor listed in
+  `workers/booking/directory.mjs` from their own D1 database, picked by the
+  site that calls it; Inês's calls run exactly as before (see "More than one
+  tutor" in [docs-booking-system.md](./docs-booking-system.md)). Expressions is
+  her own add-on, not part of the platform.
 - **Booking is owned by this repository**, not by a third-party scheduler. The
   `ines-booking` Worker in `workers/booking/` and its D1 database are the source
   of truth for availability, bookings, reschedules and cancellations. See

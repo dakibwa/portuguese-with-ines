@@ -25,6 +25,7 @@ import {
   redeemRecurringRate
 } from "@/lib/booking-api";
 import { STUDENT_MARKS } from "@/lib/student-marks";
+import { TUTOR_NAME, TUTOR_OBJECT } from "@/lib/tutor";
 import { hasStudentSide } from "@/lib/account-workspace";
 import { StudentHomework } from "@/components/homework/StudentHomework";
 
@@ -765,7 +766,7 @@ export function MyLessons({
                           setCardChecking(false);
                           returningCard.current = false;
                           setOpenField((field) => field === "card" ? null : field);
-                          setDetailsNote("Card removed. Lessons Inês adds are paid to her by hand again.");
+                          setDetailsNote(`Card removed. Lessons ${TUTOR_NAME} adds are paid to ${TUTOR_OBJECT} by hand again.`);
                           void load();
                         } catch (caught) {
                           if (readSession() !== session) return;
@@ -857,7 +858,7 @@ export function MyLessons({
             <p className="my-lessons__details-note">We couldn&rsquo;t check your prices just now.</p>
           ) : null}
           <details className="my-lessons__code">
-            <summary>Have a code from Inês?</summary>
+            <summary>Have a code from {TUTOR_NAME}?</summary>
             <form
               className="my-lessons__details-row"
               onSubmit={(event) => {

@@ -15,8 +15,8 @@
  * lock/refund behaviour, inside the same window.
  */
 
-import { DEFAULT_MINIMUM_NOTICE_HOURS } from "./availability.mjs";
-import { dateKey, PORTO } from "./time.mjs";
+import { dateKey, homeZone } from "./time.mjs";
+import { currentTutor } from "./tutor.mjs";
 
 /** The wording a booking made under the 14-hour rule consents to. */
 export const PAYMENT_CONSENT_VERSION = "2026-09-21-fourteen-hours-v1";
@@ -50,14 +50,14 @@ export const NO_SHOW_WINDOW_HOURS = 0;
 const LESSON_DAY_CONSENT_VERSIONS = new Set(["2026-09-01-after-lesson-v1"]);
 
 /** True when moving or cancelling now falls inside the fee window. */
-export function isLateChange(row, now = new Date(), noticeHours = DEFAULT_MINIMUM_NOTICE_HOURS) {
+export function isLateChange(row, now = new Date(), noticeHours = currentTutor().defaults.noticeHours) {
   const start = new Date(row.starts_at);
   const late = start.getTime() - now.getTime() < noticeHours * 3600000;
   if (!LESSON_DAY_CONSENT_VERSIONS.has(row.payment_consent_version)) return late;
-  return late && dateKey(now, PORTO) === dateKey(start, PORTO);
+  return late && dateKey(now, homeZone()) === dateKey(start, homeZone());
 }
 
-export function changePolicy(row, now = new Date(), noticeHours = DEFAULT_MINIMUM_NOTICE_HOURS) {
+export function changePolicy(row, now = new Date(), noticeHours = currentTutor().defaults.noticeHours) {
   const paid = row.payment_status === "paid";
   const scheduled = row.payment_status === "scheduled" || row.payment_status === "processing";
   // A free lesson has nothing to take a fee from and no card behind it
@@ -84,7 +84,7 @@ export function changePolicy(row, now = new Date(), noticeHours = DEFAULT_MINIMU
  * never applies the EUR 5 fee behind the scenes: an occurrence inside the fee
  * window stays booked and every later occurrence can go.
  */
-export function planSeriesCancellation(rows, now = new Date(), noticeHours = DEFAULT_MINIMUM_NOTICE_HOURS) {
+export function planSeriesCancellation(rows, now = new Date(), noticeHours = currentTutor().defaults.noticeHours) {
   const cancellable = [];
   const kept = [];
 
@@ -104,7 +104,7 @@ export function planSeriesCancellation(rows, now = new Date(), noticeHours = DEF
  * lesson may already have a hosted Checkout Session for the old amount; neither
  * should be rewritten silently by the reschedule endpoint.
  */
-export function lessonTypeChangeProblem(row, currentLessonType, nextLessonType) {
+export function lessonTypeChangeProblem(row, currentLessonType, nextLessonType, tutor = currentTutor()) {
   if (currentLessonType.id === nextLessonType.id) return "";
   if (currentLessonType.id === "trial" || nextLessonType.id === "trial") {
     return "A trial lesson can't be changed into another lesson length. Choose a new date and time, or cancel it and book another lesson.";
@@ -112,7 +112,7 @@ export function lessonTypeChangeProblem(row, currentLessonType, nextLessonType) 
 
   // Paid to Inês by hand for this length: another length is hers to arrange.
   if (row.payment_consent_version === PAID_BY_HAND_MARK) {
-    return "This lesson is already paid. To change its length, reply to your confirmation email and Inês will help.";
+    return `This lesson is already paid. To change its length, reply to your confirmation email and ${tutor.shortName} will help.`;
   }
   if (row.payment_status === "not_required" || row.payment_status === "scheduled") return "";
   // Allowed only onto another free length; the caller knows the new price.
