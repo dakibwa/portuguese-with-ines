@@ -517,7 +517,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   corner when they have a weekly run, three small checks and the one thing to
   press next, and only the dabs that need her eye (27 October 2026, Dan). The
   checks are `Signed in` (or `Link sent 5 Sept`, or `Not signed in`), `Card
-  saved` (or `No card yet`) and `Paid up` (or `€70 open` in coral, counting
+  saved` (or `No card yet`, or `Lessons not on card` when a saved card doesn't
+  yet cover lessons she added to come; a saved card with none of those counts
+  as done, 9 November 2026, Dan: no `Ask for card` for someone already paying)
+  and `Paid up` (or `€70 open` in coral, counting
   past lessons she added that were neither charged nor ticked paid); a
   blue dab marks each one done. Card and paid are omitted when cards are
   unavailable or the student is free at every length. The next button is
