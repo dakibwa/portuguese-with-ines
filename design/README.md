@@ -1332,8 +1332,8 @@ Preserve these desktop and mobile states:
   added`, with `Change` or `Add card`; opening it shows the confirm step's
   dabbed terms in place (the two €5 fees among them) and `Agree & add
   card`, which goes to Stripe's page. While a lesson Inês added is still
-  paid to her by hand, Your lessons opens with one sheet card above the
-  calendar, the same card a payment link opens (2 November 2026, Dan: "just
+  paid to her by hand, Your lessons opens on one sheet card alone, its
+  calendar held back until the card is agreed, the same card a payment link opens (2 November 2026, Dan: "just
   have it as one single thing"): a card icon in a lilac disc, `Confirm your
   card payments`, `Paid at the end of each lesson` with `Porto time` over their
   weekly run or the lessons she added as dashed tiles, the fee's two dabs, the
