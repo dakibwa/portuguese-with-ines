@@ -471,7 +471,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       })
     : event === "rescheduled"
       ? lessonMovedTeacher({
-          ...teacherFacts, lengthChanged: !byTeacher && lessonTypeChanged, fromMinutes: previousLessonType?.duration_minutes,
+          ...teacherFacts, lengthChanged: lessonTypeChanged, fromMinutes: previousLessonType?.duration_minutes,
           minutes: lessonType.duration_minutes, late: Boolean(row.same_day_change),
           previousWhen: previousStartsAt ? formatInZone(new Date(previousStartsAt), PORTO) : "",
           lateNote: row.same_day_change
@@ -768,8 +768,11 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   const slotWeekday = new Intl.DateTimeFormat("en-GB", { timeZone: studentClock, weekday: "long" }).format(new Date(first.starts_at));
   const slotTime = new Intl.DateTimeFormat("en-GB", { timeZone: studentClock, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
     .format(new Date(first.starts_at));
-  const moved = reason === "moved";
+  // Inês changed how long they are, at the same times (9 November 2026, Dan).
+  const lengthChanged = reason === "length";
+  const moved = reason === "moved" || lengthChanged;
   const common = {
+    lengthChanged, minutes: lessonType.duration_minutes,
     lesson: lessonLine(lessonType), lessonName: lessonName(lessonType), place: placeLabel(first),
     notice: `${settings.minimumNoticeHours} hours`, fee: formatEuros(settings.sameDayChangeFeeCents)
   };
@@ -797,7 +800,9 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
         kind: moved ? "student_series_moved" : "student_series_booked",
         bookingId: first.id,
         lifecycle: emailLifecycle(rows),
-        dedupeKey: moved
+        dedupeKey: lengthChanged
+          ? `student:series-length:${series.id}:${first.id}:${first.sequence}`
+          : moved
           ? `student:series-moved:${series.id}:${first.sequence}`
           : `student:series:${series.id}:${rows[0].id}`,
         replyTo,
@@ -825,7 +830,9 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
         kind: reason === "extended" ? "teacher_series_extended" : moved ? "teacher_series_moved" : "teacher_series_booked",
         bookingId: first.id,
         lifecycle: emailLifecycle(rows),
-        dedupeKey: moved
+        dedupeKey: lengthChanged
+          ? `teacher:series-length:${series.id}:${first.id}:${first.sequence}`
+          : moved
           ? `teacher:series-moved:${series.id}:${first.sequence}`
           : `teacher:series:${series.id}:${rows[0].id}`,
         replyTo: first.student_email,
@@ -937,8 +944,11 @@ function keptLessons(kept, zone) {
   return kept.length ? { count: kept.length, dates: kept.map((row) => formatInZone(new Date(row.starts_at), zone)).join("\n") } : null;
 }
 
-async function notifySeriesCancelled(env, { rows, kept = [], lessonType, settings }) {
+async function notifySeriesCancelled(env, { rows, kept = [], lessonType, settings, byTeacher = false, message = null }) {
   if (!rows.length) return [];
+  const held = byTeacher && await awaitingWelcomeAt(env, rows[0].student_email);
+  // Her words go to a student who is emailed; one who is held is not.
+  const cancellationMessage = byTeacher && !held ? message?.trim() ?? "" : "";
 
   const teacherEmail = env.TEACHER_EMAIL || settings.teacherEmail;
   const replyTo = settings.replyToEmail || teacherEmail || undefined;
@@ -964,7 +974,7 @@ async function notifySeriesCancelled(env, { rows, kept = [], lessonType, setting
   const count = `${rows.length} ${rows.length === 1 ? "lesson" : "lessons"}`;
 
   const studentCopy = studentCancelled({
-    first: first.student_name.split(" ")[0],
+    first: first.student_name.split(" ")[0], byInes: byTeacher, message: cancellationMessage,
     run: { count, zone: zoneName(studentClock, new Date(first.starts_at)), dates: datesOn(studentClock), kept: keptLessons(kept, studentClock) }
   });
   const sends = [
@@ -983,6 +993,7 @@ async function notifySeriesCancelled(env, { rows, kept = [], lessonType, setting
 
   if (teacherNotificationsEnabled(env) && teacherEmail) {
     const teacherCopy = lessonCancelledTeacher({
+      byInes: byTeacher, held, message: cancellationMessage,
       student: { name: first.student_name, email: shownEmail(first.student_email), nif: await studentNif(env, first.student_id) },
       run: { count, dates: datesOn(PORTO), kept: keptLessons(kept, PORTO) }
     });
@@ -5877,6 +5888,249 @@ function availabilityRevisionBump(env, authorization) {
     ON CONFLICT(key) DO UPDATE SET value = CAST(settings.value AS INTEGER) + 1`).bind(...authorization.values);
 }
 
+/**
+ * One lesson cancelled by her. Her cancellation always refunds a paid lesson,
+ * inside the 14-hour window included: a student loses the free change window,
+ * she never does, and the money follows automatically so there is nothing to
+ * remember. It gives the cancelled row, or why the lesson stays and the
+ * status to answer with.
+ */
+async function teacherCancelLesson(env, row, cancellationMessage, authorization) {
+  const changed = { problem: "That lesson has just changed. Please reload.", status: 409 };
+  if (row.payment_status === "paid" && row.stripe_payment_intent) {
+    if (!await claimRefund(env, row, "teacher", cancellationMessage, null, authorization)) return changed;
+    await authorization.assert();
+    const updated = await completeRefund(env, row.id);
+    return updated ? { row: updated } : {
+      problem: "The cancellation request is recorded. Its refund is awaiting confirmation; the lesson stays reserved and locked. Review the payment in Stripe before any further action.",
+      status: 503, pendingRefund: true
+    };
+  }
+
+  // A card declined after the lesson, or on a late change fee, leaves money
+  // owed and a page to pay it on. Her cancellation never costs them
+  // anything (22 October 2026, Dan), so it waives both, once that page can
+  // no longer take a payment: one landing on a cancelled lesson would have
+  // nothing to refund it.
+  const owed = [
+    row.payment_status === "payment_due" && row.stripe_session_id,
+    row.same_day_fee_status === "payment_due" && row.same_day_fee_session_id
+  ].filter(Boolean);
+  for (const sessionId of owed) {
+    if (!await checkoutSessionExpired(env, sessionId)) {
+      return { problem: "A payment for this lesson may be going through. Please reload in a few minutes.", status: 409 };
+    }
+  }
+
+  const now = new Date().toISOString();
+  // A charge may finish after our read without changing sequence. Only the
+  // payment we inspected may take this path; a newly paid lesson must reload
+  // into the refund claim above rather than becoming cancelled without it.
+  const cancelled = await env.DB.prepare(
+    `UPDATE bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'teacher',
+       sequence = sequence + 1, same_day_change = 0, updated_at = ?, cancellation_message = ?,
+       payment_status = CASE WHEN payment_status = 'payment_due' THEN 'not_required' ELSE payment_status END,
+       same_day_fee_status = CASE WHEN same_day_fee_status IN ('scheduled', 'payment_due') THEN 'not_required' ELSE same_day_fee_status END
+     WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
+       AND payment_status = ? AND amount_cents IS ? AND charged_cents IS ?
+       AND stripe_payment_intent IS ? AND stripe_session_id IS ? AND charge_started_at IS ? AND charge_request IS ?
+       AND payment_consent_at IS ? AND payment_consent_version IS ?
+       AND same_day_fee_status != 'processing' AND same_day_fee_status = ? AND same_day_fee_session_id IS ? AND (${authorization.sql})`
+  )
+    .bind(now, now, cancellationMessage, row.id, row.sequence,
+      row.payment_status, row.amount_cents, row.charged_cents, row.stripe_payment_intent, row.stripe_session_id,
+      row.charge_started_at, row.charge_request, row.payment_consent_at, row.payment_consent_version,
+      row.same_day_fee_status, row.same_day_fee_session_id ?? null, ...authorization.values)
+    .run();
+  if (!(cancelled?.meta?.changes > 0)) return changed;
+  return { row: await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first() };
+}
+
+/**
+ * Her cancellation of a weekly lesson and every later week of its run
+ * (9 November 2026, Dan: "she can cancel them all too"). The run stops first,
+ * so no week can be added after the set is read; then each lesson is
+ * cancelled exactly as she cancels one. A lesson whose payment is part way
+ * through stays and is named in the reply. The student gets one email for
+ * the rest, as when they stop a run themselves.
+ */
+async function teacherCancelFollowing(request, env, ctx, row, message, authorization) {
+  if (!row.series_id) return fail("This lesson isn't part of a weekly run.", 400, request, env);
+  const now = new Date();
+  if (Date.parse(row.starts_at) <= now.getTime()) return fail("Cancel weekly lessons from one still to come.", 409, request, env);
+
+  await env.DB.prepare(`UPDATE booking_series SET status = 'ended', ended_at = ?, updated_at = ?
+    WHERE id = ? AND status = 'active' AND (${authorization.sql})`)
+    .bind(now.toISOString(), now.toISOString(), row.series_id, ...authorization.values)
+    .run();
+  const { results } = await env.DB.prepare(
+    "SELECT * FROM bookings WHERE series_id = ? AND status = 'confirmed' AND starts_at >= ? ORDER BY starts_at"
+  )
+    .bind(row.series_id, row.starts_at)
+    .all();
+
+  const cancelled = [];
+  const kept = [];
+  for (const lesson of results ?? []) {
+    const outcome = await teacherCancelLesson(env, lesson, message, authorization);
+    if (outcome.row) cancelled.push(outcome.row);
+    else kept.push({ startsAt: lesson.starts_at, reason: outcome.pendingRefund ? "its refund is still going through" : "a payment for it may be going through" });
+  }
+  if (!cancelled.length) {
+    return fail(kept.length ? "A payment for these lessons may be going through. Please reload in a few minutes." : "That lesson has just changed. Please reload.", 409, request, env);
+  }
+
+  const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
+  const settings = await loadSettings(env);
+  ctx.waitUntil(notifySeriesCancelled(env, { rows: cancelled, lessonType, settings, byTeacher: true, message }));
+  return json({
+    cancelled: cancelled.map((lesson) => lesson.starts_at),
+    kept,
+    emailed: !await awaitingWelcomeAt(env, row.student_email)
+  }, 200, request, env);
+}
+
+/** Why a lesson keeps its length when she changes it, in a few words, or "". */
+function lengthKeptReason(row, currentLessonType, lessonType, amountCents) {
+  if (!lessonTypeChangeProblem(row, currentLessonType, lessonType) && !freeLengthProblem(row, amountCents) && !row.charge_started_at) return "";
+  if (currentLessonType.id === "trial") return "it's a trial lesson";
+  if (row.payment_status === "paid" || row.payment_consent_version === PAID_BY_HAND_MARK) return "it's already paid";
+  if (row.payment_status === "payment_due") return "it has a payment due";
+  if (row.payment_status === FREE) return "it's free";
+  return "its payment is going through";
+}
+
+/**
+ * Her change of a lesson's length, or of it and every later week of its run
+ * (9 November 2026, Dan: "change recurring ones from 60 to 90 and they all
+ * change"). Each changes to the student's own price for the new length, in
+ * one guarded write: all of them or none. A lesson paid, being paid or free,
+ * or one the longer lesson would run into another, keeps its length and is
+ * named in the reply. With `following` the run's recipe takes the new length
+ * too, so weeks added to it later are booked at it.
+ */
+async function teacherChangeLength(request, env, ctx, bookingId, body, authorization) {
+  const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(bookingId).first();
+  if (!row || row.status !== "confirmed") return fail("That lesson could not be found.", 404, request, env);
+  if (Date.parse(row.starts_at) <= Date.now()) return fail("A lesson already had keeps its length.", 409, request, env);
+  const following = body.following === true;
+  if (following && !row.series_id) return fail("This lesson isn't part of a weekly run.", 400, request, env);
+  const lessonType = await loadLessonType(env, cleanText(body.lessonType, 40));
+  if (!lessonType || lessonType.id === "trial") return fail("Choose 60 or 90 minutes.", 400, request, env);
+  const amountCents = (await studentLessonType(env, row.student_id, lessonType)).price_cents;
+  if (body.expectedPriceCents !== amountCents) {
+    return fail("Their price for that length has changed. Please reload and check it.", 409, request, env);
+  }
+
+  const lessons = following
+    ? (await env.DB.prepare("SELECT * FROM bookings WHERE series_id = ? AND status = 'confirmed' AND starts_at >= ? ORDER BY starts_at")
+        .bind(row.series_id, row.starts_at).all()).results ?? []
+    : [row];
+  const types = new Map();
+  const planned = [];
+  const kept = [];
+  for (const lesson of lessons) {
+    if (lesson.lesson_type_id === lessonType.id) continue;
+    if (!types.has(lesson.lesson_type_id)) {
+      types.set(lesson.lesson_type_id, await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(lesson.lesson_type_id).first());
+    }
+    const endAt = new Date(Date.parse(lesson.starts_at) + lessonType.duration_minutes * 60000).toISOString();
+    // Her own lessons keep no gap, as when she adds one: only an overlap stops it.
+    const reason = lengthKeptReason(lesson, types.get(lesson.lesson_type_id), lessonType, amountCents) ||
+      (await env.DB.prepare(
+        `SELECT 1 FROM bookings WHERE id != ? AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))
+           AND starts_at < ? AND ends_at > ? LIMIT 1`
+      ).bind(lesson.id, new Date().toISOString(), endAt, lesson.starts_at).first() ? "it would run into another lesson" : "");
+    if (reason) {
+      kept.push({ startsAt: lesson.starts_at, reason });
+      continue;
+    }
+    planned.push({
+      id: lesson.id, startAt: lesson.starts_at, endAt, oldSequence: lesson.sequence, oldLessonType: lesson.lesson_type_id,
+      oldPaymentStatus: lesson.payment_status, oldAmount: lesson.amount_cents ?? null,
+      oldConsentAt: lesson.payment_consent_at ?? null, oldConsentVersion: lesson.payment_consent_version ?? null
+    });
+  }
+  if (!planned.length) {
+    return fail(
+      kept.length === 1 ? `This lesson keeps its length: ${kept[0].reason}.`
+        : kept.length ? "None of these lessons can change length. Open each one to see why."
+        : `${following ? "These lessons are" : "This lesson is"} already ${lessonType.duration_minutes} minutes.`,
+      409, request, env
+    );
+  }
+
+  // One write for every lesson, as a student's weekly move is: JSON keeps a
+  // long run inside D1's 100-parameter limit, and the counts make it all or
+  // none. A run that gained or lost a lesson since the read is refused too.
+  const nowIso = new Date().toISOString();
+  const proposed = JSON.stringify(planned);
+  const statements = [env.DB.prepare(
+    `WITH proposed AS MATERIALIZED (
+       SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.startAt') AS start_at, json_extract(value, '$.endAt') AS end_at,
+         json_extract(value, '$.oldSequence') AS old_sequence, json_extract(value, '$.oldLessonType') AS old_lesson_type,
+         json_extract(value, '$.oldPaymentStatus') AS old_payment_status, json_extract(value, '$.oldAmount') AS old_amount,
+         json_extract(value, '$.oldConsentAt') AS old_consent_at, json_extract(value, '$.oldConsentVersion') AS old_consent_version
+       FROM json_each(?)
+     )
+     UPDATE bookings
+     SET lesson_type_id = ?, ends_at = (SELECT end_at FROM proposed WHERE id = bookings.id),
+       amount_cents = ?, ${FREE_ON_ZERO("?")}, sequence = sequence + 1, same_day_change = 0, updated_at = ?
+     WHERE id IN (SELECT id FROM proposed)
+       AND (SELECT COUNT(*) FROM bookings current JOIN proposed p ON p.id = current.id
+              AND p.start_at = current.starts_at AND p.old_sequence = current.sequence
+              AND p.old_lesson_type = current.lesson_type_id AND p.old_payment_status = current.payment_status
+              AND p.old_amount IS current.amount_cents AND p.old_consent_at IS current.payment_consent_at
+              AND p.old_consent_version IS current.payment_consent_version
+            WHERE current.status = 'confirmed' AND current.starts_at > ? AND current.charge_started_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = current.id AND status = 'pending')) = ?
+       AND (? IS NULL OR (SELECT COUNT(*) FROM bookings current
+            WHERE current.series_id = ? AND current.status = 'confirmed' AND current.starts_at >= ?) = ?)
+       AND NOT EXISTS (SELECT 1 FROM bookings other JOIN proposed p ON other.starts_at < p.end_at AND other.ends_at > p.start_at
+         WHERE (other.status = 'confirmed' OR (other.status = 'pending_payment' AND other.hold_expires_at > ?))
+           AND other.id NOT IN (SELECT id FROM proposed))
+       AND ${lessonPriceSnapshotSql()} AND (${authorization.sql})`
+  ).bind(
+    proposed, lessonType.id, amountCents, amountCents, amountCents, amountCents, nowIso,
+    nowIso, planned.length,
+    following ? row.series_id : null, row.series_id, row.starts_at, lessons.length,
+    nowIso,
+    ...lessonPriceSnapshot(row.student_id, { ...lessonType, price_cents: amountCents }), ...authorization.values
+  )];
+  if (following) {
+    statements.push(env.DB.prepare(
+      `UPDATE booking_series SET lesson_type_id = ?, updated_at = ? WHERE id = ? AND changes() = ? AND (${authorization.sql})`
+    ).bind(lessonType.id, nowIso, row.series_id, planned.length, ...authorization.values));
+  }
+  const [changed] = await env.DB.batch(statements);
+  if ((changed?.meta?.changes ?? 0) !== planned.length) {
+    return fail("Those lessons have just changed. Please reload and try again.", 409, request, env);
+  }
+
+  const { results: updated = [] } = await env.DB.prepare(
+    "SELECT * FROM bookings WHERE id IN (SELECT value FROM json_each(?)) ORDER BY starts_at"
+  ).bind(JSON.stringify(planned.map((entry) => entry.id))).all();
+  const settings = await loadSettings(env);
+  const manageUrls = {};
+  for (const lesson of updated) {
+    manageUrls[lesson.id] = studentManageUrl(env, await createManageToken(lesson.id, env.BOOKING_TOKEN_SECRET));
+  }
+  ctx.waitUntil(updated.length === 1
+    ? notify(env, {
+        event: "rescheduled", row: updated[0], lessonType, settings, manageUrl: manageUrls[updated[0].id],
+        previousLessonType: types.get(planned[0].oldLessonType), byTeacher: true
+      })
+    : notifySeries(env, {
+        rows: updated, lessonType, settings, manageUrls, skipped: [], reason: "length", byTeacher: true,
+        series: await env.DB.prepare("SELECT * FROM booking_series WHERE id = ?").bind(row.series_id).first()
+      }));
+  return json({
+    changed: updated.map((lesson) => lesson.starts_at),
+    kept,
+    emailed: !await awaitingWelcomeAt(env, row.student_email)
+  }, 200, request, env);
+}
+
 async function handleAdmin(request, env, ctx, url, path) {
   const admin = await isAdmin(request, env);
   if (admin === "throttled") return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
@@ -6774,60 +7028,11 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       return fail("Keep the message to 1,000 characters or fewer.", 400, request, env);
     }
     const cancellationMessage = body.message?.replace(/\r\n?/g, "\n").trim() || null;
+    if (body.following === true) return await teacherCancelFollowing(request, env, ctx, row, cancellationMessage, authorization);
 
-    // Her cancellation always refunds a paid lesson — inside the 14-hour window
-    // included. A student loses the free change window; she never does, and
-    // the money follows automatically so there is nothing to remember.
-    if (row.payment_status === "paid" && row.stripe_payment_intent) {
-      if (!await claimRefund(env, row, "teacher", cancellationMessage, null, authorization)) return fail("That lesson has just changed. Please reload.", 409, request, env);
-      await authorization.assert();
-      const updated = await completeRefund(env, row.id);
-      if (!updated) return fail("The cancellation request is recorded. Its refund is awaiting confirmation; the lesson stays reserved and locked. Review the payment in Stripe before any further action.", 503, request, env);
-      const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
-      const settings = await loadSettings(env);
-      ctx.waitUntil(notify(env, { event: "cancelled", row: updated, lessonType, settings, manageUrl: "", byTeacher: true }));
-      return json({ booking: publicBooking(updated, lessonType, settings), emailed: !await awaitingWelcomeAt(env, updated.student_email) }, 200, request, env);
-    }
-
-    // A card declined after the lesson, or on a late change fee, leaves money
-    // owed and a page to pay it on. Her cancellation never costs them
-    // anything (22 October 2026, Dan), so it waives both, once that page can
-    // no longer take a payment: one landing on a cancelled lesson would have
-    // nothing to refund it.
-    const owed = [
-      row.payment_status === "payment_due" && row.stripe_session_id,
-      row.same_day_fee_status === "payment_due" && row.same_day_fee_session_id
-    ].filter(Boolean);
-    for (const sessionId of owed) {
-      if (!await checkoutSessionExpired(env, sessionId)) {
-        return fail("A payment for this lesson may be going through. Please reload in a few minutes.", 409, request, env);
-      }
-    }
-
-    const now = new Date().toISOString();
-    // A charge may finish after our read without changing sequence. Only the
-    // payment we inspected may take this path; a newly paid lesson must reload
-    // into the refund claim above rather than becoming cancelled without it.
-    const cancelled = await env.DB.prepare(
-      `UPDATE bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'teacher',
-         sequence = sequence + 1, same_day_change = 0, updated_at = ?, cancellation_message = ?,
-         payment_status = CASE WHEN payment_status = 'payment_due' THEN 'not_required' ELSE payment_status END,
-         same_day_fee_status = CASE WHEN same_day_fee_status IN ('scheduled', 'payment_due') THEN 'not_required' ELSE same_day_fee_status END
-       WHERE id = ? AND status = 'confirmed' AND sequence = ? AND payment_status != 'processing'
-         AND payment_status = ? AND amount_cents IS ? AND charged_cents IS ?
-         AND stripe_payment_intent IS ? AND stripe_session_id IS ? AND charge_started_at IS ? AND charge_request IS ?
-         AND payment_consent_at IS ? AND payment_consent_version IS ?
-         AND same_day_fee_status != 'processing' AND same_day_fee_status = ? AND same_day_fee_session_id IS ? AND (${authorization.sql})`
-    )
-      .bind(now, now, cancellationMessage, row.id, row.sequence,
-        row.payment_status, row.amount_cents, row.charged_cents, row.stripe_payment_intent, row.stripe_session_id,
-        row.charge_started_at, row.charge_request, row.payment_consent_at, row.payment_consent_version,
-        row.same_day_fee_status, row.same_day_fee_session_id ?? null, ...authorization.values)
-      .run();
-
-    if (!(cancelled?.meta?.changes > 0)) return fail("That lesson has just changed. Please reload.", 409, request, env);
-
-    const updated = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(row.id).first();
+    const outcome = await teacherCancelLesson(env, row, cancellationMessage, authorization);
+    if (!outcome.row) return fail(outcome.problem, outcome.status, request, env);
+    const updated = outcome.row;
     const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?")
       .bind(row.lesson_type_id)
       .first();
@@ -6844,6 +7049,11 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     );
 
     return json({ booking: publicBooking(updated, lessonType, settings), emailed: !await awaitingWelcomeAt(env, updated.student_email) }, 200, request, env);
+  }
+
+  const adminLength = path.match(/^\/admin\/bookings\/([^/]+)\/length$/);
+  if (adminLength && request.method === "POST") {
+    return await teacherChangeLength(request, env, ctx, adminLength[1], adminBody, authorization);
   }
 
   const adminNoShow = path.match(/^\/admin\/bookings\/([^/]+)\/no-show$/);

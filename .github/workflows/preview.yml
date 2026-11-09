@@ -78,7 +78,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: '4.145.0'
+          wranglerVersion: '4.158.0'
           command: pages deploy out --project-name=portuguese-with-ines --branch=${{ steps.branch.outputs.name }}
       - name: Post or update the preview link
         uses: actions/github-script@v7

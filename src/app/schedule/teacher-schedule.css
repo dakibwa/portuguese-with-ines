@@ -1342,6 +1342,19 @@
   grid-column: 1/-1;
   margin: 0;
 }
+/* Changing a length: which lessons, the length, then what happens, one
+   above the other as the move form's fields. */
+.teacher-length-form {
+  display: grid;
+  gap: 1rem;
+}
+.teacher-length-form > :is(h3, ul, .teacher-dialog-actions) {
+  margin: 0;
+}
+/* This lesson or every week, between Cancel these lessons? and its dabs. */
+.teacher-dialog-confirmation > .teacher-week-choice {
+  margin-bottom: 1rem;
+}
 /* Inside a dialog every stack spaces itself with a gap. */
 .teacher-lesson-dialog .teacher-inline-error {
   margin: 0;

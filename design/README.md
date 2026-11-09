@@ -1332,8 +1332,8 @@ Preserve these desktop and mobile states:
   added`, with `Change` or `Add card`; opening it shows the confirm step's
   dabbed terms in place (the two €5 fees among them) and `Agree & add
   card`, which goes to Stripe's page. While a lesson Inês added is still
-  paid to her by hand, Your lessons opens with one sheet card above the
-  calendar, the same card a payment link opens (2 November 2026, Dan: "just
+  paid to her by hand, Your lessons opens on one sheet card alone, its
+  calendar held back until the card is agreed, the same card a payment link opens (2 November 2026, Dan: "just
   have it as one single thing"): a card icon in a lilac disc, `Confirm your
   card payments`, `Paid at the end of each lesson` with `Porto time` over their
   weekly run or the lessons she added as dashed tiles, the fee's two dabs, the
@@ -1969,9 +1969,19 @@ lesson's dabs (place, length, price and how it is paid). What she records sits
 together as one row of ticks, `Already paid` and `No-show` (named `Mark
 no-show` / `Undo no-show` for a screen reader), each the same capsule whose dab
 fills when ticked. Last, `Move lesson` in coral and `Cancel lesson` in outline
-share a row while both labels fit. Moving opens under its own `Move this lesson`
+share a row while both labels fit, with `Change length` in outline between
+them for a lesson still to come (not a trial). Moving opens under its own `Move this lesson`
 heading, as cancelling does under `Cancel this lesson?`, with what happens as a
-dab (`Sam gets an email with the new time`). `No-show` is live from the lesson's start until its end
+dab (`Sam gets an email with the new time`). A weekly lesson with later weeks
+asks which with the lesson form's slider, `This lesson` or `Every week` (this
+one and every later week; 9 November 2026, Dan): Change length starts on
+`Every week`, Cancel on `This lesson`. Change length's second slider is the
+length with the student's price for each (`60 mins · €22`), and its dabs say
+how many lessons change and between which days, at what price each, which
+stay as they are and why (`Tue 1 Dec stays as it is: it's already paid`), and
+that one email goes. Cancelling every week reads `Cancel these lessons?`,
+lists how many and between which days, and confirms with `Yes, cancel 8
+lessons`. `No-show` is live from the lesson's start until its end
 (2 November 2026), and before that it shows greyed out with `Available 11:00–12:00` beneath, so
 she always knows where it is. The marked state stays reversible within the same
 window, the lesson is charged once it closes, and a no-show means only €5 is

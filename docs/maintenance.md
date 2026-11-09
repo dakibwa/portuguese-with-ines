@@ -30,6 +30,10 @@ For performance changes, keep the route, viewport, cache state, network/CPU
 conditions and fixture data comparable before and after. Record measured
 results rather than claiming a speedup from a source change alone.
 
+**Latest checkpoint:** the second pass below clears the remaining development
+dependency findings. The next priority is a measured loading/interaction
+baseline, followed by one confirmed bottleneck or failure case.
+
 ## 9 November 2026 — setup and Next.js security update
 
 **Source baseline:** initial review at
@@ -101,3 +105,75 @@ of a live-site exploit. No product, Worker, payment or database logic changed.
 3. Continue authorization and failed-request review in one focused area. Check
    the newly merged student/payment/expression changes and any open PRs to
    avoid duplicate fixes.
+
+## 9 November 2026 — development dependency security
+
+**Source baseline:** maintenance head
+`1beeb75801646dd8b58058319f4ab7b51531f25b`, integrated with main at
+`e530e0cc328684936dc0aea97a05c2b549344f06`. Main's weekly-run and card-page
+changes were retained. PRs 193 and 194 contain separate student-card and
+weekly-run UI work; this pass does not edit those areas. Continue in
+[PR 190](https://github.com/dakibwa/portuguese-with-ines/pull/190).
+
+### Confirmed findings and changes
+
+The full audit reproduced the checkpoint's 12 findings: two high and ten
+moderate, all in development dependencies. The existing production audit
+remained clear. Updated only the affected tools and their dependency chains:
+
+| Package | Before | After | Reason |
+| --- | --- | --- | --- |
+| Wrangler | 4.151.1 | 4.158.0 | Selects the patched Miniflare/Undici chain within the existing major. |
+| Miniflare | 5.20261012.1-beta | 5.20261104.0-beta | Wrangler's selected dependency. |
+| Undici | 7.29.1 | 7.30.1 | Fixes the reported HTTP/TLS, redirect, parser and buffering advisories. |
+| Zod | 4.4.3 | 4.6.7 | Fixes oversized constrained-collection memory exhaustion, GHSA-mrhx-c7xc-m3w5. |
+| TypeScript-ESLint's Minimatch | 10.2.5 | 11.0.5 | Fixes glob-parts amplification, GHSA-g3hv-75wg-m249. |
+
+The Minimatch advisory covers all published 10.x versions. Instead of the
+audit's suggested downgrade to Next's 15.x ESLint configuration, a scoped
+override replaces only `@typescript-eslint/typescript-estree`'s Minimatch.
+Its consumer calls the exported `minimatch` function with `{ dot: true }`;
+the actual parser path was checked before and after. Other ESLint consumers
+keep unaffected Minimatch 3.1.5. Revisit the override when the parent supports
+a patched version in its declared range.
+
+Raised the manifest's Wrangler minimum to `^4.158.0` and changed the preview
+workflow's explicit CLI pin from 4.145.0 to 4.158.0. Leaving that pin untouched
+would still install an older tool outside the reviewed project lockfile.
+Next and its ESLint configuration remain at 16.4.5, and the source-checked
+Braces mitigation remains in place.
+
+### Validation
+
+- Full `npm audit`: **0 known vulnerabilities**, down from 12. The full report
+  includes the production dependency tree, which remains clear.
+- A fresh `npm ci --no-audit --no-fund`: passed with the scoped override and
+  existing postinstall Braces hardening, confirming the lockfile installs.
+- `npm run lint`: passed with zero errors and the existing ref-cleanup warning
+  in `LessonDetails.tsx`, now at line 209 following upstream changes.
+- `node scripts/harden-braces.mjs --check`: passed.
+- A temporary comparison probe exercised six dot-aware glob cases and the
+  actual TypeScript-ESLint `projectService.allowDefaultProject` path using both
+  the old 10.2.5 and replacement 11.0.5 packages. Both produced the expected
+  matches and a parser AST backed by a TypeScript program. The probe is scratch
+  validation, not an additional permanent suite.
+- `WRANGLER_SEND_METRICS=false npm run worker:dry-run`: passed with Wrangler
+  4.158.0, bundling the current booking Worker (535.28 KiB, 119.27 KiB gzip).
+  Wrangler confirmed `--dry-run: exiting now`; no Worker was uploaded or
+  resource mutated. This establishes packaging compatibility, not live runtime
+  behavior.
+- No product or Worker logic was authored in this pass, and no UI or browser
+  journey changed. Local release builds, live probes and the full journey
+  suite were not rerun for development-tool updates. No loading-speed or
+  frame-rate improvement is claimed.
+- `git diff --check`: passed.
+
+### Next priorities
+
+1. Capture matched cold/warm loading and interaction measurements on public
+   routes and the booking workspace. Choose the highest-impact observed
+   bottleneck; preserve the deliberate motion and use isolated API replies.
+2. Review one failed-request or authorization path, accounting for PRs 193/194
+   and any newer work before choosing files.
+3. Remove the scoped Minimatch override when upstream TypeScript-ESLint can
+   select a patched dependency itself; keep audits and Braces hardening checked.

@@ -5,14 +5,18 @@ import { X, ArrowLeft, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
   addedByTeacher,
   cancelBookingAs,
+  cancelFollowingAs,
+  changeLessonLength,
   rescheduleBookingAs,
   paidByHand,
   recordRefundByHand,
   setLessonPaid,
   setNoShow,
   type AdminBooking,
+  type AdminStudent,
+  type KeptLesson,
 } from "@/lib/admin-api";
-import { formatBookedLessonLabel, formatMoneyCents, formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
+import { formatBookedLessonLabel, formatMoneyCents, formatPriceCents, formatSlotTime, portoTimeToUtc } from "@/lib/booking-api";
 import { NO_SHOW_WINDOW_HOURS_AFTER, SAME_DAY_FEE_LABEL } from "@/lib/config";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
 import { AssetMark } from "@/components/BrandMarks";
@@ -24,9 +28,14 @@ import { useDialogBackdrop } from "@/lib/dialog-backdrop";
 import { TeacherHomework } from "@/components/homework/TeacherHomework";
 import { PaidTick } from "@/components/teacher/PaidTick";
 import { CardApprovalLink } from "@/components/teacher/CardApprovalLink";
+import { priceFor } from "@/components/teacher/StudentPrice";
 
 type Props = {
   booking: AdminBooking;
+  /** The lessons of its weekly run, for changing or cancelling every week from this one. */
+  weekly?: AdminBooking[];
+  /** Whose lesson it is, for their price at each length. */
+  student?: AdminStudent;
   token: string;
   now: Date;
   afterChangeFocusRef: RefObject<HTMLElement | null>;
@@ -35,8 +44,72 @@ type Props = {
   initialAction?: "view" | "refund";
 };
 
+/** "Tue 8 Dec", as her timetable names a day. */
+function shortDay(startsAt: string) {
+  return dateLabel(dateKey(new Date(startsAt)), { weekday: "short", day: "numeric", month: "short" });
+}
+
+/** "Tue 8 Dec to Tue 5 Jan" for several lessons, or the one day. */
+function daySpan(lessons: Pick<AdminBooking, "starts_at">[]) {
+  const first = shortDay(lessons[0].starts_at);
+  return lessons.length > 1 ? `${first} to ${shortDay(lessons[lessons.length - 1].starts_at)}` : first;
+}
+
+/** Lessons that stayed as they were, grouped by why: "Tue 15 Dec stays as it is: it's already paid." */
+function keptLine(kept: KeptLesson[]) {
+  const reasons = [...new Set(kept.map(lesson => lesson.reason))];
+  return reasons.map(reason => {
+    const days = kept.filter(lesson => lesson.reason === reason);
+    return ` ${days.map(lesson => shortDay(lesson.startsAt)).join(", ")} ${days.length === 1 ? "stays as it is" : "stay as they are"}: ${reason}.`;
+  }).join("");
+}
+
+/**
+ * Why a lesson can't take another length, as the Worker decides it, or "".
+ * Paid, due or being paid lessons keep theirs; a free one keeps it unless the
+ * new length is free too.
+ */
+function lengthHeld(lesson: AdminBooking, cents: number) {
+  if (paidByHand(lesson) || lesson.payment_status === "paid") return "it's already paid";
+  if (lesson.payment_status === "payment_due") return "it has a payment due";
+  if (lesson.payment_status === "processing" || lesson.charge_started_at) return "its payment is going through";
+  if (lesson.payment_status === "free" && cents > 0) return "it's free";
+  return "";
+}
+
+/**
+ * This lesson, or every week of its run from here (9 November 2026, Dan:
+ * "change recurring ones from 60 to 90 and they all change and she can cancel
+ * them all too"). The same slider as her lesson form's.
+ */
+function WeekChoice({ verb, following, disabled, onChange }: { verb: string; following: boolean; disabled: boolean; onChange: (following: boolean) => void }) {
+  return (
+    <fieldset className="teacher-manual-choice teacher-week-choice">
+      <legend>{verb}</legend>
+      <div className={`segmented${following ? " segmented--second" : ""}`}>
+        <span aria-hidden="true" className="segmented__thumb" />
+        {([[false, "This lesson"], [true, "Every week"]] as const).map(([value, label]) => (
+          <label className={following === value ? "is-active" : ""} key={label}>
+            <input
+              checked={following === value}
+              disabled={disabled}
+              name={`teacher-week-choice-${verb}`}
+              onChange={() => onChange(value)}
+              type="radio"
+              value={String(value)}
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 export function LessonDetails({
   booking,
+  weekly,
+  student,
   token,
   now,
   afterChangeFocusRef,
@@ -46,9 +119,12 @@ export function LessonDetails({
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const changed = useRef(false);
-  const [action, setAction] = useState<"view" | "move" | "cancel" | "no-show" | "homework" | "refund">(
+  const [action, setAction] = useState<"view" | "move" | "length" | "cancel" | "no-show" | "homework" | "refund">(
     initialAction,
   );
+  // The other length: a 60-minute lesson is most likely becoming 90.
+  const [length, setLength] = useState<"single" | "long">(booking.lesson_type_id === "long" ? "single" : "long");
+  const [following, setFollowing] = useState(false);
   const [date, setDate] = useState(dateKey(new Date(booking.starts_at)));
   const [time, setTime] = useState(formatSlotTime(booking.starts_at));
   // Pre-filled with the current slot: nothing to save until she changes it.
@@ -78,6 +154,19 @@ export function LessonDetails({
     booking.payment_status === "processing" ||
     booking.same_day_fee_status === "processing";
   const minutes = Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60_000);
+  // This lesson and the weeks after it, while it has weeks after it.
+  const later = booking.series_id ? (weekly ?? [])
+    .filter(lesson => lesson.series_id === booking.series_id && lesson.status === "confirmed" && lesson.starts_at >= booking.starts_at)
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at)) : [];
+  const toCome = booking.status === "confirmed" && !recorded && now < new Date(booking.starts_at);
+  const repeats = toCome && later.length > 1;
+  const everyWeek = following && repeats;
+  const lengthMinutes = length === "long" ? 90 : 60;
+  const lengthCents = priceFor(student, lengthMinutes);
+  const lengthScope = (everyWeek ? later : [booking]).filter(lesson => lesson.lesson_type_id !== length);
+  const lengthChanging = lengthScope.filter(lesson => !lengthHeld(lesson, lengthCents));
+  const lengthKept = lengthScope.filter(lesson => lengthHeld(lesson, lengthCents))
+    .map(lesson => ({ startsAt: lesson.starts_at, reason: lengthHeld(lesson, lengthCents) }));
   // Its price and how it is paid, one dab: "€25 · paid by card". A
   // cancelled lesson's money matters only if some moved.
   const ticked = paidByHand(booking);
@@ -150,6 +239,14 @@ export function LessonDetails({
         );
         changed.current = true;
         onChanged(moved.emailed === false ? "Lesson moved." : "Lesson moved. The student has been emailed the new time.");
+      } else if (action === "length") {
+        const result = await changeLessonLength(token, booking.id, length, lengthCents, everyWeek);
+        changed.current = true;
+        onChanged(`${result.changed.length === 1 ? "The lesson is" : `${result.changed.length} lessons are`} now ${lengthMinutes} minutes.${keptLine(result.kept)}${result.emailed === false ? "" : " The student has been emailed."}`);
+      } else if (action === "cancel" && everyWeek) {
+        const result = await cancelFollowingAs(token, booking.id, awaiting ? "" : cancelMessage);
+        changed.current = true;
+        onChanged(`${result.cancelled.length === 1 ? "Lesson" : `${result.cancelled.length} lessons`} cancelled.${keptLine(result.kept)}${result.emailed === false ? "" : " The student has been emailed."}`);
       } else if (action === "cancel") {
         const cancelled = await cancelBookingAs(token, booking.id, awaiting ? "" : cancelMessage);
         changed.current = true;
@@ -336,11 +433,28 @@ export function LessonDetails({
           >
             Move lesson
           </button>
+          {toCome && booking.lesson_type_id !== "trial" ? (
+            <button
+              className="button button--outline"
+              type="button"
+              disabled={busy || locked}
+              onClick={() => {
+                // Weekly, she most likely means every week from here.
+                setFollowing(repeats);
+                setAction("length");
+              }}
+            >
+              Change length
+            </button>
+          ) : null}
           <button
             className="button button--outline"
             type="button"
             disabled={busy || locked}
-            onClick={() => setAction("cancel")}
+            onClick={() => {
+              setFollowing(false);
+              setAction("cancel");
+            }}
           >
             Cancel lesson
           </button>
@@ -350,7 +464,61 @@ export function LessonDetails({
         <TeacherHomework bookingId={booking.id} token={token} onBusy={setBusy} />
       </div> : (
         <div className="teacher-dialog-confirmation">
-          {action === "move" ? (
+          {action === "length" ? (
+            <form
+              className="teacher-form teacher-length-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void perform();
+              }}
+            >
+              <h3>Change length</h3>
+              {repeats ? <WeekChoice verb="Change" following={following} disabled={busy} onChange={setFollowing} /> : null}
+              {/* Each length with what this student pays for it, as her lesson form shows them. */}
+              <fieldset className="teacher-manual-choice">
+                <legend>Length</legend>
+                <div className={`segmented${length === "long" ? " segmented--second" : ""}`}>
+                  <span aria-hidden="true" className="segmented__thumb" />
+                  {([["single", 60], ["long", 90]] as const).map(([value, mins]) => (
+                    <label className={length === value ? "is-active" : ""} key={value}>
+                      <input
+                        aria-label={`${mins} mins, ${formatPriceCents(priceFor(student, mins))}`}
+                        checked={length === value}
+                        disabled={busy}
+                        name="teacher-lesson-length"
+                        onChange={() => setLength(value)}
+                        type="radio"
+                        value={value}
+                      />
+                      <span>{mins} mins</span>
+                      <span className="teacher-manual-price">{formatPriceCents(priceFor(student, mins))}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <ul className="booking-payment-facts teacher-confirm-facts">
+                {lengthChanging.length ? (
+                  <li>
+                    {lengthChanging.length === 1
+                      ? `${everyWeek ? `${shortDay(lengthChanging[0].starts_at)} becomes` : "Becomes"} ${lengthMinutes} minutes at the same time, ${formatPriceCents(lengthCents)}`
+                      : `${lengthChanging.length} lessons, ${daySpan(lengthChanging)}, become ${lengthMinutes} minutes at the same times, ${formatPriceCents(lengthCents)} each`}
+                  </li>
+                ) : (
+                  <li>{lengthKept.length ? "Nothing to change" : `${everyWeek ? "These lessons are" : "This lesson is"} already ${lengthMinutes} minutes`}</li>
+                )}
+                {lengthKept.length ? <li>{keptLine(lengthKept).trim().replace(/\.$/, "")}</li> : null}
+                {lengthChanging.length ? (
+                  <li>{awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets one email with the change`}</li>
+                ) : null}
+              </ul>
+              <div className="teacher-dialog-actions">
+                <button className="button button--coral" type="submit" disabled={busy || !lengthChanging.length}>
+                  {busy ? "Saving…" : "Save length"}
+                </button>
+                {backToLesson}
+              </div>
+            </form>
+          ) : action === "move" ? (
             <>
               {/* Headed as Cancel this lesson? is, with what happens as a dab. */}
               <h3>Move this lesson</h3>
@@ -400,13 +568,23 @@ export function LessonDetails({
             <>
               <h3>
                 {action === "refund" ? "Record a refund made by hand?" : action === "cancel"
-                  ? "Cancel this lesson?"
+                  ? everyWeek ? "Cancel these lessons?" : "Cancel this lesson?"
                   : noShow
                     ? "Remove the no-show?"
                     : "Mark as a no-show?"}
               </h3>
+              {action === "cancel" && repeats ? <WeekChoice verb="Cancel" following={following} disabled={busy} onChange={setFollowing} /> : null}
               <ul className="booking-payment-facts teacher-confirm-facts">
-                {action === "refund" ? <>
+                {action === "cancel" && everyWeek ? <>
+                  <li>{later.length} lessons, {daySpan(later)}</li>
+                  <li>{awaiting
+                    ? `${firstName} isn’t emailed: they haven’t had their welcome yet`
+                    : `${firstName} gets one email listing them, with an update for their calendar`}</li>
+                  {later.some(paidByHand) ? <li>Refund {firstName} directly for any paid to you by hand</li> : null}
+                  {later.some(lesson => lesson.payment_status === "paid") ? <li>{firstName} is refunded in full, automatically</li> : null}
+                  {later.some(lesson => lesson.payment_status === "scheduled") ? <li>Nothing is charged to {firstName}’s card</li> : null}
+                  <li>They come off your calendar, and no more weeks are added</li>
+                </> : action === "refund" ? <>
                   <li>You have already refunded {firstName} directly</li>
                   <li>Recording it sends no payment or email</li>
                 </> : action === "cancel" ? (
@@ -463,7 +641,7 @@ export function LessonDetails({
                   {busy
                     ? "Saving…"
                     : action === "refund" ? "Yes, record refund" : action === "cancel"
-                      ? "Yes, cancel lesson"
+                      ? everyWeek ? `Yes, cancel ${later.length} lessons` : "Yes, cancel lesson"
                       : noShow
                         ? "Undo no-show"
                         : "Confirm no-show"}

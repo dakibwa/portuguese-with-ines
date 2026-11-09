@@ -194,11 +194,13 @@ export function MyLessons({
   // One step to a screen on a first visit, their lessons last (2 November
   // 2026, Dan: "surely they should type in email then go to the next page
   // where they pay … then see the next lesson bit"). Told before paint, so the
-  // lessons never flash up under the step.
+  // lessons never flash up under the step. The card is a step too, and can't
+  // be skipped (Dan, 2 Nov: card first); CardPrompt says while it is open.
   const emailStep = Boolean(student && !student.email && hasStudentSide(student) && !emailPending);
+  const [cardOpen, setCardOpen] = useState(false);
   useLayoutEffect(() => {
-    onStepChange?.(emailStep);
-  }, [emailStep, onStepChange]);
+    onStepChange?.(emailStep || cardOpen);
+  }, [emailStep, cardOpen, onStepChange]);
   useLayoutEffect(() => () => onStepChange?.(false), [onStepChange]);
 
   // A reload that lands while the details form is open must not replace what
@@ -1034,7 +1036,7 @@ export function MyLessons({
       });
     }
   }
-  const cardPrompt = cardBookingId || askForCard ? <CardPrompt key={cardBookingId} bookingId={cardBookingId} upcoming={upcomingAdded} /> : null;
+  const cardPrompt = cardBookingId || askForCard ? <CardPrompt key={cardBookingId} bookingId={cardBookingId} onOpenChange={setCardOpen} upcoming={upcomingAdded} /> : null;
   return (
     <>
       {cardNote}

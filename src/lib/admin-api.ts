@@ -592,6 +592,38 @@ export function cancelBookingAs(token: string, bookingId: string, message?: stri
   ).then(validateBookingAcknowledgment);
 }
 
+/** A lesson that stayed as it was when she changed several, and why, in a few words. */
+export type KeptLesson = { startsAt: string; reason: string };
+
+function validKept(value: unknown): value is KeptLesson[] {
+  return Array.isArray(value) && value.every(entry => isApiRecord(entry) && isApiInstant(entry.startsAt) && typeof entry.reason === "string");
+}
+
+/**
+ * Change a lesson to 60 or 90 minutes, or it and every later week of its
+ * weekly run (9 November 2026, Dan). Each is priced at the student's own
+ * price for that length; a lesson paid, being paid, or that would run into
+ * another, stays as it is and comes back under `kept`.
+ */
+export function changeLessonLength(token: string, bookingId: string, lessonType: "single" | "long", expectedPriceCents: number, following: boolean) {
+  return adminRequest<{ changed: string[]; kept: KeptLesson[]; emailed?: boolean }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/length`, {
+    method: "POST", body: JSON.stringify({ lessonType, expectedPriceCents, following }),
+  }).then(data => {
+    if (!Array.isArray(data.changed) || !data.changed.length || !data.changed.every(isApiInstant) || !validKept(data.kept)) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
+}
+
+/** Cancel a weekly lesson and every later week of its run; the run stops there. */
+export function cancelFollowingAs(token: string, bookingId: string, message?: string) {
+  return adminRequest<{ cancelled: string[]; kept: KeptLesson[]; emailed?: boolean }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+    method: "POST", body: JSON.stringify({ message, following: true }),
+  }).then(data => {
+    if (!Array.isArray(data.cancelled) || !data.cancelled.length || !data.cancelled.every(isApiInstant) || !validKept(data.kept)) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
+}
+
 /** Record a refund already made directly, without sending money or email. */
 export function recordRefundByHand(token: string, bookingId: string) {
   return adminRequest<{ booking: AdminBooking }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/refund-by-hand`, {

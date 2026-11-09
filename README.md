@@ -183,9 +183,17 @@ As of 9 November 2026, Next and its ESLint configuration are pinned to
 16.4.5. This clears the Next.js image-optimization, Server Actions and typed-array
 cache advisories reported against 16.3.8. The deployed site remains a static
 export with unoptimized images; this audit did not reproduce an exploit against
-the live site. `npm audit --omit=dev` reports zero known vulnerabilities. The full
-audit still reports development-tool findings in the ESLint/Minimatch,
-Wrangler/Miniflare/Undici and Zod chains; these are tracked in
+the live site. Both `npm audit` and `npm audit --omit=dev` report zero known
+vulnerabilities after updating Wrangler to 4.158.0 (Undici 7.30.1) and Zod to
+4.6.7. The preview workflow uses the same Wrangler version.
+
+The TypeScript-ESLint consumer of Minimatch is temporarily overridden to
+11.0.5 for [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+Its declared 10.x range has no version outside the advisory. This override is
+limited to `@typescript-eslint/typescript-estree`; the other ESLint consumers
+keep their unaffected 3.x dependency. The actual parser's project-service path
+and linting were checked with the replacement. Remove the override once the
+parent supports a fixed version itself. Evidence and follow-up work are in
 [the maintenance checkpoint](docs/maintenance.md).
 
 The install script retains its source-checked local Braces mitigation for

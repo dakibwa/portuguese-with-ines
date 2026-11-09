@@ -5729,6 +5729,73 @@ await test("she marks students dormant and sends them her own come-back email, o
   }
 });
 
+// 9 November 2026, Dan: "Ines can change recurring ones from 60 to 90 and
+// they all change and she can cancel them all too".
+await test("Inês changes a weekly run's length from one lesson on, and cancels the rest of a run in one go", async () => {
+  const email = "weekly-length@example.invalid";
+  db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('lena',?,'Lena Longer','',?)").run(email, new Date().toISOString());
+  db.prepare("INSERT INTO student_recurring_rates (student_id,duration_minutes,amount_cents,redeemed_at) VALUES ('lena',60,2000,?)").run(new Date().toISOString());
+  captureEmail();
+  try {
+    const added = await call("/admin/bookings", { user: "teacher", body: { studentId: "lena", lessonType: "single", startAt: "2026-12-01T10:00:00.000Z", repeat: 6 } });
+    assert.equal(added.status, 201, await added.clone().text());
+    await drain();
+    const rows = () => db.prepare("SELECT * FROM bookings WHERE student_id='lena' ORDER BY starts_at").all();
+    const [first, second, third, fourth] = rows();
+    db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(third.id);
+    // Bob's lesson straight after the fourth week: 90 minutes would run into it.
+    booking("bob-after-lena", { owner: "bob", start: "2026-12-22T11:00:00.000Z", end: "2026-12-22T12:00:00.000Z" });
+    sentEmails.length = 0;
+
+    const longer = { lessonType: "long", expectedPriceCents: 3000, following: true };
+    assert.equal((await call(`/admin/bookings/${second.id}/length`, { user: "alice", body: longer })).status, 401);
+    assert.equal((await call(`/admin/bookings/${second.id}/length`, { user: "teacher", body: { ...longer, expectedPriceCents: 3500 } })).status, 409,
+      "her 90-minute price is 1.5 times her own 60");
+    const changed = await call(`/admin/bookings/${second.id}/length`, { user: "teacher", body: longer });
+    assert.equal(changed.status, 200, await changed.clone().text());
+    const reply = await changed.json();
+    assert.deepEqual(reply.changed, ["2026-12-08T10:00:00.000Z", "2026-12-29T10:00:00.000Z", "2027-01-05T10:00:00.000Z"]);
+    assert.deepEqual(reply.kept, [
+      { startsAt: "2026-12-15T10:00:00.000Z", reason: "it's already paid" },
+      { startsAt: "2026-12-22T10:00:00.000Z", reason: "it would run into another lesson" }
+    ]);
+    assert.deepEqual(rows().map((row) => [row.lesson_type_id, row.ends_at.slice(11, 16), row.amount_cents]), [
+      ["single", "11:00", 2000], ["long", "11:30", 3000], ["single", "11:00", 2000],
+      ["single", "11:00", 2000], ["long", "11:30", 3000], ["long", "11:30", 3000]
+    ], "the lesson before and the kept weeks are untouched");
+    assert.equal(db.prepare("SELECT lesson_type_id FROM booking_series WHERE id=?").get(first.series_id).lesson_type_id, "long",
+      "weeks added later are 90 minutes too");
+    await drain();
+    assert.deepEqual(sentEmails.map((mail) => mail.subject), ["Inês has changed your lessons to 90 minutes — from Tue 8 Dec, 10:00"]);
+    assert.match(sentEmails[0].text, /€30/);
+
+    // One lesson on its own, with its own email.
+    sentEmails.length = 0;
+    const one = await call(`/admin/bookings/${first.id}/length`, { user: "teacher", body: { lessonType: "long", expectedPriceCents: 3000 } });
+    assert.deepEqual((await one.json()).changed, ["2026-12-01T10:00:00.000Z"]);
+    await drain();
+    assert.match(sentEmails[0].subject, /^Inês has changed your lesson to 90 minutes/);
+
+    // Cancelling from the fourth week ends the run: the first three stay.
+    sentEmails.length = 0;
+    const cancelled = await call(`/admin/bookings/${fourth.id}/cancel`, { user: "teacher", body: { following: true, message: "Vou mudar de horário." } });
+    assert.equal(cancelled.status, 200, await cancelled.clone().text());
+    assert.equal((await cancelled.json()).cancelled.length, 3);
+    assert.deepEqual(rows().map((row) => [row.status, row.cancelled_by]), [
+      ["confirmed", null], ["confirmed", null], ["confirmed", null],
+      ["cancelled", "teacher"], ["cancelled", "teacher"], ["cancelled", "teacher"]
+    ]);
+    assert.equal(db.prepare("SELECT status FROM booking_series WHERE id=?").get(first.series_id).status, "ended");
+    await drain();
+    assert.deepEqual(sentEmails.map((mail) => mail.subject), ["Inês has cancelled your weekly lessons — 3 lessons"]);
+    assert.match(sentEmails[0].text, /Vou mudar de horário\./);
+  } finally {
+    releaseEmail();
+    db.prepare("DELETE FROM bookings WHERE id='bob-after-lena'").run();
+    forgetStudent(email);
+  }
+});
+
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;
