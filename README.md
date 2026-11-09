@@ -60,6 +60,11 @@ once, and only for the exact request it would have made. Free times are reused
 for a minute. The sign-in form's code is left out of the first load and
 fetched while the page is idle, with the next likely step's free times, and
 the account's own code comes with the page whenever a session is stored.
+Failures from those early requests are handled before the app's code arrives,
+then reach its normal error and retry UI. A first successful account retry
+opens Your lessons while preserving an explicit booking destination.
+The optional expression gift and its painter load only when a student's lesson
+overview needs them; a visitor choosing a lesson does not download that code.
 
 Two settings look incidental and are not. Both were wrong at some point and
 cost real bytes:
@@ -195,11 +200,24 @@ by protecting a student, Inês or money in a way these don't already.
 
 ## Security maintenance
 
-As of 18 October 2026, Next and its ESLint configuration are
-patched to 16.3.8, with compatible Sharp and source-map-js fixes in the lockfile.
-`npm audit --omit=dev` reports zero known vulnerabilities. The full audit still
-reports the development-only Braces/ESLint chain; Braces has no published fix.
-The install script applies a source-checked local mitigation for
+As of 9 November 2026, Next and its ESLint configuration are pinned to
+16.4.5. This clears the Next.js image-optimization, Server Actions and typed-array
+cache advisories reported against 16.3.8. The deployed site remains a static
+export with unoptimized images; this audit did not reproduce an exploit against
+the live site. Both `npm audit` and `npm audit --omit=dev` report zero known
+vulnerabilities after updating Wrangler to 4.158.0 (Undici 7.30.1) and Zod to
+4.6.7. The preview workflow uses the same Wrangler version.
+
+The TypeScript-ESLint consumer of Minimatch is temporarily overridden to
+11.0.5 for [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+Its declared 10.x range has no version outside the advisory. This override is
+limited to `@typescript-eslint/typescript-estree`; the other ESLint consumers
+keep their unaffected 3.x dependency. The actual parser's project-service path
+and linting were checked with the replacement. Remove the override once the
+parent supports a fixed version itself. Evidence and follow-up work are in
+[the maintenance checkpoint](docs/maintenance.md).
+
+The install script retains its source-checked local Braces mitigation for
 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm):
 Braces rejects nesting beyond 128 levels in its parser and recursive walkers,
 including directly supplied syntax trees. Ordinary patterns retain their
@@ -208,6 +226,12 @@ installation using `--ignore-scripts` fails the check until `npm run postinstall
 applies it. Changed upstream versions or source files require explicit review
 of the temporary patch; the package version and npm audit report remain honest.
 Braces is not shipped in the static Cloudflare export.
+
+The hourly maintenance automation works through confirmed bugs, dependency
+security, loading speed and interaction smoothness. It resumes the checkpoint
+and its existing maintenance pull request, follows `AGENTS.md`'s focused checks,
+and leaves verified changes on `codex/maintenance` for review. Main's existing
+release workflow remains the publication gate.
 
 ## Accessibility
 

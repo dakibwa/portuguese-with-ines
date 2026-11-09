@@ -31,6 +31,11 @@ answers and resume them. **Do online** submits a fixed copy for marking.
 it is blank by default, with optional student answers and a separate answer key.
 Paper work is not marked automatically: students can enter their answers online.
 
+Reading **Terms & privacy** opens the notice over the current worksheet. It
+keeps unsaved answers in place without saving them or changing the page.
+Ordinary site navigation still waits for an answer save; if that save fails,
+the worksheet and its answers stay open for retry.
+
 ## Marking and approval
 
 Short-answer questions declare their accepted answers. The server ignores case,

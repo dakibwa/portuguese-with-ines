@@ -183,6 +183,12 @@ export function fetchAvailability(
       session ? { headers: { Authorization: `Bearer ${session}` } } : undefined,
       primed && !session && primed.url === `${BOOKING_API_BASE_URL}${path}` ? primed.response : undefined
     ).then((data) => {
+      // The Worker allows 1–365 days. An invalid horizon can hide real slots
+      // or build thousands of weeks on the main thread. Older replies may
+      // omit it and keep the calendar's existing fallback.
+      if (data.horizonDays !== undefined && (!Number.isInteger(data.horizonDays) || data.horizonDays < 1 || data.horizonDays > 365)) {
+        unreadableReply();
+      }
       if (!isRecord(data.slotsByDate) || !Object.values(data.slotsByDate).every((slots) =>
         Array.isArray(slots) && slots.every((slot) =>
           isRecord(slot) && typeof slot.startAt === "string" && typeof slot.endAt === "string" &&

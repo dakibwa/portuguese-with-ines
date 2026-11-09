@@ -181,6 +181,33 @@ try {
   assert.match(await page.locator(".lesson-overview__next").innerText(), /Monday, 7 September 2026/);
   await page.screenshot({ path: `${out}/upcoming-long-desktop.png`, fullPage: true });
 
+  // Choosing the page already open only closes its menu. Keyboard focus
+  // must return to the opener instead of falling out onto the document body.
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const [path, label, source, reducedMotion] of [
+    ["/faq/", "FAQ", "header", "no-preference"],
+    ["/", "Português com a Inês, home", "footer", "reduce"]
+  ]) {
+    await page.emulateMedia({ reducedMotion });
+    await page.goto(`${base}${path}`);
+    const opener = source === "header"
+      ? page.getByRole("button", { name: "Open menu", exact: true })
+      : page.locator(".site-footer__menu");
+    await opener.click();
+    const menu = page.getByRole("dialog", { name: "Site navigation" });
+    await menu.getByRole("link", { name: label, exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await menu.waitFor({ state: "hidden" });
+    await settle();
+    assert.ok(await opener.evaluate(element => element === document.activeElement),
+      `${source} menu restores focus after selecting ${label} (${reducedMotion})`);
+    assert.equal(await page.locator("main").getAttribute("inert"), null);
+    assert.equal(await page.evaluate(() => document.body.style.overflow), "");
+    assert.equal(page.url(), `${base}${path}`);
+  }
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.setViewportSize({ width: 1920, height: 1100 });
+
   for (const width of [390]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto(`${base}/`);

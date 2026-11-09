@@ -1342,6 +1342,10 @@ while validation runs. Inês's explicit calendar additions retain their override
   rendering. Invalid dates, missing lesson objects, malformed series/exceptions
   and unreadable recurring previews produce recoverable feedback, preserving
   the session. An invalid skipped-date reply cannot invent a clash in 1970.
+  An availability reply's horizon, when present, must be a whole number from
+  1 through 365 days, matching the Worker's settings limit. Invalid horizons
+  are refused before caching or building calendar weeks and offer the usual
+  retry; an older reply without a horizon keeps the display fallback.
 - Booking creation, cancellation and move replies validate the returned
   lesson before showing success. Invalid selection/series dates and teacher
   booking acknowledgments are rejected too, retaining the form without
@@ -1784,6 +1788,8 @@ acknowledges the privacy notice. The final button states both the lesson count
 and the obligation to pay. The toggle still sends the existing `paymentConsent`
 boolean; payment amounts, timing, enforcement and the monetary agreement version
 are unchanged. Reading the combined notice preserves the selection and agreement.
+From homework it also preserves the open worksheet and unsaved answers;
+opening the notice neither saves answers nor navigates away.
 The underlined terms text inside the agreement opens the dialog independently
 of the toggle. The page shows one payment summary, without a separate reading
 link or repeated authorisation sentence. Escape, the close button or clicking
@@ -1801,6 +1807,12 @@ they show a retryable error instead of treating it as an empty lesson list or
 schedule. Sign-in validates the returned student and a nonempty string session
 before storing it.
 These response failures retain an existing session; a matching 401 still ends it.
+The availability and account requests started by the page's HTML attach rejection
+handlers immediately, while keeping their original promises for the app's
+normal failure handling. A network failure before hydration therefore reaches
+the retry UI without first escaping as an unhandled rejection. Retrying the
+initial account read opens the default Your lessons calendar once the account
+returns; explicit booking destinations and a view already chosen remain in place.
 Password-reset, recurring-stop and teacher no-show actions require a valid
 acknowledgment before reporting success. Rate-code receipts, optional rendered
 booking fields, payment amounts and late-fee flags are also validated; malformed

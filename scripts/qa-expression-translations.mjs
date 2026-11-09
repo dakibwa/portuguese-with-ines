@@ -78,8 +78,8 @@ try {
 
     // A student paints their expression and opens its meaning: Inês's notes
     // and the other languages are among its facts, with nothing at the foot.
-    async function openTranslations() {
-      await page.goto(`${base}/idioms/`);
+    async function openTranslations(path = "/idioms/") {
+      await page.goto(`${base}${path}`);
       await page.getByRole("button", { name: "Paint it", exact: true }).click();
       await page.getByRole("button", { name: "Show meaning", exact: true }).click();
       const card = page.locator(".expression-reading__text");
@@ -88,7 +88,9 @@ try {
       await expect(card.getByRole("button")).toHaveText(["Add yours"]);
       return card.locator(".expression-translations");
     }
-    let panel = await openTranslations();
+    // The gift beside Your lessons loads separately from a visitor's booking
+    // code; cover that path as well as the full expression page on return.
+    let panel = await openTranslations("/book/?view=lessons");
     await expect(panel).toContainText("Do you say it another way in your language?");
     await panel.getByRole("button", { name: "Add yours", exact: true }).click();
     await panel.getByLabel("How you say it", { exact: true }).fill("To laugh your head off");
@@ -109,7 +111,7 @@ try {
     await expect(item).toContainText("From Ana");
     await review.screenshot({ path: `${output}/teacher-review-${width}.png` });
     await item.getByRole("button", { name: /^Approve/ }).click();
-    await expect(review.getByRole("status")).toContainText("Approved.");
+    await expect(review.getByRole("status").filter({ hasText: /^Approved\./ })).toContainText("Approved.");
     await expect(review.locator(".teacher-translations__count")).toHaveCount(0);
     await expect(review).toContainText("Nothing to check just now.");
 
@@ -124,5 +126,5 @@ try {
     assert.deepEqual(errors, []);
     await context.close();
   }
-  console.log("Expression translations passed: a student opens the meaning on the second press, sends their own version from Noutras línguas, Inês sees the waiting count and approves it, and it then shows without a name; desktop and phone.");
+  console.log("Expression translations passed: a student opens the gift beside Your lessons, sends their own version from Noutras línguas, Inês sees the waiting count and approves it, and it then shows without a name on the full expression page; desktop and phone.");
 } finally { await browser.close(); }

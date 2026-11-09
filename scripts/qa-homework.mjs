@@ -35,7 +35,7 @@ try {
   for (const width of [1280, 390]) {
     const context = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: width < 600, reducedMotion: "reduce" });
     await context.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-homework-session"));
-    let studentView = false, photoCalls = 0, answerSaveFails = false, generated = null, slow = false, staleHomeworkList = false;
+    let studentView = false, photoCalls = 0, answerWrites = 0, answerSaveFails = false, generated = null, slow = false, staleHomeworkList = false;
     // The Worker starts a new sheet at the student's last level (A2 here) and 15 minutes.
     let homework = { bookingId: lesson.id, studentName: student.name, lessonAt: lesson.starts_at, notes: "", level: "A2", minutes: 15,
       sheet: null, publishedAt: null, updatedAt: null, aiAvailable: true, progress: { answers: {}, completedAt: null, updatedAt: null, submission: null } };
@@ -80,6 +80,7 @@ try {
       }
       if (url.pathname === "/me/homework") return json({ homework: homework.publishedAt ? [{ bookingId: lesson.id, lessonAt: lesson.starts_at, title: homework.sheet.title, level: homework.level, minutes: homework.minutes, completedAt: homework.progress.completedAt, submittedAt: homework.progress.submission?.submittedAt ?? null, returnedAt: staleHomeworkList ? null : homework.progress.submission?.returnedAt ?? null, started: Boolean(homework.progress.updatedAt) }] : [] }).finally(() => { staleHomeworkList = false; });
       if (url.pathname === `/me/homework/${lesson.id}` || url.pathname === `/me/homework/${lesson.id}/submit`) {
+        if (data) answerWrites++;
         if (data && answerSaveFails) return json({ error: "Answers could not be saved. Try again." }, 503);
         if (data) homework.progress = { ...homework.progress, answers: data.answers, updatedAt: new Date().toISOString() };
         if (url.pathname.endsWith("/submit")) {
@@ -218,6 +219,20 @@ try {
     }
     await openHomework();
     await page.locator(".student-homework textarea").first().fill("Queria.");
+    // Reading the policy is an in-place dialog, even with unsaved answers.
+    // It must not pass through the navigation guard and save or leave the sheet.
+    const homeworkUrl = page.url(), writesBeforeTerms = answerWrites;
+    const termsLink = page.locator(".site-footer__legal a[data-terms-privacy]");
+    await expect(page.locator("#terms-privacy")).toHaveAttribute("data-ready", "true");
+    await termsLink.click();
+    await expect(page.getByRole("dialog", { name: "Terms & privacy", exact: true })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    assert.equal(page.url(), homeworkUrl, "reading terms keeps the homework destination");
+    assert.equal(answerWrites, writesBeforeTerms, "reading terms sends no homework save");
+    await page.getByRole("button", { name: "Close terms & privacy", exact: true }).click();
+    await expect(termsLink).toBeFocused();
+    await expect(page.locator(".student-homework textarea").first()).toHaveValue("Queria.");
+    await expect(page.getByRole("button", { name: "Save answers", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "Save answers", exact: true }).click();
     await expect(page.locator(".homework-save")).toContainText("Answers saved.");
     await page.reload(); await openHomework();

@@ -190,6 +190,77 @@ async function confirm(page) {
 
 let cases = 0;
 try {
+  // A broken horizon must not empty the calendar or make it build unbounded
+  // weeks. Reject it before caching, then let the normal retry recover.
+  for (const width of [390, 1280]) for (const horizonDays of ["broken", 100000]) {
+    let recovered = false, reads = 0;
+    const state = await fixture(width, async path => {
+      if (path !== "/availability") return null;
+      reads += 1;
+      const reply = availability([at(9)], 60);
+      if (!recovered) reply.horizonDays = horizonDays;
+      // Keep both the longest supported horizon and the older reply without
+      // a horizon working; the latter uses the existing display fallback.
+      else if (horizonDays === "broken") reply.horizonDays = 365;
+      else delete reply.horizonDays;
+      return { json: reply };
+    }, false);
+    try {
+      const { page } = state;
+      await page.goto(`${base}/book/?view=book`);
+      const warning = page.getByRole("status").filter({ hasText: unreadable });
+      await expect(warning).toBeVisible();
+      await expect(page.locator('#lesson-calendar button[data-date-key]:not(:disabled)')).toHaveCount(0);
+      recovered = true;
+      await warning.getByRole("button", { name: "Try again", exact: true }).click();
+      await expect(warning).toHaveCount(0);
+      await choose(page, at(9));
+      await expect(page.locator("#booking-confirmation-stage")).toBeVisible();
+      assert.ok(reads >= 2, "Retry fetches a fresh reply instead of the invalid cached horizon");
+      await check(state); cases += 1;
+    } finally { await state.context.close(); }
+  }
+
+  // HTML starts availability/account requests before the app's code arrives.
+  // A connection failure in that gap must still reach the normal retry UI,
+  // without first escaping as an unhandled rejection or losing the session.
+  for (const width of [390, 1280]) for (const [signed, destination] of [[false, "/book/"], [true, "/book/"], [true, "/book/?view=book"]]) {
+    const scripts = deferred();
+    let recovered = false, failures = 0, heldScripts = 0;
+    const target = signed ? "/me" : "/availability";
+    const state = await fixture(width, async path => {
+      if (path === target && !recovered) { failures += 1; return { abort: true }; }
+      if (path === "/availability") return { json: availability([at(9)], 60) };
+      return null;
+    }, signed);
+    try {
+      const { page } = state;
+      await state.context.route(url => url.pathname.startsWith("/_next/") && url.pathname.endsWith(".js"), async route => {
+        heldScripts += 1;
+        await scripts.promise;
+        await route.continue();
+      });
+      await page.goto(`${base}${destination}`, { waitUntil: "commit" });
+      await expect.poll(() => failures).toBe(1);
+      assert.ok(heldScripts > 0, "the primed request finished while app scripts were held");
+      // Let the browser dispatch a premature unhandled-rejection event before
+      // releasing hydration; the app catching it later is too late.
+      await page.waitForTimeout(100);
+      assert.deepEqual(state.errors, []);
+      scripts.resolve();
+      const warning = page.locator(".booking-alert").filter({ hasText: signed ? "account just now" : "We couldn’t reach the booking system" });
+      await expect(warning).toBeVisible();
+      assert.equal(await page.evaluate(() => localStorage.getItem("ines-student-session")), signed ? "isolated-continuity" : null);
+      recovered = true;
+      await warning.getByRole("button", { name: "Try again", exact: true }).click();
+      await expect(warning).toHaveCount(0);
+      if (signed && destination === "/book/") await expect(page.locator(".unified-calendar--overview")).toBeVisible();
+      else if (signed) await expect(page.getByRole("radio", { name: "Single", exact: true })).toBeChecked();
+      else await expect(page.locator("#lesson-calendar button[data-date-key]:not(:disabled)").first()).toBeVisible();
+      await check(state);
+      cases += 1;
+    } finally { scripts.resolve(); await state.context.close(); }
+  }
   for (const width of [390]) {
     // A spring gap has no UTC instant for the intended time. Legacy skipped
     // values still identify the correct date; neither their shifted time nor
