@@ -287,7 +287,9 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
           {actions}
         </div>
       ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
-      {!fullPage ? <p className="expression-page-link"><Link className="button button--outline button--small" href="/idioms/">Open full page</Link></p> : null}
+      {/* Inês's tab already has View page beside Add an expression: the same
+          way to the same page is said once (9 November 2026). */}
+      {!fullPage && !source ? <p className="expression-page-link"><Link className="button button--outline button--small" href="/idioms/">Open full page</Link></p> : null}
     </section>
   );
 }

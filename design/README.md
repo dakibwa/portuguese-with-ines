@@ -1815,7 +1815,11 @@ as a form:
   on it);
 - signed in, booking is headed by the account's own bar, as Your lessons is:
   the name's menu, or the places open on a wide card, holding the way back;
-- Inês's schedule reads as the same place: the booking page's blue band,
+- Inês's schedule reads as the same place, though it is her workspace
+  rather than a page of the site: one slim blue banner with her cream
+  wordmark (still the way home), a hairline and `Your schedule` in her hand,
+  with no site header, links or footer (9 November 2026, Dan: "does she even
+  need the rest of the site anymore"); then
   one bar for `Students`, `Timetable`, `Time off`,
   `Receipts`, `Expressions` and `Profile`; sliders for a
   lesson's length and place in her lesson form, with the
@@ -2049,7 +2053,7 @@ page, and for onboarding to feel easy:
   their icons and wrap three and two on a narrow card; lesson history puts its
   heading and the student's contact on one row where there is room; a wide
   `Add a lesson` runs its calendar the full height beside the choices; and
-  the footer of Inês's tabs meets the bottom of the window;
+  Inês's page fills the window's height;
 - a phone's month pagers say `Sept 2026`, so the month and both arrows
   share one row;
 - `Add a student` opens on just a name and an email; their phone, NIF,
@@ -2155,6 +2159,55 @@ gave an email, and only two had ever signed in.
   Lesson history a date reads `Tue 5 Jan`, adding its year only beyond six
   months, and its time shares the line on a wide card or sits beneath it,
   without the dot, on a narrow one, so `· 18:00` never starts a line.
+
+## Smoother, and one system — 9 November 2026
+
+Dan asked for everything to feel smoother and less janky, checked against the
+published design system, with spacing given the same care:
+
+- Inês's schedule opens in one step. Until her week arrives, her tabs stand
+  in their places (already answering, so a tab chosen now is the one she
+  lands on) above a held week of the real one's shape: the next lesson's
+  band, the month, `Edit weekly hours`, the pager and the card with a
+  turning splat. The week then replaces it once, whole, as Your lessons'
+  placeholder does for a student, and the page does not move (it used to
+  open in four steps, the next lesson pushing the week down last). Any
+  other tab holds a plain card with the splat until it is ready.
+- Moving between her tabs, the panel slides in from the side of the tab
+  chosen, at the pace the account's places slide, and with reduced motion
+  simply appears. Her tabs are set as a student's places are, small
+  capitals tracked wide (0.7 rem, a little closer on a phone so
+  `Expressions` fits its third at 320 px): every bar of places on the site
+  speaks in one voice.
+- Disabled is the same everywhere: a filled button becomes the quiet outline
+  at 55%, on her page and in her dialogs as in booking.
+- The Meet pill answers one way: pointed at, a student's `Join Google Meet`
+  fills coral as Inês's `Join Meet` does. The account's name pill alone
+  still brightens to white, because the hover wash sank it into its card.
+- Your lessons' placeholder holds all four places, `Homework` included, and
+  the booking page holds the workspace's room while it is empty, so the
+  footer never flashes up the page on a slow phone.
+- One pace for every hover: the surface motion (190 ms on the soft ease).
+  Colours and shadows used in more than one place are named tokens (pressed
+  coral and lilac, warning ink, the outline edges, the hover wash, the
+  dialog, menu, lift and raised shadows); text on blue or coral is the paper
+  colour, never pure white.
+- Spacing: Inês's cards and dialogs take the same card and dialog insets as
+  the students' do; her tabs keep one 1.25 rem gutter; side-by-side headings
+  share their line (the Time off month and its selection, Translations and
+  its filter); fields in one row stand the same height; her Profile's labels
+  are the small capitals legends of the student's Your details. On a phone
+  her tab labels stay readable rather than shrinking to fit. The system's
+  twelve gap steps are named tokens (`--gap-hair` 0.3 rem to `--gap-section`
+  2 rem); older rules move onto them as they are touched rather than in one
+  sweep that would shift every screen by a pixel. Her expression cards' label
+  column fits `Tradução à letra` on one line.
+- Each thing is said once: Inês's Expressions tab already offers `View page`,
+  so its expressions carry no `Open full page` of their own.
+- Inês's page drops the site's header, its booking band and the footer for
+  one slim banner (76 px, 64 px on a phone): her wordmark leading home, a
+  hairline, `Your schedule`, and the band's splat cut off at the right edge
+  (let go on the narrowest phones). Her tools reach the first screen.
 
 ## Transactional emails — 16 October 2026
 

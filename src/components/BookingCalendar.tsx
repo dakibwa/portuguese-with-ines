@@ -3083,6 +3083,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               setAccountLoadError("");
               setCheckingSession(true);
               refreshStudent()
+                .then((data) => {
+                  // A retry can be this visit's first successful account read.
+                  // Settle only its unresolved default, keeping explicit views
+                  // and any choice made while the request was on its way.
+                  if (data?.student) setIntent((current) => current === "choose" ? "lessons" : current);
+                })
                 .catch(() => setAccountLoadError("We still couldn’t reach your account. Please try again in a moment."))
                 .finally(() => setCheckingSession(false));
             }}

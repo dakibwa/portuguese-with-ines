@@ -30,9 +30,9 @@ For performance changes, keep the route, viewport, cache state, network/CPU
 conditions and fixture data comparable before and after. Record measured
 results rather than claiming a speedup from a source change alone.
 
-**Latest checkpoint:** the third pass below reduces signed-out booking
-JavaScript and records matched loading measurements. Next, profile remaining
-booking work and interaction delays before choosing another change.
+**Latest checkpoint:** the fourth pass below fixes early request failures and
+the blank calendar after a first successful account retry. Continue measuring
+remaining booking work and review a different failure/authorization path next.
 
 ## 9 November 2026 — setup and Next.js security update
 
@@ -271,3 +271,73 @@ above. The focused journey remains the permanent regression coverage.
 3. Rotate into one failed-request or authorization path, checking current main
    and open PRs first. Revisit the scoped dependency override when supported
    upstream.
+
+## 9 November 2026 — early request failures and account retry
+
+**Source baseline:** maintenance head
+`5963c3be1de5c2774b1f66506ff079de8d0f1585`, integrated with main at
+`b7209cffd5c47858678c6daf86a2928bc9eef144`. Main's motion, loading-placeholder
+and teacher-banner work was retained. PR 197 is a separate student-dashboard
+redesign; its files were left alone. Continue in
+[PR 190](https://github.com/dakibwa/portuguese-with-ines/pull/190).
+
+### Confirmed findings and fixes
+
+1. **Early network failures escaped before hydration.** `/book/` starts
+   availability or saved-session account requests from its HTML. If the
+   connection failed before app scripts loaded, the parked promise had no
+   rejection handler. Holding the scripts and aborting that isolated request
+   reproduced an unhandled `Failed to fetch` error in all four combinations of
+   signed-out/signed-in and 390/1280px.
+   The bootstrap now attaches an immediate rejection handler but returns the
+   original promise. The app therefore still sees the failure and shows its
+   ordinary retry UI; it is not turned into a successful or empty response.
+   The same four-case probe now reports zero unhandled rejections/page errors.
+2. **A successful account retry could leave an empty workspace.** With a saved
+   session but no reusable account snapshot, a failed initial `/me` left the
+   default destination unresolved. `Try again` recovered the student but never
+   selected the lesson overview. The regression reached a blank account region
+   after the warning disappeared. The first successful retry now settles only
+   the unresolved `choose` state to `lessons`. Explicit booking destinations
+   and a view chosen while waiting retain their state.
+
+Both fixes stay in the frontend; API authorization, booking/payment writes and
+session storage semantics are unchanged. The helper starts the same early
+request and keeps its original promise; the regression confirms one failed
+target request before scripts are released.
+
+### Validation
+
+- The existing `qa-selection-calendar-recovery.mjs` journey now has six focused
+  bootstrap cases: signed-out availability failure, default saved-session
+  account failure, and explicit-booking saved-session failure at 390/1280px.
+  Each holds app scripts, lets the early request fail, checks for no premature
+  page error, releases hydration, verifies the normal warning/session, then
+  recovers through `Try again` into the intended calendar.
+- `QA_BASE_URL=http://localhost:3000 node scripts/qa-selection-calendar-recovery.mjs`:
+  **53 isolated Chromium cases passed**, including those six and the existing
+  phone selection/teacher recovery cases. All private/provider replies and
+  mutation responses were fixtures; no real account, lesson, email or payment
+  was created.
+- `npm run typecheck` and focused ESLint of the booking page, calendar and
+  affected journey passed. `git diff --check` passed.
+- Tests used `next dev` with localhost API/QA public configuration. No release
+  build, live probe, Worker test, database migration or deployment was run.
+  Next regenerated its managed AGENTS heading; that formatting update is kept
+  as its existing instruction requests. The development-only `next-env.d.ts`
+  path rewrite was restored after stopping the server.
+
+The formatter investigation did not establish a significant interaction
+bottleneck, so no formatter refactor was made. This is a failure-recovery pass;
+it makes no additional loading-speed or animation-smoothness claim. Scratch
+before/after evidence is under `/workspace/scratch/ines-pass4-*`.
+
+### Next priorities
+
+1. Measure a real date/time selection and remaining main-thread work before
+   changing another rendering or formatting path. Obtain warm-cache evidence
+   without browser request interception if investigating repeat visits.
+2. Rotate into one separate authorization or failed-request path, preserving
+   the current student-dashboard work and checking for newer PRs first.
+3. Keep the scoped dependency override under review until upstream supports
+   the patched range directly; audit when dependency state changes.

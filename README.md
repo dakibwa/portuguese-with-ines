@@ -60,6 +60,9 @@ once, and only for the exact request it would have made. Free times are reused
 for a minute. The sign-in form's code is left out of the first load and
 fetched while the page is idle, with the next likely step's free times, and
 the account's own code comes with the page whenever a session is stored.
+Failures from those early requests are handled before the app's code arrives,
+then reach its normal error and retry UI. A first successful account retry
+opens Your lessons while preserving an explicit booking destination.
 The optional expression gift and its painter load only when a student's lesson
 overview needs them; a visitor choosing a lesson does not download that code.
 

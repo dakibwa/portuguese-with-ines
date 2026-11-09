@@ -163,11 +163,11 @@ async function selectRadio(page, name) {
   // time picker; each case verifies the resulting selection and request.
   await radio.locator("..").click();
 }
-async function leaveForFaq(page) {
-  const menu = page.getByRole("button", { name: "Open menu", exact: true });
-  if (await menu.isVisible()) await menu.click();
-  await page.getByRole("link", { name: "FAQ", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/faq\/?$/);
+// Her page has no site nav (9 November 2026): the wordmark in its banner is
+// the one way out, and it leaves without a reload, as the nav did.
+async function leaveForHome(page) {
+  await page.getByRole("link", { name: "Português com a Inês, home", exact: true }).click();
+  await expect(page).toHaveURL(`${base}/`);
 }
 async function chooseAccount(page, name) {
   await page.locator("#account-menu").waitFor({ state: "attached" });
@@ -187,6 +187,46 @@ async function confirm(page) {
 
 let cases = 0;
 try {
+  // HTML starts availability/account requests before the app's code arrives.
+  // A connection failure in that gap must still reach the normal retry UI,
+  // without first escaping as an unhandled rejection or losing the session.
+  for (const width of [390, 1280]) for (const [signed, destination] of [[false, "/book/"], [true, "/book/"], [true, "/book/?view=book"]]) {
+    const scripts = deferred();
+    let recovered = false, failures = 0, heldScripts = 0;
+    const target = signed ? "/me" : "/availability";
+    const state = await fixture(width, async path => {
+      if (path === target && !recovered) { failures += 1; return { abort: true }; }
+      if (path === "/availability") return { json: availability([at(9)], 60) };
+      return null;
+    }, signed);
+    try {
+      const { page } = state;
+      await state.context.route(url => url.pathname.startsWith("/_next/") && url.pathname.endsWith(".js"), async route => {
+        heldScripts += 1;
+        await scripts.promise;
+        await route.continue();
+      });
+      await page.goto(`${base}${destination}`, { waitUntil: "commit" });
+      await expect.poll(() => failures).toBe(1);
+      assert.ok(heldScripts > 0, "the primed request finished while app scripts were held");
+      // Let the browser dispatch a premature unhandled-rejection event before
+      // releasing hydration; the app catching it later is too late.
+      await page.waitForTimeout(100);
+      assert.deepEqual(state.errors, []);
+      scripts.resolve();
+      const warning = page.locator(".booking-alert").filter({ hasText: signed ? "account just now" : "We couldn’t reach the booking system" });
+      await expect(warning).toBeVisible();
+      assert.equal(await page.evaluate(() => localStorage.getItem("ines-student-session")), signed ? "isolated-continuity" : null);
+      recovered = true;
+      await warning.getByRole("button", { name: "Try again", exact: true }).click();
+      await expect(warning).toHaveCount(0);
+      if (signed && destination === "/book/") await expect(page.locator(".unified-calendar--overview")).toBeVisible();
+      else if (signed) await expect(page.getByRole("radio", { name: "Single", exact: true })).toBeChecked();
+      else await expect(page.locator("#lesson-calendar button[data-date-key]:not(:disabled)").first()).toBeVisible();
+      await check(state);
+      cases += 1;
+    } finally { scripts.resolve(); await state.context.close(); }
+  }
   for (const width of [390]) {
     // A spring gap has no UTC instant for the intended time. Legacy skipped
     // values still identify the correct date; neither their shifted time nor
@@ -309,7 +349,7 @@ try {
         const { page } = state;
         await monday(page); await takeOff(page, slot(page, 1, 600)); await started.promise;
         await takeOff(page, slot(page, 1, 630));
-        await leaveForFaq(page);
+        await leaveForHome(page);
         await page.evaluate(value => {
           if (value) localStorage.setItem("ines-student-session", value); else localStorage.removeItem("ines-student-session");
           window.dispatchEvent(new StorageEvent("storage", { key: "ines-student-session", newValue: value || null }));
@@ -317,7 +357,7 @@ try {
         const response = page.waitForResponse("**/admin/exceptions/day");
         waiting.resolve(); await response; await check(state);
         assert.equal(writes.length, 1);
-        await expect(page).toHaveURL(/\/faq\/?$/);
+        await expect(page).toHaveURL(`${base}/`);
         assert.equal(await page.evaluate(() => localStorage.getItem("ines-student-session")), session || null);
         cases += 1;
       } finally { waiting.resolve(); await state.context.close(); }

@@ -32,7 +32,7 @@
 .homework-back, .homework-answers-toggle, .homework-link, .homework-review summary, .teacher-history-homework.teacher-history-homework {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; min-height: 40px; padding: 0.5rem 1rem; border: 0; border-radius: var(--squiggle-chip);
   background: var(--raised); color: var(--coral-action); cursor: pointer; font: 700 0.72rem/1.2 var(--ui); letter-spacing: 0.1em; text-decoration: none; text-transform: uppercase;
-  transition: background 140ms ease, color 140ms ease;
+  transition: background var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease);
 }
 :is(.homework-back, .homework-answers-toggle, .homework-link, .homework-review summary, .teacher-history-homework):hover:not(:disabled) { background: var(--coral-action); color: var(--paper-light); }
 :is(.homework-back, .homework-answers-toggle, .homework-link, .homework-review summary, .teacher-history-homework):focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -200,10 +200,10 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .homework-summary__copy small { color: var(--lavender-ink); font: 700 0.68rem/1.3 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; }
 .homework-summary__copy strong { overflow: hidden; font: 700 0.98rem/1.3 var(--ui); text-overflow: ellipsis; white-space: nowrap; }
 .homework-summary__change {
-  min-height: 44px; padding: 0.4rem 1rem; border: 1.5px solid rgba(26, 49, 105, 0.55); border-radius: var(--squiggle-button-alt); background: transparent; color: var(--ink);
-  cursor: pointer; font: 700 0.8rem/1.2 var(--ui); letter-spacing: 0.06em; text-transform: uppercase; transition: background 160ms ease, border-color 160ms ease;
+  min-height: 44px; padding: 0.4rem 1rem; border: 1.5px solid var(--outline-edge); border-radius: var(--squiggle-button-alt); background: transparent; color: var(--ink);
+  cursor: pointer; font: 700 0.8rem/1.2 var(--ui); letter-spacing: 0.06em; text-transform: uppercase; transition: background var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
 }
-.homework-summary__change:hover, .homework-summary__change:focus-visible { border-color: var(--ink); background: rgba(170, 164, 230, 0.2); }
+.homework-summary__change:hover, .homework-summary__change:focus-visible { border-color: var(--ink); background: var(--hover-wash); }
 .homework-summary__change:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 /* Private is a lock, not a sentence; its words are for screen readers and on hover. */
@@ -371,7 +371,7 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .homework-review__verdict { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.6rem 0.9rem; align-content: start; min-width: 0; }
 .homework-review__verdict p { margin: 0; font-size: 0.95rem; line-height: 1.5; }
 .homework-review__status { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--blue-deep); font: 700 0.72rem/1.3 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
-.homework-review__question--retry .homework-review__status { color: #a73523; }
+.homework-review__question--retry .homework-review__status { color: var(--warning-ink); }
 @container homework (min-width: 44rem) {
   .homework-review__question { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1.75rem; padding: 1.4rem 1.5rem; }
   .homework-review__question--folded { padding-block: 1rem; }
@@ -392,7 +392,7 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .teacher-homework-return button {
   position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 0.65rem; min-height: 44px; padding: 0.5rem 0.6rem 0.5rem 1.1rem;
   border: 0; border-radius: var(--squiggle-button-alt); background: var(--coral-action); color: var(--paper-light);
-  cursor: pointer; font: 700 0.72rem/1.2 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; transition: background 160ms ease;
+  cursor: pointer; font: 700 0.72rem/1.2 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; transition: background var(--motion-surface) var(--motion-ease);
 }
 .teacher-homework-return button:hover:not(:disabled) { background: #9a301f; }
 .teacher-homework-return button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -416,7 +416,7 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .homework-list__item {
   position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; width: 100%;
   padding: 1.6rem 1.5rem 1.5rem; border: 1.5px solid var(--rule-soft); border-radius: 58px 24px 52px 30px / 27px 56px 25px 50px;
-  background: var(--paper-light); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background-color 220ms ease, border-color 220ms ease;
+  background: var(--paper-light); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background-color var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
 }
 .homework-list li:nth-child(3n + 2) .homework-list__item { border-radius: 46px 30px 60px 22px / 34px 58px 24px 52px; }
 .homework-list li:nth-child(3n) .homework-list__item { border-radius: 30px 60px 26px 54px / 55px 26px 58px 29px; }

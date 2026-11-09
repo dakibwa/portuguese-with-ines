@@ -1795,6 +1795,12 @@ they show a retryable error instead of treating it as an empty lesson list or
 schedule. Sign-in validates the returned student and a nonempty string session
 before storing it.
 These response failures retain an existing session; a matching 401 still ends it.
+The availability and account requests started by the page's HTML attach rejection
+handlers immediately, while keeping their original promises for the app's
+normal failure handling. A network failure before hydration therefore reaches
+the retry UI without first escaping as an unhandled rejection. Retrying the
+initial account read opens the default Your lessons calendar once the account
+returns; explicit booking destinations and a view already chosen remain in place.
 Password-reset, recurring-stop and teacher no-show actions require a valid
 acknowledgment before reporting success. Rate-code receipts, optional rendered
 booking fields, payment amounts and late-fee flags are also validated; malformed
