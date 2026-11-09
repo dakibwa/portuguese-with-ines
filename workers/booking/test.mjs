@@ -1467,8 +1467,8 @@ await test("moving a recurring sequence sends one updated calendar to each enabl
   );
   assert.ok(fixture.emailLog.every(({ dedupeKey }) => dedupeKey.endsWith(":2")));
   const message = JSON.parse(fixture.emailLog[0].request_json);
-  assert.match(message.text, /3 September[^\n]*— €15 · charged to your saved card after the lesson/);
-  assert.match(message.text, /10 September[^\n]*— €18 · charged to your saved card after the lesson/);
+  assert.match(message.text, /3 September[^\n]*— €15 · charged to your saved card at the end of the lesson/);
+  assert.match(message.text, /10 September[^\n]*— €18 · charged to your saved card at the end of the lesson/);
   assert.match(message.text, /17 September[^\n]*— €15 · paid/);
   assert.ok(!message.text.includes("€15 a lesson"), "different agreed prices and terms belong beside their own dates");
 });
@@ -1628,10 +1628,9 @@ await test("a no-show can only be changed after the lesson starts and before its
   };
   assert.match(noShowProblem(row, new Date("2026-09-09T15:59:59.000Z")), /starts/i);
   assert.equal(noShowProblem(row, new Date("2026-09-09T16:00:00.000Z")), "");
-  assert.equal(noShowProblem(row, new Date("2026-09-09T16:59:59.000Z")), "");
-  assert.equal(noShowProblem(row, new Date("2026-09-09T17:00:00.000Z")), "", "the scheduled end is inside the window");
-  assert.equal(noShowProblem(row, new Date("2026-09-09T17:59:59.000Z")), "", "which lasts an hour after it");
-  assert.match(noShowProblem(row, new Date("2026-09-09T18:00:00.000Z")), /until an hour after the lesson ends/);
+  assert.equal(noShowProblem(row, new Date("2026-09-09T16:59:59.000Z")), "", "open until the lesson ends");
+  // Charged when it ends (2 November 2026, Dan), so the window closes then.
+  assert.match(noShowProblem(row, new Date("2026-09-09T17:00:00.000Z")), /until the lesson ends/);
   assert.match(noShowProblem({ ...row, payment_status: "processing" }, new Date("2026-09-09T16:30:00.000Z")), /already started/i);
 });
 

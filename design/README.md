@@ -499,49 +499,56 @@ usual lesson starts and days off; avoid a wall of administration forms.
   which opens that lesson's own dialog to move or cancel it, keeping her
   draft (13 October 2026, Dan: "it should show the person's lesson card for
   Inês to move if she needs to").
-- `Students` combines student setup and ongoing care in one searchable list
-  (14 October 2026, Dan). Show each student once. Payments to check lead,
-  then recent lesson changes, setup Inês can do, first lessons, students still
-  signing in or adding a card, and completed students. Within setup, nearer
-  lessons come first. Count students needing her attention once, not each task.
-  Meet and unmatched payment notices remain visible above the list; never match
-  a payment to a student by name alone.
-  Incomplete students have compact, distinct steps: Price, Lessons, Email,
-  Welcome, Sign in and Card. Later unfinished steps stay locked until
-  the preceding steps are complete; completed steps remain editable. A lock
-  gives the missing prerequisite. Lessons are suggested, never required
-  (16 October 2026, Inês: some students have none yet and book their own):
-  Lessons never locks Email or Welcome, and once the welcome has gone an
-  empty Lessons step holds nothing open. Checks mark completion, the next action has an
-  outline, and a clock marks waiting on the student. The steps are the controls;
-  do not repeat the next action as a top-right button or status beside the name.
-  Explain what is outstanding inside the selected step, without vague ownership
-  labels such as Yours or Theirs.
-  Completed onboarding becomes a normal card: their splat and name, a
-  `Weekly` tag in its top right corner when they have a weekly run, and only
-  the dabs that need her eye (27 October 2026, Dan). Its controls become Details, Price, Add a lesson
-  and Lesson history, and, with an email, `Sign-in link`, whose panel holds
-  `Send the link again`. No duplicate To do list or separate student profile popup.
+- `Students` combines bringing students in and ongoing care in one searchable list
+  (14 October 2026, Dan; regrouped 2 November 2026, Dan: "get everyone logged
+  in, pay for previous lessons and able to book their own lessons"). Show each
+  student once, in the first group that fits, each group headed in the small
+  eyebrow with its count and one hint: `Needs you` (payments to check, recent
+  lesson changes, first lessons, homework), `To do` (`Send each their link.`),
+  `Waiting on them` (`Link sent. They haven’t finished yet.`) and `All set`
+  (`Signed in, card saved, nothing open.`), then `Dormant`. Within a group,
+  nearer lessons come first. Above the groups, `6 of 21 students are all set`
+  over a thin blue meter counts active students whose checks are all done.
+  Count students needing her attention once, not each task; her own next
+  steps are on their cards, never in the badge. Meet and unmatched payment
+  notices remain visible above the list; never match a payment to a student
+  by name alone.
+  Each card holds their splat and name, a `Weekly` tag in its top right
+  corner when they have a weekly run, three small checks and the one thing to
+  press next, and only the dabs that need her eye (27 October 2026, Dan). The
+  checks are `Signed in` (or `Link sent 5 Sept`, or `Not signed in`), `Card
+  saved` (or `No card yet`) and `Paid up` (or `€70 open` in coral, counting
+  past lessons she added that were neither charged nor ticked paid); a
+  blue dab marks each one done. Card and paid are omitted when cards are
+  unavailable or the student is free at every length. The next button is
+  coral when the move is hers (`Invite`, then `Ask to pay`, then `Ask for
+  card`), lilac `Send again` once a link is out and the move is theirs, and
+  absent when they are all set. A dormant card shows no checks, only lilac
+  `Come-back email` (or `Invite back` with no email). The card she opened
+  stays in its place until she opens another, so ticking a lesson paid or
+  sending a link never moves it out from under her.
+  Her name opens their profile in the same card: their email (or `No email`),
+  phone, NIF and prices as dabs, then small outline `Add a lesson`, `Edit
+  details`, `Change price`, `Sign-in link` (only when all set, for a lost
+  link) and `Mark as dormant`, then their lessons. A past lesson she added
+  and nothing charged carries the `Already paid` tick in place, so a lesson
+  paid in cash is marked from here and leaves what is open. No duplicate To
+  do list or separate student profile popup.
   Student cards sit side by side according to the list's available width,
   with one column on phones. An opened card spans the whole list so details,
   lesson forms and history have room; closing it restores the compact card.
-  Keep their ranked reading order across each row. A closed card puts its
-  steps or places beneath the name, on a tablet's single column as well, so
-  nothing sits out past the last place; only an opened card on a wide list
-  shares one band. The steps wrap without horizontal scrolling. Opening a step keeps the
+  Keep their ranked reading order across each row. The checks wrap beside
+  the next button and never scroll sideways; on a phone the button keeps its
+  own width at the end of the checks. Opening a piece of the profile keeps the
   student's name visible and places one X close control at the top right.
-  The editor spans the row, and the selected step's
-  heading and short bullet facts share a band with status actions. Details and
-  price fields use the full row width, with their save action alongside when
-  space allows; fields stack on phones. Hover gently changes the row's border; a strong outline is reserved
-  for keyboard focus. Help states the current status and anything still
-  needed, rather than explaining controls or repeating their labels.
-  Standard prices count as ready. A confirmed past lesson counts for Lessons;
-  no upcoming booking does not restart onboarding. Card is omitted when cards
-  are unavailable. Saved cards and permission to charge every lesson differ.
-  Every student's name opens lesson history in the same row. Its existing
-  controls keep details, prices, lessons and welcome editable there. Adding a
-  lesson opens the calendar with available Porto start times. In a wide row,
+  The editor spans the row, and its heading and short bullet facts share a
+  band. Details and price fields use the full row width, with their save
+  action alongside when space allows; fields stack on phones. Saved details,
+  and Cancel on the price, return to the profile. Hover gently changes the
+  row's border; a strong outline is reserved for keyboard focus. Help states
+  the current status and anything still needed, rather than explaining
+  controls or repeating their labels.
+  Adding a lesson opens the calendar with available Porto start times. In a wide row,
   compact lesson settings sit beside the calendar and its available times;
   they stack on a phone. The lesson calendar opens on today and pages back a
   year for a lesson already had (15 October 2026, Dan). Past days read quieter
@@ -553,7 +560,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   tick and one coral `Add past lesson` (beneath the times on a phone, under
   the settings beside the calendar on a wide row). Nothing is said about
   email, because nothing is sent or charged; her history reads `Recorded`, or
-  `Paid by hand` once ticked.
+  carries the ticked `Already paid` once ticked.
   `Already paid` (16 October 2026, Dan) is one tick, the booking agreement's
   squiggle capsule with a paint dab for its box: pale lavender dab on the
   lilac wash until ticked, then the blue capsule with a coral dab and a cream
@@ -566,9 +573,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   dab instead (`€25 · paid by card`), with no tick; a lesson still to be paid
   to her reads `to pay you directly`. The old `Already paid you by hand? Take
   it off their card` link is gone; the tick covers it. Choose a time; there is no manual date
-  or time entry. Location, length and weekly repeat remain available. Welcomes are explicit:
-  opening a step never sends email. First welcomes use `onlyIfWaiting: true`;
-  `Send the link again` deliberately requests a fresh link without that guard.
+  or time entry. Location, length and weekly repeat remain available. Emails are explicit:
+  opening a card or its link never sends email. A first welcome uses `onlyIfWaiting: true`;
+  `Email instead` for someone already welcomed deliberately requests a fresh link without that guard.
   The Timetable keeps up to three operational notices under the next lesson,
   with `See all in Students`. Setup tasks live in Students. Notices clear from
   existing reads; there is nothing new to store or dismiss.
@@ -618,12 +625,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - Every booked lesson shows its time, student and explicit `Online` or `In Porto`
   label in both layouts, including 60-minute blocks. Keep the location icons and
   coral marker for Porto lessons.
-- A student's row is their profile throughout setup and ongoing use
-  (14 October 2026, Dan). Opening the name shows lesson history in that row.
-  Completed students have Details, Price, Add a lesson and Lesson history
-  controls in place of the onboarding journey. One editor opens at a time;
-  the single X closes it and returns focus to the row control. Opening a row
-  changes nothing and sends nothing.
+- A student's card is their profile throughout, from first invite to ongoing
+  use (14 October 2026, Dan; 2 November 2026). Opening the name shows their
+  profile and lessons in that card, with Add a lesson, Edit details, Change
+  price and the rest beneath their dabs. One editor opens at a time; the
+  single X closes it and returns focus to the control that opened it. Opening
+  a card changes nothing and sends nothing.
   - Names wrap between words. Give the name enough room before wrapping the
     controls below it; never split an ordinary name such as Bingham midway.
     Students without a chosen mark receive a stable default splat from their
@@ -645,14 +652,13 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - Add a student opens a short creation dialog with name, optional email,
     phone, NIF, prices and splat. Nothing is emailed. Next: their lessons closes
     the dialog and opens that student's lesson form in the Students list; the
-    outline `No lessons yet` beside it opens their Welcome step instead (their
-    Email step when none was given), where she still presses `Send welcome
-    email` herself. A dialog opened from a timetable time offers only the lesson.
+    outline `No lessons yet` beside it opens their link instead, where she
+    still presses `Send on WhatsApp` or `Email instead` herself. A dialog opened from a timetable time offers only the lesson.
   - A free timetable time opens a student chooser. A past time offers only
     `Add a lesson here`, never time off. Choosing or creating the
     student closes the chooser, switches to Students and opens their lesson
     form with the same date and time. There is no second student profile dialog.
-  - Sent from the profile or from the card, `Send welcome email` is one email
+  - Sent by `Email instead` from their card, the welcome email is one email
     for everyone, in the site's email design: their lessons and prices, and the
     way in. It shows for someone she still needs to bring in, and only once
     they have an address. After the two `Your price` dabs (for each length she
@@ -678,18 +684,17 @@ usual lesson starts and days off; avoid a wall of administration forms.
     to pay. It is often the first email a student has from the site, so it
     says who sent it and why, and keeps passwords and cards out of its subject,
     preheader and button: students found the earlier `Sign in and add card`
-    welcome in spam (27 October 2026). The Welcome and Sign-in panels say in their dabs
-    which of these the email will be before she sends it.
+    welcome in spam (27 October 2026).
   - Dormant (22 October 2026, Dan) is hers to set: `Mark as dormant` is a
     small lilac button beside the contact details in a student's profile,
     offered only with no lesson to come, and `Mark as active` returns them.
     Marking sends nothing. Dormant students rest in a `Dormant · n` section
-    beneath the list, by name, as ordinary rows labelled `Dormant` with no
-    setup steps, and a `Come-back email sent 22 Oct` dab once she has emailed
-    them; a new lesson of theirs brings them back on its own. Each has its
-    own email (Dan: "for each individual student but there be the default
-    email already written for each"): `Come-back email` takes the place of
-    `Sign-in link` among their controls, and its panel, headed `Come-back
+    beneath the list, by name, as ordinary cards labelled `Dormant` with no
+    checks, and a `Come-back email sent 22 Oct` dab in their profile once she
+    has emailed them; a new lesson of theirs brings them back on its own. Each
+    has its own email (Dan: "for each individual student but there be the
+    default email already written for each"): `Come-back email` is their
+    card's one button, and its panel, headed `Come-back
     email to Marta` with two dabs (it ends with a button to sign in and book;
     when it was last sent), holds Subject and Message prefilled with `Olá
     Marta,` above her default, an outline `Start again` once she edits, and
@@ -812,11 +817,14 @@ opening `/idioms/` with the same signed-in account.
   right, and each label sits beside its value; narrower cards and the
   preview keep labels above values: `Tradução à letra` (the literal
   translation, when there is one; restored 30 October 2026 at Inês's request),
-  `Quer dizer` (the Portuguese meaning,
-  a step larger than the rest) and `Em inglês`; then
+  `Quer dizer` (the Portuguese meaning) and `Em inglês`; then
   `Exemplo`/`Exemplos`, where the expression's own words are marked with a
-  soft wash of the paint, taking in a verb the example has conjugated. Notes/origin and reference links
-  open in a quiet disclosure. Optional themes use a lilac pill fill.
+  soft wash of the paint, taking in a verb the example has conjugated.
+  Notes/origin are one of the facts, `Notas e/ou origem`, never a
+  disclosure, and the reference link is not shown (7 November 2026, Dan;
+  the editor still keeps it). Every value shares one type style, the
+  meaning included (7 November 2026, Dan: "same font styles"). Optional
+  themes use a lilac pill fill.
 - Reuse blue for Edit, soft lilac for Preview and publication changes, coral
   for saving, and outline for Cancel/Done. Up/down buttons reorder the whole
   collection; clear filters first. Every phone action is at least 44px.
@@ -824,11 +832,15 @@ opening `/idioms/` with the same signed-in account.
   the same close button, backdrop dismissal, scroll lock and focus return.
   Failed writes retain the draft. Discarding edits and deleting an expression
   each require an explicit confirmation. Stale versions never overwrite an edit.
-- Students' translations (30 October 2026): a `Translations` toggle beside
-  `Notas e/ou origem` in the painted reading's foot row, the same quiet
-  disclosure, opening its own panel below the row. Only translations Inês
-  approved are shown, never with a name. Her `Translations to check` panel sits
-  in the Expressions tab with a waiting count. See
+- Students' own versions (30 October 2026; moved 7 November 2026, Dan: "get
+  rid of the notes and translations at the bottom, they can go in main
+  bullets"): `Noutras línguas` is one of the painted reading's facts, after
+  its examples, listing each version's language and text. A student's quiet
+  `Add yours` opens a small form in place: only `How you say it` and
+  `Send to Inês` (7 November 2026, Dan: no language box); the language is
+  taken from their device's language setting. Only versions Inês approved are shown, never with a name.
+  Her `Translations to check` panel sits in the Expressions tab with a
+  waiting count. See
   [the booking-system contract](../docs-booking-system.md#students-translations-of-an-expression).
 - `Preview as students see it` renders the same reading-card component, without
   teacher actions or publication pills. The surrounding private-preview note
@@ -853,7 +865,9 @@ centre is `Pinta e descobre` (13 October 2026, at Dan's choice; it replaced a
 spinning wheel he rejected): Inês has written the expression in wax on a cream
 sheet, and a gouache brush sweeps across it line by line so the phrase shows
 through the paint in Beth Ellen, in reading order. The painted phrase is the
-reading's title; the facts follow it.
+reading's title. The first press shows the painting alone; the same button
+then reads `Show meaning`, and its second press opens the facts beneath it
+(7 November 2026, Dan: the information appears on a second click).
 
 - No visible heading and no helper text (Dan: "do we even need the top
   stuff"). The section keeps `Uma expressão para ti` as a visually hidden
@@ -861,21 +875,17 @@ reading's title; the facts follow it.
   and `Paint it`: no phrase hints, paint marks, meanings or fact labels are
   visible before the press (27 October 2026, Dan). A returning student
   repaints their saved expression on that first press without spending
-  another pick; `Paint another` asks for a new one. Once painted, the card is
-  the whole section, and it ends in a footer separated by a quiet rule:
-  the reading's themes, then `Notas e/ou origem` (when Inês has written notes or
-  a source) and the compact `Paint another` at the row's end. The notes'
-  toggle reads like the facts' labels, its chevron in the dabs' column when it
-  leads the row. On desktop the footer spans both reading columns; notes
-  open below the whole row with a comfortable line length, so opening them
-  never moves the action row or leaves an empty half beside the notes. On a
-  narrow column the row starts at the dabs' column and runs to
-  the card's edge, so two short themes, or the notes' toggle, share it with
-  the button; the toggle and the button drop beneath the themes together only
-  for a longer set of themes, and only on the narrowest phones (320px) does the
-  button take a line of its own. The button keeps the width of its longest
-  label, so `Painting…` and `Try again` never reflow the row; it stays a 48px
-  target and never becomes a full-width slab.
+  another pick; `Paint another` asks for a new one. Painted, the card holds
+  the painting and `Show meaning` beneath it (beside it from a landscape
+  phone up), exactly where `Paint it` stood. Opened, the card is the whole
+  section: its facts (`Notas e/ou origem` among them), then the examples
+  and `Noutras línguas`, each version followed
+  quietly by its language, all in one rhythm. There is no footer band, rule
+  or toggle row (7 November 2026, Dan: "no need for the divider"):
+  `Paint another` ends the card at its foot, in the same place as `Paint it`
+  and `Show meaning`. The one button keeps the width of its longest label,
+  so `Painting…`, `Show meaning` and `Try again` never reflow it; it stays a
+  48px target and never becomes a full-width slab.
 - Colour: each painting uses the site's paints, every one with lettering
   clear of AA: dark blue `#203E82`, coral `#B43A26` and
   lavender ink `#554F91` carry cream `#FBF4E5` lettering; lavender `#AAA4E6`
@@ -901,18 +911,26 @@ reading's title; the facts follow it.
   Nothing is ever cut: a phrase too long for every size takes as many lines as
   it needs at the smallest, and the sheet grows to hold them.
 - Composition: on a phone the sheet fills the cream card and the reading opens
-  beneath it. From a landscape phone up, the painting with its example
-  straight beneath it sits beside the meanings. Both columns begin at the
-  top, and the footer follows the taller of them. Notes and the next-paint
-  action use that shared footer rather than extending only the right column
-  (27 October 2026, Dan: the layout should feel cleaner). Keep two reading
+  beneath it: facts, example, other languages, then the button at the
+  right. A student's card shows no theme pills (7 November 2026, Dan); they
+  stay in Inês's collection, where she filters by them. From a landscape
+  phone up, the painting with its example and `Noutras línguas` straight
+  beneath it sits beside the facts.
+  Both columns begin at the top; the button ends the facts' column at the
+  card's foot, level with the end of the taller column. Keep two reading
   columns on larger screens as well. At rest the blank
   sheet reserves room for the first strokes, with the button at the card's
-  foot. The paint lands where it stays and never slides on the sheet. The
-  painted sheet closes round its phrase as the reading opens, only its foot
-  rising, so a one-line phrase never sits in a
-  tall empty sheet. Nothing above the section moves, and the card grows and
-  shrinks smoothly below.
+  foot. The paint lands where it stays and never slides on the sheet, and the
+  card keeps its size while `Show meaning` waits. The painted sheet closes
+  round its phrase as the reading opens, only its foot rising, so a one-line
+  phrase never sits in a tall empty sheet beside the facts. Nothing above the section moves, and the card grows and
+  shrinks smoothly below. As it opens, each fact rises gently in after the
+  last, in reading order (both columns together on a wide card), and
+  `Paint another` follows at the foot, so nothing arrives as one block (7
+  November 2026, Dan: "animated as it comes in"). The page scrolls in the
+  same motion, only as far as the card's foot needs and never past its top.
+  The other languages load while the expression paints, so the reading
+  opens whole.
 - The idle canvas reveals nothing from the collection. The first paint
   appears only after the press. Gouache is matte: nothing glossy. Finished
   lettering stays cream on dark paint and dark on lavender.
@@ -942,18 +960,21 @@ reading's title; the facts follow it.
   at rest. `Paint another`
   brings the sheet into view and the last reading waits in wax where it
   stands, out of reach: its labels and dabs stay, taking the new paint's
-  colours, its words dry to wax lines and its themes and notes fade, while
+  colours, its words dry to wax lines and `Add yours` fades, while
   the button reads `Painting…` and the focus waits on the section. The card
   never shortens while it paints, and grows
   smoothly only when a longer phrase needs the room, so nothing below jumps
-  under the student.
+  under the student. Once the new phrase is painted, the last reading closes
+  smoothly beneath it to `Show meaning`.
 - Only the button paints: no swipe or drag on the sheet, and no loose chapéu at
   the card's corner.
 - The painting is decorative: the pick is the Worker's and the brush paints only
   what it saved, so nothing done mid-stroke can change or lose a pick. Assistive
-  technology hears the result in words and the reading takes the focus.
-  Reduced-motion users see the finished painting and reading at once, and the
-  card keeps the colours it shows until the new reading replaces it. Where the
+  technology hears the result in words, the focus waits on `Show meaning`,
+  and the opened reading takes it.
+  Reduced-motion users see the finished painting at once, and its reading at
+  once on the second press; the card keeps the colours it shows until the new
+  painting replaces it. Where the
   sheet cannot be painted at all, the reading shows the expression in the hand
   as its title instead.
 - The strokes, pool, drops and wax are drawn in code for now.
@@ -1311,30 +1332,64 @@ Preserve these desktop and mobile states:
   added`, with `Change` or `Add card`; opening it shows the confirm step's
   dabbed terms in place (the two €5 fees among them) and `Agree & add
   card`, which goes to Stripe's page. While a lesson Inês added is still
-  paid to her by hand, Your lessons carries one quiet sheet card above the
-  calendar: a card icon in a lilac disc, `Pay by card`, `Add your card once
-  and you’re set.` and `Add card`, nothing more; back from Stripe it becomes
-  `Card saved. You’re all set.` Its words are as short and
+  paid to her by hand, Your lessons opens with one sheet card above the
+  calendar, the same card a payment link opens (2 November 2026, Dan: "just
+  have it as one single thing"): a card icon in a lilac disc, `Confirm your
+  card payments`, `Paid at the end of each lesson` with `Porto time` over their
+  weekly run or the lessons she added as dashed tiles, the fee's two dabs, the
+  agreement capsule `I authorise card payments for my future lessons`, then `Agree &
+  add card` alone: the card comes first, with no `Not now` (2 November 2026,
+  Dan: "card first"), and only a card that can't go ahead (its lessons
+  already settled, cards switched off) adds `See your lessons` beside the
+  error for that visit; back from Stripe it becomes `Card saved. You’re all set. Book, move
+  or cancel your lessons below.` above their lessons and `Book`. Its words are as short and
   plain as they can be (12 October 2026, Dan: "the language here can be
   even more simple"), and so are the emails that bring students in.
   That success waits for verified current card permission; a return URL alone
   cannot hide `Add card`, and removing the card clears the success state.
-  A sign-in link from an email opens on `Welcome`, `Sign in to see your
-  lessons. No password needed.` and one coral `Sign in`, spent only when
+  A sign-in link from an email or WhatsApp opens on `Welcome` (see 2 November
+  2026 below for its words; a payment link: `Sign in to pay for your
+  lessons.`) and one coral `See my lessons`, spent only when
   pressed, since mail scanners open links on their own; a spent link says so
   there and offers `Email me a new link`. The card terms add `Your upcoming
-  lessons with Inês are charged to it, each after it ends` and `Already paid
-  Inês for some? Tell her and she’ll take them off`; an open Card row also
-  offers `Remove card`. A payment approval link for one lesson Inês added
+  lessons with Inês are charged to it, each after it ends`; nothing asks
+  whether they paid her already, since she ticks only what is still owed
+  (2 November 2026, Dan); an open Card row also
+  offers `Remove card`. A payment approval link for lessons Inês added
   opens the same card as `Confirm your card payments` (27 October 2026,
   Dan: "simple and beautiful", in the site's own styling and words): the
   lesson as the booking step's cream time tile (its splat, day and times,
-  `Porto time`, the price on the right), the confirm step's three dabs (when
-  that lesson is charged, future lessons charged automatically, the €5 fee),
-  then the agreement capsule with `Terms & privacy` inside it and
-  `Authorise payments` beside `Not now`. A wide card sets the lesson and dabs
-  on the left and the agreement on the right, level in the middle; a phone
-  reads them top to bottom. In Inês's lesson dialog a lesson a card now pays for
+  `Porto time`, the price on the right), then the fee's two dabs over the
+  agreement capsule with `Terms & privacy` inside it and
+  `Authorise payments`. A wide card sets the lessons on the
+  left and the dabs and agreement on the right, level in the middle; a phone
+  reads them top to bottom. Several lessons Inês ticked (2 November 2026,
+  Dan: "so they can backpay all the lessons") stack as the booking step's
+  chosen lessons do, each a smaller tile with its own splat, one line each
+  (day and start, never wrapped; Dan: "always fits on the same line") under
+  an `Outstanding lessons` label that names `Porto time` once for every tile,
+  then a receipt's ruled `Charged now €45` under the prices, worked out from
+  the lessons whose charge time has passed (`Total` with `Charged at the end of
+  each lesson` under it while none has). Their lessons still to come that
+  Inês added follow under `Then at the end of each lesson`, each weekly run once as
+  `Every Tuesday, 17:00` in a dashed tile with the weekly lilac repeat mark
+  (Dan: make it obvious it covers their weekly lessons), and the capsule
+  reads `these and future lessons`. The dabs stay few (2 November 2026,
+  Dan: the list was too long, but "I liked the bullets they are cute"): the
+  labels and total say what is charged and when, so only the fee's two dabs
+  sit over the capsule, with `Future lessons are charged at the end of each lesson`
+  first only when no later lesson is shown. Inês gets the same tick list from an unpaid
+  lesson's dialog (`Create payment link`, small outline, the opened lesson
+  ticked) and from a student's card on Students (`Payment link`, nothing
+  ticked): `Tick what Jess still owes` and `Their future lessons then go on
+  the card too.` over one-line Already-paid-style capsules (day and start on
+  the left, price on the right), with the total on the button, `Create link
+  for €30`, beside `Cancel` (Dan: "less spread out"; a separate count and
+  total line read as stray). Ready, it says `Link ready: 2 lessons, €30.
+  Nothing sent or charged yet.` with blue `Send on WhatsApp` and outline
+  `Copy link`; the WhatsApp message is one short line
+  in her voice and the link (2 November 2026, Dan: not wordy). In Inês's
+  lesson dialog a lesson a card now pays for
   offers the `Already paid` tick (below). The sign-in panel's small outline buttons read `Email a link` and
   `Forgot password`, side by side down to a 360 px phone (27 October 2026, Dan); asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.
@@ -1916,8 +1971,8 @@ no-show` / `Undo no-show` for a screen reader), each the same capsule whose dab
 fills when ticked. Last, `Move lesson` in coral and `Cancel lesson` in outline
 share a row while both labels fit. Moving opens under its own `Move this lesson`
 heading, as cancelling does under `Cancel this lesson?`, with what happens as a
-dab (`Sam gets an email with the new time`). `No-show` is live from the lesson's start until an hour after
-its end, and before that it shows greyed out with `Available 11:00–13:00` beneath, so
+dab (`Sam gets an email with the new time`). `No-show` is live from the lesson's start until its end
+(2 November 2026), and before that it shows greyed out with `Available 11:00–12:00` beneath, so
 she always knows where it is. The marked state stays reversible within the same
 window, the lesson is charged once it closes, and a no-show means only €5 is
 taken instead of the full price. Confirmations keep a `Back to lesson` button
@@ -1971,10 +2026,88 @@ time") took each busy place back to one voice:
   first dab (`Goes to sam@…`), never as a bare line after the dabs;
 - an expression's `Edit`, `Preview` and `Publish` are one family of lilac
   buttons;
-- `Pay by card` states its fee once: `€5 to move or cancel less than 14 hours
-  before, or if you don’t show up`;
+- the card prompt and a payment approval state the fee once, the free part
+  first (2 November 2026, Dan, the same words across the site): `**Free to
+  change or cancel** a lesson up to 14 hours before`, then `**€5** to move or
+  cancel later, or if you don’t show up`, as two dabs. When lessons are charged follows the
+  charge window: `after each lesson` while the hourly charge runs an hour
+  after the end, `at the end of each lesson` once that window is nothing;
 - a past lesson's long date breaks before its year, never leaving the time on a
   line of its own.
+
+## Students on WhatsApp, and a tighter pass — 2 November 2026
+
+Dan's goal: "clear up admin burden". Students pay what is still open and from
+now on book, move and cancel their own lessons; most of Inês's students never
+gave an email, and only two had ever signed in.
+
+- A student with no email is set up, not unfinished: the usual card, and the
+  Students badge counts only real to-dos. Their way in is the card's `Invite`,
+  whose panel is headed `Send Marta their link` with one dab,
+  `Signs them in once, within 14 days.`, a two-line Message she can edit
+  (`Olá Marta! From now on you can book, move or cancel your lessons with me
+  here:`, or for a dormant student `Whenever you’d like another lesson, you
+  can book one here:`), the link on its own line after her words, an outline
+  `Copy` and coral `Send on WhatsApp`. That opens WhatsApp to their number
+  when it is certain (written with `+` or `00`, or a nine-digit Portuguese
+  mobile), otherwise WhatsApp's own chooser, so it never goes to a stranger.
+  Nothing is emailed, and nothing is sent until she presses Send in
+  WhatsApp. A student with an email can have the welcome email instead, from
+  outline `Email instead` beside `Copy`. Keep the message short (Dan:
+  "quite wordy and not in fitting with our super simple fresh design");
+  the site does the teaching.
+- Students is regrouped around that goal (2 November 2026, Dan: "get everyone
+  logged in, pay for previous lessons and able to book their own lessons and
+  then … easily see a profile for each of her students"). The six-step
+  stepper is gone: each card has three checks (signed in, card saved, paid
+  up, with what is open in coral) and one button for her next move, and the
+  list reads `Needs you`, `To do`, `Waiting on them`, `All set` under `6 of
+  21 students are all set`. Her invite first asks `Tick what Marta still
+  owes. Leave any paid in cash.` over the past lessons nothing has paid,
+  none ticked (Dan: many were paid in cash and never marked), then coral
+  `Make link with €45 to pay` (or `Make link, nothing to pay`), so one
+  WhatsApp both signs them in and asks for what is open; the message names
+  the total and the panel says `Asks them to pay €45 for 3 lessons. Nothing
+  is charged until they agree.` A lesson paid in cash is ticked `Already
+  paid` in their profile instead, and leaves what is open.
+- Arriving is one step to a screen, nothing said twice, their lessons last
+  (Dan, 2 November 2026: "rather than repeated"). The welcome a link opens
+  keeps the splat mark and a handwritten `Welcome` (a plain card-style
+  heading there read as a regression), `Your lessons with Inês, all in one
+  place. No password needed.`, and, for a student with no email, `Your email`
+  with `So you can sign in on any phone or computer.` beneath, then coral `See
+  my lessons`, greyed until an address is typed. No dabs: the rules and what
+  they pay for are on the card page that follows. Nothing asks them to book
+  what Inês has already booked.
+- The rules read the same wherever a student meets them (2 November 2026,
+  Dan): `Free to change or cancel a lesson up to 14 hours before` (the first
+  four words bold in ink, since coral is for a charge) and `€5 to move or
+  cancel later, or if you don’t show up` (the no-show part only where cards
+  are taken), `Your card is charged at the end of each lesson`, and with no fee
+  `No fee to change or cancel, or for a missed lesson`. That covers the card
+  terms, and the booking confirm step and its success.
+- A student with no email must give one (Dan, 2 November 2026: "they need to
+  add an email"; it is their only way back in on another device), on the
+  welcome. If that didn't reach the Worker, Your lessons asks first, `Add
+  your email` with coral `Add email`, with their lessons held back until it
+  is sent. Then the card to confirm, then, while the address waits, `Check
+  your email` / `Open the link we sent to … on this phone.` Their Details
+  email row reads `Not added` with `Add email`.
+- Students' cards on a wide list each keep their own height, packed in
+  columns, so a short card never leaves a hole under it.
+- `Time off`'s card lists what is `Coming up` (consecutive whole days as one
+  line, `Wed 25 Nov – Fri 27 Nov` / `3 days off`; hours as `Off 09:00–12:00`),
+  the next few and `And 3 more later on`; tapping one chooses it.
+- `Receipts` opens on last month during the first ten days of a month when
+  last month still has receipts to issue and this one has none yet.
+- Notes and empty states speak at the hint size, never a paragraph's:
+  `Choose a date and a time first.` sits small just above the greyed action;
+  `Nothing to check just now.` and `Your collection is empty.` match the
+  dabs around them. `November 2026` stays on one line beside its arrows; a
+  wrapped Needs-you title breaks evenly (`Jessica Riley / added a card`); in
+  Lesson history a date reads `Tue 5 Jan`, adding its year only beyond six
+  months, and its time shares the line on a wide card or sits beneath it,
+  without the dot, on a narrow one, so `· 18:00` never starts a line.
 
 ## Transactional emails — 16 October 2026
 

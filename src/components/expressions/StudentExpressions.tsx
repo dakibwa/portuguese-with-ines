@@ -2,12 +2,13 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ExpressionExamples, ExpressionExtras, ExpressionMeanings } from "@/components/expressions/ExpressionCard";
+import { ExpressionImage, ExpressionMeanings, ExpressionUsage } from "@/components/expressions/ExpressionCard";
 import { ExpressionPainting, type ExpressionPaintingHandle, type PaintingStart } from "@/components/expressions/ExpressionPainting";
-import { FACTS_OPEN, OPEN_EASE, openDuration } from "@/components/expressions/painter";
+import { OPEN_EASE, openDuration } from "@/components/expressions/painter";
 import { AuthApiError, readSession } from "@/lib/auth-api";
 import { chooseDecoy, nextPaint, paintFor, rememberPaint, type PaintKey } from "@/lib/expression-paint";
 import { workerExpressions, type ExpressionSource, type StudentExpressions as Collection } from "@/lib/student-expressions-api";
+import { prefetchTranslations } from "@/lib/expression-translations-api";
 
 /** The colour the shown expression was painted in, and the one waiting for the next. */
 type Paints = { shown: PaintKey | null; next: PaintKey };
@@ -18,8 +19,20 @@ const EXHAUSTED = "You’ve explored every expression. Come back when Inês adds
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
+ * The opening reading comes into view in the same motion as it opens: the
+ * page scrolls only as far as its foot needs, and never past the card's top.
+ */
+function reveal(element: HTMLElement, height: number, still: boolean) {
+  const top = element.getBoundingClientRect().top;
+  const by = Math.min(top + height + 16 - window.innerHeight, top - 16);
+  if (by > 0) window.scrollBy({ top: by, behavior: still ? "instant" : "smooth" });
+}
+
+/**
  * "Uma expressão para ti": the first press repaints a saved expression, or
- * asks the Worker to pick one. Later presses pick another. A failed reply
+ * asks the Worker to pick one, and the painting is all the card shows. The
+ * same button then reads "Show meaning", and its second press opens the
+ * reading. "Paint another" in the reading picks another. A failed reply
  * keeps its request, so trying again cannot spend a second pick.
  *
  * `source` replaces the Worker: Inês's try-out paints from her own collection
@@ -39,6 +52,8 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
   const [error, setError] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const [revealed, setRevealed] = useState(0);
+  /** The painted expression's reading is open: its second press. */
+  const [open, setOpen] = useState(false);
   /** Counts the changes the card's height follows smoothly. */
   const [resized, setResized] = useState(0);
   /** The sheet could not be painted: the reading shows the expression as its title. */
@@ -58,7 +73,6 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
   const settling = useRef(false);
   /** A failed press: the button takes the focus back once it can be pressed again. */
   const refocus = useRef(false);
-  const settle = useRef(0);
   const canUpdate = () => active.current && readSession() === token;
 
   useEffect(() => {
@@ -67,6 +81,7 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
     setCollection(null);
     setPaints(null);
     setRevealed(0);
+    setOpen(false);
     setLoadError("");
     // Expressions are a gift beside the lessons, never in their way: if they
     // cannot be read, the section stays away rather than raising an alarm.
@@ -81,7 +96,6 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
     return () => {
       current = false;
       active.current = false;
-      window.clearTimeout(settle.current);
     };
   }, [studentId, token, source, fullPage, loadAttempt]);
 
@@ -92,31 +106,30 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
     const from = before.current;
     before.current = null;
     const element = card.current;
-    const closeSheet = settling.current ? painting.current?.settle() : undefined;
+    // Only the second press settles the sheet: the reading is opening.
+    const opening = settling.current;
+    const closeSheet = opening ? painting.current?.settle() : undefined;
     settling.current = false;
     if (from === null || !element || reducedMotion()) {
       closeSheet?.();
+      if (opening && element) reveal(element, element.getBoundingClientRect().height, true);
       return;
     }
     const to = element.getBoundingClientRect().height;
     const duration = openDuration(Math.abs(to - from));
     closeSheet?.(duration);
     if (Math.abs(to - from) >= 1) element.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration, easing: OPEN_EASE });
+    if (opening) reveal(element, to, false);
   }, [resized]);
 
-  // The new reading takes the focus as its facts follow the paint.
+  // The opened reading takes the focus as its facts follow one another in.
   useLayoutEffect(() => {
-    if (!revealed) return;
-    result.current?.focus({ preventScroll: true });
-    const still = reducedMotion();
-    window.clearTimeout(settle.current);
-    settle.current = window.setTimeout(() => {
-      if (active.current) card.current?.scrollIntoView({ block: "nearest", behavior: still ? "instant" : "smooth" });
-    }, still ? 0 : FACTS_OPEN);
-  }, [revealed]);
+    if (open) result.current?.focus({ preventScroll: true });
+  }, [open]);
 
-  // After a failed press the reading comes back from under the paint; if the
-  // focus was lost with it, it returns to the button.
+  // Once painted, the button waits for its second press; after a failed press
+  // the reading comes back from under the paint. Either way, if the focus was
+  // lost with it, it returns to the button.
   useEffect(() => {
     if (busy || !refocus.current) return;
     refocus.current = false;
@@ -127,7 +140,7 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
   async function pick() {
     if (pending.current || !collection || !paints) return;
     pending.current = true;
-    const previous = revealed ? collection.expression : null;
+    const previous = revealed && open ? collection.expression : null;
     // A return visit starts blank too. Its first press repaints the saved
     // expression without asking the Worker to spend another pick.
     const saved = !revealed ? collection.expression : null;
@@ -163,16 +176,21 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
       if (picked) {
         // A return visit can repaint the saved expression in this same colour.
         rememberPaint(studentId, picked.id, paint);
+        // Its other languages load while it paints, so the reading opens whole.
+        prefetchTranslations(picked.id);
         if (still) painting.current?.show(picked.expression, picked.id, paint);
         else await painting.current?.land(picked.expression, picked.id);
         if (!canUpdate()) return;
         request.current = null;
+        // Only the painting shows, the button beneath it: the last reading
+        // closes round it, and the sheet settles once the new one opens.
         measure();
-        settling.current = true;
+        refocus.current = true;
         setResized((count) => count + 1);
         setPaints({ shown: paint, next: nextPaint([paint]) });
         setCollection(next);
         setRevealed((count) => count + 1);
+        setOpen(false);
         setAnnouncement(`Your expression: ${picked.expression}`);
       } else {
         await painting.current?.stop();
@@ -199,6 +217,16 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
     }
   }
 
+  // The second press: the painted sheet closes round its phrase as the reading opens.
+  function showMeaning() {
+    if (pending.current || busy) return;
+    before.current = card.current?.getBoundingClientRect().height ?? null;
+    settling.current = true;
+    setResized((count) => count + 1);
+    setOpen(true);
+    setAnnouncement("");
+  }
+
   // Nothing published yet, or nothing to read: leave the lesson workspace clear.
   if (!collection || !paints) return fullPage ? loadError ? (
     <div className="idioms-state" role="alert">
@@ -208,18 +236,21 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
   ) : <p className="idioms-state" role="status">Loading expressions…</p> : null;
   if (!collection.hasPublished) return fullPage ? <p className="idioms-state" role="status">Expressions aren’t available yet.</p> : null;
   const expression = revealed ? collection.expression : null;
+  const reading = expression && open ? expression : null;
   const canPaint = collection.canPick || (!revealed && Boolean(collection.expression));
   const start: PaintingStart = expression
     ? { kind: "show", phrase: expression.expression, id: expression.id, paint: paints.shown ?? paints.next }
     : { kind: "rest", paint: paints.shown ?? paints.next };
-  // Beside the reading's themes once painted; on the empty sheet before.
+  // One button, at the card's foot in every state, so it never moves under the student.
+  const painted = Boolean(expression && !reading);
   const actions = (
     <div className="expression-reading__actions" lang="en">
-      {canPaint ? (
-        <button className="button button--coral button--compact expression-reading__go" disabled={Boolean(busy)} ref={button} type="button" onClick={() => void pick()}>
-          <span>{busy ? "Painting…" : error ? "Try again" : expression ? "Paint another" : "Paint it"}</span>
-          {/* In the reading's last row the button keeps the width of its longest label, so the row never reflows as it changes. */}
-          {expression ? <span aria-hidden="true" className="expression-reading__go-sizer">Paint another</span> : null}
+      {canPaint || painted ? (
+        <button className="button button--coral button--compact expression-reading__go" disabled={Boolean(busy)} ref={button} type="button" onClick={painted ? showMeaning : () => void pick()}>
+          <span>{busy ? "Painting…" : error ? "Try again" : painted ? "Show meaning" : reading ? "Paint another" : "Paint it"}</span>
+          {/* The button keeps the width of its longest labels, so nothing reflows as it changes. */}
+          <span aria-hidden="true" className="expression-reading__go-sizer">Show meaning</span>
+          <span aria-hidden="true" className="expression-reading__go-sizer">Paint another</span>
         </button>
       ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
       {error ? <p className="booking-alert" role="alert">{error}</p> : null}
@@ -235,20 +266,25 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
           data-busy={busy && !busy.still ? "" : undefined}
           /* The card takes the new paint as it lands: its labels and dabs while it paints, then the reading. With reduced motion it keeps the paint it shows until the new reading replaces it. */
           data-paint={busy && !busy.still ? busy.paint : expression ? (paints.shown ?? paints.next) : paints.next}
-          data-state={expression ? "read" : "waiting"}
+          data-state={reading ? "read" : expression ? "painted" : "waiting"}
           data-unpainted={unpainted ? "" : undefined}
           ref={card}
         >
           <ExpressionPainting ref={painting} start={start} onUnavailable={() => setUnpainted(true)} />
-          {expression ? (
+          {/* Painted, the phrase is named in words for assistive technology, or in the hand where the sheet cannot be painted. */}
+          {painted && expression ? <h3 className="expression-reading__title" lang="pt-PT">{expression.expression}</h3> : null}
+          {reading ? (
             // While another is painted, the last reading waits in wax where it stands, out of reach.
-            <article className="expression-card expression-reading__text" inert={Boolean(busy)} key={expression.id} lang="pt-PT" ref={result} tabIndex={-1}>
-              <h3 className="expression-reading__title">{expression.expression}</h3>
-              <ExpressionMeanings item={expression} />
-              <ExpressionExamples item={expression} />
-              <ExpressionExtras action={actions} image item={expression} translations={{ token, viewer: source ? "teacher" : "student" }} />
+            <article className="expression-card expression-reading__text" inert={Boolean(busy)} key={reading.id} lang="pt-PT" ref={result} tabIndex={-1}>
+              <h3 className="expression-reading__title">{reading.expression}</h3>
+              <div className="expression-reading__facts">
+                <ExpressionMeanings item={reading} />
+                {reading.imageUrl ? <ExpressionImage item={reading} /> : null}
+              </div>
+              <ExpressionUsage item={reading} translations={{ token, viewer: source ? "teacher" : "student" }} />
             </article>
-          ) : actions}
+          ) : null}
+          {actions}
         </div>
       ) : <p className="expression-reading__note">{EXHAUSTED}</p>}
       {!fullPage ? <p className="expression-page-link"><Link className="button button--outline button--small" href="/idioms/">Open full page</Link></p> : null}

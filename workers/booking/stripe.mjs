@@ -197,7 +197,7 @@ export function createCardSetupSession(
  * reference names the student, so the webhook can never mistake it for a
  * booking's setup.
  */
-export function createStudentCardSession(env, { student, successUrl, cancelUrl, approvedBooking = null }) {
+export function createStudentCardSession(env, { student, successUrl, cancelUrl, approvedBookings = [] }) {
   return stripeRequest(
     env,
     "/checkout/sessions",
@@ -214,12 +214,11 @@ export function createStudentCardSession(env, { student, successUrl, cancelUrl, 
       ...uiModeFields(env, { successUrl, cancelUrl, forceHosted: true }),
       metadata: {
         purpose: "student_card",
-        ...(approvedBooking ? {
-          approved_booking_id: approvedBooking.id,
-          approved_booking_amount: approvedBooking.amountCents,
-          approved_booking_start: approvedBooking.startAt,
-          approved_booking_end: approvedBooking.endAt
-        } : {}),
+        // Each lesson the student reviewed, one key apiece (Stripe allows 50
+        // keys of up to 500 characters): "id start end amount".
+        ...Object.fromEntries(approvedBookings.map((lesson, index) => [
+          `approved_booking_${index + 1}`, `${lesson.id} ${lesson.startAt} ${lesson.endAt} ${lesson.amountCents}`
+        ])),
         student_id: student.id,
         session_version: student.session_version ?? 0,
         card_setup_version: student.card_setup_version ?? 0

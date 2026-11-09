@@ -2774,6 +2774,11 @@ async function paintBlankExpression() {
     throw new Error("An expression must start as a blank canvas, including on a return visit.");
   }
   await paint.click();
+  // The first press paints the expression alone; its meaning opens on the second.
+  const meaning = expressions.getByRole("button", { name: "Show meaning", exact: true });
+  await meaning.waitFor({ timeout: 10_000 });
+  if (await expressions.getByText(expression.meaningPt, { exact: true }).count()) throw new Error("The meaning must wait for the second press.");
+  await meaning.click();
   await expressions.locator(".expression-card").getByRole("heading", { name: expression.expression, exact: true }).waitFor();
 }
 await paintBlankExpression();

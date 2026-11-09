@@ -13,8 +13,9 @@ export const SAME_DAY_RESCHEDULE_FEE_CENTS = Number(
  */
 export const NOTICE_HOURS = 14;
 /** Inês can mark a no-show from the start until this long after the end; the
- * lesson is charged once the window closes. Mirrors the Worker's constant. */
-export const NO_SHOW_WINDOW_HOURS_AFTER = 1;
+ * lesson is charged once the window closes. Zero since 2 November 2026 (Dan:
+ * "charged at the time of when the lessons ends"). Mirrors the Worker's constant. */
+export const NO_SHOW_WINDOW_HOURS_AFTER = 0;
 
 /** Her teaching timezone. Every advertised time on the site is Porto time. */
 export const BOOKING_TIME_ZONE = "Europe/Lisbon";

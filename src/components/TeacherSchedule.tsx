@@ -386,17 +386,19 @@ export function TeacherSchedule() {
 
   /** Initial welcomes are guarded; a requested reminder sends a fresh link. */
   async function sendWelcome(student: AdminStudent, again = false) {
-    if (welcoming || !student.email || student.email.startsWith("no-email:")) return;
+    if (welcoming || !student.email || student.email.startsWith("no-email:")) return false;
+    let sent = false;
     const account = accountGeneration.current;
     setWelcoming(student.id);
     setError("");
     setStatus("");
     try {
       await sendStudentWelcome(token, student.id, again ? undefined : { onlyIfWaiting: true });
-      if (account !== accountGeneration.current) return;
+      if (account !== accountGeneration.current) return false;
+      sent = true;
       setStatus(`${again ? "Link" : "Welcome"} sent to ${student.name.trim().split(/\s+/)[0]}.`);
     } catch (caught) {
-      if (account !== accountGeneration.current) return;
+      if (account !== accountGeneration.current) return false;
       setError(caught instanceof Error ? caught.message : "The welcome couldn’t be sent.");
     } finally {
       if (account === accountGeneration.current) setWelcoming("");
@@ -404,6 +406,7 @@ export function TeacherSchedule() {
     // Either way the list reads afresh, so a welcome another device sent leaves too.
     void reloadStudents();
     if (activeTab === "week") calendarTitleRef.current?.focus({ preventScroll: true });
+    return sent;
   }
 
   useEffect(() => {
@@ -704,7 +707,7 @@ export function TeacherSchedule() {
       ) : null}
       {!editing && bookingsShown ? (
         <NeedsYou
-          items={needs.filter(item => !["email", "lessons", "welcome"].includes(item.kind))}
+          items={needs.filter(item => !["lessons", "welcome"].includes(item.kind))}
           sending={welcoming}
           onMeet={() => {
             document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true });
@@ -904,7 +907,7 @@ export function TeacherSchedule() {
         onMeet={() => { setActiveTab("profile"); document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true }); }}
         onView={setSelectedBooking}
         onRetry={() => { void reloadStudents(); void reloadBookings(); }}
-        onWelcome={(student, again) => void sendWelcome(student, again)}
+        onWelcome={(student, again) => sendWelcome(student, again)}
         request={studentRequest}
         onAddStudent={() => openStudentPicker({ step: "new" })}
         onStudentsChanged={student => {
@@ -937,8 +940,9 @@ export function TeacherSchedule() {
           if (readSession() !== token) return;
           setStudents(current => current ? { ...current, list: [...current.list.filter(entry => entry.id !== student.id), student] } : { list: [student], cardsAccepted: false });
           setStudentPicker(null);
-          // With no lessons yet she goes to their welcome, which needs an email first.
-          openStudent(student, next === "welcome" ? student.email ? "welcome" : "email" : "lessons", slot);
+          // With no lessons yet she goes to their way in: their invite, on
+          // WhatsApp or, with an address, by email (2 November 2026, Dan).
+          openStudent(student, next === "welcome" ? "invite" : "lessons", slot);
           void reloadStudents();
         }}
         onClose={() => setStudentPicker(null)}

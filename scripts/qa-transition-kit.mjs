@@ -84,48 +84,65 @@ try {
     assert.ok(!linked.page.url().includes("signin="), "the link leaves the address bar at once");
     assert.equal(linked.posts.filter((post) => post.endpoint === "/auth/email-link/confirm").length, 0, "nothing is spent on arrival");
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/link-${width}.png`, fullPage: false });
-    await linked.page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await linked.page.getByRole("button", { name: "See my lessons", exact: true }).click();
     const prompt = linked.page.locator(".card-prompt");
-    await expect(prompt.getByRole("heading", { name: "Pay by card" })).toBeVisible({ timeout: 15000 });
-    await expect(prompt).toContainText("Add your card once and you’re set.");
+    // One card, as a payment link's is (2 November 2026, Dan: "one single thing").
+    await expect(prompt.getByRole("heading", { name: "Confirm your card payments" })).toBeVisible({ timeout: 15000 });
+    await expect(prompt.locator(".card-terms__lessons--then")).toContainText("Paid at the end of each lesson");
     assert.equal(await linked.page.evaluate(() => localStorage.getItem("ines-student-session")), "qa-link-session");
     assert.deepEqual(linked.posts.filter((post) => post.endpoint === "/auth/email-link/confirm").map((post) => post.body), [{ token: "qa-good-link" }]);
     await expect(linked.page.getByRole("heading", { name: "Your account" })).toHaveCount(0);
     assert.ok(await noOverflow(linked.page), `no sideways scroll at ${width}px`);
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/prompt-${width}.png`, fullPage: false });
 
-    await prompt.getByRole("button", { name: "Add card" }).click();
-    await expect(prompt.locator(".booking-payment-facts")).toBeVisible();
+    const addCard = prompt.getByRole("button", { name: "Agree & add card" });
+    await expect(addCard).toBeDisabled();
+    // Card first (2 November 2026, Dan): nothing lets them skip it.
+    await expect(prompt.getByRole("button", { name: "Not now" })).toHaveCount(0);
+    await prompt.getByRole("button", { name: "I authorise card payments for my future lessons" }).click();
     await linked.page.screenshot({ path: `tmp/qa/transition-kit/terms-${width}.png`, fullPage: false });
-    await prompt.getByRole("button", { name: "Agree & add card" }).click();
+    await addCard.click();
     await linked.page.waitForURL(/checkout\.stripe\.com/);
     assert.deepEqual(linked.posts.find((post) => post.endpoint === "/me/card")?.body, { consent: true });
     assert.deepEqual(linked.errors, []);
     await linked.page.close();
 
-    // A named past lesson stays explicit and requires its own payment
+    // The past lessons Inês ticked stay explicit and require their own payment
     // agreement. Merely opening the personal link never starts card setup.
-    const approvedBooking = { id: "approved-past-lesson", reference: "PT-COMBINED", startAt: "2026-10-27T17:00:00.000Z", endAt: "2026-10-27T18:00:00.000Z", amountCents: 1500 };
+    const approvedBookings = [
+      { id: "approved-older-lesson", reference: "PT-OLDER", startAt: "2026-10-20T17:00:00.000Z", endAt: "2026-10-20T18:00:00.000Z", amountCents: 1500 },
+      { id: "approved-past-lesson", reference: "PT-COMBINED", startAt: "2026-10-27T17:00:00.000Z", endAt: "2026-10-27T18:00:00.000Z", amountCents: 1500 },
+    ];
+    // What agreeing then pays for (2 November 2026, Dan): their weekly run once.
+    const weekly = { ...added, reference: "PT-WEEKLY", startAt: "2026-11-03T17:00:00.000Z", endAt: "2026-11-03T18:00:00.000Z", seriesId: "qa-weekly",
+      lessonType: { ...added.lessonType, priceCents: 1500 } };
+    const weeklyRun = { id: "qa-weekly", weekday: 2, minuteOfDay: 1020, occurrences: null, openEnded: true, upcoming: 4 };
     let combinedAuthorised = false;
-    const combined = await open(width, "/book/?signin=qa-combined-link&cardBooking=approved-past-lesson", {
+    const combined = await open(width, "/book/?signin=qa-combined-link&cardBooking=approved-older-lesson,approved-past-lesson", {
       now: "2026-10-27T20:00:00Z",
       me: { ...student, hasCard: true },
       reply: endpoint => {
         if (endpoint === "/auth/email-link/confirm") return { json: { student: { ...student, hasCard: true }, session: "qa-combined-session" } };
-        if (endpoint === "/me/card/preview") return { json: { booking: approvedBooking, savedCardKey: "qa-saved-card", sameDayFeeCents: 500, minimumNoticeHours: 14 } };
+        if (endpoint === "/me/card/preview") return { json: { booking: approvedBookings[0], bookings: approvedBookings, savedCardKey: "qa-saved-card", sameDayFeeCents: 500, minimumNoticeHours: 14 } };
         if (endpoint === "/me" && combinedAuthorised) return { json: { student: { ...student, hasCard: true, cardForAllLessons: true }, bookings: [added], series: [], cardsAccepted: true } };
+        if (endpoint === "/me") return { json: { student: { ...student, hasCard: true }, bookings: [added, weekly, { ...weekly, reference: "PT-WEEKLY2", startAt: "2026-11-10T17:00:00.000Z", endAt: "2026-11-10T18:00:00.000Z" }], series: [weeklyRun], sameDayFeeCents: 500, cardsAccepted: true } };
         if (endpoint === "/me/card") { combinedAuthorised = true; return { json: { authorised: true } }; }
         return null;
       }
     });
     await expect(combined.page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(combined.page.getByText("Sign in to pay for your lessons.")).toBeVisible();
     assert.equal(combined.posts.length, 0);
     assert.ok(!combined.page.url().includes("signin="));
-    await combined.page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await combined.page.getByRole("button", { name: "See my lessons", exact: true }).click();
     const approval = combined.page.locator(".card-prompt");
-    await expect(approval).toContainText("€15");
+    // What is charged now is the total; over the agreement, only the fee's two dabs.
+    await expect(approval.locator(".card-terms__total")).toHaveText("Charged now€30");
+    await expect(approval.locator(".card-terms__lessons--then")).toHaveText("Then at the end of each lessonEvery Tuesday, 17:00€15");
+    await expect(approval.locator(".card-terms__consent .booking-payment-facts li")).toHaveText(["Free to change or cancel a lesson up to 14 hours before", "€5 to move or cancel later, or if you don’t show up"]);
+    assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card/preview")?.body, { bookingIds: ["approved-older-lesson", "approved-past-lesson"] });
     await combined.page.reload();
-    await expect(approval).toContainText("€15");
+    await expect(approval.locator(".card-terms__total")).toHaveText("Charged now€30");
     const agree = approval.getByRole("button", { name: "Authorise payments" });
     await expect(agree).toBeDisabled();
     await approval.getByRole("link", { name: "Terms & privacy" }).click();
@@ -133,12 +150,12 @@ try {
     await expect(agree).toBeDisabled();
     assert.equal(combined.posts.filter(post => post.endpoint === "/me/card").length, 0);
     await approval.screenshot({ path: `tmp/qa/transition-kit/combined-${width}.png` });
-    await approval.getByRole("button", { name: "I authorise card payments for this and future lessons" }).click();
+    await approval.getByRole("button", { name: "I authorise card payments for these and future lessons" }).click();
     await expect(agree).toBeEnabled();
     assert.ok(await noOverflow(combined.page));
     await agree.click();
     await expect(combined.page.getByText("Payments authorised. You’re all set.")).toBeVisible();
-    assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card")?.body, { consent: true, booking: approvedBooking, bookingConsent: true, savedCardKey: "qa-saved-card" });
+    assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card")?.body, { consent: true, bookings: approvedBookings, bookingConsent: true, savedCardKey: "qa-saved-card" });
     assert.deepEqual(combined.errors, []);
     await combined.page.close();
 
@@ -161,7 +178,7 @@ try {
       },
     });
     try {
-      await interrupted.page.getByRole("button", { name: "Sign in", exact: true }).click({ timeout: 15000 });
+      await interrupted.page.getByRole("button", { name: "See my lessons", exact: true }).click({ timeout: 15000 });
       await linkStarted.promise;
       await interrupted.page.evaluate(() => {
         localStorage.setItem("ines-student-session", "qa-newer-session");
@@ -169,14 +186,14 @@ try {
       });
       const linkResponse = interrupted.page.waitForResponse("**/auth/email-link/confirm");
       linkWaiting.resolve(); await linkResponse;
-      await expect(interrupted.page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
+      await expect(interrupted.page.getByRole("button", { name: "See my lessons", exact: true })).toBeEnabled();
       assert.equal(await interrupted.page.evaluate(() => localStorage.getItem("ines-student-session")), "qa-newer-session");
 
       // Remove the welcome surface by returning to the account in a fresh
       // document. The newer session is retained by this tab.
       await interrupted.page.goto(`${base}/book/?view=lessons`);
       const interruptedPrompt = interrupted.page.locator(".card-prompt");
-      await interruptedPrompt.getByRole("button", { name: "Add card", exact: true }).click({ timeout: 15000 });
+      await interruptedPrompt.getByRole("button", { name: "I authorise card payments for my future lessons" }).click({ timeout: 15000 });
       await interruptedPrompt.getByRole("button", { name: "Agree & add card", exact: true }).click();
       await cardStarted.promise;
       await interrupted.page.locator(".site-header__brand").click();
@@ -201,7 +218,7 @@ try {
         return null;
       },
     });
-    await spent.page.getByRole("button", { name: "Sign in", exact: true }).click({ timeout: 15000 });
+    await spent.page.getByRole("button", { name: "See my lessons", exact: true }).click({ timeout: 15000 });
     // The landing says why and offers the way on, never a dead end.
     await expect(spent.page.locator(".sign-in-link [role=alert]")).toContainText("already been used");
     await spent.page.getByRole("button", { name: "Email me a new link", exact: true }).click();
@@ -232,7 +249,7 @@ try {
           return nativeSet.call(this, key, value);
         };
       });
-      await blocked.page.getByRole("button", { name: "Sign in", exact: true }).click({ timeout: 15000 });
+      await blocked.page.getByRole("button", { name: "See my lessons", exact: true }).click({ timeout: 15000 });
       await expect(blocked.page.locator(".sign-in-link [role=alert]")).toContainText("this link has now been used");
       await expect(blocked.page.getByRole("button", { name: "Email me a new link", exact: true })).toBeVisible();
       assert.equal(await blocked.page.evaluate(() => localStorage.getItem("ines-student-session")), null);
@@ -330,6 +347,7 @@ try {
     });
     await expect(painting.page.locator(".site-header")).toBeVisible();
     await painting.page.getByRole("button", { name: "Paint it", exact: true }).click();
+    await painting.page.getByRole("button", { name: "Show meaning", exact: true }).click();
     await expect(painting.page.locator(".expression-card")).toContainText(draft.meaningPt);
     await expect(painting.page.getByRole("link", { name: "Expressions collection", exact: true })).toHaveAttribute("href", /\/schedule\/\?tab=expressions$/);
     assert.ok(!painting.reads.includes("/me/expressions"), "a teacher's page must not spend a student pick");
