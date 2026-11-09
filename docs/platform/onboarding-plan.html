@@ -1,0 +1,932 @@
+<title>Tutor Onboarding Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Brygada+1918:ital,wght@0,400..700;1,400..700&family=Commissioner:wght@300..700&family=Young+Serif&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap">
+<style>
+/* Layout: an exercise-book page in the platform's proposed brand. Step numbers and notes sit in a margin column left of a red margin line; the work runs to the right. Phone sketches sit in one storyboard strip per part of the flow. */
+:root {
+  --paper: #F6F7FA;
+  --sheet: #FFFFFF;
+  --ink: #131932;
+  --pencil: #5A6180;
+  --royal: #2B45D4;
+  --wash: #E9EDFB;
+  --rule: #CDD6F0;
+  --frame: #A3ABC9;
+  --margin: #DD4B37;
+  --marker: #FFE35A;
+  --on-marker: #131932;
+  --royal-ink: #FFFFFF;
+  --shadow: 0 1px 0 rgba(19, 25, 50, .04), 0 18px 32px -24px rgba(19, 25, 50, .45);
+  /* A sample tutor's site inside the sketches. It is a picture of their site, so it keeps its own colours in both themes. */
+  --t-bg: #F2F4EC;
+  --t-ink: #27331F;
+  --t-accent: #3D6FA8;
+  --t-soft: #DCE3CF;
+  --t-skin: #C89B7B;
+  --t-hair: #4A3426;
+  --t-on-accent: #FFFFFF;
+  --display: "Brygada 1918", "Iowan Old Style", Georgia, serif;
+  --ui: "Commissioner", "Segoe UI", system-ui, sans-serif;
+  --t-serif: "Young Serif", Georgia, serif;
+  --t-grot: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --step--1: 0.8125rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.6rem;
+  --step-3: clamp(1.9rem, 4vw, 2.6rem);
+  --step-hero: clamp(2.3rem, 6vw, 4.2rem);
+  --margin-col: 11rem;
+  --phone-w: 13.75rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0E1226; --sheet: #161B36; --ink: #ECEEF7; --pencil: #A4AAC6; --royal: #93A3FF;
+    --wash: #1F2650; --rule: #28305A; --frame: #444C7A; --margin: #FF7B66; --marker: #F2D64B;
+    --on-marker: #131932; --royal-ink: #0E1226;
+    --shadow: 0 1px 0 rgba(0, 0, 0, .2), 0 18px 32px -22px rgba(0, 0, 0, .8);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0E1226; --sheet: #161B36; --ink: #ECEEF7; --pencil: #A4AAC6; --royal: #93A3FF;
+  --wash: #1F2650; --rule: #28305A; --frame: #444C7A; --margin: #FF7B66; --marker: #F2D64B;
+  --on-marker: #131932; --royal-ink: #0E1226;
+  --shadow: 0 1px 0 rgba(0, 0, 0, .2), 0 18px 32px -22px rgba(0, 0, 0, .8);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: var(--ui); font-size: var(--step-0); line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.page { max-width: 72rem; margin: 0 auto; padding-block: 2rem 4rem; position: relative; }
+.page::before {
+  content: ""; position: absolute; top: 0; bottom: 0; z-index: 0;
+  left: calc(var(--margin-col) + 1rem); width: 1px; background: var(--margin); opacity: .5;
+}
+h1, h2, h3 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; line-height: 1.1; }
+h1 { font-size: var(--step-hero); letter-spacing: -0.02em; line-height: 1.02; }
+h2 { font-size: var(--step-3); letter-spacing: -0.01em; }
+h3 { font-size: var(--step-1); }
+p { margin: 0; max-width: 65ch; }
+a { color: var(--royal); text-underline-offset: .18em; }
+a:focus-visible { outline: 2px solid var(--royal); outline-offset: 3px; border-radius: 2px; }
+.legend { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; color: var(--pencil); }
+.note { font-family: var(--display); font-style: italic; color: var(--royal); line-height: 1.38; }
+.mark-hl { background: linear-gradient(transparent 18%, var(--marker) 18% 88%, transparent 88%); color: var(--on-marker); padding: 0 .1em; border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+
+/* Margin layout */
+.sec { display: grid; grid-template-columns: var(--margin-col) minmax(0, 1fr); column-gap: 2rem; padding-block: 2.75rem; border-top: 1px solid var(--rule); position: relative; z-index: 1; }
+.sec > .side { display: grid; gap: .5rem; align-content: start; padding-top: .4rem; }
+.sec > .work { display: grid; gap: 1.25rem; min-width: 0; align-content: start; }
+.hero { border-top: 0; padding-top: 1rem; }
+.hero .work { gap: 1.4rem; }
+.lede { font-size: var(--step-1); line-height: 1.5; max-width: 44rem; }
+
+/* Sketch frames */
+.pair { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; }
+.pair > figure { margin: 0; display: grid; gap: .6rem; min-width: 0; }
+.pair > .lap-fig { flex: 1 1 38rem; }
+.pair > .ph-fig { flex: 0 0 var(--phone-w); }
+.scroll-x { overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .5rem; }
+figcaption { font-size: .88rem; color: var(--pencil); max-width: 44ch; }
+figcaption b { color: var(--ink); }
+
+.laptop { min-width: 38rem; background: var(--sheet); border: 1px solid var(--frame); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); font-size: .76rem; line-height: 1.4; }
+.lap-bar { display: flex; align-items: center; gap: .55rem; padding: .45rem .8rem; border-bottom: 1px solid var(--rule); color: var(--pencil); font-size: .7rem; }
+.lap-bar svg { width: 15px; height: 10px; color: var(--royal); flex: none; }
+.lap-bar .saved { margin-left: auto; display: inline-flex; align-items: center; gap: .25rem; }
+.lap-bar .saved svg { width: 11px; height: 11px; }
+.lap-body { display: grid; grid-template-columns: 8.6rem 12.5rem minmax(0, 1fr); min-height: 24.5rem; }
+.lap-steps { list-style: none; margin: 0; padding: .9rem .7rem; display: grid; gap: .32rem; align-content: start; border-right: 1px solid var(--margin); }
+.lap-steps li { display: grid; grid-template-columns: .9rem 1fr; align-items: center; gap: .3rem; color: var(--pencil); }
+.lap-steps li svg { width: 11px; height: 11px; color: var(--royal); }
+.lap-steps li.now { color: var(--ink); font-weight: 600; }
+.lap-steps li.now::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--royal); justify-self: center; }
+.lap-steps li:not(.done):not(.now)::before { content: ""; width: 5px; height: 1px; background: var(--frame); justify-self: center; }
+.lap-q { padding: 1rem .9rem; display: flex; flex-direction: column; gap: .6rem; }
+.lap-q .btn { margin-top: .4rem; }
+.lap-prev { background: var(--paper); padding: .9rem; display: grid; gap: .5rem; align-content: start; border-left: 1px solid var(--rule); }
+.browser { border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--t-bg); }
+.b-bar { font-size: .64rem; padding: .3rem .6rem; background: var(--sheet); color: var(--pencil); border-bottom: 1px solid var(--rule); }
+.lap-prev .note { font-size: .82rem; }
+
+.phone { position: relative; width: var(--phone-w); height: 28.5rem; background: var(--sheet); border: 1px solid var(--frame); border-radius: 1.7rem; padding: 1.05rem .85rem .85rem; display: flex; flex-direction: column; gap: .55rem; overflow: hidden; font-size: .74rem; line-height: 1.42; box-shadow: var(--shadow); }
+.phone::before { content: ""; position: absolute; top: .42rem; left: 50%; width: 2.6rem; height: .28rem; border-radius: 99px; background: var(--rule); transform: translateX(-50%); }
+.ph-top { display: flex; align-items: center; gap: .4rem; padding-top: .2rem; }
+.ph-top > svg { width: 14px; height: 9px; color: var(--royal); flex: none; }
+.ph-top .legend { font-size: .58rem; letter-spacing: .1em; }
+.bars { display: flex; gap: 2px; margin-left: auto; }
+.bars i { width: .5rem; height: 2px; background: var(--rule); border-radius: 1px; }
+.bars i.d { background: var(--royal); }
+.q { font-family: var(--display); font-weight: 600; font-size: 1.06rem; line-height: 1.18; text-wrap: balance; color: var(--ink); }
+.lap-q .q { font-size: 1.25rem; }
+.fld { display: grid; gap: .05rem; border-bottom: 1px solid var(--rule); padding-bottom: .3rem; }
+.fld .legend { font-size: .56rem; }
+.fld .val { font-size: .86rem; color: var(--ink); }
+.caret { display: inline-block; width: 1px; height: 1em; background: var(--royal); vertical-align: -.15em; margin-left: 1px; }
+.btn { display: block; text-align: center; background: var(--royal); color: var(--royal-ink); border-radius: 4px; padding: .5rem .6rem; font-weight: 600; font-size: .76rem; }
+.btn.ghost { background: transparent; color: var(--royal); border: 1px solid var(--royal); }
+.phone .push { margin-top: auto; }
+.tiny { font-size: .66rem; color: var(--pencil); }
+.mini-btn { font-size: .62rem; font-weight: 600; color: var(--royal); border: 1px solid var(--royal); border-radius: 3px; padding: .12rem .4rem; white-space: nowrap; }
+.mini-btn.sent { color: var(--pencil); border-color: var(--rule); display: inline-flex; align-items: center; gap: .2rem; }
+.mini-btn.sent svg { width: 9px; height: 9px; }
+.peek { margin: auto -.85rem -.85rem; background: var(--paper); border-top: 1px solid var(--rule); border-radius: 1rem 1rem 0 0; padding: .45rem .85rem .9rem; display: grid; gap: .4rem; }
+.peek .grab { width: 2rem; height: .22rem; border-radius: 99px; background: var(--frame); justify-self: center; }
+.peek .legend { font-size: .56rem; }
+
+/* The sample tutor's site */
+.site { background: var(--t-bg); color: var(--t-ink); font-family: var(--ui); display: grid; gap: .55rem; padding: .7rem; }
+.s-nav { display: flex; gap: .55rem; align-items: center; font-size: .6rem; }
+.s-nav b { font-family: var(--t-serif); font-weight: 400; font-size: .78rem; margin-right: auto; }
+.s-cta { background: var(--t-accent); color: var(--t-on-accent); border-radius: 99px; padding: .08rem .45rem; }
+.s-hero { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr); gap: .7rem; align-items: center; }
+.s-kick { display: block; font-size: .56rem; letter-spacing: .1em; text-transform: uppercase; opacity: .75; }
+.s-h { display: block; font-family: var(--t-serif); font-size: 1.32rem; line-height: 1.05; margin: .15rem 0 .4rem; }
+.s-btn { display: inline-block; background: var(--t-accent); color: var(--t-on-accent); border-radius: 99px; padding: .2rem .6rem; font-size: .6rem; font-weight: 600; }
+.s-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
+.s-cards span { background: var(--t-soft); border-radius: 5px; padding: .35rem .4rem; font-size: .58rem; line-height: 1.3; }
+.s-cards b { display: block; font-family: var(--t-serif); font-weight: 400; font-size: .72rem; }
+.face { aspect-ratio: 1; border-radius: 6px; max-width: 100%;
+  background:
+    radial-gradient(circle at 50% 41%, var(--t-skin) 0 19%, transparent 19.5%),
+    radial-gradient(circle at 50% 35%, var(--t-hair) 0 25%, transparent 25.5%),
+    radial-gradient(ellipse 46% 34% at 50% 100%, var(--t-accent) 0 99%, transparent 100%),
+    var(--t-soft); }
+.typed { background: linear-gradient(transparent 55%, var(--marker) 55% 92%, transparent 92%); }
+.site.sm { padding: .5rem; gap: .35rem; border-radius: 6px; }
+.site.sm .s-hero { grid-template-columns: 2.6rem minmax(0, 1fr); gap: .5rem; }
+.site.sm .s-h { font-size: .92rem; margin: .1rem 0 0; }
+
+/* Layout 2, big name, for the look picker */
+.site.l2 { border-radius: 8px; padding: .8rem .75rem; gap: .5rem; position: relative; overflow: hidden; }
+.site.l2 .big { font-family: var(--t-grot); font-weight: 800; font-size: 2.65rem; line-height: .86; letter-spacing: -.035em; }
+.site.l2 .sub { font-family: var(--t-grot); font-size: .78rem; font-weight: 500; }
+.site.l2 .l2-top { display: flex; align-items: center; gap: .5rem; font-size: .56rem; letter-spacing: .1em; text-transform: uppercase; }
+.site.l2 .face { width: 2.6rem; border-radius: 50%; flex: none; }
+.face.empty { background: transparent; border: 1.5px dashed var(--t-accent); display: grid; place-items: center; text-align: center; font-size: .5rem; line-height: 1.2; font-weight: 600; color: var(--t-accent); }
+.site.l2 .band { margin: .2rem -.75rem -.8rem; background: var(--t-accent); color: var(--t-on-accent); padding: .45rem .75rem; font-size: .6rem; display: flex; justify-content: space-between; }
+
+/* Storyboards */
+.board { list-style: none; margin: 0; padding: 0 0 .9rem; display: flex; gap: 1rem; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; }
+.board > li { flex: 0 0 var(--phone-w); display: grid; gap: .65rem; align-content: start; scroll-snap-align: start; }
+.board figure { margin: 0; display: grid; gap: .65rem; }
+.board figcaption { display: flex; gap: .45rem; align-items: baseline; font-size: .9rem; color: var(--ink); }
+.board figcaption b { font-family: var(--display); color: var(--royal); font-size: 1.05rem; }
+
+/* Story sketch */
+.about { border-radius: 8px; padding: .7rem; gap: .45rem; font-size: .7rem; line-height: 1.45; }
+.about .t-h { font-family: var(--t-serif); font-size: .95rem; }
+.about mark { background: linear-gradient(transparent 8%, var(--marker) 8% 96%, transparent 96%); color: var(--t-ink); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.tools { display: flex; gap: .3rem; }
+.tools span { background: var(--sheet); color: var(--ink); border: 1px solid var(--frame); border-radius: 3px; font-size: .58rem; font-weight: 600; padding: .1rem .35rem; }
+.tools span:first-child { background: var(--royal); color: var(--royal-ink); border-color: var(--royal); }
+.gap { border: 1px dashed var(--t-accent); border-radius: 3px; padding: 0 .25rem; color: var(--t-accent); font-weight: 600; white-space: nowrap; }
+
+/* Look sketch */
+.pager { display: flex; justify-content: space-between; align-items: center; font-size: .66rem; color: var(--pencil); }
+.pager span:first-child, .pager span:last-child { width: 1.4rem; height: 1.4rem; display: grid; place-items: center; border: 1px solid var(--rule); border-radius: 50%; color: var(--ink); font-size: .8rem; }
+.swatches { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .4rem; justify-items: center; }
+.cs { width: 1.45rem; height: 1.45rem; border-radius: 50%; background: linear-gradient(135deg, var(--a) 0 50%, var(--b) 50% 100%); border: 1px solid var(--rule); }
+.cs.on { outline: 2px solid var(--royal); outline-offset: 2px; }
+
+/* Week sketch */
+.presets { display: flex; flex-wrap: wrap; gap: .3rem; }
+.presets span { font-size: .62rem; border: 1px solid var(--rule); border-radius: 99px; padding: .12rem .45rem; color: var(--ink); }
+.presets span.on { background: var(--royal); border-color: var(--royal); color: var(--royal-ink); font-weight: 600; }
+.week { display: grid; grid-template-columns: 1.15rem repeat(7, minmax(0, 1fr)); gap: 2px; font-size: .56rem; }
+.week b { text-align: center; color: var(--pencil); font-weight: 600; }
+.week em { font-style: normal; color: var(--pencil); text-align: right; padding-right: 3px; line-height: 1.08rem; font-variant-numeric: tabular-nums; }
+.week i { height: 1.08rem; background: var(--wash); border-radius: 2px; }
+.week i.on { background: var(--royal); }
+.cal-row { display: flex; align-items: center; gap: .5rem; border: 1px solid var(--rule); border-radius: 4px; padding: .4rem .5rem; }
+.cal-row span:first-child { display: grid; line-height: 1.25; margin-right: auto; }
+.cal-row b { font-size: .7rem; }
+.cal-row em { font-style: normal; font-size: .62rem; color: var(--pencil); }
+
+/* Rules sketch */
+.terms { display: grid; gap: .45rem; font-size: .76rem; line-height: 1.75; }
+.blank { font-weight: 600; color: var(--royal); background: var(--wash); border-bottom: 2px solid var(--royal); border-radius: 3px 3px 0 0; padding: 0 .22rem; white-space: nowrap; }
+.blank.open { background: var(--royal); color: var(--royal-ink); }
+.pop { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; background: var(--sheet); border: 1px solid var(--frame); border-radius: 5px; padding: .35rem; box-shadow: var(--shadow); margin-top: -.15rem; }
+.pop span { font-size: .64rem; border: 1px solid var(--rule); border-radius: 3px; padding: .05rem .35rem; }
+.pop span.sel { border-color: var(--royal); color: var(--royal); font-weight: 600; }
+.pop em { font-family: var(--display); color: var(--royal); font-size: .7rem; width: 100%; }
+
+/* Live sketch */
+.phone.live { align-items: stretch; text-align: center; }
+.live-mark { display: grid; place-items: center; padding-top: 1.4rem; }
+.live-mark svg { width: 3.6rem; height: auto; overflow: visible; color: var(--ink); }
+.hat { transform-box: fill-box; transform-origin: 20% 100%; transition: transform .45s cubic-bezier(.3, 1.6, .5, 1); }
+.tip:hover .hat, .tip.is-tipped .hat { transform: translate(6%, -22%) rotate(-14deg); }
+@media (prefers-reduced-motion: reduce) { .hat { transition: none; } }
+.live .q { font-size: 1.3rem; }
+.addr { justify-self: center; align-self: center; font-weight: 600; color: var(--royal); background: var(--wash); border-radius: 99px; padding: .2rem .7rem; font-size: .76rem; }
+.qr-row { display: flex; align-items: center; gap: .6rem; text-align: left; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding-block: .55rem; }
+.qr { width: 3.4rem; height: 3.4rem; flex: none; color: var(--ink); }
+.stack { display: grid; gap: .4rem; margin-top: auto; }
+
+/* Get paid sketch */
+.stripe-box { border: 1px dashed var(--frame); border-radius: 6px; padding: .5rem; display: grid; gap: .3rem; background: var(--paper); }
+.stripe-box .legend { font-size: .55rem; }
+.ln { display: block; font-size: .64rem; color: var(--pencil); border-bottom: 1px solid var(--rule); padding-bottom: .15rem; }
+.opt { display: flex; align-items: center; gap: .4rem; border: 1px solid var(--rule); border-radius: 4px; padding: .3rem .45rem; font-size: .68rem; }
+.opt::before { content: ""; width: .6rem; height: .6rem; border-radius: 50%; border: 1px solid var(--frame); flex: none; }
+.opt.on { border-color: var(--royal); }
+.opt.on::before { border: 3px solid var(--royal); }
+
+/* Invite sketch */
+.people { list-style: none; margin: 0; padding: 0; display: grid; }
+.people li { display: flex; align-items: center; gap: .45rem; padding-block: .38rem; border-bottom: 1px solid var(--rule); }
+.people i { width: 1.45rem; height: 1.45rem; border-radius: 50%; display: grid; place-items: center; background: var(--wash); color: var(--royal); font-style: normal; font-weight: 700; font-size: .62rem; flex: none; }
+.people li > span:nth-child(2) { display: grid; line-height: 1.25; margin-right: auto; min-width: 0; }
+.people b { font-size: .7rem; }
+.people em { font-style: normal; font-size: .6rem; color: var(--pencil); }
+.bubble { background: var(--wash); border-radius: 10px 10px 10px 2px; padding: .45rem .55rem; font-size: .66rem; line-height: 1.4; color: var(--ink); }
+.bubble span { color: var(--royal); font-weight: 600; overflow-wrap: anywhere; }
+
+/* First booking sketch */
+.toast { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .05rem .55rem; align-items: center; border: 1px solid var(--rule); border-radius: 6px; padding: .55rem .6rem; background: var(--paper); }
+.toast svg { grid-row: span 2; width: 1.9rem; height: auto; overflow: visible; color: var(--ink); }
+.toast b { font-family: var(--display); font-size: .86rem; line-height: 1.2; }
+.toast span { font-size: .64rem; color: var(--pencil); }
+.sched { list-style: none; margin: 0; padding: 0; display: grid; }
+.sched li { display: flex; gap: .5rem; align-items: baseline; padding-block: .3rem; border-bottom: 1px solid var(--rule); font-size: .7rem; }
+.sched b { font-variant-numeric: tabular-nums; width: 3.6rem; flex: none; }
+.sched em { margin-left: auto; font-style: normal; font-size: .58rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; background: var(--marker); color: var(--on-marker); border-radius: 3px; padding: 0 .3rem; }
+.finish { border: 1px solid var(--rule); border-radius: 6px; padding: .5rem .6rem; display: grid; gap: .25rem; }
+.finish .legend { font-size: .56rem; }
+.fr { display: flex; align-items: center; gap: .4rem; font-size: .68rem; }
+.fr svg { width: 11px; height: 11px; color: var(--royal); flex: none; }
+.fr .o { width: 11px; height: 11px; border-radius: 50%; border: 1px solid var(--frame); flex: none; }
+.fr .h { width: 11px; height: 11px; border-radius: 50%; border: 1px solid var(--royal); background: linear-gradient(90deg, var(--royal) 50%, transparent 50%); flex: none; }
+.fr em { margin-left: auto; font-style: normal; color: var(--pencil); font-size: .62rem; }
+
+/* Principles */
+.feel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6rem 2.5rem; }
+.pr { display: grid; gap: .4rem; align-content: start; border-top: 1px solid var(--ink); padding-top: .85rem; }
+.pr h3 { font-size: 1.22rem; }
+.pr p { color: var(--ink); }
+
+/* Contents */
+.toc { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.4rem 3rem; align-items: start; }
+.toc-col { display: grid; gap: 1.4rem; }
+.toc-group { display: grid; }
+.toc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; border-bottom: 1px solid var(--ink); padding-bottom: .35rem; margin-bottom: .25rem; }
+.toc-head h3 { font-size: 1.15rem; }
+.toc-head .legend { font-variant-numeric: tabular-nums; }
+.toc-row { display: grid; grid-template-columns: 1.7rem auto minmax(1rem, 1fr) auto; align-items: baseline; gap: .45rem; padding-block: .3rem; color: var(--ink); text-decoration: none; border-radius: 3px; }
+.toc-row:hover .nm { text-decoration: underline; text-decoration-color: var(--royal); text-underline-offset: .2em; }
+.toc-row .n { font-family: var(--display); font-weight: 600; color: var(--royal); font-size: 1.05rem; }
+.toc-row .lead { border-bottom: 1px dotted var(--frame); transform: translateY(-.3em); }
+.toc-row .t { font-variant-numeric: tabular-nums; color: var(--pencil); font-size: var(--step--1); }
+.toc-branch { margin: 0 0 .2rem 2.15rem; padding: .1rem 0 .1rem .9rem; border-left: 1px solid var(--royal); font-size: .88rem; color: var(--pencil); }
+.toc-branch b { color: var(--ink); font-weight: 600; }
+
+/* Step rows */
+.steps { grid-column: 1 / -1; display: grid; margin-top: 1.5rem; }
+.steps-head, .step { display: grid; grid-template-columns: var(--margin-col) minmax(0, 1fr); column-gap: 2rem; }
+.steps-head { padding-bottom: .5rem; }
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; min-width: 0; }
+.step { padding-block: 1.15rem; border-top: 1px solid var(--rule); scroll-margin-top: 1rem; }
+.step .who { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); column-gap: .35rem; align-content: start; }
+.step .n { font-family: var(--display); font-weight: 600; font-size: 2rem; line-height: .95; color: var(--royal); grid-row: span 3; }
+.step h3 { font-size: 1.08rem; line-height: 1.2; }
+.step .mins { font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; color: var(--pencil); margin-top: .2rem; }
+.step .see { font-size: .8rem; margin-top: .3rem; }
+.step .body { display: grid; gap: .8rem; min-width: 0; }
+.step .cols > div { font-size: .95rem; line-height: 1.5; min-width: 0; }
+.step .cols > .fl { font-family: var(--display); font-style: italic; color: var(--royal); font-size: 1.02rem; line-height: 1.42; }
+.extra { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: 1rem; padding: .6rem .8rem; background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; font-size: .92rem; }
+.extra .legend { padding-top: .15rem; }
+
+/* Rows */
+.rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.rows li { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1.5rem; padding-block: .8rem; border-bottom: 1px solid var(--rule); }
+.rows li > b { font-family: var(--display); font-weight: 600; font-size: 1.08rem; line-height: 1.3; }
+.rows li > span { min-width: 0; }
+.rows .src { color: var(--pencil); font-size: .88rem; }
+
+/* Decisions */
+.decs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+.dcard { background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; padding: 1.1rem 1.15rem; display: grid; gap: .8rem; }
+.dcard h3 { font-size: 1.3rem; }
+.dopt { display: grid; gap: .15rem; padding-top: .7rem; border-top: 1px solid var(--rule); }
+.dopt b { font-weight: 600; }
+.dopt span { color: var(--pencil); font-size: .93rem; }
+.pick { justify-self: start; font-size: .64rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; background: var(--marker); color: var(--on-marker); padding: .1rem .42rem; border-radius: 3px; margin-bottom: .15rem; }
+
+.cols-label { display: none; }
+
+@media (max-width: 1000px) {
+  .steps-head { display: none; }
+  .step .cols { grid-template-columns: minmax(0, 1fr); gap: .65rem; }
+  .cols-label { display: block; font-family: var(--ui); font-style: normal; font-size: .64rem; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: var(--pencil); margin-bottom: .1rem; }
+}
+@media (max-width: 760px) {
+  .page::before { display: none; }
+  .sec { grid-template-columns: minmax(0, 1fr); row-gap: .9rem; padding-block: 2rem; }
+  .sec > .side { padding-top: 0; }
+  .step, .steps-head { grid-template-columns: minmax(0, 1fr); row-gap: .7rem; }
+  .step .who { grid-template-columns: auto auto minmax(0, 1fr); align-items: baseline; column-gap: .55rem; }
+  .step .n { grid-row: auto; font-size: 1.6rem; }
+  .step .see { grid-column: 1 / -1; margin-top: 0; }
+  .feel, .toc, .decs { grid-template-columns: minmax(0, 1fr); }
+  .rows li, .extra { grid-template-columns: minmax(0, 1fr); gap: .25rem; }
+  .pair > .ph-fig { flex-basis: 100%; }
+  .pair > .ph-fig .phone { margin-inline: auto; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="hat" viewBox="0 0 64 40"><path d="M2 36 L29 3 C30.5 1.2 33 1.2 34.5 3 L62 34 L52 39 L31.5 12 L6 39 Z" fill="currentColor"/></symbol>
+    <symbol id="tick" viewBox="0 0 16 16"><path d="M2.5 8.5 L6.2 12 L13.5 3.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<main class="page">
+
+  <section class="sec hero" aria-labelledby="top">
+    <div class="side">
+      <span class="legend">Tutor onboarding</span>
+      <span class="note">A plan for the platform, 9&nbsp;November 2026. Chapeau is still the working name.</span>
+      <span class="note">No calls and no waiting on a person: every step is self-serve.</span>
+      <span class="note">Every sketch shows a sample tutor, Maria, who teaches Spanish online and in Valencia.</span>
+    </div>
+    <div class="work">
+      <h1 id="top">From hello to a live site in <span class="mark-hl">twenty minutes</span>.</h1>
+      <p class="lede">A tutor arrives with a marketplace profile, a photo and students they already teach. Every screen asks one question, and every answer shows on their own site right beside it. About twenty minutes in, the site is live on a free address. Getting paid and inviting students take about twenty more, straight away or another day.</p>
+      <div class="pair">
+        <figure class="lap-fig">
+          <div class="scroll-x">
+            <div class="laptop" role="img" aria-label="Sketch on a laptop: the nine steps down the left, the question in the middle, and the tutor's own site on the right with their name already in the heading">
+              <div class="lap-bar"><svg viewBox="0 0 64 40" aria-hidden="true"><use href="#hat"/></svg><span>chapeau.school/start</span><span class="saved"><svg aria-hidden="true"><use href="#tick"/></svg>Saved</span></div>
+              <div class="lap-body">
+                <ol class="lap-steps">
+                  <li class="done"><svg aria-hidden="true"><use href="#tick"/></svg>Say hello</li>
+                  <li class="now">What you teach</li>
+                  <li>Your photo</li>
+                  <li>Your story</li>
+                  <li>Your look</li>
+                  <li>Lessons and prices</li>
+                  <li>Your week</li>
+                  <li>Your rules</li>
+                  <li>Go live</li>
+                </ol>
+                <div class="lap-q">
+                  <span class="legend">2 of 9</span>
+                  <p class="q">What should students call you?</p>
+                  <div class="fld"><span class="legend">Your name</span><span class="val">Maria<i class="caret"></i></span></div>
+                  <div class="fld"><span class="legend">You teach</span><span class="val">Spanish</span></div>
+                  <div class="fld"><span class="legend">Where</span><span class="val">Online and in Valencia</span></div>
+                  <span class="btn">Next</span>
+                </div>
+                <div class="lap-prev">
+                  <div class="browser">
+                    <div class="b-bar">maria.chapeau.school</div>
+                    <div class="site">
+                      <div class="s-nav"><b>Maria</b><span>Lessons</span><span>About</span><span class="s-cta">Book</span></div>
+                      <div class="s-hero">
+                        <div class="face empty">Your photo, next</div>
+                        <div><span class="s-kick">Online and in Valencia</span><span class="s-h">Spanish with <span class="typed">Maria</span></span><span class="s-btn">Book a trial lesson</span></div>
+                      </div>
+                      <div class="s-cards"><span><b>Trial</b>30 min · €15</span><span><b>Lesson</b>60 min · €22</span><span><b>Longer</b>90 min · €32</span></div>
+                    </div>
+                  </div>
+                  <p class="note">The name lands in the heading as it's typed. The photo comes next, and the lessons show typical prices for Spanish until step 6.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>On a laptop.</b> The steps run down the left, one question sits in the middle, and the real site fills the right.</figcaption>
+        </figure>
+        <figure class="ph-fig">
+          <div class="phone" role="img" aria-label="Sketch on a phone: one question per screen, with the tutor's site in a sheet at the bottom">
+            <div class="ph-top"><svg viewBox="0 0 64 40" aria-hidden="true"><use href="#hat"/></svg><span class="legend">2 of 9</span><span class="bars" aria-hidden="true"><i class="d"></i><i class="d"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+            <p class="q">What should students call you?</p>
+            <div class="fld"><span class="legend">Your name</span><span class="val">Maria<i class="caret"></i></span></div>
+            <div class="fld"><span class="legend">You teach</span><span class="val">Spanish</span></div>
+            <div class="fld"><span class="legend">Where</span><span class="val">Online and in Valencia</span></div>
+            <span class="btn">Next</span>
+            <div class="peek">
+              <span class="grab"></span>
+              <span class="legend">Your site so far</span>
+              <div class="site sm">
+                <div class="s-hero"><div class="face empty">Photo</div><div><span class="s-kick">Online and in Valencia</span><span class="s-h">Spanish with <span class="typed">Maria</span></span></div></div>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>On a phone.</b> One question per screen, and their site waits in a sheet at the bottom. Pull it up to see the whole page.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="feel">
+    <div class="side">
+      <span class="legend">How it should feel</span>
+      <span class="note">Six rules to check every screen against.</span>
+    </div>
+    <div class="work">
+      <h2 id="feel">How it should feel</h2>
+      <div class="feel">
+        <div class="pr"><h3>Their site from the first answer</h3><p>The site is drawn beside the questions from the start. Type Maria and the heading reads Spanish with Maria. There's no big reveal at the end, because nothing is hidden along the way.</p></div>
+        <div class="pr"><h3>One question per screen</h3><p>Each screen asks one thing in plain words, with a good answer already filled in, so most screens end with reading and pressing Next. Every screen works one-handed on a phone, and every answer saves as it's given.</p></div>
+        <div class="pr"><h3>Nothing starts blank</h3><p>Pages are drafted from what they paste, prices from the rate they charge now, rules from common choices. The drafting never adds a qualification, a number of years or a review the tutor didn't give.</p></div>
+        <div class="pr"><h3>Live before it's finished</h3><p>The site goes live once it has a name, a photo, a lesson and some hours. Stripe, students and a domain come after, from the dashboard. Until Stripe is connected, students book and pay the tutor directly.</p></div>
+        <div class="pr"><h3>Terms in plain sentences</h3><p>Tutors set their rules by filling in the sentences their students will read: book at least 24 hours ahead. The site enforces exactly what the sentence says.</p></div>
+        <div class="pr"><h3>Quiet, with three celebrations</h3><p>No confetti, no percentage bars, no sparkle icons and no thinking animations. The hat tips three times: when the site goes live, at the first booking, and when the first card payment arrives.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="flow">
+    <div class="side">
+      <span class="legend">The whole flow</span>
+      <span class="note">Times are targets to test with the first tutors, not measurements.</span>
+    </div>
+    <div class="work">
+      <h2 id="flow">Twelve steps, one branch</h2>
+      <p>Steps 1 to 9 happen in one sitting and end with the site live. Steps 10 and 11 then wait on the dashboard and can be done in either order, that day or later. Only step 10 branches.</p>
+      <div class="toc">
+        <div class="toc-col">
+          <div class="toc-group">
+            <div class="toc-head"><h3>Make it yours</h3><span class="legend">18 min</span></div>
+            <a class="toc-row" href="#step-1"><span class="n">1</span><span class="nm">Say hello</span><span class="lead"></span><span class="t">1 min</span></a>
+            <a class="toc-row" href="#step-2"><span class="n">2</span><span class="nm">What you teach</span><span class="lead"></span><span class="t">1 min</span></a>
+            <a class="toc-row" href="#step-3"><span class="n">3</span><span class="nm">Your photo</span><span class="lead"></span><span class="t">2 min</span></a>
+            <a class="toc-row" href="#step-4"><span class="n">4</span><span class="nm">Your story</span><span class="lead"></span><span class="t">5 min</span></a>
+            <a class="toc-row" href="#step-5"><span class="n">5</span><span class="nm">Your look</span><span class="lead"></span><span class="t">3 min</span></a>
+            <a class="toc-row" href="#step-6"><span class="n">6</span><span class="nm">Lessons and prices</span><span class="lead"></span><span class="t">2 min</span></a>
+            <a class="toc-row" href="#step-7"><span class="n">7</span><span class="nm">Your week</span><span class="lead"></span><span class="t">2 min</span></a>
+            <a class="toc-row" href="#step-8"><span class="n">8</span><span class="nm">Your rules</span><span class="lead"></span><span class="t">2 min</span></a>
+          </div>
+        </div>
+        <div class="toc-col">
+          <div class="toc-group">
+            <div class="toc-head"><h3>Go live</h3><span class="legend">2 min</span></div>
+            <a class="toc-row" href="#step-9"><span class="n">9</span><span class="nm">Your address, then live</span><span class="lead"></span><span class="t">2 min</span></a>
+          </div>
+          <div class="toc-group">
+            <div class="toc-head"><h3>On the dashboard, any order</h3><span class="legend">20 min</span></div>
+            <a class="toc-row" href="#step-10"><span class="n">10</span><span class="nm">Get paid</span><span class="lead"></span><span class="t">10 min</span></a>
+            <p class="toc-branch"><b>No Stripe in their country:</b> students pay them by hand, on the same plan.</p>
+            <a class="toc-row" href="#step-11"><span class="n">11</span><span class="nm">Bring your students</span><span class="lead"></span><span class="t">10 min</span></a>
+            <a class="toc-row" href="#step-12"><span class="n">12</span><span class="nm">The first booking</span><span class="lead"></span><span class="t">milestone</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="part-one">
+    <div class="side">
+      <span class="legend">Part one</span>
+      <span class="note">Steps 1 to 8, in order, about 18 minutes.</span>
+    </div>
+    <div class="work">
+      <h2 id="part-one">Make it yours</h2>
+      <p>Eight short screens fill in the tutor's site. Four of them are sketched below at phone width; on a phone, swipe along the strip.</p>
+      <ul class="board">
+
+        <li><figure>
+          <div class="phone" role="img" aria-label="Sketch of step 4: the About page drafted from pasted text, one drafted line highlighted with Keep, Rewrite and Remove, and a gap for years teaching">
+            <div class="ph-top"><svg viewBox="0 0 64 40" aria-hidden="true"><use href="#hat"/></svg><span class="legend">4 of 9</span><span class="bars" aria-hidden="true"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i><i></i><i></i><i></i></span></div>
+            <p class="q">Your About page, from what you pasted</p>
+            <div class="site about">
+              <span class="t-h">About me</span>
+              <p>I'm Maria. I teach Spanish to adults who want to use it with friends, at work and on holiday. <mark>Most of my students come to me after years of apps, ready to finally speak.</mark></p>
+              <div class="tools"><span>Keep</span><span>Rewrite</span><span>Remove</span></div>
+              <p>I've taught for <span class="gap">years teaching</span>, online and from my flat in Ruzafa.</p>
+            </div>
+            <p class="tiny">Drafted from your words. 3 highlighted lines left to read.</p>
+            <span class="btn push">Next</span>
+          </div>
+          <figcaption><b>4</b> Your story</figcaption>
+        </figure></li>
+
+        <li><figure>
+          <div class="phone" role="img" aria-label="Sketch of step 5: the tutor's own site in layout 2 of 10, with arrows to swipe and ten colour sets below">
+            <div class="ph-top"><svg viewBox="0 0 64 40" aria-hidden="true"><use href="#hat"/></svg><span class="legend">5 of 9</span><span class="bars" aria-hidden="true"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i><i></i><i></i></span></div>
+            <p class="q">Which one feels like you?</p>
+            <div class="site l2">
+              <div class="l2-top"><div class="face"></div><span>Online and in Valencia</span></div>
+              <span class="big">Maria</span>
+              <span class="sub">teaches Spanish to grown-ups who want to talk</span>
+              <span class="s-btn" style="justify-self:start">Book a trial lesson</span>
+              <div class="band"><span>Trial €15</span><span>Lesson €22</span><span>Longer €32</span></div>
+            </div>
+            <div class="pager"><span>‹</span><span>Layout 2 of 10</span><span>›</span></div>
+            <span class="legend" style="font-size:.56rem">Colours</span>
+            <div class="swatches">
+              <span class="cs on" style="--a:#F2F4EC;--b:#3D6FA8"></span>
+              <span class="cs" style="--a:#FBEFF1;--b:#8C2F55"></span>
+              <span class="cs" style="--a:#16202E;--b:#F2C14E"></span>
+              <span class="cs" style="--a:#EAF4F4;--b:#0F6E6E"></span>
+              <span class="cs" style="--a:#F3EEF6;--b:#5B3A8C"></span>
+              <span class="cs" style="--a:#FFF8E1;--b:#C2410C"></span>
+              <span class="cs" style="--a:#EEF0F2;--b:#2F3B4A"></span>
+              <span class="cs" style="--a:#E9EFE6;--b:#2F5D3A"></span>
+              <span class="cs" style="--a:#FFFFFF;--b:#141414"></span>
+              <span class="cs" style="--a:#2A1E2F;--b:#E9A6B8"></span>
+            </div>
+            <p class="tiny" style="text-align:center">Colours can change any time, free.</p>
+            <span class="btn push">Use this look</span>
+          </div>
+          <figcaption><b>5</b> Your look</figcaption>
+        </figure></li>
+
+        <li><figure>
+          <div class="phone" role="img" aria-label="Sketch of step 7: a week grid with weekday evenings shaded, presets above, and a button to connect Google Calendar">
+            <div class="ph-top"><svg viewBox="0 0 64 40" aria-hidden="true"><use href="#hat"/></svg><span class="legend">7 of 9</span><span class="bars" aria-hidden="true"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i></span></div>
+            <p class="q">When do you teach?</p>
+            <div class="presets"><span class="on">Weekday evenings</span><span>Mornings</span><span>Weekends</span></div>
+            <div class="week" aria-hidden="true">
+              <span></span><b>M</b><b>T</b><b>W</b><b>T</b><b>F</b><b>S</b><b>S</b>
+              <em>8</em><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <em>10</em><i></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i></i>
+              <em>12</em><i></i><i></i><i></i><i></i><i></i><i class="on"></i><i></i>
+              <em>14</em><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <em>16</em><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <em>18</em><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i>
+              <em>20</em><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i>
+            </div>
+            <p class="tiny">Valencia time. Drag across the grid to shade more.</p>
+            <div class="cal-row"><span><b>Google Calendar</b><em>Lessons arrive with a Meet link</em></span><span class="mini-btn">Connect</span></div>
+            <span class="btn push">Next</span>
+          </div>
+          <figcaption><b>7</b> Your week</figcaption>
+        </figure></li>
+
+        <li><figure>
+          <div class="phone" role="img" aria-label="Sketch of step 8: the booking terms as sentences with blanks, one blank open showing 12, 24 and 48 hours">
+            <div class="ph-top"><svg viewBox="0 0 64 40" aria-hidden="true"><use href="#hat"/></svg><span class="legend">8 of 9</span><span class="bars" aria-hidden="true"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i></i></span></div>
+            <p class="q">Your booking terms</p>
+            <div class="terms">
+              <p>Students can book up to <span class="blank">12 weeks</span> ahead, and no later than <span class="blank open">24 hours</span> before.</p>
+              <div class="pop"><span>12 hours</span><span class="sel">24 hours</span><span>48 hours</span><em>24 hours is a common choice.</em></div>
+              <p>I keep <span class="blank">15 minutes</span> free after each lesson.</p>
+              <p>Moving or cancelling inside <span class="blank">24 hours</span> costs <span class="blank">€5</span>.</p>
+              <p>A missed lesson costs <span class="blank">the full price</span>.</p>
+            </div>
+            <p class="tiny">Students read exactly this on your terms page.</p>
+            <span class="btn push">Next</span>
+          </div>
+          <figcaption><b>8</b> Your rules</figcaption>
+        </figure></li>
+
+      </ul>
+    </div>
+
+    <div class="steps">
+      <div class="steps-head" aria-hidden="true">
+        <span></span>
+        <div class="cols"><span class="legend">What it asks</span><span class="legend">Already filled in</span><span class="legend">How it should feel</span></div>
+      </div>
+
+      <article class="step" id="step-1">
+        <div class="who"><span class="n">1</span><h3>Say hello</h3><span class="mins">1 min</span></div>
+        <div class="body"><div class="cols">
+          <div><span class="cols-label">What it asks</span>An email address, or Continue with Google. There's no password: a six-digit code arrives by email.</div>
+          <div><span class="cols-label">Already filled in</span>Their name, if they use Google. Sign-in asks Google for name and email only, as Inês's site does today.</div>
+          <div class="fl"><span class="cols-label">How it should feel</span>A door that's already open. The screen after the code is already their site, with their name on it.</div>
+        </div></div>
+      </article>
+
+      <article class="step" id="step-2">
+        <div class="who"><span class="n">2</span><h3>What you teach</h3><span class="mins">1 min</span><a class="see" href="#top">Sketch at the top</a></div>
+        <div class="body"><div class="cols">
+          <div><span class="cols-label">What it asks</span>What they teach, what students should call them, and where they teach: online, in a city, or both.</div>
+          <div><span class="cols-label">Already filled in</span>Their name, and a city guessed from their time zone, ready to change.</div>
+          <div class="fl"><span class="cols-label">How it should feel</span>Seeing their own name land on their own site, at the size of a heading, in the first minute.</div>
+        </div></div>
+      </article>
+
+      <article class="step" id="step-3">
+        <div class="who"><span class="n">3</span><h3>Your photo</h3><span class="mins">2 min</span></div>
+        <div class="body"><div class="cols">
+          <div><span class="cols-label">What it asks</span>One photo of themselves, from the camera roll or taken there and then.</div>
+          <div><span class="cols-label">Already filled in</span>The crop, fitted to the layout's frame, and the light balanced. Faces are never retouched or generated.</div>
+          <div class="fl"><span class="cols-label">How it should feel</span>Handing a photo to someone who frames it well. If it's dark, one kind line: a photo near a window works best.</div>
+        </div></div>
+      </article>
+
+      <article class="step" id="step-4">
+        <div class="who"><span class="n">4</span><h3>Your story</h3><span class="mins">5 min</span></div>
+        <div class="body">
+          <div class="cols">
+            <div><span class="cols-label">What it asks</span>Paste anything they've written about their teaching: a Preply or italki profile, a bio, an old flyer. With nothing to paste, three short questions: who they teach, what a lesson is like, what students say.</div>
+            <div><span class="cols-label">Already filled in</span>Home, About, Lessons and Questions pages, drafted in their voice and in the site's language. Drafted lines stay highlighted until the tutor reads or changes them.</div>
+            <div class="fl"><span class="cols-label">How it should feel</span>A friend who writes well tidied their notes. Tap any line to keep it, rewrite it or remove it.</div>
+          </div>
+          <div class="extra"><span class="legend">The drafting rule</span><span>Facts come only from their own words. A missing detail becomes a gap, such as <i>years teaching</i>, to fill in or delete. Nothing is invented to make a page look fuller.</span></div>
+        </div>
+      </article>
+
+      <article class="step" id="step-5">
+        <div class="who"><span class="n">5</span><h3>Your look</h3><span class="mins">3 min</span></div>
+        <div class="body"><div class="cols">
+          <div><span class="cols-label">What it asks</span>Swipe through the ten layouts, then tap one of the ten colour sets.</div>
+          <div><span class="cols-label">Already filled in</span>Every layout already shows their name, photo and words. There's never placeholder text.</div>
+          <div class="fl"><span class="cols-label">How it should feel</span>Trying on, rather than browsing a catalogue of other people's sites. A line under the colours says they can change them any time, free.</div>
+        </div></div>
+      </article>
+
+      <article class="step" id="step-6">
+        <div class="who"><span class="n">6</span><h3>Lessons and prices</h3><span class="mins">2 min</span></div>
+        <div class="body"><div class="cols">
+          <div><span class="cols-label">What it asks</span>Check three lesson types: a trial, a lesson and a longer lesson. Change a length or a price, add one or remove one.</div>
+          <div><span class="cols-label">Already filled in</span>30, 60 and 90 minutes. Prices from the rate in their pasted profile, saying where it came from (from your italki rate of €22), or else a middle price for their language. The currency follows their country.</div>
+          <div class="fl"><span class="cols-label">How it should feel</span>A price list on a blackboard. Three lines, and done.</div>
+        </div></div>
+      </article>
+
+      <article class="step" id="step-7">
+        <div class="who"><span class="n">7</span><h3>Your week</h3><span class="mins">2 min</span></div>
+        <div class="body"><div class="cols">
+          <div><span class="cols-label">What it asks</span>Shade the hours they teach on a week grid, or tap a starting point: weekday evenings, mornings or weekends.</div>
+          <div><span class="cols-label">Already filled in</span>Their time zone, in words (Valencia time). One button connects Google Calendar so lessons arrive with a Meet link, as on Inês's site. It can wait for later.</div>
+          <div class="fl"><span class="cols-label">How it should feel</span>Shading a paper diary with a pencil.</div>
+        </div></div>
+      </article>
+
+      <article class="step" id="step-8">
+        <div class="who"><span class="n">8</span><h3>Your rules</h3><span class="mins">2 min</span></div>
+        <div class="body">
+          <div class="cols">
+            <div><span class="cols-label">What it asks</span>One short paragraph with blanks: how far ahead and how late students can book, the gap after each lesson, the fee for a late change and what a missed lesson costs.</div>
+            <div><span class="cols-label">Already filled in</span>A common choice in every blank, with a note that says so.</div>
+            <div class="fl"><span class="cols-label">How it should feel</span>Writing house rules on one card. The preview turns to their terms page, which is written from these sentences.</div>
+          </div>
+          <div class="extra"><span class="legend">Why it's safe</span><span>The terms page, the booking screens and the emails all read these numbers. A change applies to new bookings only, because each booking keeps the terms its student agreed to.</span></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="part-two">
+    <div class="side">
+      <span class="legend">Parts two and three</span>
+      <span class="note">Step 9 ends the sitting. Steps 10 and 11 wait on the dashboard.</span>
+    </div>
+    <div class="work">
+      <h2 id="part-two">Go live, then get paid and bring students</h2>
+      <p>Going live is one screen. After it, the dashboard holds the two remaining jobs as cards, and the site already takes bookings while they wait.</p>
+      <ul class="board">
+
+        <li><figure>
+          <div class="phone live" role="img" aria-label="Sketch of step 9: the hat tips over an e, with Chapeau! Your site is live, the address, a QR code and share buttons">
+            <div class="live-mark tip" id="live-tip">
+              <svg viewBox="0 0 120 150" aria-hidden="true"><text x="60" y="140" text-anchor="middle" font-family="'Brygada 1918', Georgia, serif" font-weight="700" font-size="168" fill="currentColor">e</text><g class="hat" style="color: var(--royal)"><use href="#hat" x="24" y="10" width="72" height="45"/></g></svg>
+            </div>
+            <p class="q">Chapeau! Your site is live.</p>
+            <span class="addr">maria.chapeau.school</span>
+            <div class="qr-row"><svg class="qr" id="qr" viewBox="0 0 21 21" aria-hidden="true"></svg><span class="tiny">A QR code to print for your classroom wall or your marketplace bio.</span></div>
+            <div class="stack">
+              <span class="btn">Share on WhatsApp</span>
+              <span class="btn ghost">Copy link</span>
+              <span class="tiny">30 days free from today. No card needed yet.</span>
+            </div>
+          </div>
+          <figcaption><b>9</b> Live</figcaption>
+        </figure></li>
+
+        <li><figure>
+          <div class="phone" role="img" aria-label="Sketch of step 10: one paragraph about getting paid, Stripe's form shown inside the page, and a choice of how students pay">
+            <div class="ph-top"><svg viewBox="0 0 64 40" aria-hidden="true"><use href="#hat"/></svg><span class="legend">Dashboard</span></div>
+            <p class="q">Get paid into your bank</p>
+            <p>Students pay you straight into your bank. The money never passes through us. Stripe, the payment company, checks your ID and bank account once.</p>
+            <div class="stripe-box">
+              <span class="legend">Stripe's form, in these colours</span>
+              <span class="ln">Date of birth</span>
+              <span class="ln">Photo of your ID</span>
+              <span class="ln">Bank account</span>
+            </div>
+            <span class="legend" style="font-size:.56rem">How students pay</span>
+            <div class="opt on">Card, charged when the lesson ends</div>
+            <div class="opt">By hand</div>
+            <div class="opt">Both</div>
+          </div>
+          <figcaption><b>10</b> Get paid</figcaption>
+        </figure></li>
+
+        <li><figure>
+          <div class="phone" role="img" aria-label="Sketch of step 11: four students found in a pasted list, each with a WhatsApp or email invite button, and the invite message">
+            <div class="ph-top"><svg viewBox="0 0 64 40" aria-hidden="true"><use href="#hat"/></svg><span class="legend">Dashboard</span></div>
+            <p class="q">Invite your students</p>
+            <p class="tiny">4 students found in what you pasted.</p>
+            <ul class="people">
+              <li><i>A</i><span><b>Ana Silva</b><em>Tuesdays 18:00 · €22</em></span><span class="mini-btn">WhatsApp</span></li>
+              <li><i>T</i><span><b>Tom Becker</b><em>Thursdays 19:00</em></span><span class="mini-btn sent"><svg aria-hidden="true"><use href="#tick"/></svg>Sent</span></li>
+              <li><i>P</i><span><b>Priya Nair</b><em>No usual time</em></span><span class="mini-btn">WhatsApp</span></li>
+              <li><i>L</i><span><b>Lukas Weber</b><em>Email only</em></span><span class="mini-btn">Email</span></li>
+            </ul>
+            <div class="bubble">Hi Ana! I have my own booking site now. Our Tuesday lessons are already in it, and you can move one yourself: <span>maria.chapeau.school/i/7Kq2</span></div>
+          </div>
+          <figcaption><b>11</b> Bring your students</figcaption>
+        </figure></li>
+
+        <li><figure>
+          <div class="phone" role="img" aria-label="Sketch of step 12: Chapeau! Ana booked her first lesson, this week's schedule, and a finish setting up card">
+            <div class="ph-top"><svg viewBox="0 0 64 40" aria-hidden="true"><use href="#hat"/></svg><span class="legend">Dashboard</span></div>
+            <div class="toast tip" id="toast-tip">
+              <svg viewBox="0 0 120 150" aria-hidden="true"><text x="60" y="140" text-anchor="middle" font-family="'Brygada 1918', Georgia, serif" font-weight="700" font-size="168" fill="currentColor">e</text><g class="hat" style="color: var(--royal)"><use href="#hat" x="24" y="10" width="72" height="45"/></g></svg>
+              <b>Chapeau! Ana booked her first lesson.</b>
+              <span>Thursday 12 November, 18:00</span>
+            </div>
+            <span class="legend" style="font-size:.56rem">This week</span>
+            <ul class="sched">
+              <li><b>Tue 18:00</b>Ana Silva</li>
+              <li><b>Thu 18:00</b>Ana Silva<em>New</em></li>
+              <li><b>Thu 19:00</b>Tom Becker</li>
+              <li><b>Sat 10:00</b>Priya Nair</li>
+            </ul>
+            <div class="finish">
+              <span class="legend">Finish setting up</span>
+              <div class="fr"><svg aria-hidden="true"><use href="#tick"/></svg>Site live</div>
+              <div class="fr"><svg aria-hidden="true"><use href="#tick"/></svg>Get paid</div>
+              <div class="fr"><span class="h"></span>Students invited<em>2 of 4</em></div>
+              <div class="fr"><span class="o"></span>Your own address<em>any time</em></div>
+            </div>
+          </div>
+          <figcaption><b>12</b> The first booking</figcaption>
+        </figure></li>
+
+      </ul>
+    </div>
+
+    <div class="steps">
+      <div class="steps-head" aria-hidden="true">
+        <span></span>
+        <div class="cols"><span class="legend">What it asks</span><span class="legend">Already filled in</span><span class="legend">How it should feel</span></div>
+      </div>
+
+      <article class="step" id="step-9">
+        <div class="who"><span class="n">9</span><h3>Your address, then live</h3><span class="mins">2 min</span></div>
+        <div class="body">
+          <div class="cols">
+            <div><span class="cols-label">What it asks</span>An address, such as maria.chapeau.school, checked as they type. Then a read-through of at most five things worth a look, each fixed in place. Then one button: Put my site live.</div>
+            <div><span class="cols-label">Already filled in</span>An address made from their name. Their own domain can come any time later, and the free address keeps working.</div>
+            <div class="fl"><span class="cols-label">How it should feel</span>Opening the shop door. The hat tips once, then the link, a QR code, Share on WhatsApp and Copy link.</div>
+          </div>
+          <div class="extra"><span class="legend">After going live</span><span>A support agent reads each new site within the hour and writes to the tutor about anything worth fixing. It passes a site to Dan only if something looks wrong, such as a site that isn't about teaching.</span></div>
+        </div>
+      </article>
+
+      <article class="step" id="step-10">
+        <div class="who"><span class="n">10</span><h3>Get paid</h3><span class="mins">10 min</span></div>
+        <div class="body">
+          <div class="cols">
+            <div><span class="cols-label">What it asks</span>One paragraph to read, then Stripe's own form shown inside the page in the platform's colours and type: ID and a bank account, once. Then how students pay: card charged when the lesson ends, by hand, or both.</div>
+            <div><span class="cols-label">Already filled in</span>Name, email, country and site address, passed to Stripe so it asks less. Card after the lesson is picked to start with.</div>
+            <div class="fl"><span class="cols-label">How it should feel</span>The bank part is handled by a bank, and the paragraph says so plainly: the money goes straight to them and never passes through us.</div>
+          </div>
+          <div class="extra"><span class="legend">The branch</span><span>Where Stripe doesn't serve the tutor's country, this card says their students pay them directly, and the site switches to paid by hand on the same plan. It reads as a choice, never as an error.</span></div>
+        </div>
+      </article>
+
+      <article class="step" id="step-11">
+        <div class="who"><span class="n">11</span><h3>Bring your students</h3><span class="mins">10 min</span></div>
+        <div class="body">
+          <div class="cols">
+            <div><span class="cols-label">What it asks</span>Paste a list as it comes (names with phone numbers or emails, in any order), upload a spreadsheet, or add one person. For each, if they like: a usual weekly time and a personal price.</div>
+            <div><span class="cols-label">Already filled in</span>Columns sorted out from the paste, and phone numbers put in international form from the tutor's country. A usual time sets up that student's weekly lessons.</div>
+            <div class="fl"><span class="cols-label">How it should feel</span>Sending a message they'd have sent anyway. Each student gets the site's WhatsApp invite in the tutor's voice, one tap each.</div>
+          </div>
+          <div class="extra"><span class="legend">Marketplace students</span><span>Preply's rules forbid moving students off Preply through Preply's own messages. One line on this screen says so and suggests inviting only students they already reach by phone or email.</span></div>
+        </div>
+      </article>
+
+      <article class="step" id="step-12">
+        <div class="who"><span class="n">12</span><h3>The first booking</h3><span class="mins">Milestone</span></div>
+        <div class="body">
+          <div class="cols">
+            <div><span class="cols-label">What it asks</span>Nothing. This one happens to them.</div>
+            <div><span class="cols-label">Already filled in</span>The dashboard shows their week. The setup card lists what's left and goes away once it's all done.</div>
+            <div class="fl"><span class="cols-label">How it should feel</span>The second hat tip: Chapeau! Ana booked her first lesson. The third comes with the first card payment.</div>
+          </div>
+          <div class="extra"><span class="legend">If they stop partway</span><span>One email the next day says what's left, with a link back to the same screen. It's sent once and never repeated as a series of reminders.</span></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="later">
+    <div class="side">
+      <span class="legend">Left out on purpose</span>
+      <span class="note">Each has a default that works, so none of it stands between a tutor and a first booking.</span>
+    </div>
+    <div class="work">
+      <h2 id="later">Not in onboarding</h2>
+      <ul class="rows">
+        <li><b>Their own domain</b><span>Settings, any time. The free address keeps working and points to it.</span></li>
+        <li><b>An intro video</b><span>Their About page, added from the dashboard.</span></li>
+        <li><b>More lesson types and places</b><span>Lessons in Settings. Personal prices sit on each student.</span></li>
+        <li><b>Email and message wording</b><span>Settings, starting from defaults that already use their name and their terms.</span></li>
+        <li><b>Homework, expressions and the curriculum</b><span>Off until the tutor turns each one on.</span></li>
+        <li><b>A different layout</b><span>Free to switch themselves, since their words and photos move with them. A fee only if Dan reworks their pages to suit it.</span></li>
+        <li><b>Receipts and tax details</b><span>Asked for when their first card payment arrives, not before.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="build">
+    <div class="side">
+      <span class="legend">Building it</span>
+      <span class="note">This is step 5 of the build plan, and it leans on steps 1 to 4.</span>
+    </div>
+    <div class="work">
+      <h2 id="build">What it takes</h2>
+      <ul class="rows">
+        <li><b>The preview is the real site</b><span>Onboarding writes a draft tutor record, and the preview renders the real layout from it. What they see is exactly what goes live, so there's no mock-up to keep in step.</span></li>
+        <li><b>Layouts that fill themselves</b><span>Each of the ten layouts has to look right from any tutor's record: few words or many, one photo, two lessons or six. The look picker needs small live renders that are quick on a phone.</span></li>
+        <li><b>Drafting</b><span>Claude drafts from the pasted text only, in the tutor's voice and the site's language, and marks gaps. The read-through before going live uses the same check.</span></li>
+        <li><b>Payments</b><span>Stripe Connect with Stripe's embedded onboarding form, which takes our colours, font and corner radius and keeps the tutor on our page. Stripe recommends its newer Accounts v2 for a new platform. Stripe's hosted page is the fallback.</span></li>
+        <li><b>Google</b><span>Sign-in asks for name and email only. Calendar uses the narrow permission the site already asks for, which only touches calendars the site made itself. Google reviews apps that ask for calendar access before the public can connect without a warning screen, so that review should start early.</span></li>
+        <li><b>Addresses</b><span>A wildcard address and certificate for every tutor's free address on Cloudflare, plus a list of reserved and rude names.</span></li>
+        <li><b>Billing</b><span>A €25 monthly subscription on Stripe Billing with a 30-day trial and no card. The dashboard asks for the card before day 30.</span></li>
+        <li><b>Invites</b><span>The WhatsApp invite Inês's site already has, run per tutor.</span></li>
+        <li><b>Support</b><span>Agents answer tutors' questions and read every new site and every answer to the after-launch question. They pass a case to Dan only when money goes wrong or something looks off.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="calls">
+    <div class="side">
+      <span class="legend">Your calls</span>
+      <span class="note">Dan agreed both on 9&nbsp;November 2026. Either can change later without rework.</span>
+    </div>
+    <div class="work">
+      <h2 id="calls">Two things decided</h2>
+      <div class="decs">
+        <div class="dcard">
+          <h3>When does the €25 start?</h3>
+          <div class="dopt"><span class="pick">Decided</span><b>30 days free from going live, with no card to start.</b><span>Nothing to hesitate over at the door, and a month is long enough for a first booking.</span></div>
+          <div class="dopt"><b>A card at sign-up, first month free.</b><span>Fewer tutors start, though more of those who start go on to pay.</span></div>
+          <div class="dopt"><b>Free until their first student pays them.</b><span>A lovely promise, but tutors paid by hand would never reach it.</span></div>
+        </div>
+        <div class="dcard">
+          <h3>Does a new site go live straight away?</h3>
+          <div class="dopt"><span class="pick">Decided</span><b>Straight away.</b><span>A support agent reads each new site within the hour and passes one to Dan only if something looks wrong.</span></div>
+          <div class="dopt"><b>Only after Dan has read it.</b><span>Safer, but it breaks the twenty-minute promise and makes the best moment wait for Dan.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="know">
+    <div class="side">
+      <span class="legend">How we'll know</span>
+      <span class="note">Each step logs how long it took, never what was typed.</span>
+    </div>
+    <div class="work">
+      <h2 id="know">Three numbers to watch</h2>
+      <ul class="rows">
+        <li><b>Hello to a live site</b><span>Half of tutors in under 20 minutes.</span></li>
+        <li><b>Live within a day of signing up</b><span>7 in 10 tutors.</span></li>
+        <li><b>The first booking</b><span>Within 7 days of going live.</span></li>
+      </ul>
+      <p>A day after going live, one optional question asks what was hard. Support agents read every answer, and the step times show where people slow down.</p>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  (function () {
+    // A sketch of a QR code: three finder squares and a fixed scatter of modules.
+    var svg = document.getElementById('qr');
+    if (svg) {
+      var n = 21, out = '', seed = 11;
+      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+      function finder(x, y) {
+        out += '<rect x="' + x + '" y="' + y + '" width="7" height="7" fill="currentColor"/>' +
+               '<rect x="' + (x + 1) + '" y="' + (y + 1) + '" width="5" height="5" style="fill: var(--sheet)"/>' +
+               '<rect x="' + (x + 2) + '" y="' + (y + 2) + '" width="3" height="3" fill="currentColor"/>';
+      }
+      for (var y = 0; y < n; y++) {
+        for (var x = 0; x < n; x++) {
+          var inFinder = (x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12);
+          if (!inFinder && rnd() > 0.52) out += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="currentColor"/>';
+        }
+      }
+      finder(0, 0); finder(14, 0); finder(0, 14);
+      svg.innerHTML = out;
+    }
+    // Tip the hats once so the one motion is visible, then let them settle.
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    ['live-tip', 'toast-tip'].forEach(function (id, i) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      setTimeout(function () { el.classList.add('is-tipped'); }, 700 + i * 500);
+      setTimeout(function () { el.classList.remove('is-tipped'); }, 1600 + i * 500);
+    });
+  })();
+</script>
