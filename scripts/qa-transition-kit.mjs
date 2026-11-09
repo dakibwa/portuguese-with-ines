@@ -50,6 +50,7 @@ async function open(width, path, { session = "", me = student, bookings = [added
     if (endpoint === "/me" && !body) return route.fulfill({ json: { student: me, bookings, series: [], sameDayFeeCents: 500, cardsAccepted: true } });
     if (endpoint === "/me/recurring-rates") return route.fulfill({ json: { rates: {} } });
     if (endpoint === "/me/expressions") return route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } });
+    if (endpoint === "/me/homework") return route.fulfill({ json: { homework: [] } });
     if (endpoint === "/lesson-types") return route.fulfill({ json: { lessonTypes: [], postpay: true, paymentReady: true } });
     if (endpoint === "/availability") return route.fulfill({ json: { slotsByDate: {}, horizonDays: 56 } });
     errors.push(`Unexpected fixture request: ${request.method()} ${endpoint}`);

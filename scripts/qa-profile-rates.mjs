@@ -42,6 +42,7 @@ async function open(width, { session = true, ratesReadFails = false } = {}) {
     return route.fallback();
   });
   await context.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
+  await context.route("**/me/homework", route => route.fulfill({ json: { homework: [] } }));
   await context.route("**/me", (route) => json(route, { student, bookings: [], series: [], sameDayFeeCents: 500 }));
   await context.route("**/me/recurring-rates", (route) => {
     if (route.request().method() === "GET") {

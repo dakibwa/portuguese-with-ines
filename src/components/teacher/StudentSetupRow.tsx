@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { CalendarPlus, Check, Euro, KeyRound, Repeat, UserRound, X } from "lucide-react";
+import { CalendarPlus, Check, Euro, KeyRound, Repeat, X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { ComeBackEmail, firstName } from "@/components/teacher/DormantEmail";
 import { LessonForm } from "@/components/teacher/LessonForm";
+import { StudentDashboard, FactRow } from "@/components/teacher/StudentDashboard";
 import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
-import { StudentHistory } from "@/components/teacher/StudentHistory";
-import { StudentNotes } from "@/components/teacher/StudentNotes";
-import { HomeworkToggle } from "@/components/homework/HomeworkWorksheet";
 import { StudentPrice } from "@/components/teacher/StudentPrice";
 import { WhatsAppInvite } from "@/components/teacher/WhatsAppInvite";
 import { setStudentDormant, type AdminStudent } from "@/lib/admin-api";
@@ -79,11 +77,6 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
   const setBusy = (value: boolean) => { setBusyState(value); onBusy?.(value); };
   const [notice, setNotice] = useState("");
   const [problem, setProblem] = useState("");
-  // Their lessons, or her notes and their homework (9 November 2026, Dan:
-  // "can we have a homework page for each student"); homework to review
-  // opens the notes.
-  const [view, setView] = useState<"lessons" | "notes">(homeworkId ? "notes" : "lessons");
-  useEffect(() => { if (homeworkId) setView("notes"); }, [homeworkId, homeworkRequestKey]);
   const row = useRef<HTMLLIElement>(null);
   const height = useRef<number | null>(null);
   const motion = useRef<Animation | null>(null);
@@ -216,6 +209,15 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
   // A piece of the profile goes back to the profile once it is done.
   const backToProfile = (message: string) => { setNotice(message); onSelect("history"); };
 
+  // Change, at the end of the row it changes, in the small outline every
+  // Change on the site is.
+  const change = (panel: StudentPanel, what: string) => <button
+    aria-controls={paneId}
+    className="button button--outline button--small"
+    disabled={disabled}
+    onClick={() => open(panel)}
+    type="button"
+  >Change<span className="visually-hidden"> {what} for {student.name}</span></button>;
   const tool = (panel: StudentPanel, label: string, Icon: typeof Euro) => <button
     aria-controls={paneId}
     className="button button--outline button--small"
@@ -236,13 +238,11 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
         onClick={() => open(profile ? null : "history")}
         type="button"
       ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{student.dormant ? <span className="teacher-student__label">Dormant</span> : null}</span></button>
-      {/* Open, everything about them sits in this one row (9 November 2026,
-          Dan: "more consolidate and simple … with the sliders in the top"):
-          their checks, Lessons or Notes, the next step, then close. */}
+      {/* Open, how far they have got sits in this one row (9 November 2026,
+          Dan: "more consolidate and simple"): their checks, the next step,
+          then close. */}
       {profile ? <div className="teacher-student__bar">
         {student.dormant ? null : <ProgressChecks progress={progress} />}
-        <HomeworkToggle label={`${student.name}’s lessons or notes`} value={view} controls={`${paneId}-view`} onChange={setView} className="teacher-student__view"
-          options={[["lessons", "Lessons"], ["notes", "Notes & homework"]]} />
         {nextButton}
       </div> : null}
       {step ? <div className="teacher-setup__action teacher-setup__close">
@@ -270,35 +270,38 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
         {help.length ? <ul className="booking-payment-facts teacher-setup__help">{help.map(text => <li key={text}>{text}</li>)}</ul> : null}
       </div> : null}
       {profile ? <>
-        {/* Who they are and what they pay, then everything she can change,
-            then their lessons (2 November 2026, Dan: "she can easily see a
-            profile for each of her students"). */}
-        <div className="teacher-student__about">
-          <ul className="booking-payment-facts">
-            {student.email ? <li>{student.email}</li> : <li>No email</li>}
-            {student.phone ? <li>{student.phone}</li> : null}
-            {student.nif ? <li>NIF {student.nif}</li> : null}
-            {prices.length ? prices.map(price => <li key={price}>{price}</li>) : <li>Standard price</li>}
-            {student.dormant && comeBackSent ? <li>Come-back email sent {comeBackSent}</li> : null}
-          </ul>
-          <div className="teacher-student__tools">
-            {tool("lessons", "Add a lesson", CalendarPlus)}
-            {tool("details", "Edit details", UserRound)}
-            {tool("price", "Change price", Euro)}
+        {/* Everything about them, each thing once (9 November 2026, Dan: "a
+            simple dashboard for all things for that student"). */}
+        {problem ? <p className="teacher-inline-error" role="alert">{problem}</p> : null}
+        <StudentDashboard
+          key={`${student.id}-${token}`}
+          student={student}
+          token={token}
+          homeworkId={homeworkId}
+          homeworkRequestKey={homeworkRequestKey}
+          onBusy={setBusy}
+          onPaidChanged={() => onChanged?.()}
+          facts={<>
+            <FactRow label="Details" action={change("details", "details")}>
+              <span className={student.email ? undefined : "teacher-fact__empty"}>{student.email || "No email"}</span>
+              {student.phone ? <span>{student.phone}</span> : null}
+              {student.nif ? <span>NIF {student.nif}</span> : null}
+            </FactRow>
+            <FactRow label="Price" action={change("price", "price")}>
+              {prices.length ? prices.map(price => <span key={price}>{price}</span>) : <span>Standard price</span>}
+            </FactRow>
+            {student.dormant && comeBackSent ? <FactRow label="Come-back email"><span>Sent {comeBackSent}</span></FactRow> : null}
+          </>}
+          addLesson={tool("lessons", "Add a lesson", CalendarPlus)}
+          tools={!next || student.dormant || !student.nextLessonAt ? <>
             {/* Someone all set has no next step; a fresh way in for a lost link. */}
             {!next ? tool("invite", "Sign-in link", KeyRound) : null}
             {student.dormant || !student.nextLessonAt
               ? <button className="button button--outline button--small" disabled={disabled} onClick={() => void markDormant(!student.dormant)} type="button">
                 {busy ? "Saving…" : student.dormant ? "Mark as active" : "Mark as dormant"}
               </button> : null}
-          </div>
-        </div>
-        {problem ? <p className="teacher-inline-error" role="alert">{problem}</p> : null}
-        <div className="teacher-student__history" id={`${paneId}-view`}>
-          {view === "notes"
-            ? <StudentNotes key={`${student.id}-${token}-${homeworkRequestKey ?? 0}`} student={student} token={token} homeworkId={homeworkId} />
-            : <StudentHistory key={`${student.id}-${token}`} student={student} token={token} onPaidChanged={() => onChanged?.()} />}
-        </div>
+          </> : null}
+        />
       </> : step === "details" ? <StudentDetailsForm
         key={`${student.id}-details`}
         onBusy={setBusy}

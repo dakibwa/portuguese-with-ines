@@ -1,8 +1,9 @@
 # Lesson homework
 
-Inês opens **Homework** on a lesson from the timetable, or from the
-student's **Notes & homework** page in their profile, where each lesson that
-has been shows her notes and where its homework is, under her plan for them. A new sheet is one decision per step, as in
+Inês opens **Homework** on a lesson from the timetable, or with **Add notes**
+or **Notes** on that lesson's row in the student's dashboard, where each
+lesson that has been shows her notes and where its homework is, beside her
+plan for them. A new sheet is one decision per step, as in
 the booking journey (15 October 2026, Dan: far too much text). **What did you
 work on?** offers one big **Take a photo** blob, which opens the phone's rear
 camera (`capture="environment"`), with **Gallery** and **Type it** beneath.
@@ -48,9 +49,10 @@ waiting for her. Answers that already have a mark and real feedback are folded
 to the student's words, the mark and the feedback, with **Change** to open one.
 Uncertain or unmarked answers stay open, edged in coral, until she resolves
 them. Then she clicks **Approve & send back**. That explicit action
-makes her approved feedback visible in the student's Homework tab, and the
-sheet then reads **Done** for both of them: a Done chip and band for Inês, and
-for the student a Done band on the sheet and **Done** on its card. Earlier,
+makes her approved feedback visible to the student, and the sheet then reads
+**Done** for both of them: a Done chip and band for Inês, and for the student
+a Done band on the sheet and **Done** at the end of its lesson's row beneath
+their calendar on Your lessons, where each sheet opens from. Earlier,
 unapproved automatic suggestions are never sent to the student.
 
 ## Telling Inês
@@ -132,7 +134,8 @@ applied in production; homework AI has been live since 15 October 2026.
 Apply future additive migrations manually to staging, then production. Do not
 apply the full schema or replay older migrations on an existing database.
 The schema is for new local databases only. Where these tables are absent, the
-Students list shows no homework to review and a student's Homework tab is empty,
+Students list shows no homework to review and a student's past lessons carry
+no homework,
 rather than either failing. Migration `0030-homework-notified.sql` adds the two
 notification columns; apply it after 0029. This feature does not change bookings, fees or meetings.
 

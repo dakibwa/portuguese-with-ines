@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, CircleX, Mail } from "lucide-react";
-import { AccountAvatar, AccountMenu, AccountSignature, type AccountSection } from "@/components/AccountMenu";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { AlertCircle, CheckCircle2, Mail } from "lucide-react";
+import { AccountAvatar, AccountMenu, type AccountSection } from "@/components/AccountMenu";
 import { AuthPanel } from "@/components/AuthPanel";
 import { CardPrompt, CardTerms, type CardUpcoming } from "@/components/CardOnFile";
-import { LessonMark } from "@/components/LessonMarks";
 import {
   confirmEmailChange,
   fetchMe,
@@ -18,19 +17,13 @@ import {
   type Student
 } from "@/lib/auth-api";
 import {
-  browserTimeZone,
-  clockDiffersFromPorto,
   fetchRecurringRates,
-  formatBookedLessonLabel,
-  formatLongDate,
   formatMoneyCents,
   formatPriceCents,
   formatShortDay,
   formatSlotTime,
-  formatTimeIn,
   redeemRecurringRate
 } from "@/lib/booking-api";
-import { BOOKING_TIME_ZONE } from "@/lib/config";
 import { STUDENT_MARKS } from "@/lib/student-marks";
 import { hasStudentSide } from "@/lib/account-workspace";
 import { StudentHomework } from "@/components/homework/StudentHomework";
@@ -43,48 +36,12 @@ function accountDetails(student?: Student | null) {
   return { name: student?.name ?? "", email: student?.email ?? "", nif: student?.nif ?? "" };
 }
 
-function historyTime(booking: MyBooking) {
-  return Date.parse(booking.status === "cancelled" && booking.cancelledAt ? booking.cancelledAt : booking.endAt);
-}
-
-function HistoryLessonCard({ booking, named, zone }: { booking: MyBooking; named: boolean; zone: string }) {
-  const cancelled = booking.status === "cancelled";
-
-  return (
-    <article className={`upcoming-lesson-group history-lesson-card history-lesson-card--${cancelled ? "cancelled" : "completed"}`}>
-      <div className="upcoming-lesson-group__summary history-lesson-card__summary">
-        <LessonMark
-          className="lesson-calendar__mark"
-          durationMinutes={booking.lessonType.durationMinutes}
-          lessonTypeId={booking.lessonType.id}
-          location={booking.location}
-        />
-        <span className="lesson-calendar__lesson-copy">
-          <span className={`lesson-calendar__status history-lesson-card__status--${cancelled ? "cancelled" : "completed"}`}>
-            {cancelled ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
-            {cancelled ? "Cancelled" : "Completed"}
-          </span>
-          {/* Online at the student's own time, in Porto at Porto's, naming the
-              clock for a student whose own differs from Porto's. */}
-          <strong>
-            {formatLongDate(booking.startAt, booking.location === "porto" ? BOOKING_TIME_ZONE : zone)},{" "}
-            {(named ? formatTimeIn : formatSlotTime)(booking.startAt, booking.location === "porto" ? BOOKING_TIME_ZONE : zone)}
-          </strong>
-          <span>
-            {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}
-          </span>
-          <small className="history-lesson-card__reference">Reference {booking.reference}</small>
-        </span>
-      </div>
-    </article>
-  );
-}
-
 /**
- * The account's own cards, Past lessons and Your details, each headed like the
- * Your lessons calendar card with the name's menu beneath its heading. Which
- * one shows is the booking page's choice (`section`); on Your lessons itself
- * this draws nothing but a failure to read the account, if there is one.
+ * The account's own cards, a lesson's homework and Your details, each headed
+ * like the Your lessons calendar card with the name's menu beneath its
+ * heading. Which one shows is the booking page's choice (`section`); on Your
+ * lessons itself, where their past lessons sit beneath the calendar
+ * (PastLessons), this draws nothing but a failure to read the account.
  */
 export function MyLessons({
   initialAccount = null,
@@ -97,6 +54,7 @@ export function MyLessons({
   openUpcomingRequest = 0,
   cardBookingId = "",
   initialEmailPending = "",
+  homeworkId = "",
   section = "upcoming"
 }: {
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
@@ -116,6 +74,8 @@ export function MyLessons({
   cardBookingId?: string;
   /** An address they gave on the welcome, waiting for its link. */
   initialEmailPending?: string;
+  /** The lesson whose homework is open, chosen from its row on Your lessons. */
+  homeworkId?: string;
   section?: AccountSection;
 }) {
   const [student, setStudent] = useState<Student | null>(initialAccount?.student ?? null);
@@ -157,8 +117,6 @@ export function MyLessons({
   const [loading, setLoading] = useState(!initialAccount);
   const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
-  const [zone, setZone] = useState(BOOKING_TIME_ZONE);
-  const clockNamed = useMemo(() => clockDiffersFromPorto(zone), [zone]);
   const rateCodeRef = useRef<HTMLInputElement>(null);
   const onRatesChangeRef = useRef(onRatesChange);
   const ratesVersion = useRef(0);
@@ -318,7 +276,6 @@ export function MyLessons({
   // request; every later reload still asks.
   const arrivedWithAccount = useRef(Boolean(initialAccount));
   useEffect(() => {
-    setZone(browserTimeZone());
     if (!arrivedWithAccount.current) load();
   }, [load]);
 
@@ -528,10 +485,6 @@ export function MyLessons({
         booking.seriesId && activeSeriesIds.has(booking.seriesId) ? `series:${booking.seriesId}` : `booking:${booking.reference}`
       )
   ).size;
-  const past = bookings
-    .filter((booking) => booking.status === "cancelled" || (booking.status === "confirmed" && Date.parse(booking.endAt) <= clock))
-    .sort((a, b) => historyTime(b) - historyTime(a) || b.startAt.localeCompare(a.startAt));
-
   if (loading) return section === "upcoming" ? null : <p className="booking-state-note" role="status">Loading your lessons…</p>;
 
   /*
@@ -621,29 +574,17 @@ export function MyLessons({
     </div>
   ) : null;
 
-  if (section === "homework") {
+  if (section === "homework" && homeworkId) {
     return <section className="account-card my-lessons__homework" id="account-homework" aria-labelledby="homework-heading" tabIndex={-1}>
       {heading("homework-heading", "Homework", "homework")}
       {alert}
-      <StudentHomework key={`${student.id}-${readSession()}`} leaveGuard={homeworkLeave} />
+      <StudentHomework
+        bookingId={homeworkId}
+        key={`${student.id}-${homeworkId}-${readSession()}`}
+        leaveGuard={homeworkLeave}
+        onBack={() => onSelectSection?.("upcoming")}
+      />
     </section>;
-  }
-
-  if (section === "history") {
-    return (
-      <section className="account-card my-lessons__history" id="account-past-lessons" aria-labelledby="past-lessons-heading" tabIndex={-1}>
-        <AccountSignature mark={student.mark} />
-        {heading("past-lessons-heading", "Past lessons", "history")}
-        {alert}
-        {past.length ? (
-          <div className="my-lessons__history-bookings">
-            {past.map((booking) => <HistoryLessonCard booking={booking} key={booking.reference} named={clockNamed} zone={zone} />)}
-          </div>
-        ) : (
-          <p className="booking-state-note">No past lessons yet.</p>
-        )}
-      </section>
-    );
   }
 
   if (section === "profile") {

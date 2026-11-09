@@ -862,6 +862,7 @@ await accountPage.route("**/me/recurring-rates", (route) => route.fulfill({
   status: 200, contentType: "application/json", body: JSON.stringify({ rates: {} })
 }));
 await accountPage.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
+await accountPage.route("**/me/homework", route => route.fulfill({ json: { homework: [] } }));
 await accountPage.route("**/me", async (route) => {
   accountRequestMethods.push(route.request().method());
   if (route.request().method() === "OPTIONS") {
@@ -1314,12 +1315,14 @@ if (!(await initialAccountMenu.isVisible()) || await accountMenuButton.isVisible
 const initialAccountActionLabels = (await initialAccountMenu.getByRole("button").allTextContents()).map((label) =>
   label.replace(/\s+/g, " ").trim()
 );
+// Past lessons and their homework live on Your lessons, beneath the calendar,
+// so there are two places (9 November 2026, Dan: one simple schedule).
 if (
-  initialAccountActionLabels.length !== 4 ||
+  initialAccountActionLabels.length !== 2 ||
   !initialAccountActionLabels[0]?.startsWith("Your lessons") ||
-  initialAccountActionLabels.slice(1).join(" | ") !== "Past lessons | Homework | Edit details"
+  initialAccountActionLabels[1] !== "Edit details"
 ) {
-  throw new Error(`A wide card's places should be Your lessons, Past lessons, Homework and Edit details, Sign out being in Your details: ${JSON.stringify(initialAccountActionLabels)}.`);
+  throw new Error(`A wide card's places should be Your lessons and Edit details, Sign out being in Your details: ${JSON.stringify(initialAccountActionLabels)}.`);
 }
 // The places are one sliding control, its thumb on the card that is showing,
 // and the one highlighted action on the card stays Book.
@@ -1346,18 +1349,37 @@ if (
 ) {
   throw new Error(`The account's places should be one control with its thumb on Your lessons, beside Book: ${JSON.stringify(lessonsPlaces)}.`);
 }
-if (/\d/.test(await initialAccountMenu.getByRole("button", { name: /Past lessons/ }).innerText())) {
-  throw new Error("Past lessons should not carry an attention-grabbing count.");
-}
-await initialAccountMenu.getByRole("button", { name: /Past lessons/ }).click();
-await accountPanel.locator("#account-past-lessons").waitFor({ state: "visible" });
-if (await accountPage.locator("#lesson-calendar").count()) {
-  throw new Error("Past lessons should show its own complete view without an unrelated future calendar.");
+// One schedule: the lessons that have happened sit beneath the calendar of
+// those to come, on the same card, each a row of two lines with its state at
+// the end of the first.
+const pastLessons = accountPage.locator("#lesson-calendar #account-past-lessons");
+await pastLessons.waitFor({ state: "visible" });
+const cancelledPastLesson = pastLessons.locator(".past-lesson.is-cancelled");
+const cancelledPastRow = await cancelledPastLesson.evaluate((row) => {
+  const [first, second] = row.querySelectorAll(".past-lesson__line");
+  const when = first?.querySelector(".past-lesson__when")?.getBoundingClientRect();
+  const status = first?.querySelector(".past-lesson__status")?.getBoundingClientRect();
+  return {
+    lines: row.querySelectorAll(".past-lesson__line").length,
+    status: first?.querySelector(".past-lesson__status")?.textContent?.trim() ?? "",
+    facts: second?.textContent?.trim() ?? "",
+    beside: Boolean(when && status && status.left > when.right && Math.abs((when.top + when.bottom) / 2 - (status.top + status.bottom) / 2) < 8),
+    buttons: row.querySelectorAll("button").length
+  };
+});
+if (
+  (await pastLessons.getByRole("heading", { name: "Past lessons", exact: true }).count()) !== 1 ||
+  (await cancelledPastLesson.count()) !== 1 ||
+  cancelledPastRow.lines !== 2 ||
+  cancelledPastRow.status !== "Cancelled" ||
+  cancelledPastRow.facts !== "60 mins · Online" ||
+  !cancelledPastRow.beside ||
+  cancelledPastRow.buttons
+) {
+  throw new Error(`Past lessons should sit beneath the calendar on Your lessons, a cancelled one in two lines with Cancelled beside its date and no action: ${JSON.stringify(cancelledPastRow)}.`);
 }
 // Choosing the card already open keeps it open.
-await chooseAccountAction(/Past lessons/);
-await accountPanel.locator("#account-past-lessons").waitFor({ state: "visible" });
-await accountPanel.getByRole("button", { name: /^Your lessons/ }).first().click();
+await chooseAccountAction(/^Your lessons/);
 await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
 await chooseAccountAction("Edit details");
 await accountPanel.locator(".my-lessons__details").waitFor({ state: "visible" });
@@ -1429,46 +1451,11 @@ const lessonsAccountMenu = accountPanel.locator("#account-menu");
 const accountMenuFolded = await accountMenuButton.isVisible();
 if (accountMenuFolded) await accountMenuButton.click();
 await lessonsAccountMenu.waitFor({ state: "visible" });
-if ((await lessonsAccountMenu.getByRole("button").count()) !== (accountMenuFolded ? 5 : 4)) {
-  throw new Error("Your lessons, Past lessons, Homework and Edit details, with Sign out where the menu folds, should live together in the account menu.");
+if ((await lessonsAccountMenu.getByRole("button").count()) !== (accountMenuFolded ? 3 : 2)) {
+  throw new Error("Your lessons and Edit details, with Sign out where the menu folds, should live together in the account menu.");
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-account-menu-desktop.png"), fullPage: true });
-await lessonsAccountMenu.getByRole("button", { name: /Past lessons/ }).click();
-await accountPanel.getByRole("heading", { name: "Past lessons", exact: true }).waitFor();
-await waitForOrientation(accountPage);
-const cancelledHistoryCard = accountPanel.locator("#account-past-lessons .history-lesson-card--cancelled");
-if (
-  (await cancelledHistoryCard.count()) !== 1 ||
-  !(await cancelledHistoryCard.getByText("Cancelled", { exact: true }).isVisible()) ||
-  !(await cancelledHistoryCard.getByText("60 mins · Online", { exact: true }).isVisible()) ||
-  !(await cancelledHistoryCard.getByText("Reference INES-OLD1", { exact: true }).isVisible()) ||
-  (await cancelledHistoryCard.locator(".lesson-calendar__mark").count()) !== 1 ||
-  (await cancelledHistoryCard.getByRole("button").count()) !== 0
-) {
-  throw new Error("A cancelled lesson should use the same readable card anatomy as Your lessons without a management action.");
-}
-const pastLessonsCard = await accountPanel.locator("#account-past-lessons").evaluate((card) => {
-  const bounds = (selector) => card.querySelector(selector)?.getBoundingClientRect().toJSON() ?? null;
-  return {
-    card: card.classList.contains("account-card"),
-    heading: bounds("#past-lessons-heading"),
-    current: card.querySelector('.account-card__head #account-menu [aria-current="true"]')?.textContent?.trim() ?? ""
-  };
-});
-const pastPlaces = await readPlaces();
-if (
-  !pastLessonsCard.card ||
-  (pastLessonsCard.heading?.width ?? 0) > 1 ||
-  pastLessonsCard.current !== "Past lessons" ||
-  Math.abs((pastPlaces.placesLeft ?? 0) - (lessonsPlaces.placesLeft ?? -99)) > 2 ||
-  Math.abs(pastPlaces.thumb.left - pastPlaces.current.left) > 2
-) {
-  throw new Error(`Past lessons should be its own card, headed like Your lessons, its places where they were with the thumb on Past lessons: ${JSON.stringify({ pastLessonsCard, pastPlaces })}.`);
-}
-await accountPage.screenshot({ path: path.join(outDir, "booking-past-lessons-desktop.png"), fullPage: true });
-await accountPanel.getByRole("button", { name: /^Your lessons/ }).first().click();
-await accountPanel.locator("#account-past-lessons").waitFor({ state: "detached" });
-await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
+if (accountMenuFolded) await accountMenuButton.click();
 
 const laterLessonsToggle = accountActions.getByRole("button", { name: /^Your lessons/ });
 if (!/3\s*upcoming$/i.test((await laterLessonsToggle.innerText()).trim())) {
@@ -1938,24 +1925,26 @@ if (
 ) {
   throw new Error(`The account menu should open beneath the name and over the calendar: ${JSON.stringify(openAccountMenu)}.`);
 }
-await accountPanel.getByRole("button", { name: /Past lessons/ }).click();
-await accountPanel.locator("#account-past-lessons").waitFor({ state: "visible" });
+await accountMenuButton.click();
 await accountPanel.locator("#account-menu").waitFor({ state: "hidden" });
-await waitForOrientation(accountPage);
-const mobilePastLessonsLayout = await accountPage.evaluate(() => ({
-  clientWidth: document.documentElement.clientWidth,
-  scrollWidth: document.documentElement.scrollWidth
-}));
-if (mobilePastLessonsLayout.scrollWidth > mobilePastLessonsLayout.clientWidth + 1) {
-  throw new Error("The separate past-lessons panel overflows on a phone.");
+// On a phone the past lessons follow the calendar on the same card, a
+// cancelled one still two lines with Cancelled beside its date.
+const mobilePastLessons = accountPage.locator("#lesson-calendar #account-past-lessons");
+await mobilePastLessons.scrollIntoViewIfNeeded();
+const mobilePastLessonsLayout = await accountPage.evaluate(() => {
+  const row = document.querySelector("#account-past-lessons .past-lesson.is-cancelled");
+  const when = row?.querySelector(".past-lesson__when")?.getBoundingClientRect();
+  const status = row?.querySelector(".past-lesson__status")?.getBoundingClientRect();
+  return {
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    beside: Boolean(when && status && status.left > when.right && Math.abs(when.top - status.top) < 8)
+  };
+});
+if (mobilePastLessonsLayout.scrollWidth > mobilePastLessonsLayout.clientWidth + 1 || !mobilePastLessonsLayout.beside) {
+  throw new Error(`Past lessons beneath the calendar should fit a phone, Cancelled beside its date: ${JSON.stringify(mobilePastLessonsLayout)}.`);
 }
-await accountPanel.screenshot({ path: path.join(outDir, "booking-past-lessons-mobile.png") });
-// The way back is the name's menu, centred beneath the title; there is no
-// separate back link.
-await accountPanel.locator("#account-menu-button").click();
-await accountPanel.locator("#account-menu").getByRole("button", { name: /^Your lessons/ }).click();
-await accountPanel.locator("#account-past-lessons").waitFor({ state: "detached" });
-await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible" });
+await mobilePastLessons.screenshot({ path: path.join(outDir, "booking-past-lessons-mobile.png") });
 await accountMenuButton.click();
 await accountPanel.getByRole("button", { name: "Edit details", exact: true }).click();
 await accountPanel.locator(".my-lessons__details").waitFor({ state: "visible" });
