@@ -6,15 +6,16 @@
  * minutes-from-midnight in `zone`. Nothing stores a fixed offset.
  */
 
-import { DEFAULT_TUTOR } from "./tutor.mjs";
+import { currentTutor } from "./tutor.mjs";
 
 /**
- * The tutor's own clock (Inês's is Europe/Lisbon, "Porto time"). Every
- * advertised time is on it. One tutor for now, so it is read once from the
- * tutor record; the helpers below all take a zone for when that changes.
+ * The running tutor's own clock (Inês's is Europe/Lisbon, "Porto time"). Every
+ * advertised time is on it, and every helper below defaults to it.
  */
-export const HOME_ZONE = DEFAULT_TUTOR.place.timeZone;
-const HOME_CLOCK = `${DEFAULT_TUTOR.place.city} time`;
+export function homeZone() {
+  return currentTutor().place.timeZone;
+}
+const homeClock = () => `${currentTutor().place.city} time`;
 
 const partsCache = new Map();
 
@@ -37,7 +38,7 @@ function formatterFor(zone) {
 }
 
 /** Wall-clock fields for `date` as seen in `zone`. */
-export function zonedParts(date, zone = HOME_ZONE) {
+export function zonedParts(date, zone = homeZone()) {
   const parts = {};
   for (const part of formatterFor(zone).formatToParts(date)) {
     if (part.type !== "literal") parts[part.type] = part.value;
@@ -55,7 +56,7 @@ export function zonedParts(date, zone = HOME_ZONE) {
 }
 
 /** Offset of `zone` from UTC, in minutes, at the instant `date`. */
-export function offsetMinutes(date, zone = HOME_ZONE) {
+export function offsetMinutes(date, zone = homeZone()) {
   const { year, month, day, hour, minute, second } = zonedParts(date, zone);
   const asIfUtc = Date.UTC(year, month - 1, day, hour, minute, second);
   return (asIfUtc - date.getTime()) / 60000;
@@ -69,7 +70,7 @@ export function offsetMinutes(date, zone = HOME_ZONE) {
  * correction is enough for every real transition, since offsets move by at most
  * an hour and the guess is never more than an hour out.
  */
-export function zonedToUtc(year, month, day, minutesFromMidnight, zone = HOME_ZONE) {
+export function zonedToUtc(year, month, day, minutesFromMidnight, zone = homeZone()) {
   const naive = Date.UTC(year, month - 1, day, 0, minutesFromMidnight);
   const firstPass = naive - offsetMinutes(new Date(naive), zone) * 60000;
   const corrected = naive - offsetMinutes(new Date(firstPass), zone) * 60000;
@@ -77,7 +78,7 @@ export function zonedToUtc(year, month, day, minutesFromMidnight, zone = HOME_ZO
 }
 
 /** "2026-09-03" as seen in `zone`. */
-export function dateKey(date, zone = HOME_ZONE) {
+export function dateKey(date, zone = homeZone()) {
   const { year, month, day } = zonedParts(date, zone);
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
@@ -96,7 +97,7 @@ export function parseDateKey(key) {
 }
 
 /** Midnight-to-midnight in `zone` for the Porto date `key`, as UTC instants. */
-export function dayBounds(key, zone = HOME_ZONE) {
+export function dayBounds(key, zone = homeZone()) {
   const parsed = parseDateKey(key);
   if (!parsed) return null;
 
@@ -148,7 +149,7 @@ export function isValidTimeZone(zone) {
 }
 
 /** Human date and time in a given zone, for emails and confirmations. */
-export function formatInZone(date, zone = HOME_ZONE, locale = "en-GB") {
+export function formatInZone(date, zone = homeZone(), locale = "en-GB") {
   return new Intl.DateTimeFormat(locale, {
     timeZone: zone,
     weekday: "long",
@@ -169,9 +170,9 @@ export function formatInZone(date, zone = HOME_ZONE, locale = "en-GB") {
  * "19:00 (WEST) / 19:00 (BST)" to every UK student, which is just noise.
  */
 export function differingZonedTime(date, zone, locale = "en-GB") {
-  if (!zone || zone === HOME_ZONE) return null;
+  if (!zone || zone === homeZone()) return null;
 
-  const here = formatInZone(date, HOME_ZONE, locale);
+  const here = formatInZone(date, homeZone(), locale);
   const there = formatInZone(date, zone, locale);
   return here === there ? null : `${there} (${timeZoneAbbreviation(date, zone, locale)})`;
 }
@@ -192,7 +193,7 @@ const RENAMED_PLACES = {
  * builds and so between runtimes.
  */
 export function zoneName(zone, date = new Date()) {
-  if (!zone || zone === HOME_ZONE) return HOME_CLOCK;
+  if (!zone || zone === homeZone()) return homeClock();
   const place = zone.includes("/") && !zone.startsWith("Etc/") ? zone.slice(zone.lastIndexOf("/") + 1).replace(/_/g, " ") : "";
   if (place) return `${RENAMED_PLACES[place] ?? place} time`;
   let minutes;
@@ -213,7 +214,7 @@ export function zoneName(zone, date = new Date()) {
  * "Fri 25 Sep, 19:00" — for subject lines, where a full date runs past what an
  * inbox shows and a reference code says nothing to the person reading it.
  */
-export function formatShort(date, zone = HOME_ZONE, locale = "en-GB") {
+export function formatShort(date, zone = homeZone(), locale = "en-GB") {
   const parts = new Intl.DateTimeFormat(locale, {
     timeZone: zone,
     weekday: "short",
@@ -228,7 +229,7 @@ export function formatShort(date, zone = HOME_ZONE, locale = "en-GB") {
   return `${get("weekday")} ${get("day")} ${get("month")}, ${get("hour")}:${get("minute")}`;
 }
 
-export function timeZoneAbbreviation(date, zone = HOME_ZONE, locale = "en-GB") {
+export function timeZoneAbbreviation(date, zone = homeZone(), locale = "en-GB") {
   const parts = new Intl.DateTimeFormat(locale, { timeZone: zone, timeZoneName: "short" }).formatToParts(date);
   return parts.find((part) => part.type === "timeZoneName")?.value ?? zone;
 }

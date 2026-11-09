@@ -15,7 +15,7 @@
  */
 
 import { isNoEmailYet } from "./no-email.mjs";
-import { DEFAULT_TUTOR } from "./tutor.mjs";
+import { currentTutor } from "./tutor.mjs";
 
 const CRLF = "\r\n";
 
@@ -142,7 +142,7 @@ function wrapCalendar(method, eventLines) {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    `PRODID:-//${DEFAULT_TUTOR.brandPlain}//Booking//EN`,
+    `PRODID:-//${currentTutor().brandPlain}//Booking//EN`,
     "CALSCALE:GREGORIAN",
     `METHOD:${method}`,
     ...eventLines,
@@ -168,6 +168,6 @@ export function buildCalendarSeriesInvite({ method, events }) {
 }
 
 /** Stable for the life of the booking, so updates match the original event. */
-export function calendarUid(bookingId, domain = DEFAULT_TUTOR.bookings.calendarUidDomain) {
+export function calendarUid(bookingId, domain = currentTutor().bookings.calendarUidDomain) {
   return `booking-${bookingId}@${domain}`;
 }

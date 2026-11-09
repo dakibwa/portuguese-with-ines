@@ -2410,13 +2410,19 @@ booked until they set their prices and hours. `node
 workers/booking/tenancy-test.mjs` (part of `npm run test:booking`) proves two
 tutors never see each other's students, lessons, secrets or name.
 
-Not yet per tutor, so the directory refuses a second tutor whose time zone or
-currency differs from Inês's: the home time zone (`HOME_ZONE` in `time.mjs`),
-the currency in `stripe.mjs` and `money.mjs`, the calendar file's PRODID and UID
-domain in `ics.mjs`, and every helper whose `tutor` defaults to `DEFAULT_TUTOR`
-(`grep -n "DEFAULT_TUTOR"` lists them). Stripe payments wait for each tutor's
-own connected account, and Google Calendar for a callback that carries the
-tutor.
+- **Their own clock and currency.** Each request, and each tutor's share of the
+  scheduled sweeps, runs inside `asTutor` (`tutor.mjs`), so `homeZone()` in
+  `time.mjs`, prices in `money.mjs` and `stripe.mjs`, the calendar file's PRODID
+  and UID domain, the email images, and every helper whose `tutor` defaults to
+  `currentTutor()` are that tutor's. Outside a request, as in the unit tests,
+  they are Inês's. A tutor in New York charging dollars gets slots, emails and
+  fees on New York time and in US$, while Inês's request at the same moment
+  stays on Porto time in euros (`tenancy-test.mjs`).
+
+Still Inês's alone until later steps: Stripe payments (each tutor's own
+connected account), Google Calendar (its callback has to carry the tutor), the
+site itself (built for her), the Portuguese tax number and Portal das Finanças
+reminders, and `'porto'` as the stored key for an in-person lesson.
 
 ```bash
 NEXT_PUBLIC_BOOKING_API_BASE_URL=https://ines-booking.<subdomain>.workers.dev

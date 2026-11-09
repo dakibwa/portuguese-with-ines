@@ -18,9 +18,8 @@
  * Inês's own add-on, not part of the platform (9 November 2026, Dan), so no
  * other tutor can have it.
  *
- * Until helpers take the tutor's clock and currency per request, every tutor
- * must share Inês's time zone and currency. A record that differs fails to
- * load rather than showing a student the wrong time or price.
+ * Each request and sweep runs as its tutor (asTutor in tutor.mjs), so times are
+ * on that tutor's own clock and prices in their own currency.
  *
  * Adding a tutor: a folder under tutors/ with their tutor.json, one line in
  * TUTORS below, a D1 database made from schema.sql and then
@@ -57,7 +56,17 @@ function deepFreeze(value) {
   return value;
 }
 
-/** Check the directory once: unique ids, databases, origins and hosts, and the clock and currency every helper still assumes. */
+function realTimeZone(zone) {
+  if (typeof zone !== "string" || !zone) return false;
+  try { new Intl.DateTimeFormat("en-GB", { timeZone: zone }); return true; } catch { return false; }
+}
+
+function realCurrency(code) {
+  if (typeof code !== "string" || !/^[A-Z]{3}$/.test(code)) return false;
+  try { new Intl.NumberFormat("en-GB", { style: "currency", currency: code }); return true; } catch { return false; }
+}
+
+/** Check the directory once: unique ids, databases, origins and hosts, a real clock and currency, and only switches a tutor may set. */
 export function loadDirectory(records) {
   const tutors = records.map((record) => deepFreeze(structuredClone(record)));
   const seen = { id: new Set(), database: new Set(), origin: new Set(), host: new Set() };
@@ -71,9 +80,8 @@ export function loadDirectory(records) {
     if (!/^[A-Z][A-Z0-9_]*$/.test(tutor.database ?? "")) throw new Error(`Tutor ${tutor.id} needs a database binding name.`);
     claim("database", tutor.database, tutor.id);
     if (tutor.id !== DEFAULT_TUTOR.id) {
-      if (tutor.place?.timeZone !== DEFAULT_TUTOR.place.timeZone || tutor.place?.currency !== DEFAULT_TUTOR.place.currency) {
-        throw new Error(`Tutor ${tutor.id}: another time zone or currency needs the per-request clock and currency first.`);
-      }
+      if (!realTimeZone(tutor.place?.timeZone)) throw new Error(`Tutor ${tutor.id}: ${tutor.place?.timeZone} is not a time zone.`);
+      if (!realCurrency(tutor.place?.currency)) throw new Error(`Tutor ${tutor.id}: ${tutor.place?.currency} is not a currency code.`);
       for (const origin of tutor.site?.origins ?? []) {
         if (new URL(origin).origin !== origin) throw new Error(`Tutor ${tutor.id}: ${origin} is not a bare origin.`);
         claim("origin", origin, tutor.id);

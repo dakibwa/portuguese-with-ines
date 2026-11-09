@@ -1,5 +1,5 @@
 import { ExpressionProblem } from "./expressions.mjs";
-import { DEFAULT_TUTOR } from "./tutor.mjs";
+import { currentTutor } from "./tutor.mjs";
 
 /*
  * Students' own translations of an expression (30 October 2026, Dan, for
@@ -42,7 +42,7 @@ export async function approvedTranslations(db, expressionId) {
  * limit and their session still stands, or nothing is saved. The unique index
  * keeps one translation waiting per student per expression.
  */
-export async function submitTranslation(db, studentId, expressionId, body, authorization = null, tutor = DEFAULT_TUTOR) {
+export async function submitTranslation(db, studentId, expressionId, body, authorization = null, tutor = currentTutor()) {
   if (!EXPRESSION_ID.test(expressionId)) problem("That expression was not found.", 404);
   if (Object.keys(body).some((key) => !["language", "text"].includes(key))) problem("Please send just the language and your translation.");
   const language = field(body, "language", "language");

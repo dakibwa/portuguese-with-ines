@@ -2,14 +2,15 @@
  * The tutor this Worker serves, read from the one tutor record in
  * `tutors/<id>/tutor.json` rather than spelled out across the code.
  *
- * Inês is the only tutor for now, so every request gets her record. When the
- * Worker serves several tutors, the request's tutor arrives as `env.TUTOR`
- * (picked from the web address) and everything below already reads it from
- * there, so nothing that names a tutor has to change again.
+ * Inês's requests get her record. Another tutor's request carries theirs as
+ * `env.TUTOR` (picked from the web address in directory.mjs), and the whole of
+ * that request, or that tutor's sweep, runs inside `asTutor`, so the clock,
+ * currency and every helper that defaults to `currentTutor()` are theirs too.
  *
  * The deploy settings still win where they exist: staging and local runs set
  * SITE_URL, MAIL_FROM and MAIL_SENDER_ADDRESS to their own values.
  */
+import { AsyncLocalStorage } from "node:async_hooks";
 import ines from "../../tutors/ines/tutor.json" with { type: "json" };
 
 function deepFreeze(value) {
@@ -41,6 +42,18 @@ export function tutorOf(env) {
     fromEnv.set(env, tutor);
   }
   return tutor;
+}
+
+const running = new AsyncLocalStorage();
+
+/** Run `work` as `tutor`'s: everything it starts, awaited or not, sees them as the current tutor. */
+export function asTutor(tutor, work) {
+  return running.run(tutor ?? DEFAULT_TUTOR, work);
+}
+
+/** The tutor whose request or sweep is running; the default tutor outside any. */
+export function currentTutor() {
+  return running.getStore() ?? DEFAULT_TUTOR;
 }
 
 /** What the site calls an in-person lesson's place: "In Porto". */

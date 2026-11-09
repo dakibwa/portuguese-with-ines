@@ -20,7 +20,15 @@ globalThis.Date = class extends NativeDate {
   constructor(...args) { super(...(args.length ? args : [clock])); }
   static now() { return clock; }
 };
-globalThis.fetch = async (url) => { throw new Error(`No network in tenancy tests: ${url}`); };
+// No network, except a stand-in for the mail service that keeps what it was asked to send.
+const sent = [];
+globalThis.fetch = async (url, init) => {
+  if (String(url) === "https://api.resend.com/emails") {
+    sent.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ id: `re_${sent.length}` }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+  throw new Error(`No network in tenancy tests: ${url}`);
+};
 
 function database(seed = readFileSync(new URL("./seed.sql", import.meta.url), "utf8")) {
   const db = new DatabaseSync(":memory:");
@@ -58,6 +66,7 @@ const ANA = {
   name: "Ana Example",
   shortName: "Ana",
   brand: "Português com a Ana",
+  place: { city: "New York", timeZone: "America/New_York", country: "US", currency: "USD", inPersonKey: "porto" },
   bookings: { referencePrefix: "AN", calendarUidDomain: "ana.example" },
   site: { url: "https://ana.example", domain: "ana.example", mailFrom: "Português com a Ana <bookings@ana.example>", mailSender: "bookings@ana.example",
     origins: ["https://ana.example"] },
@@ -96,10 +105,10 @@ const request = (path, { origin, host = "api.example", method = "GET", body, ses
   ...(body ? { body: JSON.stringify(body) } : {})
 });
 
-await test("a directory refuses a clash, another clock or currency, an unknown switch, and a missing default", () => {
+await test("a directory refuses a clash, an unreal clock or currency, an unknown switch, and a missing default", () => {
   assert.throws(() => loadDirectory([DEFAULT_TUTOR, ANA, { ...ANA, id: "anna", database: "DB_ANNA" }]), /origin https:\/\/ana.example/);
-  assert.throws(() => loadDirectory([DEFAULT_TUTOR, { ...ANA, place: { ...ANA.place, timeZone: "Europe/Berlin" } }]), /time zone or currency/);
-  assert.throws(() => loadDirectory([DEFAULT_TUTOR, { ...ANA, place: { ...ANA.place, currency: "GBP" } }]), /time zone or currency/);
+  assert.throws(() => loadDirectory([DEFAULT_TUTOR, { ...ANA, place: { ...ANA.place, timeZone: "Mars/Olympus" } }]), /not a time zone/);
+  assert.throws(() => loadDirectory([DEFAULT_TUTOR, { ...ANA, place: { ...ANA.place, currency: "usd" } }]), /not a currency/);
   assert.throws(() => loadDirectory([DEFAULT_TUTOR, { ...ANA, switches: { STRIPE_SECRET_KEY: "x" } }]), /not a switch/);
   assert.throws(() => loadDirectory([DEFAULT_TUTOR, { ...ANA, database: "DB" }]), /database DB/);
   assert.throws(() => loadDirectory([ANA]), /default tutor/);
@@ -163,26 +172,42 @@ await test("a booking on the second tutor's site lands in their database, in the
   const own = await envForTutor(env, anaTutor);
   const availability = await worker.fetch(request("/availability?lessonType=single&from=2026-09-07&to=2026-09-07", { origin: "https://ana.example" }), own, ctx);
   assert.equal(availability.status, 200);
+  assert.equal((await availability.json()).slotsByDate["2026-09-07"][0].startAt, "2026-09-07T13:00:00.000Z", "her 09:00 is New York's");
   assert.equal(availability.headers.get("Access-Control-Allow-Origin"), "https://ana.example");
   ana.db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('sam','sam@example.invalid','Sam Student','',?)").run(new Date().toISOString());
   const session = await createSession("sam", own.BOOKING_TOKEN_SECRET);
   // The same session is no one on Inês's side: her secret did not sign it, and her database has no Sam.
   const elsewhere = await worker.fetch(request("/me", { origin: "https://lesson.example", session }), env, ctx);
   assert.equal(elsewhere.status, 401);
+  // Her mail switched on for this one booking, to read what her student is sent.
+  const live = { ...own, EMAIL_DRY_RUN: "0" };
   const created = await worker.fetch(request("/bookings", { origin: "https://ana.example", method: "POST", session, body: {
-    lessonType: "trial", startAt: "2026-09-07T09:00:00.000Z", timezone: "Europe/Lisbon", location: "online"
-  } }), own, ctx);
+    lessonType: "trial", startAt: "2026-09-07T14:00:00.000Z", timezone: "America/New_York", location: "online"
+  } }), live, ctx);
   assert.equal(created.status, 201, await created.clone().text());
+
   await Promise.all(tasks.splice(0));
   const row = ana.db.prepare("SELECT reference FROM bookings").get();
   assert.match(row.reference, /^AN-/);
   assert.equal(ines.db.prepare("SELECT COUNT(*) AS count FROM bookings").get().count, 0);
   assert.equal(ines.db.prepare("SELECT COUNT(*) AS count FROM students").get().count, 0);
   assert.equal(ines.db.prepare("SELECT COUNT(*) AS count FROM email_log").get().count, 0);
-  const mail = ana.db.prepare("SELECT request_json, recipient, status FROM email_log WHERE recipient = 'sam@example.invalid'").get();
-  assert.ok(mail, "the student's confirmation is logged in the tutor's own database");
-  // Dry run: recorded, not sent, until the tutor's domain is verified.
-  assert.notEqual(mail.status, "sent");
+  assert.ok(ana.db.prepare("SELECT 1 FROM email_log WHERE recipient = 'sam@example.invalid'").get(), "logged in the tutor's own database");
+  const mail = sent.find((message) => message.to?.includes?.("sam@example.invalid") || message.to === "sam@example.invalid");
+  assert.ok(mail, "the student's confirmation was sent");
+  assert.equal(mail.from, "Português com a Ana <bookings@ana.example>");
+  assert.match(mail.text, /\$30/, "priced in her own currency");
+  assert.match(mail.text, /10:00/, "at 10:00 on her clock and her student's");
+  assert.doesNotMatch(JSON.stringify(mail), /€|Porto|Inês|portuguesewithines/);
+});
+
+await test("at the same moment, Inês's request runs on her clock and the other tutor's on theirs", async () => {
+  const own = await envForTutor(env, anaTutor);
+  const ask = (origin, on) => worker.fetch(request("/availability?lessonType=single&from=2026-09-14&to=2026-09-14", { origin }), on, ctx)
+    .then((reply) => reply.json()).then((body) => body.slotsByDate["2026-09-14"][0].startAt);
+  const [hers, theirs] = await Promise.all([ask("https://lesson.example", env), ask("https://ana.example", own)]);
+  assert.equal(hers, "2026-09-14T09:00:00.000Z", "10:00 in Porto");
+  assert.equal(theirs, "2026-09-14T13:00:00.000Z", "09:00 in New York");
 });
 
 await test("Inês's own requests are untouched by a second tutor existing, and refused from the other's origin", async () => {

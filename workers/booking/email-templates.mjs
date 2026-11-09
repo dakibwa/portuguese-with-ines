@@ -27,7 +27,7 @@
  * so they are kept word for word. Change them only together with that.
  */
 
-import { DEFAULT_TUTOR } from "./tutor.mjs";
+import { currentTutor } from "./tutor.mjs";
 
 export const SIGN_OFF = "Sent automatically by the booking system.";
 export const FREE_LABEL = "Free";
@@ -67,7 +67,7 @@ function studentRows({ name, email, phone, nif, notes }, { withPhone = true } = 
  *   free · paid · card (saved card, after the lesson) · untilCard (hers, until
  *   their card is added) · asUsual (hers, paid to her) · onTheDay (older terms)
  */
-export function priceValue({ tutor = DEFAULT_TUTOR, terms, amount, run = false }) {
+export function priceValue({ tutor = currentTutor(), terms, amount, run = false }) {
   const each = run ? `${amount} a lesson` : amount;
   switch (terms) {
     case "free": return FREE_LABEL;
@@ -177,7 +177,7 @@ function lessonRows({ lesson, place, meetingUrl, reference, price, cancelled = f
  * fixed (a set number of lessons), twoTimes, slot ("Tuesday", "17:30") when
  * Inês set up a plain weekly slot, repeats, occurrences, skippedNote }.
  */
-export function studentBooked({ tutor = DEFAULT_TUTOR, first, byTeacher, welcome = null, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
+export function studentBooked({ tutor = currentTutor(), first, byTeacher, welcome = null, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
   price, policy, paid = false, notice, fee, manageUrl, lessonsUrl, run = null }) {
   if (!run) {
     return {
@@ -294,7 +294,7 @@ export function lessonBookedTeacher({ student, byTeacher, held = false, noEmailY
  * 09 10 — the day-before reminder, and the Meet link sent on its own when it
  * was not ready for the confirmation (`linkOnly`).
  */
-export function lessonReminder({ tutor = DEFAULT_TUTOR, first, lessonName, lesson, place, reference, when, shortWhen, meetingUrl = "", meetComing = false,
+export function lessonReminder({ tutor = currentTutor(), first, lessonName, lesson, place, reference, when, shortWhen, meetingUrl = "", meetComing = false,
   manageUrl, cutoff = "", policy = "card", fee = "", linkOnly = false }) {
   const manage = manageUrl ? { label: MANAGE_LABEL, url: manageUrl } : null;
   if (linkOnly) {
@@ -340,7 +340,7 @@ export function lessonReminder({ tutor = DEFAULT_TUTOR, first, lessonName, lesso
 /* ------------------------------------------------------------------ moved */
 
 /** 11 12 15 — a student's lesson (or weekly run) has moved or changed length. */
-export function studentMoved({ tutor = DEFAULT_TUTOR, first, byTeacher, lengthChanged = false, minutes, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
+export function studentMoved({ tutor = currentTutor(), first, byTeacher, lengthChanged = false, minutes, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
   price, lateNote = "", policy, notice, fee, manageUrl, lessonsUrl, welcome = null, run = null }) {
   if (run) {
     // Inês changed how long they are (9 November 2026, Dan), at the same times.
@@ -434,7 +434,7 @@ export function lessonMovedTeacher({ student, byTeacher, held = false, lengthCha
 /* -------------------------------------------------------------- cancelled */
 
 /** 18 19 22 — a student's lesson, or the rest of their weekly run, is cancelled. */
-export function studentCancelled({ tutor = DEFAULT_TUTOR, first, byTeacher, message = "", note = "", lesson, lessonName, place, reference, when, shortWhen, run = null }) {
+export function studentCancelled({ tutor = currentTutor(), first, byTeacher, message = "", note = "", lesson, lessonName, place, reference, when, shortWhen, run = null }) {
   if (run) {
     return {
       subject: byTeacher ? `${tutor.shortName} has cancelled your weekly lessons — ${run.count}` : `Your weekly lessons are cancelled — ${run.count}`,
@@ -512,7 +512,7 @@ export function lessonCancelledTeacher({ student, byTeacher, held = false, late 
 const ITEM = { lesson: "lesson payment", "no-show": "no-show fee", fee: "late change fee" };
 
 /** 24 25 27 — the student's receipt for a charge to their saved card; the line item varies. */
-export function paymentReceipt({ tutor = DEFAULT_TUTOR, first, item, amount, lesson, lessonName, shortWhen, reference, nif = "", noticeHours }) {
+export function paymentReceipt({ tutor = currentTutor(), first, item, amount, lesson, lessonName, shortWhen, reference, nif = "", noticeHours }) {
   const fee = item === "fee";
   const heading = fee ? "Your late change fee is paid" : item === "no-show" ? "Your no-show fee is paid" : "Your lesson is paid";
   return {
@@ -564,7 +564,7 @@ export function paymentReceivedTeacher({ studentName, item, amount, lessonName, 
 }
 
 /** 29 30 — the saved card was declined: a secure link to pay. */
-export function paymentFailed({ tutor = DEFAULT_TUTOR, first, item, amount, lesson, lessonName, shortWhen, reference, payUrl }) {
+export function paymentFailed({ tutor = currentTutor(), first, item, amount, lesson, lessonName, shortWhen, reference, payUrl }) {
   return {
     subject: `${item === "fee" ? "Late change fee" : item === "no-show" ? "No-show fee" : "Lesson payment"} — the card didn't go through`,
     content: {
@@ -588,7 +588,7 @@ export function paymentFailed({ tutor = DEFAULT_TUTOR, first, item, amount, less
  * 32 33 34 — her welcome: their lessons and prices and the one-click way in;
  * with no lesson yet, an invitation to book one (`rows` then holds prices only).
  */
-export function welcome({ tutor = DEFAULT_TUTOR, first, welcome, book, free, rows }) {
+export function welcome({ tutor = currentTutor(), first, welcome, book, free, rows }) {
   return {
     subject: book ? `Book your next lesson with ${tutor.shortName}` : `Your lessons with ${tutor.shortName}, in one place`,
     content: {
@@ -615,7 +615,7 @@ export function welcome({ tutor = DEFAULT_TUTOR, first, welcome, book, free, row
  * carries; a teacher who is also a student signs in as themselves, so theirs
  * opens the booking page.
  */
-export function dormantInvite({ tutor = DEFAULT_TUTOR, subject, message, signInUrl = "", bookUrl }) {
+export function dormantInvite({ tutor = currentTutor(), subject, message, signInUrl = "", bookUrl }) {
   return {
     subject,
     content: {
@@ -631,7 +631,7 @@ export function dormantInvite({ tutor = DEFAULT_TUTOR, subject, message, signInU
 /* ---------------------------------------------------------------- account */
 
 /** 36 */
-export function signInLink({ tutor = DEFAULT_TUTOR, first, url }) {
+export function signInLink({ tutor = currentTutor(), first, url }) {
   return {
     subject: `Your sign-in link — ${tutor.brand}`,
     content: {
@@ -645,7 +645,7 @@ export function signInLink({ tutor = DEFAULT_TUTOR, first, url }) {
 }
 
 /** 37 */
-export function passwordReset({ tutor = DEFAULT_TUTOR, first, url }) {
+export function passwordReset({ tutor = currentTutor(), first, url }) {
   return {
     subject: `Reset your password — ${tutor.brand}`,
     content: {
@@ -659,7 +659,7 @@ export function passwordReset({ tutor = DEFAULT_TUTOR, first, url }) {
 }
 
 /** 38 — to the new address. */
-export function emailChangeConfirm({ tutor = DEFAULT_TUTOR, first, email, url }) {
+export function emailChangeConfirm({ tutor = currentTutor(), first, email, url }) {
   return {
     subject: `Confirm your new email — ${tutor.brand}`,
     content: {
@@ -674,7 +674,7 @@ export function emailChangeConfirm({ tutor = DEFAULT_TUTOR, first, email, url })
 }
 
 /** 39 — to the address on file, the one that would notice a change nobody asked for. */
-export function emailChangeNotice({ tutor = DEFAULT_TUTOR, first, email }) {
+export function emailChangeNotice({ tutor = currentTutor(), first, email }) {
   return {
     subject: `Someone asked to change your email — ${tutor.brand}`,
     content: {

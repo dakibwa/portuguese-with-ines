@@ -1,5 +1,5 @@
 import {
-  HOME_ZONE,
+  homeZone,
   addDaysToKey,
   dateKey,
   dayBounds,
@@ -26,8 +26,8 @@ function overlaps(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
 }
 
+/** Inês's horizon before her settings say otherwise; each tutor's own comes from their record. */
 export const DEFAULT_BOOKING_HORIZON_DAYS = DEFAULT_TUTOR.defaults.bookingHorizonDays;
-export const DEFAULT_MINIMUM_NOTICE_HOURS = DEFAULT_TUTOR.defaults.noticeHours;
 
 /** Bumped in the same transaction as teaching-hour and notice-setting writes. */
 export function availabilityRevisionSql() {
@@ -112,15 +112,15 @@ export async function loadSettings(env) {
 
   return {
     availabilityRevision: String(settings.availability_revision ?? "0"),
-    minimumNoticeHours: Number(settings.minimum_notice_hours ?? DEFAULT_MINIMUM_NOTICE_HOURS),
+    minimumNoticeHours: Number(settings.minimum_notice_hours ?? tutorOf(env).defaults.noticeHours),
     // Matches what seed.sql writes. The two disagreed for a while, which meant
     // a database missing the row behaved differently from every real one.
-    bookingHorizonDays: Number(settings.booking_horizon_days ?? DEFAULT_BOOKING_HORIZON_DAYS),
+    bookingHorizonDays: Number(settings.booking_horizon_days ?? tutorOf(env).defaults.bookingHorizonDays),
     slotIntervalMinutes: Number(settings.slot_interval_minutes ?? 30),
     // Free time kept after every lesson before a student's next one can start.
     // Missing means none, which is how every booking behaved before it existed.
     lessonBufferMinutes: Math.max(0, Number(settings.lesson_buffer_minutes ?? 0) || 0),
-    sameDayChangeFeeCents: Number(settings.same_day_change_fee_cents ?? DEFAULT_TUTOR.defaults.lateChangeFeeCents),
+    sameDayChangeFeeCents: Number(settings.same_day_change_fee_cents ?? tutorOf(env).defaults.lateChangeFeeCents),
     // 'off' preserves the original pay-in-person flow. 'postpay' saves a card
     // at booking and charges it only when the lesson ends. The retired
     // 'prepay' value remains readable only so a half-finished rollout fails
@@ -163,7 +163,7 @@ export async function computeAvailability(
   // Only the authenticated teacher picker opts out of student notice and gaps.
   const bufferMs = teacher ? 0 : settings.lessonBufferMinutes * 60000;
 
-  const todayKey = dateKey(now, HOME_ZONE);
+  const todayKey = dateKey(now, homeZone());
   /*
    * The horizon stops a stranger reaching in and taking a slot months out. A
    * student holding their own standing weekly time is the case it is meant to
@@ -265,8 +265,8 @@ export async function computeAvailability(
     const daySlots = [];
 
     for (const minute of candidateStartMinutes({ startRanges, duration, interval })) {
-      const slotStart = zonedToUtc(year, month, day, minute, HOME_ZONE);
-      const wall = zonedParts(slotStart, HOME_ZONE);
+      const slotStart = zonedToUtc(year, month, day, minute, homeZone());
+      const wall = zonedParts(slotStart, homeZone());
       // The missing spring hour must not reappear as a duplicate, shifted
       // start. Only real minutes from the teaching window are offered.
       if (wall.year !== year || wall.month !== month || wall.day !== day || wall.hour * 60 + wall.minute !== minute) continue;
@@ -297,7 +297,7 @@ export async function isSlotBookable(
   const start = new Date(startAt);
   if (Number.isNaN(start.getTime())) return { ok: false, reason: "That time could not be understood." };
 
-  const key = dateKey(start, HOME_ZONE);
+  const key = dateKey(start, homeZone());
   const { slotsByDate, settings: checkedSettings } = await computeAvailability(env, {
     fromKey: key,
     toKey: key,
@@ -328,7 +328,7 @@ export async function isSlotBookable(
     };
   }
 
-  const horizonKey = addDaysToKey(dateKey(now, HOME_ZONE), settings.bookingHorizonDays);
+  const horizonKey = addDaysToKey(dateKey(now, homeZone()), settings.bookingHorizonDays);
   if (!ignoreHorizon && key > horizonKey) {
     return { ok: false, reason: "That's further ahead than booking is open. Please choose an earlier date." };
   }

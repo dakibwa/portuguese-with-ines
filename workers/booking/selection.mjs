@@ -1,18 +1,18 @@
-import { HOME_ZONE, addDaysToKey, dateKey } from "./time.mjs";
+import { homeZone, addDaysToKey, dateKey } from "./time.mjs";
 import { lessonPriceSnapshotSql } from "./rates.mjs";
 import { availabilityRevisionSql } from "./availability.mjs";
-import { DEFAULT_TUTOR } from "./tutor.mjs";
+import { currentTutor } from "./tutor.mjs";
 
 export const MAX_SINGLE_SELECTIONS = 8;
 
 /** Calendar weeks are Monday–Sunday in Porto, including across DST/year changes. */
 export function portoWeekOf(startAt) {
-  const key = dateKey(new Date(startAt), HOME_ZONE);
+  const key = dateKey(new Date(startAt), homeZone());
   const weekday = new Date(`${key}T12:00:00Z`).getUTCDay();
   return addDaysToKey(key, -((weekday + 6) % 7));
 }
 
-export function bookingSelection(body, { recurring = false, durationMinutes = 60, trial = false, tutor = DEFAULT_TUTOR } = {}) {
+export function bookingSelection(body, { recurring = false, durationMinutes = 60, trial = false, tutor = currentTutor() } = {}) {
   const values = "startAts" in body ? body.startAts : [body.startAt];
   const limit = trial ? 1 : recurring ? 2 : MAX_SINGLE_SELECTIONS;
   if (!Array.isArray(values) || !values.length || values.length > limit) {

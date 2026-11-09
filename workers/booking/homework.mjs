@@ -1,6 +1,6 @@
 import { takeRateLimit } from "./rates.mjs";
 import { homeworkSubmitted } from "./email-templates.mjs";
-import { HOME_ZONE, formatInZone, zoneName } from "./time.mjs";
+import { homeZone, formatInZone, zoneName } from "./time.mjs";
 import { tutorOf } from "./tutor.mjs";
 import { initialMarks, markingInstructions, validateAutomaticMarks } from "./homework-marking.mjs";
 import { isStudentLike } from "./student-like.mjs";
@@ -424,7 +424,7 @@ export async function notifyHomeworkSubmissions(env, { to, send, link, bookingId
         // The homework sweep owns retries after checking the submission.
         bookingId: null, dedupeKey: `teacher:homework-submitted:${submission.id}`,
         replyTo: lesson?.student_email || undefined,
-        ...homeworkSubmitted({ tutor: tutorOf(env), name, title: lesson?.title ?? "", when: when ? `${when}, ${zoneName(HOME_ZONE)}` : "", url: link(lessonId, studentId) }),
+        ...homeworkSubmitted({ tutor: tutorOf(env), name, title: lesson?.title ?? "", when: when ? `${when}, ${zoneName(homeZone())}` : "", url: link(lessonId, studentId) }),
       });
     } catch { result = { ok: false }; }
     if (result?.ok) { sent++; continue; }

@@ -61,7 +61,7 @@ import {
   verifyPassword
 } from "./auth.mjs";
 import {
-  HOME_ZONE,
+  homeZone,
   addDaysToKey,
   dateKey,
   differingZonedTime,
@@ -72,7 +72,7 @@ import {
   zoneName,
   zonedToUtc
 } from "./time.mjs";
-import { DEFAULT_TUTOR, tutorOf } from "./tutor.mjs";
+import { asTutor, currentTutor, tutorOf } from "./tutor.mjs";
 import { envForTutor, everyTutor, tutorForRequest } from "./directory.mjs";
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
@@ -120,7 +120,7 @@ function fail(message, status, request, env) {
   return json({ error: message }, status, request, env);
 }
 
-export function bookingPaymentProblem({ paymentRequired, stripeIsReady, paymentConsent, tutor = DEFAULT_TUTOR }) {
+export function bookingPaymentProblem({ paymentRequired, stripeIsReady, paymentConsent, tutor = currentTutor() }) {
   if (paymentRequired && !stripeIsReady) {
     return {
       status: 503,
@@ -247,7 +247,7 @@ function lessonDescription(row, lessonType, manageUrl) {
   ];
   if (!isNoEmailYet(row.student_email)) lines.push(`Email: ${row.student_email}`);
   if (row.student_phone) lines.push(`Phone: ${row.student_phone}`);
-  if (row.student_timezone && row.student_timezone !== HOME_ZONE) lines.push(`Their timezone: ${row.student_timezone}`);
+  if (row.student_timezone && row.student_timezone !== homeZone()) lines.push(`Their timezone: ${row.student_timezone}`);
   if (row.notes) lines.push(`Notes: ${row.notes}`);
   if (meetingUrl(row)) lines.push(`Join Google Meet: ${meetingUrl(row)}`);
   lines.push(`Reference: ${row.reference}`);
@@ -255,7 +255,7 @@ function lessonDescription(row, lessonType, manageUrl) {
   return lines.join("\n");
 }
 
-function locationLabel(row, tutor = DEFAULT_TUTOR) {
+function locationLabel(row, tutor = currentTutor()) {
   return row.location === tutor.place.inPersonKey ? `In person, ${tutor.place.city}` : "Online";
 }
 
@@ -265,7 +265,7 @@ function shownEmail(address) {
 }
 
 /** An email row's place, in the site's words; the calendar file keeps `locationLabel`. */
-function placeLabel(row, tutor = DEFAULT_TUTOR) {
+function placeLabel(row, tutor = currentTutor()) {
   return row.location === tutor.place.inPersonKey ? `In ${tutor.place.city}` : "Online";
 }
 
@@ -274,8 +274,8 @@ function placeLabel(row, tutor = DEFAULT_TUTOR) {
  * an online lesson, Porto's for one in Porto, where it happens.
  */
 function lessonZone(row) {
-  if (row.location === "porto") return HOME_ZONE;
-  return isValidTimeZone(row.student_timezone) ? row.student_timezone : HOME_ZONE;
+  if (row.location === "porto") return homeZone();
+  return isValidTimeZone(row.student_timezone) ? row.student_timezone : homeZone();
 }
 
 /** "Wednesday 14 October 2026 at 09:00, Los Angeles time": one time, its clock named. */
@@ -365,8 +365,8 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   // Clocks in words, the site's own vocabulary: "(WEST)" was accurate but
   // jargon. The student reads the lesson on its own clock, as the site shows
   // it, one time named once; Inês reads Porto's, with the student's beneath.
-  const portoTime = `${formatInZone(start, HOME_ZONE)}, ${zoneName(HOME_ZONE)}`;
-  const studentZone = isValidTimeZone(row.student_timezone) ? row.student_timezone : HOME_ZONE;
+  const portoTime = `${formatInZone(start, homeZone())}, ${zoneName(homeZone())}`;
+  const studentZone = isValidTimeZone(row.student_timezone) ? row.student_timezone : homeZone();
   // Null unless the student's clock genuinely reads differently from Porto's.
   const studentTime = differingZonedTime(start, studentZone);
   const studentClock = lessonZone(row);
@@ -430,7 +430,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
 
   // Subjects carry the date, not the reference: "PT-LS29CT" tells the reader
   // nothing in an inbox list, and the date is what they are scanning for.
-  const shortWhen = formatShort(start, HOME_ZONE);
+  const shortWhen = formatShort(start, homeZone());
   const studentShortWhen = formatShort(start, studentClock);
   const lessonTypeChanged = Boolean(previousLessonType && previousLessonType.id !== lessonType.id);
   const refundNote = wasRefunded
@@ -475,13 +475,13 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       ? lessonMovedTeacher({ tutor: tutorOf(env),
           ...teacherFacts, lengthChanged: lessonTypeChanged, fromMinutes: previousLessonType?.duration_minutes,
           minutes: lessonType.duration_minutes, late: Boolean(row.same_day_change),
-          previousWhen: previousStartsAt ? formatInZone(new Date(previousStartsAt), HOME_ZONE) : "",
+          previousWhen: previousStartsAt ? formatInZone(new Date(previousStartsAt), homeZone()) : "",
           lateNote: row.same_day_change
             ? `This was changed less than ${notice} before the lesson, so the ${fee} fee ${automaticSameDayFee ? "is charged automatically to the student's saved card" : "is due"}.`
             : ""
         })
       : lessonCancelledTeacher({ tutor: tutorOf(env),
-          ...teacherFacts, late: Boolean(row.same_day_change), message: cancellationMessage, longWhen: formatInZone(start, HOME_ZONE),
+          ...teacherFacts, late: Boolean(row.same_day_change), message: cancellationMessage, longWhen: formatInZone(start, homeZone()),
           note: wasRefunded
             ? `${formatEuros(row.amount_cents ?? lessonType.price_cents)} was refunded automatically — nothing to sort out.`
             : row.same_day_change ? `This was cancelled less than ${notice} before the lesson, so the ${fee} fee applies.` : ""
@@ -729,7 +729,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   // Skipped values also travel through older card-setup metadata, so show
   // dates here rather than interpreting that placeholder as a real time.
   const skippedDate = new Intl.DateTimeFormat("en-GB", {
-    timeZone: HOME_ZONE, weekday: "short", day: "numeric", month: "short"
+    timeZone: homeZone(), weekday: "short", day: "numeric", month: "short"
   });
   const skippedNote = skipped.length
     ? `${
@@ -755,7 +755,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
       meetingUrl: meetingUrl(row), online: row.location === "online", place: placeLabel(row),
       price: !forTeacher && mixedPrices ? priceValue({ tutor: tutorOf(env), terms: rowTerms(row), amount: formatEuros(row.amount_cents ?? lessonType.price_cents) }) : null
     })),
-    lastShort: formatShort(new Date(rows[rows.length - 1].starts_at), HOME_ZONE),
+    lastShort: formatShort(new Date(rows[rows.length - 1].starts_at), homeZone()),
     kept: keptLessons(kept, zone)
   });
 
@@ -821,8 +821,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     const teacherFacts = {
       ...common, byTeacher, held, noEmailYet: isNoEmailYet(first.student_email), welcome,
       student: { name: first.student_name, email: shownEmail(first.student_email), phone: first.student_phone, nif: await studentNif(env, first.student_id), notes: first.notes },
-      when: `${formatInZone(new Date(first.starts_at), HOME_ZONE)}, ${zoneName(HOME_ZONE)}`, shortWhen: formatShort(new Date(first.starts_at), HOME_ZONE),
-      run: runOn(HOME_ZONE, true), extended: reason === "extended"
+      when: `${formatInZone(new Date(first.starts_at), homeZone())}, ${zoneName(homeZone())}`, shortWhen: formatShort(new Date(first.starts_at), homeZone()),
+      run: runOn(homeZone(), true), extended: reason === "extended"
     };
     const { subject, content } = moved ? lessonMovedTeacher(teacherFacts) : lessonBookedTeacher(teacherFacts);
     sends.push(
@@ -997,7 +997,7 @@ async function notifySeriesCancelled(env, { rows, kept = [], lessonType, setting
     const teacherCopy = lessonCancelledTeacher({ tutor: tutorOf(env),
       byTeacher, held, message: cancellationMessage,
       student: { name: first.student_name, email: shownEmail(first.student_email), nif: await studentNif(env, first.student_id) },
-      run: { count, dates: datesOn(HOME_ZONE), kept: keptLessons(kept, HOME_ZONE) }
+      run: { count, dates: datesOn(homeZone()), kept: keptLessons(kept, homeZone()) }
     });
     sends.push(
       deliver(env, {
@@ -1403,7 +1403,7 @@ function dormantSql(alias) {
  * beneath "Olá" and their first name. The default is hers to change and is
  * kept in settings; these are its words until she does.
  */
-export function dormantEmail(tutor = DEFAULT_TUTOR) {
+export function dormantEmail(tutor = currentTutor()) {
   return {
     subject: `It’s been a while! Book your next lesson with ${tutor.shortName}`,
     message: "It’s been a while since your last lesson, and I’d love to see you again.\n\n" +
@@ -1467,7 +1467,7 @@ async function sendDormantInvite(env, { student, settings, words, owner }) {
     to: student.email,
     subject,
     kind: "student_dormant_invite",
-    dedupeKey: `dormant:${student.id}:${student.session_version ?? 0}:${dateKey(new Date(), HOME_ZONE)}:${sameSend}`,
+    dedupeKey: `dormant:${student.id}:${student.session_version ?? 0}:${dateKey(new Date(), homeZone())}:${sameSend}`,
     replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined,
     content, authorization: owner
   });
@@ -2017,160 +2017,166 @@ async function getBookingByToken(env, token) {
   return env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(bookingId).first();
 }
 
+/** Answer one request, as the tutor it belongs to, from their own env. */
+async function answer(request, env, ctx) {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders(request, env) });
+  }
+
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+
+  try {
+    if (!env.DB) return fail("The booking database is not bound to this Worker.", 500, request, env);
+    // Expressions is Inês's own add-on (9 November 2026, Dan): for any other tutor it does not exist.
+    if (!tutorOf(env).features?.expressions && EXPRESSIONS_PATH.test(path)) return fail("Not found.", 404, request, env);
+    if (!env.BOOKING_TOKEN_SECRET) return fail("The booking service is not fully configured.", 500, request, env);
+
+    if (request.method === "POST" && path !== "/stripe/webhook") {
+      const origin = request.headers.get("Origin");
+      const allowed = String(env.ALLOWED_ORIGIN ?? "").split(",").map((value) => value.trim());
+      if (origin && !allowed.includes(origin)) return fail("This origin is not allowed.", 403, request, env);
+      if (request.headers.get("Sec-Fetch-Site") === "cross-site" && !origin) return fail("Origin required.", 403, request, env);
+      if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
+        return fail("Send a JSON request.", 415, request, env);
+      }
+      const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
+        : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path) ? 1048576
+        : /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path) ? 262144
+        : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
+      if (Number(request.headers.get("Content-Length") || 0) > bodyLimit) return fail("Request too large.", 413, request, env);
+      // Cloudflare supplies this trusted edge header. It cannot be replaced
+      // with an arbitrary body/email key to bypass unauthenticated limits.
+      const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
+      if (path.startsWith("/auth/") && !await takeRateLimit(env, `auth:${ip}`, 40)) {
+        return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
+      }
+    }
+
+    /*
+     * `await`, not a bare return. The catch below exists to turn any handler
+     * failure into a tidy JSON 500, and it never fired: returning a promise
+     * from inside a try block does not route its rejection there, because the
+     * function has already returned by the time it rejects.
+     */
+    if (request.method === "GET" && path === "/health") return await handleHealth(request, env);
+    if (request.method === "GET" && path === "/google-calendar/callback") {
+      const result = await finishCalendarConnection(env, url);
+      return new Response(null, { status: 303, headers: {
+        Location: siteUrl(env, `/schedule/?meet=${result}`), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"
+      } });
+    }
+    if (request.method === "GET" && path === "/lesson-types") {
+      // The page adapts without a rebuild when saved-card charging is enabled.
+      const settings = await loadSettings(env);
+      return json(
+        {
+          lessonTypes: await listLessonTypes(env),
+          paymentMode: settings.paymentMode,
+          postpay: settings.paymentMode === "postpay" && stripeReady(env),
+          paymentReady: settings.paymentMode !== "postpay" || stripeReady(env)
+        },
+        200,
+        request,
+        env
+      );
+    }
+    if (request.method === "GET" && path === "/availability") return await handleAvailability(request, env, url);
+    const shownTranslations = path.match(/^\/expressions\/([^/]+)\/translations$/);
+    if (shownTranslations && request.method === "GET") return await handleShownTranslations(request, env, shownTranslations[1]);
+
+    if (request.method === "POST" && path === "/stripe/webhook") return await handleStripeWebhook(request, env, ctx);
+
+    if (request.method === "POST" && path === "/auth/register") return await handleRegister(request, env);
+    if (request.method === "POST" && path === "/auth/login") return await handleLogin(request, env);
+    if (request.method === "POST" && path === "/auth/google") return await handleGoogleSignIn(request, env);
+    if (request.method === "POST" && path === "/auth/forgot") return await handleForgot(request, env, ctx);
+    if (request.method === "POST" && path === "/auth/reset") return await handleReset(request, env);
+    if (request.method === "POST" && path === "/auth/email-link") return await handleEmailLink(request, env, ctx);
+    if (request.method === "POST" && path === "/auth/email-link/confirm") return await handleEmailLinkConfirm(request, env);
+    if (request.method === "POST" && path === "/auth/logout") {
+      const student = await currentStudent(request, env);
+      if (!student) return json({ ok: true }, 200, request, env);
+      const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+      await env.DB.prepare("INSERT OR IGNORE INTO revoked_sessions (token_hash, expires_at) VALUES (?, ?)")
+        .bind(await sessionHash(bearer), Number(bearer.split(".")[1])).run();
+      return json({ ok: true }, 200, request, env);
+    }
+    if (request.method === "GET" && path === "/me") return await handleMe(request, env);
+    if ((request.method === "GET" && path === "/me/expressions") ||
+        (request.method === "POST" && path === "/me/expressions/pick")) {
+      return await handleStudentExpressions(request, env);
+    }
+    const newTranslation = path.match(/^\/me\/expressions\/([^/]+)\/translations$/);
+    if (newTranslation && request.method === "POST") return await handleNewTranslation(request, env, newTranslation[1]);
+    if (path === "/me/recurring-rates" && ["GET", "POST"].includes(request.method)) {
+      return await handleRecurringRates(request, env);
+    }
+    if (request.method === "POST" && path === "/me") return await handleUpdateMe(request, env);
+    if (request.method === "POST" && path === "/me/email") return await handleRequestEmailChange(request, env, ctx);
+    if (request.method === "POST" && path === "/me/email/confirm") return await handleConfirmEmailChange(request, env);
+    if (request.method === "POST" && path === "/me/card/preview") return await handleCardBookingPreview(request, env);
+    if (request.method === "POST" && path === "/me/card") return await handleStudentCard(request, env);
+    if (request.method === "POST" && path === "/me/card/remove") return await handleRemoveStudentCard(request, env);
+    if (path === "/me/homework" || /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path)) {
+      const student = await currentStudent(request, env);
+      if (!student) return fail("Please sign in.", 401, request, env);
+      const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+      const tokenHash = await sessionHash(bearer);
+      const reply = await homeworkReply(request, env, async () => studentHomework(env, student, request.method, path.split("/")[3] ?? null,
+        request.method === "POST" ? await readJson(request, 262144) : {}, path.split("/")[4] ?? "", tokenHash));
+      const current = await currentStudent(request, env);
+      if (!current || current.id !== student.id || current.session_version !== student.session_version) return fail("Please sign in again.", 401, request, env);
+      // Marking has finished by the time a submission replies; tell Inês.
+      if (reply.ok && request.method === "POST" && path.endsWith("/submit")) ctx.waitUntil(homeworkNotices(env, path.split("/")[3]));
+      return reply;
+    }
+
+    // Preview before commit: a student is told which weeks are free, and
+    // which are not, before anything is booked in their name.
+    if (request.method === "POST" && path === "/bookings/series/preview") {
+      return await handleSeriesPreview(request, env);
+    }
+
+    if (request.method === "POST" && path === "/bookings") return await handleCreate(request, env, ctx);
+
+    const stopSeries = path.match(/^\/series\/([^/]+)\/stop$/);
+    if (stopSeries && request.method === "POST") return await handleStopSeries(request, env, ctx, stopSeries[1]);
+
+    const rescheduleSeries = path.match(/^\/series\/([^/]+)\/reschedule$/);
+    if (rescheduleSeries && request.method === "POST") {
+      return await handleRescheduleSeries(request, env, ctx, rescheduleSeries[1]);
+    }
+
+    const manage = path.match(/^\/bookings\/([^/]+)$/);
+    if (manage && request.method === "GET") return await handleGetBooking(request, env, manage[1]);
+
+    const reschedule = path.match(/^\/bookings\/([^/]+)\/reschedule$/);
+    if (reschedule && request.method === "POST") return await handleReschedule(request, env, ctx, reschedule[1]);
+
+    const cancel = path.match(/^\/bookings\/([^/]+)\/cancel$/);
+    if (cancel && request.method === "POST") return await handleCancel(request, env, ctx, cancel[1]);
+
+    const payment = path.match(/^\/bookings\/([^/]+)\/payment$/);
+    if (payment && request.method === "POST") return await handlePaymentRecovery(request, env, payment[1]);
+
+    if (path.startsWith("/admin/")) return await handleAdmin(request, env, ctx, url, path);
+
+    return fail("Not found.", 404, request, env);
+  } catch (error) {
+    if (error?.status === 413) return fail("Request too large.", 413, request, env);
+    console.error("booking-worker", error?.stack ?? String(error));
+    return fail("Something went wrong handling that request.", 500, request, env);
+  }
+}
+
 const worker = {
   async fetch(request, env, ctx) {
     // The tutor this request belongs to, and their own database and secrets.
-    // Inês's requests keep the deploy's env exactly as it was.
-    env = await envForTutor(env, tutorForRequest(request));
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders(request, env) });
-    }
-
-    const url = new URL(request.url);
-    const path = url.pathname.replace(/\/+$/, "") || "/";
-
-    try {
-      if (!env.DB) return fail("The booking database is not bound to this Worker.", 500, request, env);
-      // Expressions is Inês's own add-on (9 November 2026, Dan): for any other tutor it does not exist.
-      if (!tutorOf(env).features?.expressions && EXPRESSIONS_PATH.test(path)) return fail("Not found.", 404, request, env);
-      if (!env.BOOKING_TOKEN_SECRET) return fail("The booking service is not fully configured.", 500, request, env);
-
-      if (request.method === "POST" && path !== "/stripe/webhook") {
-        const origin = request.headers.get("Origin");
-        const allowed = String(env.ALLOWED_ORIGIN ?? "").split(",").map((value) => value.trim());
-        if (origin && !allowed.includes(origin)) return fail("This origin is not allowed.", 403, request, env);
-        if (request.headers.get("Sec-Fetch-Site") === "cross-site" && !origin) return fail("Origin required.", 403, request, env);
-        if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
-          return fail("Send a JSON request.", 415, request, env);
-        }
-        const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
-          : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path) ? 1048576
-          : /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path) ? 262144
-          : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
-        if (Number(request.headers.get("Content-Length") || 0) > bodyLimit) return fail("Request too large.", 413, request, env);
-        // Cloudflare supplies this trusted edge header. It cannot be replaced
-        // with an arbitrary body/email key to bypass unauthenticated limits.
-        const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
-        if (path.startsWith("/auth/") && !await takeRateLimit(env, `auth:${ip}`, 40)) {
-          return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
-        }
-      }
-
-      /*
-       * `await`, not a bare return. The catch below exists to turn any handler
-       * failure into a tidy JSON 500, and it never fired: returning a promise
-       * from inside a try block does not route its rejection there, because the
-       * function has already returned by the time it rejects.
-       */
-      if (request.method === "GET" && path === "/health") return await handleHealth(request, env);
-      if (request.method === "GET" && path === "/google-calendar/callback") {
-        const result = await finishCalendarConnection(env, url);
-        return new Response(null, { status: 303, headers: {
-          Location: siteUrl(env, `/schedule/?meet=${result}`), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"
-        } });
-      }
-      if (request.method === "GET" && path === "/lesson-types") {
-        // The page adapts without a rebuild when saved-card charging is enabled.
-        const settings = await loadSettings(env);
-        return json(
-          {
-            lessonTypes: await listLessonTypes(env),
-            paymentMode: settings.paymentMode,
-            postpay: settings.paymentMode === "postpay" && stripeReady(env),
-            paymentReady: settings.paymentMode !== "postpay" || stripeReady(env)
-          },
-          200,
-          request,
-          env
-        );
-      }
-      if (request.method === "GET" && path === "/availability") return await handleAvailability(request, env, url);
-      const shownTranslations = path.match(/^\/expressions\/([^/]+)\/translations$/);
-      if (shownTranslations && request.method === "GET") return await handleShownTranslations(request, env, shownTranslations[1]);
-
-      if (request.method === "POST" && path === "/stripe/webhook") return await handleStripeWebhook(request, env, ctx);
-
-      if (request.method === "POST" && path === "/auth/register") return await handleRegister(request, env);
-      if (request.method === "POST" && path === "/auth/login") return await handleLogin(request, env);
-      if (request.method === "POST" && path === "/auth/google") return await handleGoogleSignIn(request, env);
-      if (request.method === "POST" && path === "/auth/forgot") return await handleForgot(request, env, ctx);
-      if (request.method === "POST" && path === "/auth/reset") return await handleReset(request, env);
-      if (request.method === "POST" && path === "/auth/email-link") return await handleEmailLink(request, env, ctx);
-      if (request.method === "POST" && path === "/auth/email-link/confirm") return await handleEmailLinkConfirm(request, env);
-      if (request.method === "POST" && path === "/auth/logout") {
-        const student = await currentStudent(request, env);
-        if (!student) return json({ ok: true }, 200, request, env);
-        const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-        await env.DB.prepare("INSERT OR IGNORE INTO revoked_sessions (token_hash, expires_at) VALUES (?, ?)")
-          .bind(await sessionHash(bearer), Number(bearer.split(".")[1])).run();
-        return json({ ok: true }, 200, request, env);
-      }
-      if (request.method === "GET" && path === "/me") return await handleMe(request, env);
-      if ((request.method === "GET" && path === "/me/expressions") ||
-          (request.method === "POST" && path === "/me/expressions/pick")) {
-        return await handleStudentExpressions(request, env);
-      }
-      const newTranslation = path.match(/^\/me\/expressions\/([^/]+)\/translations$/);
-      if (newTranslation && request.method === "POST") return await handleNewTranslation(request, env, newTranslation[1]);
-      if (path === "/me/recurring-rates" && ["GET", "POST"].includes(request.method)) {
-        return await handleRecurringRates(request, env);
-      }
-      if (request.method === "POST" && path === "/me") return await handleUpdateMe(request, env);
-      if (request.method === "POST" && path === "/me/email") return await handleRequestEmailChange(request, env, ctx);
-      if (request.method === "POST" && path === "/me/email/confirm") return await handleConfirmEmailChange(request, env);
-      if (request.method === "POST" && path === "/me/card/preview") return await handleCardBookingPreview(request, env);
-      if (request.method === "POST" && path === "/me/card") return await handleStudentCard(request, env);
-      if (request.method === "POST" && path === "/me/card/remove") return await handleRemoveStudentCard(request, env);
-      if (path === "/me/homework" || /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path)) {
-        const student = await currentStudent(request, env);
-        if (!student) return fail("Please sign in.", 401, request, env);
-        const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-        const tokenHash = await sessionHash(bearer);
-        const reply = await homeworkReply(request, env, async () => studentHomework(env, student, request.method, path.split("/")[3] ?? null,
-          request.method === "POST" ? await readJson(request, 262144) : {}, path.split("/")[4] ?? "", tokenHash));
-        const current = await currentStudent(request, env);
-        if (!current || current.id !== student.id || current.session_version !== student.session_version) return fail("Please sign in again.", 401, request, env);
-        // Marking has finished by the time a submission replies; tell Inês.
-        if (reply.ok && request.method === "POST" && path.endsWith("/submit")) ctx.waitUntil(homeworkNotices(env, path.split("/")[3]));
-        return reply;
-      }
-
-      // Preview before commit: a student is told which weeks are free, and
-      // which are not, before anything is booked in their name.
-      if (request.method === "POST" && path === "/bookings/series/preview") {
-        return await handleSeriesPreview(request, env);
-      }
-
-      if (request.method === "POST" && path === "/bookings") return await handleCreate(request, env, ctx);
-
-      const stopSeries = path.match(/^\/series\/([^/]+)\/stop$/);
-      if (stopSeries && request.method === "POST") return await handleStopSeries(request, env, ctx, stopSeries[1]);
-
-      const rescheduleSeries = path.match(/^\/series\/([^/]+)\/reschedule$/);
-      if (rescheduleSeries && request.method === "POST") {
-        return await handleRescheduleSeries(request, env, ctx, rescheduleSeries[1]);
-      }
-
-      const manage = path.match(/^\/bookings\/([^/]+)$/);
-      if (manage && request.method === "GET") return await handleGetBooking(request, env, manage[1]);
-
-      const reschedule = path.match(/^\/bookings\/([^/]+)\/reschedule$/);
-      if (reschedule && request.method === "POST") return await handleReschedule(request, env, ctx, reschedule[1]);
-
-      const cancel = path.match(/^\/bookings\/([^/]+)\/cancel$/);
-      if (cancel && request.method === "POST") return await handleCancel(request, env, ctx, cancel[1]);
-
-      const payment = path.match(/^\/bookings\/([^/]+)\/payment$/);
-      if (payment && request.method === "POST") return await handlePaymentRecovery(request, env, payment[1]);
-
-      if (path.startsWith("/admin/")) return await handleAdmin(request, env, ctx, url, path);
-
-      return fail("Not found.", 404, request, env);
-    } catch (error) {
-      if (error?.status === 413) return fail("Request too large.", 413, request, env);
-      console.error("booking-worker", error?.stack ?? String(error));
-      return fail("Something went wrong handling that request.", 500, request, env);
-    }
+    // Inês's requests keep the deploy's env exactly as it was. Everything the
+    // request does, including work it leaves running, runs as that tutor's.
+    const own = await envForTutor(env, tutorForRequest(request));
+    return asTutor(own.TUTOR, () => answer(request, own, ctx));
   },
 
   /**
@@ -2183,7 +2189,7 @@ const worker = {
    */
   async scheduled(event, env, ctx) {
     // Each tutor's sweeps run on their own database, one after another's start.
-    for (const own of await everyTutor(env)) sweep(event, own, ctx);
+    for (const own of await everyTutor(env)) asTutor(own.TUTOR, () => sweep(event, own, ctx));
   }
 };
 
@@ -2493,8 +2499,8 @@ async function notifyPaid(env, { row, lessonType, settings, teacherEmail, amount
   }
   if (teacherOwed) {
     const received = paymentReceivedTeacher({ tutor: tutorOf(env),
-      studentName: row.student_name, item, amount, lessonName: lessonName(lessonType), longWhen: formatInZone(start, HOME_ZONE),
-      shortWhen: formatShort(start, HOME_ZONE), reference: row.reference, nif, noticeHours: settings.minimumNoticeHours
+      studentName: row.student_name, item, amount, lessonName: lessonName(lessonType), longWhen: formatInZone(start, homeZone()),
+      shortWhen: formatShort(start, homeZone()), reference: row.reference, nif, noticeHours: settings.minimumNoticeHours
     });
     sends.push(deliver(env, {
       to: teacherEmail, subject: received.subject, ...teacher, bookingId: row.id, replyTo: row.student_email, content: received.content
@@ -2931,7 +2937,7 @@ async function handleAvailability(request, env, url, teacher = false) {
   if (!lessonType) return fail("That lesson type is not available.", 400, request, env);
 
   const now = new Date();
-  const fromKey = url.searchParams.get("from") || dateKey(now, HOME_ZONE);
+  const fromKey = url.searchParams.get("from") || dateKey(now, homeZone());
   // Generous, because computeAvailability clamps to the booking horizon anyway.
   // A hard-coded default narrower than the horizon silently truncates the
   // answer for any caller that does not pass an explicit range.
@@ -2965,7 +2971,7 @@ async function handleAvailability(request, env, url, teacher = false) {
   return json(
     {
       slotsByDate: slotsByDate ?? {},
-      timeZone: HOME_ZONE,
+      timeZone: homeZone(),
       minimumNoticeHours: teacher ? 0 : settings.minimumNoticeHours,
       sameDayFeeCents: settings.sameDayChangeFeeCents,
       horizonDays: settings.bookingHorizonDays,
@@ -3389,7 +3395,7 @@ async function handleCreateSelection(request, env, ctx, {
   const skipped = [];
   for (const startAt of starts) {
     const check = await isSlotBookable(env, { startAt, lessonType, now });
-    if (!check.ok) return fail(`${formatInZone(new Date(startAt), HOME_ZONE)}: ${check.reason} Nothing has been booked.`, 409, request, env);
+    if (!check.ok) return fail(`${formatInZone(new Date(startAt), homeZone())}: ${check.reason} Nothing has been booked.`, 409, request, env);
     const slot = slotOf(startAt);
     const count = wantsRepeat ? repeatWeeks ?? OPEN_ENDED_HORIZON_WEEKS : 1;
     const plan = wantsRepeat
@@ -3930,7 +3936,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     });
     if (!check.ok) {
       return fail(
-        `${formatShort(occurrence.startAt, HOME_ZONE)} is not free for the new weekly time. Choose another day or time.`,
+        `${formatShort(occurrence.startAt, homeZone())} is not free for the new weekly time. Choose another day or time.`,
         409,
         request,
         env
@@ -3941,7 +3947,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     const clash = kept.find((late) => Date.parse(late.starts_at) < check.endAt.getTime() + gapMs && Date.parse(late.ends_at) + gapMs > occurrence.startAt.getTime());
     if (clash) {
       return fail(
-        `${formatShort(occurrence.startAt, HOME_ZONE)} overlaps your lesson on ${formatShort(new Date(clash.starts_at), HOME_ZONE)}, which stays where it is. Choose another day or time.`,
+        `${formatShort(occurrence.startAt, homeZone())} overlaps your lesson on ${formatShort(new Date(clash.starts_at), homeZone())}, which stays where it is. Choose another day or time.`,
         409,
         request,
         env
@@ -4987,7 +4993,7 @@ async function handleRegister(request, env) {
   const name = cleanText(body.name, 120);
   const phone = cleanText(body.phone, 40);
   const nif = normaliseNif(body.nif);
-  const timezone = isValidTimeZone(body.timezone) ? body.timezone : HOME_ZONE;
+  const timezone = isValidTimeZone(body.timezone) ? body.timezone : homeZone();
 
   if (name.length < 2) return fail("Please give your name.", 400, request, env);
   if (!isEmail(email)) return fail("Please give a valid email address.", 400, request, env);
@@ -5137,7 +5143,7 @@ async function handleGoogleSignIn(request, env) {
        VALUES (?, ?, ?, '', ?, '', ?, ?, ?, ?) ON CONFLICT(email) DO NOTHING`
     )
       .bind(id, profile.email, profile.name || profile.email.split("@")[0],
-        isValidTimeZone(body.timezone) ? body.timezone : HOME_ZONE, profile.sub, now, now, now)
+        isValidTimeZone(body.timezone) ? body.timezone : homeZone(), profile.sub, now, now, now)
       .run();
     // Another callback or password registration may have won since the read.
     // Resolve its row through the same verified first-link rules below.
@@ -5687,7 +5693,7 @@ function studentPrices(value) {
   for (const minutes of [60, 90]) {
     if (!(String(minutes) in value)) continue;
     const cents = teacherRate(value[minutes]);
-    if (cents === undefined) return { problem: "Each price needs to be €0 (free) or between €1 and €100." };
+    if (cents === undefined) return { problem: `Each price needs to be ${formatEuros(0)} (free) or between ${formatEuros(100)} and ${formatEuros(10000)}.` };
     prices[minutes] = cents;
   }
   return { prices };
@@ -6273,7 +6279,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       // Weekly blocks (lunch) too: the calendar has to show every time students
       // cannot book, not only the one-off dates.
       env.DB.prepare("SELECT * FROM availability_exceptions WHERE date >= ? OR weekday IS NOT NULL ORDER BY date")
-        .bind(dateKey(new Date(), HOME_ZONE))
+        .bind(dateKey(new Date(), homeZone()))
         .all()
     ]);
     return json({ rules: rules.results ?? [], exceptions: exceptions.results ?? [], settings: await loadSettings(env) }, 200, request, env);
@@ -6341,7 +6347,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
   if (request.method === "POST" && path === "/admin/exceptions/day") {
     const body = adminBody;
     if (!parseDateKey(body.date)) return fail("Invalid date.", 400, request, env);
-    if (body.date < dateKey(new Date(), HOME_ZONE)) return fail("That date has already passed.", 400, request, env);
+    if (body.date < dateKey(new Date(), homeZone())) return fail("That date has already passed.", 400, request, env);
     const dayOff = typeof body.dayOff === "boolean" ? body.dayOff : undefined;
     const blocks = "blocks" in body ? normaliseBlockedSpans(body.blocks) : undefined;
     if (blocks === null) return fail("Those times could not be saved. Please reload and try again.", 400, request, env);
@@ -6435,7 +6441,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       `INSERT INTO students (id, email, name, phone, nif, mark, timezone, password_hash, created_at, awaiting_welcome)
        SELECT ?, ?, ?, ?, ?, ?, ?, '', ?, 1 WHERE (${authorization.sql}) ON CONFLICT(email) DO NOTHING`
     )
-      .bind(id, email || `${NO_EMAIL_YET}${id}`, name, details.phone, details.nif, details.mark, HOME_ZONE, new Date().toISOString(), ...authorization.values)
+      .bind(id, email || `${NO_EMAIL_YET}${id}`, name, details.phone, details.nif, details.mark, homeZone(), new Date().toISOString(), ...authorization.values)
       .run();
     let studentId = id;
     if (!(added?.meta?.changes > 0)) {
@@ -7237,7 +7243,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
         // Positive EUR card charges must meet Stripe's €0.50 minimum. Zero
         // deliberately disables the fee and never reaches the payment API.
         if (key === "same_day_change_fee_cents" && value > 0 && value < 50) {
-          return fail("The change fee must be €0 or at least €0.50.", 400, request, env);
+          return fail(`The change fee must be ${formatEuros(0)} or at least ${formatEuros(50)}.`, 400, request, env);
         }
       }
       if ((key === "teacher_email" || key === "reply_to_email") && String(value) !== "" && !isEmail(normaliseEmail(value))) {

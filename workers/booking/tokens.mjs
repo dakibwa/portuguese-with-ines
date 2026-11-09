@@ -8,7 +8,7 @@
  * even before the signature check.
  */
 
-import { DEFAULT_TUTOR } from "./tutor.mjs";
+import { currentTutor } from "./tutor.mjs";
 
 const encoder = new TextEncoder();
 const keyCache = new Map();
@@ -84,7 +84,7 @@ export function safeEqual(a, b) {
  * from the tutor record.
  * Ambiguous glyphs (0/O, 1/I) are excluded so it survives being read aloud.
  */
-export function bookingReference(prefix = DEFAULT_TUTOR.bookings.referencePrefix) {
+export function bookingReference(prefix = currentTutor().bookings.referencePrefix) {
   const alphabet = "ACDEFGHJKLMNPQRSTUVWXYZ2345679";
   const random = crypto.getRandomValues(new Uint8Array(6));
   let reference = "";

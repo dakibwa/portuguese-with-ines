@@ -11,7 +11,7 @@
  */
 
 import { isNoEmailYet, realEmail } from "./no-email.mjs";
-import { DEFAULT_TUTOR, tutorOf } from "./tutor.mjs";
+import { currentTutor, tutorOf } from "./tutor.mjs";
 
 const BRAND = {
   blue: "#203e82",
@@ -38,9 +38,9 @@ const bannerUrl = (tutor) => `https://${tutor.site.domain}/email/banner.png`;
  * `npm run build:email-icons`. Decorative, so blocked images leave nothing
  * behind but the facts themselves.
  */
-const EMAIL_ASSETS = `https://${DEFAULT_TUTOR.site.domain}/email`;
-const DABS = ["dab-blue", "dab-lavender", "dab-coral", "dab-ink"].map(name => `${EMAIL_ASSETS}/${name}.png`);
-const MEET_MARK = `${EMAIL_ASSETS}/google-meet.png`;
+/** The email's images, served from the running tutor's own site like their banner. */
+const emailAsset = (name) => `https://${currentTutor().site.domain}/email/${name}.png`;
+const DABS = ["dab-blue", "dab-lavender", "dab-coral", "dab-ink"];
 const SANS = "Montserrat,Arial,Helvetica,sans-serif";
 /** One small label above a fact or a message, as the site labels its fields. */
 const LABEL = `font:700 11px/1.4 ${SANS};letter-spacing:.1em;text-transform:uppercase;color:${BRAND.lavenderInk}`;
@@ -62,7 +62,7 @@ export function splitWhen(value) {
 }
 
 function meetMark(size = 18) {
-  return `<img src="${MEET_MARK}" width="${size}" height="${Math.round(size * 0.8)}" alt="" style="display:inline-block;border:0;vertical-align:-3px;margin-right:7px">`;
+  return `<img src="${emailAsset("google-meet")}" width="${size}" height="${Math.round(size * 0.8)}" alt="" style="display:inline-block;border:0;vertical-align:-3px;margin-right:7px">`;
 }
 
 function escapeHtml(value) {
@@ -177,7 +177,7 @@ ${darkRules.split("\n").filter((rule) => !rule.startsWith(".pwi-dab")).map((rule
 }
 </style>`;
 
-const dab = (index) => `<img class="pwi-dab" src="${DABS[index % DABS.length]}" width="14" height="14" alt="" style="display:block;border:0">`;
+const dab = (index) => `<img class="pwi-dab" src="${emailAsset(DABS[index % DABS.length])}" width="14" height="14" alt="" style="display:block;border:0">`;
 
 /**
  * Short facts, one per row beside a dab and without a label, as the confirm
@@ -424,7 +424,7 @@ function plainText({ heading, intro, hero, heroNote, rows = [], callout, message
   return lines.join("\n");
 }
 
-export function renderEmail(content, tutor = DEFAULT_TUTOR) {
+export function renderEmail(content, tutor = currentTutor()) {
   return { html: layout(content, tutor), text: plainText(content, tutor) };
 }
 
