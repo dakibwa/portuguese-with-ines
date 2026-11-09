@@ -190,8 +190,9 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
         now={now}
         busy={busy}
         selectedId={selectedBooking ? selected!.id : null}
-        details={selectedBooking ? <LessonDetails
+        details={selectedBooking ? heading => <LessonDetails
           key={selectedBooking.id}
+          inlineHeading={heading}
           booking={selectedBooking}
           weekly={selectedBooking.series_id ? (bookings ?? []).filter(lesson => lesson.series_id === selectedBooking.series_id) : undefined}
           student={student}
