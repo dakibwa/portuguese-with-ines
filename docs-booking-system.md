@@ -58,6 +58,9 @@ Inês on /schedule                     (her own account, role=teacher)
   → GET/POST /admin/dormant-email                    the default each come-back email starts from
   → POST /admin/students/:id/dormant-email           send one dormant student theirs, at most once a day
   → POST /admin/bookings/:id/reschedule | /cancel
+  → POST /admin/bookings/:id/cancel { following }    this lesson and every later week of its run; the run stops
+  → POST /admin/bookings/:id/length                  60 or 90 minutes, for this lesson or (`following`) every
+                                                     later week of its run, at the student's own price
 Stripe → POST /stripe/webhook                        signature-verified
 ```
 
@@ -1185,6 +1188,31 @@ while validation runs. Inês's explicit calendar additions retain their override
   response lists its start under `kept`. Each booking keeps its
   calendar UID, increments its sequence, and the student receives one combined
   updated calendar email. Inês's copy follows the existing development pause.
+- **Inês can change the length of, or cancel, a weekly lesson and every later
+  week of its run in one go** (9 November 2026, Dan: "change recurring ones
+  from 60 to 90 and they all change and she can cancel them all too"). Both
+  start from the lesson she opened, which must still be to come; lessons
+  before it, and every lesson already had, are never touched.
+  `POST /admin/bookings/:id/length` takes `lessonType` (`single` or `long`),
+  the displayed `expectedPriceCents` (the student's own price for that length,
+  a 90 derived as 1.5× their 60) and `following`. A lesson paid by card or by
+  hand, with a payment due or going through, a free one going to a priced
+  length, or one the longer lesson would run into another lesson, keeps its
+  length and comes back under `kept` with a short reason; her own lessons keep
+  no gap, as when she adds one. The rest change in one JSON-backed write that
+  checks each row's sequence, length, payment state and price snapshot, that
+  the run has gained or lost no lesson since the read, and that nothing
+  overlaps: all of them or none. Each keeps its calendar UID with a higher
+  sequence and its time, takes the new end and price, and with `following` the
+  run's recipe takes the new length so later top-ups use it. One email tells
+  the student (`Inês has changed your lessons to 90 minutes`), or the single
+  lesson's own when only one changed.
+  `POST /admin/bookings/:id/cancel` with `following: true` ends the run first,
+  so the nightly top-up cannot add a week, then cancels each confirmed lesson
+  from this one on exactly as her single cancellation does: a card payment is
+  refunded, money owed is waived, nothing is charged, and her optional message
+  travels in one email listing them. A lesson whose payment is part way
+  through stays and is listed under `kept`.
 - **A run saves a card once and charges each lesson after it.** Stripe Checkout
   runs in setup mode, so no money is taken while the run is booked. The whole
   run is held until its webhook proves a reusable card exists, then every

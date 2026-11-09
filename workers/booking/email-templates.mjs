@@ -341,12 +341,16 @@ export function lessonReminder({ first, lessonName, lesson, place, reference, wh
 export function studentMoved({ first, byInes, lengthChanged = false, minutes, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
   price, lateNote = "", policy, notice, fee, manageUrl, lessonsUrl, welcome = null, run = null }) {
   if (run) {
+    // Inês changed how long they are (9 November 2026, Dan), at the same times.
+    const longer = byInes && lengthChanged;
     return {
-      subject: `Your weekly Portuguese lessons have moved — from ${shortWhen}`,
+      subject: longer ? `Inês has changed your lessons to ${minutes} minutes — from ${shortWhen}` : `Your weekly Portuguese lessons have moved — from ${shortWhen}`,
       content: {
-        heading: "Your weekly lessons have moved",
+        heading: longer ? `Your lessons are now ${minutes} minutes` : "Your weekly lessons have moved",
         preheader: `${lessonName} · ${run.repeats.value}`,
-        intro: `${hello(first)} your upcoming weekly lessons now use this new time.${keptNote(run.kept, "move")} The updated dates are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`,
+        intro: longer
+          ? `${hello(first)} Inês has changed the lessons below to ${minutes} minutes, at the same times. The updated lessons are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`
+          : `${hello(first)} your upcoming weekly lessons now use this new time.${keptNote(run.kept, "move")} The updated dates are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`,
         callout: run.skippedNote,
         hero: when,
         rows: [...runRows({ lesson, place, price, repeats: run.repeats, occurrences: run.occurrences }), ...keptRows(run.kept)],
@@ -356,15 +360,18 @@ export function studentMoved({ first, byInes, lengthChanged = false, minutes, le
     };
   }
   // Written for someone who did not ask for this when Inês moved it.
-  const intro = byInes
+  const intro = byInes && lengthChanged
+    ? `${hello(first)} Inês has changed your lesson to ${minutes} minutes, at the same time. An updated calendar invitation is attached.`
+    : byInes
     ? `${hello(first)} Inês has moved your lesson to the time below. An updated calendar invitation is attached. If the new time doesn't suit, choose another time or reply to this email.`
     : lengthChanged
       ? `${hello(first)} your lesson is now ${minutes} minutes at the time below. An updated calendar invitation is attached.`
       : `${hello(first)} your new lesson time is below. An updated calendar invitation is attached.`;
   return {
-    subject: byInes ? `Inês has moved your lesson — now ${shortWhen}` : lengthChanged ? `Your lesson has changed — ${shortWhen}` : `Your lesson has moved — ${shortWhen}`,
+    subject: byInes && lengthChanged ? `Inês has changed your lesson to ${minutes} minutes — ${shortWhen}`
+      : byInes ? `Inês has moved your lesson — now ${shortWhen}` : lengthChanged ? `Your lesson has changed — ${shortWhen}` : `Your lesson has moved — ${shortWhen}`,
     content: {
-      heading: lengthChanged && !byInes ? "Your lesson has changed" : "Your lesson has moved",
+      heading: lengthChanged ? "Your lesson has changed" : "Your lesson has moved",
       preheader: `${lessonName} · ${when}`,
       intro,
       callout: byInes ? "" : lateNote,
@@ -382,12 +389,15 @@ export function lessonMovedTeacher({ student, byInes, held = false, lengthChange
   lateNote = "", notice, lesson, lessonName, place, meetingUrl, reference, when, heroNote = "", shortWhen, run = null }) {
   const name = student.name;
   if (run) {
+    const longer = byInes && lengthChanged;
     return {
-      subject: `Weekly slot moved — ${name}, from ${shortWhen}`,
+      subject: longer ? `You changed ${name}'s lessons to ${minutes} minutes — from ${shortWhen}` : `Weekly slot moved — ${name}, from ${shortWhen}`,
       content: {
-        heading: "Weekly lessons moved",
+        heading: longer ? "You changed these lessons" : "Weekly lessons moved",
         preheader: `${name} · ${run.repeats.value}`,
-        intro: `${name}'s upcoming weekly lessons have moved.${keptNote(run.kept, "move")} The updated events will appear in your calendar.`,
+        intro: longer
+          ? `You changed ${name}'s lessons below to ${minutes} minutes. ${held ? "They haven't been emailed yet" : "They have been told"}, and your calendar has been updated.`
+          : `${name}'s upcoming weekly lessons have moved.${keptNote(run.kept, "move")} The updated events will appear in your calendar.`,
         callout: run.skippedNote,
         hero: when,
         rows: [...runRows({ lesson, place, repeats: run.repeats, occurrences: run.occurrences, forTeacher: true }), ...keptRows(run.kept), ...studentRows(student)],
@@ -397,14 +407,16 @@ export function lessonMovedTeacher({ student, byInes, held = false, lengthChange
   }
   const from = previousWhen ? ` from ${previousWhen}` : "";
   return {
-    subject: byInes
+    subject: byInes && lengthChanged
+      ? `You changed ${name}'s lesson to ${minutes} minutes — ${shortWhen}`
+      : byInes
       ? `You moved ${name}'s lesson — ${shortWhen}`
       : lengthChanged ? `Lesson changed — ${name}, ${shortWhen}` : `${late ? "Late change" : "Lesson moved"} — ${name}, ${shortWhen}`,
     content: {
-      heading: byInes ? "You moved this lesson" : lengthChanged ? "Lesson changed" : late ? `Moved less than ${notice} before` : "Lesson moved",
+      heading: byInes && lengthChanged ? "You changed this lesson" : byInes ? "You moved this lesson" : lengthChanged ? "Lesson changed" : late ? `Moved less than ${notice} before` : "Lesson moved",
       preheader: `${name} · ${lessonName} · ${when}`,
       intro: byInes
-        ? `You moved ${name}'s lesson${from}. ${held ? "They haven't been emailed yet" : "They have been told"}, and your calendar has been updated.`
+        ? `You ${lengthChanged ? `changed ${name}'s lesson from ${fromMinutes} to ${minutes} minutes` : `moved ${name}'s lesson${from}`}. ${held ? "They haven't been emailed yet" : "They have been told"}, and your calendar has been updated.`
         : lengthChanged
           ? `${name} changed their lesson from ${fromMinutes} to ${minutes} minutes${previousWhen ? ` and moved it${from}` : ""}. Your calendar has been updated.`
           : `${name} moved their lesson${from}. Your calendar has been updated.`,
@@ -423,13 +435,16 @@ export function lessonMovedTeacher({ student, byInes, held = false, lengthChange
 export function studentCancelled({ first, byInes, message = "", note = "", lesson, lessonName, place, reference, when, shortWhen, run = null }) {
   if (run) {
     return {
-      subject: `Your weekly lessons are cancelled — ${run.count}`,
+      subject: byInes ? `Inês has cancelled your weekly lessons — ${run.count}` : `Your weekly lessons are cancelled — ${run.count}`,
       content: {
         heading: "Your weekly lessons are cancelled",
         preheader: `${run.count} removed from your calendar.`,
-        intro: `${hello(first)} the rest of your weekly run has been cancelled and removed from your calendar.${keptNote(run.kept, "cancel")}`,
+        intro: byInes
+          ? `${hello(first)} Inês has cancelled the lessons below${message ? " and left you a message" : ""}. A cancellation update for your calendar is attached.${message ? "" : " Reply to this email to arrange another time."}`
+          : `${hello(first)} the rest of your weekly run has been cancelled and removed from your calendar.${keptNote(run.kept, "cancel")}`,
+        message: byInes && message ? { label: "Message from Inês", body: message } : null,
         rows: [{ label: `Cancelled, ${run.zone}`, value: run.dates, dates: true }, ...keptRows(run.kept, run.zone)],
-        footer: "You’re welcome back any time — booking is always open on the website."
+        footer: byInes ? "A cancellation Inês makes never costs you anything." : "You’re welcome back any time — booking is always open on the website."
       }
     };
   }
@@ -459,11 +474,14 @@ export function lessonCancelledTeacher({ student, byInes, held = false, late = f
   const name = student.name;
   if (run) {
     return {
-      subject: `Weekly run cancelled — ${name}, ${run.count}`,
+      subject: byInes ? `You cancelled ${name}'s weekly lessons — ${run.count}` : `Weekly run cancelled — ${name}, ${run.count}`,
       content: {
-        heading: "Weekly lessons cancelled",
+        heading: byInes ? "You cancelled these lessons" : "Weekly lessons cancelled",
         preheader: `${name} · ${run.count}`,
-        intro: `${name} cancelled the rest of their weekly lessons. They are off your calendar.${keptNote(run.kept, "cancel")}`,
+        intro: byInes
+          ? `You cancelled ${name}'s lessons below. ${held ? "They hadn't been emailed about them" : "They have been told"}, and they are off your calendar.`
+          : `${name} cancelled the rest of their weekly lessons. They are off your calendar.${keptNote(run.kept, "cancel")}`,
+        message: byInes && message ? { label: "Your message to the student", body: message } : null,
         rows: [...studentRows(student, { withPhone: false }), { label: "Cancelled", value: run.dates, dates: true }, ...keptRows(run.kept)],
         footer: SIGN_OFF
       }
