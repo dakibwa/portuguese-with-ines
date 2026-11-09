@@ -1,7 +1,7 @@
 "use client";
 
 import { IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { X, ArrowLeft, Check, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
   addedByTeacher,
@@ -55,6 +55,8 @@ type Props = {
   presentation?: "dialog" | "inline";
   /** Inline, whether a change is being saved, so the page around it waits. */
   onBusy?: (busy: boolean) => void;
+  /** Inline, the lesson's own date, status and level summary, shown first in the header so the date and controls flow together. */
+  inlineHeading?: ReactNode;
 };
 
 /** "Tue 8 Dec", as her timetable names a day. */
@@ -131,6 +133,7 @@ export function LessonDetails({
   initialAction = "view",
   presentation = "dialog",
   onBusy,
+  inlineHeading,
 }: Props) {
   const inline = presentation === "inline";
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -225,14 +228,22 @@ export function LessonDetails({
       // that opened them (or, once something changed and the lessons
       // reloaded, to their stable container) when they close. If focus has
       // already gone elsewhere on the page, such as to another lesson that was
-      // pressed to replace these, it stays there.
+      // pressed to replace these, it stays there. The opener is hidden while
+      // these are open, so focus returns once React has shown it again.
       const panel = panelRef.current;
       panel?.focus();
       return () => {
-        const active = document.activeElement;
-        if (active && active !== document.body && !panel?.contains(active)) return;
-        const target = changed.current || !previous?.isConnected ? afterChangeFocusRef.current : previous;
-        target?.focus({ preventScroll: true });
+        queueMicrotask(() => {
+          const active = document.activeElement;
+          if (active && active !== document.body && !panel?.contains(active)) return;
+          const container = afterChangeFocusRef.current;
+          // Hiding the original opener can blur it before this effect mounts.
+          // Find that same lesson after React reveals its compact row again.
+          const opener = changed.current ? null : Array.from(container?.querySelectorAll<HTMLElement>("[data-lesson-id]") ?? [])
+            .find(element => element.dataset.lessonId === booking.id);
+          const target = changed.current ? container : opener ?? (previous?.isConnected && previous !== document.body ? previous : container);
+          target?.focus({ preventScroll: true });
+        });
       };
     }
     const releaseScroll = lockPageScroll();
@@ -245,7 +256,7 @@ export function LessonDetails({
       // keyboard position at the stable week heading throughout that reload.
       restoreDialogFocus(changed.current ? afterChangeFocusRef.current : previous);
     };
-  }, [afterChangeFocusRef, inline]);
+  }, [afterChangeFocusRef, booking.id, inline]);
 
   // Inline, the dashboard waits while a change is being saved, and is released
   // if these details leave mid-way (a saved change closes them at once).
@@ -359,14 +370,7 @@ export function LessonDetails({
   // status, who, then when in bold with its length and place beneath, and the
   // actions side by side. Inline, the lesson's own row above already says who,
   // when and any exceptional status, so only its close and call link remain.
-  const head = inline ? (
-    <>
-      <div className="teacher-lesson-inline__head">
-        {closeButton}
-      </div>
-      {action === "view" ? <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} /> : null}
-    </>
-  ) : (
+  const dialogHead = (
     <>
       {closeButton}
       <div className="teacher-dialog-top">
@@ -458,6 +462,67 @@ export function LessonDetails({
     booking.payment_status === "not_required" && !noShow && !locked && !booking.charge_started_at && Boolean(booking.amount_cents && booking.amount_cents > 0) ? (
     <CardApprovalLink booking={booking} token={token} busy={busy} onBusy={setBusy} onError={setError} quiet={inline} />
   ) : null;
+  // The default actions, rendered once: in the inline header beside the date,
+  // and in the timetable modal's toolbar where they have always been.
+  const homeworkTrigger = booking.student_id ? <button className={`${routine("button button--lilac")} teacher-lesson-homework`} type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null;
+  const defaultActions = (
+    <>
+      <button
+        className={routine("button button--coral")}
+        type="button"
+        disabled={busy || locked}
+        onClick={() => setAction("move")}
+      >
+        {inline ? "Move or cancel" : "Move lesson"}
+      </button>
+      {toCome && booking.lesson_type_id !== "trial" ? (
+        <button
+          className={routine("button button--outline")}
+          type="button"
+          disabled={busy || locked}
+          onClick={() => {
+            // Weekly, she most likely means every week from here.
+            setFollowing(repeats);
+            setAction("length");
+          }}
+        >
+          Change length
+        </button>
+      ) : null}
+      {inline ? null : (
+        <button
+          className="button button--outline"
+          type="button"
+          disabled={busy || locked}
+          onClick={() => {
+            setFollowing(false);
+            setAction("cancel");
+          }}
+        >
+          Cancel lesson
+        </button>
+      )}
+    </>
+  );
+  // Inline, one flowing header: the lesson's date, Homework and Close, then
+  // the other controls, all sharing one gap and wrapping naturally.
+  const inlineHead = (
+    <>
+      <div className="teacher-lesson-inline__head">
+        {inlineHeading}
+        {action === "view" && booking.status !== "cancelled" ? homeworkTrigger : null}
+        {closeButton}
+        {action === "view" && booking.status !== "cancelled" ? (
+          <div className="teacher-dialog-actions">
+            {defaultActions}
+            {recordBlock}
+            {approvalBlock}
+          </div>
+        ) : null}
+      </div>
+      {action === "view" ? <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} /> : null}
+    </>
+  );
   const main = (
     <>
       {/* The lesson, not the student (13 October 2026, Dan: "this page is
@@ -471,6 +536,8 @@ export function LessonDetails({
             <li>{formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: minutes })}</li>
             {money ? <li>{money}</li> : null}
             {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
+            {inline && booking.same_day_fee_status === "scheduled" ? <li>Change fee scheduled</li>
+              : inline && booking.same_day_fee_status === "processing" ? <li>Change fee processing</li> : null}
             {awaiting ? <li>{noEmail ? "No email yet: add it from their details on Students, then send their welcome" : "Not emailed yet: send their welcome from Students"}</li> : null}
           </ul>
           {inline ? null : recordBlock}
@@ -502,45 +569,9 @@ export function LessonDetails({
         {canRecordRefund ? <button className={routine("button button--coral")} type="button" onClick={() => setAction("refund")}>Record refund</button> : null}
         <button className={routine("button button--outline")} type="button" onClick={onClose}>Done</button>
       </div> : action === "view" ? (
-        <div className="teacher-dialog-actions">
-          {booking.student_id ? <button className={`${routine("button button--lilac")} teacher-lesson-homework`} type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null}
-          <button
-            className={routine("button button--coral")}
-            type="button"
-            disabled={busy || locked}
-            onClick={() => setAction("move")}
-          >
-            {inline ? "Move or cancel" : "Move lesson"}
-          </button>
-          {toCome && booking.lesson_type_id !== "trial" ? (
-            <button
-              className={routine("button button--outline")}
-              type="button"
-              disabled={busy || locked}
-              onClick={() => {
-                // Weekly, she most likely means every week from here.
-                setFollowing(repeats);
-                setAction("length");
-              }}
-            >
-              Change length
-            </button>
-          ) : null}
-          {inline ? null : (
-            <button
-              className="button button--outline"
-              type="button"
-              disabled={busy || locked}
-              onClick={() => {
-                setFollowing(false);
-                setAction("cancel");
-              }}
-            >
-              Cancel lesson
-            </button>
-          )}
-          {inline ? recordBlock : null}
-          {inline ? approvalBlock : null}
+        inline ? null : <div className="teacher-dialog-actions">
+          {homeworkTrigger}
+          {defaultActions}
         </div>
       ) : action === "homework" ? <div className="teacher-dialog-homework">
         {backToLesson}
@@ -774,7 +805,7 @@ export function LessonDetails({
         ref={panelRef}
         tabIndex={-1}
       >
-        {head}
+        {inlineHead}
         {main}
       </section>
     );
@@ -790,7 +821,7 @@ export function LessonDetails({
         if (!busy) onClose();
       }}
     >
-      {head}
+      {dialogHead}
       {main}
     </dialog>
   );

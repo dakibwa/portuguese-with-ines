@@ -616,13 +616,13 @@ usual lesson starts and days off; avoid a wall of administration forms.
     words in that line, not pills. Every secondary action here (`Show weeks`,
     `Homework`, `Move or cancel`, `Change length`, `Create
     payment link`, `Close`) is one small soft lilac button, dark blue words in
-    sentence case, with the same size, hover and focus. Close stays at the end
-    of the header. In an open lesson the
-    date and the actions (`Already paid` / `No-show` and `Create payment link`
-    included) share the top line where they fit and wrap beneath where they do
-    not, with the facts below; on a phone `Homework` takes the idle gap in the
-    header between the date and Close when it fits, leaving the rest two
-    compact rows. `Move or cancel` is one entry inline: it opens
+    sentence case, with the same size, hover and focus. In an open lesson the
+    date and the controls (`Homework`, `Close`, `Move or cancel`, `Change
+    length`, `Already paid` / `No-show` and `Create payment link`) flow together
+    as one group with one shared gap, wrapping naturally where they do not fit
+    and never pinned or spread apart, with the facts below. On narrow cards
+    the controls expand to fill each row while keeping the same gap.
+    `Move or cancel` is one entry inline: it opens
     the move form, with `Move lesson` / `Cancel lesson` choices, and a cancel
     still needs its explicit confirmation; coral stays for a save,
     a confirmed cancel and the one next step on a closed student's card. A level shows only where it

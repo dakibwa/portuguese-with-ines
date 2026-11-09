@@ -11,7 +11,7 @@ type Props = {
   busy: boolean;
   onBusy: (busy: boolean) => void;
   onError: (message: string) => void;
-  /** Inline on Students: its routine actions take the one quiet text style. */
+  /** Inline on Students: its routine actions take the one small soft lilac button. */
   quiet?: boolean;
 } & (
   /** From a lesson she opened, which starts ticked. */

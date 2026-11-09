@@ -135,7 +135,7 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
   token: string;
   /** The lesson whose details are open in place, and those details. */
   selectedId: string | null;
-  details: ReactNode;
+  details: ((heading: ReactNode) => ReactNode) | null;
   /** Null until they have been read. */
   bookings: AdminBooking[] | null;
   /** Her notes and their homework per lesson had; null while they load or if they couldn't. */
@@ -227,6 +227,24 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
       title={opened ? "Close" : written ? "Notes" : "Add notes"} onClick={() => opened ? onCloseNotes() : onOpenNotes(booking.id)}>
       {opened ? <X size={14} aria-hidden="true" /> : <Pencil size={13} strokeWidth={2.4} aria-hidden="true" />}
     </button> : null;
+    // The day, status and level summary. Open in place, the row's own copy is
+    // hidden (it stays here so the opener is still connected and returns after
+    // Close) and the same summary leads the details' header.
+    const summary = (hiddenCopy: boolean) => (
+      <div className="teacher-lesson-row__what" hidden={hiddenCopy}>
+        {/* "Tue 5 Jan" reads the same with a year or without. The time
+            shares its line on a wide row and has its own, without the
+            dot, on a narrow one, so "· 18:00" never starts a line. */}
+        <button className="teacher-lesson-row__when" data-lesson-id={booking.id} aria-controls={selected ? detailsId : undefined} aria-expanded={selected} data-homework-exit disabled={busy} onClick={() => selected ? onCloseLesson() : onOpenLesson(booking)} type="button">
+          <strong>{label}</strong>
+          {" "}<span className="teacher-history-lesson__time"><i aria-hidden="true">· </i><span className="visually-hidden">, </span>{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
+          <span className="visually-hidden">, open lesson</span>
+        </button>
+        {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
+        {note?.level && note.level !== level ? <span className="teacher-notes__level">{note.level}</span> : null}
+      </div>
+    );
+    const openDetails = selected && details ? details(summary(false)) : null;
     // One line of what she does and one of facts: the day and time, then at
     // its end the homework chip, notes pencil and the compact Already paid
     // tick, which wrap together beneath on a narrow tile. The day and time
@@ -234,18 +252,7 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     return (
       <li className={`teacher-history-lesson teacher-lesson-row${cancelled || noShow ? " is-cancelled" : ""}${opened ? " is-open" : ""}${selected ? " is-selected" : ""}`} key={booking.id}>
         <div className="teacher-lesson-row__line">
-          <div className="teacher-lesson-row__what">
-            {/* "Tue 5 Jan" reads the same with a year or without. The time
-                shares its line on a wide row and has its own, without the
-                dot, on a narrow one, so "· 18:00" never starts a line. */}
-            <button className="teacher-lesson-row__when" aria-controls={selected ? detailsId : undefined} aria-expanded={selected} data-homework-exit disabled={busy} onClick={() => selected ? onCloseLesson() : onOpenLesson(booking)} type="button">
-              <strong>{label}</strong>
-              {" "}<span className="teacher-history-lesson__time"><i aria-hidden="true">· </i><span className="visually-hidden">, </span>{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
-              <span className="visually-hidden">, open lesson</span>
-            </button>
-            {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
-            {note?.level && note.level !== level ? <span className="teacher-notes__level">{note.level}</span> : null}
-          </div>
+          {summary(selected && Boolean(openDetails))}
           {notesButton || settle || refund ? <div className="teacher-lesson-row__side">
             {note && state ? <span className={`teacher-notes__state is-${note.homework}`}>{state}</span> : null}
             {notesButton}
@@ -253,13 +260,14 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
               : refund ? <button className="teacher-quiet" data-homework-exit disabled={busy} onClick={() => onRecordRefund(booking)} type="button">Record refund</button> : null}
           </div> : null}
         </div>
-        {facts}
+        {openDetails ? <div className="teacher-lesson-row__details" id={detailsId}>{openDetails}</div> : null}
+        {/* Open details say these facts themselves. */}
+        {openDetails ? null : facts}
         {paidError?.id === booking.id ? <p className="teacher-inline-error" role="alert">{paidError.message}</p> : null}
         {note?.notes.trim() && !opened ? <p className="teacher-notes__text">{note.notes.trim()}</p> : null}
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
-        {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
+        {booking.notes && !openDetails ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
         {opened ? <TeacherHomework key={`${booking.id}-${token}`} bookingId={booking.id} token={token} onBusy={onBusy} /> : null}
-        {selected && details ? <div className="teacher-lesson-row__details" id={detailsId}>{details}</div> : null}
       </li>
     );
   }

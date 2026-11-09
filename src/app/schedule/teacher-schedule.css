@@ -3597,31 +3597,10 @@
 /* Open in place, a lesson takes the grid's whole width for its details. */
 .teacher-history-lesson.is-selected { grid-column: 1 / -1; border-color: var(--blue); }
 .teacher-lesson-row__details { position: relative; z-index: 1; min-width: 0; margin-top: 0.15rem; }
-/* Close uses the same corner as the closed tile's pencil, leaving the whole
-   width beneath for the lesson actions, including two across on a phone. */
-.teacher-lesson-row.is-selected > .teacher-lesson-row__line { min-height: 32px; padding-right: 5rem; }
-.teacher-lesson-row.is-selected > .teacher-lesson-row__details { position: static; }
-@media (pointer: coarse) { .teacher-lesson-row.is-selected > .teacher-lesson-row__line { min-height: 40px; } }
-/* On a wide tile the date and the toolbar share the top row: the date line is
-   column 1, the details span the tile on the same row with matching columns,
-   and the toolbar sits in column 2 (clear of Close) with the facts beneath. A
-   narrow tile keeps the date and Close, then the toolbar wrapping beneath. */
-.teacher-lesson-row.is-selected { grid-template-columns: max-content minmax(0, 1fr); }
-.teacher-lesson-row.is-selected > * { grid-column: 1 / -1; }
-@container (min-width: 36rem) {
-  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions) > .teacher-lesson-row__line { position: relative; z-index: 2; grid-column: 1; grid-row: 1; align-self: start; padding-right: 0; }
-  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions) > .teacher-lesson-row__details { grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: subgrid; margin-top: 0; }
-  .teacher-lesson-row.is-selected > .teacher-lesson-row__details > .teacher-lesson-dialog.teacher-lesson-dialog--inline:has(> .teacher-dialog-actions) { grid-column: 1 / -1; grid-template-columns: subgrid; padding-top: 0; }
-  .teacher-lesson-row.is-selected > .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions { grid-column: 2; grid-row: 1; padding-right: 4.75rem; }
-}
-/* On a phone-width card the existing Homework button sits in the header's idle
-   middle, between the date and Close, so the other four controls wrap in two
-   compact rows beneath. Narrower than the safe minimum it wraps as before. */
-@container (min-width: 17rem) and (max-width: 35.99rem) {
-  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions > .teacher-lesson-homework) > .teacher-lesson-row__line { padding-right: 11.75rem; }
-  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions > .teacher-lesson-homework) .teacher-dialog-actions > .teacher-lesson-homework { position: absolute; z-index: 2; top: 0.55rem; left: calc(50% + 0.5rem); transform: translateX(-50%); }
-  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions > .teacher-lesson-homework) .teacher-dialog-actions > .teacher-quiet { padding-inline: 0.6rem; }
-}
+/* Open in place, the row's own date summary is hidden (native hidden would lose
+   to its display:flex) and the same summary leads the details' header. */
+.teacher-lesson-row__what[hidden] { display: none; }
+.teacher-lesson-row.is-selected > .teacher-lesson-row__line:not(:has(> :not([hidden]))) { display: none; }
 .teacher-move-cancel { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
 .teacher-move-cancel .teacher-quiet[aria-pressed="true"] { background: var(--lavender); box-shadow: inset 0 0 0 2px var(--blue); }
 /* The lesson dialog's own layout, laid out in the lesson's tile: no box and no
@@ -3630,18 +3609,29 @@
 .teacher-lesson-dialog--inline > * { grid-column: 1 / -1; }
 .teacher-lesson-dialog--inline:focus { outline: 0; }
 .teacher-lesson-dialog--inline:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; border-radius: var(--squiggle-field); }
-.teacher-lesson-dialog--inline > .teacher-lesson-inline__head { position: absolute; top: 0.55rem; right: 0.75rem; display: flex; justify-content: flex-end; }
-.teacher-lesson-dialog--inline > .teacher-dialog-actions { grid-column: 1 / -1; grid-row: 1; gap: 0.35rem; margin: 0; }
-.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-quiet { flex: 0 0 auto; }
+/* One flowing header: the date summary, Homework, Close, then the other
+   controls, all in one wrapping row with one gap and no pinned slots. */
+.teacher-lesson-dialog--inline > .teacher-lesson-inline__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 0.5rem; min-width: 0; }
+.teacher-lesson-inline__head > .teacher-lesson-row__what { flex: 0 1 auto; }
+/* The visible date is never the row's stretched press area. */
+.teacher-lesson-inline__head .teacher-lesson-row__when::after { content: none; }
+.teacher-lesson-inline__head .teacher-lesson-row__when:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: var(--squiggle-chip); }
+/* Plain wrappers let their controls flow as header items. */
+.teacher-lesson-dialog--inline .teacher-lesson-inline__head :is(.teacher-dialog-actions, .teacher-lesson-record, .teacher-no-show) { display: contents; }
+.teacher-lesson-inline__head :is(.teacher-quiet, .paid-tick--plain) { flex: 0 0 auto; justify-content: center; }
+.teacher-lesson-inline__head .teacher-no-show__hint { order: 1; flex: 1 1 100%; margin: 0; }
+@container (max-width: 35.99rem) {
+  .teacher-lesson-inline__head :is(.teacher-quiet, .paid-tick--plain) { padding-inline: 0.6rem; }
+  .teacher-lesson-inline__head .paid-tick--plain { gap: 0.35rem; }
+  .teacher-lesson-inline__head:has(> .teacher-dialog-actions) :is(.teacher-quiet, .paid-tick--plain) { flex: 1 1 auto; }
+}
 .teacher-lesson-dialog--inline .meeting-link { width: auto; justify-self: start; }
 .teacher-lesson-dialog--inline > .teacher-lesson-facts { margin: 0; }
 /* Paid, no-show and Create payment link join the toolbar: the record group
    sizes to its contents, the initial payment trigger is a plain flex item, and
    the expanded payment block takes the full width beneath the buttons. */
-.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-lesson-record { flex: 0 0 auto; align-items: center; gap: 0.35rem; }
 .teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-card-link--trigger { display: contents; }
-.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-card-link--trigger > .teacher-quiet { flex: 0 0 auto; }
-.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-card-link:not(.teacher-card-link--trigger) { flex: 1 1 100%; padding-top: 0; border-top: 0; }
+.teacher-lesson-dialog--inline .teacher-lesson-inline__head .teacher-dialog-actions > .teacher-card-link:not(.teacher-card-link--trigger) { order: 1; flex: 1 1 100%; padding-top: 0; border-top: 0; }
 .teacher-lesson-row__side { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.25rem 0.4rem; }
 .teacher-lesson-row > :is(.teacher-notes__text, .teacher-history-lesson__note, .teacher-inline-error, .teacher-homework) { position: relative; z-index: 1; }
 .teacher-lesson-row > .teacher-inline-error, .teacher-lesson-row > .teacher-history-lesson__note { margin: 0; }
