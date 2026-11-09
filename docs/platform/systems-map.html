@@ -1,0 +1,748 @@
+<title>Tutor Platform Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column for argument, figures allowed to run wider; every system and record keeps one colour role across all figures. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --ink: #172033;
+  --muted: #5b667c;
+  --line: #cbd2de;
+  --edge: #3b4660;
+  --core: #2a4db3;
+  --core-wash: #e6ecfb;
+  --rigid: #c23b22;
+  --rigid-wash: #fbe9e5;
+  --complex: #9a6200;
+  --complex-wash: #faf0dc;
+  --ok: #23784f;
+  --ok-wash: #e3f2ea;
+  --planned: #6b5bb5;
+  --planned-wash: #eeebfa;
+  --on-mark: #ffffff;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141d; --surface: #171e2a; --ink: #e7ebf2; --muted: #9aa5b8; --line: #2f394b; --edge: #aeb8ca;
+    --core: #8ea8ff; --core-wash: #1c2747; --rigid: #ff8b73; --rigid-wash: #3a1f1b; --complex: #f2b44c; --complex-wash: #33270f;
+    --ok: #6fd3a0; --ok-wash: #15301f; --planned: #b4a6f5; --planned-wash: #251f40; --on-mark: #120c0a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141d; --surface: #171e2a; --ink: #e7ebf2; --muted: #9aa5b8; --line: #2f394b; --edge: #aeb8ca;
+  --core: #8ea8ff; --core-wash: #1c2747; --rigid: #ff8b73; --rigid-wash: #3a1f1b; --complex: #f2b44c; --complex-wash: #33270f;
+  --ok: #6fd3a0; --ok-wash: #15301f; --planned: #b4a6f5; --planned-wash: #251f40; --on-mark: #120c0a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 17px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 72px;
+}
+.page { max-width: 1120px; margin: 0 auto; display: grid; gap: 56px; }
+.prose { max-width: 68ch; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.1rem, 5vw, 3.1rem); line-height: 1.05; font-weight: 700; }
+h2 { font-size: clamp(1.45rem, 3vw, 1.8rem); line-height: 1.15; font-weight: 700; }
+h3 { font-size: 1.08rem; line-height: 1.25; font-weight: 700; }
+p { margin: 0; }
+.eyebrow { font: 600 0.78rem/1.3 var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 1.2rem; line-height: 1.5; color: var(--ink); }
+.stack { display: grid; gap: 14px; }
+.stack-lg { display: grid; gap: 22px; }
+code, .ref { font-family: var(--mono); font-size: 0.8em; }
+.ref { color: var(--muted); font-size: 0.74rem; line-height: 1.4; word-break: break-word; }
+a { color: var(--core); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--core); outline-offset: 2px; }
+
+/* Verdict strip */
+.verdict { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.verdict > div { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.verdict .q { font: 600 0.78rem/1.3 var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.verdict .a { font: 700 1.2rem/1.2 var(--display); }
+.verdict p { font-size: 0.95rem; color: var(--muted); }
+.tone-ok .a { color: var(--ok); }
+.tone-mixed .a { color: var(--complex); }
+.tone-rigid .a { color: var(--rigid); }
+
+/* Figures */
+figure { margin: 0; display: grid; gap: 14px; }
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; height: auto; min-width: 820px; }
+.diagram.narrow svg { min-width: 640px; }
+figcaption { font-size: 0.95rem; color: var(--muted); max-width: 80ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 0.9rem; color: var(--muted); align-items: center; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend svg { flex: none; }
+
+/* SVG roles */
+.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.4; }
+.box-core { fill: var(--core-wash); stroke: var(--core); stroke-width: 1.8; }
+.box-plan { fill: var(--planned-wash); stroke: var(--planned); stroke-width: 1.6; stroke-dasharray: 7 5; }
+.box-tutor { fill: var(--surface); stroke: var(--ink); stroke-width: 1.6; }
+.box-bus { fill: var(--surface); stroke: var(--edge); stroke-width: 1.6; }
+.box-old { fill: var(--rigid-wash); stroke: var(--rigid); stroke-width: 1.4; }
+.box-new { fill: var(--ok-wash); stroke: var(--ok); stroke-width: 1.4; }
+.t-title { fill: var(--ink); font: 700 16px var(--body); }
+.t-big { fill: var(--ink); font: 700 19px var(--display); }
+.t-sub { fill: var(--muted); font: 400 13px var(--body); }
+.t-core { fill: var(--core); font: 600 13px var(--body); }
+.t-edge { fill: var(--muted); font: 600 12px var(--body); }
+.t-row { fill: var(--muted); font: 600 12px var(--body); letter-spacing: 0.1em; text-transform: uppercase; }
+.t-warn { fill: var(--rigid); font: 600 12px var(--body); }
+.t-plan { fill: var(--planned); font: 600 12px var(--body); }
+.t-okay { fill: var(--ok); font: 600 12px var(--body); }
+.edge { stroke: var(--edge); stroke-width: 1.6; fill: none; }
+.edge-plan { stroke: var(--planned); stroke-width: 1.6; fill: none; stroke-dasharray: 6 5; }
+.edge-bad { stroke: var(--rigid); stroke-width: 1.8; fill: none; }
+.edge-good { stroke: var(--ok); stroke-width: 2.2; fill: none; }
+.ah { fill: var(--edge); }
+.ah-plan { fill: var(--planned); }
+.ah-bad { fill: var(--rigid); }
+.ah-good { fill: var(--ok); }
+.mk-r { fill: var(--rigid); }
+.mk-a { fill: var(--complex); }
+.mk-t { fill: var(--on-mark); font: 700 11.5px var(--body); text-anchor: middle; }
+
+/* Lesson life */
+.life { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; position: relative; }
+.life li { position: relative; padding: 34px 14px 0 0; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.life li::before { content: ""; position: absolute; top: 9px; left: 0; right: 0; height: 2px; background: var(--edge); opacity: 0.5; }
+.life li::after { content: ""; position: absolute; top: 3px; left: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 2px solid var(--core); }
+.life li.planned::after { border-color: var(--planned); border-style: dashed; }
+.life li.planned::before { background: var(--planned); }
+.life .when { font: 600 0.78rem/1.3 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--core); }
+.life li.planned .when { color: var(--planned); }
+.life h3 { font-size: 1rem; }
+.life p { font-size: 0.92rem; color: var(--muted); line-height: 1.45; }
+.life .who { font-size: 0.8rem; color: var(--ink); font-weight: 600; }
+
+/* Number marks used in prose */
+.n { display: inline-grid; place-items: center; min-width: 1.45em; height: 1.45em; padding: 0 0.3em; border-radius: 999px; font: 700 0.72rem/1 var(--body); color: var(--on-mark); background: var(--rigid); vertical-align: 0.12em; text-decoration: none; }
+.n.amb { background: var(--complex); }
+.marks { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+
+/* Findings */
+.findings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.finding { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: grid; gap: 10px; align-content: start; min-width: 0; scroll-margin-top: 24px; }
+.finding header { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+.finding header .n { font-size: 0.85rem; min-width: 1.9em; height: 1.9em; margin-top: 1px; }
+.finding .area { font: 600 0.74rem/1.3 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.finding dl { margin: 0; display: grid; gap: 8px; }
+.finding dt { font: 600 0.74rem/1.3 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.finding dd { margin: 0; font-size: 0.97rem; }
+.finding dd.fix { color: var(--ink); }
+.finding .fixlabel { color: var(--ok); }
+.finding:target { border-color: var(--core); box-shadow: 0 0 0 2px var(--core-wash); }
+
+/* Rules table */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 0.95rem; }
+th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 0.74rem/1.3 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
+.chip.ready { background: var(--ok-wash); color: var(--ok); }
+.chip.screen { background: var(--core-wash); color: var(--core); }
+.chip.fixed { background: var(--rigid-wash); color: var(--rigid); }
+.chip.gap { background: var(--complex-wash); color: var(--complex); }
+
+/* Keep list */
+.keep { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.keep li { background: var(--ok-wash); border-radius: 12px; padding: 14px 16px; font-size: 0.97rem; min-width: 0; }
+.keep strong { color: var(--ok); }
+
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.plainlist { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; }
+.plainlist li { padding-left: 2px; }
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: grid; gap: 10px; }
+.build { counter-reset: none; list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.build li { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; display: grid; grid-template-columns: 9.5rem 1fr; gap: 14px; min-width: 0; }
+.build .step { font: 600 0.8rem/1.35 var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--core); }
+.foot { font-size: 0.88rem; color: var(--muted); max-width: 80ch; }
+
+@media (max-width: 900px) {
+  .life { grid-template-columns: minmax(0, 1fr); }
+  .life li { padding: 0 0 22px 34px; }
+  .life li::before { top: 14px; bottom: 0; left: 6px; right: auto; width: 2px; height: auto; }
+  .life li::after { top: 2px; }
+}
+@media (max-width: 760px) {
+  body { font-size: 16px; padding-block: 28px 56px; }
+  .verdict, .findings, .keep, .two { grid-template-columns: minmax(0, 1fr); }
+  .build li { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .page { gap: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<main class="page">
+
+  <header class="stack-lg">
+    <p class="eyebrow">Português com a Inês, becoming a platform for any tutor · read from the code on main, 9 November 2026</p>
+    <h1>How the tutor platform fits together</h1>
+    <p class="lede prose">Every system hangs off two records, the student and the lesson. That core is simple, and it is the right shape for many tutors. What stops a tutor working their own way is eight rules written into the code instead of the tutor's settings, and one hole: students without an email never hear from the site.</p>
+    <div class="verdict" aria-label="Verdict">
+      <div class="tone-ok">
+        <span class="q">Simple?</span>
+        <span class="a">Yes, at the core</span>
+        <p>Two records, one settings table, one money module, one clock. Weekly runs are ordinary lessons, so nothing special-cases them.</p>
+      </div>
+      <div class="tone-mixed">
+        <span class="q">Intuitive?</span>
+        <span class="a">For the tutor, mostly</span>
+        <p>One card and one next button per student. Money states leak into the words she reads <a class="n amb" href="#f10">10</a>. For students it is unproven: 3 of 21 have ever signed in.</p>
+      </div>
+      <div class="tone-rigid">
+        <span class="q">Room to work their way?</span>
+        <span class="a">Not yet</span>
+        <p>Notice, fees, no-shows, trials, places, lesson lengths and homework language are fixed in code. All fixable, mostly small.</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Figure 1: the map -->
+  <section class="stack-lg" aria-labelledby="map-h">
+    <div class="stack prose">
+      <h2 id="map-h">The map</h2>
+      <p>Arrows show what one system does to another today. The numbers mark the spots where a tutor can't do it their own way, or where the system is harder than it needs to be. Each number is explained further down.</p>
+    </div>
+    <figure>
+      <div class="diagram">
+        <svg viewBox="0 0 1120 690" role="img" aria-label="System map. A tutor record at the top feeds rules to Booking, currency and time zone to the Lesson, and the Stripe account to Payments. At the centre are two records: Lesson, and Student, which has many lessons. Booking creates lessons. Payments charge a lesson when it ends. Lesson notes feed Homework, which sets the student's level. Accounts sign the student in, and the tutor's pages manage students and lessons. A planned Curriculum drafts lesson plans and homework: it sends topics to Homework, gets weak spots back, and gives the Student plans and progress. An every-minute clock charges ended lessons and sends reminders and pay links through Messages, which also carries every booking change and the welcome and sign-in emails.">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-plan" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+
+          <!-- Tutor record -->
+          <rect class="box-tutor" x="50" y="16" width="1020" height="60" rx="10"/>
+          <text class="t-title" x="70" y="42">Tutor record</text>
+          <text class="t-sub" x="70" y="63">name · domain · language · time zone · currency · look · rules · Stripe account · email wording</text>
+          <text class="t-edge" x="1050" y="42" text-anchor="end">build step 1, under way</text>
+          <circle class="mk-a" cx="1048" cy="59" r="10"/><text class="mk-t" x="1048" y="63">11</text>
+
+          <!-- reads -->
+          <line class="edge" x1="180" y1="76" x2="180" y2="113" marker-end="url(#ah)"/>
+          <text class="t-edge" x="188" y="100">rules</text>
+          <line class="edge" x1="560" y1="76" x2="560" y2="113" marker-end="url(#ah)"/>
+          <text class="t-edge" x="568" y="100">currency, time zone</text>
+          <line class="edge" x1="940" y1="76" x2="940" y2="113" marker-end="url(#ah)"/>
+          <text class="t-edge" x="948" y="100">Stripe account</text>
+
+          <!-- Left column -->
+          <rect class="box" x="50" y="116" width="260" height="90" rx="10"/>
+          <text class="t-title" x="68" y="148">Booking</text>
+          <text class="t-sub" x="68" y="172">singles · weekly runs · trial</text>
+          <text class="t-sub" x="68" y="192">hours, time off, notice, buffer</text>
+          <circle class="mk-r" cx="266" cy="138" r="10"/><text class="mk-t" x="266" y="142">1</text>
+          <circle class="mk-r" cx="290" cy="138" r="10"/><text class="mk-t" x="290" y="142">6</text>
+
+          <rect class="box" x="50" y="246" width="260" height="90" rx="10"/>
+          <text class="t-title" x="68" y="278">Accounts</text>
+          <text class="t-sub" x="68" y="302">sign-in links · Google sign-in</text>
+          <text class="t-sub" x="68" y="322">WhatsApp invite · saved card</text>
+
+          <rect class="box" x="50" y="376" width="260" height="90" rx="10"/>
+          <text class="t-title" x="68" y="408">Tutor's pages</text>
+          <text class="t-sub" x="68" y="432">schedule · students · dashboard</text>
+          <text class="t-sub" x="68" y="452">where any rule can be overridden</text>
+
+          <!-- Core records -->
+          <rect class="box-core" x="420" y="116" width="280" height="160" rx="12"/>
+          <text class="t-big" x="440" y="150">Lesson</text>
+          <text class="t-sub" x="440" y="176">one row per lesson: single or trial</text>
+          <text class="t-sub" x="440" y="196">a weekly run is a real row each week</text>
+          <text class="t-sub" x="440" y="216">time · place · price · payment state</text>
+          <text class="t-sub" x="440" y="236">attendance · notes · Meet link</text>
+          <circle class="mk-r" cx="680" cy="138" r="10"/><text class="mk-t" x="680" y="142">7</text>
+
+          <line class="edge" x1="560" y1="306" x2="560" y2="279" marker-end="url(#ah)"/>
+          <text class="t-edge" x="570" y="297">has many</text>
+
+          <rect class="box-core" x="420" y="306" width="280" height="160" rx="12"/>
+          <text class="t-big" x="440" y="340">Student</text>
+          <text class="t-sub" x="440" y="366">one account, with or without email</text>
+          <text class="t-sub" x="440" y="386">own price · saved card · plan</text>
+          <text class="t-sub" x="440" y="406">level: none yet, read off homework</text>
+          <text class="t-sub" x="440" y="426">dormant · come-back email</text>
+          <circle class="mk-r" cx="680" cy="328" r="10"/><text class="mk-t" x="680" y="332">9</text>
+          <circle class="mk-r" cx="656" cy="328" r="10"/><text class="mk-t" x="656" y="332">5</text>
+
+          <!-- Right column -->
+          <rect class="box" x="810" y="116" width="260" height="90" rx="10"/>
+          <text class="t-title" x="828" y="148">Payments</text>
+          <text class="t-sub" x="828" y="172">card charged as the lesson ends</text>
+          <text class="t-sub" x="828" y="192">pay links · refunds · receipts</text>
+          <circle class="mk-r" cx="1026" cy="138" r="10"/><text class="mk-t" x="1026" y="142">2</text>
+          <circle class="mk-a" cx="1050" cy="138" r="10"/><text class="mk-t" x="1050" y="142">10</text>
+
+          <rect class="box" x="810" y="246" width="260" height="90" rx="10"/>
+          <text class="t-title" x="828" y="278">Homework</text>
+          <text class="t-sub" x="828" y="302">notes become an AI-drafted sheet</text>
+          <text class="t-sub" x="828" y="322">AI marks it, the tutor returns it</text>
+          <circle class="mk-r" cx="1050" cy="268" r="10"/><text class="mk-t" x="1050" y="272">8</text>
+
+          <rect class="box-plan" x="810" y="376" width="260" height="90" rx="10"/>
+          <text class="t-title" x="828" y="408">Curriculum</text>
+          <text class="t-plan" x="1050" y="408" text-anchor="end">planned</text>
+          <text class="t-sub" x="828" y="432">a plan and homework per lesson</text>
+          <text class="t-sub" x="828" y="452">drafted per language and student</text>
+
+          <rect class="box" x="810" y="506" width="260" height="60" rx="10"/>
+          <text class="t-title" x="828" y="531">Clock, every minute</text>
+          <text class="t-sub" x="828" y="551">charges · reminders · retries · Meet</text>
+
+          <!-- Edges between systems and records -->
+          <line class="edge" x1="310" y1="161" x2="417" y2="161" marker-end="url(#ah)"/>
+          <text class="t-edge" x="364" y="152" text-anchor="middle">creates</text>
+
+          <line class="edge" x1="700" y1="161" x2="807" y2="161" marker-end="url(#ah)"/>
+          <text class="t-edge" x="754" y="152" text-anchor="middle">when it ends</text>
+
+          <line class="edge" x1="700" y1="262" x2="807" y2="262" marker-end="url(#ah)"/>
+          <text class="t-edge" x="754" y="254" text-anchor="middle">notes</text>
+
+          <line class="edge" x1="810" y1="320" x2="703" y2="320" marker-end="url(#ah)"/>
+          <text class="t-edge" x="756" y="312" text-anchor="middle">sets level</text>
+
+          <line class="edge" x1="310" y1="320" x2="417" y2="320" marker-end="url(#ah)"/>
+          <text class="t-edge" x="364" y="312" text-anchor="middle">signs in</text>
+
+          <line class="edge" x1="310" y1="421" x2="417" y2="421" marker-end="url(#ah)"/>
+          <text class="t-edge" x="364" y="412" text-anchor="middle">manages</text>
+
+          <line class="edge-plan" x1="810" y1="421" x2="703" y2="421" marker-end="url(#ahp)"/>
+          <text class="t-plan" x="756" y="412" text-anchor="middle">plans, progress</text>
+
+          <line class="edge-plan" x1="900" y1="376" x2="900" y2="339" marker-end="url(#ahp)"/>
+          <text class="t-plan" x="892" y="362" text-anchor="end">topics</text>
+          <line class="edge-plan" x1="980" y1="336" x2="980" y2="373" marker-end="url(#ahp)"/>
+          <text class="t-plan" x="988" y="362">weak spots</text>
+
+          <!-- Clock to payments, right rail -->
+          <path class="edge" d="M1070,536 H1092 V161 H1073" marker-end="url(#ah)"/>
+          <text class="t-edge" x="1108" y="350" text-anchor="middle" transform="rotate(-90 1108 350)">charges lessons that ended</text>
+
+          <!-- Into Messages -->
+          <line class="edge" x1="560" y1="466" x2="560" y2="603" marker-end="url(#ah)"/>
+          <text class="t-edge" x="570" y="540">every booking, move, cancel</text>
+
+          <line class="edge" x1="940" y1="566" x2="940" y2="603" marker-end="url(#ah)"/>
+          <text class="t-edge" x="948" y="590">reminders, pay links</text>
+
+          <path class="edge" d="M50,291 H28 V641 H47" marker-end="url(#ah)"/>
+          <text class="t-edge" x="16" y="470" text-anchor="middle" transform="rotate(-90 16 470)">welcome, sign-in, come-back</text>
+
+          <!-- Messages bus -->
+          <rect class="box-bus" x="50" y="606" width="1020" height="70" rx="10"/>
+          <text class="t-title" x="70" y="636">Messages</text>
+          <text class="t-sub" x="70" y="658">about 20 kinds of email · WhatsApp links the tutor taps to send · Google Calendar event with a Meet link</text>
+          <text class="t-warn" x="1000" y="663" text-anchor="end">never reaches a student with no email</text>
+          <circle class="mk-r" cx="1050" cy="628" r="10"/><text class="mk-t" x="1050" y="632">4</text>
+          <circle class="mk-r" cx="1026" cy="628" r="10"/><text class="mk-t" x="1026" y="632">3</text>
+        </svg>
+      </div>
+      <div class="legend">
+        <span><svg width="34" height="10" aria-hidden="true"><line x1="0" y1="5" x2="34" y2="5" class="edge"/></svg>happens today</span>
+        <span><svg width="34" height="10" aria-hidden="true"><line x1="0" y1="5" x2="34" y2="5" class="edge-plan"/></svg>planned</span>
+        <span><span class="n">1</span>blocks a tutor's own way</span>
+        <span><span class="n amb">10</span>adds complexity</span>
+      </div>
+      <figcaption>Student and Lesson are the only records the other systems share. Booking, Payments and Homework each write to one of them and never to each other, which is what keeps the system simple. The planned Curriculum is the one deliberate exception: it and Homework form a loop, so what a student got wrong comes back in the next plan. Messages is the one shared outlet that the other systems all send through. Expressions is left out because it stays an add-on on Inês's own site.</figcaption>
+    </figure>
+  </section>
+
+  <!-- Figure 2: one lesson's life -->
+  <section class="stack-lg" aria-labelledby="life-h">
+    <div class="stack prose">
+      <h2 id="life-h">One lesson, start to finish</h2>
+      <p>The same systems in the order a lesson meets them. Each step uses one of the tutor's rules, and that is where the fixed ones bite.</p>
+    </div>
+    <ol class="life">
+      <li>
+        <span class="when">Booked</span>
+        <h3>Booking checks the rules</h3>
+        <p>Hours, time off, buffer, notice and how far ahead. Priced at the student's own rate. Both get an email; the calendar gets an event, with a Meet link when online.</p>
+        <span class="marks"><a class="n" href="#f1">1</a><a class="n" href="#f5">5</a><a class="n" href="#f6">6</a><a class="n" href="#f7">7</a></span>
+      </li>
+      <li class="planned">
+        <span class="when">Ahead, planned</span>
+        <h3>Lesson plan</h3>
+        <p>Drafted from the student's level, goals and what they got wrong last time. The tutor edits and approves it.</p>
+        <span class="marks"><a class="n" href="#f9">9</a></span>
+      </li>
+      <li>
+        <span class="when">24 hours before</span>
+        <h3>Reminder</h3>
+        <p>Sent to land before free changes end, by email only.</p>
+        <span class="marks"><a class="n" href="#f3">3</a><a class="n" href="#f4">4</a></span>
+      </li>
+      <li>
+        <span class="when">14 hours before</span>
+        <h3>Free changes end</h3>
+        <p>From here a move or cancel costs the late fee, charged to the saved card.</p>
+        <span class="marks"><a class="n" href="#f1">1</a></span>
+      </li>
+      <li>
+        <span class="when">Lesson ends</span>
+        <h3>Paid</h3>
+        <p>The clock charges the saved card within a minute, unless the tutor ticked Already paid. A no-show is charged the late fee instead.</p>
+        <span class="marks"><a class="n" href="#f2">2</a><a class="n amb" href="#f10">10</a></span>
+      </li>
+      <li>
+        <span class="when">After</span>
+        <h3>Homework</h3>
+        <p>Drafted from today's notes, plus review of earlier topics. The tutor publishes it, the student answers, AI marks it, the tutor returns it.</p>
+        <span class="marks"><a class="n" href="#f8">8</a></span>
+      </li>
+      <li class="planned">
+        <span class="when">Then, planned</span>
+        <h3>Next plan</h3>
+        <p>Topics covered are ticked off, and anything marked wrong is scheduled to come back. Level and progress move on.</p>
+      </li>
+    </ol>
+    <p class="foot">At any step the tutor can step outside the rules by hand: her own moves skip the student's notice rule, she can add a lesson outside her hours, tick Already paid, or make a lesson free. That escape hatch is a big part of why the system already suits Inês.</p>
+  </section>
+
+  <!-- The fix that matters most -->
+  <section class="stack-lg" aria-labelledby="terms-h">
+    <div class="stack prose">
+      <h2 id="terms-h">The change that opens up most of the rules</h2>
+      <p>A lesson today remembers only the name of the wording its student agreed to. Every move or cancel is judged against the tutor's settings as they are now. So if a tutor raised her notice from 14 to 24 hours, students who booked under 14 would suddenly be charged under 24. To stop that, the settings screen refuses anything above 14 hours or €5. Copying the terms onto each lesson when it is booked removes the reason for the cap.</p>
+    </div>
+    <figure>
+      <div class="diagram narrow">
+        <svg viewBox="0 0 1000 262" role="img" aria-label="Today, the change rule reads the tutor's current settings on every move or cancel, and the lesson only names its wording, so settings are capped at 14 hours and 5 euros. With the fix, settings are copied onto each lesson once at booking, and the change rule reads the lesson's own terms, so a tutor can change settings for new bookings only.">
+          <defs>
+            <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-bad" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-good" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <text class="t-row" x="0" y="26">Today</text>
+          <rect class="box" x="0" y="40" width="250" height="72" rx="10"/>
+          <text class="t-title" x="18" y="70">Tutor's settings now</text>
+          <text class="t-warn" x="18" y="94">capped: 14 h notice, €5 fee</text>
+          <line class="edge-bad" x1="250" y1="76" x2="372" y2="76" marker-end="url(#ahb)"/>
+          <text class="t-warn" x="311" y="66" text-anchor="middle">read on every</text>
+          <text class="t-warn" x="311" y="96" text-anchor="middle">move or cancel</text>
+          <rect class="box" x="375" y="40" width="250" height="72" rx="10"/>
+          <text class="t-title" x="393" y="70">Change rule</text>
+          <text class="t-sub" x="393" y="94">free, fee, or locked?</text>
+          <line class="edge" x1="750" y1="76" x2="628" y2="76" marker-end="url(#ah2)"/>
+          <text class="t-edge" x="689" y="66" text-anchor="middle">gives only</text>
+          <text class="t-edge" x="689" y="96" text-anchor="middle">a wording name</text>
+          <rect class="box" x="750" y="40" width="250" height="72" rx="10"/>
+          <text class="t-title" x="768" y="70">Each lesson</text>
+          <text class="t-sub" x="768" y="94">"fourteen-hours-v1"</text>
+
+          <text class="t-row" x="0" y="164">With the fix</text>
+          <rect class="box" x="0" y="178" width="250" height="72" rx="10"/>
+          <text class="t-title" x="18" y="208">Tutor's settings now</text>
+          <text class="t-okay" x="18" y="232">any: 24 h notice, €10 fee</text>
+          <line class="edge-good" x1="250" y1="214" x2="372" y2="214" marker-end="url(#ahg)"/>
+          <text class="t-okay" x="311" y="204" text-anchor="middle">copied once,</text>
+          <text class="t-okay" x="311" y="234" text-anchor="middle">at booking</text>
+          <rect class="box-new" x="375" y="178" width="250" height="72" rx="10"/>
+          <text class="t-title" x="393" y="208">Each lesson keeps its terms</text>
+          <text class="t-sub" x="393" y="232">14 h · €5 fee · no-show: full price</text>
+          <line class="edge" x1="625" y1="214" x2="747" y2="214" marker-end="url(#ah2)"/>
+          <text class="t-edge" x="686" y="204" text-anchor="middle">read on every</text>
+          <text class="t-edge" x="686" y="234" text-anchor="middle">move or cancel</text>
+          <rect class="box" x="750" y="178" width="250" height="72" rx="10"/>
+          <text class="t-title" x="768" y="208">Change rule</text>
+          <text class="t-sub" x="768" y="232">reads the lesson's own terms</text>
+        </svg>
+      </div>
+      <figcaption>The arrow that moves is the one from the tutor's settings. With the fix it is read once, when a lesson is booked, so a tutor can change her terms whenever she likes and only new bookings follow them. Weekly runs keep their terms the same way. The plan assumes each booking already records its terms; it records which wording, not the numbers.</figcaption>
+    </figure>
+  </section>
+
+  <!-- Findings -->
+  <section class="stack-lg" aria-labelledby="find-h">
+    <div class="stack prose">
+      <h2 id="find-h">Where a tutor can't do it their way yet</h2>
+      <p>Ordered by how much each one would stop a new tutor. The first nine block something a tutor will reasonably want; the last two make the system harder than it needs to be.</p>
+    </div>
+    <div class="findings">
+
+      <article class="finding" id="f1">
+        <header><span class="n">1</span><div><span class="area">Booking</span><h3>Notice and late fee can't go above 14 hours and €5</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>The change rule reads the tutor's current settings for every lesson, so raising them would reach lessons already booked. The settings refuse more than 14 hours or €5 to prevent that.</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">Copy notice, late fee and no-show rule onto each lesson and weekly run at booking, as drawn above. Then open the limits to 0 to 72 hours and up to the lesson price.</dd>
+        </dl>
+        <p class="ref">policy.mjs changePolicy · index.mjs /admin/settings ranges</p>
+      </article>
+
+      <article class="finding" id="f2">
+        <header><span class="n">2</span><div><span class="area">Payments</span><h3>A no-show always costs the late fee</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>A no-show is charged the late-change fee (€5) instead of the lesson. Many tutors charge the full lesson when a student doesn't turn up.</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">Its own setting: full price, a fixed fee, or nothing.</dd>
+        </dl>
+        <p class="ref">index.mjs lessonChargePlan</p>
+      </article>
+
+      <article class="finding" id="f3">
+        <header><span class="n">3</span><div><span class="area">Messages</span><h3>Reminders stop if notice is 24 hours or more</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>The reminder goes out between the notice point and 24 hours before the lesson. Set the notice to 24 hours and that window is empty, so no reminder is ever sent and nothing says so.</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">Time the reminder from the tutor's own notice, for example 10 hours before free changes end, or give it its own setting.</dd>
+        </dl>
+        <p class="ref">index.mjs sendLessonReminders, REMINDER_LEAD_HOURS = 24</p>
+      </article>
+
+      <article class="finding" id="f4">
+        <header><span class="n">4</span><div><span class="area">Messages</span><h3>Students with no email hear nothing from the site</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>Every automatic message is an email, and the sender skips students with no address. That was 11 of Inês's 21 students on 2 November: no confirmation, reminder or pay link. WhatsApp exists only as links she taps herself.</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">Choose the channel per student. Email where there is one; otherwise the message waits in the tutor's Needs you as a ready WhatsApp link. WhatsApp's business API can come later.</dd>
+        </dl>
+        <p class="ref">email.mjs send, skips "no-email-yet"</p>
+      </article>
+
+      <article class="finding" id="f5">
+        <header><span class="n">5</span><div><span class="area">Student</span><h3>A student's own price exists only for 60 and 90 minutes</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>The database allows a student's own price only for 60 or 90 minutes, and 90 is 1.5 times the hour unless set. A tutor teaching 30 or 45 minutes can't give a student their own price.</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">Keep a student's price per lesson type, any length, with "work it out from the hour" as an option.</dd>
+        </dl>
+        <p class="ref">schema.sql student_recurring_rates · rates.mjs withDerived</p>
+      </article>
+
+      <article class="finding" id="f6">
+        <header><span class="n">6</span><div><span class="area">Booking</span><h3>"Trial" is a fixed lesson, not a setting</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>One per student, can't repeat weekly, keeps its own price: all of it hangs on the id <code>trial</code>, checked in 11 places.</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">Three switches on every lesson type: first lesson only, can repeat weekly, student's own price applies. Then a tutor can offer a free 20-minute intro, a paid trial, or neither.</dd>
+        </dl>
+        <p class="ref">index.mjs, rates.mjs lessonPriceSnapshotSql</p>
+      </article>
+
+      <article class="finding" id="f7">
+        <header><span class="n">7</span><div><span class="area">Lesson</span><h3>In person means Porto</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>A lesson's place must be <code>online</code> or <code>porto</code>, by a database rule on lessons and weekly runs.</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">A list of places per tutor (online, a city, the student's home, a café), each lesson pointing at one. The plan has this; it needs a migration, not only a new label.</dd>
+        </dl>
+        <p class="ref">schema.sql bookings.location CHECK</p>
+      </article>
+
+      <article class="finding" id="f8">
+        <header><span class="n">8</span><div><span class="area">Homework</span><h3>Homework is written in European Portuguese only</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>The AI is told to use "Portuguese as spoken and written in Portugal". Levels are fixed at A1 to C2 and length at 10, 15 or 20 minutes.</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">Language and variant from the tutor record (Brazilian Portuguese, Mexican Spanish), levels from the tutor's curriculum, length as a setting.</dd>
+        </dl>
+        <p class="ref">homework.mjs draft instructions</p>
+      </article>
+
+      <article class="finding" id="f9">
+        <header><span class="n">9</span><div><span class="area">Student</span><h3>A student has no level of their own</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>The dashboard shows the level of the latest homework sheet. With no homework there is no level, and the curriculum will need one.</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">Store the level on the student, with the date it changed. Homework starts from it and the curriculum moves it.</dd>
+        </dl>
+        <p class="ref">StudentDashboard.tsx · homework.mjs lastLevel</p>
+      </article>
+
+      <article class="finding" id="f10">
+        <header><span class="n amb">10</span><div><span class="area">Payments · complexity</span><h3>Nine payment states, plus one hidden in another column</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>A lesson's payment can be in nine states, and "paid by hand" is stored in the column meant for consent wording. The late fee has five states of its own. The pages have to turn this into words like "Lessons not on card".</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">Two plain questions per lesson: how is it paid (card, by hand, free, record only) and where is it (to come, due, paid, failed, refunded). Before many tutors arrive, with <code>npm run test:booking</code>, since it is money.</dd>
+        </dl>
+        <p class="ref">policy.mjs PAID_BY_HAND_MARK · bookings.payment_status</p>
+      </article>
+
+      <article class="finding" id="f11">
+        <header><span class="n amb">11</span><div><span class="area">Platform · complexity</span><h3>Three ways in have no web address</h3></div></header>
+        <dl>
+          <dt>Today</dt><dd>Build step 2 picks the tutor from the web address. Three entry points carry none: the every-minute clock, Stripe's webhook and the return from connecting Google Calendar.</dd>
+          <dt class="fixlabel">Fix</dt><dd class="fix">The clock walks a list of tutors (only those with work due), the Stripe event names its connected account, and the Google sign-in state names the tutor.</dd>
+        </dl>
+        <p class="ref">index.mjs scheduled(), /stripe/webhook, /google-calendar/callback</p>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- Rules table -->
+  <section class="stack-lg" aria-labelledby="rules-h">
+    <div class="stack prose">
+      <h2 id="rules-h">The rules a tutor will want to set</h2>
+      <p>The plan's list, checked against the code. Ready means a tutor could change it today. In settings means the number is stored but there's no screen for it yet; today only an API call changes it.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Rule</th><th>Inês today</th><th>Where it stands</th></tr></thead>
+        <tbody>
+          <tr><td>Weekly hours and time off</td><td>Her schedule</td><td><span class="chip ready">Ready</span></td></tr>
+          <tr><td>How students pay</td><td>Card after the lesson, or by hand, both at once</td><td><span class="chip ready">Ready</span></td></tr>
+          <tr><td>Start times and gap after lessons</td><td>Every 15 minutes, 15 minutes free</td><td><span class="chip screen">In settings, no screen</span></td></tr>
+          <tr><td>How far ahead students book</td><td>12 weeks</td><td><span class="chip screen">In settings, no screen</span></td></tr>
+          <tr><td>Lesson types and prices</td><td>Trial €20, 60 minutes €25, 90 minutes €35</td><td><span class="chip screen">In data, no screen</span> <a class="n" href="#f6">6</a></td></tr>
+          <tr><td>Booking notice</td><td>14 hours</td><td><span class="chip fixed">Capped at 14 hours</span> <a class="n" href="#f1">1</a></td></tr>
+          <tr><td>Late change fee</td><td>€5</td><td><span class="chip fixed">Capped at €5</span> <a class="n" href="#f1">1</a></td></tr>
+          <tr><td>No-show</td><td>€5 instead of the lesson</td><td><span class="chip fixed">Tied to the late fee</span> <a class="n" href="#f2">2</a></td></tr>
+          <tr><td>Reminder</td><td>Before free changes end</td><td><span class="chip fixed">Breaks at 24 hours' notice</span> <a class="n" href="#f3">3</a></td></tr>
+          <tr><td>A student's own price</td><td>Per student</td><td><span class="chip fixed">60 and 90 minutes only</span> <a class="n" href="#f5">5</a></td></tr>
+          <tr><td>Places</td><td>Online or Porto</td><td><span class="chip fixed">Fixed in the database</span> <a class="n" href="#f7">7</a></td></tr>
+          <tr><td>Currency and time zone</td><td>Euros, Lisbon time</td><td><span class="chip fixed">Fixed in code, build step 1</span></td></tr>
+          <tr><td>Homework language and levels</td><td>European Portuguese, A1 to C2</td><td><span class="chip fixed">Fixed in code</span> <a class="n" href="#f8">8</a></td></tr>
+          <tr><td>How messages reach students</td><td>Email</td><td><span class="chip fixed">Email only</span> <a class="n" href="#f4">4</a></td></tr>
+          <tr><td>Email wording</td><td>Hers, written into the templates</td><td><span class="chip fixed">Fixed, except the come-back email</span></td></tr>
+          <tr><td>Packages paid up front, or paying before a first lesson</td><td>Not offered</td><td><span class="chip gap">Not built</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="foot prose">The last row is not in the plan. Packages of 5 or 10 lessons, and paying before a first lesson to stop no-shows, are common ways tutors work. Nobody needs them on day one, but a credit balance on the student that a lesson can draw from would leave room for both.</p>
+  </section>
+
+  <!-- Keep -->
+  <section class="stack-lg" aria-labelledby="keep-h">
+    <div class="stack prose">
+      <h2 id="keep-h">Already simple, worth keeping as it is</h2>
+    </div>
+    <ul class="keep">
+      <li><strong>Two records carry everything.</strong> A weekly run is a real lesson each week, so payments, homework and the calendar never need a special case for it.</li>
+      <li><strong>The rules sit in one settings table</strong>, read by one loader. That is exactly the shape of one tutor record.</li>
+      <li><strong>Money runs in one Stripe module on one clock</strong>, so connecting each tutor's own Stripe account is a contained change.</li>
+      <li><strong>The tutor can always step outside the rules</strong>: move without notice, add a lesson outside her hours, tick Already paid, make a lesson free.</li>
+      <li><strong>Homework hangs off one lesson</strong>, one sheet each, and the tutor's lesson notes stay private.</li>
+      <li><strong>Students without an email are still full students.</strong> Inês can book, price and charge them; only messages miss them <a class="n" href="#f4">4</a>.</li>
+    </ul>
+  </section>
+
+  <!-- Curriculum -->
+  <section class="stack-lg" aria-labelledby="cur-h">
+    <div class="stack prose">
+      <h2 id="cur-h">The curriculum: a plan and homework for every lesson</h2>
+      <p>Before each lesson it drafts a plan for that student. After it, it drafts homework that practises what was taught and brings back what they got wrong. Both follow what language-learning research has found works, and both are built for the language being taught. The tutor stays in charge: as with homework today, nothing reaches the student until she has read it and approved it.</p>
+    </div>
+    <figure>
+      <div class="diagram narrow">
+        <svg viewBox="0 0 1000 250" role="img" aria-label="The learning loop. A language pack and the student's level, goals and first language feed a drafted lesson plan, which the tutor edits and approves. The plan is taught in the lesson, where topics are ticked; practised in homework, which mixes today's practice with spaced review; and marked. What was hard comes back in a later plan and sheet.">
+          <defs>
+            <marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-plan" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <rect class="box-plan" x="0" y="14" width="170" height="86" rx="10"/>
+          <text class="t-title" x="14" y="42">Language pack</text>
+          <text class="t-sub" x="14" y="64">path and can-dos</text>
+          <text class="t-sub" x="14" y="84">words, pitfalls</text>
+
+          <rect class="box-core" x="0" y="134" width="170" height="86" rx="10"/>
+          <text class="t-title" x="14" y="162">Student</text>
+          <text class="t-sub" x="14" y="184">level and goals</text>
+          <text class="t-sub" x="14" y="204">first language</text>
+
+          <path class="edge-plan" d="M170,57 H200 V105 H227" marker-end="url(#ah5)"/>
+          <path class="edge-plan" d="M170,177 H200 V129 H227" marker-end="url(#ah5)"/>
+
+          <rect class="box-plan" x="230" y="74" width="150" height="86" rx="10"/>
+          <text class="t-title" x="244" y="102">Lesson plan</text>
+          <text class="t-sub" x="244" y="124">drafted for her</text>
+          <text class="t-sub" x="244" y="144">she edits, approves</text>
+
+          <line class="edge" x1="380" y1="117" x2="437" y2="117" marker-end="url(#ah4)"/>
+          <text class="t-edge" x="410" y="108" text-anchor="middle">taught</text>
+
+          <rect class="box-core" x="440" y="74" width="140" height="86" rx="10"/>
+          <text class="t-title" x="454" y="102">Lesson</text>
+          <text class="t-sub" x="454" y="124">topics ticked</text>
+          <text class="t-sub" x="454" y="144">notes kept</text>
+
+          <line class="edge" x1="580" y1="117" x2="637" y2="117" marker-end="url(#ah4)"/>
+          <text class="t-edge" x="610" y="108" text-anchor="middle">practised</text>
+
+          <rect class="box" x="640" y="74" width="150" height="86" rx="10"/>
+          <text class="t-title" x="654" y="102">Homework</text>
+          <text class="t-sub" x="654" y="124">today's practice</text>
+          <text class="t-sub" x="654" y="144">spaced review</text>
+
+          <line class="edge" x1="790" y1="117" x2="847" y2="117" marker-end="url(#ah4)"/>
+          <text class="t-edge" x="820" y="108" text-anchor="middle">marked</text>
+
+          <rect class="box" x="850" y="74" width="150" height="86" rx="10"/>
+          <text class="t-title" x="864" y="102">Marks</text>
+          <text class="t-sub" x="864" y="124">what was right</text>
+          <text class="t-sub" x="864" y="144">what was hard</text>
+
+          <path class="edge-plan" d="M925,160 V236 H305 V163" marker-end="url(#ah5)"/>
+          <text class="t-plan" x="615" y="228" text-anchor="middle">anything marked wrong comes back in a later plan and sheet</text>
+        </svg>
+      </div>
+      <figcaption>The loop is what makes it more than a worksheet generator. Each plan starts from what the last homework showed, so practice goes where the student needs it, and topics they have mastered stop coming back. Lesson, homework and marks exist today; the pack, the plan and the return arrow are new.</figcaption>
+    </figure>
+
+    <div class="stack prose">
+      <h3>What the research says, and what the curriculum does with it</h3>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>What works</th><th>Research</th><th>What the curriculum does</th></tr></thead>
+        <tbody>
+          <tr><td>A balance of four kinds of work: understanding, speaking or writing, studying the language, and building fluency</td><td>Nation, the four strands (2007)</td><td>Checks that each week of lessons and homework gives each about a quarter of the time, so it never becomes grammar drills alone</td></tr>
+          <tr><td>Recalling from memory teaches more than rereading</td><td>Roediger and Karpicke, the testing effect (2006)</td><td>Homework asks students to produce answers, never just to reread notes</td></tr>
+          <tr><td>Review spread over days and weeks lasts longer than review crammed together</td><td>Cepeda and colleagues, spacing meta-analysis (2006)</td><td>Each sheet brings back items from earlier lessons at growing gaps, sooner for the ones marked wrong</td></tr>
+          <tr><td>Lessons built around real tasks, with grammar brought in as the task needs it</td><td>Ellis, task-based teaching (2003); CEFR can-do descriptors (Council of Europe, 2020)</td><td>Each plan's goal is a can-do, such as "can arrange to meet a friend by phone", not a grammar heading</td></tr>
+          <tr><td>Short, explicit teaching of a troublesome form helps</td><td>Norris and Ortega, meta-analysis (2000)</td><td>A brief, direct explanation of the form the student keeps getting wrong, then practice in use</td></tr>
+          <tr><td>The most frequent words give the biggest return</td><td>Nation, Learning Vocabulary in Another Language (2013)</td><td>New words come from the language's frequency bands for the level, plus words for the student's own goals</td></tr>
+          <tr><td>Prompting learners to correct themselves leads to more repair than handing them the right form</td><td>Lyster and Ranta, corrective feedback (1997)</td><td>Marks group a student's errors into patterns, so the tutor knows what to prompt for next lesson</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="two">
+      <div class="stack">
+        <h3>Built for each language</h3>
+        <ul class="plainlist">
+          <li><strong>The path</strong> follows the language's own guide to the CEFR levels: the Referencial Camões and CAPLE exams for Portuguese, the Instituto Cervantes Plan curricular and DELE for Spanish, DELF for French, Profile Deutsch and the Goethe exams for German. Other languages use their own scale, such as HSK for Mandarin and JLPT for Japanese.</li>
+          <li><strong>The variant</strong> is the tutor's choice: European or Brazilian Portuguese, Spain or Latin American Spanish.</li>
+          <li><strong>Words</strong> come from frequency lists for that language.</li>
+          <li><strong>Trouble spots depend on the student's first language.</strong> An English speaker learning Portuguese needs ser and estar, nasal vowels, and false friends like puxar, which means pull. A Spanish speaker already knows much of the grammar and needs pronunciation and false friends instead.</li>
+          <li><strong>Pace</strong> follows how long the language takes. The US Foreign Service Institute puts Portuguese or Spanish at about 24 to 30 weeks of full-time study for an English speaker, and Japanese or Mandarin at about 88.</li>
+        </ul>
+      </div>
+      <div class="note">
+        <h3>Who makes each language pack</h3>
+        <p>AI drafts a pack once per language and variant from those references. A native-speaker teacher checks it before any tutor gets it; Inês would check the European Portuguese one first. Each tutor can then edit their copy, add their own materials, or switch the curriculum off.</p>
+        <h3>What the data needs</h3>
+        <p>The language pack; the student's level, goals and first language <a class="n" href="#f9">9</a>; a plan on each lesson and the topics it covered; and a review list fed by the marks. Inês's free-text plan for each student becomes their goals.</p>
+      </div>
+    </div>
+    <p class="foot prose">The research backs these principles across languages but doesn't crown one method, and most of it comes from classrooms rather than one-to-one lessons. That is another reason the tutor approves every plan instead of the curriculum deciding.</p>
+  </section>
+
+  <!-- Build -->
+  <section class="stack-lg" aria-labelledby="build-h">
+    <div class="stack prose">
+      <h2 id="build-h">Passed to the platform build</h2>
+      <p>I've sent these to the thread building the platform, matched to its steps.</p>
+    </div>
+    <ol class="build">
+      <li><span class="step">Step 1, tutor record</span><span>Add language and variant, places, reminder timing and the no-show rule alongside name, domain, currency and time zone <a class="n" href="#f2">2</a> <a class="n" href="#f3">3</a> <a class="n" href="#f7">7</a> <a class="n" href="#f8">8</a>.</span></li>
+      <li><span class="step">Step 2, tutor from the address</span><span>Cover the clock, Stripe's webhook and the Google Calendar return, which have no address <a class="n amb" href="#f11">11</a>.</span></li>
+      <li><span class="step">Before tutors set their rules</span><span>Copy the terms onto each lesson and weekly run, then lift the 14-hour and €5 caps <a class="n" href="#f1">1</a>. Make trial a set of switches and key a student's own price by lesson type <a class="n" href="#f5">5</a> <a class="n" href="#f6">6</a>.</span></li>
+      <li><span class="step">Messages</span><span>Choose the channel per student so students with no email still get confirmations, reminders and pay links <a class="n" href="#f4">4</a>.</span></li>
+      <li><span class="step">Before many tutors</span><span>Simplify the payment states into how it's paid and where it is <a class="n amb" href="#f10">10</a>.</span></li>
+      <li><span class="step">Step 7, curriculum</span><span>A plan and homework for each lesson from a checked language pack, with a review list fed by the marks. Reserve the student's level, goals and first language now <a class="n" href="#f9">9</a>.</span></li>
+    </ol>
+  </section>
+
+  <p class="foot">Read from the code on main at commit 2873b96 (booking Worker, database schema and site pages) and the plan "Turning the Inês site into a product for language tutors". Student counts are the live figures of 2 November 2026.</p>
+</main>
