@@ -517,7 +517,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   corner when they have a weekly run, three small checks and the one thing to
   press next, and only the dabs that need her eye (27 October 2026, Dan). The
   checks are `Signed in` (or `Link sent 5 Sept`, or `Not signed in`), `Card
-  saved` (or `No card yet`) and `Paid up` (or `€70 open` in coral, counting
+  saved` (or `No card yet`, or `Lessons not on card` when a saved card doesn't
+  yet cover lessons she added to come; a saved card with none of those counts
+  as done, 9 November 2026, Dan: no `Ask for card` for someone already paying)
+  and `Paid up` (or `€70 open` in coral, counting
   past lessons she added that were neither charged nor ticked paid); a
   blue dab marks each one done. Card and paid are omitted when cards are
   unavailable or the student is free at every length. The next button is
@@ -723,7 +726,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
   Each section uses a responsive grid of lesson cards: several across where
-  there is room, one column on phones. `Homework` sits at the top right beside
+  there is room, one column on phones, packed so a short card leaves no hole
+  under it while still reading in date order. Where the open profile is wide
+  enough for two lessons beside it (9 November 2026, Dan: "this space isn't
+  used in a good way"), the student's details and her tools stack in a narrow
+  column on the left and the lessons fill the rest; narrower, they sit above
+  the lessons in rows. `Homework` sits at the top right beside
   the date, with compact facts beneath, instead of taking another row at the
   bottom. The date and time can wrap within the header; on very narrow cards
   the button can wrap too, retaining a 44px target. Opening homework expands

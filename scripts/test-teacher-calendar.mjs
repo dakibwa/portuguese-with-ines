@@ -467,6 +467,10 @@ test("each student has three checks and one next step, grouped by whose move it 
   assert.deepEqual(step({ invitedAt: sent }), [false, false, 0, 0, sent, "waiting", "invite"]);
   assert.deepEqual(step({ signedIn: true, unpaidPast: 1, unpaidPastCents: 2500 }), [true, false, 1, 2500, null, "todo", "pay"]);
   assert.deepEqual(step({ signedIn: true }), [true, false, 0, 0, null, "todo", "card"]);
+  // Already paying by card, as Roman does, needs nothing; a card her lessons
+  // to come are not on still asks for them.
+  assert.deepEqual(step({ signedIn: true, hasCard: true, unpaidUpcoming: 0 }), [true, true, 0, 0, null, "set", null]);
+  assert.deepEqual(step({ signedIn: true, hasCard: true, unpaidUpcoming: 12 }), [true, false, 0, 0, null, "todo", "card"]);
   // A link left unused never holds back someone already all set.
   assert.deepEqual(step({ signedIn: true, cardForAllLessons: true, invitedAt: sent }), [true, true, 0, 0, sent, "set", null]);
   // With cards switched off, or free at every length, there is no card or debt to chase.
