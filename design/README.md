@@ -1815,7 +1815,11 @@ as a form:
   on it);
 - signed in, booking is headed by the account's own bar, as Your lessons is:
   the name's menu, or the places open on a wide card, holding the way back;
-- Inês's schedule reads as the same place: the booking page's blue band,
+- Inês's schedule reads as the same place, though it is her workspace
+  rather than a page of the site: one slim blue banner with her cream
+  wordmark (still the way home), a hairline and `Your schedule` in her hand,
+  with no site header, links or footer (9 November 2026, Dan: "does she even
+  need the rest of the site anymore"); then
   one bar for `Students`, `Timetable`, `Time off`,
   `Receipts`, `Expressions` and `Profile`; sliders for a
   lesson's length and place in her lesson form, with the
@@ -2049,7 +2053,7 @@ page, and for onboarding to feel easy:
   their icons and wrap three and two on a narrow card; lesson history puts its
   heading and the student's contact on one row where there is room; a wide
   `Add a lesson` runs its calendar the full height beside the choices; and
-  the footer of Inês's tabs meets the bottom of the window;
+  Inês's page fills the window's height;
 - a phone's month pagers say `Sept 2026`, so the month and both arrows
   share one row;
 - `Add a student` opens on just a name and an email; their phone, NIF,
@@ -2200,6 +2204,10 @@ published design system, with spacing given the same care:
   column fits `Tradução à letra` on one line.
 - Each thing is said once: Inês's Expressions tab already offers `View page`,
   so its expressions carry no `Open full page` of their own.
+- Inês's page drops the site's header, its booking band and the footer for
+  one slim banner (76 px, 64 px on a phone): her wordmark leading home, a
+  hairline, `Your schedule`, and the band's splat cut off at the right edge
+  (let go on the narrowest phones). Her tools reach the first screen.
 
 ## Transactional emails — 16 October 2026
 
