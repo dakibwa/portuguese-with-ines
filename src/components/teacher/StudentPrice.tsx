@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
+import { EditValue } from "@/components/teacher/EditControls";
 import { setStudentPrices, type AdminStudent, type StudentPrices } from "@/lib/admin-api";
 import { formatPriceCents } from "@/lib/booking-api";
 import { lessonProducts } from "@/lib/lesson-products";
@@ -21,6 +22,16 @@ export function standardPrice(minutes: Length) {
 /** A student's price for a length, theirs or the standard one. */
 export function priceFor(student: Pick<AdminStudent, "prices"> | null | undefined, minutes: Length) {
   return student?.prices?.[minutes] ?? standardPrice(minutes);
+}
+
+/** One length as it reads in their profile, with how it came about where it isn't a price she typed. */
+export function priceLabel(student: Pick<AdminStudent, "prices" | "ownPrices">, minutes: Length) {
+  const price = formatPriceCents(priceFor(student, minutes));
+  if (student.prices?.[minutes] === undefined) return `${minutes} mins · ${price} · standard`;
+  if (minutes === 90 && student.ownPrices && student.ownPrices[90] === undefined) {
+    return `${minutes} mins · ${price} · ${student.prices[90] === 0 ? "as their 60" : "1.5× their 60"}`;
+  }
+  return `${minutes} mins · ${price}`;
 }
 
 export function priceDraft(student?: Pick<AdminStudent, "prices" | "ownPrices"> | null): PriceDraft {
@@ -88,6 +99,7 @@ export function PriceFields({ draft, disabled, idPrefix, invalid, onChange }: {
               disabled={disabled}
               id={`${idPrefix}-${minutes}`}
               inputMode="decimal"
+              name={`price-${minutes}`}
               onChange={(event) => onChange({ ...draft, [minutes]: event.target.value })}
               placeholder={minutes === 90 && typedCents(draft[60]) !== null ? euroText(Math.round(typedCents(draft[60])! * 1.5)) : euroText(standardPrice(minutes))}
               type="text"
@@ -121,6 +133,15 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
+  const section = useRef<HTMLElement>(null);
+  // Opened from its pencil, the price field takes focus; saved or cancelled,
+  // focus goes back to that pencil rather than to the page.
+  const focus = useRef<"field" | "pencil" | null>(null);
+  useEffect(() => {
+    if (focus.current === "field" && editing) document.getElementById(`${idPrefix}-60`)?.focus();
+    else if (focus.current === "pencil" && !editing) section.current?.querySelector<HTMLElement>("[data-edit]")?.focus();
+    focus.current = null;
+  }, [editing, idPrefix]);
 
   async function save() {
     if (busy) return;
@@ -135,6 +156,7 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
     try {
       const result = await setStudentPrices(token, student.id, prices);
       onChanged(result.student);
+      focus.current = "pencil";
       setEditing(false);
       const lessons = (count: number) => `${count} ${count === 1 ? "lesson" : "lessons"}`;
       setSaved([
@@ -152,7 +174,7 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
   }
 
   return (
-    <section className="teacher-price" aria-labelledby={labelledBy ?? `${idPrefix}-title`}>
+    <section className="teacher-price" ref={section} aria-labelledby={labelledBy ?? `${idPrefix}-title`}>
       {!labelledBy ? <h3 id={`${idPrefix}-title`}>Their price</h3> : null}
       {editing ? (
         <form className="teacher-form" noValidate onSubmit={(event) => { event.preventDefault(); void save(); }}>
@@ -164,24 +186,14 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
           </ul>
           <div className="teacher-dialog-actions">
             <button className="button button--coral button--compact" disabled={busy} type="submit">{busy ? "Saving…" : "Save price"}</button>
-            {showCancel ? <button className="button button--outline button--compact" disabled={busy} onClick={() => { setEditing(false); setDraft(priceDraft(student)); setError(""); onCancel?.(); }} type="button">Cancel</button> : null}
+            {showCancel ? <button className="button button--outline button--compact" disabled={busy} onClick={() => { focus.current = "pencil"; setEditing(false); setDraft(priceDraft(student)); setError(""); onCancel?.(); }} type="button">Cancel</button> : null}
           </div>
         </form>
       ) : (
         <div className="teacher-price__view">
-          <ul className="booking-payment-facts teacher-price__facts">
-            {LENGTHS.map((minutes) => (
-              <li key={minutes}>
-                {minutes} mins · <strong>{formatPriceCents(priceFor(student, minutes))}</strong>
-                {student.prices?.[minutes] === undefined
-                  ? " · standard"
-                  : minutes === 90 && student.ownPrices && student.ownPrices[90] === undefined
-                    ? student.prices[90] === 0 ? " · as their 60" : " · 1.5× their 60"
-                    : ""}
-              </li>
-            ))}
-          </ul>
-          <button className="button button--lilac button--compact" onClick={() => { setEditing(true); setSaved(""); }} type="button">Change price</button>
+          <EditValue field="price" label="Change price" onEdit={() => { focus.current = "field"; setEditing(true); setSaved(""); }}>
+            {LENGTHS.map((minutes) => <span className="teacher-price__line" key={minutes}>{priceLabel(student, minutes)}</span>)}
+          </EditValue>
         </div>
       )}
       {error ? <p className="teacher-inline-error" id={`${idPrefix}-error`} role="alert">{error}</p> : null}
