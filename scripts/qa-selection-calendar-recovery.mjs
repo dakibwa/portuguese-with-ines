@@ -163,11 +163,11 @@ async function selectRadio(page, name) {
   // time picker; each case verifies the resulting selection and request.
   await radio.locator("..").click();
 }
-async function leaveForFaq(page) {
-  const menu = page.getByRole("button", { name: "Open menu", exact: true });
-  if (await menu.isVisible()) await menu.click();
-  await page.getByRole("link", { name: "FAQ", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/faq\/?$/);
+// Her page has no site nav (9 November 2026): the wordmark in its banner is
+// the one way out, and it leaves without a reload, as the nav did.
+async function leaveForHome(page) {
+  await page.getByRole("link", { name: "Português com a Inês, home", exact: true }).click();
+  await expect(page).toHaveURL(`${base}/`);
 }
 async function chooseAccount(page, name) {
   await page.locator("#account-menu").waitFor({ state: "attached" });
@@ -309,7 +309,7 @@ try {
         const { page } = state;
         await monday(page); await takeOff(page, slot(page, 1, 600)); await started.promise;
         await takeOff(page, slot(page, 1, 630));
-        await leaveForFaq(page);
+        await leaveForHome(page);
         await page.evaluate(value => {
           if (value) localStorage.setItem("ines-student-session", value); else localStorage.removeItem("ines-student-session");
           window.dispatchEvent(new StorageEvent("storage", { key: "ines-student-session", newValue: value || null }));
@@ -317,7 +317,7 @@ try {
         const response = page.waitForResponse("**/admin/exceptions/day");
         waiting.resolve(); await response; await check(state);
         assert.equal(writes.length, 1);
-        await expect(page).toHaveURL(/\/faq\/?$/);
+        await expect(page).toHaveURL(`${base}/`);
         assert.equal(await page.evaluate(() => localStorage.getItem("ines-student-session")), session || null);
         cases += 1;
       } finally { waiting.resolve(); await state.context.close(); }
