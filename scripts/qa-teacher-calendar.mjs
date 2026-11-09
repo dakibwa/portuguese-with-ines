@@ -150,6 +150,7 @@ async function fixture(width, options = {}) {
     return route.fulfill({ json: { student: state.account, session: "isolated-renewed-teacher-fixture" } });
   });
   await page.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
+  await page.route("**/me/homework", route => route.fulfill({ json: { homework: [] } }));
   await page.route("**/me", (route) =>
     route.fulfill({
       json: {
@@ -386,6 +387,8 @@ async function fixture(width, options = {}) {
       else booking.attendance_status = data.noShow ? "no_show" : "expected";
       return route.fulfill({ json: { booking } });
     }
+    // Their plan and notes, on the dashboard beside their lessons.
+    if (/^\/admin\/students\/[^/]+\/notes$/.test(path)) return route.fulfill({ json: { plan: "", planUpdatedAt: null, lessons: [] } });
     state.errors.push(
       `Unexpected fixture request: ${request.method()} ${path}`,
     );
@@ -485,6 +488,13 @@ try {
     await students.getByRole("button", { name: "Try again", exact: true }).click();
     await expect(students.getByRole("alert")).toHaveCount(0);
     await expect(studentRow(page, "Alex")).toBeVisible();
+    // Stages are lanes side by side on a wide screen, each student one card in
+    // one of them, and stack on a phone without sideways scrolling.
+    await expect(students.locator(".teacher-student")).toHaveCount(3);
+    const laneTops = await students.locator(".teacher-lane").evaluateAll(lanes => lanes.map(lane => Math.round(lane.getBoundingClientRect().top)));
+    assert.ok(laneTops.length >= 2, "Her students fall into more than one stage");
+    assert.equal(new Set(laneTops).size === 1, width === 1280, `Lanes ${width === 1280 ? "sit side by side" : "stack"} at ${width}px`);
+    await noOverflow(page);
     await page.getByRole("tab", { name: "Receipts", exact: true }).click();
     const receipts = page.locator(".teacher-receipts");
     await expect(receipts.getByRole("alert")).toContainText("couldn’t read the booking system’s reply");
@@ -933,20 +943,64 @@ try {
   await expect(forSam.locator(".teacher-student__checks")).toHaveText(/Not signed in.*No card yet.*€50 open/);
   // Her invite asks what they owe with nothing ticked, since many past
   // lessons were paid in cash and never marked. Making the link sends nothing.
+  // What agreeing also puts on their card is read from her lessons for Sam,
+  // by account and never by name: a weekly run once, and not what was paid by hand.
+  const planned = [
+    // One week moved to another hour and one at another price: the run still
+    // reads once, saying so, and never as one price for every week.
+    ...["2026-09-15T08:30:00Z", "2026-09-22T09:30:00Z", "2026-09-29T08:30:00Z"].map((start, week) =>
+      ({ ...lesson(`plan-${week}`, "Sam Known", start, "porto"), student_id: "sam", series_id: "sam-weekly", added_by_teacher: 1, payment_status: "not_required", amount_cents: week === 2 ? 3000 : 2500 })),
+    { ...lesson("by-hand", "Sam Known", "2026-09-16T09:00:00Z"), student_id: "sam", added_by_teacher: 1, payment_status: "not_required", payment_consent_version: "paid-by-hand" },
+    { ...lesson("other-sam", "Sam Known", "2026-09-18T09:00:00Z"), student_id: "someone-else", added_by_teacher: 1, payment_status: "not_required" },
+    { ...lesson("name-only", "Sam Known", "2026-09-19T09:00:00Z"), added_by_teacher: 1, payment_status: "not_required" },
+  ];
+  state.bookings.push(...planned);
   await forSam.getByRole("button", { name: "Invite for Sam Known", exact: true }).click();
   const owed = forSamForm.getByRole("group", { name: "Tick what Sam still owes", exact: true });
   await expect(owed.getByRole("checkbox", { checked: false })).toHaveCount(2);
+  // Nothing ticked: the link only signs them in, with nothing to agree to.
+  const terms = forSamForm.locator(".teacher-invite__terms");
+  await expect(terms).toContainText("Nothing ticked: this link only signs Sam in");
+  await expect(terms).not.toContainText("Future lessons");
   await owed.getByRole("checkbox").first().click();
+  await expect(terms).toContainText("€25 for the 1 lesson ticked, charged once Sam agrees.");
+  await expect(terms).toContainText("Nothing is charged until Sam agrees. Making or sending the link doesn’t agree to anything for them.");
+  await expect(terms).toContainText("Not owed yet. If Sam agrees, these go on their card, charged at the end of each lesson:");
+  const weeklyLine = terms.locator("li").filter({ hasText: "Every Tuesday, 09:30–10:30" });
+  await expect(weeklyLine).toHaveCount(1);
+  await expect(weeklyLine).toContainText(/€25–€30 a lesson, prices differ · 3 lessons to Tue 29 Sept?, 1 week moved/);
+  await expect(weeklyLine).not.toContainText(/€25 a lesson/);
+  for (const left of ["Tue 22", "Wed 16", "Fri 18", "Sat 19"]) await expect(terms).not.toContainText(left);
+  // Beside the ticked lessons where the card is wide (it stacks on a phone).
+  const [pickBox, termsBox] = await Promise.all([owed.locator(".teacher-invite__owed-pick").boundingBox(), terms.boundingBox()]);
+  assert.ok(termsBox.x >= pickBox.x + pickBox.width - 1, "At desktop width the agreement sits beside the ticked lessons");
   await owed.getByRole("button", { name: "Make link with €25 to pay", exact: true }).click();
   await expect.poll(() => state.writes.at(-1)).toEqual({ path: "/admin/students/sam/card-link", data: { bookingIds: ["past-unpaid"] } });
   await expect(forSamForm.getByRole("status")).toContainText("Asks them to pay €25 for 1 lesson. Nothing is charged until they agree.");
+  await expect(terms).toContainText("Not owed yet.");
   await expect(forSamForm.getByRole("link", { name: /^Send on WhatsApp/ })).toHaveAttribute("href",
     /^https:\/\/wa\.me\/351912345678\?text=Ol%C3%A1%20Sam!.+cardBooking%3Dpast-unpaid$/);
+  const approvalText = new URL(await forSamForm.getByRole("link", { name: /^Send on WhatsApp/ }).getAttribute("href")).searchParams.get("text");
+  assert.match(approvalText, /pay for your lesson on .+ \(€25\)\. If you agree, your future lessons are then charged to your card at the end of each lesson\.\n\S+cardBooking=past-unpaid$/);
   // Closed, the card stays put and the next move is theirs.
   await forSam.getByRole("button", { name: "Close", exact: true }).click();
   await expect(forSam.getByRole("button", { name: "Send again for Sam Known", exact: true })).toBeVisible();
   await expect(forSam.locator(".teacher-student__checks")).toContainText("Link sent 7 Sept");
   assert.equal(state.writes.filter(entry => entry.path === "/admin/students/sam/welcome").length, 0);
+  // If her lessons for them can't be read, the tick list and link still work and the words say so.
+  state.failBookings = true;
+  await forSam.getByRole("button", { name: "Send again for Sam Known", exact: true }).click();
+  await owed.getByRole("checkbox").first().click();
+  await expect(terms).toContainText("Their upcoming lessons couldn’t be checked, so what goes on their card besides the lessons ticked isn’t shown.");
+  await expect(owed.getByRole("button", { name: "Make link with €25 to pay", exact: true })).toBeEnabled();
+  // The read-only preview can be tried again without making anything.
+  state.failBookings = false;
+  const beforeRetry = state.writes.length;
+  await terms.getByRole("button", { name: "Check again", exact: true }).click();
+  await expect(terms).toContainText("Not owed yet. If Sam agrees");
+  assert.equal(state.writes.length, beforeRetry, "Checking again writes nothing");
+  await forSam.getByRole("button", { name: "Close", exact: true }).click();
+  state.bookings = state.bookings.filter(entry => !planned.includes(entry));
 
   // Setting up a student emails nothing, and her price for them shows at once.
   await students.getByRole("button", { name: "Add a student", exact: true }).click();
@@ -991,17 +1045,39 @@ try {
   await alex.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
   const profile = alex.getByRole("region", { name: "Alex’s profile", exact: true });
   await expect(profile).toContainText("No lessons recorded yet.");
-  await profile.getByRole("button", { name: "Sign-in link for Alex", exact: true }).click();
+  // Her actions sit in the card's top row beside their name, each once.
+  for (const action of ["Sign-in link for Alex", "Add a lesson for Alex", "Mark as dormant"])
+    await expect(alex.getByRole("button", { name: action, exact: true })).toHaveCount(1);
+  await expect(profile.getByRole("button", { name: /^(Sign-in link|Add a lesson|Mark as)/ })).toHaveCount(0);
+  // A signed-in student's email is theirs to change: shown, never an edit
+  // control, and locked in the details form her name's pencil opens. A new
+  // name is kept once saved.
+  await expect(alex.getByRole("button", { name: /^(Change|Add) email for Alex/ })).toHaveCount(0);
+  await alex.getByRole("button", { name: "Change name for Alex", exact: true }).click();
+  await expect(profile.getByLabel(/^Email/)).toBeDisabled();
+  await profile.getByLabel("Full name", { exact: true }).fill("Alex Rowe");
+  await profile.getByRole("button", { name: "Save details", exact: true }).click();
+  const renamed = studentRow(page, "Alex Rowe");
+  await expect(renamed.getByRole("button", { name: "Open Alex Rowe’s profile", exact: true })).toBeVisible();
+  assert.equal(state.students.find(student => student.id === "alex").name, "Alex Rowe");
+  await renamed.getByRole("button", { name: "Change name for Alex Rowe", exact: true }).click();
+  const renamedProfile = renamed.getByRole("region", { name: "Alex Rowe’s profile", exact: true });
+  await expect(renamedProfile.getByLabel("Full name", { exact: true })).toHaveValue("Alex Rowe");
+  await renamedProfile.getByLabel("Full name", { exact: true }).fill("Alex");
+  await renamedProfile.getByRole("button", { name: "Save details", exact: true }).click();
+  await expect(alex.getByRole("button", { name: "Open Alex’s profile", exact: true })).toBeVisible();
+  await alex.getByRole("button", { name: "Sign-in link for Alex", exact: true }).click();
   await expect(profile.getByRole("link", { name: /^Send on WhatsApp/ })).toHaveAttribute("href", /signin%3Dinvite-alex$/);
   assert.equal(state.writes.filter(entry => entry.path === "/admin/students/alex/welcome").length, 0);
   await alex.getByRole("button", { name: "Close", exact: true }).click();
   // Dormant (22 October 2026, Dan): marked from the profile, sending nothing;
   // each one's come-back email is written for them from her default.
   await alex.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
-  await profile.getByRole("button", { name: "Mark as dormant", exact: true }).click();
+  await alex.getByRole("button", { name: "Mark as dormant", exact: true }).click();
   const dormant = students.locator(".teacher-dormant");
-  await expect(dormant.getByRole("heading", { name: "Dormant · 1", exact: true })).toBeVisible();
   await expect(alex.locator(".teacher-student__label")).toHaveText("Dormant");
+  await alex.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(dormant.getByRole("heading", { name: "Dormant · 1", exact: true })).toBeVisible();
   await alex.getByRole("button", { name: "Come-back email for Alex", exact: true }).click();
   await expect(profile.getByLabel("Message")).toHaveValue("Olá Alex,\n\nBook a lesson on my new website.\n\nInês");
   await profile.getByLabel("Subject").fill("Saudades!");
@@ -1010,7 +1086,7 @@ try {
   assert.deepEqual(state.writes.filter(entry => entry.path.startsWith("/admin/students/alex/dormant-email")).map(entry => entry.data),
     [{ subject: "Saudades!", message: "Olá Alex,\n\nBook a lesson on my new website.\n\nInês" }]);
   await alex.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
-  await profile.getByRole("button", { name: "Mark as active", exact: true }).click();
+  await alex.getByRole("button", { name: "Mark as active", exact: true }).click();
   await expect(dormant).toHaveCount(0);
   await alex.getByRole("button", { name: "Close", exact: true }).click();
 
@@ -1028,9 +1104,11 @@ try {
 
   const openNora = async (tool) => {
     await nora.getByRole("button", { name: "Open Nora Lima’s profile", exact: true }).click();
-    await noraProfile.getByRole("button", { name: `${tool} for Nora Lima`, exact: true }).click();
+    await nora.getByRole("button", { name: `${tool} for Nora Lima`, exact: true }).click();
   };
-  await openNora("Change price");
+  // A price is changed from its own value's pencil, which focuses that field.
+  await openNora("Change 60-minute price");
+  await expect(noraProfile.getByLabel("Price for 60 minutes, in euros", { exact: true })).toBeFocused();
   await noraProfile.getByLabel("Price for 60 minutes, in euros", { exact: true }).fill("24");
   await noraProfile.getByRole("button", { name: "Save price", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/nora/prices").at(-1)?.data).toEqual({ prices: { 60: 2400, 90: null } });
@@ -1087,7 +1165,9 @@ try {
   assert.equal(state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length, 0, "A lesson for a student with no email emails nobody");
 
   // Once she has an email, her link can go by email too.
-  await openNora("Edit details");
+  // With no email yet, the empty line offers itself and the email field takes focus.
+  await openNora("Add email");
+  await expect(noraProfile.getByLabel(/^Email/)).toBeFocused();
   await expect(noraProfile.getByLabel("Full name", { exact: true })).toHaveValue("Nora Lima");
   await noraProfile.getByLabel(/^Email/).fill("nora@example.invalid");
   // A background read started before the save must not replace its newer data.
@@ -1135,6 +1215,11 @@ try {
   await expect(recorded).toContainText("In Porto");
   // Its Already paid tick is there to untick, in place of a Paid by hand dab.
   await expect(recorded.getByRole("checkbox", { name: "Already paid", exact: true })).toHaveAttribute("aria-checked", "true");
+  // The day and time press the whole tile, but never over the tick beside them.
+  const recordedTick = recorded.getByRole("checkbox", { name: "Already paid", exact: true });
+  await recordedTick.scrollIntoViewIfNeeded();
+  const tickBox = await recordedTick.boundingBox();
+  assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[role="checkbox"]') !== null, { x: tickBox.x + tickBox.width / 2, y: tickBox.y + tickBox.height / 2 }), true, "Already paid stays pressable over the stretched day button");
   await nora.getByRole("button", { name: "Close", exact: true }).click();
 
   // Select a few dates, apply time off, then see those same days in the week.
@@ -1276,7 +1361,13 @@ try {
     const alex = studentRow(page, "Alex");
     const pane = alex.getByRole("region", { name: "Alex’s profile", exact: true });
     await alex.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
-    await pane.getByRole("button", { name: "Change price for Alex", exact: true }).click();
+    // Either length's value opens the one price form on that field; Cancel
+    // puts focus back on the value that opened it.
+    await pane.getByRole("button", { name: "Change 90-minute price for Alex", exact: true }).click();
+    await expect(pane.getByLabel("Price for 90 minutes, in euros", { exact: true })).toBeFocused();
+    await pane.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(pane.getByRole("button", { name: "Change 90-minute price for Alex", exact: true })).toBeFocused();
+    await pane.getByRole("button", { name: "Change 60-minute price for Alex", exact: true }).click();
     await pane.getByLabel("Price for 60 minutes, in euros", { exact: true }).fill("0");
     await expect(pane.getByLabel("Price for 90 minutes, in euros", { exact: true })).toHaveAttribute("placeholder", "0");
     await expect(pane).toContainText("0: free, with no card needed.");
@@ -1288,7 +1379,7 @@ try {
     await pane.screenshot({ path: `tmp/qa/free-price/teacher-price-saved-${width}.png` });
     await alex.getByRole("button", { name: "Close", exact: true }).click();
     await alex.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
-    await pane.getByRole("button", { name: "Add a lesson for Alex", exact: true }).click();
+    await alex.getByRole("button", { name: "Add a lesson for Alex", exact: true }).click();
     await expect(pane.getByRole("radio", { name: "60 mins, Free", exact: true })).toBeVisible();
     await expect(pane.getByRole("radio", { name: "90 mins, Free", exact: true })).toBeVisible();
     // A free lesson has nothing to pay, so no tick.
@@ -1301,7 +1392,7 @@ try {
     const samPane = samRow.getByRole("region", { name: "Sam Known’s profile", exact: true });
     const addForSam = async () => {
       await samRow.getByRole("button", { name: "Open Sam Known’s profile", exact: true }).click();
-      await samPane.getByRole("button", { name: "Add a lesson for Sam Known", exact: true }).click();
+      await samRow.getByRole("button", { name: "Add a lesson for Sam Known", exact: true }).click();
     };
     await addForSam();
     const picker = samPane.getByRole("group", { name: "Choose a date and time", exact: true });
@@ -1382,12 +1473,15 @@ try {
     await expect(cancelledLesson).toContainText("Paid by hand");
     const beforeRefund = state.writes.length;
     await cancelledLesson.getByRole("button", { name: "Record refund", exact: true }).click();
-    await expect(details).toContainText("You have already refunded Sam directly");
-    await expect(details).toContainText("Recording it sends no payment or email");
-    await expect(details.getByRole("button", { name: "Yes, record refund", exact: true })).toBeVisible();
+    // The confirmation opens inside the lesson's own tile, not over the page.
+    const refundDetails = cancelledLesson.getByRole("region", { name: /’s lesson, Tue 8 Sept,/ });
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(refundDetails).toContainText("You have already refunded Sam directly");
+    await expect(refundDetails).toContainText("Recording it sends no payment or email");
+    await expect(refundDetails.getByRole("button", { name: "Yes, record refund", exact: true })).toBeVisible();
     assert.equal(state.writes.length, beforeRefund, "Opening the confirmation does not record a refund");
-    await details.getByRole("button", { name: "Yes, record refund", exact: true }).click();
-    await expect(details).toHaveCount(0);
+    await refundDetails.getByRole("button", { name: "Yes, record refund", exact: true }).click();
+    await expect(refundDetails).toHaveCount(0);
     await expect(cancelledLesson).toContainText("Refunded");
     await expect(cancelledLesson.getByRole("button", { name: "Record refund", exact: true })).toHaveCount(0);
     assert.deepEqual(state.writes.at(-1), { path: "/admin/bookings/next/refund-by-hand", data: { refunded: true } });
@@ -1416,13 +1510,27 @@ try {
     ];
     await page.getByRole("tab", { name: /^Students/ }).click();
     const open = page.getByRole("button", { name: "Open Sam Known’s profile", exact: true });
+    const nameSize = () => open.locator("strong").evaluate(name => getComputedStyle(name).fontSize);
+    const closedNameSize = await nameSize();
     await open.focus();
     await page.keyboard.press("Enter");
+    assert.equal(await nameSize(), closedNameSize, "Their name is the same size closed and open");
     const samRow = studentRow(page, "Sam Known");
+    // Opened, the student is taken out of their lane and shown once across the
+    // whole width, never squeezed into a lane; their lane still counts them.
+    await expect(open).toHaveCount(1);
+    const [openBox, boardBox] = await Promise.all([samRow.boundingBox(), page.locator(".teacher-students").boundingBox()]);
+    assert.ok(openBox.width >= boardBox.width - 2, "An open student has the whole width");
     const history = samRow.getByRole("region", { name: "Sam Known’s profile", exact: true });
+    await expect(page.locator(".teacher-board")).toBeHidden();
+    await expect(page.getByRole("searchbox", { name: "Find a student", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "All students", exact: true })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Upcoming · 5" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 4" })).toBeVisible();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
+    // What every lesson shares is said once above them, not on each card.
+    await expect(history.locator(".teacher-fact").filter({ hasText: "Every lesson" })).toContainText("60 mins");
+    await expect(history.locator(".teacher-history-lesson").filter({ hasText: "60 mins" })).toHaveCount(0);
     const run = history.locator(".teacher-history-run");
     await expect(run).toContainText("Every Tuesday");
     await expect(run).toContainText("09:30–10:30");
@@ -1430,7 +1538,35 @@ try {
     await expect(run).toContainText("In Porto");
     await run.getByRole("button", { name: "Show weeks", exact: true }).click();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(10);
-    await expect(history.locator(".teacher-history-lesson").filter({ hasText: "Tue 22 Sept" })).toHaveCount(1);
+    // Its weeks fit three across a wide card and one on a phone.
+    const weekColumns = await run.locator(".teacher-history-run__weeks").evaluate(list => getComputedStyle(list).gridTemplateColumns.split(" ").length);
+    assert.equal(weekColumns >= 3, width === 1280, `An opened run's weeks fit ${width === 1280 ? "three or more across" : "one column"} at ${width}px, not ${weekColumns}`);
+    // A week's whole tile opens it, not a small rectangle around its date: a
+    // press at the tile's far side, well away from its words, opens its
+    // details in place (no dialog, nothing locked), one lesson's at a time.
+    const week = run.locator(".teacher-history-run__weeks > li").filter({ hasText: "Tue 22 Sept" });
+    const tile = await week.boundingBox();
+    const corner = { x: tile.width - 6, y: tile.height / 2 };
+    if (width === 1280) {
+      await week.hover({ position: corner });
+      await expect(week).toHaveCSS("background-image", /linear-gradient/);
+    }
+    await week.click({ position: corner });
+    const lessonDetails = history.getByRole("region", { name: /’s lesson, / });
+    await expect(lessonDetails).toHaveCount(1);
+    await expect(week.getByRole("region", { name: /^Sam Known’s lesson, Tue,? 22 Sept/ })).toBeFocused();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(lessonDetails.getByRole("button", { name: "Move lesson", exact: true })).toBeVisible();
+    const nextWeek = run.locator(".teacher-history-run__weeks > li").filter({ hasText: "Tue 29 Sept" });
+    await nextWeek.locator(".teacher-lesson-row__when").click();
+    await expect(lessonDetails).toHaveCount(1);
+    await expect(nextWeek.getByRole("region", { name: /’s lesson, / })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(lessonDetails).toHaveCount(0);
+    await expect(nextWeek.locator(".teacher-lesson-row__when")).toBeFocused();
+    // Its weeks open inside it, each once, saying only what the run does not.
+    await expect(run.locator(".teacher-history-run__weeks > li").filter({ hasText: "Tue 22 Sept" })).toHaveCount(1);
+    await expect(run.locator(".teacher-history-run__weeks")).not.toContainText("In Porto");
     await run.getByRole("button", { name: "Hide weeks", exact: true }).click();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
     await expect(history).toContainText("12 Dec 2025");
@@ -1448,7 +1584,17 @@ try {
     await expect(history.getByRole("heading", { name: "Upcoming · 4" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 5" })).toBeVisible();
     await expect(history).not.toContainText("Happening now");
-    await history.getByRole("button", { name: "Edit details for Sam Known", exact: true }).click();
+    // Their name has its own pencil beside it, apart from the button that opens
+    // and closes the card; cancelling puts focus back on that pencil.
+    const renamePencil = samRow.getByRole("button", { name: "Change name for Sam Known", exact: true });
+    await renamePencil.click();
+    await expect(history.getByLabel("Full name", { exact: true })).toBeFocused();
+    await history.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(renamePencil).toBeFocused();
+    assert.equal(await open.locator("button").count(), 0, "The name's button holds no other button");
+    // Each detail is its own value and pencil, so the phone opens the form on the phone.
+    await history.getByRole("button", { name: "Change phone for Sam Known", exact: true }).click();
+    await expect(history.getByLabel(/^Phone/)).toBeFocused();
     await expect(history.getByLabel("Full name", { exact: true })).toHaveValue("Sam Known");
     await expect(history.getByLabel(/^Email/)).toHaveValue("sam@example.invalid");
     // The student chooses their splat elsewhere while this unrelated editor
@@ -1461,6 +1607,7 @@ try {
     assert.equal(state.students.find(student => student.id === "sam").mark, "bloom");
     // Saved, she is back on their profile; closing it returns her to their name.
     await expect(samRow.locator(".teacher-setup__notice")).toHaveText("Their details are saved.");
+    await expect(history.getByRole("button", { name: "Change phone for Sam Known", exact: true })).toBeFocused();
     await samRow.getByRole("button", { name: "Close", exact: true }).click();
     await expect(history).toBeHidden();
     await expect(open).toBeFocused();

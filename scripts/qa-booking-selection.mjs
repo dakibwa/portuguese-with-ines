@@ -25,6 +25,7 @@ try {
     const json = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     await context.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-selection-fixture"));
     await context.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
+    await context.route("**/me/homework", route => route.fulfill({ json: { homework: [] } }));
     await context.route("**/me", route => json(route, { student, bookings, series, sameDayFeeCents: 500, cardsAccepted: true }));
     await context.route("**/me/recurring-rates", route => json(route, { rates }));
     await context.route("**/lesson-types", route => json(route, { lessonTypes: types, paymentMode: "postpay", postpay: true, paymentReady: true }));
@@ -233,6 +234,7 @@ try {
       if (path === "/me") return json(route, { student, bookings: [], series: [], sameDayFeeCents: 500 });
       if (path === "/me/recurring-rates") return json(route, { rates: {} });
       if (path === "/me/expressions") return json(route, { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] });
+      if (path === "/me/homework") return json(route, { homework: [] });
       if (path === "/lesson-types") return json(route, { lessonTypes: types, postpay: false, paymentReady: true });
       if (path === "/availability") return json(route, { horizonDays: 84, slotsByDate: {
         "2026-09-14": [{ startAt: "2026-09-14T09:00:00Z", endAt: "2026-09-14T10:00:00Z" }],

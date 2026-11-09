@@ -46,9 +46,9 @@ directly in a few plain sentences. Keep practical details that help a student
 prepare, book or understand a fee; leave out internal payment and attendance
 processes. Avoid blunt reassurance, sales language and unnecessary jargon.
 
-Lesson homework stays attached to its lesson: for Inês on the student's
-`Notes & homework` page and in the lesson's details, for the student under
-Homework. Photo notes and
+Lesson homework stays attached to its lesson: for Inês on that lesson's row
+in the student's dashboard and in the lesson's details, for the student at the
+end of that lesson's row beneath their calendar on Your lessons. Photo notes and
 drafts stay private until Inês reviews and publishes the sheet. Use short,
 level-appropriate European Portuguese instructions, recall and useful practice,
 with answers separate from questions. Offer Do online and Print worksheet.
@@ -86,9 +86,10 @@ Homework speaks the booking journey's language and uses the room it has
 button, tab and chip is a filled paint dab cut to the site's squiggle shapes:
 the sliding `Do online` / `Print worksheet` control, state (`Feedback from
 Inês` in blue), the way back, `Show answers`, Inês's editor links and the coral
-`Homework to review` with its count on a cream drop. The student's list is
-Lessons-page cards, three across where they fit, each hugging its content with
-its splat cropped into the corner and its title in Beth Ellen. The sheet's head
+`Homework to review` with its count on a cream drop. The student reaches a
+sheet from its lesson's row under Past lessons: the row's chip (coral `Start`
+or `Continue`, lilac `With Inês`, blue `Done`) opens the sheet in the card's
+place, and `Your lessons` is the way back. The sheet's head
 is the Lessons hero in small: a lilac band, a large Beth Ellen title and a big
 splat cropping across its right edge, slimmed on a phone on its side. Each
 section opens with its own splat, a small `01` and its Beth Ellen name; on a
@@ -126,6 +127,18 @@ Use these names in review so recurring problems are easy to recognise:
   Dan: "the places of where stuff sits can be more efficient like the buttons
   and stuff rather than running onto new lines unnecessarily"). Check a page
   upright and sideways on a phone, both ways on a tablet, and on desktop.
+  Small cards are compact (9 November 2026, Dan: "the already paid could be
+  at the side of it to save lots of space", for "all little boxes like
+  this"): a status or toggle ends the line it belongs to (`Already paid`
+  beside the lesson's date, `Show weeks` beside the run's day), a fact's
+  name, value and action share one row, a card is as tall as its content,
+  and nothing it says is said by its neighbour or its parent too. On a
+  narrow card an action wraps beneath its line at the right, whole, rather
+  than squeezing it. Its opposite is the stacked card: date, then facts,
+  then a tick, each on a line of its own. On Inês's phone the same holds:
+  `Join Meet` ends the `Happening now` label's line, a receipt's status sits
+  beside the student's name, and a Profile detail's name and its button share
+  a line above what it says.
 - **Decorative motion:** adding ambient loops, click delay, entrance
   choreography for a page's text, controls or sections as it loads, or any
   movement that makes a reader wait or does not explain a state change. The
@@ -510,13 +523,18 @@ usual lesson starts and days off; avoid a wall of administration forms.
 - `Students` combines bringing students in and ongoing care in one searchable list
   (14 October 2026, Dan; regrouped 2 November 2026, Dan: "get everyone logged
   in, pay for previous lessons and able to book their own lessons"). Show each
-  student once, in the first group that fits, each group headed in the small
-  eyebrow with its count and one hint: `Needs you` (payments to check, recent
-  lesson changes, first lessons, homework), `To do` (`Send each their link.`),
-  `Waiting on them` (`Link sent. They haven’t finished yet.`) and `All set`
-  (`Signed in, card saved, nothing open.`), then `Dormant`. Within a group,
-  nearer lessons come first. Above the groups, `6 of 21 students are all set`
-  over a thin blue meter counts active students whose checks are all done.
+  student once, in the first group that fits, each group a vertical lane of
+  cards (9 November 2026, Dan: lanes, not several grids one under another),
+  headed in the small eyebrow with its count and one hint: `Needs you`
+  (payments to check, recent lesson changes, first lessons, homework), `To do`
+  (`Send each their link.`), `Waiting on them` (`Link sent. They haven’t
+  finished yet.`) and `All set` (`Signed in, card saved, nothing open.`), then
+  `Dormant`. Lanes sit side by side where 15.5 rem each fit (no wider than
+  26 rem a lane), wrap into fewer on a narrower screen and stack on a phone
+  with no sideways scroll; cards stack down a lane. A lane reads how far its
+  students have got, so nothing is dragged and nothing writes a status. Within
+  a group, nearer lessons come first. Above the groups, `6 of 21 students are all set`
+  over a thin coral meter counts active students whose checks are all done.
   Count students needing her attention once, not each task; her own next
   steps are on their cards, never in the badge. Meet and unmatched payment
   notices remain visible above the list; never match a payment to a student
@@ -535,32 +553,68 @@ usual lesson starts and days off; avoid a wall of administration forms.
   coral when the move is hers (`Invite`, then `Ask to pay`, then `Ask for
   card`), lilac `Send again` once a link is out and the move is theirs, and
   absent when they are all set. A dormant card shows no checks, only lilac
-  `Come-back email` (or `Invite back` with no email). The card she opened
-  stays in its place until she opens another, so ticking a lesson paid or
-  sending a link never moves it out from under her.
-  Her name opens their profile in the same card: their email (or `No email`),
-  phone, NIF and prices as dabs, then small outline `Add a lesson`, `Edit
-  details`, `Change price`, `Sign-in link` (only when all set, for a lost
-  link) and `Mark as dormant`, then their lessons. A past lesson she added
-  and nothing charged carries the `Already paid` tick in place, so a lesson
-  paid in cash is marked from here and leaves what is open. No duplicate To
-  do list or separate student profile popup.
-  The open card is one top row (9 November 2026, Dan: "more consolidate and
-  simple … with the sliders in the top", Invite and X never stacked): name,
-  the three checks, the `Lessons` / `Notes & homework` slider, the next button,
-  then X. Where that row doesn't fit, the checks go beneath the name; on a
-  phone the slider takes its own line, so the next button always sits beside X.
-  `Notes & homework` is the student's page for what they are learning (9
-  November 2026, Dan: "a homework page for each student and lesson structure
-  … it can build up over time"): her `Plan` for them on a lilac band (a Beth
-  Ellen heading, their latest level as a dab, `Edit plan`), a coral `Add
-  notes · Thu 3 Sept` for the latest lesson without notes, then each lesson's
-  notes newest first as cream cards packed like the lessons. A card says each
-  thing once: the date, which opens it, a level only where it differs from
-  the plan's, its homework as one dab (`Draft`, `With them`, coral `To
-  review`, blue `Done`), then her notes. Opened, a lesson spans the row with
-  the homework steps below. Lessons with no notes fold into one lilac `2
-  earlier lessons without notes`. Homework to review opens this page.
+  `Come-back email` (or `Invite back` with no email). The card she opens is
+  taken out of its lane and shown once at full width as the focused student
+  view. The board and its toolbar wait until she returns with `All students`
+  or Close. A paid lesson or newly sent link never moves the open card; on
+  return its current lane, saved search and notices appear, with focus on its
+  name (or search when a renamed name no longer matches).
+  Their name opens their dashboard in the same card (9 November 2026, Dan: "a
+  simple dashboard for all things for that student, a lesson plan, area,
+  home work … payments", "no repeated information"). One page, no switch:
+  - The top row holds everything she does with the student, so no rail of
+    tools sits below it: name with its pencil, the three checks, her actions
+    (the next button, `Add a lesson`, then `Sign-in link` when all set and
+    `Mark as dormant` or `Mark as active` where they apply, each once) and X,
+    which stays at the top right. All on one line where the card is wide;
+    a little narrower the checks drop under the name; on a phone the actions
+    wrap compactly in a row of their own.
+  - Their facts as rows, each its small-capitals name and its value
+    beneath: `Details` (email or `No email`, phone, NIF), `Price` (each
+    length), `Every lesson` (the facts all their lessons share, such as `In
+    Porto · Added by you`, so no lesson repeats them) and `Plan`, her plan
+    for them with their latest level as a chip beside its name. Nothing here
+    is changed with a big `Change`, `Edit details` or `Write` button (9
+    November 2026, Dan): a value she can change is itself the button, with a
+    tiny lucide pencil at its end, so pressing the value or the pencil opens
+    the existing form, its own field focused (email, phone, NIF, the 60 or the
+    90-minute price, the plan's text). A detail with nothing yet shows a quiet
+    placeholder (`No email`, `Add phone`, `Add NIF`) with the same pencil. A
+    signed-in student's email is only read: it is theirs to change from their
+    account, and the form still says so. Their name has its own pencil beside
+    it in the card's header, a button of its own and never inside the one that
+    opens and closes the card, and the name is one size, closed or open. The
+    forms, their `Save` and `Cancel`, validation and the explicit `Save
+    price` are unchanged; saved or cancelled, keyboard focus returns to the
+    pencil that opened them. The pencil is small to see and, for a finger,
+    reaches a 36 px row or a 44 px target. The plan (4,000 characters) is the
+    same, edited in the row. Where the card is wide these rows are a slim
+    column beside the lessons, kept tight; narrower, they pair up above them.
+  - Their lessons beside, `Upcoming` then `Past & cancelled`, each named in
+    the legend's small capitals. Every lesson is one row of two lines at most:
+    its day and time, which open the lesson's own details in place inside the
+    tile (move, length, cancel, no-show, already paid, refund, homework, a
+    payment link: the same operations, explicit confirmations and busy guards
+    as her timetable's dialog, which stays a dialog there) and whose press area
+    is the whole tile, following its
+    organic edge, with the hover wash and keyboard outline on the tile (the
+    controls beside it sit above that area, so none is swallowed); at the end
+    of that same line, a compact `Already paid` tick (same words, tick and
+    colours, smaller) on a past lesson she added, and its notes as a small
+    pencil named `Add notes`, `Notes` or, while open, `Close`, with its
+    homework as one chip beside it (`Draft`, `With them`, coral `To review`,
+    blue `Done`); on a narrow tile those wrap together beneath. Its own facts
+    are the second line. A level shows only where it
+    differs from theirs now; a few lines of her notes follow. Open details
+    span the list's whole width, one lesson's at a time, as a named region
+    (`Sam’s lesson, Tue 22 Sept, 09:30–10:30`) with no scrim, scroll lock or
+    focus trap and nothing else closed: focus moves to it, `Esc` or its close
+    returns focus to the lesson, a saved change says so in the dashboard's
+    live message. Its notes and its details are never open at once. The pencil
+    opens the homework steps in the row, which then spans the list. Eight
+    past lessons show, the rest behind `12 earlier lessons`. Homework to
+    review opens that lesson's row.
+  No duplicate To do list or separate student profile popup.
   Student cards sit side by side according to the list's available width,
   with one column on phones. An opened card spans the whole list so details,
   lesson forms and history have room; closing it restores the compact card.
@@ -669,20 +723,24 @@ usual lesson starts and days off; avoid a wall of administration forms.
     action. A student who has signed in changes their own email. A missing
     lesson never locks the email field (16 October 2026, Inês). Price uses the same editable rate form as onboarding.
   - Their lessons read Upcoming, then Past & cancelled. A weekly run's weeks
-    still to come are one dashed card (9 November 2026, Dan: "just have them
+    still to come are one dashed row (9 November 2026, Dan: "just have them
     all as one card and you can expand out"): the weekly repeat mark, `Every
-    Wednesday · 09:30–10:30`, `12 weeks, Wed 18 Nov to Wed 3 Feb`, the facts
-    its weeks share, and lilac `Show weeks`, which lists each week as its own
-    card after it. A week moved off the usual slot is counted on the run's
-    card. A lesson on now, a run with one week left and past lessons stay
-    single cards.
+    Wednesday · 09:30–10:30` with lilac `Show weeks` at the end of that line,
+    then `12 weeks, Wed 18 Nov to Wed 3 Feb` and the facts its weeks share.
+    Shown, each week is a row inside it saying only what the run does not. A
+    week moved off the usual slot is counted on the run's row. A lesson on
+    now, a run with one week left and past lessons stay single rows.
   - Add a lesson opens the calendar in the row. Length, location, weekly repeat
     and available times use the full row width as described above. A successful
     addition closes the form and leaves a short confirmation in that row.
     No email is needed to create lessons. Their welcome controls when lesson
     emails begin, with existing quiet-booking copy and safeguards preserved.
   - The Students toolbar stays on one row: Find a student on the left and
-    Add a student on the right. A completed student's closed card has a
+    Add a student on the right. Opening a student makes them the whole screen
+    (9 November 2026, Dan): the board, toolbar and progress give way to that one
+    full-width card, with a compact `All students` button (or the card's Close)
+    to go back. Search, notices and focus come back with the board; the site's
+    navigation stays as it is, and it is not a modal. A completed student's closed card has a
     stretched name-button hit area; its section controls keep their own actions.
   - Add a student opens a short creation dialog with name, optional email,
     phone, NIF, prices and splat. Nothing is emailed. Next: their lessons closes
@@ -751,20 +809,22 @@ usual lesson starts and days off; avoid a wall of administration forms.
   small tablet, held either way, the teacher tools sit in two rows, so no tab
   hides past the edge; wider, they share one row. Sign out is inside Profile.
 - A student's inline Lesson history shows
-  upcoming lessons first, then past and cancelled, one card each with
+  upcoming lessons first, then past and cancelled, one row each with
   the date and time sharing a line where they fit (the year only when it isn't
-  this one), a pill
+  this one; on a narrow row the time drops beneath the date so the tick still
+  fits beside it), a pill
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
-  Each section uses a responsive grid of lesson cards: several across where
-  there is room, one column on phones, packed so a short card leaves no hole
-  under it while still reading in date order. Where the open profile is wide
-  enough for two lessons beside it (9 November 2026, Dan: "this space isn't
-  used in a good way"), the student's details and her tools stack in a narrow
-  column on the left and the lessons fill the rest; narrower, they sit above
-  the lessons in rows. Homework is not on each lesson card: it lives on
-  their `Notes & homework` page.
+  A fact every one of their lessons shares, such as `In Porto` or `Added by
+  you`, is said once on the dashboard's `Every lesson` row, and each lesson
+  keeps only what is its own (9 November 2026, Dan: "we don't need all the
+  information repeating"). With a single lesson, its row says it all.
+  Each section uses a responsive grid of lesson rows: three across where
+  14.5 rem tiles fit, two as the card narrows, one column on phones, packed so
+  a short row leaves no hole under it while still reading in date order (9
+  November 2026, Dan: "this space isn't used in a good way"). An opened weekly
+  run's weeks use the same grid, not two huge columns on a wide display.
   The Price control opens the two fields in place and says how many lessons to
   come moved to it, and `· standard` marks a length she hasn't priced.
   History includes older lessons outside the current week and follows the account
@@ -1322,8 +1382,10 @@ Preserve these desktop and mobile states:
 - the signed-in identity appears once, with the account's menu (9 October
   2026, at Dan's request to fold the separate account bar into the calendar
   card, then to show the menu in the header's empty middle). Its places are
-  `Your lessons`, `Past lessons` and `Edit details` (`Done editing` while
-  editing), then, where the menu folds, `Sign out`, in that order. On a wide
+  `Your lessons` and `Edit details` (`Done editing` while editing), then,
+  where the menu folds, `Sign out`, in that order: past lessons and their
+  homework are part of Your lessons (9 November 2026, Dan: one simple
+  schedule). On a wide
   card (1100 px of booking column and up) they sit open at the top left of
   the header as one sliding control of the booking bar's kind, its blue thumb
   on the card that is showing, and the card's title is kept for screen
@@ -1336,8 +1398,7 @@ Preserve these desktop and mobile states:
   phone shows one `☰` for the site and one clearly different account menu,
   and it opens over the card. Booking is not repeated there: its
   one coral action belongs to the card. `Your lessons` may show the useful
-  upcoming count; `Past lessons` deliberately has no count competing for
-  attention. A running lesson stays upcoming, with `Happening now` and its call,
+  upcoming count. A running lesson stays upcoming, with `Happening now` and its call,
   until its end. History and counts advance with the current clock without a
   reload, on both student and teacher screens. The menu lives in the account
   cards, behind an open lesson too.
@@ -1345,19 +1406,22 @@ Preserve these desktop and mobile states:
   every width, never the open places: booking is not one of the account's
   places, and a slider with nothing marked read as a place missing (11
   October 2026, at Dan's request). That menu's `Your lessons` is the way
-  back. An empty history says so instead of removing the shortcut. The lessons
-  calendar reaches every future commitment. Account destinations open
-  consistently: selecting the current view again keeps it open. Past lessons
-  and Your details each take the lessons card's place, in the same hand and
-  headed the same way: on a wide card the same row, with the places exactly
-  where they were and the thumb on the card showing; on a narrower one the
-  title centred at the top (10 October 2026, at Dan's request) and the name's
-  menu beneath it, which holds the way back to Your lessons. History has two
-  readable columns of records wherever the longest date and time stay on one
-  line (from an 840px card: a tablet on its side, the largest phones on
-  theirs, and desktop) and one on mobile; order records
+  back. The lessons calendar reaches every future commitment, and beneath it
+  on the same card `Past lessons` lists what has happened: one schedule.
+  Each past lesson is a row of two lines, as many across as fit: its day and
+  time with its homework chip or a coral `Cancelled` at the line's end, then
+  its length and place and the homework's Portuguese title. Six show, the rest
+  behind `N earlier lessons`; with none the section is not drawn. Order rows
   by when each lesson ended or was cancelled, newest first, so cancelled
-  future dates do not bury recently completed lessons.
+  future dates do not bury recently completed lessons. Account destinations
+  open consistently: selecting the current view again keeps it open. Your
+  details and a lesson's homework each take the lessons card's place, in the
+  same hand and headed the same way: on a wide card the same row, with the
+  places exactly where they were and the thumb on Your lessons for a
+  homework sheet (its state takes Book's place at that row's end, and the
+  places' `Your lessons` is the way back); on a narrower one the title
+  centred at the top (10 October 2026, at Dan's request) and the name's menu
+  beneath it, with the sheet's own `Your lessons` back.
   Your details reads as a short list of what is saved rather than a form (10
   October 2026, at Dan's request): the student's splat, name, email and NIF,
   each with its value and a quiet outline `Change` beside it, or `Add NIF`
@@ -1688,7 +1752,7 @@ calmer, without new content:
   in the lesson dialog is simply its weekly time, such as `Thursdays at 18:00
   Porto time` on the lesson's own clock, or `No longer repeating` once stopped;
 - the lessons calendar has one name, `Your lessons`: the account menu's item
-  with its count, the way back from booking, Past lessons and Your details, and
+  with its count, the way back from booking, a homework sheet and Your details, and
   `Back to your lessons` after a booking.
 
 ## One voice and one hand — 9 October 2026
@@ -1790,7 +1854,7 @@ as a form:
 
 - on a wide card the header holds only the places, at the top left, and
   `Book a lesson` at the right; the student's name, their splat and `Sign out`
-  live in Your details. On a narrower card Past lessons and Your details
+  live in Your details. On a narrower card Your details and a homework sheet
   centre their title above the name's menu, which holds the way back;
 - Your details lists the splat, name, email and NIF with a `Change`, or `Add
   NIF`, beside each, opening one field at a time in place; `Sign out`, the
@@ -1805,7 +1869,7 @@ as a form:
   the page remembers the account as its session last read it (a week at
   most, forgotten on signing out) and opens on it at once while asking
   again, so Your lessons shows in about a seventh of a second;
-- moving between Your lessons, Past lessons and Your details, the places'
+- moving between Your lessons and Your details, the places'
   thumb glides from where it stood to the card now showing, and that card's
   contents slide in from the side it was reached from (forward from the
   right, back from the left); with reduced motion both simply appear;
@@ -2120,7 +2184,24 @@ gave an email, and only two had ever signed in.
   WhatsApp both signs them in and asks for what is open; the message names
   the total and the panel says `Asks them to pay €45 for 3 lessons. Nothing
   is charged until they agree.` A lesson paid in cash is ticked `Already
-  paid` in their profile instead, and leaves what is open.
+  paid` in their profile instead, and leaves what is open. While she ticks
+  (9 November 2026, Dan), a short block under the list keeps two things
+  apart: `Owed now`, the ticked total, charged once they agree, and `Future
+  lessons`, which are not owed yet and, if they agree, go on their card
+  charged at the end of each lesson (the same words as the card page), each
+  weekly run once (`Every Tuesday, 09:30–10:30 · €25 a lesson · 12 lessons to
+  Tue 24 Nov`, never a row a week; weeks moved to another time are counted
+  (`, 1 week moved`) and weeks at different prices read as a range, `€25–€30
+  a lesson, prices differ`, never one price for all), from her existing
+  lessons for that student by account and never by name; if they can't be read
+  it says so, offers `Check again` (read-only) and the link still works. It
+  says `Nothing is charged until Sam agrees. Making or sending the link
+  doesn’t agree to anything for them.`, the same block follows the link, and
+  her message adds `If you agree, your future lessons are then charged to your
+  card at the end of each lesson.` Where the card is wide the ticked lessons
+  and this block sit side by side, stacked on a phone. Nothing ticked says the
+  link only signs them in, because then it is no approval. Ticking never adds
+  lessons on its own.
 - Arriving is one step to a screen, nothing said twice, their lessons last
   (Dan, 2 November 2026: "rather than repeated"). The welcome a link opens
   keeps the splat mark and a handwritten `Welcome` (a plain card-style
@@ -2184,7 +2265,7 @@ published design system, with spacing given the same care:
 - The Meet pill answers one way: pointed at, a student's `Join Google Meet`
   fills coral as Inês's `Join Meet` does. The account's name pill alone
   still brightens to white, because the hover wash sank it into its card.
-- Your lessons' placeholder holds all four places, `Homework` included, and
+- Your lessons' placeholder holds the account's places, and
   the booking page holds the workspace's room while it is empty, so the
   footer never flashes up the page on a slow phone.
 - One pace for every hover: the surface motion (190 ms on the soft ease).
@@ -2200,7 +2281,12 @@ published design system, with spacing given the same care:
   her tab labels stay readable rather than shrinking to fit. The system's
   twelve gap steps are named tokens (`--gap-hair` 0.3 rem to `--gap-section`
   2 rem); older rules move onto them as they are touched rather than in one
-  sweep that would shift every screen by a pixel. Her expression cards' label
+  sweep that would shift every screen by a pixel. Using the available space
+  well is part of the spec: related labels, values, facts and controls share
+  the row's width before anything adds height (a closed student card's three
+  checks stack down its left with the next step beside them; a weekly run's
+  time, span, shared facts and Show weeks share one top row), and wrap
+  sensibly on a phone rather than squeeze or overflow. Her expression cards' label
   column fits `Tradução à letra` on one line.
 - Each thing is said once: Inês's Expressions tab already offers `View page`,
   so its expressions carry no `Open full page` of their own.
@@ -2208,6 +2294,19 @@ published design system, with spacing given the same care:
   one slim banner (76 px, 64 px on a phone): her wordmark leading home, a
   hairline, `Your schedule`, and the band's splat cut off at the right edge
   (let go on the narrowest phones). Her tools reach the first screen.
+
+## One schedule for students — 9 November 2026
+
+Dan: "even the idea of a student having your lessons, past lessons, homework,
+can that all be consolidated? … into a super simple scheduling system for
+them to view of their own". The student's account is two places, `Your
+lessons` and `Edit details`. Your lessons is one card: the calendar of what is
+to come, then `Past lessons` beneath its key as compact two-line rows, each
+lesson's homework at the end of its own row. The separate Past lessons and
+Homework cards, their places in the menu, the homework card grid and the
+`Completed` pills are gone; a cancelled lesson says `Cancelled` in coral at
+its line's end, and a lesson that simply happened needs no word. The booking
+reference is left to the emails that carry it.
 
 ## Transactional emails — 16 October 2026
 

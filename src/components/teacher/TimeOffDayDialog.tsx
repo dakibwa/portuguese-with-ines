@@ -1,5 +1,6 @@
 "use client";
 
+import { HOME_CLOCK } from "@/lib/tutor";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import type { AdminBooking, AvailabilityException } from "@/lib/admin-api";
@@ -62,7 +63,7 @@ export function TimeOffDayDialog({ date, exceptions, bookings, onSave, onClose }
   return (
     <dialog className="teacher-lesson-dialog teacher-timeoff-dialog" ref={dialogRef} {...backdrop} aria-labelledby="teacher-dayoff-title" onKeyDown={keepDialogFocus} onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
       <button className="teacher-dialog-close" aria-label="Close hours off" type="button" disabled={busy} onClick={onClose}><X size={20} aria-hidden="true" /></button>
-      <p className="teacher-eyebrow">Hours off · Porto time</p>
+      <p className="teacher-eyebrow">Hours off · {HOME_CLOCK}</p>
       <h2 id="teacher-dayoff-title">{dateLabel(date, { weekday: "short", day: "numeric", month: "long" })}</h2>
       <form className="teacher-form" noValidate onSubmit={event => { event.preventDefault(); void save(); }}>
         <div className="teacher-timeoff-times">

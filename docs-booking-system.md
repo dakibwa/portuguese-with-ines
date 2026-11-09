@@ -138,8 +138,9 @@ and none names `recorded`, so it is never charged, chased or put forward as
 paid or owed. It is **not in Receipts**: a record says nothing about money, so
 there is nothing to issue a fatura-recibo for; if she was paid for it, that is
 hers to note outside the site. Her history shows `Recorded`, as does the
-lesson's dialog; the student sees it in Past lessons as `Completed`, with no
-price, like any other past lesson. Homework is set on it as usual.
+lesson's dialog; the student sees it under Past lessons on Your lessons as
+a plain row, with no price, like any other past lesson. Homework is set on it
+as usual.
 
 Moving it to another past time, or cancelling it, is as quiet, since the
 student was never told of it. It cannot be moved into the future (409 `A
@@ -581,7 +582,8 @@ who isn't on the site is refused ("Add them as a student first.", 404), and
 students come from `POST /admin/students`. Each student's card is their profile
 from their first invite to regular use (14 October 2026, Dan; 2 November 2026).
 Its name opens their details, prices and all-time lesson history in place;
-editing details, price and lesson creation use the same card. A past lesson she
+the student fills the Students view, and `All students` returns to the lanes.
+Editing details, price and lesson creation use the same card. A past lesson she
 added and nothing charged can be ticked paid there (`POST
 /admin/bookings/:id/paid`), which takes it out of `unpaidPast`. A new student or a
 free timetable time can start in the creation/student-choice dialog, then opens
@@ -784,15 +786,18 @@ permission path and validation.
 
 ### Notes & homework and her plan
 
-Each student's profile has a `Notes & homework` page (9 November 2026, Dan:
-"a homework page for each student and lesson structure … Ines can input
-notes about each lesson etc and it can build up over time"). It is hers
-alone. `GET /admin/students/:id/notes` returns her plan and every confirmed
+Each student's dashboard (their open card in Students) carries her notes and
+their homework on each past lesson's row, and her plan for them beside their
+details (9 November 2026, Dan: "a homework page for each student and lesson
+structure … Ines can input notes about each lesson etc and it can build up
+over time"; then "a simple dashboard for all things for that student"). It is
+hers alone. The dashboard reads the lessons and the notes side by side and
+matches them by booking id. `GET /admin/students/:id/notes` returns her plan and every confirmed
 lesson of theirs that has started (no-shows left out), newest first, with the
 private notes from `lesson_homework`, its level and one homework state:
 `none`, `draft`, `published` (with them), `review` (submitted, not yet
 returned) or `done` (returned). Notes are still written through the lesson's
-homework editor; the page only reads them.
+homework editor; the dashboard only reads them.
 
 Migration `0038-student-plans.sql` adds `students.lesson_plan` and
 `students.lesson_plan_updated_at`. `POST /admin/students/:id/plan` with
@@ -1057,20 +1062,21 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   never blocks a change. The old `/my-lessons` and `/booking` paths remain valid
   for links already in the world, then normalise to `/book`.
 - **The signed-in account lives in the lessons card.** The account has one
-  menu: `Your lessons` with the upcoming count, `Past lessons` with no badge,
-  `Edit details` and `Sign out`. On a wide card its places sit open in the
-  header as one sliding control, with the name and `Sign out` beneath it at
-  the left; on a narrower one the student's name, under the heading of
+  menu: `Your lessons` with the upcoming count, `Edit details` and `Sign out`.
+  Your lessons is one schedule (9 November 2026): the calendar of lessons to
+  come, then `Past lessons` beneath it on the same card, each a two-line row
+  with its homework (`/me/homework`, matched by the lesson's start) at the
+  row's end. On a wide card the places sit open in the header as one sliding
+  control; on a narrower one the student's name, under the heading of
   whichever account card is showing, opens it. Booking lives on the card, not
-  in the menu. Choosing your or past lessons opens a complete view and switches
-  away from any active booking or lesson-management detail. Clicking the
-  current destination keeps it open. Past lessons and Your details take the
-  calendar card's place, headed the same way, with a `Your lessons` way back
-  where the menu is folded;
-  neither keeps the future calendar, and `Done editing` returns to Your
-  lessons. An empty history gets an empty state rather than losing the menu
-  item. While booking the menu waits, and the booking bar's `Your lessons` is
-  the way back.
+  in the menu. Choosing Your lessons switches away from any active booking or
+  lesson-management detail, and clicking the current destination keeps it
+  open. Your details and a lesson's homework sheet take the calendar card's
+  place, headed the same way; `Done editing`, the sheet's `Your lessons` and
+  the places return to Your lessons, a sheet saving its answers first. A
+  homework list that cannot be read leaves the past lessons showing with a
+  quiet `Try again`. While booking the menu waits, and the booking bar's
+  `Your lessons` is the way back.
   There is only one `Booking`
   destination in the site navigation — no separate `My lessons` tab — because
   booking and managing lessons are the same workspace.
@@ -1336,6 +1342,10 @@ while validation runs. Inês's explicit calendar additions retain their override
   rendering. Invalid dates, missing lesson objects, malformed series/exceptions
   and unreadable recurring previews produce recoverable feedback, preserving
   the session. An invalid skipped-date reply cannot invent a clash in 1970.
+  An availability reply's horizon, when present, must be a whole number from
+  1 through 365 days, matching the Worker's settings limit. Invalid horizons
+  are refused before caching or building calendar weeks and offer the usual
+  retry; an older reply without a horizon keeps the display fallback.
 - Booking creation, cancellation and move replies validate the returned
   lesson before showing success. Invalid selection/series dates and teacher
   booking acknowledgments are rejected too, retaining the form without
@@ -2367,6 +2377,66 @@ a different origin, pass `--var ALLOWED_ORIGIN:… --var SITE_URL:…` to
 
 ## Site configuration
 
+The tutor's identity is not configuration here: name, brand, language, city,
+time zone, currency, domain, sender, booking reference prefix and calendar UID
+domain come from [tutors/ines/tutor.json](./tutors/ines/tutor.json), read by
+`workers/booking/tutor.mjs` (`tutorOf(env)`) and `src/lib/tutor.ts`. The
+Worker's `SITE_URL`, `MAIL_FROM` and `MAIL_SENDER_ADDRESS` still override the
+record's site URL and sender, which is how staging and local runs point
+elsewhere. Never change `bookings.referencePrefix` or
+`bookings.calendarUidDomain` for a tutor who has lessons: calendars match
+updates by the UID, and students and receipts quote the reference.
+
+### More than one tutor
+
+One Worker can serve several tutors. `workers/booking/directory.mjs` lists them
+(`TUTORS`), and each has their own D1 database, bound under the name in their
+record's `database`. Inês's is `DB`, as it always was.
+
+- **Whose request.** A request is a tutor's when its `Origin` is one of their
+  `site.origins`, or when it arrives on one of their `api.hosts`. Everything
+  else, including the Stripe webhook, the Google Calendar callback and the
+  release probe, is Inês's, so her site behaves exactly as before.
+- **Inês's env is the deploy's own object, untouched.** Another tutor's env is
+  built from nothing: their database, the shared mail, marking and Google
+  sign-in keys, signing secrets (`BOOKING_TOKEN_SECRET`, `ADMIN_TOKEN`) derived
+  for that tutor alone so a manage link or session from one never opens
+  another, and safe switches: email held as a dry run, Google Calendar and
+  homework marking off, until their record's `switches` turn them on. None of
+  Inês's Stripe keys, calendar key, teacher email or private rate codes reach
+  them.
+- **Fail closed.** A tutor whose database binding is missing gets a 500 on every
+  call, never someone else's data; the scheduled sweeps skip and log them
+  (`tutor-database-missing`) and run once for every other tutor.
+- **Expressions is Inês's add-on**, not part of the platform (9 November 2026,
+  Dan). Only a record with `features.expressions` serves its routes; for any
+  other tutor they answer 404, and the directory refuses a second tutor who
+  claims it.
+
+Adding a tutor: a folder under `tutors/` with their `tutor.json`, one line in
+`TUTORS`, a D1 database made from `schema.sql` and then the output of `node
+workers/booking/tutor-seed.mjs <id>`, and its binding in `wrangler.jsonc` under
+the record's `database`. Never `seed.sql`: it is Inês's prices, hours and name.
+A new tutor starts with their record's rules, their name, and the three lesson
+types switched off and unpriced, with no teaching hours, so nothing can be
+booked until they set their prices and hours. `node
+workers/booking/tenancy-test.mjs` (part of `npm run test:booking`) proves two
+tutors never see each other's students, lessons, secrets or name.
+
+- **Their own clock and currency.** Each request, and each tutor's share of the
+  scheduled sweeps, runs inside `asTutor` (`tutor.mjs`), so `homeZone()` in
+  `time.mjs`, prices in `money.mjs` and `stripe.mjs`, the calendar file's PRODID
+  and UID domain, the email images, and every helper whose `tutor` defaults to
+  `currentTutor()` are that tutor's. Outside a request, as in the unit tests,
+  they are Inês's. A tutor in New York charging dollars gets slots, emails and
+  fees on New York time and in US$, while Inês's request at the same moment
+  stays on Porto time in euros (`tenancy-test.mjs`).
+
+Still Inês's alone until later steps: Stripe payments (each tutor's own
+connected account), Google Calendar (its callback has to carry the tutor), the
+site itself (built for her), the Portuguese tax number and Portal das Finanças
+reminders, and `'porto'` as the stored key for an in-person lesson.
+
 ```bash
 NEXT_PUBLIC_BOOKING_API_BASE_URL=https://ines-booking.<subdomain>.workers.dev
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
@@ -2589,6 +2659,23 @@ the invite is a plain sign-in link (`POST /admin/students/:id/invite-link`). A s
 she sends it on WhatsApp, and confirming its sign-in is what verifies the
 account before a card is saved.
 
+While she ticks, the invite panel on Students says what is owed now apart from
+what agreeing would also do (9 November 2026), so she does not send a link
+whose reach she cannot see: `Owed now` is the ticked total, charged once they
+agree; `Future lessons` are not owed yet, and are the lessons she added, still
+to come, with nothing settled on them (confirmed, `not_required`, not paid by
+hand, not already charging), which agreeing puts on their card, charged at the
+end of each lesson (each weekly run once, as its usual day and time, its price
+per lesson, or the range where its weeks differ, how many lessons run to when
+and how many weeks were moved; never a row a week). They are read
+from the existing `GET /admin/bookings?from=<now>`, matched to the student by
+`student_id` and, only for an older lesson with no account, by exact email;
+never by name. If that read fails the panel says so, offers a read-only `Check
+again`, and still makes the link.
+Nothing ticked says the link only signs them in, with nothing to agree to,
+because that path is `invite-link`, not an approval. Making or sending the
+link charges and agrees to nothing, and the ticked ids it names are unchanged.
+
 After signing in, the student reviews each lesson's date, time and price and
 their total, and sees the lessons still to come that Inês added (each weekly
 run once) that the same agreement then pays for, then actively agrees to those lessons and standing automatic
@@ -2627,7 +2714,8 @@ link**, ticks the lessons they owe, then **Create link**, and sends it with
 international form or as a Portuguese mobile, otherwise WhatsApp's own chat
 picker) or **Copy link**. The WhatsApp message is one short line in her voice
 with the lesson count and total, then the link; she can edit it before
-sending. Confirm any direct payment with Inês first and record it as
+sending. From the invite on Students it adds `If you agree, your future
+lessons are then charged to your card at the end of each lesson.` Confirm any direct payment with Inês first and record it as
 **Already paid** instead of requesting another payment.
 
 The student signs in (`Sign in to pay for your lessons. No password

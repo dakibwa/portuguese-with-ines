@@ -1,5 +1,6 @@
 "use client";
 
+import { IN_PERSON } from "@/lib/tutor";
 import { type ReactNode } from "react";
 import type { AdminBooking, AdminStudent } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatMoneyCents, formatSlotTime } from "@/lib/booking-api";
@@ -9,7 +10,7 @@ const SHOWN = 3;
 
 const day = (at: string) => dateLabel(dateKey(new Date(at)), { weekday: "short", day: "numeric", month: "short" });
 const range = (booking: AdminBooking) => `${formatSlotTime(booking.starts_at)}–${formatSlotTime(booking.ends_at)}`;
-const place = (booking: AdminBooking) => (booking.location === "porto" ? "In Porto" : "Online");
+const place = (booking: AdminBooking) => (booking.location === "porto" ? IN_PERSON : "Online");
 const facts = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).join(" · ");
 
 /** A trial keeps its name; every other lesson reads as its length. */

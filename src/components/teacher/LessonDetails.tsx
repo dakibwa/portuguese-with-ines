@@ -1,6 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { X, ArrowLeft, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
   addedByTeacher,
@@ -46,6 +47,14 @@ type Props = {
   onClose: () => void;
   onChanged: (message: string) => void;
   initialAction?: "view" | "refund";
+  /**
+   * A modal dialog over the page, as her timetable opens a lesson, or the same
+   * details laid out in place within a student's dashboard: no scrim, no page
+   * scroll lock, no focus trap, and nothing else on the page closed.
+   */
+  presentation?: "dialog" | "inline";
+  /** Inline, whether a change is being saved, so the page around it waits. */
+  onBusy?: (busy: boolean) => void;
 };
 
 /** "Tue 8 Dec", as her timetable names a day. */
@@ -120,8 +129,17 @@ export function LessonDetails({
   onClose,
   onChanged,
   initialAction = "view",
+  presentation = "dialog",
+  onBusy,
 }: Props) {
+  const inline = presentation === "inline";
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const ids = useId();
+  // Inline, ids carry the instance; the timetable's dialog keeps the ones it
+  // has always had.
+  const noShowHintId = inline ? `teacher-no-show-hint-${ids}` : "teacher-no-show-hint";
+  const cancelMessageId = inline ? `teacher-cancel-message-${ids}` : "teacher-cancel-message";
   const changed = useRef(false);
   const [action, setAction] = useState<"view" | "move" | "length" | "cancel" | "no-show" | "homework" | "refund">(
     initialAction,
@@ -202,6 +220,21 @@ export function LessonDetails({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    if (inline) {
+      // In place: focus moves to the named details, and back to the lesson
+      // that opened them (or, once something changed and the lessons
+      // reloaded, to their stable container) when they close. If focus has
+      // already gone elsewhere on the page, such as to another lesson that was
+      // pressed to replace these, it stays there.
+      const panel = panelRef.current;
+      panel?.focus();
+      return () => {
+        const active = document.activeElement;
+        if (active && active !== document.body && !panel?.contains(active)) return;
+        const target = changed.current || !previous?.isConnected ? afterChangeFocusRef.current : previous;
+        target?.focus({ preventScroll: true });
+      };
+    }
     const releaseScroll = lockPageScroll();
     const dialog = dialogRef.current;
     dialog?.showModal();
@@ -212,7 +245,27 @@ export function LessonDetails({
       // keyboard position at the stable week heading throughout that reload.
       restoreDialogFocus(changed.current ? afterChangeFocusRef.current : previous);
     };
-  }, [afterChangeFocusRef]);
+  }, [afterChangeFocusRef, inline]);
+
+  // Inline, the dashboard waits while a change is being saved, and is released
+  // if these details leave mid-way (a saved change closes them at once).
+  const reportedBusy = useRef(false);
+  useEffect(() => {
+    if (!inline) return;
+    reportedBusy.current = busy;
+    onBusy?.(busy);
+    // Only a change in busy is reported, not each new callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy, inline]);
+  useEffect(() => () => { if (reportedBusy.current) onBusy?.(false); },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []);
+  // A step replaces the button that opened it, so focus follows to the details.
+  const firstAction = useRef(true);
+  useEffect(() => {
+    if (firstAction.current) { firstAction.current = false; return; }
+    if (inline) panelRef.current?.focus({ preventScroll: true });
+  }, [action, inline]);
 
   const backToLesson = (
     <button
@@ -279,30 +332,39 @@ export function LessonDetails({
     }
   }
 
-  return (
-    <dialog
-      className={`teacher-lesson-dialog${action === "homework" ? " teacher-lesson-dialog--homework" : ""}`}
-      ref={dialogRef}
-      {...backdropHandlers}
-      aria-labelledby="teacher-lesson-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        if (!busy) onClose();
-      }}
+  const status = (
+    <p className={`lesson-calendar__status${booking.status === "cancelled" ? " lesson-calendar__status--cancelled" : addedByTeacher(booking) ? " lesson-calendar__status--added" : ""}`}>
+      {booking.status === "cancelled" ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
+      {booking.status === "cancelled" ? "Cancelled" : addedByTeacher(booking) ? "Added by you" : "Booked"}
+    </p>
+  );
+  const closeButton = (
+    <button
+      className="teacher-dialog-close"
+      data-homework-exit
+      type="button"
+      aria-label="Close lesson details"
+      disabled={busy}
+      onClick={onClose}
     >
-      {/* Set as a student's own lesson is (10 October 2026, at Dan's
-          request): the status, who, then when in bold with its length and
-          place beneath, and the actions side by side. */}
-      <button
-        className="teacher-dialog-close"
-        data-homework-exit
-        type="button"
-        aria-label="Close lesson details"
-        disabled={busy}
-        onClick={onClose}
-      >
-        <X size={20} aria-hidden="true" />
-      </button>
+      <X size={20} aria-hidden="true" />
+    </button>
+  );
+  // Set as a student's own lesson is (10 October 2026, at Dan's request): the
+  // status, who, then when in bold with its length and place beneath, and the
+  // actions side by side. Inline, the lesson's own row above already says who
+  // and when, so only its status, call link and close remain.
+  const head = inline ? (
+    <>
+      <div className="teacher-lesson-inline__head">
+        {status}
+        {closeButton}
+      </div>
+      {action === "view" ? <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} /> : null}
+    </>
+  ) : (
+    <>
+      {closeButton}
       <div className="teacher-dialog-top">
         {/* The student's own splat when they have chosen one, so Inês knows
             them at a glance (10 October 2026, at Dan's request). */}
@@ -313,10 +375,7 @@ export function LessonDetails({
         <h2 id="teacher-lesson-title">{booking.student_name}</h2>
         {/* Its status beside the name rather than a row of its own
             (27 October 2026, Dan: it felt disjointed). */}
-        <p className={`lesson-calendar__status${booking.status === "cancelled" ? " lesson-calendar__status--cancelled" : addedByTeacher(booking) ? " lesson-calendar__status--added" : ""}`}>
-          {booking.status === "cancelled" ? <CircleX size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
-          {booking.status === "cancelled" ? "Cancelled" : addedByTeacher(booking) ? "Added by you" : "Booked"}
-        </p>
+        {status}
       </div>
       <div className="teacher-lesson-when">
         {/* The date, then the time on a line of its own, rather than the
@@ -330,6 +389,10 @@ export function LessonDetails({
           <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
         ) : null}
       </div>
+    </>
+  );
+  const main = (
+    <>
       {/* The lesson, not the student (13 October 2026, Dan: "this page is
           more about the lesson"): its place, length, price and how it is
           paid as dabs, as her history shows a lesson. Who they are lives in
@@ -337,11 +400,11 @@ export function LessonDetails({
       {action === "view" ? (
         <>
           <ul className="booking-payment-facts teacher-lesson-facts">
-            <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
+            <li>{booking.location === "porto" ? IN_PERSON : "Online"}</li>
             <li>{formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: minutes })}</li>
             {money ? <li>{money}</li> : null}
             {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
-            {awaiting ? <li>{noEmail ? "No email yet: add it under Edit details, then send their welcome" : "Not emailed yet: send their welcome from Students"}</li> : null}
+            {awaiting ? <li>{noEmail ? "No email yet: add it from their details on Students, then send their welcome" : "Not emailed yet: send their welcome from Students"}</li> : null}
           </ul>
           {/* What happened, recorded side by side: paid by hand, and a
               no-show (27 October 2026, Dan). */}
@@ -378,7 +441,7 @@ export function LessonDetails({
               {/* Short enough to sit beside Already paid on a phone; marked,
                   it reads as ticked, as that does. */}
               <button
-                aria-describedby={noShowLater ? "teacher-no-show-hint" : undefined}
+                aria-describedby={noShowLater ? noShowHintId : undefined}
                 aria-label={noShow ? "Undo no-show" : "Mark no-show"}
                 className={`paid-tick paid-tick--action${noShow ? " is-checked" : ""}`}
                 type="button"
@@ -389,7 +452,7 @@ export function LessonDetails({
                 No-show
               </button>
               {noShowLater ? (
-                <p className="teacher-no-show__hint" id="teacher-no-show-hint">
+                <p className="teacher-no-show__hint" id={noShowHintId}>
                   Available {formatSlotTime(booking.starts_at)}–{formatSlotTime(noShowCloses.toISOString())}
                 </p>
               ) : null}
@@ -544,7 +607,7 @@ export function LessonDetails({
                   />
                 </label>
                 <label>
-                  <span>Time in Porto</span>
+                  <span>Time in {TUTOR_CITY}</span>
                   <input
                     type="time"
                     required
@@ -617,10 +680,10 @@ export function LessonDetails({
               </ul>
               {action === "cancel" && !awaiting && !recorded ? (
                 <div className="teacher-form teacher-cancel-message">
-                  <label htmlFor="teacher-cancel-message">
+                  <label htmlFor={cancelMessageId}>
                     <span>Add a message to the email <span className="teacher-field-optional">(optional)</span></span>
                     <textarea
-                      id="teacher-cancel-message"
+                      id={cancelMessageId}
                       rows={3}
                       maxLength={1000}
                       placeholder="Sorry, I can’t make it. Shall we find another time?"
@@ -661,6 +724,36 @@ export function LessonDetails({
           {error}
         </p>
       ) : null}
+    </>
+  );
+
+  if (inline) {
+    return (
+      <section
+        aria-label={`${booking.student_name}’s lesson, ${shortDay(booking.starts_at)}, ${formatSlotTime(booking.starts_at)}–${formatSlotTime(booking.ends_at)}`}
+        className="teacher-lesson-dialog teacher-lesson-dialog--inline"
+        onKeyDown={event => { if (event.key === "Escape" && action === "view" && !busy) onClose(); }}
+        ref={panelRef}
+        tabIndex={-1}
+      >
+        {head}
+        {main}
+      </section>
+    );
+  }
+  return (
+    <dialog
+      className={`teacher-lesson-dialog${action === "homework" ? " teacher-lesson-dialog--homework" : ""}`}
+      ref={dialogRef}
+      {...backdropHandlers}
+      aria-labelledby="teacher-lesson-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!busy) onClose();
+      }}
+    >
+      {head}
+      {main}
     </dialog>
   );
 }

@@ -10,7 +10,7 @@
 .teacher-homework { container: homework / inline-size; }
 .homework-worksheet { container: worksheet / inline-size; }
 /* An opened worksheet needs the whole row; closed lessons stay in the grid. */
-.teacher-history-lesson:has(.teacher-history-homework[aria-expanded="true"]) { grid-column: 1 / -1; }
+.teacher-history-lesson:has(:is(.teacher-history-homework, .teacher-pencil)[aria-expanded="true"]) { grid-column: 1 / -1; }
 .teacher-history-lesson .teacher-homework { margin-top: 1rem; }
 .teacher-homework fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .teacher-homework .button, .student-homework .button { gap: 0.5rem; white-space: nowrap; }
@@ -408,44 +408,6 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .teacher-homework .segmented.homework-toggle, .teacher-homework .segmented.homework-mark { background: rgba(170, 164, 230, 0.22); }
 .teacher-homework :is(.homework-editor__question, .homework-review__question) { background: rgba(170, 164, 230, 0.13); }
 
-/* The student's list: one Lessons-page card for each lesson's sheet, its
-   splat coming in from the corner and turning when pointed at, the title in
-   Beth Ellen, and its state as a dab at the foot. */
-.homework-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(17.5rem, (100% - 3 * 1.25rem) / 4)), 1fr)); align-items: start; gap: 1.25rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
-.homework-list li { min-width: 0; }
-.homework-list__item {
-  position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; width: 100%;
-  padding: 1.6rem 1.5rem 1.5rem; border: 1.5px solid var(--rule-soft); border-radius: 58px 24px 52px 30px / 27px 56px 25px 50px;
-  background: var(--paper-light); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background-color var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
-}
-.homework-list li:nth-child(3n + 2) .homework-list__item { border-radius: 46px 30px 60px 22px / 34px 58px 24px 52px; }
-.homework-list li:nth-child(3n) .homework-list__item { border-radius: 30px 60px 26px 54px / 55px 26px 58px 29px; }
-.homework-list__item:hover:not(:disabled) { border-color: var(--lavender); background-color: #f1eaf1; }
-.homework-list__item:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.homework-list__mark { position: absolute; top: -24px; right: -24px; width: 108px; height: 108px; pointer-events: none; transition: rotate 720ms var(--motion-spring), scale 720ms var(--motion-spring); }
-.homework-list__text { display: grid; gap: 0.55rem; min-width: 0; }
-.homework-list__text small { padding-right: 4.75rem; }
-.homework-list__text strong { padding-right: 2.75rem; text-wrap: balance; }
-.homework-list__text small { color: var(--lavender-ink); font: 700 0.72rem/1.4 var(--ui); letter-spacing: 0.14em; text-transform: uppercase; }
-.homework-list__text strong { font: 400 clamp(1.8rem, 2.6vw, 2.2rem)/1.2 var(--display); letter-spacing: -0.03em; overflow-wrap: anywhere; }
-.homework-list__state {
-  display: inline-flex; align-items: center; gap: 0.45rem; min-height: 40px; padding: 0.5rem 1rem; border-radius: var(--squiggle-chip);
-  background: rgba(170, 164, 230, 0.26); color: var(--lavender-ink); font: 700 0.72rem/1.2 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
-}
-.homework-list__item--new .homework-list__state, .homework-list__item--started .homework-list__state { border-radius: var(--squiggle-button-alt); background: var(--coral-action); color: var(--paper-light); }
-.homework-list__item--returned .homework-list__state { background: var(--blue-deep); color: var(--paper-light); }
-.homework-list__state svg { transition: transform 160ms var(--motion-ease); }
-.homework-list__item:hover:not(:disabled) .homework-list__state svg:last-child { transform: translateX(3px); }
-@media (prefers-reduced-motion: no-preference) {
-  .homework-list__item:hover:not(:disabled) .homework-list__mark { rotate: 8deg; scale: 1.05; }
-  .homework-list li:nth-child(even) .homework-list__item:hover:not(:disabled) .homework-list__mark { rotate: -8deg; }
-}
-/* Nothing yet: a splat and one quiet line, as the account card opens. */
-.homework-empty {
-  display: flex; flex-direction: column; align-items: center; gap: 1.1rem; max-width: 28rem; margin: 0 auto; padding: 3rem 1rem 2.5rem;
-  font-size: 1.05rem; line-height: 1.5; text-align: center;
-}
-.homework-empty__mark { width: 5.5rem; height: 5.5rem; }
 
 /* Saving and sending: the note on the left, the two actions together. */
 .homework-save { margin-top: 1.75rem; }
@@ -589,9 +551,20 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .homework-print { display: none; }
 
 
+/* Where the account's places stand open, Your lessons there is already the
+   way back, so the sheet's own Back steps aside and its state takes Book's
+   place at the right of that row: nothing said twice, no row of its own. */
+@container booking (min-width: 1100px) {
+  .my-lessons__homework > .account-card__head + .student-homework > .homework-toolbar {
+    min-height: 52px; margin-top: calc(-52px - 0.85rem); justify-content: flex-end; pointer-events: none;
+  }
+  .my-lessons__homework > .account-card__head + .student-homework > .homework-toolbar > * { pointer-events: auto; }
+  .my-lessons__homework > .account-card__head + .student-homework > .homework-toolbar > .homework-back { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .homework-list__mark, .homework-list__state svg, .homework-back svg { transition: none; }
-  .homework-list__item:hover:not(:disabled) .homework-list__state svg:last-child, .homework-back:hover:not(:disabled) svg { transform: none; }
+  .homework-back svg, .past-lesson__homework svg { transition: none; }
+  .homework-back:hover:not(:disabled) svg, .past-lesson__homework:hover svg:last-child { transform: none; }
 }
 
 @media (max-width: 600px) {
@@ -602,9 +575,6 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
   .homework-settings .button, .homework-publish .button { width: 100%; margin-left: 0; }
   .homework-save__actions { width: 100%; }
   .homework-save__actions .button { flex: 1; padding-inline: 0.6rem; }
-  .homework-list__item { padding: 1.35rem 1.25rem 1.25rem; }
-  .homework-list__mark { top: -18px; right: -18px; width: 88px; height: 88px; }
-  .homework-list__text small { padding-right: 3.75rem; }
   /* The head's splat moves into the corner, so it costs the phone no band of its own. */
   .homework-sheet:not(.homework-sheet--paper) .homework-sheet__head { padding-right: var(--pad); }
   .homework-sheet:not(.homework-sheet--paper) :is(.homework-sheet__meta, .homework-sheet__head h3) { padding-right: 4.5rem; }
@@ -624,7 +594,6 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
   .homework-sheet__head h3 { font-size: 2.3rem; }
   .homework-sheet__head .short-rule { margin-block: 0.7rem 0.6rem; }
   .homework-sheet__splat { width: 6.5rem; height: 6.5rem; }
-  .homework-list__item { padding-block: 1.1rem; }
 }
 
 @media print {

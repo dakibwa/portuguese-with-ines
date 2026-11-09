@@ -1743,13 +1743,13 @@ await test("sixteen templates cover every email, each in both colour schemes and
   const money = { amount: "€5", noticeHours: 14, nif: "123456789", longWhen: "Tuesday, 13 October 2026 at 17:00", studentName: "Ana Silva" };
   const each = [
     templates.studentBooked({ ...lesson, first: "Ana", price: "€25", policy: "card", notice: "14 hours", fee: "€5", manageUrl: "https://x.invalid/m" }),
-    templates.studentBooked({ ...lesson, first: "Ana", byInes: true, price: "€25", policy: "unpaid", notice: "14 hours", fee: "€5", lessonsUrl: "https://x.invalid/l", run }),
+    templates.studentBooked({ ...lesson, first: "Ana", byTeacher: true, price: "€25", policy: "unpaid", notice: "14 hours", fee: "€5", lessonsUrl: "https://x.invalid/l", run }),
     templates.lessonBookedTeacher({ ...lesson, student, run, extended: true }),
     templates.lessonReminder({ ...lesson, first: "Ana", manageUrl: "https://x.invalid/m", cutoff: "Tue 13 Oct, 03:00", fee: "€5" }),
     templates.lessonReminder({ ...lesson, first: "Ana", linkOnly: true, meetingUrl: "https://meet.google.com/abc-defg-hij" }),
     templates.studentMoved({ ...lesson, first: "Ana", price: "€25", policy: "again", notice: "14 hours", fee: "€5" }),
     templates.lessonMovedTeacher({ ...lesson, student, notice: "14 hours", run }),
-    templates.studentCancelled({ ...lesson, first: "Ana", byInes: true }),
+    templates.studentCancelled({ ...lesson, first: "Ana", byTeacher: true }),
     templates.lessonCancelledTeacher({ student, run: { count: "2 lessons", dates: "Tuesday 13 October 2026 at 17:00", kept: { count: 1, dates: "Tuesday 6 October 2026 at 17:00" } } }),
     templates.paymentReceipt({ ...lesson, ...money, first: "Ana", item: "fee" }),
     templates.paymentReceivedTeacher({ ...lesson, ...money, item: "fee" }),

@@ -1,5 +1,6 @@
 "use client";
 
+import { LANGUAGE_CODE, TUTOR_NAME } from "@/lib/tutor";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ExpressionImage, ExpressionMeanings, ExpressionUsage } from "@/components/expressions/ExpressionCard";
@@ -14,7 +15,7 @@ import { prefetchTranslations } from "@/lib/expression-translations-api";
 type Paints = { shown: PaintKey | null; next: PaintKey };
 
 const TITLE = "Uma expressão para ti";
-const EXHAUSTED = "You’ve explored every expression. Come back when Inês adds more.";
+const EXHAUSTED = `You’ve explored every expression. Come back when ${TUTOR_NAME} adds more.`;
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -258,7 +259,7 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
   );
   return (
     <section className={`student-expressions${fullPage ? " student-expressions--page" : ""}`} aria-labelledby="student-expressions-title" ref={section} tabIndex={-1}>
-      <h2 className="visually-hidden" id="student-expressions-title" lang="pt-PT">{TITLE}</h2>
+      <h2 className="visually-hidden" id="student-expressions-title" lang={LANGUAGE_CODE}>{TITLE}</h2>
       <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
       {canPaint || expression ? (
         <div
@@ -272,10 +273,10 @@ export function StudentExpressions({ studentId, token, source, fullPage = false 
         >
           <ExpressionPainting ref={painting} start={start} onUnavailable={() => setUnpainted(true)} />
           {/* Painted, the phrase is named in words for assistive technology, or in the hand where the sheet cannot be painted. */}
-          {painted && expression ? <h3 className="expression-reading__title" lang="pt-PT">{expression.expression}</h3> : null}
+          {painted && expression ? <h3 className="expression-reading__title" lang={LANGUAGE_CODE}>{expression.expression}</h3> : null}
           {reading ? (
             // While another is painted, the last reading waits in wax where it stands, out of reach.
-            <article className="expression-card expression-reading__text" inert={Boolean(busy)} key={reading.id} lang="pt-PT" ref={result} tabIndex={-1}>
+            <article className="expression-card expression-reading__text" inert={Boolean(busy)} key={reading.id} lang={LANGUAGE_CODE} ref={result} tabIndex={-1}>
               <h3 className="expression-reading__title">{reading.expression}</h3>
               <div className="expression-reading__facts">
                 <ExpressionMeanings item={reading} />

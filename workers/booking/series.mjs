@@ -16,7 +16,7 @@
  */
 
 import { isSlotBookable } from "./availability.mjs";
-import { PORTO, addDaysToKey, dateKey, parseDateKey, zonedParts, zonedToUtc } from "./time.mjs";
+import { homeZone, addDaysToKey, dateKey, parseDateKey, zonedParts, zonedToUtc } from "./time.mjs";
 
 /**
  * The three bounded runs offered by the booking flow.
@@ -45,11 +45,11 @@ export function normaliseWeeks(value) {
  */
 export function slotOf(startAt) {
   const start = new Date(startAt);
-  const { year, month, day, hour, minute } = zonedParts(start, PORTO);
+  const { year, month, day, hour, minute } = zonedParts(start, homeZone());
   // getUTCDay on a UTC-midnight of the Porto date gives the Porto weekday
   // without being pushed over a boundary by the offset.
   const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  return { weekday, minuteOfDay: hour * 60 + minute, dateKey: dateKey(start, PORTO) };
+  return { weekday, minuteOfDay: hour * 60 + minute, dateKey: dateKey(start, homeZone()) };
 }
 
 /**
@@ -65,7 +65,7 @@ export function occurrenceInstants({ fromKey, minuteOfDay, count }) {
   for (let i = 0; i < count; i += 1) {
     const parsed = parseDateKey(key);
     if (!parsed) break;
-    out.push({ key, startAt: zonedToUtc(parsed.year, parsed.month, parsed.day, minuteOfDay, PORTO) });
+    out.push({ key, startAt: zonedToUtc(parsed.year, parsed.month, parsed.day, minuteOfDay, homeZone()) });
     key = addDaysToKey(key, 7);
   }
   return out;
@@ -136,7 +136,7 @@ async function teacherWeekProblem(env, occurrence, now) {
  * the caller can skip the work entirely on the common path.
  */
 export function outstandingFor(series, { bookedCount, now }) {
-  const todayKey = dateKey(now, PORTO);
+  const todayKey = dateKey(now, homeZone());
   const startKey = series.filled_to ? addDaysToKey(series.filled_to, 7) : todayKey;
 
   if (series.occurrences === null || series.occurrences === undefined) {

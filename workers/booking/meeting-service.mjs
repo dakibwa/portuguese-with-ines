@@ -1,6 +1,7 @@
 import { CALENDAR_SCOPE, calendarConfigured, encryptCalendarToken, decryptCalendarToken, ensureAppCalendar, ensureCalendarMeeting, cancelCalendarMeeting } from "./google-calendar.mjs";
 import { verifyGoogleIdToken } from "./google.mjs";
 import { calendarUid } from "./ics.mjs";
+import { tutorOf } from "./tutor.mjs";
 
 const encoder = new TextEncoder();
 const enabled = env => env.GOOGLE_CALENDAR_ENABLED === "1" && calendarConfigured(env);
@@ -169,8 +170,8 @@ export async function prepareMeeting(env, input) {
         // the same request, so an event left without a room was asked for it
         // again and again under the one id and never given one. No Meet link
         // had reached any lesson since the calendar was connected.
-        requestId: `pwi-${row.id}-${row.sequence}-${row.meeting_attempts ?? 0}-${now.getTime().toString(36)}`, summary: `Portuguese lesson · ${row.student_name}`,
-        description: `${row.location === "online" ? "Online" : "In-person Porto"} Portuguese lesson. Booking reference: ${row.reference}. Manage lessons on https://portuguesewithines.com/schedule/`,
+        requestId: `pwi-${row.id}-${row.sequence}-${row.meeting_attempts ?? 0}-${now.getTime().toString(36)}`, summary: `${tutorOf(env).language.name} lesson · ${row.student_name}`,
+        description: `${row.location === "online" ? "Online" : `In-person ${tutorOf(env).place.city}`} ${tutorOf(env).language.name} lesson. Booking reference: ${row.reference}. Manage lessons on ${tutorOf(env).site.url}/schedule/`,
         online: row.location === "online",
         startAt: row.starts_at, endAt: row.ends_at,
       });

@@ -407,3 +407,84 @@ Before/after logs are in `/workspace/scratch/ines-pass5-homework-*.log`.
    the student redesign.
 3. Revisit the scoped dependency override when its upstream range changes;
    rerun audits when dependency state changes.
+
+## 9 November 2026 — reject malformed calendar horizons
+
+**Source baseline:** maintenance head
+`7982b604d03de973a56176d5f6374e34c191936b`, integrated with main
+`28b45765d27a76730522ee9626ee473d11f5439a`. Main has no maintenance log yet;
+the preceding checkpoints remain in [PR 190](https://github.com/dakibwa/portuguese-with-ines/pull/190).
+Only that maintenance PR was open and no competing maintenance process was
+observed. The accepted student-management and tutor-platform changes are
+preserved.
+
+### Confirmed finding and fix
+
+The availability reader checked its slots but trusted `horizonDays` before
+caching it. An otherwise valid HTTP 200 reply with `horizonDays: "broken"`
+silently produced an empty calendar saying **No free times in these weeks**,
+without a retry, despite containing a free slot. A value of 100,000 caused
+thousands of calendar weeks to be built on the browser's main thread.
+
+The reader now rejects a provided horizon unless it is a whole number from
+1 through 365, matching the existing Worker settings limit. The normal
+unreadable-reply notice and retry appear, and the rejected entry is removed
+from the availability cache. A reply without a horizon keeps the existing
+display fallback. Booking rules, payment authorization and visual styling
+are unchanged.
+
+### Comparable measurements
+
+Local Chromium 149, warmed Next development server, 4× CPU slowdown,
+390/1280×900 viewports, reduced motion and the same gated localhost responses.
+Only `Date` was frozen; performance clocks remained real. The browser journey
+had finished before these matched runs. Each numeric case used three fresh
+contexts per viewport before and after, with identical slot data and response
+release timing; the sole source difference was this validation guard.
+
+| Viewport | 100,000-day reply: median longest browser task, before → after | Response release to visible result, before → after |
+| --- | --- | --- |
+| 390px | 1,789 → 182ms | 1,848 → 241ms |
+| 1280px | 1,621 → 197ms | 1,672 → 251ms |
+
+Before, the oversized reply rendered an available calendar after doing the
+unnecessary work; after, it produces a recoverable error. The nonnumeric reply
+had no usable date or retry within the three-second observation window before;
+after, the notice/retry appeared in 275ms on phone and 246ms on desktop.
+The healthy 84-day control's median visible-result timings were 242 → 227ms
+on phone and 252 → 263ms on desktop. Those mixed control results do not
+establish a normal-load improvement. These measurements describe local error
+handling; no production load-speed or animation-smoothness claim is made.
+
+### Validation and coverage
+
+- Extended `qa-selection-calendar-recovery.mjs` with four cases: nonnumeric
+  and excessive horizons at 390/1280px, each retrying successfully and reaching
+  booking confirmation. Recovery also checks the supported 365-day horizon
+  and the older reply with no horizon.
+- Before the fix, the first new case failed waiting for the unreadable-reply
+  notice; the page instead said there were no free times.
+- `QA_BASE_URL=http://localhost:3000 node scripts/qa-selection-calendar-recovery.mjs`:
+  passed, **57 isolated cases** in Chromium. The four new cases and six early
+  request cases use phone and desktop widths; the other existing recovery
+  cases run at 390px. All account/booking/provider replies are fixtures.
+- `npm run typecheck && npx eslint src/lib/booking-api.ts scripts/qa-selection-calendar-recovery.mjs`:
+  passed. `git diff --check`: passed.
+- The matched probe recorded no page errors or horizontal overflow in its
+  28 before/after contexts. Source restored byte-for-byte to the tested fix
+  after the temporary baseline measurement.
+- No Worker logic changed, so `test:booking` was not repeated this pass.
+  No release build, live probe, full journey suite or production mutation was
+  performed. No actionable blocker was found.
+
+Matched data and logs: `/workspace/scratch/ines-pass7-calendar-matched-*`;
+journey logs: `/workspace/scratch/ines-pass7-recovery-{before,after}.log`.
+
+### Next priorities
+
+1. Profile healthy date/time selection and its animation before further
+   rendering changes; investigate repeat-visit caching without interception.
+2. Rotate to public-route navigation or account recovery after rechecking
+   current main and active work; avoid repeating this malformed-horizon case.
+3. Revisit tutor-origin collision validation when the platform directory and
+   onboarding work settle, and the dependency override when upstream changes.

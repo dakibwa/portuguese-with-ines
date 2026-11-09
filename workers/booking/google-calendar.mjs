@@ -1,3 +1,5 @@
+import { tutorOf } from "./tutor.mjs";
+
 /** Dedicated lesson calendar; online lessons also receive their own Meet room. */
 export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
 const CALENDARS_ROOT = "https://www.googleapis.com/calendar/v3/calendars";
@@ -209,9 +211,9 @@ export async function ensureAppCalendar(env, connection) {
   let created;
   try {
     created = await calendarRequest(token, CALENDARS_ROOT, "POST", {
-      summary: "Português com a Inês — lessons",
-      description: `Lessons managed by Português com a Inês. app=${APP};google_sub=${connection.google_sub}`,
-      timeZone: "Europe/Lisbon",
+      summary: `${tutorOf(env).brand} — lessons`,
+      description: `Lessons managed by ${tutorOf(env).brand}. app=${APP};google_sub=${connection.google_sub}`,
+      timeZone: tutorOf(env).place.timeZone,
     });
     calendarEventsRoot({ calendar_id: created.id });
   } catch {
@@ -262,7 +264,7 @@ export async function ensureCalendarMeeting(env, connection, input) {
   const details = {
     summary: input.summary,
     description: input.description,
-    location: online ? "Online" : "Porto",
+    location: online ? "Online" : tutorOf(env).place.city,
     // The calendar remains private unless Inês shares it. Inherit those read permissions.
     visibility: "default",
     start: { dateTime: input.startAt },

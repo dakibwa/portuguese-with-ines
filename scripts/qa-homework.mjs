@@ -78,7 +78,7 @@ try {
         }
         return json(homework);
       }
-      if (url.pathname === "/me/homework") return json({ homework: homework.publishedAt ? [{ bookingId: lesson.id, lessonAt: lesson.starts_at, title: homework.sheet.title, level: homework.level, minutes: homework.minutes, completedAt: homework.progress.completedAt, submittedAt: homework.progress.submission?.submittedAt ?? null, returnedAt: staleHomeworkList ? null : homework.progress.submission?.returnedAt ?? null, started: Boolean(homework.progress.updatedAt) }] : [] });
+      if (url.pathname === "/me/homework") return json({ homework: homework.publishedAt ? [{ bookingId: lesson.id, lessonAt: lesson.starts_at, title: homework.sheet.title, level: homework.level, minutes: homework.minutes, completedAt: homework.progress.completedAt, submittedAt: homework.progress.submission?.submittedAt ?? null, returnedAt: staleHomeworkList ? null : homework.progress.submission?.returnedAt ?? null, started: Boolean(homework.progress.updatedAt) }] : [] }).finally(() => { staleHomeworkList = false; });
       if (url.pathname === `/me/homework/${lesson.id}` || url.pathname === `/me/homework/${lesson.id}/submit`) {
         if (data) answerWrites++;
         if (data && answerSaveFails) return json({ error: "Answers could not be saved. Try again." }, 503);
@@ -103,9 +103,13 @@ try {
     await page.goto(`${base}/schedule/`);
     await page.getByRole("tab", { name: /^Students/ }).click();
     await page.getByRole("button", { name: "Open Ana Martins’s profile", exact: true }).click();
-    // Homework lives on their Notes & homework page, from its latest lesson without notes.
-    await page.getByRole("button", { name: "Notes & homework", exact: true }).click();
-    await page.getByRole("button", { name: /^Add notes · / }).click();
+    // Homework is written from the lesson's own row on their profile.
+    // Notes are a small pencil that sits above the lesson's stretched day button.
+    const notesPencil = page.getByRole("button", { name: /^Add notes · / });
+    await notesPencil.scrollIntoViewIfNeeded();
+    const pencilBox = await notesPencil.boundingBox();
+    assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest("button")?.getAttribute("aria-label")?.startsWith("Add notes"), { x: pencilBox.x + pencilBox.width / 2, y: pencilBox.y + pencilBox.height / 2 }), true, "The notes pencil is pressable over the lesson tile");
+    await notesPencil.click();
     const editor = page.locator(".teacher-homework");
     const shot = name => editor.screenshot({ path: `${output}/teacher-${name}-${width}.png` });
     const heading = name => expect(editor.locator(".homework-step__head h4")).toHaveText(name);
@@ -140,10 +144,12 @@ try {
     await heading("Ready");
     await expect(editor.locator(".homework-summary")).toHaveCount(3);
     await shot("04-ready");
-    // Unread photos are unsaved work: leaving asks first.
-    page.once("dialog", dialog => dialog.dismiss());
-    await page.getByRole("button", { name: "Close homework", exact: true }).click();
-    await expect(editor.locator(".homework-summary").first()).toContainText("2 photos");
+    // Both the notes close and the focused student's way back protect unread photos.
+    for (const exit of ["Close homework", "All students"]) {
+      page.once("dialog", dialog => dialog.dismiss());
+      await page.getByRole("button", { name: exit, exact: true }).click();
+      await expect(editor.locator(".homework-summary").first()).toContainText("2 photos");
+    }
     // One press reads both pages and makes the draft, with gentle progress meanwhile.
     slow = true;
     await editor.getByRole("button", { name: "Generate homework", exact: true }).click();
@@ -193,18 +199,23 @@ try {
     studentView = true;
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem("ines-student-session", "isolated-homework-session"); });
     await page.goto(`${base}/book/?view=lessons`);
-    async function openHomework(beforeOpen) {
-      await page.locator("#account-menu").waitFor({ state: "attached", timeout: 10000 }).catch(async error => {
+    // Homework is at the end of its lesson's row beneath their calendar:
+    // one schedule (9 November 2026, Dan).
+    const homeworkRow = page.locator("#lesson-calendar #account-past-lessons .past-lesson__homework");
+    async function openHomework() {
+      await homeworkRow.waitFor({ timeout: 10000 }).catch(async error => {
         await page.screenshot({ path: `${output}/account-error-${width}.png`, fullPage: true });
         console.error(await page.locator("body").innerText(), errors);
         throw error;
       });
-      const toggle = page.locator("#account-menu-button");
-      if (await toggle.isVisible() && await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
-      await page.locator("#account-menu").getByRole("button", { name: "Homework", exact: true }).click();
-      await page.locator(".homework-list").getByRole("button").waitFor();
-      await beforeOpen?.(page);
-      await page.locator(".homework-list").getByRole("button").click();
+      await homeworkRow.click();
+    }
+    // Where the places stand open, Your lessons there is the way back;
+    // elsewhere the sheet's own Back is.
+    async function backToLessons() {
+      const back = page.locator(".student-homework .homework-back");
+      if (await back.isVisible()) await back.click();
+      else await page.locator("#account-menu").getByRole("button", { name: /^Your lessons/ }).click();
     }
     await openHomework();
     await page.locator(".student-homework textarea").first().fill("Queria.");
@@ -266,10 +277,11 @@ try {
     await expect(page.locator(".student-homework .homework-done")).toContainText("Done");
     await expect(page.locator(".student-homework .homework-feedback")).toHaveCount(6);
     await expect(page.locator(".student-homework .homework-feedback").nth(4)).toContainText("O teu pedido está claro e educado.");
-    await page.getByRole("button", { name: "All homework", exact: true }).click();
-    await expect(page.locator(".homework-list__state")).toHaveText("Done");
-    await page.locator(".homework-list").screenshot({ path: `${output}/student-list-done-${width}.png` });
-    await page.locator(".homework-list").getByRole("button").click();
+    // Back on Your lessons, the row reads what the sheet just said.
+    await backToLessons();
+    await expect(homeworkRow).toContainText("Done");
+    await page.locator("#account-past-lessons").screenshot({ path: `${output}/student-list-done-${width}.png` });
+    await homeworkRow.click();
     await page.locator(".my-lessons__homework").screenshot({ path: `${output}/student-done-${width}.png` });
     await page.getByRole("button", { name: "Print worksheet", exact: true }).click();
     await expect(page.locator(".student-homework .homework-paper-preview")).toBeVisible();
@@ -285,7 +297,7 @@ try {
     await page.locator(".student-homework textarea").nth(2).fill("café");
     await expect(page.locator(".student-homework .homework-feedback").nth(2)).toContainText("Edited since feedback");
     answerSaveFails = true;
-    await page.getByRole("button", { name: "All homework", exact: true }).click();
+    await backToLessons();
     await expect(page.locator(".student-homework [role=alert]")).toContainText("Answers could not be saved");
     await expect(page.locator(".student-homework textarea").nth(2)).toHaveValue("café");
     answerSaveFails = false;

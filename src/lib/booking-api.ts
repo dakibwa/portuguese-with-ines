@@ -1,3 +1,4 @@
+import { HOME_CLOCK } from "@/lib/tutor";
 import { forgetSession, readSession } from "@/lib/auth-api";
 import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, formatMoney } from "@/lib/config";
 import { BOOKING_REPLY_ERROR, isApiAmount, isApiInstant, isApiLesson, isApiRecord as isRecord } from "@/lib/api-response";
@@ -182,6 +183,12 @@ export function fetchAvailability(
       session ? { headers: { Authorization: `Bearer ${session}` } } : undefined,
       primed && !session && primed.url === `${BOOKING_API_BASE_URL}${path}` ? primed.response : undefined
     ).then((data) => {
+      // The Worker allows 1–365 days. An invalid horizon can hide real slots
+      // or build thousands of weeks on the main thread. Older replies may
+      // omit it and keep the calendar's existing fallback.
+      if (data.horizonDays !== undefined && (!Number.isInteger(data.horizonDays) || data.horizonDays < 1 || data.horizonDays > 365)) {
+        unreadableReply();
+      }
       if (!isRecord(data.slotsByDate) || !Object.values(data.slotsByDate).every((slots) =>
         Array.isArray(slots) && slots.every((slot) =>
           isRecord(slot) && typeof slot.startAt === "string" && typeof slot.endAt === "string" &&
@@ -683,7 +690,7 @@ const RENAMED_PLACES: Record<string, string> = {
  * named by its offset instead.
  */
 export function timeZoneName(zone: string) {
-  if (zone === BOOKING_TIME_ZONE) return "Porto time";
+  if (zone === BOOKING_TIME_ZONE) return HOME_CLOCK;
   const place = zone.includes("/") && !zone.startsWith("Etc/") ? zone.slice(zone.lastIndexOf("/") + 1).replace(/_/g, " ") : "";
   if (place) return `${RENAMED_PLACES[place] ?? place} time`;
   try {

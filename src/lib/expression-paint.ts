@@ -1,3 +1,4 @@
+import { LANGUAGE_CODE } from "@/lib/tutor";
 /**
  * The paints a student's expression can be painted in (13 October 2026, at
  * Dan's request that each painting be a different colour on top; lavender
@@ -147,7 +148,7 @@ export function chooseDecoy(labels: string[], current?: string | null): string |
     const two = words.slice(0, 2).join(" ");
     return two.length > 14 ? words[0] : two;
   };
-  const avoid = current ? opening(current).toLocaleLowerCase("pt-PT") : "";
-  const options = labels.map(opening).filter((fragment) => fragment.length >= 3 && fragment.toLocaleLowerCase("pt-PT") !== avoid);
+  const avoid = current ? opening(current).toLocaleLowerCase(LANGUAGE_CODE) : "";
+  const options = labels.map(opening).filter((fragment) => fragment.length >= 3 && fragment.toLocaleLowerCase(LANGUAGE_CODE) !== avoid);
   return options.length ? options[Math.floor(Math.random() * options.length)] : null;
 }

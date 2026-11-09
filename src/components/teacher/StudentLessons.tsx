@@ -1,11 +1,13 @@
 "use client";
 
-import { addedByTeacher, paidByHand, setLessonPaid, type AdminBooking } from "@/lib/admin-api";
+import { Fragment, useState, type ReactNode } from "react";
+import { ChevronDown, Pencil, Repeat, X } from "lucide-react";
+import { TeacherHomework } from "@/components/homework/TeacherHomework";
 import { PaidTick } from "@/components/teacher/PaidTick";
+import { addedByTeacher, paidByHand, setLessonPaid, type AdminBooking, type NoteHomework, type StudentNoteLesson } from "@/lib/admin-api";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
-import { Fragment, useState } from "react";
-import { ChevronDown, Repeat } from "lucide-react";
+import { IN_PERSON } from "@/lib/tutor";
 
 function paymentLabel(booking: AdminBooking) {
   if (booking.payment_status === "refunded") return "Refunded";
@@ -59,17 +61,98 @@ export function upcomingEntries(upcoming: AdminBooking[], now: number): Upcoming
 }
 
 /**
- * A student's lessons beneath their profile: the ones to come, then the past
- * and cancelled, reading the records from the start of time rather than the
- * visible week.
+ * A weekly run's usual week: the slot most of its weeks keep, and how many
+ * weeks sit at another time (which show as themselves once the run is open).
  */
-export function StudentLessons({ bookings, error, now, onRetry, token, onRecordRefund, onPaid }: {
+export function usualWeek(lessons: AdminBooking[]) {
+  const slot = (booking: AdminBooking) => `${dateLabel(dateKey(new Date(booking.starts_at)), { weekday: "long" })} ${formatSlotTime(booking.starts_at)}–${formatSlotTime(booking.ends_at)} ${booking.location}`;
+  const tally = new Map<string, number>();
+  for (const lesson of lessons) tally.set(slot(lesson), (tally.get(slot(lesson)) ?? 0) + 1);
+  const usual = [...tally].sort((a, b) => b[1] - a[1])[0][0];
+  return { pattern: lessons.find(lesson => slot(lesson) === usual)!, moved: lessons.length - (tally.get(usual) ?? 0) };
+}
+
+const place = (booking: AdminBooking) => booking.location === "porto" ? IN_PERSON : "Online";
+const lessonLength = (booking: AdminBooking) => formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000) });
+
+/*
+ * A lesson she added that has been and is still open: paid in cash, she
+ * ticks it here, so what they still owe reads true (2 November 2026,
+ * Dan: everyone pays what is open). Ticked, it can be unticked again.
+ */
+function settles(booking: AdminBooking, now: number) {
+  return booking.status !== "cancelled" && Date.parse(booking.starts_at) <= now && addedByTeacher(booking) &&
+    booking.attendance_status === "expected" && (paidByHand(booking) || (booking.payment_status === "not_required" && !booking.charge_started_at));
+}
+
+/** A lesson's quiet facts: where, how long, payment, who added it, moves. */
+function lessonFacts(booking: AdminBooking, now: number) {
+  const cancelled = booking.status === "cancelled";
+  const changeFee = booking.same_day_fee_status === "paid" ? "Change fee paid"
+    : booking.same_day_fee_status === "payment_due" ? "Change fee due"
+      : booking.same_day_fee_status === "scheduled" ? "Change fee scheduled"
+        : booking.same_day_fee_status === "processing" ? "Change fee processing" : "";
+  // A cancelled lesson's money only matters if some moved.
+  // Where the tick shows, it says how it was paid.
+  const payment = settles(booking, now) || (cancelled && !paidByHand(booking) && !["paid", "refunded"].includes(booking.payment_status)) ? "" : paymentLabel(booking);
+  return [
+    place(booking),
+    lessonLength(booking),
+    payment,
+    addedByTeacher(booking) ? "Added by you" : "",
+    booking.reschedule_count > 0 ? `Moved ${booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}` : "",
+    changeFee,
+  ].filter(Boolean);
+}
+
+/*
+ * What every one of their lessons shares, such as `In Porto · Added by you`,
+ * is said once beside their details, and each lesson keeps only what is its
+ * own (9 November 2026, Dan: "we don't need all the information repeating").
+ * With a single lesson, its row says it all.
+ */
+export function sharedFacts(bookings: AdminBooking[], now: number) {
+  if (bookings.length < 2) return [];
+  const lists = bookings.map(booking => lessonFacts(booking, now));
+  return lists[0].filter(fact => lists.every(facts => facts.includes(fact)));
+}
+
+const homeworkState: Record<NoteHomework, string> = { none: "", draft: "Draft", published: "With them", review: "To review", done: "Done" };
+/** Past lessons shown before the rest fold away. */
+const PAST_SHOWN = 8;
+
+/**
+ * A student's lessons on their profile, each one row (9 November 2026, Dan:
+ * "the already paid could be at the side of it to save lots of space"): its
+ * day and time open the lesson in place, its details spanning the row of
+ * lessons until she closes them, and what she does with it
+ * sits at the row's end: the Already paid tick, its notes and homework, a
+ * refund to record. Those to come first, each weekly run as one row; then the
+ * past and cancelled, newest first, with her notes beneath (Dan: "a homework
+ * page for each student … it can build up over time").
+ */
+export function StudentLessons({ bookings, notes, level, error, now, token, busy, selectedId, details, openNotes, onOpenNotes, onCloseNotes, onBusy, onRetry, onOpenLesson, onCloseLesson, onRecordRefund, onPaid }: {
   token: string;
+  /** The lesson whose details are open in place, and those details. */
+  selectedId: string | null;
+  details: ReactNode;
   /** Null until they have been read. */
   bookings: AdminBooking[] | null;
+  /** Her notes and their homework per lesson had; null while they load or if they couldn't. */
+  notes: StudentNoteLesson[] | null;
+  /** Their level now, so a lesson shows its own only where it differs. */
+  level: string | null;
   error: string;
   now: number;
+  busy: boolean;
+  /** The lesson whose notes and homework are open. */
+  openNotes: string | null;
+  onOpenNotes: (bookingId: string) => void;
+  onCloseNotes: () => void;
+  onBusy: (busy: boolean) => void;
   onRetry: () => void;
+  onOpenLesson: (booking: AdminBooking) => void;
+  onCloseLesson: () => void;
   onRecordRefund: (booking: AdminBooking) => void;
   /** A past lesson ticked or unticked Already paid. */
   onPaid?: (booking: AdminBooking) => void;
@@ -77,153 +160,175 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
   const [paying, setPaying] = useState("");
   const [paidError, setPaidError] = useState<{ id: string; message: string } | null>(null);
   const [openRuns, setOpenRuns] = useState<string[]>([]);
-  const upcoming = upcomingLessons(bookings ?? [], now);
+  const [showEarlier, setShowEarlier] = useState(false);
+  const listed = bookings ?? [];
+  const upcoming = upcomingLessons(listed, now);
   const entries = upcomingEntries(upcoming, now);
-  const past = (bookings ?? []).filter(booking => booking.status === "cancelled" || Date.parse(booking.ends_at) <= now)
+  const past = listed.filter(booking => booking.status === "cancelled" || Date.parse(booking.ends_at) <= now)
     .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+  const shared = sharedFacts(listed, now);
+  const noteFor = new Map((notes ?? []).map(note => [note.bookingId, note]));
+  // An open lesson stays in view even when it is one of the earlier ones.
+  const openIndex = Math.max(
+    openNotes ? past.findIndex(booking => booking.id === openNotes) : -1,
+    selectedId ? past.findIndex(booking => booking.id === selectedId) : -1,
+  );
+  const shownPast = showEarlier || openIndex >= PAST_SHOWN ? past : past.slice(0, PAST_SHOWN);
   // Within half a year either way the year is plain from the month; further
   // off, say it.
   const nearby = (date: Date) => Math.abs(date.getTime() - now) < 183 * 86_400_000;
+  const day = (booking: AdminBooking) => {
+    const starts = new Date(booking.starts_at);
+    return dateLabel(dateKey(starts), { weekday: "short", day: "numeric", month: "short", ...(nearby(starts) ? {} : { year: "numeric" }) }).replace(",", "");
+  };
+  // A week of an open run says only what its run does not.
+  const factList = (facts: string[], inherited: string[] = []) => {
+    const own = facts.filter(fact => !shared.includes(fact) && !inherited.includes(fact));
+    return own.length ? <ul className="booking-payment-facts teacher-history-lesson__facts">{own.map(fact => <li key={fact}>{fact}</li>)}</ul> : null;
+  };
 
-  /**
-   * One card per lesson: when, then a few quiet facts. A pill only for what
-   * breaks the pattern (cancelled, no-show, happening now), since the section
-   * already says upcoming or past.
-   */
-  function lessonRow(booking: AdminBooking, id?: string) {
+  async function markPaid(booking: AdminBooking, paid: boolean) {
+    setPaying(booking.id);
+    setPaidError(null);
+    try {
+      const { booking: updated } = await setLessonPaid(token, booking.id, paid);
+      onPaid?.(updated);
+    } catch (caught) {
+      setPaidError({ id: booking.id, message: caught instanceof Error ? caught.message : "This lesson couldn’t be updated." });
+    } finally {
+      setPaying("");
+    }
+  }
+
+  function lessonRow(booking: AdminBooking, inherited: string[] = []) {
     const cancelled = booking.status === "cancelled";
     const noShow = booking.attendance_status === "no_show";
-    const starts = new Date(booking.starts_at);
     const live = !cancelled && Date.parse(booking.starts_at) <= now && Date.parse(booking.ends_at) > now;
     const pill = cancelled
       ? booking.cancelled_by === "teacher" ? "Cancelled by you" : booking.cancelled_by === "student" ? "Cancelled by student" : "Cancelled"
       : noShow ? "No-show" : live ? "Happening now" : "";
-    const changeFee = booking.same_day_fee_status === "paid" ? "Change fee paid"
-      : booking.same_day_fee_status === "payment_due" ? "Change fee due"
-        : booking.same_day_fee_status === "scheduled" ? "Change fee scheduled"
-          : booking.same_day_fee_status === "processing" ? "Change fee processing" : "";
-    /*
-     * A lesson she added that has been and is still open: paid in cash, she
-     * ticks it here, so what they still owe reads true (2 November 2026,
-     * Dan: everyone pays what is open). Ticked, it can be unticked again.
-     */
-    const settle = !cancelled && Date.parse(booking.starts_at) <= now && addedByTeacher(booking) && booking.attendance_status === "expected" &&
-      (paidByHand(booking) || (booking.payment_status === "not_required" && !booking.charge_started_at));
-    // A cancelled lesson's money only matters if some moved.
-    // Where the tick shows, it says how it was paid.
-    const payment = settle || (cancelled && !paidByHand(booking) && !["paid", "refunded"].includes(booking.payment_status)) ? "" : paymentLabel(booking);
-    const facts = [
-      formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000) }),
-      payment,
-      addedByTeacher(booking) ? "Added by you" : "",
-      booking.reschedule_count > 0 ? `Moved ${booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}` : "",
-      changeFee,
-    ].filter(Boolean);
+    // Open, its details carry Already paid and the refund themselves.
+    const settle = settles(booking, now) && selectedId !== booking.id;
+    const note = noteFor.get(booking.id);
+    const written = Boolean(note && (note.notes.trim() || note.homework !== "none"));
+    const opened = Boolean(note) && openNotes === booking.id;
+    const selected = selectedId === booking.id;
+    const detailsId = `teacher-lesson-details-${booking.id}`;
+    const state = note ? homeworkState[note.homework] : "";
+    const refund = cancelled && paidByHand(booking) && booking.payment_status !== "refunded" && selectedId !== booking.id;
+    const label = day(booking);
+    const facts = factList(lessonFacts(booking, now), inherited);
+    // Notes are a small pencil (9 November 2026, Dan), named as the button
+    // it replaced was: Add notes, Notes, or Close while its homework is open.
+    const notesLabel = opened ? "Close homework" : written ? `Notes, ${label}` : `Add notes · ${label}`;
+    const notesButton = note ? <button className="teacher-pencil" type="button" aria-expanded={opened} aria-label={notesLabel} data-homework-exit disabled={busy}
+      title={opened ? "Close" : written ? "Notes" : "Add notes"} onClick={() => opened ? onCloseNotes() : onOpenNotes(booking.id)}>
+      {opened ? <X size={14} aria-hidden="true" /> : <Pencil size={13} strokeWidth={2.4} aria-hidden="true" />}
+    </button> : null;
+    // One line of what she does and one of facts: the day and time, then at
+    // its end the homework chip, notes pencil and the compact Already paid
+    // tick, which wrap together beneath on a narrow tile. The day and time
+    // button stretches over the whole tile; those controls sit above it.
     return (
-      <li className={`teacher-history-lesson${cancelled || noShow ? " is-cancelled" : ""}`} id={id} key={booking.id}>
-        <div className="teacher-history-lesson__top">
-          <div className="teacher-history-lesson__when">
-            <strong>
-              {/* "Tue 5 Jan" reads the same with a year or without. The time
-                  shares its line on a wide card and has its own, without the
-                  dot, on a narrow one, so "· 18:00" never starts a line. */}
-              {dateLabel(dateKey(starts), { weekday: "short", day: "numeric", month: "short", ...(nearby(starts) ? {} : { year: "numeric" }) }).replace(",", "")}
+      <li className={`teacher-history-lesson teacher-lesson-row${cancelled || noShow ? " is-cancelled" : ""}${opened ? " is-open" : ""}${selected ? " is-selected" : ""}`} key={booking.id}>
+        <div className="teacher-lesson-row__line">
+          <div className="teacher-lesson-row__what">
+            {/* "Tue 5 Jan" reads the same with a year or without. The time
+                shares its line on a wide row and has its own, without the
+                dot, on a narrow one, so "· 18:00" never starts a line. */}
+            <button className="teacher-lesson-row__when" aria-controls={selected ? detailsId : undefined} aria-expanded={selected} data-homework-exit disabled={busy} onClick={() => selected ? onCloseLesson() : onOpenLesson(booking)} type="button">
+              <strong>{label}</strong>
               {" "}<span className="teacher-history-lesson__time"><i aria-hidden="true">· </i><span className="visually-hidden">, </span>{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
-            </strong>
+              <span className="visually-hidden">, open lesson</span>
+            </button>
             {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
+            {note?.level && note.level !== level ? <span className="teacher-notes__level">{note.level}</span> : null}
           </div>
+          {notesButton || settle || refund ? <div className="teacher-lesson-row__side">
+            {note && state ? <span className={`teacher-notes__state is-${note.homework}`}>{state}</span> : null}
+            {notesButton}
+            {settle ? <PaidTick compact checked={paidByHand(booking)} disabled={Boolean(paying) || busy} onChange={paid => void markPaid(booking, paid)} />
+              : refund ? <button className="button button--outline button--small" data-homework-exit disabled={busy} onClick={() => onRecordRefund(booking)} type="button">Record refund</button> : null}
+          </div> : null}
         </div>
-        <ul className="booking-payment-facts teacher-history-lesson__facts">
-          <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
-          {facts.map(fact => <li key={fact}>{fact}</li>)}
-        </ul>
-        {settle ? <div className="teacher-history-lesson__paid">
-          <PaidTick checked={paidByHand(booking)} disabled={Boolean(paying)} onChange={async (paid) => {
-            setPaying(booking.id);
-            setPaidError(null);
-            try {
-              const { booking: updated } = await setLessonPaid(token, booking.id, paid);
-              onPaid?.(updated);
-            } catch (caught) {
-              setPaidError({ id: booking.id, message: caught instanceof Error ? caught.message : "This lesson couldn’t be updated." });
-            } finally {
-              setPaying("");
-            }
-          }} />
-          {paidError?.id === booking.id ? <p className="teacher-inline-error" role="alert">{paidError.message}</p> : null}
-        </div> : null}
+        {facts}
+        {paidError?.id === booking.id ? <p className="teacher-inline-error" role="alert">{paidError.message}</p> : null}
+        {note?.notes.trim() && !opened ? <p className="teacher-notes__text">{note.notes.trim()}</p> : null}
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
         {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
-        {cancelled && paidByHand(booking) && booking.payment_status !== "refunded" ? <button className="button button--outline button--small" type="button" onClick={() => onRecordRefund(booking)}>Record refund</button> : null}
+        {opened ? <TeacherHomework key={`${booking.id}-${token}`} bookingId={booking.id} token={token} onBusy={onBusy} /> : null}
+        {selected && details ? <div className="teacher-lesson-row__details" id={detailsId}>{details}</div> : null}
       </li>
     );
   }
 
   /**
-   * A weekly run as one card, in the dashed tile the payment card gives a
-   * run: the usual day and time, how many weeks and until when, and the
-   * facts its weeks share. Opening it lists each week as its own card.
+   * A weekly run as one row, in the dashed tile the payment card gives a
+   * run: the usual day and time, how many weeks and until when, the facts its
+   * weeks share, and Show weeks at its end (9 November 2026, Dan: it "could
+   * be reworked to save space"). Opening it lists each week as its own row.
    */
   function runRow(run: WeeklyRun) {
     const open = openRuns.includes(run.id);
-    const slot = (booking: AdminBooking) => `${dateLabel(dateKey(new Date(booking.starts_at)), { weekday: "long" })} ${formatSlotTime(booking.starts_at)}–${formatSlotTime(booking.ends_at)} ${booking.location}`;
-    // Its usual week is the slot most of its weeks keep; a week moved off it
-    // is counted, and shows as itself once the run is open.
-    const tally = new Map<string, number>();
-    for (const lesson of run.lessons) tally.set(slot(lesson), (tally.get(slot(lesson)) ?? 0) + 1);
-    const usual = [...tally].sort((a, b) => b[1] - a[1])[0][0];
-    const pattern = run.lessons.find(lesson => slot(lesson) === usual)!;
-    const moved = run.lessons.length - (tally.get(usual) ?? 0);
+    const { pattern, moved } = usualWeek(run.lessons);
     const first = run.lessons[0];
     const last = run.lessons[run.lessons.length - 1];
-    const day = (booking: AdminBooking) => {
-      const starts = new Date(booking.starts_at);
-      return dateLabel(dateKey(starts), { weekday: "short", day: "numeric", month: "short", ...(nearby(starts) ? {} : { year: "numeric" }) }).replace(",", "");
-    };
     const payments = new Set(run.lessons.map(paymentLabel));
     const facts = [
-      formatBookedLessonLabel({ id: pattern.lesson_type_id ?? "", name: pattern.lesson_name, durationMinutes: Math.round((Date.parse(pattern.ends_at) - Date.parse(pattern.starts_at)) / 60000) }),
+      place(pattern),
+      lessonLength(pattern),
       payments.size === 1 ? [...payments][0] : "",
       run.lessons.every(addedByTeacher) ? "Added by you" : "",
       moved ? `${moved === 1 ? "One week" : `${moved} weeks`} at another time` : "",
     ].filter(Boolean);
     const weeksId = `teacher-history-run-${run.id}`;
     return (
-      <Fragment key={`run-${run.id}`}>
-        <li className={`teacher-history-lesson teacher-history-run${open ? " is-open" : ""}`}>
-          <div className="teacher-history-lesson__top">
-            <div className="teacher-history-lesson__when">
-              <strong>
-                <Repeat className="teacher-history-run__mark" size={14} strokeWidth={2.4} aria-hidden="true" />
-                Every {dateLabel(dateKey(new Date(pattern.starts_at)), { weekday: "long" })}
-                {" "}<span className="teacher-history-lesson__time"><i aria-hidden="true">· </i><span className="visually-hidden">, </span>{formatSlotTime(pattern.starts_at)}–{formatSlotTime(pattern.ends_at)}</span>
-              </strong>
-            </div>
-            <button type="button" className="teacher-history-homework teacher-history-run__toggle" aria-expanded={open} aria-controls={open ? weeksId : undefined}
-              onClick={() => setOpenRuns(current => open ? current.filter(id => id !== run.id) : [...current, run.id])}>
-              <ChevronDown size={15} aria-hidden="true" />{open ? "Hide weeks" : "Show weeks"}
-            </button>
-          </div>
-          <p className="teacher-history-run__span">{run.lessons.length} weeks, <span>{day(first)} to {day(last)}</span></p>
-          <ul className="booking-payment-facts teacher-history-lesson__facts">
-            <li>{pattern.location === "porto" ? "In Porto" : "Online"}</li>
-            {facts.map(fact => <li key={fact}>{fact}</li>)}
-          </ul>
-        </li>
-        {open ? run.lessons.map(lesson => <Fragment key={lesson.id}>{lessonRow(lesson, lesson === first ? weeksId : undefined)}</Fragment>) : null}
-      </Fragment>
+      <li className={`teacher-history-lesson teacher-history-run teacher-lesson-row${open ? " is-open" : ""}`} key={`run-${run.id}`}>
+        <div className="teacher-lesson-row__line">
+          <strong className="teacher-history-run__when">
+            <Repeat className="teacher-history-run__mark" size={14} strokeWidth={2.4} aria-hidden="true" />
+            Every {dateLabel(dateKey(new Date(pattern.starts_at)), { weekday: "long" })}
+            {" "}<span className="teacher-history-lesson__time"><i aria-hidden="true">· </i><span className="visually-hidden">, </span>{formatSlotTime(pattern.starts_at)}–{formatSlotTime(pattern.ends_at)}</span>
+          </strong>
+          <span className="teacher-history-run__span">{run.lessons.length} weeks, <span>{day(first)} to {day(last)}</span></span>
+          {factList(facts)}
+          <button type="button" className="teacher-history-homework teacher-history-run__toggle" data-homework-exit aria-expanded={open} aria-controls={open ? weeksId : undefined}
+            onClick={() => {
+              // Hiding its weeks hides the week whose details are open in one.
+              if (open && run.lessons.some(lesson => lesson.id === selectedId)) onCloseLesson();
+              setOpenRuns(current => open ? current.filter(id => id !== run.id) : [...current, run.id]);
+            }}>
+            <ChevronDown size={15} aria-hidden="true" />{open ? "Hide weeks" : "Show weeks"}
+          </button>
+        </div>
+        {open ? <ul className="teacher-history-list teacher-history-run__weeks" id={weeksId}>{run.lessons.map(lesson => <Fragment key={lesson.id}>{lessonRow(lesson, facts)}</Fragment>)}</ul> : null}
+      </li>
     );
   }
 
+  // Add a lesson is in their card's top row, so a heading stands alone here.
+  const head = (id: string, title: ReactNode) => <div className="teacher-history__head">
+    <h3 className="teacher-history__legend" id={id}>{title}</h3>
+  </div>;
   if (error) {
     return <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" onClick={onRetry} type="button">Try again</button></div>;
   }
   if (bookings === null) return <p role="status">Loading lesson history…</p>;
   if (bookings.length === 0) return <p className="teacher-history-empty">No lessons recorded yet.</p>;
+  const hidden = past.length - shownPast.length;
   return (
     <>
-      {upcoming.length ? <section aria-labelledby="teacher-history-upcoming"><h3 id="teacher-history-upcoming">Upcoming <span>· {upcoming.length}</span></h3><ul className="teacher-history-list">{entries.map(entry => "run" in entry ? runRow(entry.run) : lessonRow(entry.booking))}</ul></section> : null}
-      {past.length ? <section aria-labelledby="teacher-history-past"><h3 id="teacher-history-past">Past &amp; cancelled <span>· {past.length}</span></h3><ul className="teacher-history-list">{past.map(booking => lessonRow(booking))}</ul></section> : null}
+      {upcoming.length ? <section aria-labelledby="teacher-history-upcoming">
+        {head("teacher-history-upcoming", <>Upcoming <span>· {upcoming.length}</span></>)}
+        <ul className="teacher-history-list">{entries.map(entry => "run" in entry ? runRow(entry.run) : lessonRow(entry.booking))}</ul>
+      </section> : null}
+      {past.length ? <section aria-labelledby="teacher-history-past">
+        {head("teacher-history-past", <>Past &amp; cancelled <span>· {past.length}</span></>)}
+        <ul className="teacher-history-list">{shownPast.map(booking => lessonRow(booking))}</ul>
+        {hidden ? <button className="teacher-history-homework teacher-history-earlier" type="button" onClick={() => setShowEarlier(true)}>
+          <ChevronDown size={15} aria-hidden="true" />{hidden} earlier {hidden === 1 ? "lesson" : "lessons"}
+        </button> : null}
+      </section> : null}
     </>
   );
 }

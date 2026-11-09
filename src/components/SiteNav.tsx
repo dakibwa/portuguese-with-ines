@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND, TUTOR_CITY } from "@/lib/tutor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -171,7 +172,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
           <div className="site-header__inner nav-mobile__heading">
             <Link
               aria-current={currentPage === "home" ? "page" : undefined}
-              aria-label="Português com a Inês, home"
+              aria-label={`${BRAND}, home`}
               className="site-header__brand"
               href="/"
               onClick={() => setOpen(false)}
@@ -212,7 +213,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
             })}
           </div>
           <div className="nav-mobile__cta">
-            <p>One to one, online or in Porto.</p>
+            <p>One to one, online or in {TUTOR_CITY}.</p>
             <div className="nav-mobile__cta-actions">
               <a className="button button--coral button--compact" href={publicAssetPath("/book/?view=book")} onClick={() => setOpen(false)}>
                 Book a lesson

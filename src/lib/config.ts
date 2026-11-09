@@ -1,27 +1,28 @@
+import { TUTOR, TUTOR_TIME_ZONE } from "@/lib/tutor";
 export const LESSON_PRICE_CENTS = Number(
   process.env.NEXT_PUBLIC_LESSON_PRICE_CENTS ?? process.env.LESSON_PRICE_CENTS ?? 2500
 );
-export const LESSON_CURRENCY = process.env.LESSON_CURRENCY ?? "eur";
+export const LESSON_CURRENCY = process.env.LESSON_CURRENCY ?? TUTOR.place.currency.toLowerCase();
 export const LESSON_DURATION_MINUTES = Number(process.env.NEXT_PUBLIC_LESSON_DURATION_MINUTES ?? 60);
 export const SAME_DAY_RESCHEDULE_FEE_CENTS = Number(
-  process.env.NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS ?? 500
+  process.env.NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS ?? TUTOR.defaults.lateChangeFeeCents
 );
 /**
  * The 14-hour rule: book, move or cancel free with at least this much notice;
  * a later move or cancellation costs the fee above. The booking Worker's
  * `minimum_notice_hours` setting enforces both, so keep the two in step.
  */
-export const NOTICE_HOURS = 14;
+export const NOTICE_HOURS = TUTOR.defaults.noticeHours;
 /** Inês can mark a no-show from the start until this long after the end; the
  * lesson is charged once the window closes. Zero since 2 November 2026 (Dan:
  * "charged at the time of when the lessons ends"). Mirrors the Worker's constant. */
 export const NO_SHOW_WINDOW_HOURS_AFTER = 0;
 
-/** Her teaching timezone. Every advertised time on the site is Porto time. */
-export const BOOKING_TIME_ZONE = "Europe/Lisbon";
+/** The tutor's teaching timezone. Every advertised time on the site is on it. */
+export const BOOKING_TIME_ZONE = TUTOR_TIME_ZONE;
 
 /** Used only while the API response is absent or from an older Worker. */
-export const BOOKING_HORIZON_DAYS_FALLBACK = 84;
+export const BOOKING_HORIZON_DAYS_FALLBACK = TUTOR.defaults.bookingHorizonDays;
 
 function normalizePublicHttpUrl(value: string) {
   const trimmed = value.trim();
@@ -71,8 +72,8 @@ export const STRIPE_PUBLISHABLE_READY = Boolean(
  */
 export const GOOGLE_CLIENT_ID = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "").trim();
 
-export const CONTACT_WHATSAPP_NUMBER = "+351 963 161 134";
-export const CONTACT_WHATSAPP_URL = "https://wa.me/351963161134";
+export const CONTACT_WHATSAPP_NUMBER = TUTOR.contact.whatsapp;
+export const CONTACT_WHATSAPP_URL = `https://wa.me/${TUTOR.contact.whatsapp.replace(/\D/g, "")}`;
 export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "";
 
 /**

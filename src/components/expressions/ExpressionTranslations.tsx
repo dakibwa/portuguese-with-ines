@@ -1,5 +1,6 @@
 "use client";
 
+import { LANGUAGE_CODE, TUTOR_NAME } from "@/lib/tutor";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { AuthApiError, readSession } from "@/lib/auth-api";
@@ -53,7 +54,7 @@ export function ExpressionTranslations({ expressionId, viewer }: { expressionId:
 
   return (
     <div className="expression-translations" lang="en">
-      <h4 className="expression-card__label" lang="pt-PT">Noutras línguas</h4>
+      <h4 className="expression-card__label" lang={LANGUAGE_CODE}>Noutras línguas</h4>
       {/* Her drafts have none yet: students only see published expressions. */}
       {unpublished ? <p>Students’ own versions appear here once this expression is published.</p> : loadError ? (
         <div className="expression-translations__error" role="alert">
@@ -123,7 +124,7 @@ function TranslationForm({ expressionId, token }: { expressionId: string; token:
     }
   }
 
-  if (state === "sent") return <p className="expression-translations__thanks" role="status">Thanks! Inês will check it before it appears.</p>;
+  if (state === "sent") return <p className="expression-translations__thanks" role="status">Thanks! {TUTOR_NAME} will check it before it appears.</p>;
   const left = TRANSLATION_LIMITS.text - text.length;
   return (
     <form className="expression-translations__form" onSubmit={(event) => void submit(event)}>
@@ -131,7 +132,7 @@ function TranslationForm({ expressionId, token }: { expressionId: string; token:
       <textarea aria-describedby={`${ids}-left`} id={`${ids}-text`} maxLength={TRANSLATION_LIMITS.text} required rows={3} value={text} onChange={(event) => setText(event.target.value)} />
       <p className="expression-translations__left" id={`${ids}-left`}>{left === 1 ? "1 character left" : `${left} characters left`}</p>
       {error ? <p className="booking-alert" role="alert">{error}</p> : null}
-      <button className="button button--coral button--compact" disabled={state === "sending"} type="submit">{state === "sending" ? "Sending…" : "Send to Inês"}</button>
+      <button className="button button--coral button--compact" disabled={state === "sending"} type="submit">{state === "sending" ? "Sending…" : `Send to ${TUTOR_NAME}`}</button>
     </form>
   );
 }

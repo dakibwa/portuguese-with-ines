@@ -1,3 +1,4 @@
+import { BRAND } from "@/lib/tutor";
 import Link from "next/link";
 import { BrandWordmark } from "@/components/BrandWordmark";
 import { SiteNav } from "@/components/SiteNav";
@@ -21,7 +22,7 @@ export function SiteHeader({ currentPage = "other" }: SiteHeaderProps) {
           href="/"
           className="site-header__brand"
           aria-current={currentPage === "home" ? "page" : undefined}
-          aria-label="Português com a Inês, home"
+          aria-label={`${BRAND}, home`}
         >
           <BrandWordmark priority className="header-wordmark" />
         </Link>

@@ -1,3 +1,4 @@
+import { BRAND } from "@/lib/tutor";
 import type { CSSProperties } from "react";
 import { publicAssetUrl } from "@/lib/paths";
 
@@ -35,7 +36,7 @@ export function BrandWordmark({
 
   return (
     <span
-      aria-label="Português com a Inês"
+      aria-label={BRAND}
       className={classes}
       role="img"
       style={{ "--wordmark-image": publicAssetUrl("/visuals/wordmark-cream.webp") } as WordmarkStyle}

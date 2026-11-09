@@ -1,10 +1,11 @@
+import { BRAND, LANGUAGE } from "@/lib/tutor";
 import type { Metadata } from "next";
 
 export const shareImage = {
   url: "/og.png?v=20260914",
   width: 1200,
   height: 630,
-  alt: "Português com a Inês: one-to-one Portuguese lessons"
+  alt: `${BRAND}: one-to-one ${LANGUAGE} lessons`
 };
 
 /**
@@ -21,7 +22,7 @@ export function pageMetadata({ title, description, path }: { title: string; desc
       title,
       description,
       url: path,
-      siteName: "Português com a Inês",
+      siteName: BRAND,
       locale: "en_GB",
       type: "website",
       images: [shareImage]

@@ -1,5 +1,15 @@
-const WHOLE_EUROS = new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 0 });
-const EUROS_AND_CENTS = new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { currentTutor } from "./tutor.mjs";
+
+/** The running tutor's currency (Inês charges in euros), whole and with cents, made once per currency. */
+const formats = new Map();
+function formatsFor(currency) {
+  let pair = formats.get(currency);
+  if (!pair) {
+    const format = (digits) => new Intl.NumberFormat("en-GB", { style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits });
+    formats.set(currency, pair = { whole: format(0), cents: format(2) });
+  }
+  return pair;
+}
 
 /**
  * Euros as the site prints them: whole euros bare ("€25"), anything else with
@@ -8,5 +18,6 @@ const EUROS_AND_CENTS = new Intl.NumberFormat("en-GB", { style: "currency", curr
  */
 export function formatEuros(cents) {
   const value = Number(cents);
-  return (value % 100 === 0 ? WHOLE_EUROS : EUROS_AND_CENTS).format(value / 100);
+  const { whole, cents: withCents } = formatsFor(currentTutor().place.currency);
+  return (value % 100 === 0 ? whole : withCents).format(value / 100);
 }

@@ -44,6 +44,7 @@ try {
     await page.route(url => /^\/(me(?:\/|$)|lesson-types$|availability$|bookings\/)/.test(url.pathname), async route => {
       const path = new URL(route.request().url()).pathname;
       if (path === "/me/expressions") return route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } });
+      if (path === "/me/homework") return route.fulfill({ json: { homework: [] } });
       if (path === "/me") return route.fulfill({ json: { student, bookings, series: [], sameDayFeeCents: 500 } });
       if (path === "/me/recurring-rates") return route.fulfill({ json: { rates: {} } });
       if (path === "/lesson-types") return route.fulfill({ json: { lessonTypes: [{ id: "single-60", name: "Single lesson", duration_minutes: 60, price_cents: 2500 }], postpay: false } });

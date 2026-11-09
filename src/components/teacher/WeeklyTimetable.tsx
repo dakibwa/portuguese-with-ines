@@ -1,5 +1,6 @@
 "use client";
 
+import { IN_PERSON } from "@/lib/tutor";
 import {
   Fragment,
   useEffect,
@@ -831,7 +832,7 @@ export function WeeklyTimetable({
                               )}
                               <span className="visually-hidden">
                                 {booking.location === "porto"
-                                  ? "In Porto"
+                                  ? IN_PERSON
                                   : "Online"}
                               </span>
                             </span>
@@ -892,7 +893,7 @@ export function WeeklyTimetable({
             </span>
             <span>
               <UserRound size={12} strokeWidth={2.4} aria-hidden="true" />
-              In Porto
+              {IN_PERSON}
             </span>
           </div>
           {status}

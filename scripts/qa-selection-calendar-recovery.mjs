@@ -49,6 +49,7 @@ async function fixture(width, reply = async () => null, signed = true) {
     if (answer) return route.fulfill({ headers: cors, ...answer });
     if (request.method() === "GET") {
       if (path === "/me/expressions") return route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } });
+      if (path === "/me/homework") return route.fulfill({ json: { homework: [] } });
       if (path === "/me") return route.fulfill({ headers: cors, json: { student, bookings: [lesson], series: [], sameDayFeeCents: 500 } });
       if (path === "/me/recurring-rates") return route.fulfill({ headers: cors, json: { rates: {} } });
       if (path === "/lesson-types") return route.fulfill({ headers: cors, json: { lessonTypes: types, postpay: false, paymentReady: true } });
@@ -57,6 +58,8 @@ async function fixture(width, reply = async () => null, signed = true) {
       if (path === "/admin/availability") return route.fulfill({ headers: cors, json: { rules: [], exceptions: [] } });
       // Her add-a-lesson form asks for her students when she reaches the email.
       if (path === "/admin/students") return route.fulfill({ headers: cors, json: { students: [], cardsAccepted: false } });
+      // An open student card is their dashboard, and reads their plan and notes.
+      if (/^\/admin\/students\/[^/]+\/notes$/.test(path)) return route.fulfill({ headers: cors, json: { plan: "", planUpdatedAt: null, lessons: [] } });
       if (path === "/admin/bookings") return route.fulfill({ headers: cors, json: { bookings: [] } });
       if (path === "/admin/google-calendar") return route.fulfill({ headers: cors, json: { configured: false, connected: false, needsReconnect: false, pending: 0 } });
     }
@@ -187,6 +190,37 @@ async function confirm(page) {
 
 let cases = 0;
 try {
+  // A broken horizon must not empty the calendar or make it build unbounded
+  // weeks. Reject it before caching, then let the normal retry recover.
+  for (const width of [390, 1280]) for (const horizonDays of ["broken", 100000]) {
+    let recovered = false, reads = 0;
+    const state = await fixture(width, async path => {
+      if (path !== "/availability") return null;
+      reads += 1;
+      const reply = availability([at(9)], 60);
+      if (!recovered) reply.horizonDays = horizonDays;
+      // Keep both the longest supported horizon and the older reply without
+      // a horizon working; the latter uses the existing display fallback.
+      else if (horizonDays === "broken") reply.horizonDays = 365;
+      else delete reply.horizonDays;
+      return { json: reply };
+    }, false);
+    try {
+      const { page } = state;
+      await page.goto(`${base}/book/?view=book`);
+      const warning = page.getByRole("status").filter({ hasText: unreadable });
+      await expect(warning).toBeVisible();
+      await expect(page.locator('#lesson-calendar button[data-date-key]:not(:disabled)')).toHaveCount(0);
+      recovered = true;
+      await warning.getByRole("button", { name: "Try again", exact: true }).click();
+      await expect(warning).toHaveCount(0);
+      await choose(page, at(9));
+      await expect(page.locator("#booking-confirmation-stage")).toBeVisible();
+      assert.ok(reads >= 2, "Retry fetches a fresh reply instead of the invalid cached horizon");
+      await check(state); cases += 1;
+    } finally { await state.context.close(); }
+  }
+
   // HTML starts availability/account requests before the app's code arrives.
   // A connection failure in that gap must still reach the normal retry UI,
   // without first escaping as an unhandled rejection or losing the session.

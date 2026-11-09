@@ -27,7 +27,7 @@
     "worker:tail": "wrangler tail --config workers/booking/wrangler.jsonc",
     "worker:schema": "wrangler d1 execute ines-booking --remote --config workers/booking/wrangler.jsonc --file workers/booking/schema.sql",
     "worker:seed": "wrangler d1 execute ines-booking --remote --config workers/booking/wrangler.jsonc --file workers/booking/seed.sql",
-    "test:booking": "node workers/booking/test.mjs && node workers/booking/integration-test.mjs && node workers/booking/series-extension-test.mjs && node workers/booking/google-calendar-test.mjs && node workers/booking/meeting-service-test.mjs",
+    "test:booking": "node workers/booking/test.mjs && node workers/booking/integration-test.mjs && node workers/booking/series-extension-test.mjs && node workers/booking/google-calendar-test.mjs && node workers/booking/meeting-service-test.mjs && node workers/booking/tenancy-test.mjs",
     "worker:www:dry-run": "wrangler deploy --config workers/www-redirect/wrangler.jsonc --dry-run",
     "worker:www:deploy": "wrangler deploy --config workers/www-redirect/wrangler.jsonc",
     "test:www-redirect": "node workers/www-redirect/test.mjs",

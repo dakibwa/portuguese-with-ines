@@ -61,7 +61,7 @@ import {
   verifyPassword
 } from "./auth.mjs";
 import {
-  PORTO,
+  homeZone,
   addDaysToKey,
   dateKey,
   differingZonedTime,
@@ -72,6 +72,8 @@ import {
   zoneName,
   zonedToUtc
 } from "./time.mjs";
+import { asTutor, currentTutor, tutorOf } from "./tutor.mjs";
+import { envForTutor, everyTutor, tutorForRequest } from "./directory.mjs";
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
@@ -118,11 +120,11 @@ function fail(message, status, request, env) {
   return json({ error: message }, status, request, env);
 }
 
-export function bookingPaymentProblem({ paymentRequired, stripeIsReady, paymentConsent }) {
+export function bookingPaymentProblem({ paymentRequired, stripeIsReady, paymentConsent, tutor = currentTutor() }) {
   if (paymentRequired && !stripeIsReady) {
     return {
       status: 503,
-      message: "Payment isn't available just now. Please try again in a few minutes, or message Inês."
+      message: `Payment isn't available just now. Please try again in a few minutes, or message ${tutor.shortName}.`
     };
   }
   if (paymentRequired && paymentConsent !== true) {
@@ -173,7 +175,7 @@ async function readBody(request, limit) {
 }
 
 function siteUrl(env, path = "") {
-  return `${String(env.SITE_URL ?? "https://portuguesewithines.com").replace(/\/+$/, "")}${path}`;
+  return `${tutorOf(env).site.url}${path}`;
 }
 
 /** Every student action now opens inside the one booking workspace. */
@@ -245,7 +247,7 @@ function lessonDescription(row, lessonType, manageUrl) {
   ];
   if (!isNoEmailYet(row.student_email)) lines.push(`Email: ${row.student_email}`);
   if (row.student_phone) lines.push(`Phone: ${row.student_phone}`);
-  if (row.student_timezone && row.student_timezone !== PORTO) lines.push(`Their timezone: ${row.student_timezone}`);
+  if (row.student_timezone && row.student_timezone !== homeZone()) lines.push(`Their timezone: ${row.student_timezone}`);
   if (row.notes) lines.push(`Notes: ${row.notes}`);
   if (meetingUrl(row)) lines.push(`Join Google Meet: ${meetingUrl(row)}`);
   lines.push(`Reference: ${row.reference}`);
@@ -253,8 +255,8 @@ function lessonDescription(row, lessonType, manageUrl) {
   return lines.join("\n");
 }
 
-function locationLabel(row) {
-  return row.location === "porto" ? "In person, Porto" : "Online";
+function locationLabel(row, tutor = currentTutor()) {
+  return row.location === tutor.place.inPersonKey ? `In person, ${tutor.place.city}` : "Online";
 }
 
 /** Where a student's address would be, for her eyes: theirs, or that there is none yet. */
@@ -263,8 +265,8 @@ function shownEmail(address) {
 }
 
 /** An email row's place, in the site's words; the calendar file keeps `locationLabel`. */
-function placeLabel(row) {
-  return row.location === "porto" ? "In Porto" : "Online";
+function placeLabel(row, tutor = currentTutor()) {
+  return row.location === tutor.place.inPersonKey ? `In ${tutor.place.city}` : "Online";
 }
 
 /**
@@ -272,8 +274,8 @@ function placeLabel(row) {
  * an online lesson, Porto's for one in Porto, where it happens.
  */
 function lessonZone(row) {
-  if (row.location === "porto") return PORTO;
-  return isValidTimeZone(row.student_timezone) ? row.student_timezone : PORTO;
+  if (row.location === "porto") return homeZone();
+  return isValidTimeZone(row.student_timezone) ? row.student_timezone : homeZone();
 }
 
 /** "Wednesday 14 October 2026 at 09:00, Los Angeles time": one time, its clock named. */
@@ -363,8 +365,8 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   // Clocks in words, the site's own vocabulary: "(WEST)" was accurate but
   // jargon. The student reads the lesson on its own clock, as the site shows
   // it, one time named once; Inês reads Porto's, with the student's beneath.
-  const portoTime = `${formatInZone(start, PORTO)}, Porto time`;
-  const studentZone = isValidTimeZone(row.student_timezone) ? row.student_timezone : PORTO;
+  const portoTime = `${formatInZone(start, homeZone())}, ${zoneName(homeZone())}`;
+  const studentZone = isValidTimeZone(row.student_timezone) ? row.student_timezone : homeZone();
   // Null unless the student's clock genuinely reads differently from Porto's.
   const studentTime = differingZonedTime(start, studentZone);
   const studentClock = lessonZone(row);
@@ -395,7 +397,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   // Ticked "Already paid": paid to Inês by hand, so nothing is owed.
   const isPaidByHand = row.payment_consent_version === PAID_BY_HAND_MARK;
   const priceTerms = isFree ? "free" : isPaid || isPaidByHand ? "paid" : isOnCard ? "card" : welcome?.card ? "untilCard" : byTeacher ? "asUsual" : "onTheDay";
-  const price = event === "cancelled" ? null : priceValue({ terms: priceTerms, amount: formatEuros(lessonType.price_cents) });
+  const price = event === "cancelled" ? null : priceValue({ tutor: tutorOf(env), terms: priceTerms, amount: formatEuros(lessonType.price_cents) });
   const uid = calendarUid(row.id);
   const method = event === "cancelled" ? "CANCEL" : "REQUEST";
   // The manage link is the student's own credential to this booking, so it
@@ -412,7 +414,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       startsAt: row.starts_at,
       endsAt: row.ends_at,
       organiserName: settings.teacherName,
-      organiserEmail: env.MAIL_SENDER_ADDRESS || "bookings@portuguesewithines.com",
+      organiserEmail: tutorOf(env).site.mailSender,
       attendees,
       url: showManageUrl ? manageUrl : ""
     });
@@ -428,7 +430,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
 
   // Subjects carry the date, not the reference: "PT-LS29CT" tells the reader
   // nothing in an inbox list, and the date is what they are scanning for.
-  const shortWhen = formatShort(start, PORTO);
+  const shortWhen = formatShort(start, homeZone());
   const studentShortWhen = formatShort(start, studentClock);
   const lessonTypeChanged = Boolean(previousLessonType && previousLessonType.id !== lessonType.id);
   const refundNote = wasRefunded
@@ -442,19 +444,19 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const policyArgs = { notice, fee, manageUrl: event === "cancelled" ? "" : manageUrl };
 
   const student = event === "booked"
-    ? studentBooked({
-        ...facts, ...policyArgs, first, byInes: byTeacher, welcome, when: studentWhen, shortWhen: studentShortWhen, price, paid: isPaid,
+    ? studentBooked({ tutor: tutorOf(env),
+        ...facts, ...policyArgs, first, byTeacher, welcome, when: studentWhen, shortWhen: studentShortWhen, price, paid: isPaid,
         // Older already-paid bookings lock inside the window; saved-card ones stay changeable for the fee.
         policy: isFree ? "free" : isPaid && !byTeacher ? "paid" : isOnCard ? "card" : "unpaid"
       })
     : event === "rescheduled"
-      ? studentMoved({
-          ...facts, ...policyArgs, first, byInes: byTeacher, lengthChanged: lessonTypeChanged, minutes: lessonType.duration_minutes,
+      ? studentMoved({ tutor: tutorOf(env),
+          ...facts, ...policyArgs, first, byTeacher, lengthChanged: lessonTypeChanged, minutes: lessonType.duration_minutes,
           when: studentWhen, shortWhen: studentShortWhen, price, lateNote: sameDayNotice,
           policy: row.same_day_change && isOnCard ? "late" : isPaid ? "paid" : isOnCard ? "card" : "again"
         })
-      : studentCancelled({
-          ...facts, first, byInes: byTeacher, message: cancellationMessage, when: studentWhen, shortWhen: studentShortWhen,
+      : studentCancelled({ tutor: tutorOf(env),
+          ...facts, first, byTeacher, message: cancellationMessage, when: studentWhen, shortWhen: studentShortWhen,
           note: byTeacher ? refundNote : wasRefunded ? refundNote : row.same_day_change ? sameDayNotice : isOnCard ? "The lesson price will not be charged." : ""
         });
 
@@ -463,23 +465,23 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const who = {
     name: row.student_name, email: shownEmail(row.student_email), phone: row.student_phone, nif, notes: row.notes
   };
-  const teacherFacts = { ...facts, student: who, byInes: byTeacher, held, when: hero, heroNote: teacherHeroNote, shortWhen, notice };
+  const teacherFacts = { ...facts, student: who, byTeacher, held, when: hero, heroNote: teacherHeroNote, shortWhen, notice };
   const teacher = event === "booked"
-    ? lessonBookedTeacher({
+    ? lessonBookedTeacher({ tutor: tutorOf(env),
         ...teacherFacts, noEmailYet: isNoEmailYet(row.student_email), welcome, calendarAttached,
         paidAmount: isPaid ? formatEuros(row.amount_cents ?? lessonType.price_cents) : ""
       })
     : event === "rescheduled"
-      ? lessonMovedTeacher({
+      ? lessonMovedTeacher({ tutor: tutorOf(env),
           ...teacherFacts, lengthChanged: lessonTypeChanged, fromMinutes: previousLessonType?.duration_minutes,
           minutes: lessonType.duration_minutes, late: Boolean(row.same_day_change),
-          previousWhen: previousStartsAt ? formatInZone(new Date(previousStartsAt), PORTO) : "",
+          previousWhen: previousStartsAt ? formatInZone(new Date(previousStartsAt), homeZone()) : "",
           lateNote: row.same_day_change
             ? `This was changed less than ${notice} before the lesson, so the ${fee} fee ${automaticSameDayFee ? "is charged automatically to the student's saved card" : "is due"}.`
             : ""
         })
-      : lessonCancelledTeacher({
-          ...teacherFacts, late: Boolean(row.same_day_change), message: cancellationMessage, longWhen: formatInZone(start, PORTO),
+      : lessonCancelledTeacher({ tutor: tutorOf(env),
+          ...teacherFacts, late: Boolean(row.same_day_change), message: cancellationMessage, longWhen: formatInZone(start, homeZone()),
           note: wasRefunded
             ? `${formatEuros(row.amount_cents ?? lessonType.price_cents)} was refunded automatically — nothing to sort out.`
             : row.same_day_change ? `This was cancelled less than ${notice} before the lesson, so the ${fee} fee applies.` : ""
@@ -533,7 +535,7 @@ export async function notifyMeetingReady(env, input) {
   } catch {
     // The join link can still reach the student without a lesson-length label.
   }
-  const { subject, content } = lessonReminder({
+  const { subject, content } = lessonReminder({ tutor: tutorOf(env),
     linkOnly: true, first: row.student_name.split(" ")[0], reference: row.reference, meetingUrl: url,
     lesson: lessonType ? lessonLine(lessonType) : "", when: lessonWhen(new Date(row.starts_at), lessonZone(row)),
     manageUrl: studentManageUrl(env, await createManageToken(row.id, env.BOOKING_TOKEN_SECRET))
@@ -564,10 +566,10 @@ const REMINDER_QUIET_HOURS = 36;
 const REMINDER_BATCH = 6;
 const REMINDER_RETRY_MINUTES = 5;
 
-function reminderEmail({ row, lessonType, settings, manageUrl, meetingLink, meetComing }) {
+function reminderEmail({ tutor, row, lessonType, settings, manageUrl, meetingLink, meetComing }) {
   const start = new Date(row.starts_at);
   const zone = lessonZone(row);
-  return lessonReminder({
+  return lessonReminder({ tutor,
     first: row.student_name.split(" ")[0], lessonName: lessonName(lessonType), lesson: lessonLine(lessonType), place: placeLabel(row),
     reference: row.reference, when: lessonWhen(start, zone), shortWhen: formatShort(start, zone), meetingUrl: meetingLink || "", meetComing, manageUrl,
     cutoff: formatShort(new Date(start.getTime() - settings.minimumNoticeHours * 3600000), zone),
@@ -640,7 +642,7 @@ export async function sendLessonReminders(env, now = new Date()) {
       if (!meetingLink && row.location === "online" && meetComing === undefined) {
         meetComing = (await calendarConnectionStatus(env).catch(() => ({}))).configured === true;
       }
-      const { subject, content } = reminderEmail({
+      const { subject, content } = reminderEmail({ tutor: tutorOf(env),
         row, lessonType, settings, meetingLink,
         meetComing: !meetingLink && row.location === "online" && meetComing === true,
         manageUrl: studentManageUrl(env, await createManageToken(row.id, env.BOOKING_TOKEN_SECRET))
@@ -704,7 +706,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     organiserName: settings.teacherName,
-    organiserEmail: env.MAIL_SENDER_ADDRESS || "bookings@portuguesewithines.com",
+    organiserEmail: tutorOf(env).site.mailSender,
     manageUrl: manageUrls[row.id] ?? "",
     row
   }));
@@ -727,7 +729,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   // Skipped values also travel through older card-setup metadata, so show
   // dates here rather than interpreting that placeholder as a real time.
   const skippedDate = new Intl.DateTimeFormat("en-GB", {
-    timeZone: PORTO, weekday: "short", day: "numeric", month: "short"
+    timeZone: homeZone(), weekday: "short", day: "numeric", month: "short"
   });
   const skippedNote = skipped.length
     ? `${
@@ -751,9 +753,9 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     occurrences: rows.map((row) => ({
       short: formatShort(new Date(row.starts_at), zone), long: formatInZone(new Date(row.starts_at), zone),
       meetingUrl: meetingUrl(row), online: row.location === "online", place: placeLabel(row),
-      price: !forTeacher && mixedPrices ? priceValue({ terms: rowTerms(row), amount: formatEuros(row.amount_cents ?? lessonType.price_cents) }) : null
+      price: !forTeacher && mixedPrices ? priceValue({ tutor: tutorOf(env), terms: rowTerms(row), amount: formatEuros(row.amount_cents ?? lessonType.price_cents) }) : null
     })),
-    lastShort: formatShort(new Date(rows[rows.length - 1].starts_at), PORTO),
+    lastShort: formatShort(new Date(rows[rows.length - 1].starts_at), homeZone()),
     kept: keptLessons(kept, zone)
   });
 
@@ -761,7 +763,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   // lesson separately after it ends; an older run keeps its pay-on-the-day terms.
   const seriesOnCard = rows.some((row) => row.payment_status === "paid" || row.payment_status === "scheduled");
   const seriesFree = rows.every((row) => row.payment_status === FREE);
-  const price = mixedPrices ? null : priceValue({
+  const price = mixedPrices ? null : priceValue({ tutor: tutorOf(env),
     run: true, amount: formatEuros(lessonType.price_cents),
     terms: seriesFree ? "free" : seriesOnCard ? "card" : welcome?.card ? "untilCard" : byTeacher ? "asUsual" : "onTheDay"
   });
@@ -772,12 +774,12 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
   const lengthChanged = reason === "length";
   const moved = reason === "moved" || lengthChanged;
   const common = {
-    lengthChanged, minutes: lessonType.duration_minutes,
+    tutor: tutorOf(env), lengthChanged, minutes: lessonType.duration_minutes,
     lesson: lessonLine(lessonType), lessonName: lessonName(lessonType), place: placeLabel(first),
     notice: `${settings.minimumNoticeHours} hours`, fee: formatEuros(settings.sameDayChangeFeeCents)
   };
   const studentFacts = {
-    ...common, first: first.student_name.split(" ")[0], byInes: byTeacher, welcome, price,
+    ...common, first: first.student_name.split(" ")[0], byTeacher, welcome, price,
     when: lessonWhen(new Date(first.starts_at), studentClock), shortWhen: formatShort(new Date(first.starts_at), studentClock),
     policy: seriesFree ? "free" : seriesOnCard ? "card" : "unpaid",
     lessonsUrl: siteUrl(env, "/book/?view=lessons"),
@@ -817,10 +819,10 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
 
   if (teacherNotificationsEnabled(env) && teacherEmail) {
     const teacherFacts = {
-      ...common, byInes: byTeacher, held, noEmailYet: isNoEmailYet(first.student_email), welcome,
+      ...common, byTeacher, held, noEmailYet: isNoEmailYet(first.student_email), welcome,
       student: { name: first.student_name, email: shownEmail(first.student_email), phone: first.student_phone, nif: await studentNif(env, first.student_id), notes: first.notes },
-      when: `${formatInZone(new Date(first.starts_at), PORTO)}, Porto time`, shortWhen: formatShort(new Date(first.starts_at), PORTO),
-      run: runOn(PORTO, true), extended: reason === "extended"
+      when: `${formatInZone(new Date(first.starts_at), homeZone())}, ${zoneName(homeZone())}`, shortWhen: formatShort(new Date(first.starts_at), homeZone()),
+      run: runOn(homeZone(), true), extended: reason === "extended"
     };
     const { subject, content } = moved ? lessonMovedTeacher(teacherFacts) : lessonBookedTeacher(teacherFacts);
     sends.push(
@@ -963,7 +965,7 @@ async function notifySeriesCancelled(env, { rows, kept = [], lessonType, setting
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     organiserName: settings.teacherName,
-    organiserEmail: env.MAIL_SENDER_ADDRESS || "bookings@portuguesewithines.com"
+    organiserEmail: tutorOf(env).site.mailSender
   }));
 
   const invite = (attendee) =>
@@ -973,8 +975,8 @@ async function notifySeriesCancelled(env, { rows, kept = [], lessonType, setting
   const studentClock = lessonZone(first);
   const count = `${rows.length} ${rows.length === 1 ? "lesson" : "lessons"}`;
 
-  const studentCopy = studentCancelled({
-    first: first.student_name.split(" ")[0], byInes: byTeacher, message: cancellationMessage,
+  const studentCopy = studentCancelled({ tutor: tutorOf(env),
+    first: first.student_name.split(" ")[0], byTeacher, message: cancellationMessage,
     run: { count, zone: zoneName(studentClock, new Date(first.starts_at)), dates: datesOn(studentClock), kept: keptLessons(kept, studentClock) }
   });
   const sends = [
@@ -992,10 +994,10 @@ async function notifySeriesCancelled(env, { rows, kept = [], lessonType, setting
   ];
 
   if (teacherNotificationsEnabled(env) && teacherEmail) {
-    const teacherCopy = lessonCancelledTeacher({
-      byInes: byTeacher, held, message: cancellationMessage,
+    const teacherCopy = lessonCancelledTeacher({ tutor: tutorOf(env),
+      byTeacher, held, message: cancellationMessage,
       student: { name: first.student_name, email: shownEmail(first.student_email), nif: await studentNif(env, first.student_id) },
-      run: { count, dates: datesOn(PORTO), kept: keptLessons(kept, PORTO) }
+      run: { count, dates: datesOn(homeZone()), kept: keptLessons(kept, homeZone()) }
     });
     sends.push(
       deliver(env, {
@@ -1367,7 +1369,7 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [], dedu
     value: prices[minutes] === 0 ? FREE_LABEL : `${formatEuros(prices[minutes])} a lesson`
   })));
   const free = prices[60] === 0 && prices[90] === 0;
-  const { subject, content } = welcomeTemplate({ first, welcome, book, free, rows });
+  const { subject, content } = welcomeTemplate({ tutor: tutorOf(env), first, welcome, book, free, rows });
   return deliver(env, {
     to: student.email,
     subject,
@@ -1401,12 +1403,14 @@ function dormantSql(alias) {
  * beneath "Olá" and their first name. The default is hers to change and is
  * kept in settings; these are its words until she does.
  */
-export const DORMANT_EMAIL = {
-  subject: "It’s been a while! Book your next lesson with Inês",
-  message: "It’s been a while since your last lesson, and I’d love to see you again.\n\n" +
-    "I now have a new website where you can see when I’m free and book a lesson whenever it suits you.\n\n" +
-    "Até breve,\nInês"
-};
+export function dormantEmail(tutor = currentTutor()) {
+  return {
+    subject: `It’s been a while! Book your next lesson with ${tutor.shortName}`,
+    message: "It’s been a while since your last lesson, and I’d love to see you again.\n\n" +
+      "I now have a new website where you can see when I’m free and book a lesson whenever it suits you.\n\n" +
+      `${tutor.language.phrases.goodbye},\n${tutor.shortName}`
+  };
+}
 const DORMANT_SUBJECT_LIMIT = 150;
 const DORMANT_MESSAGE_LIMIT = 3000;
 /** Each student is sent it at most once a day, so a second press or device never repeats it. */
@@ -1415,7 +1419,7 @@ const DORMANT_EMAIL_GAP_MS = 24 * 3600000;
 async function dormantEmailWords(env) {
   const { results } = await env.DB.prepare("SELECT key, value FROM settings WHERE key IN ('dormant_email_subject', 'dormant_email_message')").all();
   const saved = Object.fromEntries((results ?? []).map((row) => [row.key, row.value]));
-  return { subject: saved.dormant_email_subject || DORMANT_EMAIL.subject, message: saved.dormant_email_message || DORMANT_EMAIL.message };
+  return { subject: saved.dormant_email_subject || dormantEmail(tutorOf(env)).subject, message: saved.dormant_email_message || dormantEmail(tutorOf(env)).message };
 }
 
 /** Her subject and message as given, tidied, or what is wrong with them. */
@@ -1455,7 +1459,7 @@ function dormantAuthorization(env, student, teacher) {
  */
 async function sendDormantInvite(env, { student, settings, words, owner }) {
   const signIn = student.role === "student" ? await issueSignInLink(env, student, WELCOME_LINK_MINUTES, owner) : null;
-  const { subject, content } = dormantInvite({
+  const { subject, content } = dormantInvite({ tutor: tutorOf(env),
     subject: words.subject, message: words.message, signInUrl: signIn?.url ?? "", bookUrl: siteUrl(env, "/book/")
   });
   const sameSend = await sessionHash(JSON.stringify([student.email, words.subject, words.message]));
@@ -1463,7 +1467,7 @@ async function sendDormantInvite(env, { student, settings, words, owner }) {
     to: student.email,
     subject,
     kind: "student_dormant_invite",
-    dedupeKey: `dormant:${student.id}:${student.session_version ?? 0}:${dateKey(new Date(), PORTO)}:${sameSend}`,
+    dedupeKey: `dormant:${student.id}:${student.session_version ?? 0}:${dateKey(new Date(), homeZone())}:${sameSend}`,
     replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined,
     content, authorization: owner
   });
@@ -1704,7 +1708,7 @@ async function handleCardBookingPreview(request, env) {
   const ids = cardBookingIds(body.bookingIds ?? body.bookingId);
   const rows = ids ? await cardBookings(env, student.id, ids) : [];
   if (!rows.length) {
-    return fail(`${ids?.length > 1 ? "These lessons are" : "This lesson is"} no longer waiting for card approval. Please check with Inês before paying.`, 409, request, env);
+    return fail(`${ids?.length > 1 ? "These lessons are" : "This lesson is"} no longer waiting for card approval. Please check with ${tutorOf(env).shortName} before paying.`, 409, request, env);
   }
   const settings = await loadSettings(env);
   if (!cardsTaken(env, settings)) return fail("Cards can't be added just now. Please try again later.", 503, request, env);
@@ -1924,7 +1928,7 @@ async function handleEmailLink(request, env, ctx) {
     if (!await takeRateLimit(env, `signin:${student.id}`, 3, 3600)) return;
     const link = await issueSignInLink(env, student, SIGN_IN_LINK_MINUTES);
     const settings = await loadSettings(env);
-    const { subject, content } = signInLink({ first: student.name.split(" ")[0], url: link.url });
+    const { subject, content } = signInLink({ tutor: tutorOf(env), first: student.name.split(" ")[0], url: link.url });
     await deliver(env, {
       to: student.email,
       subject,
@@ -2004,6 +2008,7 @@ async function handleEmailLinkConfirm(request, env) {
  * session token also verifies as a manage token, for "<student>.<expiry>.<version>";
  * only a UUID is looked up, so no other signed value can ever name a booking.
  */
+const EXPRESSIONS_PATH = /^\/(?:admin\/|me\/)?expressions(?:\/|$)|^\/admin\/expression-translations(?:\/|$)/;
 const BOOKING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function getBookingByToken(env, token) {
@@ -2012,155 +2017,166 @@ async function getBookingByToken(env, token) {
   return env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(bookingId).first();
 }
 
+/** Answer one request, as the tutor it belongs to, from their own env. */
+async function answer(request, env, ctx) {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders(request, env) });
+  }
+
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+
+  try {
+    if (!env.DB) return fail("The booking database is not bound to this Worker.", 500, request, env);
+    // Expressions is Inês's own add-on (9 November 2026, Dan): for any other tutor it does not exist.
+    if (!tutorOf(env).features?.expressions && EXPRESSIONS_PATH.test(path)) return fail("Not found.", 404, request, env);
+    if (!env.BOOKING_TOKEN_SECRET) return fail("The booking service is not fully configured.", 500, request, env);
+
+    if (request.method === "POST" && path !== "/stripe/webhook") {
+      const origin = request.headers.get("Origin");
+      const allowed = String(env.ALLOWED_ORIGIN ?? "").split(",").map((value) => value.trim());
+      if (origin && !allowed.includes(origin)) return fail("This origin is not allowed.", 403, request, env);
+      if (request.headers.get("Sec-Fetch-Site") === "cross-site" && !origin) return fail("Origin required.", 403, request, env);
+      if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
+        return fail("Send a JSON request.", 415, request, env);
+      }
+      const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
+        : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path) ? 1048576
+        : /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path) ? 262144
+        : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
+      if (Number(request.headers.get("Content-Length") || 0) > bodyLimit) return fail("Request too large.", 413, request, env);
+      // Cloudflare supplies this trusted edge header. It cannot be replaced
+      // with an arbitrary body/email key to bypass unauthenticated limits.
+      const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
+      if (path.startsWith("/auth/") && !await takeRateLimit(env, `auth:${ip}`, 40)) {
+        return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
+      }
+    }
+
+    /*
+     * `await`, not a bare return. The catch below exists to turn any handler
+     * failure into a tidy JSON 500, and it never fired: returning a promise
+     * from inside a try block does not route its rejection there, because the
+     * function has already returned by the time it rejects.
+     */
+    if (request.method === "GET" && path === "/health") return await handleHealth(request, env);
+    if (request.method === "GET" && path === "/google-calendar/callback") {
+      const result = await finishCalendarConnection(env, url);
+      return new Response(null, { status: 303, headers: {
+        Location: siteUrl(env, `/schedule/?meet=${result}`), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"
+      } });
+    }
+    if (request.method === "GET" && path === "/lesson-types") {
+      // The page adapts without a rebuild when saved-card charging is enabled.
+      const settings = await loadSettings(env);
+      return json(
+        {
+          lessonTypes: await listLessonTypes(env),
+          paymentMode: settings.paymentMode,
+          postpay: settings.paymentMode === "postpay" && stripeReady(env),
+          paymentReady: settings.paymentMode !== "postpay" || stripeReady(env)
+        },
+        200,
+        request,
+        env
+      );
+    }
+    if (request.method === "GET" && path === "/availability") return await handleAvailability(request, env, url);
+    const shownTranslations = path.match(/^\/expressions\/([^/]+)\/translations$/);
+    if (shownTranslations && request.method === "GET") return await handleShownTranslations(request, env, shownTranslations[1]);
+
+    if (request.method === "POST" && path === "/stripe/webhook") return await handleStripeWebhook(request, env, ctx);
+
+    if (request.method === "POST" && path === "/auth/register") return await handleRegister(request, env);
+    if (request.method === "POST" && path === "/auth/login") return await handleLogin(request, env);
+    if (request.method === "POST" && path === "/auth/google") return await handleGoogleSignIn(request, env);
+    if (request.method === "POST" && path === "/auth/forgot") return await handleForgot(request, env, ctx);
+    if (request.method === "POST" && path === "/auth/reset") return await handleReset(request, env);
+    if (request.method === "POST" && path === "/auth/email-link") return await handleEmailLink(request, env, ctx);
+    if (request.method === "POST" && path === "/auth/email-link/confirm") return await handleEmailLinkConfirm(request, env);
+    if (request.method === "POST" && path === "/auth/logout") {
+      const student = await currentStudent(request, env);
+      if (!student) return json({ ok: true }, 200, request, env);
+      const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+      await env.DB.prepare("INSERT OR IGNORE INTO revoked_sessions (token_hash, expires_at) VALUES (?, ?)")
+        .bind(await sessionHash(bearer), Number(bearer.split(".")[1])).run();
+      return json({ ok: true }, 200, request, env);
+    }
+    if (request.method === "GET" && path === "/me") return await handleMe(request, env);
+    if ((request.method === "GET" && path === "/me/expressions") ||
+        (request.method === "POST" && path === "/me/expressions/pick")) {
+      return await handleStudentExpressions(request, env);
+    }
+    const newTranslation = path.match(/^\/me\/expressions\/([^/]+)\/translations$/);
+    if (newTranslation && request.method === "POST") return await handleNewTranslation(request, env, newTranslation[1]);
+    if (path === "/me/recurring-rates" && ["GET", "POST"].includes(request.method)) {
+      return await handleRecurringRates(request, env);
+    }
+    if (request.method === "POST" && path === "/me") return await handleUpdateMe(request, env);
+    if (request.method === "POST" && path === "/me/email") return await handleRequestEmailChange(request, env, ctx);
+    if (request.method === "POST" && path === "/me/email/confirm") return await handleConfirmEmailChange(request, env);
+    if (request.method === "POST" && path === "/me/card/preview") return await handleCardBookingPreview(request, env);
+    if (request.method === "POST" && path === "/me/card") return await handleStudentCard(request, env);
+    if (request.method === "POST" && path === "/me/card/remove") return await handleRemoveStudentCard(request, env);
+    if (path === "/me/homework" || /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path)) {
+      const student = await currentStudent(request, env);
+      if (!student) return fail("Please sign in.", 401, request, env);
+      const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+      const tokenHash = await sessionHash(bearer);
+      const reply = await homeworkReply(request, env, async () => studentHomework(env, student, request.method, path.split("/")[3] ?? null,
+        request.method === "POST" ? await readJson(request, 262144) : {}, path.split("/")[4] ?? "", tokenHash));
+      const current = await currentStudent(request, env);
+      if (!current || current.id !== student.id || current.session_version !== student.session_version) return fail("Please sign in again.", 401, request, env);
+      // Marking has finished by the time a submission replies; tell Inês.
+      if (reply.ok && request.method === "POST" && path.endsWith("/submit")) ctx.waitUntil(homeworkNotices(env, path.split("/")[3]));
+      return reply;
+    }
+
+    // Preview before commit: a student is told which weeks are free, and
+    // which are not, before anything is booked in their name.
+    if (request.method === "POST" && path === "/bookings/series/preview") {
+      return await handleSeriesPreview(request, env);
+    }
+
+    if (request.method === "POST" && path === "/bookings") return await handleCreate(request, env, ctx);
+
+    const stopSeries = path.match(/^\/series\/([^/]+)\/stop$/);
+    if (stopSeries && request.method === "POST") return await handleStopSeries(request, env, ctx, stopSeries[1]);
+
+    const rescheduleSeries = path.match(/^\/series\/([^/]+)\/reschedule$/);
+    if (rescheduleSeries && request.method === "POST") {
+      return await handleRescheduleSeries(request, env, ctx, rescheduleSeries[1]);
+    }
+
+    const manage = path.match(/^\/bookings\/([^/]+)$/);
+    if (manage && request.method === "GET") return await handleGetBooking(request, env, manage[1]);
+
+    const reschedule = path.match(/^\/bookings\/([^/]+)\/reschedule$/);
+    if (reschedule && request.method === "POST") return await handleReschedule(request, env, ctx, reschedule[1]);
+
+    const cancel = path.match(/^\/bookings\/([^/]+)\/cancel$/);
+    if (cancel && request.method === "POST") return await handleCancel(request, env, ctx, cancel[1]);
+
+    const payment = path.match(/^\/bookings\/([^/]+)\/payment$/);
+    if (payment && request.method === "POST") return await handlePaymentRecovery(request, env, payment[1]);
+
+    if (path.startsWith("/admin/")) return await handleAdmin(request, env, ctx, url, path);
+
+    return fail("Not found.", 404, request, env);
+  } catch (error) {
+    if (error?.status === 413) return fail("Request too large.", 413, request, env);
+    console.error("booking-worker", error?.stack ?? String(error));
+    return fail("Something went wrong handling that request.", 500, request, env);
+  }
+}
+
 const worker = {
   async fetch(request, env, ctx) {
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders(request, env) });
-    }
-
-    const url = new URL(request.url);
-    const path = url.pathname.replace(/\/+$/, "") || "/";
-
-    try {
-      if (!env.DB) return fail("The booking database is not bound to this Worker.", 500, request, env);
-      if (!env.BOOKING_TOKEN_SECRET) return fail("The booking service is not fully configured.", 500, request, env);
-
-      if (request.method === "POST" && path !== "/stripe/webhook") {
-        const origin = request.headers.get("Origin");
-        const allowed = String(env.ALLOWED_ORIGIN ?? "").split(",").map((value) => value.trim());
-        if (origin && !allowed.includes(origin)) return fail("This origin is not allowed.", 403, request, env);
-        if (request.headers.get("Sec-Fetch-Site") === "cross-site" && !origin) return fail("Origin required.", 403, request, env);
-        if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
-          return fail("Send a JSON request.", 415, request, env);
-        }
-        const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
-          : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path) ? 1048576
-          : /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path) ? 262144
-          : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
-        if (Number(request.headers.get("Content-Length") || 0) > bodyLimit) return fail("Request too large.", 413, request, env);
-        // Cloudflare supplies this trusted edge header. It cannot be replaced
-        // with an arbitrary body/email key to bypass unauthenticated limits.
-        const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
-        if (path.startsWith("/auth/") && !await takeRateLimit(env, `auth:${ip}`, 40)) {
-          return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
-        }
-      }
-
-      /*
-       * `await`, not a bare return. The catch below exists to turn any handler
-       * failure into a tidy JSON 500, and it never fired: returning a promise
-       * from inside a try block does not route its rejection there, because the
-       * function has already returned by the time it rejects.
-       */
-      if (request.method === "GET" && path === "/health") return await handleHealth(request, env);
-      if (request.method === "GET" && path === "/google-calendar/callback") {
-        const result = await finishCalendarConnection(env, url);
-        return new Response(null, { status: 303, headers: {
-          Location: siteUrl(env, `/schedule/?meet=${result}`), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"
-        } });
-      }
-      if (request.method === "GET" && path === "/lesson-types") {
-        // The page adapts without a rebuild when saved-card charging is enabled.
-        const settings = await loadSettings(env);
-        return json(
-          {
-            lessonTypes: await listLessonTypes(env),
-            paymentMode: settings.paymentMode,
-            postpay: settings.paymentMode === "postpay" && stripeReady(env),
-            paymentReady: settings.paymentMode !== "postpay" || stripeReady(env)
-          },
-          200,
-          request,
-          env
-        );
-      }
-      if (request.method === "GET" && path === "/availability") return await handleAvailability(request, env, url);
-      const shownTranslations = path.match(/^\/expressions\/([^/]+)\/translations$/);
-      if (shownTranslations && request.method === "GET") return await handleShownTranslations(request, env, shownTranslations[1]);
-
-      if (request.method === "POST" && path === "/stripe/webhook") return await handleStripeWebhook(request, env, ctx);
-
-      if (request.method === "POST" && path === "/auth/register") return await handleRegister(request, env);
-      if (request.method === "POST" && path === "/auth/login") return await handleLogin(request, env);
-      if (request.method === "POST" && path === "/auth/google") return await handleGoogleSignIn(request, env);
-      if (request.method === "POST" && path === "/auth/forgot") return await handleForgot(request, env, ctx);
-      if (request.method === "POST" && path === "/auth/reset") return await handleReset(request, env);
-      if (request.method === "POST" && path === "/auth/email-link") return await handleEmailLink(request, env, ctx);
-      if (request.method === "POST" && path === "/auth/email-link/confirm") return await handleEmailLinkConfirm(request, env);
-      if (request.method === "POST" && path === "/auth/logout") {
-        const student = await currentStudent(request, env);
-        if (!student) return json({ ok: true }, 200, request, env);
-        const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-        await env.DB.prepare("INSERT OR IGNORE INTO revoked_sessions (token_hash, expires_at) VALUES (?, ?)")
-          .bind(await sessionHash(bearer), Number(bearer.split(".")[1])).run();
-        return json({ ok: true }, 200, request, env);
-      }
-      if (request.method === "GET" && path === "/me") return await handleMe(request, env);
-      if ((request.method === "GET" && path === "/me/expressions") ||
-          (request.method === "POST" && path === "/me/expressions/pick")) {
-        return await handleStudentExpressions(request, env);
-      }
-      const newTranslation = path.match(/^\/me\/expressions\/([^/]+)\/translations$/);
-      if (newTranslation && request.method === "POST") return await handleNewTranslation(request, env, newTranslation[1]);
-      if (path === "/me/recurring-rates" && ["GET", "POST"].includes(request.method)) {
-        return await handleRecurringRates(request, env);
-      }
-      if (request.method === "POST" && path === "/me") return await handleUpdateMe(request, env);
-      if (request.method === "POST" && path === "/me/email") return await handleRequestEmailChange(request, env, ctx);
-      if (request.method === "POST" && path === "/me/email/confirm") return await handleConfirmEmailChange(request, env);
-      if (request.method === "POST" && path === "/me/card/preview") return await handleCardBookingPreview(request, env);
-      if (request.method === "POST" && path === "/me/card") return await handleStudentCard(request, env);
-      if (request.method === "POST" && path === "/me/card/remove") return await handleRemoveStudentCard(request, env);
-      if (path === "/me/homework" || /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path)) {
-        const student = await currentStudent(request, env);
-        if (!student) return fail("Please sign in.", 401, request, env);
-        const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-        const tokenHash = await sessionHash(bearer);
-        const reply = await homeworkReply(request, env, async () => studentHomework(env, student, request.method, path.split("/")[3] ?? null,
-          request.method === "POST" ? await readJson(request, 262144) : {}, path.split("/")[4] ?? "", tokenHash));
-        const current = await currentStudent(request, env);
-        if (!current || current.id !== student.id || current.session_version !== student.session_version) return fail("Please sign in again.", 401, request, env);
-        // Marking has finished by the time a submission replies; tell Inês.
-        if (reply.ok && request.method === "POST" && path.endsWith("/submit")) ctx.waitUntil(homeworkNotices(env, path.split("/")[3]));
-        return reply;
-      }
-
-      // Preview before commit: a student is told which weeks are free, and
-      // which are not, before anything is booked in their name.
-      if (request.method === "POST" && path === "/bookings/series/preview") {
-        return await handleSeriesPreview(request, env);
-      }
-
-      if (request.method === "POST" && path === "/bookings") return await handleCreate(request, env, ctx);
-
-      const stopSeries = path.match(/^\/series\/([^/]+)\/stop$/);
-      if (stopSeries && request.method === "POST") return await handleStopSeries(request, env, ctx, stopSeries[1]);
-
-      const rescheduleSeries = path.match(/^\/series\/([^/]+)\/reschedule$/);
-      if (rescheduleSeries && request.method === "POST") {
-        return await handleRescheduleSeries(request, env, ctx, rescheduleSeries[1]);
-      }
-
-      const manage = path.match(/^\/bookings\/([^/]+)$/);
-      if (manage && request.method === "GET") return await handleGetBooking(request, env, manage[1]);
-
-      const reschedule = path.match(/^\/bookings\/([^/]+)\/reschedule$/);
-      if (reschedule && request.method === "POST") return await handleReschedule(request, env, ctx, reschedule[1]);
-
-      const cancel = path.match(/^\/bookings\/([^/]+)\/cancel$/);
-      if (cancel && request.method === "POST") return await handleCancel(request, env, ctx, cancel[1]);
-
-      const payment = path.match(/^\/bookings\/([^/]+)\/payment$/);
-      if (payment && request.method === "POST") return await handlePaymentRecovery(request, env, payment[1]);
-
-      if (path.startsWith("/admin/")) return await handleAdmin(request, env, ctx, url, path);
-
-      return fail("Not found.", 404, request, env);
-    } catch (error) {
-      if (error?.status === 413) return fail("Request too large.", 413, request, env);
-      console.error("booking-worker", error?.stack ?? String(error));
-      return fail("Something went wrong handling that request.", 500, request, env);
-    }
+    // The tutor this request belongs to, and their own database and secrets.
+    // Inês's requests keep the deploy's env exactly as it was. Everything the
+    // request does, including work it leaves running, runs as that tutor's.
+    const own = await envForTutor(env, tutorForRequest(request));
+    return asTutor(own.TUTOR, () => answer(request, own, ctx));
   },
 
   /**
@@ -2172,32 +2188,38 @@ const worker = {
    * bookings is the kind of thing that is impossible to reason about later.
    */
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(chargeDueLessons(env));
-    ctx.waitUntil(chargeDueSameDayFees(env));
-    ctx.waitUntil(retryPaymentRecovery(env));
-    ctx.waitUntil(retryRefunds(env));
-    ctx.waitUntil(resendFailedEmails(env));
-    ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row)));
-    ctx.waitUntil(sendLessonReminders(env));
-    // Homework whose marking was interrupted, or whose notice failed to send.
-    ctx.waitUntil(homeworkNotices(env));
-
-    // The account has a finite trigger allowance. One per-minute trigger owns
-    // prompt money work, and only its 03:10 UTC tick runs the larger nightly
-    // calendar extension query.
-    const scheduledAt = new Date(event?.scheduledTime ?? Date.now());
-    if (!event?.cron || (scheduledAt.getUTCHours() === 3 && scheduledAt.getUTCMinutes() === 10)) {
-      ctx.waitUntil(topUpOpenSeries(env));
-      ctx.waitUntil(env.DB.batch([
-        // A day after its start, any window (an hour at most) has closed.
-        env.DB.prepare("DELETE FROM request_limits WHERE window < ?").bind(Math.floor(Date.now() / 1000) - 86400),
-        env.DB.prepare("DELETE FROM revoked_sessions WHERE expires_at < ?").bind(Date.now())
-      ]));
-      ctx.waitUntil(env.DB.prepare("DELETE FROM sign_in_links WHERE expires_at < ?").bind(new Date().toISOString()).run()
-        .catch((error) => console.error("prune-sign-in-links", String(error?.message ?? error))));
-    }
+    // Each tutor's sweeps run on their own database, one after another's start.
+    for (const own of await everyTutor(env)) asTutor(own.TUTOR, () => sweep(event, own, ctx));
   }
 };
+
+/** One tutor's share of the minute and nightly work. */
+function sweep(event, env, ctx) {
+  ctx.waitUntil(chargeDueLessons(env));
+  ctx.waitUntil(chargeDueSameDayFees(env));
+  ctx.waitUntil(retryPaymentRecovery(env));
+  ctx.waitUntil(retryRefunds(env));
+  ctx.waitUntil(resendFailedEmails(env));
+  ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row)));
+  ctx.waitUntil(sendLessonReminders(env));
+  // Homework whose marking was interrupted, or whose notice failed to send.
+  ctx.waitUntil(homeworkNotices(env));
+
+  // The account has a finite trigger allowance. One per-minute trigger owns
+  // prompt money work, and only its 03:10 UTC tick runs the larger nightly
+  // calendar extension query.
+  const scheduledAt = new Date(event?.scheduledTime ?? Date.now());
+  if (!event?.cron || (scheduledAt.getUTCHours() === 3 && scheduledAt.getUTCMinutes() === 10)) {
+    ctx.waitUntil(topUpOpenSeries(env));
+    ctx.waitUntil(env.DB.batch([
+      // A day after its start, any window (an hour at most) has closed.
+      env.DB.prepare("DELETE FROM request_limits WHERE window < ?").bind(Math.floor(Date.now() / 1000) - 86400),
+      env.DB.prepare("DELETE FROM revoked_sessions WHERE expires_at < ?").bind(Date.now())
+    ]));
+    ctx.waitUntil(env.DB.prepare("DELETE FROM sign_in_links WHERE expires_at < ?").bind(new Date().toISOString()).run()
+      .catch((error) => console.error("prune-sign-in-links", String(error?.message ?? error))));
+  }
+}
 
 /**
  * Charge only once the lesson's no-show window has closed, NO_SHOW_WINDOW_HOURS
@@ -2466,7 +2488,7 @@ async function notifyPaid(env, { row, lessonType, settings, teacherEmail, amount
   const nif = await studentNif(env, row.student_id);
   const sends = [];
   if (studentOwed) {
-    const receipt = paymentReceipt({
+    const receipt = paymentReceipt({ tutor: tutorOf(env),
       first: row.student_name.split(" ")[0], item, amount, lesson: lessonLine(lessonType), lessonName: lessonName(lessonType),
       shortWhen: formatShort(start, lessonZone(row)), reference: row.reference, nif, noticeHours: settings.minimumNoticeHours
     });
@@ -2476,9 +2498,9 @@ async function notifyPaid(env, { row, lessonType, settings, teacherEmail, amount
     }));
   }
   if (teacherOwed) {
-    const received = paymentReceivedTeacher({
-      studentName: row.student_name, item, amount, lessonName: lessonName(lessonType), longWhen: formatInZone(start, PORTO),
-      shortWhen: formatShort(start, PORTO), reference: row.reference, nif, noticeHours: settings.minimumNoticeHours
+    const received = paymentReceivedTeacher({ tutor: tutorOf(env),
+      studentName: row.student_name, item, amount, lessonName: lessonName(lessonType), longWhen: formatInZone(start, homeZone()),
+      shortWhen: formatShort(start, homeZone()), reference: row.reference, nif, noticeHours: settings.minimumNoticeHours
     });
     sends.push(deliver(env, {
       to: teacherEmail, subject: received.subject, ...teacher, bookingId: row.id, replyTo: row.student_email, content: received.content
@@ -2541,7 +2563,7 @@ async function recoverySession(env, { row, lessonType, amountCents, purpose }) {
     checkoutPurpose: `${purpose}-due`, amountCents,
     recoveryGeneration: previousId ?? "",
     productName: fee ? "Late lesson change fee" : purpose === "no-show" ? "Lesson no-show fee" : lessonName(lessonType),
-    productDescription: `${row.reference} · Português com a Inês`,
+    productDescription: `${row.reference} · ${tutorOf(env).brand}`,
     successUrl: siteUrl(env, "/book/?view=lessons&paid=1"),
     cancelUrl: studentManageUrl(env, await createManageToken(row.id, env.BOOKING_TOKEN_SECRET))
   });
@@ -2596,7 +2618,7 @@ async function notifyPaymentDue(env, { row, lessonType, amountCents, purpose = "
   // dedupe key on an email which promises a secure button but has no payment link.
   if (!payUrl) return;
 
-  const { subject, content } = paymentFailed({
+  const { subject, content } = paymentFailed({ tutor: tutorOf(env),
     first: row.student_name.split(" ")[0], item: isSameDayFee ? "fee" : isNoShow ? "no-show" : "lesson", amount,
     lesson: lessonLine(lessonType), lessonName: lessonName(lessonType), shortWhen: formatShort(start, lessonZone(row)),
     reference: row.reference, payUrl
@@ -2915,7 +2937,7 @@ async function handleAvailability(request, env, url, teacher = false) {
   if (!lessonType) return fail("That lesson type is not available.", 400, request, env);
 
   const now = new Date();
-  const fromKey = url.searchParams.get("from") || dateKey(now, PORTO);
+  const fromKey = url.searchParams.get("from") || dateKey(now, homeZone());
   // Generous, because computeAvailability clamps to the booking horizon anyway.
   // A hard-coded default narrower than the horizon silently truncates the
   // answer for any caller that does not pass an explicit range.
@@ -2949,7 +2971,7 @@ async function handleAvailability(request, env, url, teacher = false) {
   return json(
     {
       slotsByDate: slotsByDate ?? {},
-      timeZone: PORTO,
+      timeZone: homeZone(),
       minimumNoticeHours: teacher ? 0 : settings.minimumNoticeHours,
       sameDayFeeCents: settings.sameDayChangeFeeCents,
       horizonDays: settings.bookingHorizonDays,
@@ -2996,7 +3018,7 @@ async function handleCreate(request, env, ctx) {
     return fail(`Choose ${SERIES_LENGTHS.join(", ")} weeks, or every week.`, 400, request, env);
   }
   if (wantsRepeat && lessonType.id === "trial") return fail("A trial is one first lesson and cannot repeat.", 400, request, env);
-  const selection = bookingSelection(body, { recurring: wantsRepeat, durationMinutes: lessonType.duration_minutes, trial: lessonType.id === "trial" });
+  const selection = bookingSelection(body, { recurring: wantsRepeat, durationMinutes: lessonType.duration_minutes, trial: lessonType.id === "trial", tutor: tutorOf(env) });
   if (selection.error) return fail(selection.error, 400, request, env);
   body.startAt = selection.starts[0];
   lessonType = await studentLessonType(env, student.id, lessonType);
@@ -3025,7 +3047,7 @@ async function handleCreate(request, env, ctx) {
       .first();
     if ((prior?.n ?? 0) > 0) {
       return fail(
-        "The trial is for your first lesson with Inês. You've already had a lesson, so choose a single lesson instead.",
+        `The trial is for your first lesson with ${tutorOf(env).shortName}. You've already had a lesson, so choose a single lesson instead.`,
         400,
         request,
         env
@@ -3055,7 +3077,7 @@ async function handleCreate(request, env, ctx) {
    * and no more than about two terms' worth of lessons, in an hour.
    */
   if ((recent?.acts ?? 0) >= 5 || (recent?.lessons ?? 0) >= 26) {
-    return fail("That's several bookings in a short time. Please email Inês directly instead.", 429, request, env);
+    return fail(`That's several bookings in a short time. Please email ${tutorOf(env).shortName} directly instead.`, 429, request, env);
   }
 
   const check = await isSlotBookable(env, { startAt: body.startAt, lessonType, now });
@@ -3069,7 +3091,7 @@ async function handleCreate(request, env, ctx) {
   const free = lessonType.price_cents === 0;
   const paymentRequired = settings.paymentMode === "postpay" && !free;
   const stripeIsReady = stripeReady(env);
-  const paymentProblem = bookingPaymentProblem({
+  const paymentProblem = bookingPaymentProblem({ tutor: tutorOf(env),
     paymentRequired,
     stripeIsReady,
     paymentConsent: body.paymentConsent
@@ -3090,7 +3112,7 @@ async function handleCreate(request, env, ctx) {
   if (needsCardSetup) {
     const ip = rateLimitAddress(request.headers.get("CF-Connecting-IP"));
     if (!await takeRateLimit(env, `hold:${ip}`, 8, 3600)) {
-      return fail("That's several bookings in a short time. Please email Inês directly instead.", 429, request, env);
+      return fail(`That's several bookings in a short time. Please email ${tutorOf(env).shortName} directly instead.`, 429, request, env);
     }
   }
 
@@ -3103,7 +3125,7 @@ async function handleCreate(request, env, ctx) {
   }
 
   const id = crypto.randomUUID();
-  const reference = bookingReference();
+  const reference = bookingReference(tutorOf(env).bookings.referencePrefix);
   const startsAt = new Date(body.startAt).toISOString();
   const timestamp = now.toISOString();
   // The database hold is authoritative: even if Stripe still shows its setup
@@ -3373,7 +3395,7 @@ async function handleCreateSelection(request, env, ctx, {
   const skipped = [];
   for (const startAt of starts) {
     const check = await isSlotBookable(env, { startAt, lessonType, now });
-    if (!check.ok) return fail(`${formatInZone(new Date(startAt), PORTO)}: ${check.reason} Nothing has been booked.`, 409, request, env);
+    if (!check.ok) return fail(`${formatInZone(new Date(startAt), homeZone())}: ${check.reason} Nothing has been booked.`, 409, request, env);
     const slot = slotOf(startAt);
     const count = wantsRepeat ? repeatWeeks ?? OPEN_ENDED_HORIZON_WEEKS : 1;
     const plan = wantsRepeat
@@ -3394,7 +3416,7 @@ async function handleCreateSelection(request, env, ctx, {
     });
     skipped.push(...plan.skipped);
     for (const occurrence of plan.bookable) plannedRows.push({
-      id: crypto.randomUUID(), reference: bookingReference(), lesson_type_id: lessonType.id, student_id: student.id,
+      id: crypto.randomUUID(), reference: bookingReference(tutorOf(env).bookings.referencePrefix), lesson_type_id: lessonType.id, student_id: student.id,
       student_name: student.name, student_email: student.email, student_phone: student.phone,
       student_timezone: timezone, location, notes, starts_at: occurrence.startAt.toISOString(),
       ends_at: occurrence.endAt.toISOString(), status: needsCardSetup ? "pending_payment" : "confirmed", sequence: 0,
@@ -3411,7 +3433,7 @@ async function handleCreateSelection(request, env, ctx, {
   if (plannedRows.some((row, index) => index && Date.parse(row.starts_at) < Date.parse(plannedRows[index - 1].ends_at) + gapMs)) {
     return fail(
       gapMs
-        ? `Two of those lessons are too close together. Inês keeps ${settings.lessonBufferMinutes} minutes free after each lesson, so please choose different times.`
+        ? `Two of those lessons are too close together. ${tutorOf(env).shortName} keeps ${settings.lessonBufferMinutes} minutes free after each lesson, so please choose different times.`
         : "Those weekly times overlap on a later date. Please choose different times.",
       409,
       request,
@@ -3529,7 +3551,7 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
     ],
     values: [
       id,
-      bookingReference(),
+      bookingReference(tutorOf(env).bookings.referencePrefix),
       lessonType.id,
       student.id,
       student.name,
@@ -3885,7 +3907,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
       );
     }
     const currentLessonType = currentLessonTypes.get(row.lesson_type_id);
-    const typeChangeProblem = lessonTypeChangeProblem(row, currentLessonType, lessonType);
+    const typeChangeProblem = lessonTypeChangeProblem(row, currentLessonType, lessonType, tutorOf(env));
     if (typeChangeProblem) return fail(typeChangeProblem, 409, request, env);
   }
 
@@ -3914,7 +3936,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     });
     if (!check.ok) {
       return fail(
-        `${formatShort(occurrence.startAt, PORTO)} is not free for the new weekly time. Choose another day or time.`,
+        `${formatShort(occurrence.startAt, homeZone())} is not free for the new weekly time. Choose another day or time.`,
         409,
         request,
         env
@@ -3925,7 +3947,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     const clash = kept.find((late) => Date.parse(late.starts_at) < check.endAt.getTime() + gapMs && Date.parse(late.ends_at) + gapMs > occurrence.startAt.getTime());
     if (clash) {
       return fail(
-        `${formatShort(occurrence.startAt, PORTO)} overlaps your lesson on ${formatShort(new Date(clash.starts_at), PORTO)}, which stays where it is. Choose another day or time.`,
+        `${formatShort(occurrence.startAt, homeZone())} overlaps your lesson on ${formatShort(new Date(clash.starts_at), homeZone())}, which stays where it is. Choose another day or time.`,
         409,
         request,
         env
@@ -4183,7 +4205,7 @@ async function handleReschedule(request, env, ctx, token) {
   if (row.status === "cancelled") return fail("That lesson has already been cancelled.", 409, request, env);
 
   let now = new Date();
-  if (new Date(row.starts_at) <= now) return fail("That lesson has already started. Please email Inês.", 409, request, env);
+  if (new Date(row.starts_at) <= now) return fail(`That lesson has already started. Please email ${tutorOf(env).shortName}.`, 409, request, env);
 
   // Only an older already-paid lesson is locked. A current saved-card lesson
   // stays changeable and the EUR 5 fee is charged below.
@@ -4191,7 +4213,7 @@ async function handleReschedule(request, env, ctx, token) {
   let policy = changePolicy(row, now, settings.minimumNoticeHours);
   if (policy.locked) {
     return fail(
-      `This lesson is less than ${settings.minimumNoticeHours} hours away, so it can't be moved. If something has happened, reply to your confirmation email and Inês will help.`,
+      `This lesson is less than ${settings.minimumNoticeHours} hours away, so it can't be moved. If something has happened, reply to your confirmation email and ${tutorOf(env).shortName} will help.`,
       409,
       request,
       env
@@ -4210,7 +4232,7 @@ async function handleReschedule(request, env, ctx, token) {
     return json({ booking: publicBooking(row, lessonType, settings), sameDayFeeApplied: false }, 200, request, env);
   }
 
-  const typeChangeProblem = lessonTypeChangeProblem(row, previousLessonType, lessonType);
+  const typeChangeProblem = lessonTypeChangeProblem(row, previousLessonType, lessonType, tutorOf(env));
   if (typeChangeProblem) return fail(typeChangeProblem, 409, request, env);
 
   // Switching only between online and Porto keeps the time the lesson already
@@ -4242,7 +4264,7 @@ async function handleReschedule(request, env, ctx, token) {
   // or while this request checked the new time. Charge only the quote their
   // current page accepted; older clients may omit it as before.
   now = new Date();
-  if (new Date(row.starts_at) <= now) return fail("That lesson has already started. Please email Inês.", 409, request, env);
+  if (new Date(row.starts_at) <= now) return fail(`That lesson has already started. Please email ${tutorOf(env).shortName}.`, 409, request, env);
   policy = changePolicy(row, now, settings.minimumNoticeHours);
   if (policy.locked) return fail("That lesson is now inside the change window and cannot be moved. Please reload.", 409, request, env);
   if (!sameTime && Date.parse(startsAt) < now.getTime() + settings.minimumNoticeHours * 3600000) {
@@ -4451,7 +4473,7 @@ async function handleCancel(request, env, ctx, token) {
 
   let now = new Date();
   if (new Date(row.starts_at) <= now) {
-    return fail("That lesson has already started. Please email Inês.", 409, request, env);
+    return fail(`That lesson has already started. Please email ${tutorOf(env).shortName}.`, 409, request, env);
   }
   const settings = await loadSettings(env);
   const body = await readJson(request);
@@ -4460,7 +4482,7 @@ async function handleCancel(request, env, ctx, token) {
 
   if (policy.locked) {
     return fail(
-      `This lesson is less than ${settings.minimumNoticeHours} hours away, so it can't be cancelled. If something has happened, reply to your confirmation email and Inês will help.`,
+      `This lesson is less than ${settings.minimumNoticeHours} hours away, so it can't be cancelled. If something has happened, reply to your confirmation email and ${tutorOf(env).shortName} will help.`,
       409,
       request,
       env
@@ -4482,7 +4504,7 @@ async function handleCancel(request, env, ctx, token) {
 
   const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
   now = new Date();
-  if (new Date(row.starts_at) <= now) return fail("That lesson has already started. Please email Inês.", 409, request, env);
+  if (new Date(row.starts_at) <= now) return fail(`That lesson has already started. Please email ${tutorOf(env).shortName}.`, 409, request, env);
   policy = changePolicy(row, now, settings.minimumNoticeHours);
   const sameDay = policy.feeApplies && settings.sameDayChangeFeeCents > 0 ? 1 : 0;
   if (body.expectedLateFeeCents !== undefined && body.expectedLateFeeCents !== (sameDay ? settings.sameDayChangeFeeCents : 0)) {
@@ -4971,7 +4993,7 @@ async function handleRegister(request, env) {
   const name = cleanText(body.name, 120);
   const phone = cleanText(body.phone, 40);
   const nif = normaliseNif(body.nif);
-  const timezone = isValidTimeZone(body.timezone) ? body.timezone : PORTO;
+  const timezone = isValidTimeZone(body.timezone) ? body.timezone : homeZone();
 
   if (name.length < 2) return fail("Please give your name.", 400, request, env);
   if (!isEmail(email)) return fail("Please give a valid email address.", 400, request, env);
@@ -5121,7 +5143,7 @@ async function handleGoogleSignIn(request, env) {
        VALUES (?, ?, ?, '', ?, '', ?, ?, ?, ?) ON CONFLICT(email) DO NOTHING`
     )
       .bind(id, profile.email, profile.name || profile.email.split("@")[0],
-        isValidTimeZone(body.timezone) ? body.timezone : PORTO, profile.sub, now, now, now)
+        isValidTimeZone(body.timezone) ? body.timezone : homeZone(), profile.sub, now, now, now)
       .run();
     // Another callback or password registration may have won since the read.
     // Resolve its row through the same verified first-link rules below.
@@ -5210,7 +5232,7 @@ async function handleForgot(request, env, ctx) {
     ctx.waitUntil(
       deliver(env, {
         to: student.email,
-        ...passwordReset({ first: student.name.split(" ")[0], url: resetUrl }),
+        ...passwordReset({ tutor: tutorOf(env), first: student.name.split(" ")[0], url: resetUrl }),
         kind: "password_reset",
         dedupeKey: `reset:${nonce}`,
         replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined
@@ -5288,8 +5310,8 @@ async function handleRecurringRates(request, env) {
     if (!rate) {
       return fail(
         named
-          ? "That code isn't available for this lesson length. Check the code with Inês."
-          : "We don't recognise that code. Check it with Inês.",
+          ? `That code isn't available for this lesson length. Check the code with ${tutorOf(env).shortName}.`
+          : `We don't recognise that code. Check it with ${tutorOf(env).shortName}.`,
         400,
         request,
         env
@@ -5307,7 +5329,7 @@ async function handleRecurringRates(request, env) {
     if (!await sameStudentSession(request, env, student)) return fail("Please sign in.", 401, request, env);
     if (rates[rate.duration] !== rate.cents) {
       return fail(
-        `You already have an agreed rate for ${rate.duration}-minute lessons. Ask Inês if it needs to change.`,
+        `You already have an agreed rate for ${rate.duration}-minute lessons. Ask ${tutorOf(env).shortName} if it needs to change.`,
         409,
         request,
         env
@@ -5384,7 +5406,7 @@ async function handleNewTranslation(request, env, expressionId) {
         AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)`,
       values: [student.id, student.session_version ?? 0, await sessionHash(bearer)]
     };
-    const data = await submitTranslation(env.DB, student.id, expressionId, await readJson(request, 4096), authorization);
+    const data = await submitTranslation(env.DB, student.id, expressionId, await readJson(request, 4096), authorization, tutorOf(env));
     return json(data, 201, request, env);
   } catch (error) {
     if (error instanceof ExpressionProblem) return fail(error.message, error.status, request, env);
@@ -5530,7 +5552,7 @@ async function handleRequestEmailChange(request, env, ctx) {
     ctx.waitUntil(
       deliver(env, {
         to: email,
-        ...emailChangeConfirm({ first: student.name.split(" ")[0], email, url: confirmUrl }),
+        ...emailChangeConfirm({ tutor: tutorOf(env), first: student.name.split(" ")[0], email, url: confirmUrl }),
         kind: "email_change",
         dedupeKey: `email-change:${nonce}`,
         replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined
@@ -5542,7 +5564,7 @@ async function handleRequestEmailChange(request, env, ctx) {
     ctx.waitUntil(
       deliver(env, {
         to: student.email,
-        ...emailChangeNotice({ first: student.name.split(" ")[0], email }),
+        ...emailChangeNotice({ tutor: tutorOf(env), first: student.name.split(" ")[0], email }),
         kind: "email_change_notice",
         dedupeKey: `email-change-notice:${nonce}`,
         replyTo: settings.replyToEmail || env.TEACHER_EMAIL || settings.teacherEmail || undefined
@@ -5671,7 +5693,7 @@ function studentPrices(value) {
   for (const minutes of [60, 90]) {
     if (!(String(minutes) in value)) continue;
     const cents = teacherRate(value[minutes]);
-    if (cents === undefined) return { problem: "Each price needs to be €0 (free) or between €1 and €100." };
+    if (cents === undefined) return { problem: `Each price needs to be ${formatEuros(0)} (free) or between ${formatEuros(100)} and ${formatEuros(10000)}.` };
     prices[minutes] = cents;
   }
   return { prices };
@@ -6257,7 +6279,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       // Weekly blocks (lunch) too: the calendar has to show every time students
       // cannot book, not only the one-off dates.
       env.DB.prepare("SELECT * FROM availability_exceptions WHERE date >= ? OR weekday IS NOT NULL ORDER BY date")
-        .bind(dateKey(new Date(), PORTO))
+        .bind(dateKey(new Date(), homeZone()))
         .all()
     ]);
     return json({ rules: rules.results ?? [], exceptions: exceptions.results ?? [], settings: await loadSettings(env) }, 200, request, env);
@@ -6325,7 +6347,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
   if (request.method === "POST" && path === "/admin/exceptions/day") {
     const body = adminBody;
     if (!parseDateKey(body.date)) return fail("Invalid date.", 400, request, env);
-    if (body.date < dateKey(new Date(), PORTO)) return fail("That date has already passed.", 400, request, env);
+    if (body.date < dateKey(new Date(), homeZone())) return fail("That date has already passed.", 400, request, env);
     const dayOff = typeof body.dayOff === "boolean" ? body.dayOff : undefined;
     const blocks = "blocks" in body ? normaliseBlockedSpans(body.blocks) : undefined;
     if (blocks === null) return fail("Those times could not be saved. Please reload and try again.", 400, request, env);
@@ -6419,7 +6441,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       `INSERT INTO students (id, email, name, phone, nif, mark, timezone, password_hash, created_at, awaiting_welcome)
        SELECT ?, ?, ?, ?, ?, ?, ?, '', ?, 1 WHERE (${authorization.sql}) ON CONFLICT(email) DO NOTHING`
     )
-      .bind(id, email || `${NO_EMAIL_YET}${id}`, name, details.phone, details.nif, details.mark, PORTO, new Date().toISOString(), ...authorization.values)
+      .bind(id, email || `${NO_EMAIL_YET}${id}`, name, details.phone, details.nif, details.mark, homeZone(), new Date().toISOString(), ...authorization.values)
       .run();
     let studentId = id;
     if (!(added?.meta?.changes > 0)) {
@@ -6658,7 +6680,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
 
   // Her come-back email's words, as she last saved them.
   if (path === "/admin/dormant-email" && request.method === "GET") {
-    return json({ ...await dormantEmailWords(env), standard: DORMANT_EMAIL }, 200, request, env);
+    return json({ ...await dormantEmailWords(env), standard: dormantEmail(tutorOf(env)) }, 200, request, env);
   }
   if (path === "/admin/dormant-email" && request.method === "POST") {
     const words = dormantEmailInput(adminBody);
@@ -6825,7 +6847,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const notes = cleanText(body.notes, 1000);
 
     const id = crypto.randomUUID();
-    const reference = bookingReference();
+    const reference = bookingReference(tutorOf(env).bookings.referencePrefix);
     const claimed = await claimSlot(env, {
       columns: ["id", "reference", "lesson_type_id", "student_id", "student_name", "student_email", "student_phone",
         "student_timezone", "location", "notes", "starts_at", "ends_at", "status", "sequence", "created_at", "updated_at",
@@ -7221,7 +7243,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
         // Positive EUR card charges must meet Stripe's €0.50 minimum. Zero
         // deliberately disables the fee and never reaches the payment API.
         if (key === "same_day_change_fee_cents" && value > 0 && value < 50) {
-          return fail("The change fee must be €0 or at least €0.50.", 400, request, env);
+          return fail(`The change fee must be ${formatEuros(0)} or at least ${formatEuros(50)}.`, 400, request, env);
         }
       }
       if ((key === "teacher_email" || key === "reply_to_email") && String(value) !== "" && !isEmail(normaliseEmail(value))) {
