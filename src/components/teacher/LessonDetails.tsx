@@ -503,7 +503,7 @@ export function LessonDetails({
         <button className={routine("button button--outline")} type="button" onClick={onClose}>Done</button>
       </div> : action === "view" ? (
         <div className="teacher-dialog-actions">
-          {booking.student_id ? <button className={routine("button button--lilac")} type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null}
+          {booking.student_id ? <button className={`${routine("button button--lilac")} teacher-lesson-homework`} type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null}
           <button
             className={routine("button button--coral")}
             type="button"
