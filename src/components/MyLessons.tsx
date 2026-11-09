@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, CircleX } from "lucide-react";
+import { AlertCircle, CheckCircle2, CircleX, Mail } from "lucide-react";
 import { AccountAvatar, AccountMenu, AccountSignature, type AccountSection } from "@/components/AccountMenu";
 import { AuthPanel } from "@/components/AuthPanel";
-import { CardPrompt, CardTerms } from "@/components/CardOnFile";
+import { CardPrompt, CardTerms, type CardUpcoming } from "@/components/CardOnFile";
 import { LessonMark } from "@/components/LessonMarks";
 import {
   confirmEmailChange,
@@ -25,6 +25,7 @@ import {
   formatLongDate,
   formatMoneyCents,
   formatPriceCents,
+  formatShortDay,
   formatSlotTime,
   formatTimeIn,
   redeemRecurringRate
@@ -36,6 +37,7 @@ import { StudentHomework } from "@/components/homework/StudentHomework";
 
 /** The two lengths a code from Inês can set a weekly price for. */
 const RATE_LENGTHS = [60, 90] as const;
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function accountDetails(student?: Student | null) {
   return { name: student?.name ?? "", email: student?.email ?? "", nif: student?.nif ?? "" };
@@ -91,8 +93,10 @@ export function MyLessons({
   onStudentChange,
   onSelectSection,
   onSignOut,
+  onStepChange,
   openUpcomingRequest = 0,
   cardBookingId = "",
+  initialEmailPending = "",
   section = "upcoming"
 }: {
   /** The account the booking page has just loaded, so arriving doesn't ask for it twice. */
@@ -105,8 +109,13 @@ export function MyLessons({
   onStudentChange?: (fields: Partial<Student>) => void;
   onSelectSection?: (section: AccountSection) => void;
   onSignOut?: () => void;
+  /** True while a first-visit step (their email) has the page to itself, so
+   * the booking page holds their lessons back until it is done. */
+  onStepChange?: (step: boolean) => void;
   openUpcomingRequest?: number;
   cardBookingId?: string;
+  /** An address they gave on the welcome, waiting for its link. */
+  initialEmailPending?: string;
   section?: AccountSection;
 }) {
   const [student, setStudent] = useState<Student | null>(initialAccount?.student ?? null);
@@ -136,7 +145,7 @@ export function MyLessons({
   // Just chosen: the new splat lands in its row (11 October 2026, at Dan's
   // request: choosing one felt abrupt).
   const [markLanding, setMarkLanding] = useState(false);
-  const [emailPending, setEmailPending] = useState("");
+  const [emailPending, setEmailPending] = useState(initialEmailPending);
   const [emailBusy, setEmailBusy] = useState(false);
   const [detailsNote, setDetailsNote] = useState("");
   // The prices saved on the account, read each time the details open.
@@ -181,6 +190,16 @@ export function MyLessons({
     setLoading(false);
     setLoadError("");
   }, [initialAccount, student?.id]);
+
+  // One step to a screen on a first visit, their lessons last (2 November
+  // 2026, Dan: "surely they should type in email then go to the next page
+  // where they pay … then see the next lesson bit"). Told before paint, so the
+  // lessons never flash up under the step.
+  const emailStep = Boolean(student && !student.email && hasStudentSide(student) && !emailPending);
+  useLayoutEffect(() => {
+    onStepChange?.(emailStep);
+  }, [emailStep, onStepChange]);
+  useLayoutEffect(() => () => onStepChange?.(false), [onStepChange]);
 
   // A reload that lands while the details form is open must not replace what
   // the student is typing with the values it had before.
@@ -472,6 +491,12 @@ export function MyLessons({
     }
   }
 
+  // One way to type an address, from Your details or the prompt beside the card.
+  function draftEmail(value: string) {
+    emailDraftVersion.current += 1;
+    setDetails((current) => ({ ...current, email: value }));
+  }
+
   async function changeEmail() {
     // Each request sends two emails, so a double-click must not send four.
     if (emailBusy) return;
@@ -728,10 +753,7 @@ export function MyLessons({
                     autoCapitalize="none"
                     autoComplete="email"
                     autoCorrect="off"
-                    onChange={(event) => {
-                      emailDraftVersion.current += 1;
-                      setDetails((current) => ({ ...current, email: event.target.value }));
-                    }}
+                    onChange={(event) => draftEmail(event.target.value)}
                     spellCheck={false}
                     type="email"
                     value={details.email}
@@ -749,15 +771,16 @@ export function MyLessons({
                   </button>
                   <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
                 </div>
-                <p className="my-lessons__details-note">It changes once you open the link we send to the new address.</p>
+                <p className="my-lessons__details-note">{student.email ? "It changes once you open the link we send to the new address." : "It’s added once you open the link we send to it, on this phone or computer."}</p>
               </form>
             ) : (
               <>
                 <span className="my-lessons__fact-label">Email</span>
-                <span className="my-lessons__fact-value">
+                <span className={`my-lessons__fact-value${student.email || emailPending ? "" : " my-lessons__fact-value--empty"}`}>
                   {/* A long address breaks after its @, never mid-word, so
-                      it keeps its row beside Change as every detail does. */}
-                  <span>{student.email.split("@")[0]}{student.email.includes("@") ? <>@<wbr />{student.email.slice(student.email.indexOf("@") + 1)}</> : null}</span>
+                      it keeps its row beside Change as every detail does. A
+                      student Inês invited on WhatsApp may have none yet. */}
+                  {student.email ? <span>{student.email.split("@")[0]}{student.email.includes("@") ? <>@<wbr />{student.email.slice(student.email.indexOf("@") + 1)}</> : null}</span> : emailPending ? null : "Not added"}
                   {emailPending ? (
                     <small className="my-lessons__details-note">
                       Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.
@@ -765,7 +788,7 @@ export function MyLessons({
                   ) : null}
                 </span>
                 <button className="my-lessons__change" onClick={() => openDetail("email")} type="button">
-                  Change<span className="visually-hidden"> email</span>
+                  {student.email ? <>Change<span className="visually-hidden"> email</span></> : "Add email"}
                 </button>
               </>
             )}
@@ -942,15 +965,83 @@ export function MyLessons({
   const cardNote = cardAdded ? (
     <div className="booking-outcome card-added" role="status">
       {cardSaved ? <CheckCircle2 size={20} aria-hidden="true" /> : <AlertCircle size={20} aria-hidden="true" />}
-      <p>{cardSaved ? <>{cardAuthorised ? "Payments authorised." : "Card saved."} You&rsquo;re all set.</> : cardChecking ? "We’re confirming your saved card…" : "Your card hasn’t been confirmed yet. You can try adding it again."}</p>
+      <p>{cardSaved ? <>{cardAuthorised ? "Payments authorised." : "Card saved."} You&rsquo;re all set. Book, move or cancel your lessons below.</> : cardChecking ? "We’re confirming your saved card…" : "Your card hasn’t been confirmed yet. You can try adding it again."}</p>
     </div>
   ) : null;
   const askForCard = !cardSaved && !cardChecking && cardsAccepted && hasStudentSide(student) &&
     student.cardForAllLessons === false && unpaidAdded > 0;
+  // Someone Inês let in from a WhatsApp link may have no email yet. It is
+  // their only way back in on another phone, so it is the first thing asked,
+  // before the card, with no skip (2 November 2026, Dan: "they need to add an
+  // email then yeah that's fine"). Never a second card beside another.
+  const needsEmail = !student.email && hasStudentSide(student);
+  const emailPrompt = needsEmail ? (
+    <section aria-labelledby="email-prompt-heading" className={`card-prompt email-prompt${emailPending ? "" : " card-prompt--open"}`}>
+      <span aria-hidden="true" className="card-prompt__icon">
+        <Mail size={20} />
+      </span>
+      <div className="card-prompt__body">
+        <h3 id="email-prompt-heading">{emailPending ? "Check your email" : "Add your email"}</h3>
+        {emailPending ? (
+          <p>Open the link we sent to <strong>{emailPending}</strong> on this phone.</p>
+        ) : (
+          <>
+            <p>So you can sign in on any phone or computer.</p>
+            <form
+              className="email-prompt__form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!emailBusy && details.email.trim()) void changeEmail();
+              }}
+            >
+              <label>
+                <span className="visually-hidden">Your email</span>
+                <input
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  autoCorrect="off"
+                  onChange={(event) => draftEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  spellCheck={false}
+                  type="email"
+                  value={details.email}
+                />
+              </label>
+              <button className="button button--coral button--compact" disabled={emailBusy || !details.email.trim()} type="submit">
+                {emailBusy ? "Sending…" : "Add email"}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </section>
+  ) : null;
+  // What agreeing goes on to pay for (2 November 2026, Dan: make it obvious
+  // it covers their weekly lessons too): each weekly run once, as its day and
+  // Porto time, and any single lesson Inês added still to come.
+  const upcomingAdded: CardUpcoming[] = [];
+  if (cardBookingId || askForCard) {
+    for (const booking of bookings
+      .filter((entry) => Date.parse(entry.startAt) > clock && entry.status === "confirmed" && entry.addedByTeacher && entry.paymentStatus === "not_required" && !entry.paidByHand)
+      .sort((a, b) => a.startAt.localeCompare(b.startAt))) {
+      const run = booking.seriesId ? series.find((entry) => entry.id === booking.seriesId) : undefined;
+      const key = run ? `series:${run.id}` : `booking:${booking.reference}`;
+      const known = upcomingAdded.find((entry) => entry.key === key);
+      if (known) { known.startAts.push(booking.startAt); continue; }
+      upcomingAdded.push({
+        key, weekly: Boolean(run), startAts: [booking.startAt], amountCents: booking.lessonType.priceCents,
+        when: run ? `Every ${WEEKDAYS[run.weekday]}, ${formatSlotTime(booking.startAt)}` : `${formatShortDay(booking.startAt)}, ${formatSlotTime(booking.startAt)}`
+      });
+    }
+  }
+  const cardPrompt = cardBookingId || askForCard ? <CardPrompt key={cardBookingId} bookingId={cardBookingId} upcoming={upcomingAdded} /> : null;
   return (
     <>
       {cardNote}
-      {cardBookingId || askForCard ? <CardPrompt key={cardBookingId} bookingId={cardBookingId} /> : null}
+      {/* One card at a time above their lessons (2 November 2026, Dan: "super
+          smooth"): their email first, then the card to confirm, then a
+          reminder to open the email's link if it is still waiting. */}
+      {emailStep ? emailPrompt : cardPrompt ?? emailPrompt}
       {alert}
     </>
   );

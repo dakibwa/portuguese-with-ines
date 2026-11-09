@@ -32,9 +32,14 @@ results rather than claiming a speedup from a source change alone.
 
 ## 9 November 2026 — setup and Next.js security update
 
-**Source baseline:** `main` at
-`7deae0d6b97630d24df81b90863587d62573b60b`. Open draft PRs 185–188 contain
-separate payment/student/expression work and were left untouched.
+**Source baseline:** initial review at
+`7deae0d6b97630d24df81b90863587d62573b60b`; integrated with current main at
+`5d159bd200a4d0140ada5fc91ba4482f9f5e2933` before completing the pass. PR 189
+merged the separate payment/student/expression work from PRs 185–188 while
+the maintenance PR was being opened. Their changes were preserved; the
+production build and isolated authentication journey were repeated against
+the integrated source. The maintenance pull request is
+[PR 190](https://github.com/dakibwa/portuguese-with-ines/pull/190).
 
 ### Confirmed finding and change
 
@@ -61,17 +66,22 @@ of a live-site exploit. No product, Worker, payment or database logic changed.
 - Full `npm audit`: **12 findings remain** (2 high, 10 moderate), all in
   development dependencies. Before the change it reported 13 including the
   critical Next.js package. The remaining report is not a passing audit.
-- `npm run check:site`: passed before and after the update, including types,
+- `npm run check:site`: passed before and after the dependency update on the
+  initial baseline, including types,
   lint, Braces hardening, five redirect tests and 17 teacher-calendar tests.
   Both runs have the same existing `react-hooks/exhaustive-deps` warning at
   `src/components/teacher/LessonDetails.tsx:125`; no lint errors.
-- `npm run build`: passed with Next.js 16.4.5, producing all 16 static pages.
+- `npm run build`: passed with Next.js 16.4.5 on both the initial and integrated
+  source, producing all 16 static pages.
   The build used a localhost API URL and isolated QA Google/Stripe public
   placeholders; it is a test artifact, not a production-ready release.
-- `QA_BASE_URL=http://localhost:3000 node scripts/qa-auth-recovery.mjs`: passed
-  against that static export in Chromium at 320/390/1280px. The existing script
-  reports 7/15 configured Google cases, 5/15 storage cases and 2/6 expired-session
-  destinations, along with its reset/form-switch/retry checks. Its fixtures
+- `node scripts/qa-auth-recovery.mjs`: passed against the initial static export
+  (`QA_BASE_URL=http://localhost:3000`) and the integrated export
+  (`QA_BASE_URL=http://localhost:3001`), in Chromium at 320/390/1280px. On the
+  integrated build the existing script reports 6/15 configured Google cases
+  (7/15 on the initial build), 5/15 storage cases and 2/6 expired-session
+  destinations, along with its reset/form-switch/retry checks. These runs do
+  not establish coverage of every optional configured case. Its fixtures
   isolate authentication and API replies; no real accounts or emails are made.
 - `git diff --check`: passed. No Worker tests, live release probe, deployment,
   production mutations or production performance comparison were run. This
@@ -88,5 +98,6 @@ of a live-site exploit. No product, Worker, payment or database logic changed.
    pages and the booking workspace, then target the largest measured delay.
    Use isolated booking replies, fixed data and matched desktop/phone settings;
    account for the deliberately retained page-turn, splat and wordmark motion.
-3. Continue authorization and failed-request review in one focused area. Keep
-   the open student/payment/expression PRs in view to avoid duplicate fixes.
+3. Continue authorization and failed-request review in one focused area. Check
+   the newly merged student/payment/expression changes and any open PRs to
+   avoid duplicate fixes.

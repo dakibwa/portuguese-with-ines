@@ -5654,6 +5654,12 @@ p.lesson-when > span {
   opacity: 0.82;
 }
 
+/* Arriving from a link: the intro, their email when there is none yet, and
+   the one button. */
+.sign-in-link .auth-panel__intro {
+  margin-bottom: 1.1rem;
+}
+
 /*
  * Google's button is Google's. What is ours is the frame around it — coral
  * outline, white fill, her corner shape — which is as far as this can go
@@ -7409,6 +7415,17 @@ p.lesson-when > span {
 .booking-payment-facts strong {
   color: var(--coral-action);
   white-space: nowrap;
+}
+/* What costs nothing is bold in the text's own blue; coral is for a charge. */
+.booking-payment-facts strong.is-free {
+  color: var(--ink);
+  white-space: normal;
+}
+
+/* What costs nothing is bold in the text's own blue; coral is for a charge. */
+.booking-payment-facts strong.is-free {
+  color: var(--ink);
+  white-space: normal;
 }
 
 .booking-payment-facts a {
@@ -9557,6 +9574,44 @@ dialog[open]::backdrop {
   }
 }
 
+/* Add your email, for a student let in from a WhatsApp link: the card
+   prompt's own shape, its address and button on one row where they fit. */
+/* Open, its address takes the card's whole width beneath the line, as a
+   card's terms do, never a column indented under the icon. */
+.email-prompt .email-prompt__form {
+  grid-column: 1 / -1;
+  margin-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.email-prompt__form label {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.email-prompt__form input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-field);
+  padding: 0.55rem 0.85rem;
+  background: var(--raised);
+  font: inherit;
+}
+
+.email-prompt__form input:focus-visible {
+  border: 2px solid var(--blue-deep);
+  outline: 0;
+  box-shadow: none;
+}
+
+.email-prompt__form .button {
+  flex: 0 0 auto;
+}
+
 .card-terms {
   display: grid;
   gap: 0.75rem;
@@ -9621,10 +9676,6 @@ dialog[open]::backdrop {
   color: var(--ink);
   font: 700 1.05rem/1 var(--ui);
   font-variant-numeric: tabular-nums;
-}
-
-.card-terms--approval .booking-payment-facts {
-  padding-left: 0.2rem;
 }
 
 .card-terms__agreement {
@@ -9693,9 +9744,10 @@ dialog[open]::backdrop {
 
 /* The reading card, the same in her collection, its preview and a student's
    own painting (13 October 2026): what the words say, what they mean and the
-   English for it, each under a small label after a painted dab
-   (the literal translation under `Tradução à letra`); then the expression in use, its own
-   words marked in the paint. A student's card sets the paint (--paint, the
+   English for it, and her notes on it or its origin, each under a small label
+   after a painted dab (the literal translation under `Tradução à letra`);
+   then the expression in use, its own words marked in the paint. A
+   student's card adds its versions in other languages after its examples. A student's card sets the paint (--paint, the
    colour its labels are written
    in, its two companions and its mark); elsewhere the site's deep blue,
    lavender and coral stand in. */
@@ -9703,8 +9755,8 @@ dialog[open]::backdrop {
 .expression-card .expression-card__title { margin: 0 0 1rem; font: 400 clamp(1.05rem, 1.6vw, 1.25rem)/2 var(--display); color: var(--blue-deep); }
 .expression-card__label { display: block; margin: 0; color: var(--paint-ink, var(--blue-deep)); font: 700 0.66rem/1.5 var(--ui); letter-spacing: 0.15em; text-transform: uppercase; }
 .expression-card__meanings { display: grid; gap: 0.95rem; margin: 0; }
-.expression-card__fact, .expression-card__examples { position: relative; padding-left: 1.75rem; }
-.expression-card__fact::before, .expression-card__examples::before {
+.expression-card__fact, .expression-card__examples, .expression-translations { position: relative; padding-left: 1.75rem; }
+.expression-card__fact::before, .expression-card__examples::before, .expression-translations::before {
   position: absolute;
   top: 0.02rem;
   left: 0;
@@ -9718,9 +9770,9 @@ dialog[open]::backdrop {
 .expression-card__fact:nth-child(3n + 2)::before { background: var(--paint-2, var(--lavender)); rotate: 60deg; }
 .expression-card__fact:nth-child(3n + 3)::before { background: var(--paint-3, var(--coral)); rotate: 180deg; }
 .expression-card__examples::before { rotate: 330deg; }
+.expression-translations::before { background: var(--paint-2, var(--lavender)); rotate: 120deg; }
+/* Every value in one type style (7 November 2026, Dan: "same font styles"). */
 .expression-card__fact dd { margin: 0.18rem 0 0; font-size: 0.92rem; line-height: 1.55; white-space: pre-wrap; text-wrap: pretty; }
-/* The meaning is what a student came for: a step larger than the rest. */
-.expression-card__fact[data-fact="meaning"] dd { font-size: 1.04rem; line-height: 1.5; }
 .expression-card__examples { margin-top: 1.15rem; }
 .expression-card__examples ul { display: grid; gap: 0.55rem; margin: 0.2rem 0 0; padding: 0; list-style: none; }
 .expression-card__examples li { font-size: 0.92rem; line-height: 1.6; white-space: pre-wrap; text-wrap: pretty; }
@@ -9736,13 +9788,6 @@ dialog[open]::backdrop {
 .expression-card__extras { display: grid; justify-items: start; gap: 0.3rem; margin-top: 0.9rem; padding-left: 1.75rem; }
 .expression-card__tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.25rem 0 0; padding: 0; list-style: none; }
 .expression-card__tags li { border-radius: var(--squiggle-pill); padding: 0.2rem 0.7rem; background: color-mix(in srgb, var(--paint-tag, var(--paint-2, var(--lavender))) 30%, var(--raised)); font-size: 0.74rem; }
-.expression-card__notes { font-size: 0.85rem; line-height: 1.65; }
-.expression-card__notes summary { display: inline-flex; align-items: center; gap: 0.55rem; min-height: 44px; color: var(--paint-ink, var(--blue-deep)); cursor: pointer; font: 700 0.66rem/1.5 var(--ui); letter-spacing: 0.15em; list-style: none; text-transform: uppercase; }
-.expression-card__notes summary::-webkit-details-marker { display: none; }
-.expression-card__notes summary::after { width: 0.4rem; height: 0.4rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; content: ""; rotate: 45deg; translate: 0 -0.12rem; transition: rotate var(--motion-surface) var(--motion-ease), translate var(--motion-surface) var(--motion-ease); }
-.expression-card__notes[open] summary::after { rotate: 225deg; translate: 0 0.1rem; }
-.expression-card__notes p { margin: 0 0 0.3rem; white-space: pre-wrap; }
-.expression-card__notes a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; }
 .expression-form__more summary { min-height: 44px; padding-block: 0.7rem; cursor: pointer; font-weight: 600; }
 .expression-card__image { display: block; width: 100%; max-height: 18rem; object-fit: contain; border-radius: var(--squiggle-field); margin-bottom: 1rem; }
 
@@ -9804,20 +9849,25 @@ dialog[open]::backdrop {
   box-decoration-break: clone;
 }
 .expression-reading[data-busy] .expression-card__phrase { background: none; }
-.expression-reading__text :is(.expression-card__tags, .expression-card__notes, .expression-card__notes-toggle, .expression-card__image) { transition: opacity 220ms var(--motion-ease); }
-.expression-reading[data-busy] .expression-reading__text :is(.expression-card__tags, .expression-card__notes, .expression-card__notes-toggle, .expression-card__image) { opacity: 0; }
+.expression-reading__text :is(.expression-card__image, .expression-translations__language, .expression-translations > :not(.expression-card__label, .expression-translations__list)) { transition: opacity 220ms var(--motion-ease); }
+.expression-reading[data-busy] .expression-reading__text :is(.expression-card__image, .expression-translations__language, .expression-translations > :not(.expression-card__label, .expression-translations__list)) { opacity: 0; }
 .expression-reading__text { padding: 0.15rem 1.25rem 1rem var(--paint-text-x); background: none; outline: none; }
-.expression-reading__text :is(.expression-card__fact, .expression-card__examples, .expression-card__extras) { padding-left: 0; }
-.expression-reading__text :is(.expression-card__fact, .expression-card__examples)::before { left: -1.6rem; }
-.expression-reading__text > .expression-card__extras { justify-items: stretch; margin-top: 1rem; padding-top: 0.6rem; border-top: 1px solid var(--rule-soft); }
-.expression-reading__text .expression-card__notes { max-width: 72ch; }
-.expression-reading__text .expression-card__image { max-width: 28rem; }
+.expression-reading__text :is(.expression-card__fact, .expression-card__examples, .expression-translations) { padding-left: 0; }
+.expression-reading__text :is(.expression-card__fact, .expression-card__examples, .expression-translations)::before { left: -1.6rem; }
+.expression-reading__text .expression-card__fact dd { max-width: 72ch; }
+/* Every fact, example and version keeps one rhythm. */
+.expression-reading__text > .expression-reading__usage { margin-top: 0.95rem; }
+.expression-reading__usage > * + * { margin-top: 0.95rem; }
+.expression-reading__usage > :first-child { margin-top: 0; }
+.expression-reading__text .expression-card__image { max-width: 28rem; margin: 0.95rem 0 0; }
 /* The painting is the reading's title. Its words are for assistive technology,
    and show in the hand only if the sheet cannot be painted. */
 .expression-reading__title { margin: 0.9rem 0 1rem; color: var(--paint-ink); font: 400 clamp(1.5rem, 6cqi, 2.2rem)/1.35 var(--display); text-wrap: balance; }
 .expression-reading:not([data-unpainted]) .expression-reading__title { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Painted, before its reading opens: the title alone, above the button. */
+.expression-reading > .expression-reading__title { margin-inline: var(--paint-text-x) 1.25rem; }
 .expression-reading[data-unpainted] > .paint-sheet { display: none; }
-/* The button stays with the card: under the waiting sheet, then at the end of the reading's last row. */
+/* One button at the card's foot in every state: under the sheet, then after the reading, at its end. */
 .expression-reading__actions { position: relative; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem 1rem; min-width: 0; }
 .expression-reading > .expression-reading__actions { grid-row: 3; padding: 0.35rem 1rem 1rem; }
 /* Compact at every width (phones otherwise stretch every button full width), and still a 44px target. */
@@ -9827,28 +9877,21 @@ dialog[open]::backdrop {
 .expression-reading__go-sizer { visibility: hidden; }
 .expression-reading__actions .booking-alert { flex-basis: 100%; margin: 0; }
 .expression-reading__actions .expression-reading__note { max-width: 19rem; text-align: right; }
-/* The reading ends in one row: its themes, then the notes' toggle and the
-   button, which keep together at the row's end and drop beneath the themes
-   only when the row has no room for them. The notes open below the row. */
-.expression-card__foot { display: flex; flex-wrap: wrap; align-items: center; justify-self: stretch; gap: 0.4rem 0.5rem; margin-top: 0.15rem; }
-.expression-card__foot > .expression-card__tags { gap: 0.3rem; margin: 0; }
-.expression-card__foot .expression-card__tags li { padding-inline: 0.55rem; white-space: nowrap; }
-.expression-card__foot-end { display: flex; flex: 1 0 auto; flex-wrap: wrap; align-items: center; gap: 0.4rem; max-width: 100%; }
-.expression-card__foot-end > .expression-reading__actions { margin-left: auto; }
-.expression-card__foot-end:has(.booking-alert), .expression-card__foot-end > .expression-reading__actions:has(.booking-alert) { flex-basis: 100%; }
-.expression-card__foot .button { min-width: 0; padding-inline: 0.8rem; letter-spacing: 0.1em; }
-/* The notes' toggle: a label like the facts', its chevron in the dabs' column when it leads the row. */
-.expression-card__notes-toggle { display: inline-flex; align-items: center; min-height: 48px; margin: 0; padding: 0; border: 0; background: none; color: var(--paint-ink, var(--blue-deep)); cursor: pointer; font: 700 0.66rem/1.5 var(--ui); letter-spacing: 0.11em; text-transform: uppercase; }
-.expression-card__notes-toggle::before { flex: none; width: 0.4rem; height: 0.4rem; margin: 0 0.5rem 0 0.15rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; content: ""; rotate: 45deg; translate: 0 -0.12rem; transition: rotate var(--motion-surface) var(--motion-ease), translate var(--motion-surface) var(--motion-ease); }
-.expression-card__notes-toggle[aria-expanded="true"]::before { rotate: 225deg; translate: 0 0.1rem; }
-.expression-card__foot[data-lead="notes"] .expression-card__notes-toggle:first-child::before { margin-inline: 0.3rem 0.9rem; }
-.expression-card__foot + .expression-card__notes { margin-top: 0.1rem; }
-/* Students' translations, approved by Inês: a panel like the notes', with a small form for a student's own. */
-.expression-translations { display: grid; gap: 0.6rem; min-width: 0; }
+/* A quiet toggle in the values' own type: "Add yours" under the versions in other languages. */
+.expression-card__toggle { display: inline-flex; align-items: center; min-height: 44px; margin: 0 0 -0.4rem; padding: 0; border: 0; background: none; color: var(--paint-ink, var(--blue-deep)); cursor: pointer; font: 600 0.92rem/1.55 var(--ui); }
+.expression-card__toggle::before { flex: none; width: 0.4rem; height: 0.4rem; margin: 0 0.5rem 0 0.15rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; content: ""; rotate: 45deg; translate: 0 -0.12rem; transition: rotate var(--motion-surface) var(--motion-ease), translate var(--motion-surface) var(--motion-ease); }
+.expression-card__toggle[aria-expanded="true"]::before { rotate: 225deg; translate: 0 0.1rem; }
+/* "Noutras línguas": students' own versions, approved by Inês, one of the
+   reading's facts, with a small form for a student's own. */
+.expression-translations { display: grid; justify-items: start; gap: 0.18rem; min-width: 0; margin-top: 0.95rem; font-size: 0.92rem; line-height: 1.55; }
+.expression-translations > * { max-width: 100%; }
 .expression-translations p { margin: 0; }
-.expression-translations__list { display: grid; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
-.expression-translations__list li { min-width: 0; overflow-wrap: anywhere; }
-.expression-translations__language { display: block; color: var(--paint-ink, var(--blue-deep)); font: 700 0.62rem/1.5 var(--ui); letter-spacing: 0.11em; text-transform: uppercase; }
+/* Each version reads like an example, its language quietly after it. */
+.expression-translations__list { display: grid; gap: 0.3rem; margin: 0; padding: 0; list-style: none; }
+.expression-translations__list li { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; text-wrap: pretty; }
+.expression-translations__language { margin-left: 0.4em; opacity: 0.68; font-size: 0.88em; white-space: nowrap; }
+.expression-translations__language::before { content: "· "; }
+.expression-translations__adding { justify-self: stretch; min-width: 0; }
 .expression-translations__form { display: grid; gap: 0.3rem; max-width: 32rem; min-width: 0; }
 .expression-translations__form label { margin-top: 0.3rem; font: 600 0.78rem/1.4 var(--ui); }
 .expression-translations__form :is(input, textarea) { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); padding: 0.55rem 0.75rem; background: var(--raised); color: inherit; font: inherit; }
@@ -9858,18 +9901,28 @@ dialog[open]::backdrop {
 .expression-translations__form .booking-alert { margin: 0; }
 .expression-translations__error { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
 .expression-translations a { display: inline; min-height: 0; }
-/* On a narrow column the row takes the card's whole width from the dabs'
-   column, so a theme and the button share it; it wraps only for many themes. */
-.expression-reading__text .expression-card__foot { margin-inline: -1.6rem -0.75rem; }
+/* "Show meaning": as the card opens, each fact rises in after the last, in
+   reading order (both columns together on a wide card), and the button
+   follows at the foot, so nothing arrives in one block (7 November 2026,
+   Dan: "animated as it comes in"). */
 @media (prefers-reduced-motion: no-preference) {
-  .expression-reading__text > :not(h3) { animation: expression-fact-in 560ms var(--motion-ease) backwards; }
-  .expression-reading__text > :nth-child(3) { animation-delay: 90ms; }
-  .expression-reading__text > :nth-child(4) { animation-delay: 170ms; }
-  .expression-reading__text .expression-card__fact:nth-child(2) { animation: expression-fact-in 560ms var(--motion-ease) 50ms backwards; }
-  .expression-reading__text .expression-card__fact:nth-child(3) { animation: expression-fact-in 560ms var(--motion-ease) 100ms backwards; }
+  .expression-reading__text :is(.expression-card__fact, .expression-card__examples, .expression-translations, .expression-card__image) {
+    animation: expression-fact-in 640ms var(--motion-ease) backwards;
+    animation-delay: calc(var(--fact-i, 0) * 85ms);
+  }
+  .expression-reading__text .expression-card__fact:nth-child(2) { --fact-i: 1; }
+  .expression-reading__text .expression-card__fact:nth-child(3) { --fact-i: 2; }
+  .expression-reading__text .expression-card__fact:nth-child(4) { --fact-i: 3; }
+  .expression-reading__text :is(.expression-card__examples, .expression-card__image) { --fact-i: 4; }
+  .expression-reading__text .expression-translations { --fact-i: 5; }
+  .expression-reading[data-state="read"] > .expression-reading__actions { animation: expression-fact-in 560ms var(--motion-ease) 320ms backwards; }
+  @container expressions (min-width: 34rem) {
+    .expression-reading__text .expression-card__examples { --fact-i: 1; }
+    .expression-reading__text .expression-translations { --fact-i: 2; }
+  }
 }
 @keyframes expression-fact-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(10px); }
 }
 
 /* The sheet. Its layers are built and moved by the painter (painter.ts),
@@ -9895,12 +9948,11 @@ dialog[open]::backdrop {
   .expression-reading { --paint-text-x: 40px; }
   .expression-reading__text { padding-right: 1rem; }
   .expression-reading > .expression-reading__actions { padding-inline: 0.75rem; }
-  .expression-reading__text .expression-card__foot { margin-right: -0.5rem; }
 }
 
-/* The painting and examples share the upper row with the meanings. Notes,
-   themes and the next-paint action span the card beneath that reading, so
-   opening notes cannot leave a tall empty half beside them. */
+/* The painting, with its examples and other languages beneath it, sits
+   beside the facts; the button ends the facts' column at the
+   card's foot, with no rule or footer band (7 November 2026, Dan). */
 @property --paint-sheet-h {
   syntax: "<length>";
   inherits: true;
@@ -9913,13 +9965,10 @@ dialog[open]::backdrop {
   .expression-reading__title { margin: 1.1rem 0.5rem 0.9rem var(--paint-text-x); }
   .expression-reading[data-unpainted] .expression-reading__title { grid-column: 1; grid-row: 1; align-self: start; }
   .expression-reading__text { display: grid; grid-column: 1 / -1; grid-row: 1 / -1; grid-template-columns: subgrid; grid-template-rows: subgrid; padding: 0; }
-  .expression-reading__text > .expression-card__meanings { grid-column: 2; grid-row: 1; align-self: start; padding: 1.2rem 1.25rem 1.25rem 0.4rem; }
-  .expression-reading__text > .expression-card__examples { grid-column: 1; grid-row: 1; align-self: start; margin: var(--paint-sheet-h) 0 0 var(--paint-text-x); padding: 0 0.5rem 1.25rem 0; }
-  .expression-reading__text > .expression-card__extras { grid-column: 1 / -1; grid-row: 2; align-self: start; margin: 0 1.25rem; padding: 0.6rem 0 1rem; }
-  .expression-reading__text .expression-card__foot { margin-inline: 0; }
-  .expression-reading__text .expression-card__foot[data-lead="notes"] .expression-card__notes-toggle:first-child::before { margin-inline: 0.15rem 0.6rem; }
-  /* At rest only the paint button sits at the foot of the blank card. */
-  .expression-reading[data-state="waiting"] > .paint-sheet { grid-row: 1 / -1; align-self: stretch; }
+  .expression-reading__text > .expression-reading__facts { grid-column: 2; grid-row: 1; align-self: start; padding: 1.2rem 1.25rem 0.25rem 0.4rem; }
+  .expression-reading__text > .expression-reading__usage { grid-column: 1; grid-row: 1 / -1; align-self: start; margin: var(--paint-sheet-h) 0 0 var(--paint-text-x); padding: 0 0.5rem 1.25rem 0; }
+  /* At rest, and painted until its reading opens, only the button sits at the card's foot. */
+  .expression-reading:is([data-state="waiting"], [data-state="painted"]) > .paint-sheet { grid-row: 1 / -1; align-self: stretch; }
   .expression-reading > .expression-reading__actions { grid-column: 2; grid-row: 2; align-self: end; padding: 0.9rem 0.9rem 1rem 0; }
 }
 
@@ -9927,18 +9976,17 @@ dialog[open]::backdrop {
    column instead, with the example beneath it. */
 @container expressions (min-width: 34rem) {
   .expression-reading[data-unpainted] { grid-template-rows: auto auto auto; }
-  .expression-reading[data-unpainted] .expression-reading__text > .expression-card__meanings { grid-row: 1 / span 2; }
-  .expression-reading[data-unpainted] .expression-reading__text > .expression-card__examples { grid-row: 2; margin-top: 0; }
-  .expression-reading[data-unpainted] .expression-reading__text > .expression-card__extras { grid-row: 3; }
+  .expression-reading[data-unpainted] .expression-reading__text > .expression-reading__facts { grid-row: 1 / span 2; }
+  .expression-reading[data-unpainted] .expression-reading__text > .expression-reading__usage { grid-row: 2 / -1; margin-top: 0; }
+  .expression-reading[data-unpainted] > .expression-reading__actions { grid-row: 3; }
 }
 
 @container expressions (min-width: 44rem) {
   .expression-reading { --paint-text-x: 64px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); column-gap: 2.5rem; }
-  .expression-reading__text > .expression-card__meanings { padding-right: 2.25rem; }
-  .expression-reading__text > .expression-card__examples { padding: 0 1rem 1.6rem 0; }
-  .expression-reading__text > .expression-card__extras { margin-inline: 2rem; padding-bottom: 1.25rem; }
-  .expression-reading__text .expression-card__fact dd, .expression-reading__text .expression-card__examples li { font-size: 0.97rem; }
-  .expression-reading__text .expression-card__fact[data-fact="meaning"] dd { font-size: 1.1rem; }
+  .expression-reading__text > .expression-reading__facts { padding-right: 2.25rem; }
+  .expression-reading__text > .expression-reading__usage { padding: 0 1rem 1.6rem 0; }
+  .expression-reading > .expression-reading__actions { padding-right: 1.25rem; }
+  .expression-reading__text :is(.expression-card__fact dd, .expression-card__examples li, .expression-translations) { font-size: 0.97rem; }
 }
 
 @container expressions (min-width: 60rem) {
@@ -9948,20 +9996,164 @@ dialog[open]::backdrop {
 /* Without subgrid, the wide reading keeps to the column beside the painting. */
 @supports not (grid-template-rows: subgrid) {
   @container expressions (min-width: 34rem) {
-    .expression-reading__text { display: block; grid-column: 2; grid-row: 1 / -1; padding: 1.2rem 1.25rem 1.25rem 0.4rem; }
-    .expression-reading__text > :is(.expression-card__meanings, .expression-card__examples, .expression-card__extras) { padding: 0; }
-    .expression-reading__text > .expression-card__examples { margin: 1.15rem 0 0; }
-    .expression-reading__text > .expression-card__extras { margin-top: 0.9rem; }
+    .expression-reading__text { display: block; grid-column: 2; grid-row: 1; padding: 1.2rem 1.25rem 1.25rem 0.4rem; }
+    .expression-reading__text > :is(.expression-reading__facts, .expression-reading__usage) { padding: 0; }
+    .expression-reading__text > .expression-reading__usage { margin: 0.95rem 0 0; }
   }
 }
 
-/* A prepared approval stays separate from the teacher's paid-by-hand control. */
+/* A prepared approval stays separate from the teacher's paid-by-hand
+   control: a rule above, and the dialog's quieter small type. */
 .teacher-card-link {
   display: grid;
   justify-items: start;
-  gap: 0.6rem;
-  margin-block: 1rem;
-  padding-block: 1rem;
+  gap: 0.5rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--rule);
 }
-.teacher-card-link p { margin: 0; }
+.teacher-card-link p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+/* On Students it is the panel's whole body, under the panel's heading. */
+.teacher-card-link--panel {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* The lessons she can tick into one link (2 November 2026): each the
+   Already paid tick's capsule, one line a lesson, the time on the left and
+   the price on the right; the total is on the button (Dan: "less spread
+   out"). */
+.teacher-card-link .teacher-card-link__heading {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.teacher-card-link .teacher-card-link__hint { opacity: 0.78; }
+.teacher-card-link__heading + .teacher-card-link__hint { margin-top: -0.35rem; }
+.teacher-card-link__choices {
+  display: grid;
+  width: 100%;
+  max-width: 28rem;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.teacher-card-link .teacher-card-link__choice {
+  width: 100%;
+  min-height: 36px;
+  padding-block: 0.3rem;
+}
+.teacher-card-link__when {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teacher-card-link__choice b {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+/* Side by side, as the dialog's own actions are. */
+.teacher-card-link__actions {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 28rem;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+.teacher-card-link .teacher-card-link__actions > .button {
+  flex: 1 1 0;
+  width: auto;
+  min-width: fit-content;
+}
+
+/* What an approval pays for (2 November 2026, Dan: "always fits on the
+   same line"): what is paid now as the booking step's chosen-lesson tiles,
+   a little smaller, one line each with Porto time named once over them,
+   with a receipt's total under the prices; then what is paid automatically
+   from then on, each weekly run once, in dashed tiles as something still to
+   come. */
+.card-terms__lessons {
+  display: grid;
+  gap: 0.45rem;
+}
+.card-terms__lessons .booking-chosen-lessons { gap: 0.4rem; }
+.card-terms__lessons .booking-selection-summary {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  min-height: 52px;
+  padding-block: 0.4rem;
+}
+.card-terms__lessons .booking-selection-summary__mark {
+  width: 36px;
+  height: 36px;
+}
+.card-terms__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  padding-inline: 0.15rem;
+  color: var(--ink);
+  font: 700 0.7rem/1.2 var(--ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.card-terms__label small {
+  color: var(--lavender-ink);
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.card-terms__when {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ink);
+  font: 600 0.92rem/1.25 var(--ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-terms__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.1rem 0 0;
+  border-top: 1px solid var(--rule-soft);
+  padding: 0.55rem var(--pad-card) 0;
+  font: 600 0.9rem/1.3 var(--ui);
+}
+.card-terms__lessons--then {
+  margin-top: 0.2rem;
+}
+.card-terms__lessons .card-terms__lesson--then {
+  border-style: dashed;
+  background: transparent;
+}
+.card-terms__then-mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: var(--squiggle-thumb);
+  background: var(--weekly);
+  color: var(--blue);
+}
+/* When a lesson not yet due is charged, quietly under its total. */
+.card-terms__note {
+  margin: 0;
+  padding-inline: var(--pad-card);
+  color: var(--lavender-ink);
+  font: 500 0.78rem/1.4 var(--ui);
+}
+/* The fee as the confirm step's dabs over the agreement, lined up with the
+   labels above. */
+.card-terms--approval .booking-payment-facts {
+  padding-left: 0.2rem;
+}

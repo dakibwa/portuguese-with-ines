@@ -70,7 +70,7 @@ export function priceValue({ terms, amount, run = false }) {
   switch (terms) {
     case "free": return FREE_LABEL;
     case "paid": return `${amount} · paid`;
-    case "card": return run ? `${each} · charged to your saved card after each lesson` : `${each} · charged to your saved card after the lesson`;
+    case "card": return run ? `${each} · charged to your saved card at the end of each lesson` : `${each} · charged to your saved card at the end of the lesson`;
     case "untilCard": return `${each} · pay Inês as usual until you add your card`;
     case "asUsual": return `${each} · pay Inês as usual`;
     default: return `${each} · pay on the day, in person`;

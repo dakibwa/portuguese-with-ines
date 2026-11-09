@@ -103,8 +103,8 @@ request only competes with the fonts for no gain.
 - The saved-card, after-lesson flow passed sandbox acceptance and was activated
   in production on 11 September 2026 with a live restricted key and webhook
   secret. A new booking saves a card without charging it; the lesson price is
-  charged an hour after the scheduled lesson ends, once a no-show can no
-  longer be recorded. Existing direct-payment bookings
+  charged when the scheduled lesson ends (2 November 2026; an hour after
+  until then), once a no-show can no longer be recorded. Existing direct-payment bookings
   keep their original terms. The first genuine live card setup and payment
   remain to be observed. Production
   expects live keys and fails closed if test or incomplete credentials are
@@ -128,9 +128,9 @@ request only competes with the fonts for no gain.
   cancelling is free while the lesson is at least 14 elapsed hours away;
   inside that window it costs €5, charged automatically to the saved card.
   Bookings made under the earlier "free until the lesson day" wording pay only
-  when both rules would charge. From the lesson's start until an hour after
-  it ends Inês can mark a no-show; that replaces the full lesson charge with
-  €5, charged when that window closes.
+  when both rules would charge. From the lesson's start until it ends Inês
+  can mark a no-show; that replaces the full lesson charge with €5, charged
+  when the lesson ends.
   One booking can incur the late change fee only once.
 - Booking and change writes recheck current prices, payment state and any
   displayed late fee. Stale quotes require review before a new charge.

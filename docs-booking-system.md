@@ -52,6 +52,8 @@ Inês on /schedule                     (her own account, role=teacher)
   → GET  /admin/receipts?month=YYYY-MM               every amount paid or due for a Porto month's lessons,
                                                      with the NIF to issue to (her Receipts tab and automation)
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
+  → POST /admin/students/:id/invite-link             make a sign-in link for her to send on WhatsApp;
+                                                     nothing emailed (ten an hour per student)
   → POST /admin/students/:id/dormant                 mark them dormant, or active again; nothing emailed
   → GET/POST /admin/dormant-email                    the default each come-back email starts from
   → POST /admin/students/:id/dormant-email           send one dormant student theirs, at most once a day
@@ -235,13 +237,21 @@ provider call. This is Dan's confirmed receipt rule (18 October 2026).
 
 `GET /admin/students` lists each student with whether they have signed in, a
 card and the standing agreement, their next lesson, how many lessons to come are
-still paid by hand, and any weekly slot. `Students` on `/schedule` puts
-those who still need to sign in or add a card first, each with
-`Send welcome email` (`POST /admin/students/:id/welcome`, three an hour per
+still paid by hand, and any weekly slot. It also gives `unpaidPast` and
+`unpaidPastCents`, the past lessons she added that a payment link can still
+ask for (the same rule `GET …/card-link` lists them by: confirmed, expected,
+nothing charged, not ticked paid, a price above €0), and `invitedAt`, when the
+newest of their sign-in links still unspent and unexpired was made (`null`
+once each is used or expired), so her list can say `Link sent 5 Sept` (2
+November 2026). `Students` on `/schedule` groups them by whose move it is:
+`To do` (her link to send), `Waiting on them` (a link out, not yet used) and
+`All set` (signed in, card saved, nothing open), after `Needs you`. Her link is
+a WhatsApp message, or for someone with an email `Email instead`, which is the
+welcome email (`POST /admin/students/:id/welcome`, three an hour per
 student). It is only ever sent by her press: nothing sends it on its own.
 Concurrent first-welcome requests share one durable delivery key and original
-sign-in link. Retries preserve that exact request; explicit `Send the link again`
-still creates a fresh link. The recipient's captured address and account version
+sign-in link. Retries preserve that exact request; `Email instead` for
+someone already welcomed still creates a fresh link. The recipient's captured address and account version
 must match at link creation, email dispatch and the final welcome-state update.
 A student needs no lesson to be welcomed (16 October 2026, Inês); with no
 lesson to come the email invites them to sign in and book their next one,
@@ -410,12 +420,14 @@ also outside this change. Students' own translations are below.
 
 ## Students' translations of an expression
 
-Added 30 October 2026 (Dan, for Inês). Under a painted expression, beside
-`Notas e/ou origem`, a `Translations` toggle opens a panel the same way: hidden
-until pressed, below the reading's last row, so opening it never moves the row.
-The panel loads on first open. Everyone reading sees the translations Inês has
-approved, as a language label and the text. A signed-in student can add their
-own in any language; it waits for Inês and is shown only once she approves it.
+Added 30 October 2026 (Dan, for Inês); since 7 November 2026 it is one of
+the painted reading's facts, `Noutras línguas`, after its examples, rather
+than a toggle at its foot. It loads when the reading opens. Everyone reading
+sees the versions Inês has approved, as a language label and the text. A
+signed-in student's `Add yours` opens a small form in place that asks only
+how they say it; its `language` is their device's language setting, named in
+English (`Other` when the browser can't name it). It waits for Inês and is
+shown only once she approves it. The Worker and the `expression_translations` table are unchanged.
 The painting page needs an account, so a visitor who is signed out sees its
 sign-in panel, which says they can add translations once signed in. If a
 student's session has lapsed when they send one, the 401 forgets it and the
@@ -559,10 +571,12 @@ Lessons only belong to students (13 October 2026, Dan: no loose lessons).
 `POST /admin/bookings` names the student by `studentId` (their account, which
 works for a student with no email yet) or, for older callers, by `email`; one
 who isn't on the site is refused ("Add them as a student first.", 404), and
-students come from `POST /admin/students`. Each student's row is their profile
-through onboarding and regular use (14 October 2026, Dan). Its name opens
-all-time lesson history in place; details, price and lesson creation use the
-same row. Completed setup becomes normal profile controls. A new student or a
+students come from `POST /admin/students`. Each student's card is their profile
+from their first invite to regular use (14 October 2026, Dan; 2 November 2026).
+Its name opens their details, prices and all-time lesson history in place;
+editing details, price and lesson creation use the same card. A past lesson she
+added and nothing charged can be ticked paid there (`POST
+/admin/bookings/:id/paid`), which takes it out of `unpaidPast`. A new student or a
 free timetable time can start in the creation/student-choice dialog, then opens
 the chosen row's lesson calendar with the selected date and time preserved.
 History matches the linked student ID first and only falls back to an exact
@@ -640,6 +654,23 @@ first. The stand-in never leaves the database (`workers/booking/no-email.mjs`):
   show `""` for it.
 
 `POST /admin/students/:id/welcome` is refused (400) until she gives an email.
+Her way to them instead is the WhatsApp invite (2 November 2026, Dan: most of
+her students never gave an email, and only two had signed in):
+`POST /admin/students/:id/invite-link` makes the same one-click sign-in link a
+welcome carries (14 days, single use, issued under the welcome's authorization
+so a teacher session can make it), returns `{ url }` and sends nothing; her page
+puts it after her own words in a `wa.me` link she sends from WhatsApp herself.
+It is refused for a teacher account (409) and limited to ten an hour per
+student (429). Pressing `See my lessons` on it signs them in and, as any
+sign-in link does, sets `email_verified_at` and `last_login_at` even on the
+`no-email:` stand-in, so a student with no email can save a card (Stripe is
+given no address for them). For a student with no email, every sign-in link
+ends `&addEmail=1` (not a credential, only which welcome to show), so the
+welcome asks for their address beside its button; the same press signs them
+in and requests the usual `/me/email` confirmation link, and Your lessons asks
+again, before anything else and with nothing beneath it, if that request
+failed or the link had no hint. A link made before an address change stops
+working, as a welcome's does.
 `POST /admin/students/:id/details` sets name, phone, NIF and splat at any time.
 It sets or corrects the email only while the student has never signed in (no
 password, Google link or sign-in); after that it answers 409 and the student
@@ -675,7 +706,7 @@ It is built in the browser by the pure `needsYou()` in
   and the Stripe payment intent ids, for `Open in Stripe` (a link to the
   payment when the id looks like `pi_…`, otherwise to Stripe's payments list);
 - `GET /admin/students` (`awaitingWelcome`, `nextLessonAt`, `email`, `signedIn`,
-  `hasCard`, `hasLessons` and existing prices);
+  `hasCard`, `hasLessons`, `unpaidPast`, `invitedAt` and existing prices);
 - `GET /admin/google-calendar`, for Meet needing to be connected or
   reconnected.
 
@@ -896,13 +927,13 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   links in emails Inês causes last 14 days. A link is signed like a reset under
   its own prefix, and its `sign_in_links` row is the record that it is unspent:
   `POST /auth/email-link/confirm` deletes the row first, so of two clicks one
-  signs in (the page calls it only when the student presses `Sign in`, so a
+  signs in (the page calls it only when the student presses `See my lessons`, so a
   mail scanner opening the link spends nothing), and only while the account still has the address the link was sent
   to. A link proves the address. On an account that was registered with a
   password and never proven, it makes a Google first link's transition: the
   password, other sessions and any pending reset or address change go. Teacher
   accounts are never sent one. `/book/?signin=` takes the link out of the
-  address bar at once and shows `Sign in`; pressing it opens `Your lessons`,
+  address bar at once and shows `See my lessons`; pressing it opens `Your lessons`,
   and a spent or expired link opens the panel on asking for a new one.
 - **An address counts as proven once it has received mail.**
   `students.email_verified_at` (migration 0020) is set by any Google sign-in,
@@ -1158,7 +1189,7 @@ while validation runs. Inês's explicit calendar additions retain their override
   runs in setup mode, so no money is taken while the run is booked. The whole
   run is held until its webhook proves a reusable card exists, then every
   occurrence becomes `scheduled`. The minute cron charges an occurrence
-  only once its no-show window has closed, an hour after `ends_at` (see
+  when it ends, on the first sweep at or after `ends_at` (see
   *The no-show policy*). Open-ended top-ups inherit the same consent
   and scheduled state. A declined charge marks the row `payment_due` and emails
   the student a hosted pay-now link; Inês sees it as a Needs you card until it
@@ -1538,17 +1569,18 @@ than presenting the first lesson's price as the price of every lesson.
 
 For a confirmed saved-card lesson, the teacher schedule's lesson dialog offers
 a `No-show` tick beside `Already paid` (its accessible name `Mark no-show`)
-from the scheduled start until **an hour after the scheduled end** (Dan,
-22 October 2026, shortened from six hours; `NO_SHOW_WINDOW_HOURS` in
-`policy.mjs`), so Inês can record
-it after the lesson rather than during it. The same control can undo the mark
-during that window. `POST /admin/bookings/:id/no-show` (`{ "noShow": false }`
-undoes) accepts the change only inside that window and only while
-`payment_status = 'scheduled'`; from an hour after the end it answers 409.
+from the scheduled start until **the scheduled end** (Dan, 2 November 2026:
+"charged at the time of when the lessons ends"; it was an hour after the end
+from 22 October, and six hours before that; `NO_SHOW_WINDOW_HOURS = 0` in
+`policy.mjs`). So Inês marks a no-show while the lesson is on, typically a few
+minutes in, and ticks `Already paid` for a cash lesson before it ends. The same
+control can undo the mark during that window. `POST /admin/bookings/:id/no-show`
+(`{ "noShow": false }` undoes) accepts the change only inside that window and
+only while `payment_status = 'scheduled'`; from the end it answers 409.
 Because a no-show changes the amount, the lesson's own charge waits for the
 window to close: nothing about the lesson's payment — the charge attempt, the
 move off `scheduled`, the receipt, a declined card's pay-now email — happens
-before `ends_at` plus an hour. The charge sweep then claims the row as
+before `ends_at`. The charge sweep then claims the row as
 `processing` before reading attendance, so the teacher decision cannot race the
 PaymentIntent. Until the charge, a lesson inside the window is still an
 ordinary `scheduled` one, so Inês's own move and cancel still reach it.
@@ -1556,8 +1588,8 @@ Attendance writes also require the original lesson version and times. Moving an
 uncharged scheduled lesson to a genuinely different time clears its old no-show;
 a same-time edit and already committed payment retain attendance evidence.
 
-- **Expected attendance** charges the booked lesson price an hour after
-  `ends_at`, on the first minute sweep once the window has closed.
+- **Expected attendance** charges the booked lesson price at `ends_at`, on
+  the first minute sweep at or after it.
 - **No-show** charges €5 at the same point, instead of the booked lesson price.
 - If Inês configures that fee to zero, the Worker settles the zero obligation
   without a Stripe request, receipt or payment-recovery link. The lesson keeps
@@ -1794,12 +1826,12 @@ With `postpay` and Stripe configured:
 
 **The after-lesson policy** (Dan, 1 September 2026, `policy.mjs` is the single
 home): booking saves a card but takes no money. A scheduled row charges its
-booked amount only once its no-show window has closed, an hour after
-`ends_at` (Dan, 22 October 2026). Moving or cancelling at least 14 hours
+booked amount when the lesson ends, at `ends_at` (Dan, 2 November 2026; an
+hour after it from 22 October). Moving or cancelling at least 14 hours
 before the lesson is free; doing either later schedules one €5 action fee and
 prevents the full price from charging if the lesson was cancelled (the 14-hour
 rule, Dan, 21 September 2026). A no-show recorded between the lesson's start
-and an hour after its end changes the end charge from the booked price to €5.
+and its end changes the end charge from the booked price to €5.
 Inês is never charged a fee for a move or cancellation she makes. Older `paid`
 rows retain their earlier lock/refund promise inside the window; `not_required` rows keep
 their original pay-in-person terms. The card itself never touches the database
@@ -1960,8 +1992,8 @@ keep their original parameters.
   old tab open. `same_day_change` is never set on a paid row.
 - **Scheduled saved-card booking**: students may move or cancel right up to the
   lesson start. A change inside the window atomically schedules one €5 charge
-  to the saved card. A move keeps the later full lesson charge, due an hour
-  after the new end; a cancellation removes the full lesson charge. Once the fee is paid,
+  to the saved card. A move keeps the later full lesson charge, due at the
+  new end; a cancellation removes the full lesson charge. Once the fee is paid,
   the student and Inês are each emailed once; hers is the fiscal reminder.
 - **Stripe**: the off-session PaymentIntent is described as `Late lesson change
   fee · <reference>` and a recovery Checkout names the product `Late lesson
@@ -2474,53 +2506,79 @@ Provider references: [Calendar scopes](https://developers.google.com/workspace/c
 [event conferences](https://developers.google.com/workspace/calendar/api/guides/create-events),
 [OAuth production readiness](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview).
 
-### Approval for one unpaid lesson and future lessons — 27 October 2026
+### Approval for unpaid lessons and future lessons — 27 October 2026, several lessons 2 November 2026
 
-From an unpaid lesson's details, Inês can create and copy a payment approval
-link (`POST /admin/bookings/:id/card-link`). Creating it only issues the
-existing 14-day, one-use sign-in link; it sends no email, opens no Stripe
-session, and changes no booking or payment consent. It does not mark a first
-welcome as sent. The link names the selected booking with `cardBooking`.
+From an unpaid lesson's details, Inês can create a payment approval link
+(**Create payment link**). `GET /admin/bookings/:id/card-link` lists what she
+can tick into it: the lesson she opened and that student's other unpaid
+lessons she added that have already started, newest first, at most 20. The
+lesson she opened starts ticked; every other one only when she ticks it,
+because many past lessons were paid to her by hand without being marked
+**Already paid**. When nothing else is unpaid there is no list and the link
+is made at once. `POST /admin/bookings/:id/card-link` with `{ bookingIds }`
+(1 to 20 of that student's eligible lessons; without it, the lesson opened)
+issues the existing 14-day, one-use sign-in link. It sends no email, opens no
+Stripe session, and changes no booking or payment consent. It does not mark a
+first welcome as sent. The link names the ticked bookings, in time order,
+with `cardBooking=<id>,<id>…`. The same two routes by student
+(`/admin/students/:id/card-link`, where `bookingIds` is required) serve the
+invite on a student's card in Students (`Invite`, `Ask to pay`), which clears
+what a student owes in one link; there the list is only their unpaid lessons
+already had, and nothing starts ticked. With nothing ticked, or nothing open,
+the invite is a plain sign-in link (`POST /admin/students/:id/invite-link`). A student without an email can have one too:
+she sends it on WhatsApp, and confirming its sign-in is what verifies the
+account before a card is saved.
 
-After signing in, the student reviews that lesson's date, time and price,
-then actively agrees to both that lesson and
-standing automatic payment for future lessons. Previewing is read-only
-(`POST /me/card/preview`); `POST /me/card` checks the reviewed snapshot and
-explicit lesson consent. A previously saved card is authorised in place:
-the student does not add it again or visit Stripe. Its opaque review key binds
-the approval to that saved card; the transaction rechecks the card, session,
-revocation and lesson snapshot before recording consent. A card removed or
-replaced, a revoked session, or a paid/edited lesson refuses the approval.
+After signing in, the student reviews each lesson's date, time and price and
+their total, and sees the lessons still to come that Inês added (each weekly
+run once) that the same agreement then pays for, then actively agrees to those lessons and standing automatic
+payment for future lessons. Previewing is read-only (`POST /me/card/preview`
+with `bookingIds`); a lesson Inês has since marked paid, cancelled or taken
+off is left out, so the student agrees only to what is shown. `POST /me/card`
+checks every reviewed snapshot (`bookings`, or `booking` for one) and explicit
+lesson consent; one changed lesson refuses the whole approval. A previously
+saved card is authorised in place: the student does not add it again or
+visit Stripe. Its opaque review key binds the approval to that saved card;
+the transaction rechecks the card, session, revocation and every lesson
+snapshot before recording consent. A card removed or replaced, a revoked
+session, or a paid/edited lesson refuses the approval.
 
 Without a saved card, Stripe setup collects one and only its verified
-completion schedules the selected lesson, including one that has started or
-ended. The webhook pins its amount and times and
-checks ownership, confirmed/unpaid status, attendance and card generations
-at the write. A changed, cancelled or already-paid lesson is skipped; no
-other past lesson is included. Future teacher-added lessons and active repeats
-use the existing standing consent. The existing hourly-after-end scheduler
-collects once due, or on its next tick after later card confirmation. Creating
-or viewing the link cannot take payment. Old welcome links retain their
-future-only behaviour. The lesson and card consent stay unchanged until the
-student completes their own approval (and Stripe setup if a card is needed).
+completion schedules the selected lessons, including ones that have started
+or ended. Each is pinned in the session's metadata as `approved_booking_<n>`
+(`id start end amount`); a setup opened before 2 November carries the older
+`approved_booking_id/amount/start/end` keys and is still honoured. The
+webhook checks ownership, confirmed/unpaid status, attendance, card
+generations and each snapshot at the write. A changed, cancelled or
+already-paid lesson is skipped; no other past lesson is included. Future
+teacher-added lessons and active repeats use the existing standing consent.
+The existing hourly-after-end scheduler collects each lesson on its own, with
+its own receipt email, once due, or on its next tick after later card
+confirmation. Creating or viewing the link cannot take payment. Old welcome
+links retain their future-only behaviour. The lessons and card consent stay
+unchanged until the student completes their own approval (and Stripe setup if
+a card is needed).
 
-Reuse this workflow whenever a student needs to authorise a teacher-added
-lesson that has already happened, including a student who already saved a
-card. Inês opens that unpaid lesson in her timetable, chooses **Create payment
-approval link**, then **Copy payment approval link**. The link can be shared
-privately through WhatsApp or email; creating it sends neither. Confirm any
-direct payment with Inês first and record it as **Already paid** instead of
-requesting another payment.
+Reuse this workflow whenever a student needs to authorise teacher-added
+lessons that have already happened, including a student who already saved a
+card. Inês opens an unpaid lesson in her timetable, chooses **Create payment
+link**, ticks the lessons they owe, then **Create link**, and sends it with
+**Send on WhatsApp** (a `wa.me` link to their phone when it is written in
+international form or as a Portuguese mobile, otherwise WhatsApp's own chat
+picker) or **Copy link**. The WhatsApp message is one short line in her voice
+with the lesson count and total, then the link; she can edit it before
+sending. Confirm any direct payment with Inês first and record it as
+**Already paid** instead of requesting another payment.
 
-The student signs in, reviews the selected lesson (its date, time and price)
-and three short lines (when that lesson is charged, future payments, and
-fees), ticks **I authorise card payments for this and
-future lessons**, then presses **Authorise payments**. **Terms & privacy**
-sits inside that agreement area and opens without ticking it. A saved card
-needs permission only; a missing card opens Stripe setup. Approval includes
-only the one named past lesson, never an unseen backlog. Repeat the same
-workflow for another unpaid past lesson when needed; future teacher-added
-lessons and recurring lessons then use the standing consent.
+The student signs in (`Sign in to pay for your lessons. No password
+needed.`), reviews the lessons (one time tile each, then their total) and
+three short lines (when they are charged, future payments, and fees), ticks
+**I authorise card payments for these and future lessons**, then presses
+**Authorise payments**. **Terms & privacy** sits inside that agreement area
+and opens without ticking it. A saved card needs permission only; a missing
+card opens Stripe setup. Approval includes only the lessons named, never an
+unseen backlog; future teacher-added lessons and recurring lessons then use
+the standing consent.
 
 For an assistant preparing this on Dan's behalf, create the link and a
 preview first, then ask Inês to approve the proposed student message. Keep
@@ -2528,4 +2586,4 @@ the private sign-in link out of screenshots and review drafts. Hold the
 student message until Inês approves, and never authorise payment on the
 student's behalf. Creating
 and reviewing the link cannot charge the card; the student's own completed
-approval lets the normal scheduler collect the named lesson when due.
+approval lets the normal scheduler collect the named lessons when due.

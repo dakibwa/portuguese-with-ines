@@ -32,6 +32,27 @@ export async function fetchTranslations(expressionId: string): Promise<Expressio
   return data.translations;
 }
 
+const loaded = new Map<string, Promise<ExpressionTranslation[]>>();
+const ready = new Map<string, ExpressionTranslation[]>();
+
+/**
+ * Starts loading an expression's approved versions once, while it paints, so
+ * its reading opens with them in place. A failure is forgotten, so opening the
+ * reading asks again.
+ */
+export function prefetchTranslations(expressionId: string) {
+  let pending = loaded.get(expressionId);
+  if (!pending) {
+    pending = fetchTranslations(expressionId);
+    loaded.set(expressionId, pending);
+    pending.then((rows) => { ready.set(expressionId, rows); }, () => { loaded.delete(expressionId); });
+  }
+  return pending;
+}
+
+/** The versions already loaded for this expression, if any. */
+export const loadedTranslations = (expressionId: string) => ready.get(expressionId) ?? null;
+
 /** A student's own translation, which waits for Inês before anyone sees it. */
 export async function sendTranslation(token: string, expressionId: string, input: { language: string; text: string }) {
   let response: Response;
