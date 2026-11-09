@@ -104,7 +104,11 @@ request only competes with the fonts for no gain.
   privacy) are still written in their pages until each tutor's content has a
   file of its own. Day-to-day rules (notice, prices, buffer, horizon, fee)
   stay in the Worker's settings and lesson types, which win over the record's
-  defaults.
+  defaults. The Worker already serves any tutor listed in
+  `workers/booking/directory.mjs` from their own D1 database, picked by the
+  site that calls it; Inês's calls run exactly as before (see "More than one
+  tutor" in [docs-booking-system.md](./docs-booking-system.md)). Expressions is
+  her own add-on, not part of the platform.
 - **Booking is owned by this repository**, not by a third-party scheduler. The
   `ines-booking` Worker in `workers/booking/` and its D1 database are the source
   of truth for availability, bookings, reschedules and cancellations. See

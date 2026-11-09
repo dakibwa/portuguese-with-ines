@@ -73,6 +73,7 @@ import {
   zonedToUtc
 } from "./time.mjs";
 import { DEFAULT_TUTOR, tutorOf } from "./tutor.mjs";
+import { envForTutor, everyTutor, tutorForRequest } from "./directory.mjs";
 import { bookingReference, createManageToken, readManageToken, safeEqual } from "./tokens.mjs";
 import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
@@ -2007,6 +2008,7 @@ async function handleEmailLinkConfirm(request, env) {
  * session token also verifies as a manage token, for "<student>.<expiry>.<version>";
  * only a UUID is looked up, so no other signed value can ever name a booking.
  */
+const EXPRESSIONS_PATH = /^\/(?:admin\/|me\/)?expressions(?:\/|$)|^\/admin\/expression-translations(?:\/|$)/;
 const BOOKING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function getBookingByToken(env, token) {
@@ -2017,6 +2019,9 @@ async function getBookingByToken(env, token) {
 
 const worker = {
   async fetch(request, env, ctx) {
+    // The tutor this request belongs to, and their own database and secrets.
+    // Inês's requests keep the deploy's env exactly as it was.
+    env = await envForTutor(env, tutorForRequest(request));
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(request, env) });
     }
@@ -2026,6 +2031,8 @@ const worker = {
 
     try {
       if (!env.DB) return fail("The booking database is not bound to this Worker.", 500, request, env);
+      // Expressions is Inês's own add-on (9 November 2026, Dan): for any other tutor it does not exist.
+      if (!tutorOf(env).features?.expressions && EXPRESSIONS_PATH.test(path)) return fail("Not found.", 404, request, env);
       if (!env.BOOKING_TOKEN_SECRET) return fail("The booking service is not fully configured.", 500, request, env);
 
       if (request.method === "POST" && path !== "/stripe/webhook") {
@@ -2175,32 +2182,38 @@ const worker = {
    * bookings is the kind of thing that is impossible to reason about later.
    */
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(chargeDueLessons(env));
-    ctx.waitUntil(chargeDueSameDayFees(env));
-    ctx.waitUntil(retryPaymentRecovery(env));
-    ctx.waitUntil(retryRefunds(env));
-    ctx.waitUntil(resendFailedEmails(env));
-    ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row)));
-    ctx.waitUntil(sendLessonReminders(env));
-    // Homework whose marking was interrupted, or whose notice failed to send.
-    ctx.waitUntil(homeworkNotices(env));
-
-    // The account has a finite trigger allowance. One per-minute trigger owns
-    // prompt money work, and only its 03:10 UTC tick runs the larger nightly
-    // calendar extension query.
-    const scheduledAt = new Date(event?.scheduledTime ?? Date.now());
-    if (!event?.cron || (scheduledAt.getUTCHours() === 3 && scheduledAt.getUTCMinutes() === 10)) {
-      ctx.waitUntil(topUpOpenSeries(env));
-      ctx.waitUntil(env.DB.batch([
-        // A day after its start, any window (an hour at most) has closed.
-        env.DB.prepare("DELETE FROM request_limits WHERE window < ?").bind(Math.floor(Date.now() / 1000) - 86400),
-        env.DB.prepare("DELETE FROM revoked_sessions WHERE expires_at < ?").bind(Date.now())
-      ]));
-      ctx.waitUntil(env.DB.prepare("DELETE FROM sign_in_links WHERE expires_at < ?").bind(new Date().toISOString()).run()
-        .catch((error) => console.error("prune-sign-in-links", String(error?.message ?? error))));
-    }
+    // Each tutor's sweeps run on their own database, one after another's start.
+    for (const own of await everyTutor(env)) sweep(event, own, ctx);
   }
 };
+
+/** One tutor's share of the minute and nightly work. */
+function sweep(event, env, ctx) {
+  ctx.waitUntil(chargeDueLessons(env));
+  ctx.waitUntil(chargeDueSameDayFees(env));
+  ctx.waitUntil(retryPaymentRecovery(env));
+  ctx.waitUntil(retryRefunds(env));
+  ctx.waitUntil(resendFailedEmails(env));
+  ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row)));
+  ctx.waitUntil(sendLessonReminders(env));
+  // Homework whose marking was interrupted, or whose notice failed to send.
+  ctx.waitUntil(homeworkNotices(env));
+
+  // The account has a finite trigger allowance. One per-minute trigger owns
+  // prompt money work, and only its 03:10 UTC tick runs the larger nightly
+  // calendar extension query.
+  const scheduledAt = new Date(event?.scheduledTime ?? Date.now());
+  if (!event?.cron || (scheduledAt.getUTCHours() === 3 && scheduledAt.getUTCMinutes() === 10)) {
+    ctx.waitUntil(topUpOpenSeries(env));
+    ctx.waitUntil(env.DB.batch([
+      // A day after its start, any window (an hour at most) has closed.
+      env.DB.prepare("DELETE FROM request_limits WHERE window < ?").bind(Math.floor(Date.now() / 1000) - 86400),
+      env.DB.prepare("DELETE FROM revoked_sessions WHERE expires_at < ?").bind(Date.now())
+    ]));
+    ctx.waitUntil(env.DB.prepare("DELETE FROM sign_in_links WHERE expires_at < ?").bind(new Date().toISOString()).run()
+      .catch((error) => console.error("prune-sign-in-links", String(error?.message ?? error))));
+  }
+}
 
 /**
  * Charge only once the lesson's no-show window has closed, NO_SHOW_WINDOW_HOURS

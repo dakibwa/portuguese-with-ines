@@ -1,6 +1,7 @@
 {
   "$comment": "One tutor's record: who they are, what they teach, where, and how the site and its emails name them. Inês is the only tutor for now; the booking Worker and the site both read this file instead of spelling her details out. Rules a tutor changes day to day (notice, prices, buffer, horizon, fees) stay in the Worker's settings table, which wins over the defaults below.",
   "id": "ines",
+  "database": "DB",
   "name": "Inês Dias Baía",
   "shortName": "Inês",
   "pronouns": { "subject": "she", "object": "her", "possessive": "her" },
@@ -35,6 +36,10 @@
     "country": "PT",
     "currency": "EUR",
     "inPersonKey": "porto"
+  },
+  "features": {
+    "$comment": "Expressions is an add-on for Inês's site only, not part of the platform (9 November 2026, Dan).",
+    "expressions": true
   },
   "contact": {
     "whatsapp": "+351 963 161 134"

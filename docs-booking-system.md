@@ -2374,11 +2374,49 @@ elsewhere. Never change `bookings.referencePrefix` or
 `bookings.calendarUidDomain` for a tutor who has lessons: calendars match
 updates by the UID, and students and receipts quote the reference.
 
-Still read once for the one tutor rather than per request: the home time zone
-(`HOME_ZONE` in `time.mjs`), the currency in `stripe.mjs` and `money.mjs`, the
-calendar file's PRODID and UID domain in `ics.mjs`, and every helper whose
-`tutor` defaults to `DEFAULT_TUTOR`. Serving a second tutor means passing the
-request's tutor to each of those; `grep -n "DEFAULT_TUTOR"` lists them.
+### More than one tutor
+
+One Worker can serve several tutors. `workers/booking/directory.mjs` lists them
+(`TUTORS`), and each has their own D1 database, bound under the name in their
+record's `database`. Inês's is `DB`, as it always was.
+
+- **Whose request.** A request is a tutor's when its `Origin` is one of their
+  `site.origins`, or when it arrives on one of their `api.hosts`. Everything
+  else, including the Stripe webhook, the Google Calendar callback and the
+  release probe, is Inês's, so her site behaves exactly as before.
+- **Inês's env is the deploy's own object, untouched.** Another tutor's env is
+  built from nothing: their database, the shared mail, marking and Google
+  sign-in keys, signing secrets (`BOOKING_TOKEN_SECRET`, `ADMIN_TOKEN`) derived
+  for that tutor alone so a manage link or session from one never opens
+  another, and safe switches: email held as a dry run, Google Calendar and
+  homework marking off, until their record's `switches` turn them on. None of
+  Inês's Stripe keys, calendar key, teacher email or private rate codes reach
+  them.
+- **Fail closed.** A tutor whose database binding is missing gets a 500 on every
+  call, never someone else's data; the scheduled sweeps skip and log them
+  (`tutor-database-missing`) and run once for every other tutor.
+- **Expressions is Inês's add-on**, not part of the platform (9 November 2026,
+  Dan). Only a record with `features.expressions` serves its routes; for any
+  other tutor they answer 404, and the directory refuses a second tutor who
+  claims it.
+
+Adding a tutor: a folder under `tutors/` with their `tutor.json`, one line in
+`TUTORS`, a D1 database made from `schema.sql` and then the output of `node
+workers/booking/tutor-seed.mjs <id>`, and its binding in `wrangler.jsonc` under
+the record's `database`. Never `seed.sql`: it is Inês's prices, hours and name.
+A new tutor starts with their record's rules, their name, and the three lesson
+types switched off and unpriced, with no teaching hours, so nothing can be
+booked until they set their prices and hours. `node
+workers/booking/tenancy-test.mjs` (part of `npm run test:booking`) proves two
+tutors never see each other's students, lessons, secrets or name.
+
+Not yet per tutor, so the directory refuses a second tutor whose time zone or
+currency differs from Inês's: the home time zone (`HOME_ZONE` in `time.mjs`),
+the currency in `stripe.mjs` and `money.mjs`, the calendar file's PRODID and UID
+domain in `ics.mjs`, and every helper whose `tutor` defaults to `DEFAULT_TUTOR`
+(`grep -n "DEFAULT_TUTOR"` lists them). Stripe payments wait for each tutor's
+own connected account, and Google Calendar for a callback that carries the
+tutor.
 
 ```bash
 NEXT_PUBLIC_BOOKING_API_BASE_URL=https://ines-booking.<subdomain>.workers.dev
