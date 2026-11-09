@@ -179,11 +179,16 @@ by protecting a student, Inês or money in a way these don't already.
 
 ## Security maintenance
 
-As of 18 October 2026, Next and its ESLint configuration are
-patched to 16.3.8, with compatible Sharp and source-map-js fixes in the lockfile.
-`npm audit --omit=dev` reports zero known vulnerabilities. The full audit still
-reports the development-only Braces/ESLint chain; Braces has no published fix.
-The install script applies a source-checked local mitigation for
+As of 9 November 2026, Next and its ESLint configuration are pinned to
+16.4.5. This clears the Next.js image-optimization, Server Actions and typed-array
+cache advisories reported against 16.3.8. The deployed site remains a static
+export with unoptimized images; this audit did not reproduce an exploit against
+the live site. `npm audit --omit=dev` reports zero known vulnerabilities. The full
+audit still reports development-tool findings in the ESLint/Minimatch,
+Wrangler/Miniflare/Undici and Zod chains; these are tracked in
+[the maintenance checkpoint](docs/maintenance.md).
+
+The install script retains its source-checked local Braces mitigation for
 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm):
 Braces rejects nesting beyond 128 levels in its parser and recursive walkers,
 including directly supplied syntax trees. Ordinary patterns retain their
@@ -192,6 +197,12 @@ installation using `--ignore-scripts` fails the check until `npm run postinstall
 applies it. Changed upstream versions or source files require explicit review
 of the temporary patch; the package version and npm audit report remain honest.
 Braces is not shipped in the static Cloudflare export.
+
+The hourly maintenance automation works through confirmed bugs, dependency
+security, loading speed and interaction smoothness. It resumes the checkpoint
+and its existing maintenance pull request, follows `AGENTS.md`'s focused checks,
+and leaves verified changes on `codex/maintenance` for review. Main's existing
+release workflow remains the publication gate.
 
 ## Accessibility
 
