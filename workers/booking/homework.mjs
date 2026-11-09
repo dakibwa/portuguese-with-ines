@@ -300,6 +300,62 @@ async function rowsOrNone(statement) {
   catch (error) { if (homeworkTablesMissing(error)) return []; throw error; }
 }
 
+/**
+ * Her notes page for one student (9 November 2026, Dan: "Ines can input notes
+ * about each lesson etc and it can build up over time"): her plan for them,
+ * then every lesson that has started, newest first, with her private notes,
+ * its level and where its homework is. Never sent to a student.
+ */
+const planMissing = error => /no such column: (?:\w+\.)?lesson_plan/.test(String(error));
+export const PLAN_LIMIT = 4000;
+async function readPlan(db, studentId) {
+  try {
+    const row = await db.prepare("SELECT lesson_plan, lesson_plan_updated_at FROM students WHERE id = ?").bind(studentId).first();
+    return { plan: row?.lesson_plan ?? "", planUpdatedAt: row?.lesson_plan_updated_at ?? null };
+  } catch (error) {
+    // Until migration 0038 is applied the page reads, with no plan.
+    if (planMissing(error)) return { plan: "", planUpdatedAt: null };
+    throw error;
+  }
+}
+export async function studentNotes(env, studentId, now = new Date()) {
+  const rows = await rowsOrNone(env.DB.prepare(`SELECT b.id, b.starts_at, b.ends_at, h.notes, h.level, h.draft_json IS NOT NULL AS drafted,
+      h.published_at, p.submission_json IS NOT NULL AS submitted, json_extract(p.submission_json, '$.returnedAt') AS returned_at
+    FROM bookings b
+    LEFT JOIN lesson_homework h ON h.booking_id = b.id AND h.student_id = b.student_id
+    LEFT JOIN homework_progress p ON p.booking_id = b.id AND p.student_id = b.student_id
+    WHERE b.student_id = ? AND b.status = 'confirmed' AND b.attendance_status <> 'no_show' AND b.starts_at <= ?
+    ORDER BY b.starts_at DESC`).bind(studentId, now.toISOString()));
+  return {
+    ...await readPlan(env.DB, studentId),
+    lessons: rows.map(row => ({
+      bookingId: row.id, lessonAt: row.starts_at, minutes: Math.round((Date.parse(row.ends_at) - Date.parse(row.starts_at)) / 60000),
+      notes: row.notes ?? "", level: row.level ?? null,
+      homework: row.published_at ? (row.submitted ? (row.returned_at ? "done" : "review") : "published") : row.drafted ? "draft" : "none",
+    })),
+  };
+}
+/** Saves her plan for a student, refusing one written over a newer save. */
+export async function saveStudentPlan(env, studentId, body, authorization = null) {
+  if (typeof body.plan !== "string") throw new HomeworkProblem("Write the plan as text.");
+  const plan = body.plan.trim();
+  if (plan.length > PLAN_LIMIT) throw new HomeworkProblem("Keep the plan under 4,000 characters.");
+  if (body.updatedAt !== null && typeof body.updatedAt !== "string") throw new HomeworkProblem("Reload the plan before saving.");
+  const { planUpdatedAt } = await readPlan(env.DB, studentId);
+  let result;
+  try {
+    result = await env.DB.prepare(`UPDATE students SET lesson_plan = ?, lesson_plan_updated_at = ?
+      WHERE id = ? AND lesson_plan_updated_at IS ? AND (${authorization?.sql ?? "1"})`)
+      .bind(plan, stamp(planUpdatedAt), studentId, body.updatedAt, ...(authorization?.values ?? [])).run();
+  } catch (error) {
+    if (planMissing(error)) throw new HomeworkProblem("Plans can’t be saved yet. Please try again after the website update.", 503);
+    throw error;
+  }
+  await authorization?.assert();
+  if (!result.meta.changes) throw new HomeworkProblem("This plan changed in another window. Reload it before saving.", 409);
+  return studentNotes(env, studentId);
+}
+
 export async function homeworkReturns(env) {
   const results = await rowsOrNone(env.DB.prepare(`SELECT p.booking_id, p.student_id,
     json_extract(p.submission_json, '$.submittedAt') AS submitted_at

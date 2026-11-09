@@ -111,7 +111,10 @@ CREATE TABLE IF NOT EXISTS students (
   -- apart in her list. A lesson of theirs ending after it wakes them again.
   dormant_at TEXT,
   -- When her come-back email to dormant students last went to them.
-  dormant_emailed_at TEXT
+  dormant_emailed_at TEXT,
+  -- Her plan for them on their Notes & homework page (migration 0038).
+  lesson_plan TEXT NOT NULL DEFAULT '',
+  lesson_plan_updated_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_students_role ON students (role);

@@ -56,6 +56,9 @@ try {
       if (url.pathname === "/admin/students") return json({ students: [{ ...student, signedIn: true, hasLessons: true, hasCard: true, prices: { 60: 2500 }, awaitingWelcome: false, upcoming: 0, homeworkToReview: homework.progress.submission && !homework.progress.submission.returnedAt ? [{ bookingId: lesson.id, submittedAt: homework.progress.submission.submittedAt }] : [] }] });
       if (url.pathname === "/admin/availability") return json({ rules: [{ id: 1, weekday: 3, start_minute: 540, last_start_minute: 1020 }], exceptions: [], settings: { slotIntervalMinutes: 30 } });
       if (url.pathname === "/admin/google-calendar") return json({ configured: false, connected: false });
+      if (url.pathname === `/admin/students/${student.id}/notes`) return json({ plan: "", planUpdatedAt: null, lessons: [{ bookingId: lesson.id, lessonAt: lesson.starts_at, minutes: 60,
+        notes: homework.notes, level: homework.sheet ? homework.level : null, homework: !homework.publishedAt ? (homework.sheet ? "draft" : "none")
+          : !homework.progress.submission ? "published" : homework.progress.submission.returnedAt ? "done" : "review" }] });
       // Slowed while the progress card is photographed.
       if (slow && /\/homework\/(transcribe|generate)$/.test(url.pathname)) await new Promise(resolve => setTimeout(resolve, 1500));
       if (url.pathname === `/admin/lessons/${lesson.id}/homework/transcribe`) {
@@ -99,7 +102,9 @@ try {
     await page.goto(`${base}/schedule/`);
     await page.getByRole("tab", { name: /^Students/ }).click();
     await page.getByRole("button", { name: "Open Ana Martins’s profile", exact: true }).click();
-    await page.getByRole("button", { name: "Homework", exact: true }).click();
+    // Homework lives on their Notes & homework page, from its latest lesson without notes.
+    await page.getByRole("button", { name: "Notes & homework", exact: true }).click();
+    await page.getByRole("button", { name: /^Add notes · / }).click();
     const editor = page.locator(".teacher-homework");
     const shot = name => editor.screenshot({ path: `${output}/teacher-${name}-${width}.png` });
     const heading = name => expect(editor.locator(".homework-step__head h4")).toHaveText(name);
