@@ -3614,6 +3614,14 @@
   .teacher-lesson-row.is-selected > .teacher-lesson-row__details > .teacher-lesson-dialog.teacher-lesson-dialog--inline:has(> .teacher-dialog-actions) { grid-column: 1 / -1; grid-template-columns: subgrid; padding-top: 0; }
   .teacher-lesson-row.is-selected > .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions { grid-column: 2; grid-row: 1; padding-right: 4.75rem; }
 }
+/* On a phone-width card the existing Homework button sits in the header's idle
+   middle, between the date and Close, so the other four controls wrap in two
+   compact rows beneath. Narrower than the safe minimum it wraps as before. */
+@container (min-width: 17rem) and (max-width: 35.99rem) {
+  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions > .teacher-lesson-homework) > .teacher-lesson-row__line { padding-right: 11.75rem; }
+  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions > .teacher-lesson-homework) .teacher-dialog-actions > .teacher-lesson-homework { position: absolute; z-index: 2; top: 0.55rem; left: calc(50% + 0.5rem); transform: translateX(-50%); }
+  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions > .teacher-lesson-homework) .teacher-dialog-actions > .teacher-quiet { padding-inline: 0.6rem; }
+}
 .teacher-move-cancel { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
 .teacher-move-cancel .teacher-quiet[aria-pressed="true"] { background: var(--lavender); box-shadow: inset 0 0 0 2px var(--blue); }
 /* The lesson dialog's own layout, laid out in the lesson's tile: no box and no
