@@ -88,7 +88,7 @@ try {
     const prompt = linked.page.locator(".card-prompt");
     // One card, as a payment link's is (2 November 2026, Dan: "one single thing").
     await expect(prompt.getByRole("heading", { name: "Confirm your card payments" })).toBeVisible({ timeout: 15000 });
-    await expect(prompt.locator(".card-terms__lessons--then")).toContainText("Paid after each lesson");
+    await expect(prompt.locator(".card-terms__lessons--then")).toContainText("Paid at the end of each lesson");
     assert.equal(await linked.page.evaluate(() => localStorage.getItem("ines-student-session")), "qa-link-session");
     assert.deepEqual(linked.posts.filter((post) => post.endpoint === "/auth/email-link/confirm").map((post) => post.body), [{ token: "qa-good-link" }]);
     await expect(linked.page.getByRole("heading", { name: "Your account" })).toHaveCount(0);
@@ -138,7 +138,7 @@ try {
     const approval = combined.page.locator(".card-prompt");
     // What is charged now is the total; over the agreement, only the fee's two dabs.
     await expect(approval.locator(".card-terms__total")).toHaveText("Charged now€30");
-    await expect(approval.locator(".card-terms__lessons--then")).toHaveText("Then after each lessonEvery Tuesday, 17:00€15");
+    await expect(approval.locator(".card-terms__lessons--then")).toHaveText("Then at the end of each lessonEvery Tuesday, 17:00€15");
     await expect(approval.locator(".card-terms__consent .booking-payment-facts li")).toHaveText(["Free to change or cancel a lesson up to 14 hours before", "€5 to move or cancel later, or if you don’t show up"]);
     assert.deepEqual(combined.posts.find(post => post.endpoint === "/me/card/preview")?.body, { bookingIds: ["approved-older-lesson", "approved-past-lesson"] });
     await combined.page.reload();

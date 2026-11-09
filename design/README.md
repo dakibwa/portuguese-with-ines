@@ -1335,7 +1335,7 @@ Preserve these desktop and mobile states:
   paid to her by hand, Your lessons opens with one sheet card above the
   calendar, the same card a payment link opens (2 November 2026, Dan: "just
   have it as one single thing"): a card icon in a lilac disc, `Confirm your
-  card payments`, `Paid after each lesson` with `Porto time` over their
+  card payments`, `Paid at the end of each lesson` with `Porto time` over their
   weekly run or the lessons she added as dashed tiles, the fee's two dabs, the
   agreement capsule `I authorise card payments for my future lessons`, then `Agree &
   add card` alone: the card comes first, with no `Not now` (2 November 2026,
@@ -1369,15 +1369,15 @@ Preserve these desktop and mobile states:
   (day and start, never wrapped; Dan: "always fits on the same line") under
   an `Outstanding lessons` label that names `Porto time` once for every tile,
   then a receipt's ruled `Charged now €45` under the prices, worked out from
-  the lessons whose charge time has passed (`Total` with `Charged after each
-  lesson` under it while none has). Their lessons still to come that
-  Inês added follow under `Then after each lesson`, each weekly run once as
+  the lessons whose charge time has passed (`Total` with `Charged at the end of
+  each lesson` under it while none has). Their lessons still to come that
+  Inês added follow under `Then at the end of each lesson`, each weekly run once as
   `Every Tuesday, 17:00` in a dashed tile with the weekly lilac repeat mark
   (Dan: make it obvious it covers their weekly lessons), and the capsule
   reads `these and future lessons`. The dabs stay few (2 November 2026,
   Dan: the list was too long, but "I liked the bullets they are cute"): the
   labels and total say what is charged and when, so only the fee's two dabs
-  sit over the capsule, with `Future lessons are charged after each lesson`
+  sit over the capsule, with `Future lessons are charged at the end of each lesson`
   first only when no later lesson is shown. Inês gets the same tick list from an unpaid
   lesson's dialog (`Create payment link`, small outline, the opened lesson
   ticked) and from a student's card on Students (`Payment link`, nothing
