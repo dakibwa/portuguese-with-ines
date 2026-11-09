@@ -11,6 +11,7 @@
  */
 
 import { isNoEmailYet, realEmail } from "./no-email.mjs";
+import { DEFAULT_TUTOR, tutorOf } from "./tutor.mjs";
 
 const BRAND = {
   blue: "#203e82",
@@ -29,7 +30,7 @@ const BRAND = {
  * far from the site, so nothing here can be a relative path. Rebuild it with
  * `npm run build:email-banner`.
  */
-const BANNER_URL = "https://portuguesewithines.com/email/banner.png";
+const bannerUrl = (tutor) => `https://${tutor.site.domain}/email/banner.png`;
 
 /**
  * The confirm step's splat dabs, one per fact, and Google Meet's mark beside a
@@ -37,7 +38,7 @@ const BANNER_URL = "https://portuguesewithines.com/email/banner.png";
  * `npm run build:email-icons`. Decorative, so blocked images leave nothing
  * behind but the facts themselves.
  */
-const EMAIL_ASSETS = "https://portuguesewithines.com/email";
+const EMAIL_ASSETS = `https://${DEFAULT_TUTOR.site.domain}/email`;
 const DABS = ["dab-blue", "dab-lavender", "dab-coral", "dab-ink"].map(name => `${EMAIL_ASSETS}/${name}.png`);
 const MEET_MARK = `${EMAIL_ASSETS}/google-meet.png`;
 const SANS = "Montserrat,Arial,Helvetica,sans-serif";
@@ -222,7 +223,7 @@ const section = (html, { top = 24, align = "" } = {}) =>
  * Sections, in order: heading and introduction, a message, the date panel, one
  * note, the facts, numbered steps, one button, one quiet link, the footer.
  */
-function layout({ heading, preheader, intro, hero, heroNote, rows = [], callout, message, steps, action, link, footer }) {
+function layout({ heading, preheader, intro, hero, heroNote, rows = [], callout, message, steps, action, link, footer }, tutor) {
   // Each fact is a line beside one of the confirm step's dabs, its label small
   // above it: a list to glance down rather than a ruled table.
   //   lesson  the label is the lesson's own short date, bold and sentence case
@@ -283,7 +284,7 @@ ${STYLE}
     <table class="pwi-card" role="article" aria-label="${escapeHtml(heading)}" width="560" cellpadding="0" cellspacing="0" bgcolor="${BRAND.paperLight}" style="width:100%;max-width:560px;border-collapse:collapse;background:${BRAND.paperLight};border-radius:16px;overflow:hidden">
 
       <tr><td bgcolor="${BRAND.blue}" style="background:${BRAND.blue};line-height:0">
-        <img src="${BANNER_URL}" width="560" alt="Português com a Inês" style="display:block;width:100%;max-width:560px;height:auto;border:0;color:#ffffff;font:600 18px/1.4 ${SANS}">
+        <img src="${bannerUrl(tutor)}" width="560" alt="${escapeHtml(tutor.brand)}" style="display:block;width:100%;max-width:560px;height:auto;border:0;color:#ffffff;font:600 18px/1.4 ${SANS}">
       </td></tr>
 
       ${section(`<h1 class="pwi-h1" style="margin:0;font:600 24px/1.25 ${SANS};letter-spacing:-.01em;color:${BRAND.ink};overflow-wrap:anywhere">${richTogether(heading)}</h1>
@@ -384,7 +385,7 @@ ${STYLE}
                   : ""
             }
             <p class="pwi-quiet" style="margin:${footer && footer.length ? 10 : 0}px 0 0;font:${footerFont}">
-              <a class="pwi-link" href="https://portuguesewithines.com" style="color:${BRAND.lavenderInk};text-decoration:underline">portuguesewithines.com</a>
+              <a class="pwi-link" href="https://${tutor.site.domain}" style="color:${BRAND.lavenderInk};text-decoration:underline">${tutor.site.domain}</a>
             </p>
           </td></tr>
         </table>
@@ -402,7 +403,7 @@ ${STYLE}
  * deleted anything a student had written between angle brackets, including part
  * of an address, from the text part while the HTML part showed it correctly.
  */
-function plainText({ heading, intro, hero, heroNote, rows = [], callout, message, steps, action, link, footer }) {
+function plainText({ heading, intro, hero, heroNote, rows = [], callout, message, steps, action, link, footer }, tutor) {
   const clean = (value) => String(value ?? "").trim();
   const lines = [heading, "", clean(intro)];
   if (message?.body?.trim()) lines.push("", clean(message.label), clean(message.body));
@@ -419,12 +420,12 @@ function plainText({ heading, intro, hero, heroNote, rows = [], callout, message
   if (steps?.items?.length) lines.push("", steps.title, ...steps.items.map((item, index) => `${index + 1}. ${clean(item)}`));
   if (action) lines.push("", `${action.label}: ${action.url}`);
   if (link) lines.push("", `${link.label}: ${link.url}`);
-  lines.push("", clean([].concat(footer ?? "").filter(Boolean).join(" ")), "portuguesewithines.com");
+  lines.push("", clean([].concat(footer ?? "").filter(Boolean).join(" ")), tutor.site.domain);
   return lines.join("\n");
 }
 
-export function renderEmail(content) {
-  return { html: layout(content), text: plainText(content) };
+export function renderEmail(content, tutor = DEFAULT_TUTOR) {
+  return { html: layout(content, tutor), text: plainText(content, tutor) };
 }
 
 /**
@@ -562,9 +563,10 @@ export async function deliver(env, { to, subject, content, calendar, dedupeKey, 
   try {
     await authorization?.assert();
     replyTo = realEmail(replyTo);
-    const { html, text } = renderEmail(content);
+    const tutor = tutorOf(env);
+    const { html, text } = renderEmail(content, tutor);
     const request = JSON.stringify({
-      from: env.MAIL_FROM || "Português com a Inês <bookings@portuguesewithines.com>", to: [to], subject, html, text,
+      from: tutor.site.mailFrom, to: [to], subject, html, text,
       ...(replyTo ? { reply_to: [replyTo] } : {}),
       ...(calendar ? { attachments: [{ filename: "lesson.ics", content: base64(calendar.body), content_type: `text/calendar; charset=utf-8; method=${calendar.method}` }] } : {}),
     });

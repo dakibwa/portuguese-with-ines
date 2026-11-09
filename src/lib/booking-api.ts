@@ -1,3 +1,4 @@
+import { HOME_CLOCK } from "@/lib/tutor";
 import { forgetSession, readSession } from "@/lib/auth-api";
 import { BOOKING_API_BASE_URL, BOOKING_TIME_ZONE, formatMoney } from "@/lib/config";
 import { BOOKING_REPLY_ERROR, isApiAmount, isApiInstant, isApiLesson, isApiRecord as isRecord } from "@/lib/api-response";
@@ -683,7 +684,7 @@ const RENAMED_PLACES: Record<string, string> = {
  * named by its offset instead.
  */
 export function timeZoneName(zone: string) {
-  if (zone === BOOKING_TIME_ZONE) return "Porto time";
+  if (zone === BOOKING_TIME_ZONE) return HOME_CLOCK;
   const place = zone.includes("/") && !zone.startsWith("Etc/") ? zone.slice(zone.lastIndexOf("/") + 1).replace(/_/g, " ") : "";
   if (place) return `${RENAMED_PLACES[place] ?? place} time`;
   try {

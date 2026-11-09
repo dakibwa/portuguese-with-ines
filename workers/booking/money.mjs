@@ -1,5 +1,9 @@
-const WHOLE_EUROS = new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 0 });
-const EUROS_AND_CENTS = new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { DEFAULT_TUTOR } from "./tutor.mjs";
+
+/** The tutor's currency; Inês charges in euros. */
+const CURRENCY = DEFAULT_TUTOR.place.currency;
+const WHOLE_EUROS = new Intl.NumberFormat("en-GB", { style: "currency", currency: CURRENCY, minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const EUROS_AND_CENTS = new Intl.NumberFormat("en-GB", { style: "currency", currency: CURRENCY, minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /**
  * Euros as the site prints them: whole euros bare ("€25"), anything else with

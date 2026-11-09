@@ -1,5 +1,6 @@
 "use client";
 
+import { IN_PERSON, TUTOR_NAME, TUTOR_OBJECT } from "@/lib/tutor";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, CircleX, Mail } from "lucide-react";
 import { AccountAvatar, AccountMenu, AccountSignature, type AccountSection } from "@/components/AccountMenu";
@@ -71,7 +72,7 @@ function HistoryLessonCard({ booking, named, zone }: { booking: MyBooking; named
             {(named ? formatTimeIn : formatSlotTime)(booking.startAt, booking.location === "porto" ? BOOKING_TIME_ZONE : zone)}
           </strong>
           <span>
-            {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}
+            {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? IN_PERSON : "Online"}
           </span>
           <small className="history-lesson-card__reference">Reference {booking.reference}</small>
         </span>
@@ -824,7 +825,7 @@ export function MyLessons({
                           setCardChecking(false);
                           returningCard.current = false;
                           setOpenField((field) => field === "card" ? null : field);
-                          setDetailsNote("Card removed. Lessons Inês adds are paid to her by hand again.");
+                          setDetailsNote(`Card removed. Lessons ${TUTOR_NAME} adds are paid to ${TUTOR_OBJECT} by hand again.`);
                           void load();
                         } catch (caught) {
                           if (readSession() !== session) return;
@@ -916,7 +917,7 @@ export function MyLessons({
             <p className="my-lessons__details-note">We couldn&rsquo;t check your prices just now.</p>
           ) : null}
           <details className="my-lessons__code">
-            <summary>Have a code from Inês?</summary>
+            <summary>Have a code from {TUTOR_NAME}?</summary>
             <form
               className="my-lessons__details-row"
               onSubmit={(event) => {

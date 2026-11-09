@@ -27,6 +27,8 @@
  * so they are kept word for word. Change them only together with that.
  */
 
+import { DEFAULT_TUTOR } from "./tutor.mjs";
+
 export const SIGN_OFF = "Sent automatically by the booking system.";
 export const FREE_LABEL = "Free";
 /*
@@ -35,16 +37,16 @@ export const FREE_LABEL = "Free";
  * preheader and button. This makes the invitation clearer; inbox placement
  * still depends on the receiving provider.
  */
-const WELCOME_FOOTER = [
-  "You’re getting this because Inês added you as one of her students.",
+const welcomeFooter = (tutor) => [
+  `You’re getting this because ${tutor.shortName} added you as one of ${tutor.pronouns.possessive} students.`,
   "The button lasts 14 days.",
-  "You can also open portuguesewithines.com yourself, press Sign in, then “Email me a sign-in link”.",
-  "Reply to this email if you have a question for Inês."
+  `You can also open ${tutor.site.domain} yourself, press Sign in, then “Email me a sign-in link”.`,
+  `Reply to this email if you have a question for ${tutor.shortName}.`
 ];
 const MANAGE_LABEL = "Change or cancel this lesson";
 const ALL_LESSONS_LABEL = "See all your lessons";
 
-const hello = (first) => `Olá ${first},`;
+const hello = (first, tutor) => `${tutor.language.phrases.hello} ${first},`;
 
 /** Her receipt automation reads this row on every email about a student's lessons. */
 export function nifRow(nif) {
@@ -65,14 +67,14 @@ function studentRows({ name, email, phone, nif, notes }, { withPhone = true } = 
  *   free · paid · card (saved card, after the lesson) · untilCard (hers, until
  *   their card is added) · asUsual (hers, paid to her) · onTheDay (older terms)
  */
-export function priceValue({ terms, amount, run = false }) {
+export function priceValue({ tutor = DEFAULT_TUTOR, terms, amount, run = false }) {
   const each = run ? `${amount} a lesson` : amount;
   switch (terms) {
     case "free": return FREE_LABEL;
     case "paid": return `${amount} · paid`;
     case "card": return run ? `${each} · charged to your saved card at the end of each lesson` : `${each} · charged to your saved card at the end of the lesson`;
-    case "untilCard": return `${each} · pay Inês as usual until you add your card`;
-    case "asUsual": return `${each} · pay Inês as usual`;
+    case "untilCard": return `${each} · pay ${tutor.shortName} as usual until you add your card`;
+    case "asUsual": return `${each} · pay ${tutor.shortName} as usual`;
     default: return `${each} · pay on the day, in person`;
   }
 }
@@ -82,13 +84,13 @@ export function priceValue({ terms, amount, run = false }) {
  * a fee the note above it states.
  *   free · paid (locks inside the window) · card · unpaid · again (no fee to name)
  */
-function policyFooter(policy, { notice, fee, run = false }) {
+function policyFooter(policy, { notice, fee, run = false, tutor }) {
   const lesson = run ? "any lesson" : "the lesson";
   const before = run ? `${notice} before it` : `${notice} before the lesson`;
   switch (policy) {
     case "free": return run
-      ? [`Please give Inês at least ${notice}' notice to move or cancel a lesson.`]
-      : ["Need to change it? Use the link above.", `Please give Inês at least ${notice}' notice.`];
+      ? [`Please give ${tutor.shortName} at least ${notice}' notice to move or cancel a lesson.`]
+      : ["Need to change it? Use the link above.", `Please give ${tutor.shortName} at least ${notice}' notice.`];
     case "paid": return [`Move or cancel ${lesson} free until ${before}.`, "After that, it can’t be changed or refunded."];
     case "card": return [`Move or cancel ${lesson} free until ${before}.`, `After that, moving or cancelling costs ${fee}.`, `A no-show costs ${fee} instead of the lesson price.`];
     case "unpaid": return run
@@ -175,41 +177,41 @@ function lessonRows({ lesson, place, meetingUrl, reference, price, cancelled = f
  * fixed (a set number of lessons), twoTimes, slot ("Tuesday", "17:30") when
  * Inês set up a plain weekly slot, repeats, occurrences, skippedNote }.
  */
-export function studentBooked({ first, byInes, welcome = null, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
+export function studentBooked({ tutor = DEFAULT_TUTOR, first, byTeacher, welcome = null, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
   price, policy, paid = false, notice, fee, manageUrl, lessonsUrl, run = null }) {
   if (!run) {
     return {
-      subject: byInes ? `Inês has booked your Portuguese lesson — ${shortWhen}` : `Your Portuguese lesson is booked — ${shortWhen}`,
+      subject: byTeacher ? `${tutor.shortName} has booked your ${tutor.language.name} lesson — ${shortWhen}` : `Your ${tutor.language.name} lesson is booked — ${shortWhen}`,
       content: {
         heading: "Your lesson is booked",
-        preheader: welcome ? "Inês has booked your lesson. You can see it on her website." : `${lessonName} · ${when}`,
-        intro: byInes
+        preheader: welcome ? `${tutor.shortName} has booked your lesson. You can see it on ${tutor.pronouns.possessive} website.` : `${lessonName} · ${when}`,
+        intro: byTeacher
           ? welcome?.neverIn
-            ? `${hello(first)} Inês has booked your next lesson. From now on you can see and change your lessons on Inês's website. A calendar invitation is attached.`
-            : `${hello(first)} Inês has booked this lesson for you. A calendar invitation is attached.`
-          : `${hello(first)} your lesson with Inês is ${paid ? "paid and confirmed" : "confirmed"}. A calendar invitation is attached.`,
+            ? `${hello(first, tutor)} ${tutor.shortName} has booked your next lesson. From now on you can see and change your lessons on ${tutor.shortName}'s website. A calendar invitation is attached.`
+            : `${hello(first, tutor)} ${tutor.shortName} has booked this lesson for you. A calendar invitation is attached.`
+          : `${hello(first, tutor)} your lesson with ${tutor.shortName} is ${paid ? "paid and confirmed" : "confirmed"}. A calendar invitation is attached.`,
         hero: when,
         rows: lessonRows({ lesson, place, meetingUrl, reference, price }),
         steps: welcome ? welcomeSteps(welcome) : null,
         action: welcome ? welcomeAction(welcome) : manageUrl ? { label: MANAGE_LABEL, url: manageUrl } : null,
         footer: welcome
-          ? [policy === "free" ? `Please give Inês at least ${notice}' notice to change it.` : `It’s free to change until ${notice} before the lesson; after that it costs ${fee}.`, ...WELCOME_FOOTER]
-          : policyFooter(policy, { notice, fee })
+          ? [policy === "free" ? `Please give ${tutor.shortName} at least ${notice}' notice to change it.` : `It’s free to change until ${notice} before the lesson; after that it costs ${fee}.`, ...welcomeFooter(tutor)]
+          : policyFooter(policy, { notice, fee, tutor })
       }
     };
   }
 
   const times = run.twoTimes ? "both times are" : "the same time is";
-  const plainSlot = byInes && !run.oneOff && run.slot;
+  const plainSlot = byTeacher && !run.oneOff && run.slot;
   const intro = plainSlot
-    ? `${hello(first)} Inês has kept ${run.slot.weekday}s at ${run.slot.time} for you. ${
+    ? `${hello(first, tutor)} ${tutor.shortName} has kept ${run.slot.weekday}s at ${run.slot.time} for you. ${
         run.fixed ? "Every lesson is in your calendar attachment." : "New weeks appear on their own until the slot is stopped."
-      }${welcome?.neverIn ? " You can see and change them on Inês's website." : ""}`
+      }${welcome?.neverIn ? ` You can see and change them on ${tutor.shortName}'s website.` : ""}`
     : run.oneOff
-      ? `${hello(first)} your selected lessons are booked. Every date is in the calendar attachment, and you can move or cancel each lesson from your lesson calendar.`
+      ? `${hello(first, tutor)} your selected lessons are booked. Every date is in the calendar attachment, and you can move or cancel each lesson from your lesson calendar.`
       : run.fixed
-        ? `${hello(first)} ${times} now held for you each week. Every lesson is in the calendar attachment, and you can move or cancel any one of them on your lesson calendar.`
-        : `${hello(first)} ${times} now held for you each week. Your current lessons are in the calendar attachment, and new weeks will appear automatically on your lesson calendar without extra confirmation emails.`;
+        ? `${hello(first, tutor)} ${times} now held for you each week. Every lesson is in the calendar attachment, and you can move or cancel any one of them on your lesson calendar.`
+        : `${hello(first, tutor)} ${times} now held for you each week. Your current lessons are in the calendar attachment, and new weeks will appear automatically on your lesson calendar without extra confirmation emails.`;
   // A slot Inês set up reads as one line, its day and time, rather than a long
   // list of dates (12 October 2026, Dan: simple to understand).
   const rows = plainSlot
@@ -221,9 +223,9 @@ export function studentBooked({ first, byInes, welcome = null, lesson, lessonNam
       ]
     : runRows({ lesson, place, price, repeats: run.repeats, occurrences: run.occurrences });
   return {
-    subject: byInes
-      ? `Inês has booked your weekly Portuguese lessons — from ${shortWhen}`
-      : `Your ${run.oneOff ? "" : "weekly "}Portuguese lessons are booked — from ${shortWhen}`,
+    subject: byTeacher
+      ? `${tutor.shortName} has booked your weekly ${tutor.language.name} lessons — from ${shortWhen}`
+      : `Your ${run.oneOff ? "" : "weekly "}${tutor.language.name} lessons are booked — from ${shortWhen}`,
     content: {
       heading: run.oneOff ? "Your lessons are booked" : "Your weekly lessons are booked",
       preheader: `${lessonName} · ${run.repeats.value}`,
@@ -233,7 +235,7 @@ export function studentBooked({ first, byInes, welcome = null, lesson, lessonNam
       rows,
       steps: welcome ? welcomeSteps(welcome) : null,
       action: welcome ? welcomeAction(welcome) : { label: ALL_LESSONS_LABEL, url: lessonsUrl },
-      footer: welcome ? [...policyFooter(policy, { notice, fee, run: true }), ...WELCOME_FOOTER] : policyFooter(policy, { notice, fee, run: true })
+      footer: welcome ? [...policyFooter(policy, { notice, fee, run: true, tutor }), ...welcomeFooter(tutor)] : policyFooter(policy, { notice, fee, run: true, tutor })
     }
   };
 }
@@ -242,16 +244,16 @@ export function studentBooked({ first, byInes, welcome = null, lesson, lessonNam
  * 03 04 07 08 17 — Inês's copy of a booking: a student's, one she added, or
  * an open-ended run carried forward (`extended`).
  */
-export function lessonBookedTeacher({ student, byInes, held = false, noEmailYet = false, welcome = null, lesson, lessonName, place, meetingUrl, reference,
+export function lessonBookedTeacher({ student, byTeacher, held = false, noEmailYet = false, welcome = null, lesson, lessonName, place, meetingUrl, reference,
   when, heroNote = "", shortWhen, paidAmount = "", calendarAttached = true, run = null, extended = false }) {
   const name = student.name;
   if (!run) {
     return {
-      subject: byInes ? `You added a lesson — ${name}, ${shortWhen}` : `New booking — ${name}, ${shortWhen}`,
+      subject: byTeacher ? `You added a lesson — ${name}, ${shortWhen}` : `New booking — ${name}, ${shortWhen}`,
       content: {
-        heading: byInes ? "You added a lesson" : "New booking",
+        heading: byTeacher ? "You added a lesson" : "New booking",
         preheader: `${name} · ${lessonName} · ${when}`,
-        intro: byInes
+        intro: byTeacher
           ? held ? `You added a lesson for ${name}. ${notEmailed(noEmailYet)}.` : `You added a lesson for ${name}. They have been emailed the details${welcomeNote(welcome)}.`
           // The invitation carries PARTSTAT=ACCEPTED: there is nothing to accept.
           : `${name} has booked a lesson. ${calendarAttached ? "The attached invitation goes straight into your calendar." : "It is in your calendar."}`,
@@ -265,17 +267,17 @@ export function lessonBookedTeacher({ student, byInes, held = false, noEmailYet 
   }
   const subject = extended
     ? `Weekly slot extended — ${name}, to ${run.lastShort}`
-    : byInes
+    : byTeacher
       ? `You added a weekly slot — ${name}, from ${shortWhen}`
       : `${run.oneOff ? "Lesson bookings" : "Weekly booking"} — ${name}, from ${shortWhen}`;
   return {
     subject,
     content: {
-      heading: extended ? "Weekly lessons extended" : byInes ? "You added weekly lessons" : run.oneOff ? "New bookings" : "New weekly booking",
+      heading: extended ? "Weekly lessons extended" : byTeacher ? "You added weekly lessons" : run.oneOff ? "New bookings" : "New weekly booking",
       preheader: `${name} · ${run.repeats.value}`,
       intro: extended
         ? `${name}'s open-ended weekly slot has been carried forward. The new lessons will appear in your calendar.`
-        : byInes
+        : byTeacher
           ? `You added a weekly slot for ${name}. ${held ? notEmailed(noEmailYet) : `They have been emailed the details${welcomeNote(welcome)}`}, and every lesson will appear in your calendar.`
           : `${name} booked ${run.oneOff ? "these individual lessons" : run.twoTimes ? "two times each week" : "the same slot each week"}. Every lesson will appear in your calendar.`,
       callout: run.skippedNote,
@@ -292,7 +294,7 @@ export function lessonBookedTeacher({ student, byInes, held = false, noEmailYet 
  * 09 10 — the day-before reminder, and the Meet link sent on its own when it
  * was not ready for the confirmation (`linkOnly`).
  */
-export function lessonReminder({ first, lessonName, lesson, place, reference, when, shortWhen, meetingUrl = "", meetComing = false,
+export function lessonReminder({ tutor = DEFAULT_TUTOR, first, lessonName, lesson, place, reference, when, shortWhen, meetingUrl = "", meetComing = false,
   manageUrl, cutoff = "", policy = "card", fee = "", linkOnly = false }) {
   const manage = manageUrl ? { label: MANAGE_LABEL, url: manageUrl } : null;
   if (linkOnly) {
@@ -301,7 +303,7 @@ export function lessonReminder({ first, lessonName, lesson, place, reference, wh
       content: {
         heading: "Your online lesson link",
         preheader: "Join your lesson from your email or booking.",
-        intro: `${hello(first)} here’s the Google Meet link for your lesson with Inês.`,
+        intro: `${hello(first, tutor)} here’s the Google Meet link for your lesson with ${tutor.shortName}.`,
         hero: when,
         rows: [...(lesson ? [{ label: "Lesson", value: lesson }] : []), { label: "Reference", value: reference }],
         action: { label: "Join Google Meet", url: meetingUrl },
@@ -321,10 +323,10 @@ export function lessonReminder({ first, lessonName, lesson, place, reference, wh
       heading: "Your lesson is coming up",
       preheader: `${lessonName} · ${meetingUrl ? "Your Google Meet link is in this email." : place}`,
       intro: meetingUrl
-        ? `${hello(first)} your lesson with Inês is coming up. Here’s the Google Meet link to join it.`
+        ? `${hello(first, tutor)} your lesson with ${tutor.shortName} is coming up. Here’s the Google Meet link to join it.`
         : meetComing
-          ? `${hello(first)} your lesson with Inês is coming up. Its Google Meet link isn’t ready yet; we’ll email it to you as soon as it is.`
-          : `${hello(first)} your lesson with Inês is coming up.`,
+          ? `${hello(first, tutor)} your lesson with ${tutor.shortName} is coming up. Its Google Meet link isn’t ready yet; we’ll email it to you as soon as it is.`
+          : `${hello(first, tutor)} your lesson with ${tutor.shortName} is coming up.`,
       hero: when,
       rows: [{ label: "Lesson", value: lesson }, { label: "Where", value: place }, { label: "Reference", value: reference }],
       // Coral marks the one thing still to do: join, when there is a link.
@@ -338,58 +340,58 @@ export function lessonReminder({ first, lessonName, lesson, place, reference, wh
 /* ------------------------------------------------------------------ moved */
 
 /** 11 12 15 — a student's lesson (or weekly run) has moved or changed length. */
-export function studentMoved({ first, byInes, lengthChanged = false, minutes, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
+export function studentMoved({ tutor = DEFAULT_TUTOR, first, byTeacher, lengthChanged = false, minutes, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
   price, lateNote = "", policy, notice, fee, manageUrl, lessonsUrl, welcome = null, run = null }) {
   if (run) {
     // Inês changed how long they are (9 November 2026, Dan), at the same times.
-    const longer = byInes && lengthChanged;
+    const longer = byTeacher && lengthChanged;
     return {
-      subject: longer ? `Inês has changed your lessons to ${minutes} minutes — from ${shortWhen}` : `Your weekly Portuguese lessons have moved — from ${shortWhen}`,
+      subject: longer ? `${tutor.shortName} has changed your lessons to ${minutes} minutes — from ${shortWhen}` : `Your weekly ${tutor.language.name} lessons have moved — from ${shortWhen}`,
       content: {
         heading: longer ? `Your lessons are now ${minutes} minutes` : "Your weekly lessons have moved",
         preheader: `${lessonName} · ${run.repeats.value}`,
         intro: longer
-          ? `${hello(first)} Inês has changed the lessons below to ${minutes} minutes, at the same times. The updated lessons are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`
-          : `${hello(first)} your upcoming weekly lessons now use this new time.${keptNote(run.kept, "move")} The updated dates are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`,
+          ? `${hello(first, tutor)} ${tutor.shortName} has changed the lessons below to ${minutes} minutes, at the same times. The updated lessons are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`
+          : `${hello(first, tutor)} your upcoming weekly lessons now use this new time.${keptNote(run.kept, "move")} The updated dates are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`,
         callout: run.skippedNote,
         hero: when,
         rows: [...runRows({ lesson, place, price, repeats: run.repeats, occurrences: run.occurrences }), ...keptRows(run.kept)],
         action: welcome ? welcomeAction(welcome) : { label: ALL_LESSONS_LABEL, url: lessonsUrl },
-        footer: welcome ? [...policyFooter(policy, { notice, fee, run: true }), ...WELCOME_FOOTER] : policyFooter(policy, { notice, fee, run: true })
+        footer: welcome ? [...policyFooter(policy, { notice, fee, run: true, tutor }), ...welcomeFooter(tutor)] : policyFooter(policy, { notice, fee, run: true, tutor })
       }
     };
   }
   // Written for someone who did not ask for this when Inês moved it.
-  const intro = byInes && lengthChanged
-    ? `${hello(first)} Inês has changed your lesson to ${minutes} minutes, at the same time. An updated calendar invitation is attached.`
-    : byInes
-    ? `${hello(first)} Inês has moved your lesson to the time below. An updated calendar invitation is attached. If the new time doesn't suit, choose another time or reply to this email.`
+  const intro = byTeacher && lengthChanged
+    ? `${hello(first, tutor)} ${tutor.shortName} has changed your lesson to ${minutes} minutes, at the same time. An updated calendar invitation is attached.`
+    : byTeacher
+    ? `${hello(first, tutor)} ${tutor.shortName} has moved your lesson to the time below. An updated calendar invitation is attached. If the new time doesn't suit, choose another time or reply to this email.`
     : lengthChanged
-      ? `${hello(first)} your lesson is now ${minutes} minutes at the time below. An updated calendar invitation is attached.`
-      : `${hello(first)} your new lesson time is below. An updated calendar invitation is attached.`;
+      ? `${hello(first, tutor)} your lesson is now ${minutes} minutes at the time below. An updated calendar invitation is attached.`
+      : `${hello(first, tutor)} your new lesson time is below. An updated calendar invitation is attached.`;
   return {
-    subject: byInes && lengthChanged ? `Inês has changed your lesson to ${minutes} minutes — ${shortWhen}`
-      : byInes ? `Inês has moved your lesson — now ${shortWhen}` : lengthChanged ? `Your lesson has changed — ${shortWhen}` : `Your lesson has moved — ${shortWhen}`,
+    subject: byTeacher && lengthChanged ? `${tutor.shortName} has changed your lesson to ${minutes} minutes — ${shortWhen}`
+      : byTeacher ? `${tutor.shortName} has moved your lesson — now ${shortWhen}` : lengthChanged ? `Your lesson has changed — ${shortWhen}` : `Your lesson has moved — ${shortWhen}`,
     content: {
       heading: lengthChanged ? "Your lesson has changed" : "Your lesson has moved",
       preheader: `${lessonName} · ${when}`,
       intro,
-      callout: byInes ? "" : lateNote,
+      callout: byTeacher ? "" : lateNote,
       hero: when,
       rows: lessonRows({ lesson, place, meetingUrl, reference, price }),
       action: manageUrl ? { label: MANAGE_LABEL, url: manageUrl } : null,
       // A late move on a saved card states its fee in the note, so the footer adds only what it doesn't say.
-      footer: byInes ? "No charge for a change she makes." : policy === "late" ? "This fee applies once per lesson." : policyFooter(policy, { notice, fee })
+      footer: byTeacher ? `No charge for a change ${tutor.pronouns.subject} makes.` : policy === "late" ? "This fee applies once per lesson." : policyFooter(policy, { notice, fee, tutor })
     }
   };
 }
 
 /** 13 14 16 — Inês's copy of a move: the student's, her own, or a weekly run's. */
-export function lessonMovedTeacher({ student, byInes, held = false, lengthChanged = false, fromMinutes, minutes, previousWhen = "", late = false,
+export function lessonMovedTeacher({ student, byTeacher, held = false, lengthChanged = false, fromMinutes, minutes, previousWhen = "", late = false,
   lateNote = "", notice, lesson, lessonName, place, meetingUrl, reference, when, heroNote = "", shortWhen, run = null }) {
   const name = student.name;
   if (run) {
-    const longer = byInes && lengthChanged;
+    const longer = byTeacher && lengthChanged;
     return {
       subject: longer ? `You changed ${name}'s lessons to ${minutes} minutes — from ${shortWhen}` : `Weekly slot moved — ${name}, from ${shortWhen}`,
       content: {
@@ -407,15 +409,15 @@ export function lessonMovedTeacher({ student, byInes, held = false, lengthChange
   }
   const from = previousWhen ? ` from ${previousWhen}` : "";
   return {
-    subject: byInes && lengthChanged
+    subject: byTeacher && lengthChanged
       ? `You changed ${name}'s lesson to ${minutes} minutes — ${shortWhen}`
-      : byInes
+      : byTeacher
       ? `You moved ${name}'s lesson — ${shortWhen}`
       : lengthChanged ? `Lesson changed — ${name}, ${shortWhen}` : `${late ? "Late change" : "Lesson moved"} — ${name}, ${shortWhen}`,
     content: {
-      heading: byInes && lengthChanged ? "You changed this lesson" : byInes ? "You moved this lesson" : lengthChanged ? "Lesson changed" : late ? `Moved less than ${notice} before` : "Lesson moved",
+      heading: byTeacher && lengthChanged ? "You changed this lesson" : byTeacher ? "You moved this lesson" : lengthChanged ? "Lesson changed" : late ? `Moved less than ${notice} before` : "Lesson moved",
       preheader: `${name} · ${lessonName} · ${when}`,
-      intro: byInes
+      intro: byTeacher
         ? `You ${lengthChanged ? `changed ${name}'s lesson from ${fromMinutes} to ${minutes} minutes` : `moved ${name}'s lesson${from}`}. ${held ? "They haven't been emailed yet" : "They have been told"}, and your calendar has been updated.`
         : lengthChanged
           ? `${name} changed their lesson from ${fromMinutes} to ${minutes} minutes${previousWhen ? ` and moved it${from}` : ""}. Your calendar has been updated.`
@@ -432,67 +434,67 @@ export function lessonMovedTeacher({ student, byInes, held = false, lengthChange
 /* -------------------------------------------------------------- cancelled */
 
 /** 18 19 22 — a student's lesson, or the rest of their weekly run, is cancelled. */
-export function studentCancelled({ first, byInes, message = "", note = "", lesson, lessonName, place, reference, when, shortWhen, run = null }) {
+export function studentCancelled({ tutor = DEFAULT_TUTOR, first, byTeacher, message = "", note = "", lesson, lessonName, place, reference, when, shortWhen, run = null }) {
   if (run) {
     return {
-      subject: byInes ? `Inês has cancelled your weekly lessons — ${run.count}` : `Your weekly lessons are cancelled — ${run.count}`,
+      subject: byTeacher ? `${tutor.shortName} has cancelled your weekly lessons — ${run.count}` : `Your weekly lessons are cancelled — ${run.count}`,
       content: {
         heading: "Your weekly lessons are cancelled",
         preheader: `${run.count} removed from your calendar.`,
-        intro: byInes
-          ? `${hello(first)} Inês has cancelled the lessons below${message ? " and left you a message" : ""}. A cancellation update for your calendar is attached.${message ? "" : " Reply to this email to arrange another time."}`
-          : `${hello(first)} the rest of your weekly run has been cancelled and removed from your calendar.${keptNote(run.kept, "cancel")}`,
-        message: byInes && message ? { label: "Message from Inês", body: message } : null,
+        intro: byTeacher
+          ? `${hello(first, tutor)} ${tutor.shortName} has cancelled the lessons below${message ? " and left you a message" : ""}. A cancellation update for your calendar is attached.${message ? "" : " Reply to this email to arrange another time."}`
+          : `${hello(first, tutor)} the rest of your weekly run has been cancelled and removed from your calendar.${keptNote(run.kept, "cancel")}`,
+        message: byTeacher && message ? { label: `Message from ${tutor.shortName}`, body: message } : null,
         rows: [{ label: `Cancelled, ${run.zone}`, value: run.dates, dates: true }, ...keptRows(run.kept, run.zone)],
-        footer: byInes ? "A cancellation Inês makes never costs you anything." : "You’re welcome back any time — booking is always open on the website."
+        footer: byTeacher ? `A cancellation ${tutor.shortName} makes never costs you anything.` : "You’re welcome back any time — booking is always open on the website."
       }
     };
   }
   return {
-    subject: byInes ? `Inês has cancelled your lesson on ${shortWhen}` : `Your lesson on ${shortWhen} is cancelled`,
+    subject: byTeacher ? `${tutor.shortName} has cancelled your lesson on ${shortWhen}` : `Your lesson on ${shortWhen} is cancelled`,
     content: {
       heading: "Your lesson is cancelled",
       preheader: `${lessonName} · ${when}`,
-      intro: byInes
+      intro: byTeacher
         ? message
-          ? `${hello(first)} Inês has cancelled this lesson and left you a message below. A cancellation update for your calendar is attached.`
-          : `${hello(first)} Inês has cancelled this lesson. Sorry about that — reply to arrange another time. A cancellation update for your calendar is attached.`
-        : `${hello(first)} your lesson has been cancelled and removed from your calendar.`,
-      message: message ? { label: "Message from Inês", body: message } : null,
+          ? `${hello(first, tutor)} ${tutor.shortName} has cancelled this lesson and left you a message below. A cancellation update for your calendar is attached.`
+          : `${hello(first, tutor)} ${tutor.shortName} has cancelled this lesson. Sorry about that — reply to arrange another time. A cancellation update for your calendar is attached.`
+        : `${hello(first, tutor)} your lesson has been cancelled and removed from your calendar.`,
+      message: message ? { label: `Message from ${tutor.shortName}`, body: message } : null,
       callout: note,
       hero: when,
       // A cancelled lesson has no call to join, so its place is named, not linked.
       rows: lessonRows({ lesson, place, reference, cancelled: true }),
-      footer: byInes ? "A cancellation Inês makes never costs you anything." : "You’re welcome back any time — booking is always open on the website."
+      footer: byTeacher ? `A cancellation ${tutor.shortName} makes never costs you anything.` : "You’re welcome back any time — booking is always open on the website."
     }
   };
 }
 
 /** 20 21 23 — Inês's copy of a cancellation. */
-export function lessonCancelledTeacher({ student, byInes, held = false, late = false, notice, note = "", message = "", lesson, lessonName, place,
+export function lessonCancelledTeacher({ student, byTeacher, held = false, late = false, notice, note = "", message = "", lesson, lessonName, place,
   reference, when, longWhen, heroNote = "", shortWhen, run = null }) {
   const name = student.name;
   if (run) {
     return {
-      subject: byInes ? `You cancelled ${name}'s weekly lessons — ${run.count}` : `Weekly run cancelled — ${name}, ${run.count}`,
+      subject: byTeacher ? `You cancelled ${name}'s weekly lessons — ${run.count}` : `Weekly run cancelled — ${name}, ${run.count}`,
       content: {
-        heading: byInes ? "You cancelled these lessons" : "Weekly lessons cancelled",
+        heading: byTeacher ? "You cancelled these lessons" : "Weekly lessons cancelled",
         preheader: `${name} · ${run.count}`,
-        intro: byInes
+        intro: byTeacher
           ? `You cancelled ${name}'s lessons below. ${held ? "They hadn't been emailed about them" : "They have been told"}, and they are off your calendar.`
           : `${name} cancelled the rest of their weekly lessons. They are off your calendar.${keptNote(run.kept, "cancel")}`,
-        message: byInes && message ? { label: "Your message to the student", body: message } : null,
+        message: byTeacher && message ? { label: "Your message to the student", body: message } : null,
         rows: [...studentRows(student, { withPhone: false }), { label: "Cancelled", value: run.dates, dates: true }, ...keptRows(run.kept)],
         footer: SIGN_OFF
       }
     };
   }
   return {
-    subject: byInes ? `You cancelled ${name}'s lesson — ${shortWhen}` : `${late ? "Late cancellation" : "Cancellation"} — ${name}, ${shortWhen}`,
+    subject: byTeacher ? `You cancelled ${name}'s lesson — ${shortWhen}` : `${late ? "Late cancellation" : "Cancellation"} — ${name}, ${shortWhen}`,
     content: {
-      heading: byInes ? "You cancelled this lesson" : late ? `Cancelled less than ${notice} before` : "Lesson cancelled",
+      heading: byTeacher ? "You cancelled this lesson" : late ? `Cancelled less than ${notice} before` : "Lesson cancelled",
       preheader: `${name} · ${lessonName} · ${when}`,
-      intro: byInes
+      intro: byTeacher
         ? `You cancelled ${name}'s lesson on ${longWhen}. ${held ? "They hadn't been emailed about it" : "They have been told"}, and it is off your calendar.`
         : `${name} cancelled their lesson on ${longWhen}. It has been removed from your calendar.`,
       message: message ? { label: "Your message to the student", body: message } : null,
@@ -510,7 +512,7 @@ export function lessonCancelledTeacher({ student, byInes, held = false, late = f
 const ITEM = { lesson: "lesson payment", "no-show": "no-show fee", fee: "late change fee" };
 
 /** 24 25 27 — the student's receipt for a charge to their saved card; the line item varies. */
-export function paymentReceipt({ first, item, amount, lesson, lessonName, shortWhen, reference, nif = "", noticeHours }) {
+export function paymentReceipt({ tutor = DEFAULT_TUTOR, first, item, amount, lesson, lessonName, shortWhen, reference, nif = "", noticeHours }) {
   const fee = item === "fee";
   const heading = fee ? "Your late change fee is paid" : item === "no-show" ? "Your no-show fee is paid" : "Your lesson is paid";
   return {
@@ -519,17 +521,17 @@ export function paymentReceipt({ first, item, amount, lesson, lessonName, shortW
       heading,
       preheader: fee ? `${lessonName} · ${amount}` : `${lessonName} · ${amount} charged to your saved card`,
       intro: fee
-        ? `${hello(first)} your saved card was charged ${amount} for moving or cancelling this lesson less than ${noticeHours} hours before it.`
+        ? `${hello(first, tutor)} your saved card was charged ${amount} for moving or cancelling this lesson less than ${noticeHours} hours before it.`
         : item === "no-show"
-          ? `${hello(first)} Inês marked this lesson as a no-show. Your saved card was charged ${amount} instead of the lesson price.`
-          : `${hello(first)} your lesson is finished. ${amount} was charged to your saved card.`,
+          ? `${hello(first, tutor)} ${tutor.shortName} marked this lesson as a no-show. Your saved card was charged ${amount} instead of the lesson price.`
+          : `${hello(first, tutor)} your lesson is finished. ${amount} was charged to your saved card.`,
       callout: fee ? "You will not be charged this fee again for the same lesson." : "",
       rows: [
         { label: "Lesson", value: `${lesson} · ${shortWhen}` },
         { label: fee ? "Late change fee" : item === "no-show" ? "No-show fee" : "Paid", value: `${amount} · saved card` },
         { label: "Reference", value: reference },
         // Lets the student check the number before Inês issues the receipt.
-        ...(nif ? [{ label: "NIF", value: `${nif} · on your receipt from Inês` }] : [])
+        ...(nif ? [{ label: "NIF", value: `${nif} · on your receipt from ${tutor.shortName}` }] : [])
       ],
       footer: SIGN_OFF
     }
@@ -562,13 +564,13 @@ export function paymentReceivedTeacher({ studentName, item, amount, lessonName, 
 }
 
 /** 29 30 — the saved card was declined: a secure link to pay. */
-export function paymentFailed({ first, item, amount, lesson, lessonName, shortWhen, reference, payUrl }) {
+export function paymentFailed({ tutor = DEFAULT_TUTOR, first, item, amount, lesson, lessonName, shortWhen, reference, payUrl }) {
   return {
     subject: `${item === "fee" ? "Late change fee" : item === "no-show" ? "No-show fee" : "Lesson payment"} — the card didn't go through`,
     content: {
       heading: "The card didn't go through",
       preheader: `${lessonName} · ${amount} still to pay`,
-      intro: `${hello(first)} we couldn't charge the ${amount} ${ITEM[item]} to your saved card. Please use the secure payment link below.`,
+      intro: `${hello(first, tutor)} we couldn't charge the ${amount} ${ITEM[item]} to your saved card. Please use the secure payment link below.`,
       rows: [
         { label: "Lesson", value: `${lesson} · ${shortWhen}` },
         { label: item === "fee" ? "Late change fee" : item === "no-show" ? "No-show fee" : "Price", value: amount },
@@ -586,20 +588,20 @@ export function paymentFailed({ first, item, amount, lesson, lessonName, shortWh
  * 32 33 34 — her welcome: their lessons and prices and the one-click way in;
  * with no lesson yet, an invitation to book one (`rows` then holds prices only).
  */
-export function welcome({ first, welcome, book, free, rows }) {
+export function welcome({ tutor = DEFAULT_TUTOR, first, welcome, book, free, rows }) {
   return {
-    subject: book ? "Book your next lesson with Inês" : "Your lessons with Inês, in one place",
+    subject: book ? `Book your next lesson with ${tutor.shortName}` : `Your lessons with ${tutor.shortName}, in one place`,
     content: {
       heading: book ? "Book your next lesson" : "Your lessons, in one place",
-      preheader: "Inês has invited you to use her website for your Portuguese lessons.",
+      preheader: `${tutor.shortName} has invited you to use ${tutor.pronouns.possessive} website for your ${tutor.language.name} lessons.`,
       intro: book
-        ? `${hello(first)} Inês has invited you to use portuguesewithines.com for your Portuguese lessons. Choose a time for your next lesson whenever it suits you.`
-        : `${hello(first)} Inês has invited you to use portuguesewithines.com to manage your Portuguese lessons. Your lessons and prices are below; sign in to see or change your bookings.`,
-      callout: free ? "Your lessons with Inês are free: there’s no card to add and nothing to pay." : "",
+        ? `${hello(first, tutor)} ${tutor.shortName} has invited you to use ${tutor.site.domain} for your ${tutor.language.name} lessons. Choose a time for your next lesson whenever it suits you.`
+        : `${hello(first, tutor)} ${tutor.shortName} has invited you to use ${tutor.site.domain} to manage your ${tutor.language.name} lessons. Your lessons and prices are below; sign in to see or change your bookings.`,
+      callout: free ? `Your lessons with ${tutor.shortName} are free: there’s no card to add and nothing to pay.` : "",
       rows,
       steps: welcomeSteps(welcome, { book }),
       action: welcomeAction(welcome, { book }),
-      footer: WELCOME_FOOTER
+      footer: welcomeFooter(tutor)
     }
   };
 }
@@ -613,15 +615,15 @@ export function welcome({ first, welcome, book, free, rows }) {
  * carries; a teacher who is also a student signs in as themselves, so theirs
  * opens the booking page.
  */
-export function dormantInvite({ subject, message, signInUrl = "", bookUrl }) {
+export function dormantInvite({ tutor = DEFAULT_TUTOR, subject, message, signInUrl = "", bookUrl }) {
   return {
     subject,
     content: {
       heading: "Book your next lesson",
-      preheader: "Choose a time on Inês’s website.",
+      preheader: `Choose a time on ${tutor.shortName}’s website.`,
       intro: message,
       action: signInUrl ? { label: "Choose a time", url: signInUrl } : { label: "Book a lesson", url: bookUrl },
-      footer: signInUrl ? WELCOME_FOOTER : "Reply to this email to write to Inês."
+      footer: signInUrl ? welcomeFooter(tutor) : `Reply to this email to write to ${tutor.shortName}.`
     }
   };
 }
@@ -629,13 +631,13 @@ export function dormantInvite({ subject, message, signInUrl = "", bookUrl }) {
 /* ---------------------------------------------------------------- account */
 
 /** 36 */
-export function signInLink({ first, url }) {
+export function signInLink({ tutor = DEFAULT_TUTOR, first, url }) {
   return {
-    subject: "Your sign-in link — Português com a Inês",
+    subject: `Your sign-in link — ${tutor.brand}`,
     content: {
       heading: "Sign in",
       preheader: "One click and you're in. The link works for 30 minutes.",
-      intro: `${hello(first)} use the button below to sign in. It works for 30 minutes, and only once.`,
+      intro: `${hello(first, tutor)} use the button below to sign in. It works for 30 minutes, and only once.`,
       action: { label: "Sign in", url },
       footer: "If you didn't ask for this, you can ignore it."
     }
@@ -643,13 +645,13 @@ export function signInLink({ first, url }) {
 }
 
 /** 37 */
-export function passwordReset({ first, url }) {
+export function passwordReset({ tutor = DEFAULT_TUTOR, first, url }) {
   return {
-    subject: "Reset your password — Português com a Inês",
+    subject: `Reset your password — ${tutor.brand}`,
     content: {
       heading: "Reset your password",
       preheader: "Choose a new password — the link works for one hour.",
-      intro: `${hello(first)} use the button below to choose a new password. The link works for one hour, and only once.`,
+      intro: `${hello(first, tutor)} use the button below to choose a new password. The link works for one hour, and only once.`,
       action: { label: "Choose a new password", url },
       footer: "If you didn't ask for this, you can ignore it — your password has not changed."
     }
@@ -657,13 +659,13 @@ export function passwordReset({ first, url }) {
 }
 
 /** 38 — to the new address. */
-export function emailChangeConfirm({ first, email, url }) {
+export function emailChangeConfirm({ tutor = DEFAULT_TUTOR, first, email, url }) {
   return {
-    subject: "Confirm your new email — Português com a Inês",
+    subject: `Confirm your new email — ${tutor.brand}`,
     content: {
       heading: "Confirm this address",
       preheader: "One click, and this becomes the address you sign in with.",
-      intro: `${hello(first)} confirm this address and it becomes the one you sign in with and receive lesson emails at. The link works for one hour, and only once.`,
+      intro: `${hello(first, tutor)} confirm this address and it becomes the one you sign in with and receive lesson emails at. The link works for one hour, and only once.`,
       rows: [{ label: "New address", value: email }],
       action: { label: "Confirm this address", url },
       footer: "If you didn't ask for this, ignore it — nothing has changed."
@@ -672,14 +674,14 @@ export function emailChangeConfirm({ first, email, url }) {
 }
 
 /** 39 — to the address on file, the one that would notice a change nobody asked for. */
-export function emailChangeNotice({ first, email }) {
+export function emailChangeNotice({ tutor = DEFAULT_TUTOR, first, email }) {
   return {
-    subject: "Someone asked to change your email — Português com a Inês",
+    subject: `Someone asked to change your email — ${tutor.brand}`,
     content: {
       heading: "A change was requested",
       preheader: "Your address has not changed yet.",
-      intro: `${hello(first)} someone signed in to your account and asked to move it to ${email}. Nothing has changed yet — it only takes effect if that address confirms.`,
-      callout: "If this wasn't you, change your password now and tell Inês.",
+      intro: `${hello(first, tutor)} someone signed in to your account and asked to move it to ${email}. Nothing has changed yet — it only takes effect if that address confirms.`,
+      callout: `If this wasn't you, change your password now and tell ${tutor.shortName}.`,
       rows: [{ label: "Requested address", value: email }],
       footer: SIGN_OFF
     }

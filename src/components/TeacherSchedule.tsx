@@ -1,5 +1,6 @@
 "use client";
 
+import { TUTOR_NAME } from "@/lib/tutor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Check, CheckCircle2 } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
@@ -631,8 +632,8 @@ export function TeacherSchedule() {
         <div className="booking-alert" role="status">
           <AlertCircle size={18} aria-hidden="true" />
           <p>
-            This page is for Inês, and you&rsquo;re signed in as {me.name}.{" "}
-            <a href={`${SITE_BASE_PATH}/book/?view=lessons`}>Go to your lessons</a>, or sign out there to sign in as Inês.
+            This page is for {TUTOR_NAME}, and you&rsquo;re signed in as {me.name}.{" "}
+            <a href={`${SITE_BASE_PATH}/book/?view=lessons`}>Go to your lessons</a>, or sign out there to sign in as {TUTOR_NAME}.
           </p>
         </div>
       );

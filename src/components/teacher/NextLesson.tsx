@@ -1,5 +1,6 @@
 "use client";
 
+import { IN_PERSON } from "@/lib/tutor";
 import { Globe, UserRound } from "lucide-react";
 import { addedByTeacher, type AdminBooking } from "@/lib/admin-api";
 import { formatSlotTime } from "@/lib/booking-api";
@@ -58,7 +59,7 @@ export function NextLesson({
             ) : (
               <Globe size={14} strokeWidth={2.4} aria-hidden="true" />
             )}
-            {porto ? "In Porto" : "Online"}
+            {porto ? IN_PERSON : "Online"}
           </span>
           {addedByTeacher(next) ? <span className="teacher-next__added">Added by you</span> : null}
         </button>

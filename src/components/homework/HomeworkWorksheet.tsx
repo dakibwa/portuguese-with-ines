@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND, LANGUAGE_CODE } from "@/lib/tutor";
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Printer, BookOpen, CheckCircle2, RotateCcw, CircleHelp, PencilLine, Eye, EyeOff } from "lucide-react";
@@ -59,7 +60,7 @@ export function HomeworkWorksheet({ sheet, lessonAt, location, level, minutes, a
     window.addEventListener("afterprint", afterPrint);
     return () => { window.removeEventListener("beforeprint", beforePrint); window.removeEventListener("afterprint", afterPrint); };
   }, []);
-  const date = new Intl.DateTimeFormat("pt-PT", { day: "numeric", month: "long", year: "numeric", timeZone: lessonDateZone(location) }).format(new Date(lessonAt));
+  const date = new Intl.DateTimeFormat(LANGUAGE_CODE, { day: "numeric", month: "long", year: "numeric", timeZone: lessonDateZone(location) }).format(new Date(lessonAt));
   const hasAnswers = Object.values(answers).some(answer => answer.trim());
 
   function chooseView(next: "online" | "print") {
@@ -81,10 +82,10 @@ export function HomeworkWorksheet({ sheet, lessonAt, location, level, minutes, a
 
   function body(paper: boolean) {
     return <>
-      <article className={`homework-sheet${paper ? " homework-sheet--paper" : ""}`} lang="pt-PT">
+      <article className={`homework-sheet${paper ? " homework-sheet--paper" : ""}`} lang={LANGUAGE_CODE}>
         <header className="homework-sheet__head">
           {paper ? <PaperBloom className="homework-sheet__motif" /> : <HomeworkSplat seed={sheet.title} className="homework-sheet__splat" />}
-          {paper ? <p className="homework-sheet__brand">Português com a Inês</p> : null}
+          {paper ? <p className="homework-sheet__brand">{BRAND}</p> : null}
           <div className="homework-sheet__meta"><span>Aula de {date}</span><span>{level} · {minutes} min</span></div>
           <h3>{sheet.title}</h3>
           {paper ? null : <span className="short-rule" aria-hidden="true" />}
@@ -117,7 +118,7 @@ export function HomeworkWorksheet({ sheet, lessonAt, location, level, minutes, a
                 </> : <>
                   <label htmlFor={`${prefix}-${question.id}`}>{question.prompt}</label>
                   <textarea id={`${prefix}-${question.id}`} rows={2} maxLength={3000} value={answer} disabled={disabled} aria-describedby={mark ? feedbackId : undefined}
-                    onChange={event => onAnswer(question.id, event.target.value)} autoCapitalize="sentences" spellCheck lang="pt-PT" />
+                    onChange={event => onAnswer(question.id, event.target.value)} autoCapitalize="sentences" spellCheck lang={LANGUAGE_CODE} />
                 </>}
                 {!paper && mark ? <div id={feedbackId} className={`homework-feedback homework-feedback--${edited ? "edited" : mark.status}`}>
                   <FeedbackIcon size={18} aria-hidden="true" />
@@ -140,10 +141,10 @@ export function HomeworkWorksheet({ sheet, lessonAt, location, level, minutes, a
         </button>}
         {!paper && showAnswers ? <div id={`${prefix}-key`}>{answerKey()}</div> : null}
       </article>
-      {paper && printAnswers ? <article className="homework-sheet homework-sheet--paper homework-sheet--answer-key" lang="pt-PT">
+      {paper && printAnswers ? <article className="homework-sheet homework-sheet--paper homework-sheet--answer-key" lang={LANGUAGE_CODE}>
         <header className="homework-sheet__head">
           <PaperBloom className="homework-sheet__motif" />
-          <p className="homework-sheet__brand">Português com a Inês</p>
+          <p className="homework-sheet__brand">{BRAND}</p>
           <div className="homework-sheet__meta"><span>{sheet.title}</span><span>Aula de {date}</span></div>
           <h3>Respostas e exemplos</h3>
           <DrawnRule className="homework-sheet__rule" />

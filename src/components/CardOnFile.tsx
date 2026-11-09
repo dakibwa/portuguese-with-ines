@@ -1,5 +1,6 @@
 "use client";
 
+import { HOME_CLOCK } from "@/lib/tutor";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Circle, CreditCard, Repeat } from "lucide-react";
 import { AssetMark } from "@/components/BrandMarks";
@@ -177,7 +178,7 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
           {lessons.length ? <section aria-labelledby="card-terms-now" className="card-terms__lessons">
             <p className="card-terms__label">
               <span id="card-terms-now">{dueNow ? several ? "Outstanding lessons" : "Outstanding lesson" : "To pay"}</span>
-              <small>Porto time</small>
+              <small>{HOME_CLOCK}</small>
             </p>
             <ol className="booking-chosen-lessons">
               {lessons.map((lesson, index) => <li key={lesson.id}>{tile(lesson, index)}</li>)}
@@ -194,7 +195,7 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
             <section aria-labelledby="card-terms-then" className="card-terms__lessons card-terms__lessons--then">
               <p className="card-terms__label">
                 <span id="card-terms-then">{lessons.length ? `Then ${CHARGED_EACH}` : `Paid ${CHARGED_EACH}`}</span>
-                {lessons.length ? null : <small>Porto time</small>}
+                {lessons.length ? null : <small>{HOME_CLOCK}</small>}
               </p>
               <ul className="booking-chosen-lessons">
                 {then.map(lesson => (

@@ -2359,6 +2359,22 @@ a different origin, pass `--var ALLOWED_ORIGIN:… --var SITE_URL:…` to
 
 ## Site configuration
 
+The tutor's identity is not configuration here: name, brand, language, city,
+time zone, currency, domain, sender, booking reference prefix and calendar UID
+domain come from [tutors/ines/tutor.json](./tutors/ines/tutor.json), read by
+`workers/booking/tutor.mjs` (`tutorOf(env)`) and `src/lib/tutor.ts`. The
+Worker's `SITE_URL`, `MAIL_FROM` and `MAIL_SENDER_ADDRESS` still override the
+record's site URL and sender, which is how staging and local runs point
+elsewhere. Never change `bookings.referencePrefix` or
+`bookings.calendarUidDomain` for a tutor who has lessons: calendars match
+updates by the UID, and students and receipts quote the reference.
+
+Still read once for the one tutor rather than per request: the home time zone
+(`HOME_ZONE` in `time.mjs`), the currency in `stripe.mjs` and `money.mjs`, the
+calendar file's PRODID and UID domain in `ics.mjs`, and every helper whose
+`tutor` defaults to `DEFAULT_TUTOR`. Serving a second tutor means passing the
+request's tutor to each of those; `grep -n "DEFAULT_TUTOR"` lists them.
+
 ```bash
 NEXT_PUBLIC_BOOKING_API_BASE_URL=https://ines-booking.<subdomain>.workers.dev
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=

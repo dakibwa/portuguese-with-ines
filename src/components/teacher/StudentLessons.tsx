@@ -1,5 +1,6 @@
 "use client";
 
+import { IN_PERSON } from "@/lib/tutor";
 import { addedByTeacher, paidByHand, setLessonPaid, type AdminBooking } from "@/lib/admin-api";
 import { PaidTick } from "@/components/teacher/PaidTick";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
@@ -134,7 +135,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
           </div>
         </div>
         <ul className="booking-payment-facts teacher-history-lesson__facts">
-          <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
+          <li>{booking.location === "porto" ? IN_PERSON : "Online"}</li>
           {facts.map(fact => <li key={fact}>{fact}</li>)}
         </ul>
         {settle ? <div className="teacher-history-lesson__paid">
@@ -206,7 +207,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
           </div>
           <p className="teacher-history-run__span">{run.lessons.length} weeks, <span>{day(first)} to {day(last)}</span></p>
           <ul className="booking-payment-facts teacher-history-lesson__facts">
-            <li>{pattern.location === "porto" ? "In Porto" : "Online"}</li>
+            <li>{pattern.location === "porto" ? IN_PERSON : "Online"}</li>
             {facts.map(fact => <li key={fact}>{fact}</li>)}
           </ul>
         </li>

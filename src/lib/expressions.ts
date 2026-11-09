@@ -1,3 +1,4 @@
+import { LANGUAGE_CODE } from "@/lib/tutor";
 import { isApiInstant, isApiRecord } from "@/lib/api-response";
 
 export type ExpressionInput = {
@@ -36,5 +37,5 @@ export function isExpression(value: unknown): value is Expression {
     isApiInstant(value.createdAt) && isApiInstant(value.updatedAt);
 }
 export function searchExpression(value: string) {
-  return value.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-PT");
+  return value.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase(LANGUAGE_CODE);
 }

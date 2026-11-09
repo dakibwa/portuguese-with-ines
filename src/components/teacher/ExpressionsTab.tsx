@@ -1,5 +1,6 @@
 "use client";
 
+import { LANGUAGE_CODE } from "@/lib/tutor";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Eye, Plus } from "lucide-react";
@@ -93,7 +94,7 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
   return (
     <section className="teacher-expressions" aria-label="Expressions collection">
       <div className="teacher-expressions__intro">
-        <dl lang="pt-PT">
+        <dl lang={LANGUAGE_CODE}>
           <dt>expressão idiomática <span>nome feminino</span></dt>
           <dd>Conjunto de palavras com um significado próprio, diferente do seu sentido literal.</dd>
         </dl>

@@ -1,5 +1,6 @@
 "use client";
 
+import { IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { X, ArrowLeft, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
@@ -337,7 +338,7 @@ export function LessonDetails({
       {action === "view" ? (
         <>
           <ul className="booking-payment-facts teacher-lesson-facts">
-            <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
+            <li>{booking.location === "porto" ? IN_PERSON : "Online"}</li>
             <li>{formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: minutes })}</li>
             {money ? <li>{money}</li> : null}
             {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
@@ -544,7 +545,7 @@ export function LessonDetails({
                   />
                 </label>
                 <label>
-                  <span>Time in Porto</span>
+                  <span>Time in {TUTOR_CITY}</span>
                   <input
                     type="time"
                     required

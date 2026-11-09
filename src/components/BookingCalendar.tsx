@@ -1,5 +1,6 @@
 "use client";
 
+import { HOME_CLOCK, IN_PERSON, LANGUAGE, TUTOR_CITY, TUTOR_NAME } from "@/lib/tutor";
 import { MeetingLink } from "@/components/MeetingLink";
 import { LessonsLoading } from "@/components/LessonsLoading";
 import { StudentExpressions } from "@/components/expressions/StudentExpressions";
@@ -1329,7 +1330,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         if (paymentReady === false || (postpayOn && !STRIPE_PUBLISHABLE_READY)) {
           setPostpay(false);
           setPaymentConfigurationError(
-            "Online payment is temporarily unavailable, so booking is paused. Please message Inês instead."
+            `Online payment is temporarily unavailable, so booking is paused. Please message ${TUTOR_NAME} instead.`
           );
           return;
         }
@@ -2200,7 +2201,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           setPayment({ clientSecret: result.checkoutClientSecret });
           return;
         }
-        setSubmitError("Payment isn’t available just now. Please try again in a few minutes, or message Inês.");
+        setSubmitError(`Payment isn’t available just now. Please try again in a few minutes, or message ${TUTOR_NAME}.`);
         return;
       }
       if (result.checkoutUrl) {
@@ -2794,7 +2795,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
    */
   function weeklyTimeLabel(series: LessonSeries, lesson: { startAt: string; location: "online" | "porto" }) {
     const zone = zoneOf(lesson);
-    if (zone === BOOKING_TIME_ZONE) return `${weekdayNames[series.weekday]} at ${minutesToClock(series.minuteOfDay)} Porto time`;
+    if (zone === BOOKING_TIME_ZONE) return `${weekdayNames[series.weekday]} at ${minutesToClock(series.minuteOfDay)} ${HOME_CLOCK}`;
     const weekdayAt = (startAt: string) =>
       `${weekdayNames[new Date(`${dateKeyIn(new Date(startAt), zone)}T12:00:00Z`).getUTCDay()]} at ${formatSlotTime(startAt, zone)}`;
     const counts = new Map<string, number>();
@@ -2829,7 +2830,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         <h2 id="lesson-manage-heading">Manage this lesson</h2>
         <div className="lesson-manage-dialog__lesson">
           <strong className="lesson-when"><span>{formatLongDate(preview.startAt, zoneOf(preview))}</span><span className="visually-hidden">, </span><span className="lesson-when__time">{lessonTime(preview.startAt, zoneOf(preview))}</span></strong>
-          <span>{formatBookedLessonLabel(preview.lessonType)} · {preview.location === "porto" ? "In Porto" : "Online"}{freeMark(preview.paymentStatus)}</span>
+          <span>{formatBookedLessonLabel(preview.lessonType)} · {preview.location === "porto" ? IN_PERSON : "Online"}{freeMark(preview.paymentStatus)}</span>
           {manageMode === "view" ? <MeetingLink meetingUrl={preview.meetingUrl} location={preview.location} status={preview.status} /> : null}
         </div>
         {preview.changeLocked && preview.status === "confirmed" ? (
@@ -2970,7 +2971,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               {(["online", "porto"] as const).map((option) => (
                 <label className={form.location === option ? "is-active" : ""} key={option}>
                   <input
-                    aria-label={option === "online" ? "Online" : "In Porto"}
+                    aria-label={option === "online" ? "Online" : IN_PERSON}
                     checked={form.location === option}
                     name="booking-location"
                     onChange={() => setForm((current) => ({ ...current, location: option }))}
@@ -2984,7 +2985,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   ) : (
                     <UserRound size={14} strokeWidth={2.4} aria-hidden="true" />
                   )}
-                  {option === "online" ? "Online" : "In Porto"}
+                  {option === "online" ? "Online" : IN_PERSON}
                 </label>
               ))}
             </div>
@@ -3112,7 +3113,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     return (
       // The same section as every other step, so the workspace eases between
       // this card and the next view instead of being swapped for it.
-      <section className="booking-steps" aria-label="Book a Portuguese lesson">
+      <section className="booking-steps" aria-label={`Book a ${LANGUAGE} lesson`}>
         <section className="booking-success" aria-live="polite" id="booking-success">
           {/* Good news gets one small celebration: the lesson's own mark, the
               one it wears on the calendar from now on, lands in the card's top
@@ -3233,7 +3234,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             {/* The fee rule as the confirm step's dabs, said once. */}
             <ul className="booking-payment-facts booking-success__note">
               {lessonType?.price_cents === 0 ? (
-                <li>Please give Inês {noticeHours} hours&rsquo; notice to move or cancel</li>
+                <li>Please give {TUTOR_NAME} {noticeHours} hours&rsquo; notice to move or cancel</li>
               ) : lateFeeCents === 0 ? (
                 <li>No fee to change or cancel, or for a missed lesson</li>
               ) : (
@@ -3305,7 +3306,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   }
 
   return (
-    <section className="booking-steps" aria-label="Book a Portuguese lesson">
+    <section className="booking-steps" aria-label={`Book a ${LANGUAGE} lesson`}>
       {/* A teacher who is also a student keeps a way back to the schedule. */}
       {intent === "lessons" && student?.role === "teacher" && student.alsoStudent ? (
         <div className="booking-schedule-return">
@@ -3355,7 +3356,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 </button>
               ) : null}
               <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-                Message Inês<span className="visually-hidden"> (opens in a new tab)</span>
+                Message {TUTOR_NAME}<span className="visually-hidden"> (opens in a new tab)</span>
               </a>
             </div>
           </div>
@@ -3481,7 +3482,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
                   <div className="lesson-manage-dialog__lesson">
                     <strong className="lesson-when"><span>{formatLongDate(managed.booking.startAt, zoneOf(managed.booking))}</span><span className="visually-hidden">, </span><span className="lesson-when__time">{lessonTime(managed.booking.startAt, zoneOf(managed.booking))}</span></strong>
-                    <span>{formatBookedLessonLabel(managed.booking.lessonType)} · {managed.booking.location === "porto" ? "In Porto" : "Online"}{freeMark(managed.booking.paymentStatus)}</span>
+                    <span>{formatBookedLessonLabel(managed.booking.lessonType)} · {managed.booking.location === "porto" ? IN_PERSON : "Online"}{freeMark(managed.booking.paymentStatus)}</span>
                     {/* Joining belongs to the lesson itself, not to a decision about it. */}
                     {manageMode === "view" ? (
                       <MeetingLink meetingUrl={managed.booking.meetingUrl} location={managed.booking.location} status={managed.booking.status} />
@@ -3719,11 +3720,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 ? "Confirming your booking…"
                 : cardReturn.state === "confirmed"
                   ? "You’re booked in. Your confirmation email is on its way."
-                  : "We couldn’t confirm your booking yet. Please check your lessons, or message Inês."}
+                  : `We couldn’t confirm your booking yet. Please check your lessons, or message ${TUTOR_NAME}.`}
             </p>
             {cardReturn.state === "slow" ? (
               <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-                Message Inês<span className="visually-hidden"> (opens in a new tab)</span>
+                Message {TUTOR_NAME}<span className="visually-hidden"> (opens in a new tab)</span>
               </a>
             ) : null}
             {cardReturn.state !== "confirming" ? (
@@ -3748,7 +3749,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   Dan: "rather than repeated"). */}
               <p className="auth-panel__intro">
                 {/* A payment approval link says what it is for (2 November 2026). */}
-                {cardBookingId ? "Sign in to pay for your lessons." : "Your lessons with Inês, all in one place."} No password needed.
+                {cardBookingId ? "Sign in to pay for your lessons." : `Your lessons with ${TUTOR_NAME}, all in one place.`} No password needed.
                 {/* Someone else's account open on this device: say what the press does. */}
                 {student ? ` You’re signed in as ${student.name}; this switches to the account the link was sent for.` : null}
               </p>
@@ -3962,7 +3963,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         />
                       </strong>
                       <span>
-                        {formatBookedLessonLabel(nextLesson.lessonType)} · {nextLesson.location === "porto" ? "In Porto" : "Online"}{freeMark(nextLesson.paymentStatus)}
+                        {formatBookedLessonLabel(nextLesson.lessonType)} · {nextLesson.location === "porto" ? IN_PERSON : "Online"}{freeMark(nextLesson.paymentStatus)}
                         {isWeeklyLesson(nextLesson) ? " · Weekly" : ""}
                       </span>
                     </button>
@@ -4007,10 +4008,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   isLessonsCalendarOverview && calendarBookings.some((booking) => booking.location === "porto") ? (
                     <p className={`calendar-zone calendar-zone--switching${nextLesson?.location === "porto" ? " calendar-zone--porto" : ""}`}>
                       <Clock3 size={15} aria-hidden="true" />
-                      <span className="visually-hidden">Times are in {viewZoneName}; lessons in Porto are in Porto time</span>
+                      <span className="visually-hidden">Times are in {viewZoneName}; lessons in {TUTOR_CITY} are in {HOME_CLOCK}</span>
                       <strong aria-hidden="true">
                         <span className="calendar-zone__own">{viewZoneName}</span>
-                        <span className="calendar-zone__porto">Porto time</span>
+                        <span className="calendar-zone__porto">{HOME_CLOCK}</span>
                       </strong>
                     </p>
                   ) : (
@@ -4018,7 +4019,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       <Clock3 size={15} aria-hidden="true" />
                       <span>
                         <span className="visually-hidden">Times are in </span>
-                        <strong>{viewZone === BOOKING_TIME_ZONE ? "Porto time" : viewZoneName}</strong>
+                        <strong>{viewZone === BOOKING_TIME_ZONE ? HOME_CLOCK : viewZoneName}</strong>
                       </span>
                     </p>
                   )
@@ -4210,7 +4211,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                                 ) : null}
                                 <strong>{formatLongDate(booking.startAt, zoneOf(booking))}, {lessonTime(booking.startAt, zoneOf(booking))}</strong>
                                 <span>
-                                  {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}{freeMark(booking.paymentStatus)}
+                                  {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? IN_PERSON : "Online"}{freeMark(booking.paymentStatus)}
                                   {isWeeklyLesson(booking) ? " · Weekly" : ""}
                                 </span>
                               </span>
@@ -4240,7 +4241,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 <span><Globe aria-hidden="true" size={12} strokeWidth={2.4} /> Online</span>
               ) : null}
               {isLessonsCalendarOverview && calendarBookings.some((booking) => booking.location === "porto") ? (
-                <span><UserRound aria-hidden="true" size={12} strokeWidth={2.4} /> In Porto</span>
+                <span><UserRound aria-hidden="true" size={12} strokeWidth={2.4} /> {IN_PERSON}</span>
               ) : null}
               {/* Only while there are free days to explain. */}
               {(intent === "book" || isManagedReschedule) && !noFreeTimes && !availabilityError && !loadingSlots ? (
@@ -4338,7 +4339,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           type="radio"
                           value={option}
                         />
-                        {option === "online" ? "Online" : "In Porto"}
+                        {option === "online" ? "Online" : IN_PERSON}
                       </label>
                     ))}
                   </div>
@@ -4354,7 +4355,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 {!selectedDate ? (
                   <p className="booking-state-note">Choose a free day on the calendar.</p>
                 ) : studentClockDiffers ? (
-                  <p className="booking-state-note">Times in {viewZone === BOOKING_TIME_ZONE ? "Porto time" : viewZoneName}</p>
+                  <p className="booking-state-note">Times in {viewZone === BOOKING_TIME_ZONE ? HOME_CLOCK : viewZoneName}</p>
                 ) : null}
                 {accountRefreshNotice}
                 {loadingSlots ? (
@@ -4482,7 +4483,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           </span>
                           <strong>{formatTimeIn(booking.startAt, zoneOf(booking))}</strong>
                           <span>
-                            {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? "In Porto" : "Online"}{freeMark(booking.paymentStatus)}
+                            {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? IN_PERSON : "Online"}{freeMark(booking.paymentStatus)}
                           </span>
                         </span>
                         <ChevronRight aria-hidden="true" size={20} />
@@ -4650,7 +4651,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                               <p>{submitError}</p>
                               <div className="booking-alert__actions">
                                 <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-                                  Message Inês<span className="visually-hidden"> (opens in a new tab)</span>
+                                  Message {TUTOR_NAME}<span className="visually-hidden"> (opens in a new tab)</span>
                                 </a>
                               </div>
                             </div>
@@ -4664,7 +4665,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                               <p>{paymentConfigurationError}</p>
                               <div className="booking-alert__actions">
                                 <a className="button button--outline button--compact" href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-                                  Message Inês<span className="visually-hidden"> (opens in a new tab)</span>
+                                  Message {TUTOR_NAME}<span className="visually-hidden"> (opens in a new tab)</span>
                                 </a>
                               </div>
                             </div>
@@ -4678,7 +4679,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           {freeLesson ? (
                             <>
                               <li>Free, with nothing to pay and no card needed</li>
-                              <li>Please give Inês {noticeHours} hours&rsquo; notice to move or cancel</li>
+                              <li>Please give {TUTOR_NAME} {noticeHours} hours&rsquo; notice to move or cancel</li>
                             </>
                           ) : postpay ? (
                             <>
@@ -4697,7 +4698,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             </>
                           ) : (
                             <>
-                              <li>Pay Inês on the lesson day</li>
+                              <li>Pay {TUTOR_NAME} on the lesson day</li>
                               {/* Paid in person, a missed lesson is the lesson itself, so
                                   only the late change has a fee here. */}
                               {lateFeeCents ? <>

@@ -1,5 +1,6 @@
 "use client";
 
+import { IN_PERSON } from "@/lib/tutor";
 import { useState } from "react";
 import { Globe, UserRound } from "lucide-react";
 import { AdminApiError, createBookingFor, type AdminStudent } from "@/lib/admin-api";
@@ -213,7 +214,7 @@ export function LessonForm({
             <legend>Where</legend>
             <div className={`segmented segmented--${lesson.location}`}>
               <span aria-hidden="true" className="segmented__thumb" />
-              {([["online", "Online"], ["porto", "In Porto"]] as const).map(([value, label]) => (
+              {([["online", "Online"], ["porto", IN_PERSON]] as const).map(([value, label]) => (
                 <label className={lesson.location === value ? "is-active" : ""} key={value}>
                   <input
                     aria-label={label}

@@ -1,5 +1,5 @@
 import {
-  PORTO,
+  HOME_ZONE,
   addDaysToKey,
   dateKey,
   dayBounds,
@@ -10,6 +10,7 @@ import {
   zonedParts,
   zonedToUtc
 } from "./time.mjs";
+import { DEFAULT_TUTOR, tutorOf } from "./tutor.mjs";
 
 /**
  * Free slots = weekly teaching hours, plus one-off extra windows, minus blocked
@@ -25,8 +26,8 @@ function overlaps(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
 }
 
-export const DEFAULT_BOOKING_HORIZON_DAYS = 84;
-export const DEFAULT_MINIMUM_NOTICE_HOURS = 14;
+export const DEFAULT_BOOKING_HORIZON_DAYS = DEFAULT_TUTOR.defaults.bookingHorizonDays;
+export const DEFAULT_MINIMUM_NOTICE_HOURS = DEFAULT_TUTOR.defaults.noticeHours;
 
 /** Bumped in the same transaction as teaching-hour and notice-setting writes. */
 export function availabilityRevisionSql() {
@@ -119,13 +120,13 @@ export async function loadSettings(env) {
     // Free time kept after every lesson before a student's next one can start.
     // Missing means none, which is how every booking behaved before it existed.
     lessonBufferMinutes: Math.max(0, Number(settings.lesson_buffer_minutes ?? 0) || 0),
-    sameDayChangeFeeCents: Number(settings.same_day_change_fee_cents ?? 500),
+    sameDayChangeFeeCents: Number(settings.same_day_change_fee_cents ?? DEFAULT_TUTOR.defaults.lateChangeFeeCents),
     // 'off' preserves the original pay-in-person flow. 'postpay' saves a card
     // at booking and charges it only when the lesson ends. The retired
     // 'prepay' value remains readable only so a half-finished rollout fails
     // visibly rather than silently behaving as pay-in-person.
     paymentMode: ["postpay", "prepay"].includes(settings.payment_mode) ? settings.payment_mode : "off",
-    teacherName: settings.teacher_name || "Inês Dias Baía",
+    teacherName: settings.teacher_name || tutorOf(env).name,
     teacherEmail: settings.teacher_email || "",
     replyToEmail: settings.reply_to_email || ""
   };
@@ -162,7 +163,7 @@ export async function computeAvailability(
   // Only the authenticated teacher picker opts out of student notice and gaps.
   const bufferMs = teacher ? 0 : settings.lessonBufferMinutes * 60000;
 
-  const todayKey = dateKey(now, PORTO);
+  const todayKey = dateKey(now, HOME_ZONE);
   /*
    * The horizon stops a stranger reaching in and taking a slot months out. A
    * student holding their own standing weekly time is the case it is meant to
@@ -264,8 +265,8 @@ export async function computeAvailability(
     const daySlots = [];
 
     for (const minute of candidateStartMinutes({ startRanges, duration, interval })) {
-      const slotStart = zonedToUtc(year, month, day, minute, PORTO);
-      const wall = zonedParts(slotStart, PORTO);
+      const slotStart = zonedToUtc(year, month, day, minute, HOME_ZONE);
+      const wall = zonedParts(slotStart, HOME_ZONE);
       // The missing spring hour must not reappear as a duplicate, shifted
       // start. Only real minutes from the teaching window are offered.
       if (wall.year !== year || wall.month !== month || wall.day !== day || wall.hour * 60 + wall.minute !== minute) continue;
@@ -296,7 +297,7 @@ export async function isSlotBookable(
   const start = new Date(startAt);
   if (Number.isNaN(start.getTime())) return { ok: false, reason: "That time could not be understood." };
 
-  const key = dateKey(start, PORTO);
+  const key = dateKey(start, HOME_ZONE);
   const { slotsByDate, settings: checkedSettings } = await computeAvailability(env, {
     fromKey: key,
     toKey: key,
@@ -323,11 +324,11 @@ export async function isSlotBookable(
     const hours = settings.minimumNoticeHours;
     return {
       ok: false,
-      reason: `That's too soon. Inês needs at least ${hours} hour${hours === 1 ? "" : "s"}' notice. Please choose a later time.`
+      reason: `That's too soon. ${tutorOf(env).shortName} needs at least ${hours} hour${hours === 1 ? "" : "s"}' notice. Please choose a later time.`
     };
   }
 
-  const horizonKey = addDaysToKey(dateKey(now, PORTO), settings.bookingHorizonDays);
+  const horizonKey = addDaysToKey(dateKey(now, HOME_ZONE), settings.bookingHorizonDays);
   if (!ignoreHorizon && key > horizonKey) {
     return { ok: false, reason: "That's further ahead than booking is open. Please choose an earlier date." };
   }

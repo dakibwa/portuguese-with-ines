@@ -10,6 +10,10 @@
  */
 
 import { realEmail } from "./no-email.mjs";
+import { DEFAULT_TUTOR, tutorOf } from "./tutor.mjs";
+
+/** Stripe's lower-case code for the tutor's currency ("eur" for Inês). */
+const CURRENCY = DEFAULT_TUTOR.place.currency.toLowerCase();
 
 const API = "https://api.stripe.com/v1";
 const API_VERSION = "2026-08-26.dahlia";
@@ -121,7 +125,7 @@ export async function chargeSavedCard(
 ) {
   let intent = await stripeRequest(env, "/payment_intents", {
     amount: amountCents,
-    currency: "eur",
+    currency: CURRENCY,
     customer,
     payment_method: paymentMethod,
     payment_method_types: { 0: "card" },
@@ -165,7 +169,7 @@ export function createCardSetupSession(
     {
       integration_identifier: INTEGRATION_IDENTIFIER,
       mode: "setup",
-      currency: "eur",
+      currency: CURRENCY,
       payment_method_types: { 0: "card" },
       client_reference_id: booking.id,
       ...(customer ? { customer } : { customer_creation: "always", customer_email: realEmail(customerEmail) || undefined }),
@@ -204,7 +208,7 @@ export function createStudentCardSession(env, { student, successUrl, cancelUrl, 
     {
       integration_identifier: INTEGRATION_IDENTIFIER,
       mode: "setup",
-      currency: "eur",
+      currency: CURRENCY,
       payment_method_types: { 0: "card" },
       client_reference_id: `student:${student.id}`,
       ...(student.stripe_customer_id
@@ -319,12 +323,12 @@ export function createCheckoutSession(
       0: {
         quantity: 1,
         price_data: {
-          currency: "eur",
+          currency: CURRENCY,
           unit_amount: amountCents ?? lessonType.price_cents,
           product_data: {
             name: productName || lessonType.name,
             description:
-              productDescription || `Portuguese lesson with Inês · ${lessonType.duration_minutes} minutes`
+              productDescription || `${tutorOf(env).language.name} lesson with ${tutorOf(env).shortName} · ${lessonType.duration_minutes} minutes`
           }
         }
       }
@@ -366,7 +370,7 @@ export function refundPayment(env, { bookingId, paymentIntent, amountCents }) {
 export function checkoutSessionProblem(session, booking) {
   if (session?.payment_status !== "paid") return "payment is not paid";
   if (session?.mode !== "payment") return "session is not a one-time payment";
-  if (String(session?.currency ?? "").toLowerCase() !== "eur") return "currency does not match";
+  if (String(session?.currency ?? "").toLowerCase() !== CURRENCY) return "currency does not match";
   if (!Number.isSafeInteger(session?.amount_total) || session.amount_total !== booking?.amount_cents) {
     return "amount does not match";
   }

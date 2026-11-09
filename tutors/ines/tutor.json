@@ -1,0 +1,52 @@
+{
+  "$comment": "One tutor's record: who they are, what they teach, where, and how the site and its emails name them. Inês is the only tutor for now; the booking Worker and the site both read this file instead of spelling her details out. Rules a tutor changes day to day (notice, prices, buffer, horizon, fees) stay in the Worker's settings table, which wins over the defaults below.",
+  "id": "ines",
+  "name": "Inês Dias Baía",
+  "shortName": "Inês",
+  "pronouns": { "subject": "she", "object": "her", "possessive": "her" },
+  "brand": "Português com a Inês",
+  "brandPlain": "Portugues com a Ines",
+  "language": {
+    "name": "Portuguese",
+    "variety": "European Portuguese",
+    "code": "pt-PT",
+    "phrases": {
+      "hello": "Olá",
+      "goodbye": "Até breve",
+      "willReview": "A Inês vai rever esta resposta.",
+      "unanswered": "Falta responder a esta pergunta.",
+      "correct": "Está certo.",
+      "tryAgain": "Revê a resposta.",
+      "compareWithSheet": "Compara com a resposta da ficha.",
+      "illegible": "[ilegível]"
+    },
+    "aiStyle": "Use Portuguese as spoken and written in Portugal, current orthography, natural local vocabulary and grammar; use tu consistently for learner instructions.",
+    "aiMarkingStyle": "Preserve meaningful accents and Portugal vocabulary/grammar."
+  },
+  "site": {
+    "url": "https://portuguesewithines.com",
+    "domain": "portuguesewithines.com",
+    "mailFrom": "Português com a Inês <bookings@portuguesewithines.com>",
+    "mailSender": "bookings@portuguesewithines.com"
+  },
+  "place": {
+    "city": "Porto",
+    "timeZone": "Europe/Lisbon",
+    "country": "PT",
+    "currency": "EUR",
+    "inPersonKey": "porto"
+  },
+  "contact": {
+    "whatsapp": "+351 963 161 134"
+  },
+  "bookings": {
+    "$comment": "Never change these for a tutor with lessons: calendars match updates by the UID's domain, and students and receipts quote the reference prefix.",
+    "referencePrefix": "PT",
+    "calendarUidDomain": "portuguesewithines.com"
+  },
+  "defaults": {
+    "noticeHours": 14,
+    "lateChangeFeeCents": 500,
+    "bookingHorizonDays": 84
+  }
+}
