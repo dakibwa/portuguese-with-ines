@@ -26,6 +26,71 @@
   flex: 1 0 auto;
   flex-direction: column;
 }
+/* One slim banner for her workspace (9 November 2026, Dan: "could it all be
+   consolidated into one smaller banner that has her logo"): the cream
+   wordmark, which still leads home, a hairline, then the page's name in her
+   hand, on the booking band's blue and grain, with the band's splat cut off
+   at the right edge. No site links: her tools are the page. */
+.teacher-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-wide);
+  min-height: 76px;
+  overflow: hidden;
+  padding: 0.7rem var(--page-pad);
+  background-color: var(--blue-deep);
+  background-image: var(--paper-texture);
+  color: var(--paper);
+}
+.teacher-banner__brand {
+  position: relative;
+  z-index: 2;
+  display: block;
+  flex: none;
+  border-radius: var(--squiggle-chip);
+}
+.teacher-banner .teacher-banner__wordmark {
+  width: calc(52px * 760 / 236);
+}
+.teacher-banner__title {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  padding-left: var(--gap-wide);
+  border-left: 1px solid var(--outline-light-edge);
+  font-family: var(--display);
+  font-size: clamp(1.55rem, 2.4vw, 2.1rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.teacher-banner__mark {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: clamp(-44px, -2.5vw, -24px);
+  width: clamp(118px, 10vw, 158px);
+  margin: 0;
+  aspect-ratio: 1;
+  opacity: 0.96;
+  transform: translateY(-50%);
+}
+@media (max-width: 560px) {
+  .teacher-banner { gap: var(--gap-block); min-height: 64px; padding-block: 0.6rem; }
+  .teacher-banner .teacher-banner__wordmark { width: calc(42px * 760 / 236); }
+  .teacher-banner__title { padding-left: var(--gap-block); font-size: 1.35rem; }
+  .teacher-banner__mark { right: -38px; width: 86px; }
+}
+/* The narrowest phones keep the wordmark and the name clear of each other
+   and let the splat go. */
+@media (max-width: 360px) {
+  .teacher-banner { gap: var(--gap-list); }
+  .teacher-banner .teacher-banner__wordmark { width: calc(36px * 760 / 236); }
+  .teacher-banner__title { padding-left: var(--gap-list); font-size: 1.25rem; }
+  .teacher-banner__mark { display: none; }
+}
 .teacher-main {
   flex: 1 0 auto;
   padding: 1.6rem var(--page-pad) 4rem;
@@ -1689,17 +1754,10 @@
   .teacher-lesson-meet--short { left: auto; right: 10px; }
 }
 
-/* A phone held sideways has little height to spare: the band keeps its
-   title on one line, so the tabs and her next lesson reach the first screen
-   rather than the band filling half of it. */
+/* A phone held sideways has little height to spare, so the tabs and her
+   next lesson start closer under the slim banner. */
 @media (orientation: landscape) and (max-height: 500px) {
   .teacher-main { padding-top: 1rem; }
-}
-@media (orientation: landscape) and (max-height: 500px) and (max-width: 820px) {
-  .teacher-page .teacher-intro { min-height: 0; padding-block: 0.65rem; }
-  .teacher-page .teacher-intro h1 { font-size: 2.4rem; }
-  .teacher-page .teacher-intro h1 br { display: none; }
-  .teacher-page .teacher-intro .booking-intro__time-window { width: 120px; right: -30px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
