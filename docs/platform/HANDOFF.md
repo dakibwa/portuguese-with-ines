@@ -45,11 +45,16 @@ All of these were decided on 9 November 2026.
 
 - **Feasibility and pricing**: [Claude Doc](https://claude.ai/artifact/KDWopQzkHBaEJNREXZUri2).
   It still says €39; €25 is the decision.
-- **Onboarding plan**, approved by Dan: [artifact](https://claude.ai/artifact/KyUBnDuD7RrKYe5sZvUdAE).
-  It covers the twelve steps from hello to a live site in about twenty minutes,
-  then getting paid and inviting students.
-- **Systems map**, showing how booking, homework, payments and curriculum connect:
-  [artifact](https://claude.ai/artifact/88kNajRKYQ7Kvm881KCy4F).
+- **Onboarding plan**, approved by Dan: [onboarding.md](./onboarding.md) in this
+  folder, the published [artifact](https://claude.ai/artifact/KyUBnDuD7RrKYe5sZvUdAE)
+  and its source [onboarding-plan.html](./onboarding-plan.html). It covers the
+  twelve steps from hello to a live site in about twenty minutes, then getting
+  paid and inviting students.
+- **Systems map**, showing how booking, homework, payments and curriculum
+  connect: [systems-map.md](./systems-map.md) in this folder, the published
+  [artifact](https://claude.ai/artifact/88kNajRKYQ7Kvm881KCy4F) and its source
+  [systems-map.html](./systems-map.html). Its eleven numbered findings are the
+  rules the code still fixes. "Known gaps" below is the same list, by build step.
 - **Design system**, Inês's site and the bar for the templates:
   [artifact](https://claude.ai/artifact/XrweSPkR5KgKC8mF5xYhcY), and
   [design/README.md](../../design/README.md).
@@ -161,38 +166,49 @@ SQLite-backed Durable Object:
 
 ## Known gaps before tutors set their own rules
 
-- **Places.** `bookings` and `booking_series` only allow `location IN
+Numbers in brackets are the systems map's findings.
+
+- **Places (7).** `bookings` and `booking_series` only allow `location IN
   ('online', 'porto')`. Until a migration, `'porto'` is the internal key for
   "in person" (`place.inPersonKey`).
-- **No-shows.** `lessonChargePlan` charges a no-show the late fee, never the
+- **No-shows (2).** `lessonChargePlan` charges a no-show the late fee, never the
   full price.
-- **Reminders.** `sendLessonReminders` sends none when the notice is 24 hours or
+- **Reminders (3).** `sendLessonReminders` sends none when the notice is 24 hours or
   more.
-- **Rules on existing bookings.** Bookings keep only `payment_consent_version`,
+- **Rules on existing bookings (1).** Bookings keep only `payment_consent_version`,
   and `changePolicy` reads the current settings, which is why `/admin/settings`
   caps notice at 0 to 14 hours and the fee at 0 to 500 cents. Snapshot the
   notice, fee and no-show rule onto each booking and series before allowing
   wider ranges.
-- **Lesson types.**
+- **Lesson types (5, 6).**
   - `student_recurring_rates` allows only 60 and 90 minutes.
   - Trial behaviour hangs on the id `trial` in about 11 places. Make these flags
     on the lesson type instead.
-- **Students without email.** 11 of Inês's 21 students have no email, so they
+- **Students without email (4).** 11 of Inês's 21 students have no email, so they
   get no confirmation, reminder or pay link. Consider a channel per student,
   with a ready WhatsApp link where there is no email.
-- **Payment status.** `payment_status` has 9 values plus paid-by-hand. Split it
+- **Payment status (10).** `payment_status` has 9 values plus paid-by-hand. Split it
   into how a lesson is paid and where that payment is.
-- **Waiting on later steps.**
+- **Homework (8).** The marking and sheet prompts already take the language and
+  its variety from the record (step 1). Levels are still fixed at A1 to C2, and
+  lengths at 10, 15 or 20 minutes.
+- **Entry points with no address (11).** The clock is done (each tutor's sweep
+  runs separately). Still waiting on later steps:
   - Stripe webhooks need the connected account id (step 4).
   - The Google Calendar callback needs the tutor in its OAuth state, which is
     why other tutors start with it off.
-  - The tax number (NIF) and Portal das Finanças reminders are for Portugal
-    only.
-- **The curriculum (step 7)** needs `students.level` (today it is read off the
-  latest homework sheet), a topics table and `lesson_topics`.
+- **Portugal only.** The tax number (NIF) and the Portal das Finanças reminders
+  apply to Inês alone.
+- **The curriculum (9, step 7)** drafts a plan and homework for every lesson
+  from a checked language pack, and the tutor approves each one. It needs
+  `students.level` (today it is read off the latest homework sheet), a topics
+  table and `lesson_topics`.
 
 ## Open questions for Dan
 
 - The platform's name and domain, which the naming thread is working on.
 - Which of the 10 template concepts to build, from the templates thread.
 - Whether Workers Paid is on, which decides the sweep cost above.
+- From the systems map: packages paid up front and paying before a first lesson
+  (not in the plan yet), and whether WhatsApp messages for students without
+  email wait for the tutor to tap them or go through WhatsApp's business API.
