@@ -1942,10 +1942,39 @@
   color: var(--lavender-soft);
   font-size: 0.8rem;
 }
+/* On a phone the call ends the label's line, as Book ends Your lessons'
+   header, rather than taking a full-width row of its own (9 November 2026,
+   Dan: the compact-card method for every small card). */
 @media (max-width: 560px) {
+  .teacher-next {
+    display: grid;
+    grid-template-areas: "label join" "lesson lesson";
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.3rem 0.75rem;
+    padding: 0.7rem 0.8rem 0.85rem 1.1rem;
+  }
+  .teacher-next__text {
+    display: contents;
+  }
+  .teacher-next .teacher-eyebrow {
+    grid-area: label;
+  }
+  .teacher-next__lesson {
+    grid-area: lesson;
+  }
+  .teacher-next__join,
+  .teacher-next__waiting {
+    grid-area: join;
+    justify-self: end;
+  }
   .teacher-next__join {
-    flex: 1 1 100%;
-    justify-content: center;
+    min-height: 44px;
+    gap: 0.45rem;
+    padding: 0.35rem 0.95rem 0.35rem 0.4rem;
+  }
+  .teacher-next__logo {
+    width: 30px;
+    height: 30px;
   }
 }
 
@@ -3210,7 +3239,7 @@
     font-weight: 700;
     text-align: right;
   }
-  .teacher-receipts__table td[data-label="Paid"] {
+  .teacher-receipts__table td[data-label="Status"] {
     grid-column: 2;
     grid-row: 2;
     text-align: right;
@@ -3266,8 +3295,15 @@
 .teacher-account__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem 1rem; }
 .teacher-account__heading p { margin-top: 0.3rem; color: var(--lavender-ink); }
 .teacher-account__detail { display: grid; gap: 0.6rem; padding-top: 1rem; border-top: 1px solid var(--rule-soft); }
-.teacher-account__line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.4rem 1rem; min-width: 0; }
-.teacher-account__line > div { min-width: 0; }
+/* A detail is a paired row (9 November 2026, Dan's compact-card method): its
+   name and its action share the first line, and what it says sits beneath
+   across the card, so on a phone Send reset link no longer drops to a row
+   of its own under the sentence. */
+.teacher-account__line { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label action" "value value"; align-items: center; gap: 0.25rem 1rem; min-width: 0; }
+.teacher-account__line > div { display: contents; }
+.teacher-account__line h3 { grid-area: label; margin: 0; }
+.teacher-account__line p { grid-area: value; }
+.teacher-account__line > .button { grid-area: action; }
 .teacher-account__email { display: grid; gap: 0.5rem; }
 .teacher-account__email > label { margin: 0; }
 .teacher-account__email > p, .teacher-account__waiting { color: var(--lavender-ink); }

@@ -135,7 +135,10 @@ Use these names in review so recurring problems are easy to recognise:
   and nothing it says is said by its neighbour or its parent too. On a
   narrow card an action wraps beneath its line at the right, whole, rather
   than squeezing it. Its opposite is the stacked card: date, then facts,
-  then a tick, each on a line of its own.
+  then a tick, each on a line of its own. On Inês's phone the same holds:
+  `Join Meet` ends the `Happening now` label's line, a receipt's status sits
+  beside the student's name, and a Profile detail's name and its button share
+  a line above what it says.
 - **Decorative motion:** adding ambient loops, click delay, entrance
   choreography for a page's text, controls or sections as it loads, or any
   movement that makes a reader wait or does not explain a state change. The
