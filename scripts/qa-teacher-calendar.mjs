@@ -1903,8 +1903,8 @@ try {
   assert.deepEqual(accountState.accountWrites.at(-1), { path: "/auth/forgot", data: { email: teacher.email } });
   await account.getByRole("button", { name: "Change email", exact: true }).click();
   const nextEmail = "verified-teacher@example.invalid";
-  await account.getByLabel("New sign-in email", { exact: true }).fill(nextEmail);
-  await account.getByRole("button", { name: "Send confirmation email", exact: true }).click();
+  await account.getByLabel("Sign-in email", { exact: true }).fill(nextEmail);
+  await account.getByRole("button", { name: "Send confirmation link", exact: true }).click();
   await expect(account.getByRole("status")).toContainText(nextEmail);
   await expect(account.getByText(teacher.email, { exact: true })).toBeVisible();
   assert.deepEqual(accountState.accountWrites.at(-1), {

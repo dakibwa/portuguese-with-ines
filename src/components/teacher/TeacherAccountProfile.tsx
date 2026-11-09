@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { confirmEmailChange, readSession, requestEmailChange, requestPasswordReset, type Student } from "@/lib/auth-api";
 
 /** Her sign-in details use the same verified email and reset links as an account. */
@@ -110,51 +110,68 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
   }
 
   const locked = disabled || Boolean(busy);
+  const at = student.email.indexOf("@");
   return (
-    <section className="teacher-account" aria-labelledby="teacher-account-title">
-      {/* One line a detail, each with its own small button at the right, and
-          Sign out at the top right as on a student's Your details
-          (27 October 2026, Dan: one style, no holes). */}
+    <section className="teacher-account my-lessons__details" aria-labelledby="teacher-account-title">
+      {/* Her sign-in details are a student's Your details (9 November 2026,
+          Dan: one way for each thing): a short list of what is saved, each
+          with its small button at the right; a detail opens in place with its
+          action and Cancel; good news and failures are the site's own panels.
+          Sign out waits at the top right (27 October 2026, Dan). */}
       <div className="teacher-account__heading">
         <div>
           <h2 id="teacher-account-title">Your profile</h2>
           <p>{student.name}</p>
         </div>
-        <button className="button button--outline button--small" disabled={locked} onClick={onSignOut} type="button">Sign out</button>
+        <button className="my-lessons__change" disabled={locked} onClick={onSignOut} type="button">Sign out</button>
       </div>
-      <div className="teacher-account__detail">
-        <div className="teacher-account__line">
-          <div>
-            <h3>Sign-in email</h3>
-            <p>{student.email}</p>
-          </div>
-          {!editingEmail ? <button className="button button--outline button--small" disabled={locked} onClick={() => { setEditingEmail(true); setEmail(""); setError(""); setNote(""); }} type="button">Change email</button> : null}
+      <div className="my-lessons__facts">
+        <div className="my-lessons__fact" data-field="email">
+          {editingEmail ? (
+            <form className="my-lessons__edit" onSubmit={changeEmail}>
+              <label>
+                <span>Sign-in email</span>
+                <input autoCapitalize="none" autoComplete="email" autoCorrect="off" autoFocus disabled={locked} onChange={event => { setEmail(event.target.value); setError(""); }} required spellCheck={false} type="email" value={email} />
+              </label>
+              <div className="my-lessons__edit-actions">
+                <button className="button button--blue" disabled={locked || !email.trim() || email.trim().toLowerCase() === student.email.toLowerCase()} type="submit">{busy === "email" ? "Sending…" : "Send confirmation link"}</button>
+                <button className="my-lessons__change" disabled={locked} onClick={() => setEditingEmail(false)} type="button">Cancel</button>
+              </div>
+              <p className="my-lessons__details-note">It changes once you open the link we send to the new address.</p>
+            </form>
+          ) : (
+            <>
+              <span className="my-lessons__fact-label">Sign-in email</span>
+              <span className="my-lessons__fact-value">
+                {/* A long address breaks after its @, never mid-word. */}
+                <span>{at < 0 ? student.email : <>{student.email.slice(0, at)}@<wbr />{student.email.slice(at + 1)}</>}</span>
+                {emailPending ? <small className="my-lessons__details-note" role="status">Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.</small> : null}
+              </span>
+              <button className="my-lessons__change" disabled={locked} onClick={() => { setEditingEmail(true); setEmail(student.email); setError(""); setNote(""); }} type="button">
+                Change<span className="visually-hidden"> email</span>
+              </button>
+            </>
+          )}
         </div>
-        {editingEmail ? (
-          <form className="teacher-form teacher-account__email" onSubmit={changeEmail}>
-            <label htmlFor="teacher-account-email">New sign-in email</label>
-            <input autoComplete="email" autoFocus disabled={locked} id="teacher-account-email" onChange={event => { setEmail(event.target.value); setError(""); }} required type="email" value={email} />
-            <p>Confirm the link sent to the new address to change where you sign in.</p>
-            <div className="teacher-account__actions">
-              <button className="button button--coral" disabled={locked || !email.trim() || email.trim().toLowerCase() === student.email.toLowerCase()} type="submit">{busy === "email" ? "Sending…" : "Send confirmation email"}</button>
-              <button className="button button--outline button--small" disabled={locked} onClick={() => setEditingEmail(false)} type="button">Cancel</button>
-            </div>
-          </form>
-        ) : null}
-        {emailPending ? <p className="teacher-account__waiting" role="status">Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.</p> : null}
-      </div>
-      <div className="teacher-account__detail">
-        <div className="teacher-account__line">
-          <div>
-            <h3>Password</h3>
-            <p>A link to your sign-in email lets you choose a new one.</p>
-          </div>
-          <button className="button button--outline button--small" disabled={locked} onClick={() => void changePassword()} type="button">{busy === "password" ? "Sending…" : "Send reset link"}</button>
+        <div className="my-lessons__fact" data-field="password">
+          {/* Nothing to show for a password: its button says what happens. */}
+          <span className="my-lessons__fact-label">Password</span>
+          <button className="my-lessons__change" disabled={locked} onClick={() => void changePassword()} type="button">{busy === "password" ? "Sending…" : "Send reset link"}</button>
         </div>
       </div>
-      {busy === "confirm" ? <p role="status">Confirming your sign-in email…</p> : null}
-      {error ? <p className="teacher-account__error" role="alert">{error}</p> : null}
-      {note ? <p className="teacher-account__note" role="status"><CheckCircle2 size={17} aria-hidden="true" />{note}</p> : null}
+      {busy === "confirm" ? <p className="my-lessons__details-note" role="status">Confirming your sign-in email…</p> : null}
+      {note ? (
+        <div className="booking-outcome my-lessons__details-outcome" role="status">
+          <CheckCircle2 size={20} aria-hidden="true" />
+          <p>{note}</p>
+        </div>
+      ) : null}
+      {error ? (
+        <div className="booking-alert booking-alert--account" role="alert">
+          <AlertCircle size={18} aria-hidden="true" />
+          <p>{error}</p>
+        </div>
+      ) : null}
     </section>
   );
 }

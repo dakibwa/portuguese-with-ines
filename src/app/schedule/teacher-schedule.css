@@ -3317,34 +3317,33 @@
 /* Inês's Profile: sign-in details and Google Meet together, 14 October. */
 .teacher-account-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--gap-panel); }
 .teacher-account-layout > .teacher-meet { max-width: none; min-width: 0; }
-.teacher-account { display: grid; gap: var(--gap-block); min-width: 0; border: 1px solid var(--rule); border-radius: var(--squiggle-panel); padding: var(--pad-card); background: var(--sheet); }
+/* Her sign-in details are a student's Your details (9 November 2026, Dan:
+   one way for each thing): its rows, small buttons, open field and panels
+   are that card's own (globals.css), on her page's card. The card answers
+   to the booking column's name, so those pieces lay themselves out by its
+   width here as they do there (a detail's name above its value on a phone),
+   and its open detail's Cancel takes her page's button type beside Send. */
+.teacher-account {
+  container: booking / inline-size;
+  --booking-control-font-size: 0.72rem;
+  --booking-control-tracking: 0.16em;
+  display: grid;
+  gap: var(--gap-block);
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: var(--pad-card);
+  background: var(--sheet);
+}
 .teacher-account h2 { margin: 0; color: var(--ink); font: 600 1.05rem/1.35 var(--ui); }
-/* A detail's name is the label a student's Your details uses (legend type,
-   lavender ink), so the two account cards speak alike (9 November 2026). */
-.teacher-account h3,
-.teacher-account__email > label { margin: 0 0 0.3rem; color: var(--lavender-ink); font: 600 0.7rem/1.5 var(--ui); letter-spacing: 0.08em; text-transform: uppercase; }
-.teacher-account p { margin: 0; font-size: 0.8rem; line-height: 1.6; overflow-wrap: anywhere; }
-.teacher-account__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem 1rem; }
-.teacher-account__heading p { margin-top: 0.3rem; color: var(--lavender-ink); }
-.teacher-account__detail { display: grid; gap: 0.6rem; padding-top: 1rem; border-top: 1px solid var(--rule-soft); }
-/* A detail is a paired row (9 November 2026, Dan's compact-card method): its
-   name and its action share the first line, and what it says sits beneath
-   across the card, so on a phone Send reset link no longer drops to a row
-   of its own under the sentence. */
-.teacher-account__line { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label action" "value value"; align-items: center; gap: 0.25rem 1rem; min-width: 0; }
-.teacher-account__line > div { display: contents; }
-.teacher-account__line h3 { grid-area: label; margin: 0; }
-.teacher-account__line p { grid-area: value; }
-.teacher-account__line > .button { grid-area: action; }
-.teacher-account__email { display: grid; gap: 0.5rem; }
-.teacher-account__email > label { margin: 0; }
-.teacher-account__email > p, .teacher-account__waiting { color: var(--lavender-ink); }
-.teacher-account__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; }
-.teacher-account .button { justify-self: start; max-width: 100%; }
-.teacher-account .button:not(.button--compact, .button--small) { min-height: 44px; font-size: 0.72rem; }
-.teacher-account__note { display: flex; align-items: flex-start; gap: 0.4rem; color: var(--blue-deep); }
-.teacher-account__note svg { flex: none; margin-top: 0.2em; }
-.teacher-account__error { color: var(--warning-ink); }
+.teacher-account__heading { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem 1rem; }
+.teacher-account__heading p { margin: 0.1rem 0 0; color: var(--lavender-ink); font-size: 0.8rem; line-height: 1.6; overflow-wrap: anywhere; }
+/* The last detail closes the card: no rule hangs beneath it. */
+.teacher-account .my-lessons__fact:last-child { min-height: 0; border-bottom: 0; padding-bottom: 0; }
+/* Password has no value to show, so its button keeps the row's end. */
+.teacher-account .my-lessons__fact[data-field="password"] > .my-lessons__change { grid-column: -2; grid-row: 1; }
+/* The open field and its buttons stand the same 44 px. */
+.teacher-account .my-lessons__edit-actions .button { min-height: 44px; padding: 0.4rem 1.1rem; }
 @media (max-width: 760px) { .teacher-account-layout { grid-template-columns: minmax(0, 1fr); } }
 
 /* Getting started: each step opens its work within the student's row. */

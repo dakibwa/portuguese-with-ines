@@ -138,8 +138,8 @@ Use these names in review so recurring problems are easy to recognise:
   than squeezing it. Its opposite is the stacked card: date, then facts,
   then a tick, each on a line of its own. On Inês's phone the same holds:
   `Join Meet` ends the `Happening now` label's line, a receipt's status sits
-  beside the student's name, and a Profile detail's name and its button share
-  a line above what it says.
+  beside the student's name, and a Profile detail is a student's detail row:
+  its name above its value, its button at the right.
 - **Decorative motion:** adding ambient loops, click delay, entrance
   choreography for a page's text, controls or sections as it loads, or any
   movement that makes a reader wait or does not explain a state change. The
@@ -723,7 +723,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
   when it needs her, and `Share your calendar` folded beneath. When the connection needs her, `Needs you` on her Timetable says so.
   Returning from Google opens Profile with the connection result. The same
   tab lets her request a confirmed sign-in email change or an emailed password
-  reset, using the existing account flows. `Sign out` is a small button at the
+  reset, using the existing account flows, in a student's Your details rows
+  (9 November 2026, below). `Sign out` is a small button at the
   top right of Your profile, beside her name (27 October 2026, Dan), and
   preserves the unsaved-hours warning. Account and Meet cards share a row
   where they fit and stack on a phone.
@@ -2124,7 +2125,7 @@ Dan asked for one consistent, beautiful pass over every student and teacher
 page, and for onboarding to feel easy:
 
 - no word on its own is an underlined button. A rare action (`Try again`,
-  `Clear`, `Sign out`, `Change email`, `Edit details`, `Mark as dormant`,
+  `Clear`, `Edit details`, `Mark as dormant`,
   `Reconnect Google Meet`, the sign-in panel's other ways in) is the site's
   small button: 40 px tall (44 px on touch), the compact label type, in
   outline, or soft lilac where it adds something (`Show all`, `Add another
@@ -2362,6 +2363,18 @@ same job, they use the same piece, on a student's side and on Inês's:
   makes that line taller, so the three cards' rules and sentences are level.
 - An account page's band holds its title alone; the card beneath says what to
   do (`New password` no longer runs a sentence across its splat on a phone).
+- Inês's sign-in details are a student's Your details, in her Profile card
+  under its own title and her name: the same rows (name, value, button, with
+  the name above the value on a narrow card), the 14 px `Change`, a field that
+  opens in place holding the current address with blue `Send confirmation
+  link` and `Cancel`, and the site's good-news and alert panels. `Password`
+  shows no value and no sentence: `Send reset link` says what happens, and the
+  panel that follows says where it went. `Sign out` is that same `Change`.
+- An open detail's buttons sit beside its field only while the field keeps
+  15 rem; otherwise they wrap beneath it, whole (her half-width card, an email
+  on a tablet), and the field keeps its 26 rem.
+- The account's failure notice is laid out as booking's: across a wide page
+  the message and `Try again` share one row.
 
 ## One schedule for students — 9 November 2026
 
