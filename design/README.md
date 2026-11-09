@@ -130,7 +130,8 @@ Use these names in review so recurring problems are easy to recognise:
   Small cards are compact (9 November 2026, Dan: "the already paid could be
   at the side of it to save lots of space", for "all little boxes like
   this"): a status or toggle ends the line it belongs to (`Already paid`
-  beside the lesson's date, `Show weeks` beside the run's day), a fact's
+  beside the lesson's date, `Show weeks` beside the run's day; on Students
+  these are small soft toggles and lilac buttons), a fact's
   name, value and action share one row, a card is as tall as its content,
   and nothing it says is said by its neighbour or its parent too. On a
   narrow card an action wraps beneath its line at the right, whole, rather
@@ -593,18 +594,36 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - Their lessons beside, `Upcoming` then `Past & cancelled`, each named in
     the legend's small capitals. Every lesson is one row of two lines at most:
     its day and time, which open the lesson's own details in place inside the
-    tile (move, length, cancel, no-show, already paid, refund, homework, a
+    row (move, length, cancel, no-show, already paid, refund, homework, a
     payment link: the same operations, explicit confirmations and busy guards
     as her timetable's dialog, which stays a dialog there) and whose press area
-    is the whole tile, following its
-    organic edge, with the hover wash and keyboard outline on the tile (the
-    controls beside it sit above that area, so none is swallowed); at the end
-    of that same line, a compact `Already paid` tick (same words, tick and
-    colours, smaller) on a past lesson she added, and its notes as a small
-    pencil named `Add notes`, `Notes` or, while open, `Close`, with its
-    homework as one chip beside it (`Draft`, `With them`, coral `To review`,
-    blue `Done`); on a narrow tile those wrap together beneath. Its own facts
-    are the second line. A level shows only where it
+    is the whole row, with the hover wash and keyboard outline on the row (the
+    controls beside it sit above that area, so none is swallowed). Each lesson
+    is one soft cream tile with the organic edge and a fine lilac border (9
+    November 2026, Dan: "I don't want it plain text", but "simple unified UX"):
+    closed or open it is the same tile, the open one spanning the list with a
+    slightly stronger blue border, with no rule above a week, no box in a box,
+    no dashed outline and no separator above its toolbar. At the end of that
+    same line, a small soft `Already paid` toggle (same words and state: organic
+    capsule, small checkbox, strong blue once checked) on a past lesson she
+    added, and its notes as a small pencil named `Add notes`, `Notes` or, while
+    open, `Close`, with its homework chip beside it (`Draft`, `With them`,
+    `To review`, `Done`); on a narrow row those wrap together beneath. While a
+    lesson's details are open the date row is its disclosure and the pencil
+    steps aside, as Homework is among those details. Its own facts are the
+    second line, one wrapping line after the site's small lilac paint dab, as
+    the shared facts are; `Cancelled`, `No-show` and `Happening now` are bold
+    words in that line, not pills. Every secondary action here (`Show weeks`,
+    `Homework`, `Move or cancel`, `Change length`, `Create
+    payment link`, `Close`) is one small soft lilac button, dark blue words in
+    sentence case, with the same size, hover and focus. Close sits beside the
+    date, leaving the width beneath for those actions. In an open lesson the
+    date and the actions (`Already paid` / `No-show` and `Create payment link`
+    included) share the top line where they fit and wrap beneath where they do
+    not, with the facts below. `Move or cancel` is one entry inline: it opens
+    the move form, with `Move lesson` / `Cancel lesson` choices, and a cancel
+    still needs its explicit confirmation; coral stays for a save,
+    a confirmed cancel and the one next step on a closed student's card. A level shows only where it
     differs from theirs now; a few lines of her notes follow. Open details
     span the list's whole width, one lesson's at a time, as a named region
     (`Sam’s lesson, Tue 22 Sept, 09:30–10:30`) with no scrim, scroll lock or
@@ -723,11 +742,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
     action. A student who has signed in changes their own email. A missing
     lesson never locks the email field (16 October 2026, Inês). Price uses the same editable rate form as onboarding.
   - Their lessons read Upcoming, then Past & cancelled. A weekly run's weeks
-    still to come are one dashed row (9 November 2026, Dan: "just have them
+    still to come are one tile (9 November 2026, Dan: "just have them
     all as one card and you can expand out"): the weekly repeat mark, `Every
-    Wednesday · 09:30–10:30` with lilac `Show weeks` at the end of that line,
-    then `12 weeks, Wed 18 Nov to Wed 3 Feb` and the facts its weeks share.
-    Shown, each week is a row inside it saying only what the run does not. A
+    Wednesday · 09:30–10:30`, `12 weeks, Wed 18 Nov to Wed 3 Feb` and the facts
+    its weeks share together where they fit, with a soft `Show weeks` button at
+    the end. Shown, the run adds no box of its own and each week is a tile
+    beneath it saying only what the run does not. A
     week moved off the usual slot is counted on the run's row. A lesson on
     now, a run with one week left and past lessons stay single rows.
   - Add a lesson opens the calendar in the row. Length, location, weekly repeat

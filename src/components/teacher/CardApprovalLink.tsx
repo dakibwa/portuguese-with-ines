@@ -11,6 +11,8 @@ type Props = {
   busy: boolean;
   onBusy: (busy: boolean) => void;
   onError: (message: string) => void;
+  /** Inline on Students: its routine actions take the one quiet text style. */
+  quiet?: boolean;
 } & (
   /** From a lesson she opened, which starts ticked. */
   | { booking: AdminBooking; student?: never; onCancel?: never }
@@ -46,7 +48,8 @@ export function cardApprovalMessage(firstName: string, lessons: CardApprovalLess
  * WhatsApp or copies it, and agreeing on it also puts their future lessons
  * on the card.
  */
-export function CardApprovalLink({ booking, student, token, busy, onBusy, onError, onCancel }: Props) {
+export function CardApprovalLink({ booking, student, token, busy, onBusy, onError, onCancel, quiet }: Props) {
+  const secondary = quiet ? "teacher-quiet" : "button button--outline button--small";
   const name = booking ? booking.student_name : student.name;
   const firstName = name.split(" ")[0];
   const phone = (booking ? booking.student_phone : student.phone) ?? "";
@@ -113,7 +116,7 @@ export function CardApprovalLink({ booking, student, token, busy, onBusy, onErro
           <a className="button button--blue button--small" href={`https://wa.me/${whatsAppNumber(phone)}?text=${encodeURIComponent(message)}`} rel="noreferrer" target="_blank">
             Send on WhatsApp<span className="visually-hidden"> (opens in a new tab)</span>
           </a>
-          <button className="button button--outline button--small" type="button" onClick={async () => {
+          <button className={secondary} type="button" onClick={async () => {
             try { await navigator.clipboard.writeText(link.url); setCopied(true); }
             catch { onError("The link couldn’t be copied. Please try again."); }
           }}>Copy link</button>
@@ -166,7 +169,7 @@ export function CardApprovalLink({ booking, student, token, busy, onBusy, onErro
           <button className="button button--blue button--small" type="button" disabled={busy || !chosen.length} onClick={() => void create(chosen)}>
             {working ? "Creating link…" : chosen.length ? `Create link for ${formatMoneyCents(sum(chosen))}` : "Create link"}
           </button>
-          <button className="button button--outline button--small" type="button" disabled={busy} onClick={() => {
+          <button className={secondary} type="button" disabled={busy} onClick={() => {
             if (onCancel) onCancel();
             else { setChoices(null); setTicked(opened); }
           }}>
@@ -185,10 +188,12 @@ export function CardApprovalLink({ booking, student, token, busy, onBusy, onErro
     </div>
   );
 
+  // Inline the button joins the lesson's toolbar; its sentence stays for
+  // assistive technology rather than as a footer.
   return (
-    <div className={box}>
-      <p>Let {firstName} pay by card for this and other unpaid lessons.</p>
-      <button className="button button--outline button--small" type="button" disabled={busy} onClick={() => void start()}>
+    <div className={quiet ? `${box} teacher-card-link--trigger` : box}>
+      <p className={quiet ? "visually-hidden" : undefined} id={quiet ? headingId : undefined}>Let {firstName} pay by card for this and other unpaid lessons.</p>
+      <button aria-describedby={quiet ? headingId : undefined} className={secondary} type="button" disabled={busy} onClick={() => void start()}>
         {working ? "Checking their lessons…" : "Create payment link"}
       </button>
     </div>

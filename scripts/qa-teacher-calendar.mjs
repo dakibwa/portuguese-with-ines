@@ -1556,7 +1556,17 @@ try {
     await expect(lessonDetails).toHaveCount(1);
     await expect(week.getByRole("region", { name: /^Sam Known’s lesson, Tue,? 22 Sept/ })).toBeFocused();
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(lessonDetails.getByRole("button", { name: "Move lesson", exact: true })).toBeVisible();
+    // The inline view has one entry for moving or cancelling. Choosing
+    // either opens its existing form; neither choice writes anything itself.
+    const writesBeforeChange = state.writes.length;
+    await lessonDetails.getByRole("button", { name: "Move or cancel", exact: true }).click();
+    await expect(lessonDetails.getByLabel("New date", { exact: true })).toBeVisible();
+    await expect(lessonDetails.getByRole("button", { name: "Save new time", exact: true })).toBeDisabled();
+    await lessonDetails.getByRole("button", { name: "Cancel lesson", exact: true }).click();
+    await expect(lessonDetails.getByRole("heading", { name: "Cancel this lesson?", exact: true })).toBeVisible();
+    await expect(lessonDetails.getByRole("button", { name: "Yes, cancel lesson", exact: true })).toBeVisible();
+    assert.equal(state.writes.length, writesBeforeChange, "Opening Move or cancel and choosing Cancel must not save or cancel a lesson");
+    await lessonDetails.getByRole("button", { name: "Back to lesson", exact: true }).click();
     const nextWeek = run.locator(".teacher-history-run__weeks > li").filter({ hasText: "Tue 29 Sept" });
     await nextWeek.locator(".teacher-lesson-row__when").click();
     await expect(lessonDetails).toHaveCount(1);

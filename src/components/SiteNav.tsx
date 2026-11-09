@@ -44,6 +44,13 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
     setMenuTop(header && header.bottom > 0 ? Math.max(0, header.top) : 0);
   }, []);
 
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    // A link to the current page does not navigate or move focus elsewhere.
+    // Wait for the background to become usable before returning to its opener.
+    requestAnimationFrame(() => openerRef.current?.focus({ preventScroll: true }));
+  }, []);
+
   // Navigating away must close the panel, or it stays open over the new page.
   useEffect(() => {
     if (previousPathname.current !== pathname) {
@@ -87,8 +94,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
       if (document.querySelector("dialog[open]")) return;
       if (event.key === "Escape") {
         event.preventDefault();
-        setOpen(false);
-        requestAnimationFrame(() => openerRef.current?.focus({ preventScroll: true }));
+        closeMenu();
       } else if (event.key === "Tab") {
         const controls = [...menuRef.current?.querySelectorAll<HTMLButtonElement | HTMLAnchorElement>("button, a[href]") ?? []];
         const current = controls.indexOf(document.activeElement as HTMLButtonElement | HTMLAnchorElement);
@@ -108,7 +114,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
       desktop.removeEventListener("change", closeOnDesktop);
       window.removeEventListener("resize", positionMenu);
     };
-  }, [open, positionMenu]);
+  }, [open, positionMenu, closeMenu]);
 
   return (
     <>
@@ -135,12 +141,11 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
         className={`nav-toggle${open ? " is-open" : ""}`}
         disabled={!ready}
         onClick={() => {
-          if (!open) {
-            openerRef.current = toggleRef.current;
-            positionMenu();
-            setHasOpened(true);
-          } else requestAnimationFrame(() => openerRef.current?.focus({ preventScroll: true }));
-          setOpen((value) => !value);
+          if (open) { closeMenu(); return; }
+          openerRef.current = toggleRef.current;
+          positionMenu();
+          setHasOpened(true);
+          setOpen(true);
         }}
         ref={toggleRef}
         type="button"
@@ -175,7 +180,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
               aria-label={`${BRAND}, home`}
               className="site-header__brand"
               href="/"
-              onClick={() => setOpen(false)}
+              onClick={closeMenu}
             >
               <BrandWordmark className="header-wordmark" />
             </Link>
@@ -183,10 +188,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
               aria-label="Close menu"
               className="nav-mobile__close"
               ref={closeRef}
-              onClick={() => {
-                setOpen(false);
-                requestAnimationFrame(() => openerRef.current?.focus({ preventScroll: true }));
-              }}
+              onClick={closeMenu}
               type="button"
             >
               <X aria-hidden="true" size={26} strokeWidth={1.8} />
@@ -202,7 +204,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
                 className="nav-mobile__link"
                 href={item.id === "book" ? publicAssetPath(item.href) : item.href}
                 key={item.id}
-                onClick={() => setOpen(false)}
+                onClick={closeMenu}
               >
                 <AssetMark asset={item.mark} className="nav-mobile__mark" lands />
                 <span className="nav-mobile__text">
@@ -215,7 +217,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
           <div className="nav-mobile__cta">
             <p>One to one, online or in {TUTOR_CITY}.</p>
             <div className="nav-mobile__cta-actions">
-              <a className="button button--coral button--compact" href={publicAssetPath("/book/?view=book")} onClick={() => setOpen(false)}>
+              <a className="button button--coral button--compact" href={publicAssetPath("/book/?view=book")} onClick={closeMenu}>
                 Book a lesson
               </a>
               <a className="button button--outline-light button--compact" href={CONTACT_WHATSAPP_URL} rel="noreferrer" target="_blank">

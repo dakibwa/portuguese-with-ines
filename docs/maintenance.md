@@ -2,11 +2,11 @@
 
 ## Continuing the loop
 
-The **Inês app maintenance loop** automation is enabled on an hourly schedule
-in Europe/London. Its first scheduled pass is 9 November 2026 at 10:43; this
-checkpoint records the setup pass performed beforehand. Scheduling lives in
-the automation, rather than in a shell process that depends on this workspace
-remaining alive.
+The **Inês app maintenance loop** automation is **paused**, at Dan's request
+on 9 November 2026 to wrap up after the current iteration. It previously ran
+hourly in Europe/London, starting at 10:43 that day. The verified changes remain
+in [PR 190](https://github.com/dakibwa/portuguese-with-ines/pull/190) for review.
+The checkpoints and handoff priorities below are retained for future work.
 
 At the start of each iteration:
 
@@ -488,3 +488,75 @@ journey logs: `/workspace/scratch/ines-pass7-recovery-{before,after}.log`.
    current main and active work; avoid repeating this malformed-horizon case.
 3. Revisit tutor-origin collision validation when the platform directory and
    onboarding work settle, and the dependency override when upstream changes.
+
+## 9 November 2026 — keep focus when the current page closes its menu
+
+**Source baseline:** maintenance head
+`af118a9afc4f8dd8b775dbf3bb0ed9a3eec9c2f1`, integrated with main
+`da499226e50eb59a5bd6c6d0868e3d4d4dd268d9`. Main still has no maintenance log;
+the preceding checkpoints were read in [PR 190](https://github.com/dakibwa/portuguese-with-ines/pull/190).
+No competing maintenance process was observed. Active PRs 209 (the Vowel
+platform, including account/booking code) and 210 (phone lesson headers) were
+inspected; this fix changes public navigation and its existing journey only,
+plus this checkpoint. Their active implementation areas were left alone.
+
+### Confirmed finding and fix
+
+On a phone, opening the menu from either the header or footer, focusing
+**FAQ** while already on FAQ and pressing Enter closed the panel but left
+keyboard focus on `BODY`. The same problem affected the menu's home wordmark
+when already on Home. The selected link becomes inert with the closed menu;
+there is no route change to move focus elsewhere. This violated the existing
+design contract that closing the menu returns focus to its opener.
+
+Menu links now use the same close action as Escape and the close button. It
+returns focus on the next browser frame, after the background is usable, with
+`preventScroll`. Link destinations, normal navigation, appearance and motion
+values are unchanged.
+
+### Validation and coverage
+
+- Extended `qa-workspace-navigation.mjs` with two representative keyboard
+  paths: FAQ from the header opener with normal motion, and the current Home
+  wordmark from the footer opener with reduced motion. They assert focus
+  returns to the opener, the URL stays put, and inert/scroll locks are released.
+  The first new assertion failed before the fix.
+- `QA_BASE_URL=http://localhost:3000 node tmp/qa/pass8-public-navigation.mjs`:
+  passed. This temporary focused runner uses the existing journey's fixtures,
+  helpers and public-navigation segment, including the new assertions. It
+  covers 390px phone and 1100px desktop, menu/header geometry, footer position,
+  Tab trapping, Escape, policy-dialog opening, reduced motion, resize unlock
+  and desktop navigation. No real accounts, bookings or provider calls were
+  used. A separate phone check also followed the menu to Approach and verified
+  the arriving page was usable with no stale inert/scroll lock.
+- `npm run typecheck && npx eslint src/components/SiteNav.tsx scripts/qa-workspace-navigation.mjs && git diff --check`:
+  passed. The tested menu source was restored byte-for-byte after the baseline
+  diagnostic below. Screenshots remain in `tmp/qa/navigation/`.
+- No Worker logic changed, so `test:booking` was not repeated. No release
+  build, live probe, full journey suite or production mutation was performed.
+  This is a keyboard-interaction fix; no loading-speed or animation-performance
+  improvement is claimed.
+
+### Verification limitation and handoff priorities
+
+The **full** `qa-workspace-navigation.mjs` run stopped at its unrelated initial
+account assertion: it observed two `/me` reads, where the check expects one.
+Restoring the original `SiteNav.tsx` and running the original journey reproduced
+the same failure at that assertion, before the public-menu checks. Moving the
+new cases after the initial account check also reproduced it. The full run is
+therefore **not recorded as passed**, and its assertion was not weakened.
+
+Logs: `/workspace/scratch/ines-pass8-navigation-{before,after,ordered,baseline}.log`
+and `/workspace/scratch/ines-pass8-public-navigation.log`.
+
+Dan requested that this be the final loop iteration. The recurring automation
+was disabled while this final verified change was prepared for publication;
+PR 190 remains open for review.
+
+1. Once the active account/platform work settles, investigate whether the two
+   account reads are a development-only effect or also occur at the built
+   preview/release gate. Preserve the one-read regression assertion meanwhile.
+2. Check current main and active PRs before profiling healthy booking date/time
+   selection or revisiting authentication and tutor-origin boundaries.
+3. Rotate to public navigation under failed network requests or repeat-visit
+   caching, using matched measurements if a performance change is justified.

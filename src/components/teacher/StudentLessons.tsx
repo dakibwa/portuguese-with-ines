@@ -221,7 +221,9 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     // Notes are a small pencil (9 November 2026, Dan), named as the button
     // it replaced was: Add notes, Notes, or Close while its homework is open.
     const notesLabel = opened ? "Close homework" : written ? `Notes, ${label}` : `Add notes · ${label}`;
-    const notesButton = note ? <button className="teacher-pencil" type="button" aria-expanded={opened} aria-label={notesLabel} data-homework-exit disabled={busy}
+    // Open in place, the date row is the disclosure and its details carry
+    // Homework, so the pencil would only repeat it.
+    const notesButton = note && (!selected || opened) ? <button className="teacher-pencil" type="button" aria-expanded={opened} aria-label={notesLabel} data-homework-exit disabled={busy}
       title={opened ? "Close" : written ? "Notes" : "Add notes"} onClick={() => opened ? onCloseNotes() : onOpenNotes(booking.id)}>
       {opened ? <X size={14} aria-hidden="true" /> : <Pencil size={13} strokeWidth={2.4} aria-hidden="true" />}
     </button> : null;
@@ -247,8 +249,8 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
           {notesButton || settle || refund ? <div className="teacher-lesson-row__side">
             {note && state ? <span className={`teacher-notes__state is-${note.homework}`}>{state}</span> : null}
             {notesButton}
-            {settle ? <PaidTick compact checked={paidByHand(booking)} disabled={Boolean(paying) || busy} onChange={paid => void markPaid(booking, paid)} />
-              : refund ? <button className="button button--outline button--small" data-homework-exit disabled={busy} onClick={() => onRecordRefund(booking)} type="button">Record refund</button> : null}
+            {settle ? <PaidTick plain checked={paidByHand(booking)} disabled={Boolean(paying) || busy} onChange={paid => void markPaid(booking, paid)} />
+              : refund ? <button className="teacher-quiet" data-homework-exit disabled={busy} onClick={() => onRecordRefund(booking)} type="button">Record refund</button> : null}
           </div> : null}
         </div>
         {facts}
@@ -263,10 +265,10 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
   }
 
   /**
-   * A weekly run as one row, in the dashed tile the payment card gives a
-   * run: the usual day and time, how many weeks and until when, the facts its
-   * weeks share, and Show weeks at its end (9 November 2026, Dan: it "could
-   * be reworked to save space"). Opening it lists each week as its own row.
+   * A weekly run as one row: the usual day and time, how many weeks and until
+   * when, the facts its weeks share, and Show weeks at its end (9 November
+   * 2026, Dan: it "could be reworked to save space"). Opening it lists each
+   * week beneath as a tile of the same kind.
    */
   function runRow(run: WeeklyRun) {
     const open = openRuns.includes(run.id);
@@ -292,7 +294,7 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
           </strong>
           <span className="teacher-history-run__span">{run.lessons.length} weeks, <span>{day(first)} to {day(last)}</span></span>
           {factList(facts)}
-          <button type="button" className="teacher-history-homework teacher-history-run__toggle" data-homework-exit aria-expanded={open} aria-controls={open ? weeksId : undefined}
+          <button type="button" className="teacher-quiet teacher-history-run__toggle" data-homework-exit aria-expanded={open} aria-controls={open ? weeksId : undefined}
             onClick={() => {
               // Hiding its weeks hides the week whose details are open in one.
               if (open && run.lessons.some(lesson => lesson.id === selectedId)) onCloseLesson();
@@ -311,7 +313,7 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     <h3 className="teacher-history__legend" id={id}>{title}</h3>
   </div>;
   if (error) {
-    return <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" onClick={onRetry} type="button">Try again</button></div>;
+    return <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="teacher-quiet" onClick={onRetry} type="button">Try again</button></div>;
   }
   if (bookings === null) return <p role="status">Loading lesson history…</p>;
   if (bookings.length === 0) return <p className="teacher-history-empty">No lessons recorded yet.</p>;
@@ -325,7 +327,7 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
       {past.length ? <section aria-labelledby="teacher-history-past">
         {head("teacher-history-past", <>Past &amp; cancelled <span>· {past.length}</span></>)}
         <ul className="teacher-history-list">{shownPast.map(booking => lessonRow(booking))}</ul>
-        {hidden ? <button className="teacher-history-homework teacher-history-earlier" type="button" onClick={() => setShowEarlier(true)}>
+        {hidden ? <button className="teacher-quiet teacher-history-earlier" type="button" onClick={() => setShowEarlier(true)}>
           <ChevronDown size={15} aria-hidden="true" />{hidden} earlier {hidden === 1 ? "lesson" : "lessons"}
         </button> : null}
       </section> : null}

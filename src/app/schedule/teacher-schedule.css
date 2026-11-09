@@ -1317,7 +1317,7 @@
   color: var(--ink);
   font-size: 0.82rem;
 }
-.teacher-lesson-facts li:nth-child(n + 3) {
+.teacher-lesson-dialog:not(.teacher-lesson-dialog--inline) .teacher-lesson-facts li:nth-child(n + 3) {
   flex-basis: 100%;
 }
 .teacher-lesson-dialog .teacher-lesson-note {
@@ -2701,24 +2701,31 @@
   .teacher-student__actions { justify-content: flex-start; }
 }
 /* A lesson's level, where it differs from theirs now, and where its homework
-   is, as chips; her notes beneath, a few lines of them. */
-.teacher-notes__level, .teacher-notes__state { padding: 0.25rem 0.65rem; border-radius: var(--squiggle-chip); font: 700 0.7rem/1.3 var(--ui); }
+   is, as small chips; her notes beneath, a few lines of them. */
+.teacher-notes__level, .teacher-notes__state { padding: 0.15rem 0.55rem; border-radius: var(--squiggle-chip); font: 700 0.68rem/1.3 var(--ui); }
 .teacher-notes__level { background: rgba(170, 164, 230, 0.26); color: var(--lavender-ink); }
 .teacher-notes__state { background: var(--paper); color: var(--lavender-ink); letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.62rem; }
 .teacher-notes__state.is-review { background: var(--coral-action); color: var(--paper-light); }
 .teacher-notes__state.is-done { background: var(--blue-deep); color: var(--paper-light); }
 .teacher-notes__text { display: -webkit-box; margin: 0.45rem 0 0; overflow: hidden; white-space: pre-wrap; font: 500 0.8rem/1.5 var(--ui); -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
-.teacher-history-lesson { container-type: inline-size; min-width: 0; padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
+/* A lesson or run is one cream tile with the site's organic edge and a fine
+   lilac border; an opened lesson is the same tile, full width, in blue. */
+.teacher-history-lesson { container-type: inline-size; min-width: 0; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
 .teacher-history-lesson__time > i { font-style: normal; }
 @container (max-width: 23.5rem) {
   .teacher-lesson-row__when .teacher-history-lesson__time, .teacher-history-run__when .teacher-history-lesson__time { display: block; }
   .teacher-history-lesson__time > i { display: none; }
 }
 .teacher-history-lesson.is-cancelled { background: var(--lavender-pale, #f1eef7); }
-.teacher-history-status { border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); padding: 0.2rem 0.5rem; font: 600 0.65rem/1.4 var(--ui); }
-.teacher-history-status.is-muted { background: var(--lavender-soft); color: var(--ink); }
-/* The lesson's facts as a row of dabs. */
-.teacher-history-lesson__facts.booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.25rem 0.85rem; margin: 0; font-size: 0.74rem; }
+/* Cancelled, No-show and Happening now are words, not pills: the live one in
+   blue, the rest quiet. */
+.teacher-history-status { color: var(--blue-deep); font: 700 0.72rem/1.4 var(--ui); }
+.teacher-history-status.is-muted { color: var(--lavender-ink); }
+/* Facts are one wrapping line, each after the site's small paint dab, all in
+   the one lilac and turned the one way so they stay quiet. */
+:is(.teacher-history-lesson__facts, .teacher-lesson-dialog--inline .teacher-lesson-facts, .teacher-fact__dabs).booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.2rem 0.85rem; margin: 0; font-size: 0.76rem; }
+:is(.teacher-history-lesson__facts, .teacher-lesson-dialog--inline .teacher-lesson-facts, .teacher-fact__dabs).booking-payment-facts li { padding-left: 1.45em; }
+:is(.teacher-history-lesson__facts, .teacher-lesson-dialog--inline .teacher-lesson-facts, .teacher-fact__dabs).booking-payment-facts li:nth-child(n)::before { top: calc((1lh - 0.9em) / 2); width: 0.9em; background: var(--lavender); rotate: none; }
 /* Her message and their note read as the emails show a message: a lilac
    edge, a small label above. */
 .teacher-history-lesson__note { margin: 0.65rem 0 0; padding-left: 0.75rem; border-left: 3px solid var(--lavender); white-space: pre-wrap; overflow-wrap: anywhere; font: 400 0.75rem/1.5 var(--ui); }
@@ -3565,7 +3572,7 @@
    (9 November 2026, Dan: "the already paid could be at the side of it"): its
    day and time with the Already paid tick, then its facts with its notes. On
    a narrow row the action wraps beneath at the right, whole. */
-.teacher-lesson-row { position: relative; display: grid; gap: 0.25rem; padding: 0.5rem 0.7rem; }
+.teacher-lesson-row { position: relative; display: grid; gap: 0.25rem; padding: 0.55rem 0.75rem; }
 .teacher-lesson-row__line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.2rem 0.5rem; min-width: 0; }
 .teacher-lesson-row__line > :last-child:not(:first-child) { margin-left: auto; }
 .teacher-lesson-row__what { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; min-width: 0; font-size: 0.8rem; }
@@ -3588,46 +3595,73 @@
 .teacher-lesson-row__when:disabled::after,
 .teacher-lesson-row:is(.is-open, .is-selected) > .teacher-lesson-row__line > .teacher-lesson-row__what > .teacher-lesson-row__when::after { content: none; }
 /* Open in place, a lesson takes the grid's whole width for its details. */
-.teacher-history-lesson.is-selected { grid-column: 1 / -1; }
-.teacher-lesson-row__details { position: relative; z-index: 1; min-width: 0; margin-top: 0.35rem; }
-/* The lesson dialog's own layout, laid out in the lesson's tile: no box of its
-   own, a quiet rule above, its close at the top right of that rule. */
-.teacher-lesson-dialog.teacher-lesson-dialog--inline { position: static; display: grid; gap: 0.75rem; width: auto; max-width: none; max-height: none; margin: 0; padding: 0.7rem 0 0; border: 0; border-top: 1px solid var(--rule-soft); border-radius: 0; background: none; box-shadow: none; overflow: visible; }
+.teacher-history-lesson.is-selected { grid-column: 1 / -1; border-color: var(--blue); }
+.teacher-lesson-row__details { position: relative; z-index: 1; min-width: 0; margin-top: 0.15rem; }
+/* Close uses the same corner as the closed tile's pencil, leaving the whole
+   width beneath for the lesson actions, including two across on a phone. */
+.teacher-lesson-row.is-selected > .teacher-lesson-row__line { min-height: 32px; padding-right: 5rem; }
+.teacher-lesson-row.is-selected > .teacher-lesson-row__details { position: static; }
+@media (pointer: coarse) { .teacher-lesson-row.is-selected > .teacher-lesson-row__line { min-height: 40px; } }
+/* On a wide tile the date and the toolbar share the top row: the date line is
+   column 1, the details span the tile on the same row with matching columns,
+   and the toolbar sits in column 2 (clear of Close) with the facts beneath. A
+   narrow tile keeps the date and Close, then the toolbar wrapping beneath. */
+.teacher-lesson-row.is-selected { grid-template-columns: max-content minmax(0, 1fr); }
+.teacher-lesson-row.is-selected > * { grid-column: 1 / -1; }
+@container (min-width: 36rem) {
+  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions) > .teacher-lesson-row__line { position: relative; z-index: 2; grid-column: 1; grid-row: 1; align-self: start; padding-right: 0; }
+  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions) > .teacher-lesson-row__details { grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: subgrid; margin-top: 0; }
+  .teacher-lesson-row.is-selected > .teacher-lesson-row__details > .teacher-lesson-dialog.teacher-lesson-dialog--inline:has(> .teacher-dialog-actions) { grid-column: 1 / -1; grid-template-columns: subgrid; padding-top: 0; }
+  .teacher-lesson-row.is-selected > .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions { grid-column: 2; grid-row: 1; padding-right: 4.75rem; }
+}
+.teacher-move-cancel { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
+.teacher-move-cancel .teacher-quiet[aria-pressed="true"] { background: var(--lavender); box-shadow: inset 0 0 0 2px var(--blue); }
+/* The lesson dialog's own layout, laid out in the lesson's tile: no box and no
+   rule of its own. One toolbar of small buttons, then the facts. */
+.teacher-lesson-dialog.teacher-lesson-dialog--inline { position: static; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.35rem 0.75rem; width: auto; max-width: none; max-height: none; margin: 0; padding: 0.15rem 0 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
+.teacher-lesson-dialog--inline > * { grid-column: 1 / -1; }
 .teacher-lesson-dialog--inline:focus { outline: 0; }
 .teacher-lesson-dialog--inline:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; border-radius: var(--squiggle-field); }
-.teacher-lesson-inline__head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-.teacher-lesson-inline__head > .lesson-calendar__status { flex: none; margin: 0; }
-.teacher-lesson-inline__head > .lesson-calendar__status:not(.lesson-calendar__status--added):not(.lesson-calendar__status--cancelled) { background: var(--blue-deep); }
-.teacher-lesson-inline__head > .teacher-dialog-close { position: static; width: 36px; height: 36px; }
-/* A wide tile lays its choices out side by side rather than one tall stack. */
-.teacher-lesson-dialog--inline .teacher-dialog-actions > .button { flex: 0 1 auto; width: auto; padding-inline: 0.65rem; }
+.teacher-lesson-dialog--inline > .teacher-lesson-inline__head { position: absolute; top: 0.55rem; right: 0.75rem; display: flex; justify-content: flex-end; }
+.teacher-lesson-dialog--inline > .teacher-dialog-actions { grid-column: 1 / -1; grid-row: 1; gap: 0.35rem; margin: 0; }
+.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-quiet { flex: 0 0 auto; }
 .teacher-lesson-dialog--inline .meeting-link { width: auto; justify-self: start; }
-/* On a wide lesson, its actions share the status row, facts sit beside the
-   paid control, and the payment-link explanation sits beside its button. */
-@container (min-width: 48rem) {
-  .teacher-lesson-dialog--inline:has(> .teacher-dialog-actions) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
-  .teacher-lesson-dialog--inline:has(> .teacher-dialog-actions) > .teacher-lesson-inline__head { display: contents; }
-  .teacher-lesson-dialog--inline:has(> .teacher-dialog-actions) > .teacher-lesson-inline__head > .lesson-calendar__status { grid-column: 1; grid-row: 1; justify-self: start; }
-  .teacher-lesson-dialog--inline:has(> .teacher-dialog-actions) > .teacher-lesson-inline__head > .teacher-dialog-close { grid-column: 2; grid-row: 1; justify-self: end; }
-  .teacher-lesson-dialog--inline > .teacher-dialog-actions { grid-column: 2; grid-row: 1; margin-right: 3rem; justify-content: flex-end; }
-  .teacher-lesson-dialog--inline > .teacher-lesson-facts { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; margin: 0; }
-  .teacher-lesson-dialog--inline:has(> .teacher-lesson-record) > .teacher-lesson-facts { padding-right: 12rem; }
-  .teacher-lesson-dialog--inline:has(> .teacher-lesson-record .teacher-no-show) > .teacher-lesson-facts { padding-right: 22rem; }
-  .teacher-lesson-dialog--inline > .teacher-lesson-record { grid-column: 2; grid-row: 2; justify-self: end; margin: 0; }
-  .teacher-lesson-dialog--inline > :is(.meeting-link, .teacher-card-link, .teacher-dialog-step, .teacher-inline-error, .teacher-history-lesson__note) { grid-column: 1 / -1; }
-  .teacher-lesson-dialog--inline > .teacher-card-link:not(:has(.teacher-card-link__choices)) { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
-  .teacher-lesson-dialog--inline > .teacher-card-link > p { margin: 0; }
-}
+.teacher-lesson-dialog--inline > .teacher-lesson-facts { margin: 0; }
+/* Paid, no-show and Create payment link join the toolbar: the record group
+   sizes to its contents, the initial payment trigger is a plain flex item, and
+   the expanded payment block takes the full width beneath the buttons. */
+.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-lesson-record { flex: 0 0 auto; align-items: center; gap: 0.35rem; }
+.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-card-link--trigger { display: contents; }
+.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-card-link--trigger > .teacher-quiet { flex: 0 0 auto; }
+.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-card-link:not(.teacher-card-link--trigger) { flex: 1 1 100%; padding-top: 0; border-top: 0; }
 .teacher-lesson-row__side { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.25rem 0.4rem; }
 .teacher-lesson-row > :is(.teacher-notes__text, .teacher-history-lesson__note, .teacher-inline-error, .teacher-homework) { position: relative; z-index: 1; }
-/* Already paid keeps its words and its tick, only smaller, at the row's end. */
-.paid-tick--compact { min-height: 28px; padding: 0.15rem 0.65rem 0.15rem 0.4rem; gap: 0.4rem; font-size: 0.75rem; }
-.paid-tick--compact .paid-tick__dab { flex-basis: 1.15rem; width: 1.15rem; }
-@media (pointer: coarse) { .paid-tick--compact { min-height: 36px; } }
-.teacher-lesson-row .teacher-history-homework.teacher-history-homework { min-height: 36px; margin: 0; }
 .teacher-lesson-row > .teacher-inline-error, .teacher-lesson-row > .teacher-history-lesson__note { margin: 0; }
 .teacher-lesson-row .teacher-homework { margin-top: 0.5rem; }
-.teacher-history-earlier.teacher-history-homework { justify-self: start; margin: 0; }
+.teacher-history-earlier.teacher-quiet { justify-self: start; }
+/* The one secondary button on Students, inline and in the lesson list: soft
+   lilac, dark blue words in sentence case, the site's organic edge. Hover
+   deepens the lilac, focus outlines it, and it keeps a comfortable press
+   area. Coral stays for a save, a confirmed cancel and the single next step on
+   a closed student's card. */
+.teacher-quiet { display: inline-flex; flex: none; align-items: center; gap: 0.3rem; min-height: 32px; margin: 0; padding: 0.25rem 0.8rem; border: 0; border-radius: var(--squiggle-chip); background: var(--lavender-soft); color: var(--blue-deep); cursor: pointer; font: 600 0.78rem/1.3 var(--ui); letter-spacing: 0; text-transform: none; white-space: nowrap; transition: background var(--motion-surface) var(--motion-ease); }
+@media (hover: hover) { .teacher-quiet:hover:not(:disabled) { background: var(--lavender); } }
+.teacher-quiet:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.teacher-quiet:disabled { cursor: default; opacity: 0.55; }
+.teacher-quiet svg { flex: none; }
+@media (pointer: coarse) { .teacher-quiet { min-height: 40px; } }
+@media (prefers-reduced-motion: reduce) { .teacher-quiet { transition: none; } }
+/* Already paid, and the no-show beside it, on Students: a small soft capsule
+   in the same organic edge with a little checkbox in front; strong blue once
+   checked. */
+.paid-tick--plain { min-height: 32px; padding: 0.2rem 0.75rem 0.2rem 0.45rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-chip); background: rgba(170, 164, 230, 0.12); gap: 0.45rem; font-size: 0.78rem; }
+.paid-tick--plain .paid-tick__dab { flex-basis: 1.05rem; width: 1.05rem; border: 1.5px solid var(--blue-deep); border-radius: 4px; color: var(--blue-deep); }
+.paid-tick--plain .paid-tick__dab::before { content: none; }
+.paid-tick--plain .paid-tick__dab svg { width: 0.75rem; height: 0.75rem; }
+.paid-tick--plain.is-checked { border-color: var(--blue-deep); background: var(--blue-deep); color: var(--paper-light); }
+.paid-tick--plain.is-checked .paid-tick__dab { border-color: var(--paper-light); background: var(--paper-light); }
+.paid-tick--plain:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+@media (pointer: coarse) { .paid-tick--plain { min-height: 40px; } }
 
 /* Students' translations waiting for her (30 October 2026): one card per translation, refreshed after each action. */
 .teacher-translations { display: grid; gap: 0.75rem; min-width: 0; padding: 1.15rem 1.25rem 1.2rem; border-radius: var(--squiggle-field); background: var(--raised); }
@@ -3647,11 +3681,12 @@
 .teacher-translation__text { white-space: pre-wrap; }
 .teacher-translation__meta { font-size: 0.78rem; opacity: 0.8; }
 .teacher-translation .teacher-expression__actions { margin-top: 0.6rem; }
-/* A weekly run as one row in a student's lessons (9 November 2026, Dan), in
-   the dashed tile the payment card gives a run: its day and time with Show
-   weeks at the end of that line, then its span and facts; its weeks open
-   inside it as rows of their own. */
-.teacher-history-run { border-style: dashed; border-color: var(--lavender); }
+/* A weekly run as one tile in a student's lessons (9 November 2026, Dan): its
+   day and time, span and shared facts together where they fit, with Show
+   weeks at the end. Open, it takes the full width without a box of its own;
+   its weeks are tiles of the same kind beneath and supply the grouping. */
+.teacher-history-run.is-open { grid-column: 1 / -1; padding-inline: 0; border-color: transparent; background: none; }
+.teacher-history-run > .teacher-lesson-row__line { align-items: center; gap: 0.2rem 0.75rem; }
 /* Inline, so on a narrow row its time drops beneath and Show weeks still fits beside it. */
 .teacher-history-run__when { display: inline-block; font: 700 0.8rem/1.4 var(--ui); }
 .teacher-history-run__when .teacher-history-lesson__time { font-weight: 500; white-space: nowrap; }
