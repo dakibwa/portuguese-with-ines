@@ -262,8 +262,11 @@ export function LessonDetails({
     []);
   // A step replaces the button that opened it, so focus follows to the details.
   const firstAction = useRef(true);
+  // Switching between Move and Cancel leaves focus on the choice pressed.
+  const keepFocus = useRef(false);
   useEffect(() => {
     if (firstAction.current) { firstAction.current = false; return; }
+    if (keepFocus.current) { keepFocus.current = false; return; }
     if (inline) panelRef.current?.focus({ preventScroll: true });
   }, [action, inline]);
 
@@ -350,7 +353,7 @@ export function LessonDetails({
       {inline ? "Close" : <X size={20} aria-hidden="true" />}
     </button>
   );
-  // Inline, every routine action is the one quiet text style; the dialog keeps its buttons.
+  // Inline, every routine action is the one small soft lilac button; the dialog keeps its buttons.
   const routine = (dialogClass: string) => inline ? "teacher-quiet" : dialogClass;
   // Set as a student's own lesson is (10 October 2026, at Dan's request): the
   // status, who, then when in bold with its length and place beneath, and the
@@ -392,6 +395,69 @@ export function LessonDetails({
       </div>
     </>
   );
+  // What happened, recorded side by side: paid by hand, and a no-show
+  // (27 October 2026, Dan). Each of these and the payment link renders in one
+  // place: below the facts in the timetable modal, in the top toolbar inline.
+  const recordBlock = tickable || (booking.status !== "cancelled" && (canMarkAttendance || noShowLater)) ? (
+    <div className="teacher-lesson-record">
+      {tickable ? (
+        <PaidTick
+          plain={inline}
+          checked={ticked}
+          disabled={busy || locked}
+          onChange={async (next) => {
+            setBusy(true);
+            setError("");
+            try {
+              const { booking: updated } = await setLessonPaid(token, booking.id, next);
+              changed.current = true;
+              onChanged(next
+                ? "Marked as already paid. It won’t be charged, and it’s in Receipts as paid by hand."
+                : updated.payment_status === "scheduled"
+                  ? `No longer marked paid. It’s charged to their card ${CHARGED}.`
+                  : updated.payment_status === "recorded"
+                    ? "No longer marked paid. It stays as a record only."
+                    : updated.payment_status === "free"
+                      ? "No longer marked paid. It’s free."
+                      : "No longer marked paid. It’s to be paid to you directly.");
+            } catch (caught) {
+              setError(caught instanceof Error ? caught.message : "This lesson couldn’t be updated.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      ) : null}
+      {booking.status !== "cancelled" && (canMarkAttendance || noShowLater) ? (
+        <div className="teacher-no-show">
+          {/* Short enough to sit beside Already paid on a phone; marked,
+              it reads as ticked, as that does. */}
+          <button
+            aria-describedby={noShowLater ? noShowHintId : undefined}
+            aria-label={noShow ? "Undo no-show" : "Mark no-show"}
+            className={`paid-tick ${inline ? "paid-tick--plain" : "paid-tick--action"}${noShow ? " is-checked" : ""}`}
+            type="button"
+            disabled={busy || !canMarkAttendance || locked}
+            onClick={() => setAction("no-show")}
+          >
+            <span aria-hidden="true" className="paid-tick__dab">
+              {inline ? noShow ? <Check size={13} strokeWidth={3.4} /> : null : <UserX size={13} strokeWidth={2.6} />}
+            </span>
+            No-show
+          </button>
+          {noShowLater ? (
+            <p className="teacher-no-show__hint" id={noShowHintId}>
+              Available {formatSlotTime(booking.starts_at)}–{formatSlotTime(noShowCloses.toISOString())}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  ) : null;
+  const approvalBlock = !ticked && addedByTeacher(booking) && booking.status === "confirmed" &&
+    booking.payment_status === "not_required" && !noShow && !locked && !booking.charge_started_at && Boolean(booking.amount_cents && booking.amount_cents > 0) ? (
+    <CardApprovalLink booking={booking} token={token} busy={busy} onBusy={setBusy} onError={setError} quiet={inline} />
+  ) : null;
   const main = (
     <>
       {/* The lesson, not the student (13 October 2026, Dan: "this page is
@@ -407,66 +473,8 @@ export function LessonDetails({
             {booking.reschedule_count > 0 ? <li>Moved {booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}</li> : null}
             {awaiting ? <li>{noEmail ? "No email yet: add it from their details on Students, then send their welcome" : "Not emailed yet: send their welcome from Students"}</li> : null}
           </ul>
-          {/* What happened, recorded side by side: paid by hand, and a
-              no-show (27 October 2026, Dan). */}
-          {tickable || (booking.status !== "cancelled" && (canMarkAttendance || noShowLater)) ? <div className="teacher-lesson-record">
-          {tickable ? (
-            <PaidTick
-              plain={inline}
-              checked={ticked}
-              disabled={busy || locked}
-              onChange={async (next) => {
-                setBusy(true);
-                setError("");
-                try {
-                  const { booking: updated } = await setLessonPaid(token, booking.id, next);
-                  changed.current = true;
-                  onChanged(next
-                    ? "Marked as already paid. It won’t be charged, and it’s in Receipts as paid by hand."
-                    : updated.payment_status === "scheduled"
-                      ? `No longer marked paid. It’s charged to their card ${CHARGED}.`
-                      : updated.payment_status === "recorded"
-                        ? "No longer marked paid. It stays as a record only."
-                        : updated.payment_status === "free"
-                          ? "No longer marked paid. It’s free."
-                          : "No longer marked paid. It’s to be paid to you directly.");
-                } catch (caught) {
-                  setError(caught instanceof Error ? caught.message : "This lesson couldn’t be updated.");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            />
-          ) : null}
-          {booking.status !== "cancelled" && (canMarkAttendance || noShowLater) ? (
-            <div className="teacher-no-show">
-              {/* Short enough to sit beside Already paid on a phone; marked,
-                  it reads as ticked, as that does. */}
-              <button
-                aria-describedby={noShowLater ? noShowHintId : undefined}
-                aria-label={noShow ? "Undo no-show" : "Mark no-show"}
-                className={`paid-tick ${inline ? "paid-tick--plain" : "paid-tick--action"}${noShow ? " is-checked" : ""}`}
-                type="button"
-                disabled={busy || !canMarkAttendance || locked}
-                onClick={() => setAction("no-show")}
-              >
-                <span aria-hidden="true" className="paid-tick__dab">
-                  {inline ? noShow ? <Check size={13} strokeWidth={3.4} /> : null : <UserX size={13} strokeWidth={2.6} />}
-                </span>
-                No-show
-              </button>
-              {noShowLater ? (
-                <p className="teacher-no-show__hint" id={noShowHintId}>
-                  Available {formatSlotTime(booking.starts_at)}–{formatSlotTime(noShowCloses.toISOString())}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-          </div> : null}
-          {!ticked && addedByTeacher(booking) && booking.status === "confirmed" &&
-            booking.payment_status === "not_required" && !noShow && !locked && !booking.charge_started_at && Boolean(booking.amount_cents && booking.amount_cents > 0) ? (
-            <CardApprovalLink booking={booking} token={token} busy={busy} onBusy={setBusy} onError={setError} quiet={inline} />
-          ) : null}
+          {inline ? null : recordBlock}
+          {inline ? null : approvalBlock}
         </>
       ) : null}
       {action === "view" && booking.notes ? (
@@ -502,7 +510,7 @@ export function LessonDetails({
             disabled={busy || locked}
             onClick={() => setAction("move")}
           >
-            Move lesson
+            {inline ? "Move or cancel" : "Move lesson"}
           </button>
           {toCome && booking.lesson_type_id !== "trial" ? (
             <button
@@ -518,23 +526,49 @@ export function LessonDetails({
               Change length
             </button>
           ) : null}
-          <button
-            className={routine("button button--outline")}
-            type="button"
-            disabled={busy || locked}
-            onClick={() => {
-              setFollowing(false);
-              setAction("cancel");
-            }}
-          >
-            Cancel lesson
-          </button>
+          {inline ? null : (
+            <button
+              className="button button--outline"
+              type="button"
+              disabled={busy || locked}
+              onClick={() => {
+                setFollowing(false);
+                setAction("cancel");
+              }}
+            >
+              Cancel lesson
+            </button>
+          )}
+          {inline ? recordBlock : null}
+          {inline ? approvalBlock : null}
         </div>
       ) : action === "homework" ? <div className="teacher-dialog-homework">
         {backToLesson}
         <TeacherHomework bookingId={booking.id} token={token} onBusy={setBusy} />
       </div> : (
         <div className="teacher-dialog-confirmation">
+          {inline && (action === "move" || action === "cancel") ? (
+            <div className="teacher-move-cancel" role="group" aria-label="Move or cancel">
+              {(["move", "cancel"] as const).map(choice => (
+                <button
+                  aria-pressed={action === choice}
+                  className="teacher-quiet"
+                  disabled={busy || locked}
+                  key={choice}
+                  type="button"
+                  onClick={() => {
+                    if (action === choice) return;
+                    keepFocus.current = true;
+                    setError("");
+                    setFollowing(false);
+                    setAction(choice);
+                  }}
+                >
+                  {choice === "move" ? "Move lesson" : "Cancel lesson"}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {action === "length" ? (
             <form
               className="teacher-form teacher-length-form"

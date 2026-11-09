@@ -13,7 +13,7 @@ export function PaidTick({ checked, disabled, onChange, describedBy, plain }: {
   disabled?: boolean;
   onChange: (checked: boolean) => void;
   describedBy?: string;
-  /** On Students: a plain checkbox and its words, as the progress checks are, with no capsule. */
+  /** On Students: a small soft capsule with a little checkbox, strong blue once checked. */
   plain?: boolean;
 }) {
   return (
