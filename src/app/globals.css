@@ -7047,12 +7047,21 @@ p.lesson-when > span {
   opacity: 0.5;
 }
 
-/* Open, a detail is its field with Save and Cancel beside it. */
+/* Open, a detail is its field with Save and Cancel beside it. Where the
+   pair does not fit beside a field wide enough to read an address in (a
+   narrow card, or Inês's Profile beside Google Meet), it wraps beneath the
+   field, whole, rather than squeezing it (9 November 2026). */
 .my-lessons__edit {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   grid-column: 1 / -1;
-  align-items: end;
+  align-items: flex-end;
   gap: 0.6rem 0.8rem;
+}
+
+.my-lessons__edit > label {
+  flex: 1 1 15rem;
+  max-width: 26rem;
 }
 
 .my-lessons__edit-actions {
@@ -7083,6 +7092,11 @@ p.lesson-when > span {
    width when they don't, so Cancel never dangles alone under Send
    confirmation link or Agree & add card. */
 @container booking (max-width: 519.98px) {
+  .my-lessons__edit > :is(label, .my-lessons__edit-actions) {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
   .my-lessons__edit-actions > :is(.button, .my-lessons__change) {
     flex: 1 1 0;
     min-width: fit-content;
@@ -7090,15 +7104,8 @@ p.lesson-when > span {
 }
 
 .my-lessons__edit > .my-lessons__details-note {
-  grid-column: 1 / -1;
+  flex: 0 0 100%;
   margin: 0;
-}
-
-@container booking (min-width: 520px) {
-  .my-lessons__edit {
-    grid-template-columns: minmax(0, 26rem) auto;
-    justify-content: start;
-  }
 }
 
 /* On a phone the detail's name sits above its value, Change to the right. */
@@ -7224,8 +7231,9 @@ p.lesson-when > span {
 }
 
 /* A saved field's good news is the site's calm success panel, compact here
-   beneath the fields it speaks for. */
-.my-lessons__details-outcome {
+   beneath the fields it speaks for: it closes the card, so it keeps none of
+   the panel's own space beneath. */
+.booking-outcome.my-lessons__details-outcome {
   grid-column: 1 / -1;
   margin: 0.35rem 0 0;
 }
@@ -7991,9 +7999,14 @@ p.lesson-when > span {
   line-height: 1.5;
 }
 
-/* The account's own notice sits above the calendar card, never against it. */
+/* The account's own notice sits above the calendar card, never against it;
+   closing a details card, it needs no space beneath. */
 .booking-alert--account {
   margin-bottom: 1rem;
+}
+
+.my-lessons__details > .booking-alert--account:last-child {
+  margin-bottom: 0;
 }
 
 /* Every alert's ways on are the same: after the message, small outline
@@ -8028,17 +8041,18 @@ p.lesson-when > span {
 }
 
 /* Across a wide page the message and its ways on share one row, rather than
-   two small buttons at the far left of an empty band beneath one line. */
+   two small buttons at the far left of an empty band beneath one line. The
+   account's own failure is laid out as booking's is (9 November 2026). */
 @container booking (min-width: 700px) {
-  .booking-steps > .booking-alert {
+  :is(.booking-steps > .booking-alert, .my-lessons > .booking-alert, .booking-alert--account:has(> .booking-alert__body)) {
     align-items: center;
   }
 
-  .booking-steps > .booking-alert > svg {
+  :is(.booking-steps > .booking-alert, .my-lessons > .booking-alert, .booking-alert--account:has(> .booking-alert__body)) > svg {
     margin-top: 0;
   }
 
-  .booking-steps > .booking-alert .booking-alert__body {
+  :is(.booking-steps > .booking-alert, .my-lessons > .booking-alert, .booking-alert--account) > .booking-alert__body {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -8046,7 +8060,7 @@ p.lesson-when > span {
     gap: 0.6rem 1.25rem;
   }
 
-  .booking-steps > .booking-alert .booking-alert__actions {
+  :is(.booking-steps > .booking-alert, .my-lessons > .booking-alert, .booking-alert--account) > .booking-alert__body > .booking-alert__actions {
     margin-top: 0;
   }
 }
