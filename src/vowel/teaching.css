@@ -1187,3 +1187,39 @@ body {
   margin-inline: 0;
   width: 100%;
 }
+
+/* Tutors can name and offer up to six lesson types. Let their choices wrap
+   within the card; the original diary's fixed two-length thumb cannot do that. */
+.vo-teaching .booking-bar__choices {
+  width: 100%;
+  min-width: 0;
+}
+.vo-teaching .booking-bar__group {
+  min-inline-size: 0;
+  max-width: 100%;
+}
+.vo-teaching .booking-bar .segmented label {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.vo-teaching fieldset:has(input[name="booking-duration"]) .segmented,
+.vo-teaching fieldset:has(input[name="managed-lesson-duration"]) .segmented {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  min-width: 0;
+}
+.vo-teaching fieldset:has(input[name="booking-duration"]) .segmented__thumb,
+.vo-teaching fieldset:has(input[name="managed-lesson-duration"]) .segmented__thumb {
+  display: none;
+}
+.vo-teaching fieldset:has(input[name="booking-duration"]) .segmented label,
+.vo-teaching fieldset:has(input[name="managed-lesson-duration"]) .segmented label {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.vo-teaching fieldset:has(input[name="booking-duration"]) .segmented label.is-active,
+.vo-teaching fieldset:has(input[name="managed-lesson-duration"]) .segmented label.is-active {
+  background: var(--brand);
+  color: var(--on-brand);
+}
