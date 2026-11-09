@@ -39,8 +39,9 @@ directly in a few plain sentences. Keep practical details that help a student
 prepare, book or understand a fee; leave out internal payment and attendance
 processes. Avoid blunt reassurance, sales language and unnecessary jargon.
 
-Lesson homework stays attached to its lesson, inside the student's existing
-profile/history for Inês and under Homework for the student. Photo notes and
+Lesson homework stays attached to its lesson: for Inês on the student's
+`Notes & homework` page and in the lesson's details, for the student under
+Homework. Photo notes and
 drafts stay private until Inês reviews and publishes the sheet. Use short,
 level-appropriate European Portuguese instructions, recall and useful practice,
 with answers separate from questions. Offer Do online and Print worksheet.
@@ -537,6 +538,22 @@ usual lesson starts and days off; avoid a wall of administration forms.
   and nothing charged carries the `Already paid` tick in place, so a lesson
   paid in cash is marked from here and leaves what is open. No duplicate To
   do list or separate student profile popup.
+  The open card is one top row (9 November 2026, Dan: "more consolidate and
+  simple … with the sliders in the top", Invite and X never stacked): name,
+  the three checks, the `Lessons` / `Notes & homework` slider, the next button,
+  then X. Where that row doesn't fit, the checks go beneath the name; on a
+  phone the slider takes its own line, so the next button always sits beside X.
+  `Notes & homework` is the student's page for what they are learning (9
+  November 2026, Dan: "a homework page for each student and lesson structure
+  … it can build up over time"): her `Plan` for them on a lilac band (a Beth
+  Ellen heading, their latest level as a dab, `Edit plan`), a coral `Add
+  notes · Thu 3 Sept` for the latest lesson without notes, then each lesson's
+  notes newest first as cream cards packed like the lessons. A card says each
+  thing once: the date, which opens it, a level only where it differs from
+  the plan's, its homework as one dab (`Draft`, `With them`, coral `To
+  review`, blue `Done`), then her notes. Opened, a lesson spans the row with
+  the homework steps below. Lessons with no notes fold into one lilac `2
+  earlier lessons without notes`. Homework to review opens this page.
   Student cards sit side by side according to the list's available width,
   with one column on phones. An opened card spans the whole list so details,
   lesson forms and history have room; closing it restores the compact card.
@@ -731,11 +748,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
   enough for two lessons beside it (9 November 2026, Dan: "this space isn't
   used in a good way"), the student's details and her tools stack in a narrow
   column on the left and the lessons fill the rest; narrower, they sit above
-  the lessons in rows. `Homework` sits at the top right beside
-  the date, with compact facts beneath, instead of taking another row at the
-  bottom. The date and time can wrap within the header; on very narrow cards
-  the button can wrap too, retaining a 44px target. Opening homework expands
-  that lesson across the full row; closing it returns the card to the grid.
+  the lessons in rows. Homework is not on each lesson card: it lives on
+  their `Notes & homework` page.
   The Price control opens the two fields in place and says how many lessons to
   come moved to it, and `· standard` marks a length she hasn't priced.
   History includes older lessons outside the current week and follows the account

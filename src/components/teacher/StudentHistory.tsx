@@ -16,11 +16,10 @@ type History = {
 };
 
 /** All of this student's lessons, independent of the visible timetable week. */
-export function StudentHistory({ student, token, refresh = 0, homeworkId, onPaidChanged }: {
+export function StudentHistory({ student, token, refresh = 0, onPaidChanged }: {
   student: AdminStudent;
   token: string;
   refresh?: number;
-  homeworkId?: string;
   /** A past lesson ticked paid or unticked here, so their card's checks follow. */
   onPaidChanged?: () => void;
 }) {
@@ -70,7 +69,6 @@ export function StudentHistory({ student, token, refresh = 0, homeworkId, onPaid
     {notice ? <p className="teacher-inline-success" role="status">{notice}</p> : null}
     <StudentLessons
       token={token}
-      requestedHomeworkId={homeworkId}
       bookings={current?.bookings ?? null}
       error={current?.error ?? ""}
       now={now}

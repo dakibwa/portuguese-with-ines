@@ -76,7 +76,7 @@ import { bookingReference, createManageToken, readManageToken, safeEqual } from 
 import { receiptLines, receiptMonth } from "./receipts.mjs";
 import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
 import { approvedTranslations, pendingTranslationCount, submitTranslation, translationsMissing, translationsReview } from "./expression-translations.mjs";
-import { HomeworkProblem, HOMEWORK_PHOTO_BODY_LIMIT, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing, notifyHomeworkSubmissions } from "./homework.mjs";
+import { HomeworkProblem, HOMEWORK_PHOTO_BODY_LIMIT, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing, notifyHomeworkSubmissions, studentNotes, saveStudentPlan } from "./homework.mjs";
 import { closedExpressions, expressionsOpenToStudents, pickExpression, studentExpressions } from "./student-expressions.mjs";
 import { findRecurringCode, studentRates, studentLessonType, lessonPriceSnapshot, lessonPriceSnapshotSql, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
@@ -6627,6 +6627,15 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
   // while, kept apart in her list and offered her come-back email. Marking
   // sends nothing. Someone with a lesson to come isn't dormant, and a lesson
   // of theirs ending after the mark makes them active again by itself.
+  // A student's Notes & homework page: her plan and each lesson's notes.
+  const notedStudent = path.match(/^\/admin\/students\/([^/]+)\/(notes|plan)$/);
+  if (notedStudent && request.method === (notedStudent[2] === "notes" ? "GET" : "POST")) {
+    const student = await env.DB.prepare(`SELECT id FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(notedStudent[1]).first();
+    if (!student) return fail("That student could not be found.", 404, request, env);
+    return homeworkReply(request, env, async () => notedStudent[2] === "notes"
+      ? studentNotes(env, student.id) : saveStudentPlan(env, student.id, adminBody, authorization));
+  }
+
   const dormantStudent = path.match(/^\/admin\/students\/([^/]+)\/dormant$/);
   if (dormantStudent && request.method === "POST") {
     if (typeof adminBody.dormant !== "boolean") return fail("Say whether they are dormant.", 400, request, env);
