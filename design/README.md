@@ -726,7 +726,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
   Each section uses a responsive grid of lesson cards: several across where
-  there is room, one column on phones. `Homework` sits at the top right beside
+  there is room, one column on phones, packed so a short card leaves no hole
+  under it while still reading in date order. Where the open profile is wide
+  enough for two lessons beside it (9 November 2026, Dan: "this space isn't
+  used in a good way"), the student's details and her tools stack in a narrow
+  column on the left and the lessons fill the rest; narrower, they sit above
+  the lessons in rows. `Homework` sits at the top right beside
   the date, with compact facts beneath, instead of taking another row at the
   bottom. The date and time can wrap within the header; on very narrow cards
   the button can wrap too, retaining a 44px target. Opening homework expands

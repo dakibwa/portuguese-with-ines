@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StudentLessons } from "@/components/teacher/StudentLessons";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
+import { useMasonryWithin } from "@/components/teacher/masonry";
 import { fetchBookings, type AdminBooking, type AdminStudent } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
 
@@ -31,6 +32,8 @@ export function StudentHistory({ student, token, refresh = 0, homeworkId, onPaid
   const [now, setNow] = useState(() => Date.now());
   const studentId = student.id;
   const email = student.email?.trim().toLowerCase() ?? "";
+  // Their lessons pack two across without holes where the profile is wide.
+  useMasonryWithin(historyRef, ".teacher-history-list");
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
