@@ -315,8 +315,9 @@ try {
     await chooseFromMenu(saved.page, "Done editing");
     await expect(saved.page.locator(".card-added")).toHaveCount(0);
     await expect(saved.page.locator(".card-prompt")).toBeVisible();
-    await expect(saved.page.locator(".lesson-overview .account-menu__name")).toHaveText("Rita Updated");
-    await expect(saved.page.locator(".calendar-panel > .account-signature")).toHaveAttribute("src", "/visuals/v2-splats/built-around-you-splat-v2.svg");
+    // Card first (2 November 2026, Dan): it is a page of its own, the lessons
+    // held back until it is agreed.
+    await expect(saved.page.locator(".lesson-overview")).toBeHidden();
     assert.ok(await noOverflow(saved.page), `no sideways scroll at ${width}px`);
     assert.deepEqual(saved.errors, []);
     await saved.page.close();
