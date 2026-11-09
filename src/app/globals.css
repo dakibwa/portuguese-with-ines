@@ -1962,6 +1962,9 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 }
 
 .lesson-product__duration {
+  /* Centred on the price rather than hung from its baseline, so it never
+     makes the line taller and the three cards' rules stay level. */
+  align-self: center;
   margin: 0;
   border-radius: var(--squiggle-pill);
   padding: 0.32rem 0.7rem;
@@ -3711,7 +3714,6 @@ textarea,
 .past-lessons__list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
-  align-items: start;
   margin: 0;
   padding: 0;
   gap: 0.5rem;
@@ -3736,6 +3738,12 @@ textarea,
   align-items: center;
   justify-content: space-between;
   gap: 0.2rem 0.75rem;
+}
+
+/* A row's first line keeps its chip's height with or without one, so a
+   cancelled lesson is as tall as the lessons beside it. */
+.past-lesson__line:first-child {
+  min-height: 36px;
 }
 
 .past-lesson__when {
@@ -5270,55 +5278,10 @@ p.lesson-when > span {
      added below — without it the tiles merged into vertical bars per column. */
   gap: 7px;
   /* minmax(0, 1fr), not 1fr: the default min-content floor let cell contents
-     push the whole grid wider than a phone screen. The first, narrow column
-     holds each week's month. */
-  grid-template-columns: var(--calendar-months, 2.6rem) repeat(7, minmax(0, 1fr));
-}
-
-/* Each week starts with its month: in ink where a month begins, and quieter
-   lilac ink where the week before was in the same one. */
-.calendar-week__month {
-  align-self: center;
-  overflow: hidden;
-  color: var(--ink);
-  font-family: var(--ui);
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-.calendar-week__month.is-repeat {
-  color: var(--lavender-ink);
-  font-weight: 600;
-}
-
-@container booking (max-width: 560px) {
-  .calendar-panel {
-    --calendar-months: 1.75rem;
-  }
-
-  .calendar-week__month {
-    font-size: 0.55rem;
-    letter-spacing: 0.04em;
-  }
-}
-
-/* The heading names the months and every 1st names its own: seven days take
-   the card's width, without repeating the month beside every week. */
-.unified-calendar--booking .calendar-weekdays,
-.unified-calendar--booking .calendar-week {
+     push the whole grid wider than a phone screen. The heading names the
+     months and every 1st names its own, so the seven days take the card's
+     whole width on every calendar, without a month beside each week. */
   grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
-.unified-calendar--booking .calendar-weekdays__corner,
-.unified-calendar--booking .calendar-week__month {
-  display: none;
-}
-
-.unified-calendar--booking .calendar-week button em.calendar-week__first {
-  display: block;
 }
 
 /* Sits above the tiles rather than under them. */
@@ -5813,8 +5776,9 @@ p.lesson-when > span {
   z-index: 1;
 }
 
-.auth-panel h3,
-.booking-workflow-sign-in .auth-panel h2 {
+/* Every sign-in card is headed in the display hand, Inês's own included. */
+.auth-panel h2,
+.auth-panel h3 {
   font-family: var(--display);
   font-size: clamp(1.9rem, 4.6vw, 2.4rem);
   font-weight: 400;
@@ -7965,12 +7929,6 @@ p.lesson-when > span {
   line-height: 1.18;
 }
 
-.account-hero p {
-  max-width: 46ch;
-  margin-top: 0.9rem;
-  font-size: clamp(1rem, 1.6vw, 1.2rem);
-}
-
 /* Bigger, and behind the words: at this size it would otherwise push the
    heading around on narrow screens. */
 .account-hero__mark {
@@ -9288,12 +9246,6 @@ dialog[open]::backdrop {
  * several of its selectors tie with theirs.
  */
 
-/* A week that starts on the 1st names its month in the day itself only where
-   the month column is hidden (a phone, below); elsewhere the column says it. */
-.calendar-week button em.calendar-week__first {
-  display: none;
-}
-
 @container booking (max-width: 519.98px) {
   /* The name's menu and Book share one row: a long name is cut short rather
      than Book being pushed onto a line of its own. */
@@ -9389,30 +9341,18 @@ dialog[open]::backdrop {
     grid-row: 1;
   }
 
-  /* The months are named above the weeks and on each 1st, so on a phone the
-     seven days take the card's whole width instead of giving a column to
-     OCT OCT OCT NOV. Rows sit as far apart as columns. */
+  /* Rows sit as far apart as columns. */
   .unified-calendar--overview {
     --day-gap: 6px;
   }
 
   .unified-calendar--overview .calendar-weekdays,
   .unified-calendar--overview .calendar-week {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: var(--day-gap);
   }
 
   .unified-calendar--overview .calendar-week + .calendar-week {
     margin-top: var(--day-gap);
-  }
-
-  .unified-calendar--overview .calendar-weekdays__corner,
-  .unified-calendar--overview .calendar-week__month {
-    display: none;
-  }
-
-  .unified-calendar--overview .calendar-week button em.calendar-week__first {
-    display: block;
   }
 
   /* Wider days carry bigger dates and times, with a little room above and

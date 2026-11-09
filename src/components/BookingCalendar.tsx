@@ -121,8 +121,8 @@ const shortMonthYear = new Intl.DateTimeFormat("en-GB", { month: "short", year: 
 const shortMonthOnly = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" });
 
 /**
- * The calendar's title: the months its rows start in, as each row's own label
- * names them, so "October 2026", or "October – November 2026" where the four
+ * The calendar's title: the months its rows start in, so "October 2026", or
+ * "October – November 2026" where the four
  * weeks cross into the next ("Oct – Nov 2026" on a phone). It stands where a
  * calendar names its month, beside the arrows, rather than as a caption row in
  * the grid.
@@ -4057,7 +4057,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               </div>
             </div>
             <div className="calendar-weekdays" aria-hidden="true">
-              <span className="calendar-weekdays__corner" />
               {weekdayLabels.map((label) => (
                 <span key={label}>{label}</span>
               ))}
@@ -4075,19 +4074,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             >
               {displayedCalendarWeeks.map((week, row) => (
                 <div className="calendar-week" key={week.key}>
-                  {/* Each week starts with its month, so a date is never far
-                      from it; a month that begins mid-week marks its 1st. On a
-                      phone, booking or on the lessons card, the month column
-                      is hidden, and every 1st names its month itself, Mondays
-                      included. The days' own labels carry the full date. */}
-                  <span
-                    aria-hidden="true"
-                    className={`calendar-week__month${
-                      row > 0 && displayedCalendarWeeks[row - 1].cells[0].month === week.cells[0].month ? " is-repeat" : ""
-                    }`}
-                  >
-                    {shortMonth(week.cells[0].month, week.cells[0].key)}
-                  </span>
+                  {/* The heading names the months and every 1st names its own, so
+                      the seven days take the card's width at every size. The
+                      days' own labels carry the full date. */}
                   {week.cells.map((cell, column) => {
                     const slots = selectableSlots(cell.key);
                     const lessons = bookingsByDate[cell.key] ?? [];
@@ -4165,7 +4154,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       >
                         <span>
                           {cell.day}
-                          {cell.day === 1 ? <em className={column === 0 ? "calendar-week__first" : undefined}>{shortMonth(cell.month, cell.key)}</em> : null}
+                          {cell.day === 1 ? <em>{shortMonth(cell.month, cell.key)}</em> : null}
                           {lessons.length ? (
                             <small className="calendar-booking-times">
                               {(lessons.length <= 2 ? lessons : lessons.slice(0, 1)).map((booking) => (

@@ -9,7 +9,6 @@
 .idioms-state { max-width: 34rem; margin: 2rem auto; text-align: center; }
 .idioms-state p { margin: 0 0 1rem; }
 .idioms-main .auth-panel { margin-block: 1rem; }
-.idioms-main .auth-panel h2 { font: 400 clamp(1.9rem, 4.6vw, 2.4rem)/1.1 var(--display); }
 @media (max-width: 30rem) {
   .idioms-account > span { max-width: 7rem; }
   .idioms-toolbar { gap: 0.75rem; font-size: 0.75rem; }
