@@ -1,15 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { ArrowLeft, ArrowRight, CheckCircle2, Send } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Send } from "lucide-react";
 import { readSession } from "@/lib/auth-api";
-import { fetchHomework, fetchHomeworkSheet, lessonDateZone, saveHomeworkAnswers, type HomeworkProgress, type HomeworkSummary, type StudentHomeworkData } from "@/lib/homework-api";
+import { fetchHomeworkSheet, saveHomeworkAnswers, type HomeworkProgress, type StudentHomeworkData } from "@/lib/homework-api";
 import { HomeworkSplat } from "./HomeworkArt";
 import { HomeworkWorksheet } from "./HomeworkWorksheet";
 
-export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => Promise<boolean>) | null> }) {
+/**
+ * One lesson's homework sheet, opened from that lesson's row beneath their
+ * calendar (9 November 2026, Dan: one schedule for their lessons, past
+ * lessons and homework). Back saves first and returns to Your lessons.
+ */
+export function StudentHomework({ bookingId, leaveGuard, onBack }: {
+  bookingId: string;
+  leaveGuard: RefObject<(() => Promise<boolean>) | null>;
+  onBack: () => void;
+}) {
   const [token] = useState(() => readSession());
-  const [list, setList] = useState<HomeworkSummary[] | null>(null);
   const [selected, setSelected] = useState<StudentHomeworkData | null>(null);
   const [draft, setDraft] = useState<HomeworkProgress | null>(null);
   const [error, setError] = useState("");
@@ -33,11 +41,12 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
   useEffect(() => {
     active.current = true;
     const controller = new AbortController();
-    void fetchHomework(token, controller.signal).then(result => {
-      if (active.current && readSession() === token) setList(result);
-    }).catch(error => { if (!controller.signal.aborted) setError(error.message); });
+    void fetchHomeworkSheet(token, bookingId, controller.signal).then(result => {
+      if (!active.current || readSession() !== token) return;
+      setSelected(result); setDraft(result.progress); setError("");
+    }).catch(caught => { if (!controller.signal.aborted && active.current) setError((caught as Error).message); });
     return () => { active.current = false; controller.abort(); };
-  }, [token, attempt]);
+  }, [token, bookingId, attempt]);
   useEffect(() => {
     unsaved.current = dirty;
     if (!dirty) return;
@@ -60,20 +69,13 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
     };
   }, [dirty, leaveGuard]);
 
-  async function open(id: string) {
+  async function refresh() {
     if (busy) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      const result = await fetchHomeworkSheet(token, id);
+      const result = await fetchHomeworkSheet(token, bookingId);
       if (!active.current || readSession() !== token) return;
       setSelected(result); setDraft(result.progress);
-      // A sheet may have been reviewed since the list loaded. Keep its card
-      // in step with the feedback we have just read.
-      setList(current => current?.map(item => item.bookingId === id ? { ...item,
-        started: Boolean(result.progress.updatedAt), completedAt: result.progress.completedAt,
-        submittedAt: result.progress.submission?.submittedAt ?? null,
-        returnedAt: result.progress.submission?.returnedAt ?? null,
-      } : item) ?? null);
     } catch (error) { if (active.current) setError((error as Error).message); }
     finally { if (active.current) setBusy(false); }
   }
@@ -85,8 +87,6 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
       if (!active.current || readSession() !== token) return false;
       unsaved.current = false;
       setDraft(progress); setSelected({ ...selected, progress });
-      setList(current => current?.map(item => item.bookingId === selected.bookingId ? { ...item, started: true, completedAt: progress.completedAt,
-        submittedAt: progress.submission?.submittedAt ?? null, returnedAt: progress.submission?.returnedAt ?? null } : item) ?? null);
       setNotice(submit ? "Sent to Inês. Your feedback appears here after she approves it." : "Answers saved.");
       return true;
     } catch (error) { if (active.current) setError((error as Error).message); return false; }
@@ -98,8 +98,8 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
       <div className="homework-toolbar">
         <button type="button" className="homework-back" disabled={busy} onClick={async () => {
           if (dirty && !await save()) return;
-          setSelected(null); setDraft(null); setError(""); setNotice(""); setView("online");
-        }}><ArrowLeft size={16} aria-hidden="true" />All homework</button>
+          onBack();
+        }}><ArrowLeft size={16} aria-hidden="true" />Your lessons</button>
         {submission ? <span className={`homework-status homework-status--${awaitingReview ? "sent" : "returned"}`}>
           {awaitingReview ? <Send size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}{awaitingReview ? "Sent to Inês" : "Done"}
         </span> : <span className="homework-status homework-status--quiet">{dirty ? "Unsaved answers" : draft.updatedAt ? "Saved" : "Ready to start"}</span>}
@@ -121,33 +121,17 @@ export function StudentHomework({ leaveGuard }: { leaveGuard: RefObject<(() => P
           : selected.aiMarking ? "Inês checks your answers before you see any feedback. Anthropic’s Claude suggests marks for written answers, so keep personal details out."
           : "Inês checks your answers and sends you feedback here.")}</p>
         <div className="homework-save__actions">
-          {awaitingReview ? <button type="button" className="button button--outline" disabled={busy} onClick={() => void open(selected.bookingId)}>Check for feedback</button> : <>
+          {awaitingReview ? <button type="button" className="button button--outline" disabled={busy} onClick={() => void refresh()}>Check for feedback</button> : <>
             <button type="button" className="button button--outline" disabled={busy || !dirty} onClick={() => void save()}>Save answers</button>
             <button type="button" className="button button--coral" disabled={busy || !answered || Boolean(submission && !changedSinceSubmission)} onClick={() => void save(true)}>{busy ? "Sending…" : submission ? "Send again" : "Submit to Inês"}</button>
           </>}
         </div>
       </div> : <p className="homework-help homework-help--paper">Paper answers aren’t marked automatically. To send them to Inês, type them in Do online.</p>}
-    </> : <>
-      {error ? <div className="homework-error" role="alert"><p>{error}</p><button className="button button--outline" type="button" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button></div> : null}
-      {!list && !error ? <p className="homework-loading" role="status">Loading homework…</p> : null}
-      {list?.length === 0 ? <p className="homework-empty"><HomeworkSplat seed="homework" className="homework-empty__mark" />When Inês shares homework, it will appear here with its lesson.</p> : null}
-      {list?.length ? <ul className="homework-list">{list.map((item, index) => {
-        const state = item.returnedAt ? "returned" : item.submittedAt ? "sent" : item.started ? "started" : "new";
-        return <li key={item.bookingId}>
-          <button type="button" className={`homework-list__item homework-list__item--${state}`} onClick={() => void open(item.bookingId)} disabled={busy}>
-            <HomeworkSplat seed={item.bookingId} offset={index} className="homework-list__mark" />
-            <span className="homework-list__text">
-              <small>{new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: lessonDateZone(item.location) }).format(new Date(item.lessonAt))} lesson · {item.minutes} mins</small>
-              <strong lang="pt-PT">{item.title}</strong>
-            </span>
-            <span className="homework-list__state">
-              {state === "returned" ? <CheckCircle2 size={15} aria-hidden="true" /> : state === "sent" ? <Send size={14} aria-hidden="true" /> : null}
-              {state === "returned" ? "Done" : state === "sent" ? "With Inês" : state === "started" ? "Continue" : "Start"}
-              {state === "new" || state === "started" ? <ArrowRight size={16} aria-hidden="true" /> : null}
-            </span>
-          </button>
-        </li>;
-      })}</ul> : null}
-    </>}
+    </> : error ? <>
+      <div className="homework-toolbar">
+        <button type="button" className="homework-back" onClick={onBack}><ArrowLeft size={16} aria-hidden="true" />Your lessons</button>
+      </div>
+      <div className="homework-error" role="alert"><p>{error}</p><button className="button button--outline" type="button" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Try again</button></div>
+    </> : <p className="homework-loading" role="status">Opening your homework…</p>}
   </div>;
 }

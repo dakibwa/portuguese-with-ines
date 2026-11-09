@@ -4,14 +4,18 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { studentMark } from "@/lib/student-marks";
 
-export type AccountSection = "upcoming" | "history" | "homework" | "profile";
+/** Your lessons (their calendar and past lessons), a lesson's homework opened
+ * from its row there, and Your details. */
+export type AccountSection = "upcoming" | "homework" | "profile";
 
 /**
  * The account's one menu, in the heading of whichever account card is showing
- * (Your lessons, Past lessons or Your details), sparing the page a second bar
- * above the calendar. Where the card is wide, its places sit open at the top
- * left as one sliding control, without the name: the name, and Sign out, live
- * in Your details (10 October 2026, at Dan's request). Where it is narrow, a
+ * (Your lessons or Your details), sparing the page a second bar above the
+ * calendar. Past lessons and their homework live on Your lessons, beneath the
+ * calendar, so there are two places (9 November 2026, Dan: one simple
+ * schedule). Where the card is wide, its places sit open at the top left as
+ * one sliding control, without the name: the name, and Sign out, live in
+ * Your details (10 October 2026, at Dan's request). Where it is narrow, a
  * button with the student's splat, or their initial, and their name opens the
  * places as a dropdown with Sign out beneath them. The same buttons serve
  * both, so either way there is one menu.
@@ -49,8 +53,8 @@ export function AccountSignature({ mark }: { mark?: string }) {
 }
 
 /**
- * Where the places' thumb last rested. Your lessons, Past lessons and Your
- * details are separate cards, each with its own menu, so a new card's thumb
+ * Where the places' thumb last rested. Your lessons and Your details are
+ * separate cards, each with its own menu, so a new card's thumb
  * starts where the last one stood and glides to its own place, and the card's
  * contents slide in from the side it was reached from (11 October 2026, at
  * Dan's request: the slider did not slide between pages).
@@ -113,7 +117,9 @@ export function AccountMenu({
     onSelect(section);
   }
 
-  const place = current === "upcoming" ? 0 : current === "history" ? 1 : current === "homework" ? 2 : current === "profile" ? 3 : "none";
+  // A lesson's homework belongs to Your lessons, where its row is.
+  const lessons = current === "upcoming" || current === "homework";
+  const place = lessons ? 0 : current === "profile" ? 1 : "none";
   const numericPlace = typeof place === "number" ? place : null;
   const [shownPlace, setShownPlace] = useState<number | "none">(() => lastPlace ?? place);
 
@@ -157,14 +163,8 @@ export function AccountMenu({
             booking bar's; the thumb rests on the card that is showing. */}
         <div className={`account-menu__places account-menu__places--at-${shownPlace}`}>
           <span aria-hidden="true" className="account-menu__thumb" />
-          <button aria-current={current === "upcoming" ? "true" : undefined} onClick={() => choose("upcoming")} type="button">
+          <button aria-current={lessons ? "true" : undefined} onClick={() => choose("upcoming")} type="button">
             Your lessons {upcomingCount ? <span>{upcomingCount}<span className="visually-hidden"> upcoming</span></span> : null}
-          </button>
-          <button aria-current={current === "history" ? "true" : undefined} onClick={() => choose("history")} type="button">
-            Past lessons
-          </button>
-          <button aria-current={current === "homework" ? "true" : undefined} onClick={() => choose("homework")} type="button">
-            Homework
           </button>
           <button aria-current={current === "profile" ? "true" : undefined} onClick={() => choose(current === "profile" ? "upcoming" : "profile")} type="button">
             {current === "profile" ? "Done editing" : "Edit details"}

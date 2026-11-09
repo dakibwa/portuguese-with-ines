@@ -150,6 +150,7 @@ async function fixture(width, options = {}) {
     return route.fulfill({ json: { student: state.account, session: "isolated-renewed-teacher-fixture" } });
   });
   await page.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
+  await page.route("**/me/homework", route => route.fulfill({ json: { homework: [] } }));
   await page.route("**/me", (route) =>
     route.fulfill({
       json: {

@@ -138,8 +138,9 @@ and none names `recorded`, so it is never charged, chased or put forward as
 paid or owed. It is **not in Receipts**: a record says nothing about money, so
 there is nothing to issue a fatura-recibo for; if she was paid for it, that is
 hers to note outside the site. Her history shows `Recorded`, as does the
-lesson's dialog; the student sees it in Past lessons as `Completed`, with no
-price, like any other past lesson. Homework is set on it as usual.
+lesson's dialog; the student sees it under Past lessons on Your lessons as
+a plain row, with no price, like any other past lesson. Homework is set on it
+as usual.
 
 Moving it to another past time, or cancelling it, is as quiet, since the
 student was never told of it. It cannot be moved into the future (409 `A
@@ -1060,20 +1061,21 @@ removes its unopened card-setup hold while retaining confirmed lessons.
   never blocks a change. The old `/my-lessons` and `/booking` paths remain valid
   for links already in the world, then normalise to `/book`.
 - **The signed-in account lives in the lessons card.** The account has one
-  menu: `Your lessons` with the upcoming count, `Past lessons` with no badge,
-  `Edit details` and `Sign out`. On a wide card its places sit open in the
-  header as one sliding control, with the name and `Sign out` beneath it at
-  the left; on a narrower one the student's name, under the heading of
+  menu: `Your lessons` with the upcoming count, `Edit details` and `Sign out`.
+  Your lessons is one schedule (9 November 2026): the calendar of lessons to
+  come, then `Past lessons` beneath it on the same card, each a two-line row
+  with its homework (`/me/homework`, matched by the lesson's start) at the
+  row's end. On a wide card the places sit open in the header as one sliding
+  control; on a narrower one the student's name, under the heading of
   whichever account card is showing, opens it. Booking lives on the card, not
-  in the menu. Choosing your or past lessons opens a complete view and switches
-  away from any active booking or lesson-management detail. Clicking the
-  current destination keeps it open. Past lessons and Your details take the
-  calendar card's place, headed the same way, with a `Your lessons` way back
-  where the menu is folded;
-  neither keeps the future calendar, and `Done editing` returns to Your
-  lessons. An empty history gets an empty state rather than losing the menu
-  item. While booking the menu waits, and the booking bar's `Your lessons` is
-  the way back.
+  in the menu. Choosing Your lessons switches away from any active booking or
+  lesson-management detail, and clicking the current destination keeps it
+  open. Your details and a lesson's homework sheet take the calendar card's
+  place, headed the same way; `Done editing`, the sheet's `Your lessons` and
+  the places return to Your lessons, a sheet saving its answers first. A
+  homework list that cannot be read leaves the past lessons showing with a
+  quiet `Try again`. While booking the menu waits, and the booking bar's
+  `Your lessons` is the way back.
   There is only one `Booking`
   destination in the site navigation — no separate `My lessons` tab — because
   booking and managing lessons are the same workspace.

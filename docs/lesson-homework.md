@@ -49,9 +49,10 @@ waiting for her. Answers that already have a mark and real feedback are folded
 to the student's words, the mark and the feedback, with **Change** to open one.
 Uncertain or unmarked answers stay open, edged in coral, until she resolves
 them. Then she clicks **Approve & send back**. That explicit action
-makes her approved feedback visible in the student's Homework tab, and the
-sheet then reads **Done** for both of them: a Done chip and band for Inês, and
-for the student a Done band on the sheet and **Done** on its card. Earlier,
+makes her approved feedback visible to the student, and the sheet then reads
+**Done** for both of them: a Done chip and band for Inês, and for the student
+a Done band on the sheet and **Done** at the end of its lesson's row beneath
+their calendar on Your lessons, where each sheet opens from. Earlier,
 unapproved automatic suggestions are never sent to the student.
 
 ## Telling Inês
@@ -133,7 +134,8 @@ applied in production; homework AI has been live since 15 October 2026.
 Apply future additive migrations manually to staging, then production. Do not
 apply the full schema or replay older migrations on an existing database.
 The schema is for new local databases only. Where these tables are absent, the
-Students list shows no homework to review and a student's Homework tab is empty,
+Students list shows no homework to review and a student's past lessons carry
+no homework,
 rather than either failing. Migration `0030-homework-notified.sql` adds the two
 notification columns; apply it after 0029. This feature does not change bookings, fees or meetings.
 
