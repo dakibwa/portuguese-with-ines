@@ -614,10 +614,15 @@ usual lesson starts and days off; avoid a wall of administration forms.
     second line, one wrapping line after the site's small lilac paint dab, as
     the shared facts are; `Cancelled`, `No-show` and `Happening now` are bold
     words in that line, not pills. Every secondary action here (`Show weeks`,
-    `Homework`, `Move lesson`, `Change length`, `Cancel lesson`, `Create
+    `Homework`, `Move or cancel`, `Change length`, `Create
     payment link`, `Close`) is one small soft lilac button, dark blue words in
     sentence case, with the same size, hover and focus. Close sits beside the
-    date, leaving the width beneath for those actions; coral stays for a save,
+    date, leaving the width beneath for those actions. In an open lesson the
+    date and the actions (`Already paid` / `No-show` and `Create payment link`
+    included) share the top line where they fit and wrap beneath where they do
+    not, with the facts below. `Move or cancel` is one entry inline: it opens
+    the move form, with `Move lesson` / `Cancel lesson` choices, and a cancel
+    still needs its explicit confirmation; coral stays for a save,
     a confirmed cancel and the one next step on a closed student's card. A level shows only where it
     differs from theirs now; a few lines of her notes follow. Open details
     span the list's whole width, one lesson's at a time, as a named region

@@ -3602,9 +3602,22 @@
 .teacher-lesson-row.is-selected > .teacher-lesson-row__line { min-height: 32px; padding-right: 5rem; }
 .teacher-lesson-row.is-selected > .teacher-lesson-row__details { position: static; }
 @media (pointer: coarse) { .teacher-lesson-row.is-selected > .teacher-lesson-row__line { min-height: 40px; } }
+/* On a wide tile the date and the toolbar share the top row: the date line is
+   column 1, the details span the tile on the same row with matching columns,
+   and the toolbar sits in column 2 (clear of Close) with the facts beneath. A
+   narrow tile keeps the date and Close, then the toolbar wrapping beneath. */
+.teacher-lesson-row.is-selected { grid-template-columns: max-content minmax(0, 1fr); }
+.teacher-lesson-row.is-selected > * { grid-column: 1 / -1; }
+@container (min-width: 36rem) {
+  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions) > .teacher-lesson-row__line { position: relative; z-index: 2; grid-column: 1; grid-row: 1; align-self: start; padding-right: 0; }
+  .teacher-lesson-row.is-selected:has(> .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions) > .teacher-lesson-row__details { grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: subgrid; margin-top: 0; }
+  .teacher-lesson-row.is-selected > .teacher-lesson-row__details > .teacher-lesson-dialog.teacher-lesson-dialog--inline:has(> .teacher-dialog-actions) { grid-column: 1 / -1; grid-template-columns: subgrid; padding-top: 0; }
+  .teacher-lesson-row.is-selected > .teacher-lesson-row__details > .teacher-lesson-dialog > .teacher-dialog-actions { grid-column: 2; grid-row: 1; padding-right: 4.75rem; }
+}
+.teacher-move-cancel { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
+.teacher-move-cancel .teacher-quiet[aria-pressed="true"] { background: var(--lavender); box-shadow: inset 0 0 0 2px var(--blue); }
 /* The lesson dialog's own layout, laid out in the lesson's tile: no box and no
-   rule of its own. One toolbar of small buttons, then the facts, with the paid
-   and no-show ticks beside them once the row is wide. */
+   rule of its own. One toolbar of small buttons, then the facts. */
 .teacher-lesson-dialog.teacher-lesson-dialog--inline { position: static; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.35rem 0.75rem; width: auto; max-width: none; max-height: none; margin: 0; padding: 0.15rem 0 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
 .teacher-lesson-dialog--inline > * { grid-column: 1 / -1; }
 .teacher-lesson-dialog--inline:focus { outline: 0; }
@@ -3614,12 +3627,13 @@
 .teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-quiet { flex: 0 0 auto; }
 .teacher-lesson-dialog--inline .meeting-link { width: auto; justify-self: start; }
 .teacher-lesson-dialog--inline > .teacher-lesson-facts { margin: 0; }
-.teacher-lesson-dialog--inline > .teacher-card-link { padding-top: 0; border-top: 0; }
-.teacher-lesson-dialog--inline > .teacher-card-link:not(:has(.teacher-card-link__choices)) { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1rem; }
-@container (min-width: 36rem) {
-  .teacher-lesson-dialog--inline > .teacher-lesson-facts:has(+ .teacher-lesson-record) { grid-column: 1; grid-row: 2; }
-  .teacher-lesson-dialog--inline > .teacher-lesson-record { grid-column: 2; grid-row: 2; justify-self: end; }
-}
+/* Paid, no-show and Create payment link join the toolbar: the record group
+   sizes to its contents, the initial payment trigger is a plain flex item, and
+   the expanded payment block takes the full width beneath the buttons. */
+.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-lesson-record { flex: 0 0 auto; align-items: center; gap: 0.35rem; }
+.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-card-link--trigger { display: contents; }
+.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-card-link--trigger > .teacher-quiet { flex: 0 0 auto; }
+.teacher-lesson-dialog--inline .teacher-dialog-actions > .teacher-card-link:not(.teacher-card-link--trigger) { flex: 1 1 100%; padding-top: 0; border-top: 0; }
 .teacher-lesson-row__side { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.25rem 0.4rem; }
 .teacher-lesson-row > :is(.teacher-notes__text, .teacher-history-lesson__note, .teacher-inline-error, .teacher-homework) { position: relative; z-index: 1; }
 .teacher-lesson-row > .teacher-inline-error, .teacher-lesson-row > .teacher-history-lesson__note { margin: 0; }
