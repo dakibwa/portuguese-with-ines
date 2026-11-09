@@ -1423,6 +1423,9 @@ try {
     await expect(history.getByRole("heading", { name: "Upcoming · 5" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 4" })).toBeVisible();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
+    // What every lesson shares is said once above them, not on each card.
+    await expect(history.locator(".teacher-history-shared")).toHaveText(/^Every lesson\s*60 mins$/);
+    await expect(history.locator(".teacher-history-lesson").filter({ hasText: "60 mins" })).toHaveCount(0);
     const run = history.locator(".teacher-history-run");
     await expect(run).toContainText("Every Tuesday");
     await expect(run).toContainText("09:30–10:30");

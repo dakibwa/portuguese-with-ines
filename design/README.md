@@ -750,6 +750,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   only for what breaks the pattern (`Cancelled by you`, `No-show`, `Happening
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
+  A fact every one of their lessons shares, such as `In Porto` or `Added by
+  you`, is said once above them on an `Every lesson` line, and each card keeps
+  only what is its own (9 November 2026, Dan: "we don't need all the
+  information repeating"). With a single lesson, its card says it all.
   Each section uses a responsive grid of lesson cards: several across where
   there is room, one column on phones, packed so a short card leaves no hole
   under it while still reading in date order. Where the open profile is wide

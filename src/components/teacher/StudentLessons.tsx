@@ -84,6 +84,49 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
   // Within half a year either way the year is plain from the month; further
   // off, say it.
   const nearby = (date: Date) => Math.abs(date.getTime() - now) < 183 * 86_400_000;
+  const place = (booking: AdminBooking) => booking.location === "porto" ? "In Porto" : "Online";
+  const lessonLength = (booking: AdminBooking) => formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000) });
+  /*
+   * A lesson she added that has been and is still open: paid in cash, she
+   * ticks it here, so what they still owe reads true (2 November 2026,
+   * Dan: everyone pays what is open). Ticked, it can be unticked again.
+   */
+  const settles = (booking: AdminBooking) => booking.status !== "cancelled" && Date.parse(booking.starts_at) <= now && addedByTeacher(booking) &&
+    booking.attendance_status === "expected" && (paidByHand(booking) || (booking.payment_status === "not_required" && !booking.charge_started_at));
+
+  /** A lesson's quiet facts: where, how long, payment, who added it, moves. */
+  function lessonFacts(booking: AdminBooking) {
+    const cancelled = booking.status === "cancelled";
+    const changeFee = booking.same_day_fee_status === "paid" ? "Change fee paid"
+      : booking.same_day_fee_status === "payment_due" ? "Change fee due"
+        : booking.same_day_fee_status === "scheduled" ? "Change fee scheduled"
+          : booking.same_day_fee_status === "processing" ? "Change fee processing" : "";
+    // A cancelled lesson's money only matters if some moved.
+    // Where the tick shows, it says how it was paid.
+    const payment = settles(booking) || (cancelled && !paidByHand(booking) && !["paid", "refunded"].includes(booking.payment_status)) ? "" : paymentLabel(booking);
+    return [
+      place(booking),
+      lessonLength(booking),
+      payment,
+      addedByTeacher(booking) ? "Added by you" : "",
+      booking.reschedule_count > 0 ? `Moved ${booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}` : "",
+      changeFee,
+    ].filter(Boolean);
+  }
+
+  /*
+   * What every one of their lessons shares, such as `In Porto · 60 mins ·
+   * Added by you`, is said once above them, and each card keeps only what is
+   * its own (9 November 2026, Dan: "we don't need all the information
+   * repeating").
+   */
+  const listed = bookings ?? [];
+  const factLists = listed.map(lessonFacts);
+  const shared = listed.length > 1 ? factLists[0].filter(fact => factLists.every(facts => facts.includes(fact))) : [];
+  const factList = (facts: string[]) => {
+    const own = facts.filter(fact => !shared.includes(fact));
+    return own.length ? <ul className="booking-payment-facts teacher-history-lesson__facts">{own.map(fact => <li key={fact}>{fact}</li>)}</ul> : null;
+  };
 
   /**
    * One card per lesson: when, then a few quiet facts. A pill only for what
@@ -98,27 +141,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
     const pill = cancelled
       ? booking.cancelled_by === "teacher" ? "Cancelled by you" : booking.cancelled_by === "student" ? "Cancelled by student" : "Cancelled"
       : noShow ? "No-show" : live ? "Happening now" : "";
-    const changeFee = booking.same_day_fee_status === "paid" ? "Change fee paid"
-      : booking.same_day_fee_status === "payment_due" ? "Change fee due"
-        : booking.same_day_fee_status === "scheduled" ? "Change fee scheduled"
-          : booking.same_day_fee_status === "processing" ? "Change fee processing" : "";
-    /*
-     * A lesson she added that has been and is still open: paid in cash, she
-     * ticks it here, so what they still owe reads true (2 November 2026,
-     * Dan: everyone pays what is open). Ticked, it can be unticked again.
-     */
-    const settle = !cancelled && Date.parse(booking.starts_at) <= now && addedByTeacher(booking) && booking.attendance_status === "expected" &&
-      (paidByHand(booking) || (booking.payment_status === "not_required" && !booking.charge_started_at));
-    // A cancelled lesson's money only matters if some moved.
-    // Where the tick shows, it says how it was paid.
-    const payment = settle || (cancelled && !paidByHand(booking) && !["paid", "refunded"].includes(booking.payment_status)) ? "" : paymentLabel(booking);
-    const facts = [
-      formatBookedLessonLabel({ id: booking.lesson_type_id ?? "", name: booking.lesson_name, durationMinutes: Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000) }),
-      payment,
-      addedByTeacher(booking) ? "Added by you" : "",
-      booking.reschedule_count > 0 ? `Moved ${booking.reschedule_count === 1 ? "once" : `${booking.reschedule_count} times`}` : "",
-      changeFee,
-    ].filter(Boolean);
+    const settle = settles(booking);
     return (
       <li className={`teacher-history-lesson${cancelled || noShow ? " is-cancelled" : ""}`} id={id} key={booking.id}>
         <div className="teacher-history-lesson__top">
@@ -133,10 +156,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
             {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
           </div>
         </div>
-        <ul className="booking-payment-facts teacher-history-lesson__facts">
-          <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
-          {facts.map(fact => <li key={fact}>{fact}</li>)}
-        </ul>
+        {factList(lessonFacts(booking))}
         {settle ? <div className="teacher-history-lesson__paid">
           <PaidTick checked={paidByHand(booking)} disabled={Boolean(paying)} onChange={async (paid) => {
             setPaying(booking.id);
@@ -182,7 +202,8 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
     };
     const payments = new Set(run.lessons.map(paymentLabel));
     const facts = [
-      formatBookedLessonLabel({ id: pattern.lesson_type_id ?? "", name: pattern.lesson_name, durationMinutes: Math.round((Date.parse(pattern.ends_at) - Date.parse(pattern.starts_at)) / 60000) }),
+      place(pattern),
+      lessonLength(pattern),
       payments.size === 1 ? [...payments][0] : "",
       run.lessons.every(addedByTeacher) ? "Added by you" : "",
       moved ? `${moved === 1 ? "One week" : `${moved} weeks`} at another time` : "",
@@ -205,10 +226,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
             </button>
           </div>
           <p className="teacher-history-run__span">{run.lessons.length} weeks, <span>{day(first)} to {day(last)}</span></p>
-          <ul className="booking-payment-facts teacher-history-lesson__facts">
-            <li>{pattern.location === "porto" ? "In Porto" : "Online"}</li>
-            {facts.map(fact => <li key={fact}>{fact}</li>)}
-          </ul>
+          {factList(facts)}
         </li>
         {open ? run.lessons.map(lesson => <Fragment key={lesson.id}>{lessonRow(lesson, lesson === first ? weeksId : undefined)}</Fragment>) : null}
       </Fragment>
@@ -222,6 +240,10 @@ export function StudentLessons({ bookings, error, now, onRetry, token, onRecordR
   if (bookings.length === 0) return <p className="teacher-history-empty">No lessons recorded yet.</p>;
   return (
     <>
+      {shared.length ? <div className="teacher-history-shared">
+        <span id="teacher-history-shared">Every lesson</span>
+        <ul className="booking-payment-facts" aria-labelledby="teacher-history-shared">{shared.map(fact => <li key={fact}>{fact}</li>)}</ul>
+      </div> : null}
       {upcoming.length ? <section aria-labelledby="teacher-history-upcoming"><h3 id="teacher-history-upcoming">Upcoming <span>· {upcoming.length}</span></h3><ul className="teacher-history-list">{entries.map(entry => "run" in entry ? runRow(entry.run) : lessonRow(entry.booking))}</ul></section> : null}
       {past.length ? <section aria-labelledby="teacher-history-past"><h3 id="teacher-history-past">Past &amp; cancelled <span>· {past.length}</span></h3><ul className="teacher-history-list">{past.map(booking => lessonRow(booking))}</ul></section> : null}
     </>
