@@ -386,6 +386,8 @@ async function fixture(width, options = {}) {
       else booking.attendance_status = data.noShow ? "no_show" : "expected";
       return route.fulfill({ json: { booking } });
     }
+    // Their plan and notes, on the dashboard beside their lessons.
+    if (/^\/admin\/students\/[^/]+\/notes$/.test(path)) return route.fulfill({ json: { plan: "", planUpdatedAt: null, lessons: [] } });
     state.errors.push(
       `Unexpected fixture request: ${request.method()} ${path}`,
     );
@@ -1087,7 +1089,7 @@ try {
   assert.equal(state.writes.filter(entry => entry.path === "/admin/students/nora/welcome").length, 0, "A lesson for a student with no email emails nobody");
 
   // Once she has an email, her link can go by email too.
-  await openNora("Edit details");
+  await openNora("Change details");
   await expect(noraProfile.getByLabel("Full name", { exact: true })).toHaveValue("Nora Lima");
   await noraProfile.getByLabel(/^Email/).fill("nora@example.invalid");
   // A background read started before the save must not replace its newer data.
@@ -1424,7 +1426,7 @@ try {
     await expect(history.getByRole("heading", { name: "Past & cancelled · 4" })).toBeVisible();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
     // What every lesson shares is said once above them, not on each card.
-    await expect(history.locator(".teacher-history-shared")).toHaveText(/^Every lesson\s*60 mins$/);
+    await expect(history.locator(".teacher-fact").filter({ hasText: "Every lesson" })).toContainText("60 mins");
     await expect(history.locator(".teacher-history-lesson").filter({ hasText: "60 mins" })).toHaveCount(0);
     const run = history.locator(".teacher-history-run");
     await expect(run).toContainText("Every Tuesday");
@@ -1433,7 +1435,9 @@ try {
     await expect(run).toContainText("In Porto");
     await run.getByRole("button", { name: "Show weeks", exact: true }).click();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(10);
-    await expect(history.locator(".teacher-history-lesson").filter({ hasText: "Tue 22 Sept" })).toHaveCount(1);
+    // Its weeks open inside it, each once, saying only what the run does not.
+    await expect(run.locator(".teacher-history-run__weeks > li").filter({ hasText: "Tue 22 Sept" })).toHaveCount(1);
+    await expect(run.locator(".teacher-history-run__weeks")).not.toContainText("In Porto");
     await run.getByRole("button", { name: "Hide weeks", exact: true }).click();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
     await expect(history).toContainText("12 Dec 2025");
@@ -1451,7 +1455,7 @@ try {
     await expect(history.getByRole("heading", { name: "Upcoming · 4" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 5" })).toBeVisible();
     await expect(history).not.toContainText("Happening now");
-    await history.getByRole("button", { name: "Edit details for Sam Known", exact: true }).click();
+    await history.getByRole("button", { name: "Change details for Sam Known", exact: true }).click();
     await expect(history.getByLabel("Full name", { exact: true })).toHaveValue("Sam Known");
     await expect(history.getByLabel(/^Email/)).toHaveValue("sam@example.invalid");
     // The student chooses their splat elsewhere while this unrelated editor

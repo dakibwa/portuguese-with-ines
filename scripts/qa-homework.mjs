@@ -102,8 +102,7 @@ try {
     await page.goto(`${base}/schedule/`);
     await page.getByRole("tab", { name: /^Students/ }).click();
     await page.getByRole("button", { name: "Open Ana Martins’s profile", exact: true }).click();
-    // Homework lives on their Notes & homework page, from its latest lesson without notes.
-    await page.getByRole("button", { name: "Notes & homework", exact: true }).click();
+    // Homework is written from the lesson's own row on their profile.
     await page.getByRole("button", { name: /^Add notes · / }).click();
     const editor = page.locator(".teacher-homework");
     const shot = name => editor.screenshot({ path: `${output}/teacher-${name}-${width}.png` });

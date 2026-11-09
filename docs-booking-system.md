@@ -784,15 +784,18 @@ permission path and validation.
 
 ### Notes & homework and her plan
 
-Each student's profile has a `Notes & homework` page (9 November 2026, Dan:
-"a homework page for each student and lesson structure … Ines can input
-notes about each lesson etc and it can build up over time"). It is hers
-alone. `GET /admin/students/:id/notes` returns her plan and every confirmed
+Each student's dashboard (their open card in Students) carries her notes and
+their homework on each past lesson's row, and her plan for them beside their
+details (9 November 2026, Dan: "a homework page for each student and lesson
+structure … Ines can input notes about each lesson etc and it can build up
+over time"; then "a simple dashboard for all things for that student"). It is
+hers alone. The dashboard reads the lessons and the notes side by side and
+matches them by booking id. `GET /admin/students/:id/notes` returns her plan and every confirmed
 lesson of theirs that has started (no-shows left out), newest first, with the
 private notes from `lesson_homework`, its level and one homework state:
 `none`, `draft`, `published` (with them), `review` (submitted, not yet
 returned) or `done` (returned). Notes are still written through the lesson's
-homework editor; the page only reads them.
+homework editor; the dashboard only reads them.
 
 Migration `0038-student-plans.sql` adds `students.lesson_plan` and
 `students.lesson_plan_updated_at`. `POST /admin/students/:id/plan` with

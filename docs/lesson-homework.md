@@ -1,8 +1,9 @@
 # Lesson homework
 
-Inês opens **Homework** on a lesson from the timetable, or from the
-student's **Notes & homework** page in their profile, where each lesson that
-has been shows her notes and where its homework is, under her plan for them. A new sheet is one decision per step, as in
+Inês opens **Homework** on a lesson from the timetable, or with **Add notes**
+or **Notes** on that lesson's row in the student's dashboard, where each
+lesson that has been shows her notes and where its homework is, beside her
+plan for them. A new sheet is one decision per step, as in
 the booking journey (15 October 2026, Dan: far too much text). **What did you
 work on?** offers one big **Take a photo** blob, which opens the phone's rear
 camera (`capture="environment"`), with **Gallery** and **Type it** beneath.
