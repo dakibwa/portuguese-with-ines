@@ -1017,6 +1017,214 @@ html:active-view-transition-type(document)::view-transition-new(root) {
   outline-offset: 3px;
 }
 
+/*
+ * An account's one bar (9 November 2026, Dan: Inês's "could it all be
+ * consolidated into one smaller banner that has her logo", then "similarly
+ * for students can the top bar merge too", "with a menu button if they care
+ * to go back"): the cream wordmark, which still leads home, a hairline, the
+ * page's name in the display hand and a splat cut off at the right edge, on
+ * the blue and grain the booking band has. `.is-bar` is always the bar;
+ * `.is-account-bar` is the booking page's, the bar only once the page is a
+ * student's. The menu's own heading (`.nav-mobile`) is the same bar, so the
+ * wordmark stays still as the menu opens.
+ */
+.is-account-bar :is(.site-header__title, .site-header__mark) {
+  display: none;
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) {
+  --bar-mark-width: clamp(118px, 10vw, 158px);
+  --bar-mark-right: clamp(-44px, -2.5vw, -24px);
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar).site-header {
+  min-height: 0;
+  border-bottom: 0;
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) :is(.site-header__inner, .nav-mobile__heading) {
+  position: relative;
+  overflow: hidden;
+  justify-content: flex-start;
+  min-height: 76px;
+  border-bottom: 0;
+  padding: 0.7rem var(--page-pad);
+  background-color: var(--blue-deep);
+  background-image: var(--paper-texture);
+  color: var(--paper);
+  gap: var(--gap-wide);
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) .site-header__brand {
+  position: relative;
+  z-index: 2;
+  flex: 0 1 calc(52px * 760 / 236);
+  width: auto;
+  min-width: 0;
+  border-radius: var(--squiggle-chip);
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) .header-wordmark {
+  width: 100%;
+  color: var(--paper);
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) .site-header__title {
+  position: relative;
+  z-index: 2;
+  display: block;
+  margin: 0;
+  border-left: 1px solid var(--outline-light-edge);
+  padding-left: var(--gap-wide);
+  font-family: var(--display);
+  font-size: clamp(1.55rem, 2.4vw, 2.1rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) .site-header__mark {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: var(--bar-mark-right);
+  display: block;
+  width: var(--bar-mark-width);
+  margin: 0;
+  aspect-ratio: 1;
+  opacity: 0.96;
+  transform: translateY(-50%);
+}
+
+/* The pages are behind the menu button at every width, clear of the splat,
+   and the menu's close stands exactly where the button did. */
+:is(.is-bar, :root[data-booking-account] .is-account-bar) .site-nav {
+  display: none;
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) :is(.nav-toggle, .nav-mobile__close) {
+  position: relative;
+  z-index: 2;
+  margin-right: calc(var(--bar-mark-width) + var(--bar-mark-right) + 0.5rem - var(--page-pad));
+  margin-left: auto;
+  border-radius: var(--squiggle-thumb);
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) .nav-toggle {
+  display: block;
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) .nav-toggle__line {
+  background: var(--paper);
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) .nav-mobile__close {
+  border-color: var(--outline-light-edge);
+  color: var(--paper);
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) .nav-mobile__close:focus-visible {
+  color: var(--blue-deep);
+}
+
+@media (hover: hover) {
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) .nav-mobile__close:hover {
+    color: var(--blue-deep);
+  }
+}
+
+:is(.is-bar, :root[data-booking-account] .is-account-bar) > .skip-link {
+  background: var(--paper-light);
+  color: var(--blue-deep);
+}
+
+/* Wide, the menu is a sheet at the right over the dimmed page. */
+@media (min-width: 821px) {
+  :is(.is-bar, :root[data-booking-account] .is-account-bar).nav-mobile {
+    display: block;
+    background: rgba(18, 33, 72, 0.4);
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) > .nav-mobile__inner {
+    --page-pad: 1.5rem;
+    width: min(24rem, 100%);
+    margin-left: auto;
+    background-color: var(--paper);
+    background-image: var(--paper-texture);
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) > .nav-mobile__inner :is(.site-header__brand, .site-header__title) {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) :is(.site-header__inner, .nav-mobile__heading) {
+    min-height: 64px;
+    padding-block: 0.6rem;
+    gap: var(--gap-block);
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) .site-header__brand {
+    flex-basis: calc(42px * 760 / 236);
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) .site-header__title {
+    padding-left: var(--gap-block);
+    font-size: 1.35rem;
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) .site-header__mark {
+    right: -38px;
+    width: 86px;
+  }
+
+  /* With a menu button the splat goes, the name is a little smaller and the
+     wordmark gives way first, so all three keep a line on a narrow phone. */
+  :is(.is-bar, :root[data-booking-account] .is-account-bar):is(.nav-mobile, :has(.nav-toggle)) :is(.site-header__inner, .nav-mobile__heading) {
+    gap: var(--gap-list);
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar):is(.nav-mobile, :has(.nav-toggle)) .site-header__title {
+    padding-left: var(--gap-list);
+    font-size: min(1.35rem, 5vw);
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar):is(.nav-mobile, :has(.nav-toggle)) .site-header__mark {
+    display: none;
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) :is(.nav-toggle, .nav-mobile__close) {
+    margin-right: 0;
+  }
+}
+
+/* The narrowest phones keep the wordmark and the name clear of each other
+   and let the splat go. */
+@media (max-width: 360px) {
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) :is(.site-header__inner, .nav-mobile__heading) {
+    gap: var(--gap-list);
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) .site-header__brand {
+    flex-basis: calc(36px * 760 / 236);
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) .site-header__title {
+    padding-left: var(--gap-list);
+    font-size: 1.25rem;
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar):is(.nav-mobile, :has(.nav-toggle)) .site-header__title {
+    font-size: min(1.25rem, 5vw);
+  }
+
+  :is(.is-bar, :root[data-booking-account] .is-account-bar) .site-header__mark {
+    display: none;
+  }
+}
+
 .button {
   display: inline-flex;
   align-items: center;
@@ -2629,6 +2837,28 @@ html:active-view-transition-type(document)::view-transition-new(root) {
 
 :root[data-booking-account] .booking-title--account {
   display: contents;
+}
+
+/* A student's bar shows the page's name (SiteHeader), so their band keeps
+   only its heading, for screen readers; the bar's copy is hidden from them. */
+:root[data-booking-account] .booking-intro {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:root[data-booking-account] .booking-intro > :not(h1) {
+  display: none;
+}
+
+:root[data-booking-account] .booking-composition {
+  grid-template-rows: 1fr;
 }
 
 .booking-intro > .editorial-rule {
@@ -7909,53 +8139,6 @@ p.lesson-when > span {
 }
 
 /* /booking — the page a student reaches from their confirmation email. */
-
-/*
- * The account pages ran straight from the wordmark into cream, while every
- * other page opens on a colour. This is that band.
- */
-.account-hero {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr;
-  align-items: center;
-  overflow: hidden;
-  padding: clamp(2rem, 4.5vw, 3.2rem) var(--page-pad);
-  background-color: var(--lavender);
-  background-image: var(--paper-texture);
-  gap: 1.5rem;
-}
-
-.account-hero h1 {
-  margin: 0;
-  font-family: var(--display);
-  font-size: clamp(2.3rem, 6vw, 4rem);
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  /* The display face has deep descenders that fall outside its line box, so a
-     1.05 line-height let "My lessons" collide with the line beneath it. */
-  line-height: 1.18;
-}
-
-/* Bigger, and behind the words: at this size it would otherwise push the
-   heading around on narrow screens. */
-.account-hero__mark {
-  position: absolute;
-  top: 50%;
-  right: clamp(-2rem, -1vw, 0rem);
-  z-index: 0;
-  width: clamp(150px, 22vw, 290px);
-  flex: none;
-  aspect-ratio: 1;
-  opacity: 0.55;
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
-.account-hero > div {
-  position: relative;
-  z-index: 1;
-}
 
 .manage-page {
   max-width: 760px;
