@@ -5654,18 +5654,10 @@ p.lesson-when > span {
   opacity: 0.82;
 }
 
-/* Arriving from a link, how the page works, as three dabs: left-aligned in
-   the centred card, at the intro's size, then the one button. */
+/* Arriving from a link: the intro, their email when there is none yet, and
+   the one button. */
 .sign-in-link .auth-panel__intro {
-  margin-bottom: 1rem;
-}
-
-.sign-in-link__steps {
-  width: fit-content;
-  max-width: 100%;
-  margin: 0 auto 1.5rem;
-  font-size: 0.93rem;
-  text-align: left;
+  margin-bottom: 1.1rem;
 }
 
 /*
