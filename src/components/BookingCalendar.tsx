@@ -2,7 +2,6 @@
 
 import { MeetingLink } from "@/components/MeetingLink";
 import { LessonsLoading } from "@/components/LessonsLoading";
-import { StudentExpressions } from "@/components/expressions/StudentExpressions";
 
 import { type ComponentType, type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -38,6 +37,14 @@ import { CalendarBookingPrompt } from "@/components/CalendarBookingPrompt";
  */
 const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/components/AuthPanel").then((m) => m.AuthPanel), "Loading…");
 const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons));
+// The optional gift and its painter are only used beside a student's lessons.
+// Keep their code out of a visitor's booking load, and keep a failed optional
+// chunk as quiet as the gift's existing failed API read.
+const { Component: StudentExpressions } = deferred(
+  () => import("@/components/expressions/StudentExpressions").then((m) => m.StudentExpressions),
+  "",
+  { quiet: true }
+);
 if (typeof window !== "undefined" && readSession()) void loadAccountControls();
 import { LessonMark } from "@/components/LessonMarks";
 import { clearSession, confirmSignInLink, fetchMe, requestEmailChange, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, SessionStorageError, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
@@ -722,7 +729,7 @@ function glideBarGroups(stage: HTMLElement, before: BarGroup[]) {
  * its fallback for 300ms before the form popped in.) Code still on its way
  * eases in when it arrives.
  */
-function deferred<Props extends object>(fetchComponent: () => Promise<ComponentType<Props>>, waiting = "") {
+function deferred<Props extends object>(fetchComponent: () => Promise<ComponentType<Props>>, waiting = "", options: { quiet?: boolean } = {}) {
   let ready: ComponentType<Props> | null = null;
   let loading: Promise<ComponentType<Props>> | null = null;
   const load = () =>
@@ -753,6 +760,7 @@ function deferred<Props extends object>(fetchComponent: () => Promise<ComponentT
     }, [Loaded, failed]);
     if (Loaded) return <Loaded {...props} />;
     if (failed) {
+      if (options.quiet) return null;
       return (
         <p className="booking-state-note" role="alert">
           This part of the page couldn&rsquo;t load.{" "}

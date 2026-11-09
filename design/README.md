@@ -7,6 +7,13 @@ published site is the acceptance surface. When this contract and the site
 diverge, reconcile them in the repository rather than maintaining a second
 design system elsewhere.
 
+The published [Português com a Inês design system](https://claude.ai/artifact/XrweSPkR5KgKC8mF5xYhcY)
+is a mirror of this file, the stylesheets and the running site, for designing
+with: colour and squiggle tokens named as the CSS variables, the site's own
+stylesheets, and cards cut from the live pages. It is rebuilt from the repository when the look
+changes and is never edited into a competing specification; where it and this
+file differ, this file wins.
+
 The current direction is:
 
 - the footer's dark blue (`#203e82`) across the interface and logo, lilac
@@ -39,8 +46,9 @@ directly in a few plain sentences. Keep practical details that help a student
 prepare, book or understand a fee; leave out internal payment and attendance
 processes. Avoid blunt reassurance, sales language and unnecessary jargon.
 
-Lesson homework stays attached to its lesson, inside the student's existing
-profile/history for Inês and under Homework for the student. Photo notes and
+Lesson homework stays attached to its lesson: for Inês on the student's
+`Notes & homework` page and in the lesson's details, for the student under
+Homework. Photo notes and
 drafts stay private until Inês reviews and publishes the sheet. Use short,
 level-appropriate European Portuguese instructions, recall and useful practice,
 with answers separate from questions. Offer Do online and Print worksheet.
@@ -517,7 +525,10 @@ usual lesson starts and days off; avoid a wall of administration forms.
   corner when they have a weekly run, three small checks and the one thing to
   press next, and only the dabs that need her eye (27 October 2026, Dan). The
   checks are `Signed in` (or `Link sent 5 Sept`, or `Not signed in`), `Card
-  saved` (or `No card yet`) and `Paid up` (or `€70 open` in coral, counting
+  saved` (or `No card yet`, or `Lessons not on card` when a saved card doesn't
+  yet cover lessons she added to come; a saved card with none of those counts
+  as done, 9 November 2026, Dan: no `Ask for card` for someone already paying)
+  and `Paid up` (or `€70 open` in coral, counting
   past lessons she added that were neither charged nor ticked paid); a
   blue dab marks each one done. Card and paid are omitted when cards are
   unavailable or the student is free at every length. The next button is
@@ -534,6 +545,22 @@ usual lesson starts and days off; avoid a wall of administration forms.
   and nothing charged carries the `Already paid` tick in place, so a lesson
   paid in cash is marked from here and leaves what is open. No duplicate To
   do list or separate student profile popup.
+  The open card is one top row (9 November 2026, Dan: "more consolidate and
+  simple … with the sliders in the top", Invite and X never stacked): name,
+  the three checks, the `Lessons` / `Notes & homework` slider, the next button,
+  then X. Where that row doesn't fit, the checks go beneath the name; on a
+  phone the slider takes its own line, so the next button always sits beside X.
+  `Notes & homework` is the student's page for what they are learning (9
+  November 2026, Dan: "a homework page for each student and lesson structure
+  … it can build up over time"): her `Plan` for them on a lilac band (a Beth
+  Ellen heading, their latest level as a dab, `Edit plan`), a coral `Add
+  notes · Thu 3 Sept` for the latest lesson without notes, then each lesson's
+  notes newest first as cream cards packed like the lessons. A card says each
+  thing once: the date, which opens it, a level only where it differs from
+  the plan's, its homework as one dab (`Draft`, `With them`, coral `To
+  review`, blue `Done`), then her notes. Opened, a lesson spans the row with
+  the homework steps below. Lessons with no notes fold into one lilac `2
+  earlier lessons without notes`. Homework to review opens this page.
   Student cards sit side by side according to the list's available width,
   with one column on phones. An opened card spans the whole list so details,
   lesson forms and history have room; closing it restores the compact card.
@@ -641,6 +668,14 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - Details contains full name, email, phone and NIF, with one Save details
     action. A student who has signed in changes their own email. A missing
     lesson never locks the email field (16 October 2026, Inês). Price uses the same editable rate form as onboarding.
+  - Their lessons read Upcoming, then Past & cancelled. A weekly run's weeks
+    still to come are one dashed card (9 November 2026, Dan: "just have them
+    all as one card and you can expand out"): the weekly repeat mark, `Every
+    Wednesday · 09:30–10:30`, `12 weeks, Wed 18 Nov to Wed 3 Feb`, the facts
+    its weeks share, and lilac `Show weeks`, which lists each week as its own
+    card after it. A week moved off the usual slot is counted on the run's
+    card. A lesson on now, a run with one week left and past lessons stay
+    single cards.
   - Add a lesson opens the calendar in the row. Length, location, weekly repeat
     and available times use the full row width as described above. A successful
     addition closes the form and leaves a short confirmation in that row.
@@ -723,11 +758,13 @@ usual lesson starts and days off; avoid a wall of administration forms.
   now`), quiet facts (place, length, payment, `Added by you`, moves), and her
   cancellation message or the student's note set off with a lilac edge.
   Each section uses a responsive grid of lesson cards: several across where
-  there is room, one column on phones. `Homework` sits at the top right beside
-  the date, with compact facts beneath, instead of taking another row at the
-  bottom. The date and time can wrap within the header; on very narrow cards
-  the button can wrap too, retaining a 44px target. Opening homework expands
-  that lesson across the full row; closing it returns the card to the grid.
+  there is room, one column on phones, packed so a short card leaves no hole
+  under it while still reading in date order. Where the open profile is wide
+  enough for two lessons beside it (9 November 2026, Dan: "this space isn't
+  used in a good way"), the student's details and her tools stack in a narrow
+  column on the left and the lessons fill the rest; narrower, they sit above
+  the lessons in rows. Homework is not on each lesson card: it lives on
+  their `Notes & homework` page.
   The Price control opens the two fields in place and says how many lessons to
   come moved to it, and `· standard` marks a length she hasn't priced.
   History includes older lessons outside the current week and follows the account

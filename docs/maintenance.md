@@ -30,9 +30,9 @@ For performance changes, keep the route, viewport, cache state, network/CPU
 conditions and fixture data comparable before and after. Record measured
 results rather than claiming a speedup from a source change alone.
 
-**Latest checkpoint:** the second pass below clears the remaining development
-dependency findings. The next priority is a measured loading/interaction
-baseline, followed by one confirmed bottleneck or failure case.
+**Latest checkpoint:** the third pass below reduces signed-out booking
+JavaScript and records matched loading measurements. Next, profile remaining
+booking work and interaction delays before choosing another change.
 
 ## 9 November 2026 — setup and Next.js security update
 
@@ -177,3 +177,97 @@ Braces mitigation remains in place.
    and any newer work before choosing files.
 3. Remove the scoped Minimatch override when upstream TypeScript-ESLint can
    select a patched dependency itself; keep audits and Braces hardening checked.
+
+## 9 November 2026 — defer the optional painter during booking
+
+**Source baseline:** maintenance head
+`673c49b22a5ba661dfdf783b11cf26068b6fadbd`, integrated with main at
+`2e1712a7657a020f3778e501ad96e172fb7c17ba`. Main's student notes and weekly-run
+work was retained. The final source also preserves main's later documentation
+update at `1d3a24330aa4dcf00179643344c9c210b356a366` from PR 196; only
+`AGENTS.md` and `design/README.md` changed there, after the timed samples.
+Continue in [PR 190](https://github.com/dakibwa/portuguese-with-ines/pull/190).
+
+### Confirmed finding and change
+
+A fresh signed-out `/book/` load downloaded the optional student-expression
+painter even though the gift only mounts beside a signed-in student's lesson
+overview. The initial network record included its 43,047-byte compiled chunk.
+Changed the import to use the calendar's existing deferred-component loader.
+The gift and painter now load when the lesson overview needs them, with the
+same quiet failure behavior as the gift's existing failed API reads. Booking,
+the expression painting, and the accepted motion remain intact.
+
+Extended the existing expression-translations journey so its first student
+visit starts from the embedded gift in `/book/?view=lessons`, then checks the
+full `/idioms/` page on return. Its approval assertion exposed a timing-dependent
+strict-selector failure: the success announcement and a concurrent loading
+announcement both have `role="status"`. The assertion now selects the approval
+announcement by its text; the subsequent count/content checks still verify
+that review completes.
+
+### Matched measurements
+
+Three fresh-browser-context cold loads per viewport, before and after, in
+Chromium 149.0.7827.55. Both static exports used the same isolated API replies,
+Porto timezone, 9 November 2026 at 09:00 business date, 900px viewport height,
+4× CPU slowdown, 1.6 Mbit/s download and 80ms simulated request latency. The
+date shim preserves real browser performance APIs. No build or other browser
+test ran concurrently with the timed samples.
+
+| Metric | Phone, 390px: before → after | Desktop, 1280px: before → after |
+| --- | --- | --- |
+| Requested JavaScript body bytes | 692,716 → 647,516 | 710,977 → 665,777 |
+| Gzip size of those JS files, level 6 | 211,110 → 194,155 | 217,767 → 200,812 |
+| Median time to first enabled calendar date | 5,863ms → 5,629ms | 5,864ms → 5,625ms |
+| Median observed LCP | 2,348ms → 2,344ms | 2,356ms → 2,340ms |
+| Observed CLS | 0.0331 → 0.0331 | 0.0127 → 0.0127 |
+
+The repeatable payload reduction is **45,200 bytes**, about 6.4–6.5% of the
+requested JavaScript, or **16,955 bytes (16.6 KiB) at gzip level 6**. The
+expression chunk is absent from the signed-out network record after the fix.
+The calendar became ready about 235–240ms sooner in this local throttled
+profile. LCP and layout shift are effectively unchanged. The long-task
+indicator varied (phone median 117 → 136ms; desktop 117 → 102ms), so this pass
+does not establish smoother animation or reduced main-thread blocking.
+
+Limits: the local static server serves uncompressed bodies; the gzip totals
+are computed file sizes, not observed Cloudflare transfer sizes. Real-world
+latency and cache behavior are not established by this profile. API interception
+also forces HTTP asset transfers during the same-context repeat navigations,
+so those repeat samples are excluded from cache-performance claims. Initial
+samples using Playwright's test clock were discarded because it replaced the
+performance APIs; only the corrected samples above are used.
+
+### Validation
+
+- Baseline and changed production export builds passed with the same isolated
+  localhost API and QA public configuration. These builds are profiling
+  artifacts, not production releases.
+- Focused ESLint of `BookingCalendar.tsx` and `qa-expression-translations.mjs`
+  passed; `git diff --check` passed.
+- The updated existing expression-translations journey passed at 390/1280px:
+  the student paints the embedded gift and sends a translation, Inês approves
+  it, and the approved text appears without a name on the full expression
+  page. Student form screenshots at both widths were inspected.
+- A scratch failure probe blocks the actual optional expression JS chunk at
+  390/1280px. The lesson overview remains visible with no nonempty alert or
+  page error. Private/provider replies are fixtures and mutations are refused.
+- Timed visitor loads report no page errors or horizontal overflow. All API
+  calls in the profile are isolated GETs. No production mutations, Worker
+  changes, database migrations or deployments were performed.
+
+Profiling code and raw samples are scratch artifacts under
+`/workspace/scratch/ines-pass3-*`; the durable method and results are recorded
+above. The focused journey remains the permanent regression coverage.
+
+### Next priorities
+
+1. Profile the remaining booking JavaScript and main-thread work, including a
+   real date/time selection, with comparable fixtures. Measure the dominant
+   delay before splitting or changing another component.
+2. Measure warm-cache behavior without browser request interception; the
+   current repeat-navigation samples do not establish it.
+3. Rotate into one failed-request or authorization path, checking current main
+   and open PRs first. Revisit the scoped dependency override when supported
+   upstream.

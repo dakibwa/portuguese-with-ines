@@ -7,6 +7,8 @@ import { ComeBackEmail, firstName } from "@/components/teacher/DormantEmail";
 import { LessonForm } from "@/components/teacher/LessonForm";
 import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
 import { StudentHistory } from "@/components/teacher/StudentHistory";
+import { StudentNotes } from "@/components/teacher/StudentNotes";
+import { HomeworkToggle } from "@/components/homework/HomeworkWorksheet";
 import { StudentPrice } from "@/components/teacher/StudentPrice";
 import { WhatsAppInvite } from "@/components/teacher/WhatsAppInvite";
 import { setStudentDormant, type AdminStudent } from "@/lib/admin-api";
@@ -29,7 +31,7 @@ function ProgressChecks({ progress }: { progress: StudentProgress }) {
   const checks: { key: string; done: boolean; label: string; owed?: boolean }[] = [
     { key: "in", done: progress.signedIn, label: progress.signedIn ? "Signed in" : progress.invitedAt ? `Link sent ${shortDate(progress.invitedAt)}` : "Not signed in" },
     ...(progress.card === null ? [] : [
-      { key: "card", done: progress.card, label: progress.card ? "Card saved" : "No card yet" },
+      { key: "card", done: progress.card, label: progress.card ? "Card saved" : progress.cardSaved ? "Lessons not on card" : "No card yet" },
       { key: "paid", done: !progress.openLessons, owed: Boolean(progress.openLessons),
         label: progress.openLessons ? `${formatMoneyCents(progress.openCents)} open` : "Paid up" },
     ]),
@@ -77,6 +79,11 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
   const setBusy = (value: boolean) => { setBusyState(value); onBusy?.(value); };
   const [notice, setNotice] = useState("");
   const [problem, setProblem] = useState("");
+  // Their lessons, or her notes and their homework (9 November 2026, Dan:
+  // "can we have a homework page for each student"); homework to review
+  // opens the notes.
+  const [view, setView] = useState<"lessons" | "notes">(homeworkId ? "notes" : "lessons");
+  useEffect(() => { if (homeworkId) setView("notes"); }, [homeworkId, homeworkRequestKey]);
   const row = useRef<HTMLLIElement>(null);
   const height = useRef<number | null>(null);
   const motion = useRef<Animation | null>(null);
@@ -229,6 +236,15 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
         onClick={() => open(profile ? null : "history")}
         type="button"
       ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{student.dormant ? <span className="teacher-student__label">Dormant</span> : null}</span></button>
+      {/* Open, everything about them sits in this one row (9 November 2026,
+          Dan: "more consolidate and simple … with the sliders in the top"):
+          their checks, Lessons or Notes, the next step, then close. */}
+      {profile ? <div className="teacher-student__bar">
+        {student.dormant ? null : <ProgressChecks progress={progress} />}
+        <HomeworkToggle label={`${student.name}’s lessons or notes`} value={view} controls={`${paneId}-view`} onChange={setView} className="teacher-student__view"
+          options={[["lessons", "Lessons"], ["notes", "Notes & homework"]]} />
+        {nextButton}
+      </div> : null}
       {step ? <div className="teacher-setup__action teacher-setup__close">
         <button className="teacher-dialog-close" aria-label="Close" aria-controls={paneId} disabled={disabled} onClick={close} type="button"><X size={20} aria-hidden="true" /></button>
       </div> : student.weekly ? <div className="teacher-setup__action">
@@ -237,7 +253,7 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
       </div> : null}
     </div>
     {/* A dormant student's checks wait until they come back. */}
-    {!student.dormant || nextButton ? <div className="teacher-student__progress">
+    {!profile && (!student.dormant || nextButton) ? <div className="teacher-student__progress">
       {student.dormant ? null : <ProgressChecks progress={progress} />}
       {nextButton}
     </div> : null}
@@ -278,7 +294,11 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
           </div>
         </div>
         {problem ? <p className="teacher-inline-error" role="alert">{problem}</p> : null}
-        <div className="teacher-student__history"><StudentHistory key={`${student.id}-${token}-${homeworkRequestKey ?? 0}`} student={student} token={token} homeworkId={homeworkId} onPaidChanged={() => onChanged?.()} /></div>
+        <div className="teacher-student__history" id={`${paneId}-view`}>
+          {view === "notes"
+            ? <StudentNotes key={`${student.id}-${token}-${homeworkRequestKey ?? 0}`} student={student} token={token} homeworkId={homeworkId} />
+            : <StudentHistory key={`${student.id}-${token}`} student={student} token={token} onPaidChanged={() => onChanged?.()} />}
+        </div>
       </> : step === "details" ? <StudentDetailsForm
         key={`${student.id}-details`}
         onBusy={setBusy}

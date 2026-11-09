@@ -5097,6 +5097,22 @@ await test("homework: private drafts, teacher review, lesson ownership and saved
   assert.equal(again.progress.submission.marks.q1.status, "retry", "meaningful accents are not stripped");
   const returnedStudents = await (await call("/admin/students", { user: "teacher", method: "GET" })).json();
   assert.ok(returnedStudents.students.find(student => student.id === "alice").homeworkToReview.some(item => item.bookingId === id));
+  // Her Notes & homework page: the lesson's private notes and that its homework
+  // waits for her, and a plan only she can read or change, never over a newer save.
+  // The page lists lessons that have started, so read it once this one has.
+  const lessonDay = clock;
+  clock = NativeDate.parse("2026-09-07T11:00:00.000Z");
+  const notesPage = await (await call("/admin/students/alice/notes", { user: "teacher", method: "GET" })).json();
+  clock = lessonDay;
+  assert.deepEqual((({ notes, level, homework }) => ({ notes, level, homework }))(notesPage.lessons.find(lesson => lesson.bookingId === id)),
+    { notes: input.notes, level: "A1", homework: "review" });
+  assert.equal((await call("/admin/students/alice/notes", { method: "GET" })).status, 401, "a student never reads her notes");
+  const planInput = { plan: "A1, a caminho do A2: pedidos no café.", updatedAt: notesPage.planUpdatedAt };
+  await endedTeacherWrite("/admin/students/alice/plan", planInput, "UPDATE students SET lesson_plan");
+  const planned = await call("/admin/students/alice/plan", { user: "teacher", body: planInput });
+  assert.equal(planned.status, 200, await planned.clone().text());
+  assert.equal((await planned.json()).plan, planInput.plan);
+  assert.equal((await call("/admin/students/alice/plan", { user: "teacher", body: { ...planInput, plan: "Stale" } })).status, 409, "a stale window cannot overwrite her plan");
   assert.equal((await call(route, { user: "teacher", body: { ...input, updatedAt: teacher.updatedAt } })).status, 409, "published questions cannot invalidate saved answers");
 
   // An old request must not read the recovered account's feedback, retry a

@@ -2511,6 +2511,66 @@
 .teacher-profile { width: min(620px, calc(100vw - 2rem)); }
 /* Let the row's available width decide how many readable lesson cards fit. */
 .teacher-history-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); align-items: start; gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
+.teacher-history-list.is-masonry { grid-auto-rows: 2px; row-gap: 0; margin-bottom: -0.75rem; }
+/* The open card's one top row (9 November 2026, Dan: the switch at the top,
+   Invite and close side by side, nothing said twice): name, checks, the
+   Lessons / Notes switch, the next step, close, in one grid whatever the
+   width, so Invite never drops under close. */
+.teacher-setup__header:has(> .teacher-student__bar) {
+  grid-template-columns: max-content minmax(0, 1fr) minmax(0, 24rem) max-content max-content; grid-template-areas: "name checks view next close";
+  gap: 0.5rem 1.25rem;
+}
+.teacher-student__bar { display: contents; }
+.teacher-setup__header:has(> .teacher-student__bar) > .teacher-setup__profile { grid-area: name; }
+.teacher-setup__header:has(> .teacher-student__bar) > .teacher-setup__action { grid-area: close; }
+.teacher-student__bar > .teacher-student__checks { grid-area: checks; }
+.teacher-student__bar > .teacher-student__next { position: relative; z-index: 2; grid-area: next; min-height: 44px; padding: 0.6rem 1.3rem; }
+.segmented.homework-toggle.teacher-student__view { grid-area: view; width: 100%; margin: 0; }
+.segmented.homework-toggle.teacher-student__view button { min-height: 40px; padding-inline: 0.4rem; text-align: center; }
+/* Too narrow for one row: the checks go beneath the name, so Invite stays beside close. */
+@container student-card (max-width: 66rem) {
+  .teacher-setup__header:has(> .teacher-student__bar) { grid-template-columns: max-content minmax(0, 1fr) minmax(0, 24rem) max-content max-content; grid-template-areas: "name . view next close" "checks checks checks checks checks"; }
+}
+/* A phone: name and close, the checks with the next step, then the switch across. */
+@container student-card (max-width: 46rem) {
+  .teacher-setup__header:has(> .teacher-student__bar) { grid-template-columns: minmax(0, 1fr) max-content; grid-template-areas: "name close" "checks next" "view view"; }
+  .teacher-student__bar > .teacher-student__next { justify-self: end; }
+  .segmented.homework-toggle.teacher-student__view { max-width: none; }
+  .segmented.homework-toggle.teacher-student__view button { white-space: normal; }
+}
+/* Notes & homework, beside Lessons in the open profile (9 November 2026,
+   Dan: "a homework page for each student … it can build up over time"): her
+   plan on a lilac band, then each lesson's notes as cards packed like the
+   lessons, with where its homework is as a dab. */
+.teacher-notes { display: grid; gap: 1rem; }
+.teacher-notes__plan { padding: 1rem 1.1rem; border-radius: var(--squiggle-field); background: rgba(170, 164, 230, 0.22); }
+.teacher-notes__plan-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.teacher-notes__plan-head h4 { margin: 0; color: var(--ink); font: 400 1.7rem/1.1 var(--display); letter-spacing: -0.02em; }
+.teacher-notes__plan-head .teacher-history-homework { margin-left: auto; }
+.teacher-notes__plan-text { margin: 0.6rem 0 0; white-space: pre-wrap; font: 500 0.88rem/1.55 var(--ui); }
+.teacher-notes__plan-field { display: block; width: 100%; margin-top: 0.75rem; }
+.teacher-notes__plan-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+.teacher-notes__next { justify-self: start; gap: 0.5rem; }
+.teacher-notes__top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; font-size: 0.8rem; }
+.teacher-notes__top > .teacher-history-homework { margin-left: auto; }
+/* The date opens its lesson; closed, the whole card answers to it. */
+.teacher-notes__lesson { position: relative; }
+.teacher-notes__lesson.is-open { grid-column: 1 / -1; }
+.teacher-notes__when { padding: 0; border: 0; background: none; color: var(--ink); font: 700 0.84rem/1.3 var(--ui); cursor: pointer; }
+.teacher-notes__lesson:not(.is-open) .teacher-notes__when::after { position: absolute; inset: 0; border-radius: var(--squiggle-field); content: ""; }
+.teacher-notes__when:focus-visible { outline: none; }
+.teacher-notes__lesson:has(.teacher-notes__when:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
+@media (hover: hover) { .teacher-notes__lesson:not(.is-open):hover { border-color: var(--lavender-ink); } }
+.teacher-notes__level, .teacher-notes__state { padding: 0.25rem 0.65rem; border-radius: var(--squiggle-chip); font: 700 0.7rem/1.3 var(--ui); }
+.teacher-notes__level { background: rgba(170, 164, 230, 0.26); color: var(--lavender-ink); }
+.teacher-notes__state { background: var(--paper); color: var(--lavender-ink); letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.62rem; }
+.teacher-notes__state.is-review { background: var(--coral-action); color: var(--paper-light); }
+.teacher-notes__state.is-done { background: var(--blue-deep); color: var(--paper-light); }
+.teacher-notes__text { display: -webkit-box; margin: 0.6rem 0 0; overflow: hidden; white-space: pre-wrap; font: 500 0.84rem/1.5 var(--ui); -webkit-box-orient: vertical; -webkit-line-clamp: 7; }
+.teacher-notes__lesson.is-open .teacher-notes__text { display: none; }
+.teacher-notes__earlier { display: grid; justify-items: start; gap: 0.75rem; }
+.teacher-notes__earlier > .teacher-history-homework.teacher-history-homework { margin: 0; }
+.teacher-notes__earlier > ul { justify-self: stretch; }
 .teacher-history-lesson { container-type: inline-size; min-width: 0; padding: 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--squiggle-field); background: var(--raised); }
 .teacher-history-lesson__time > i { font-style: normal; }
 @container (max-width: 23.5rem) {
@@ -3233,6 +3293,18 @@
 .teacher-student__about .booking-payment-facts { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0; font-size: 0.78rem; overflow-wrap: anywhere; }
 .teacher-student__tools { display: flex; flex-wrap: wrap; gap: 0.45rem; }
 .teacher-student__tools .button { gap: 0.4rem; }
+/* A wide profile (9 November 2026, Dan: "this space isn't used in a good
+   way"): who they are and her tools in a narrow column, their lessons beside
+   it, packed with no hole under a short card. The column comes in only where
+   two lessons still fit side by side beside it; narrower, it sits above them. */
+@container student-card (min-width: 58rem) {
+  .teacher-setup__body:has(> .teacher-student__about) { grid-template-columns: minmax(12rem, 14rem) minmax(0, 1fr); align-items: start; column-gap: 1.25rem; }
+  .teacher-setup__body > .teacher-student__about { grid-column: 1; grid-row: span 2; flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: flex-start; gap: 1rem; padding-right: 1.25rem; border-right: 1px solid var(--rule-soft); }
+  .teacher-setup__body > .teacher-student__about .booking-payment-facts { flex-direction: column; gap: 0.45rem; }
+  .teacher-setup__body > .teacher-student__about .teacher-student__tools { flex-direction: column; align-items: stretch; }
+  .teacher-setup__body > .teacher-student__about .teacher-student__tools .button { justify-content: flex-start; }
+  .teacher-setup__body:has(> .teacher-student__about) > :not(.teacher-student__about) { grid-column: 2; }
+}
 /* Her groups: a heading with its count and one quiet line of what it means. */
 .teacher-student-group { display: grid; gap: 0.6rem; margin-top: 1.4rem; }
 .teacher-student-group:first-of-type { margin-top: 0.9rem; }
@@ -3291,3 +3363,13 @@
 .teacher-translation__text { white-space: pre-wrap; }
 .teacher-translation__meta { font-size: 0.78rem; opacity: 0.8; }
 .teacher-translation .teacher-expression__actions { margin-top: 0.6rem; }
+/* A weekly run as one card in a student's lessons (9 November 2026, Dan),
+   in the dashed tile the payment card gives a run; its weeks follow it as
+   ordinary lesson cards once opened. */
+.teacher-history-run { border-style: dashed; border-color: var(--lavender); }
+.teacher-history-run .teacher-history-lesson__top strong { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0 0.35rem; }
+.teacher-history-run__mark { flex: none; color: var(--blue); }
+.teacher-history-run__span { margin: 0.35rem 0 0; color: var(--lavender-ink); font: 500 0.74rem/1.4 var(--ui); }
+.teacher-history-run__span > span { white-space: nowrap; }
+.teacher-history-run__toggle svg { transition: rotate var(--motion-surface, 200ms) var(--motion-ease, ease); }
+.teacher-history-run__toggle[aria-expanded="true"] svg { rotate: 180deg; }

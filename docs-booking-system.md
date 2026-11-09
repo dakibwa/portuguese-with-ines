@@ -54,6 +54,10 @@ Inês on /schedule                     (her own account, role=teacher)
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
   → POST /admin/students/:id/invite-link             make a sign-in link for her to send on WhatsApp;
                                                      nothing emailed (ten an hour per student)
+  → GET  /admin/students/:id/notes                   her plan for them and each lesson that has started, newest
+                                                     first, with her notes, level and homework state; hers alone
+  → POST /admin/students/:id/plan                    save her plan { plan, updatedAt }; 409 over a newer save,
+                                                     503 until migration 0038 is applied
   → POST /admin/students/:id/dormant                 mark them dormant, or active again; nothing emailed
   → GET/POST /admin/dormant-email                    the default each come-back email starts from
   → POST /admin/students/:id/dormant-email           send one dormant student theirs, at most once a day
@@ -777,6 +781,26 @@ what is needed; help uses short bullets. Sign-in and card belong to the student.
 without an email, and surfaces the existing 3-per-hour endpoint's 429 message.
 Waiting on students adds no badge count. All writes use the existing teacher
 permission path and validation.
+
+### Notes & homework and her plan
+
+Each student's profile has a `Notes & homework` page (9 November 2026, Dan:
+"a homework page for each student and lesson structure … Ines can input
+notes about each lesson etc and it can build up over time"). It is hers
+alone. `GET /admin/students/:id/notes` returns her plan and every confirmed
+lesson of theirs that has started (no-shows left out), newest first, with the
+private notes from `lesson_homework`, its level and one homework state:
+`none`, `draft`, `published` (with them), `review` (submitted, not yet
+returned) or `done` (returned). Notes are still written through the lesson's
+homework editor; the page only reads them.
+
+Migration `0038-student-plans.sql` adds `students.lesson_plan` and
+`students.lesson_plan_updated_at`. `POST /admin/students/:id/plan` with
+`{ plan, updatedAt }` saves at most 4,000 characters, teacher only, and
+answers 409 when `updatedAt` isn't the saved one, so a stale window never
+overwrites a newer plan. **Ship order:** apply 0038 to staging and production
+D1, then deploy the Worker. Before it is applied the page reads an empty plan
+and saving one answers 503; nothing else depends on it.
 
 ### Dormant students and the come-back email
 
