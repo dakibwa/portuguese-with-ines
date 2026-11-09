@@ -447,7 +447,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
   touch input must work without dragging.
 - A sliding tab bar with a thin dark-blue border groups `Students`, `Timetable`, `Time off`,
   `Receipts`, `Expressions` and `Profile`. Open on `Timetable`;
-  keep the week pager beside its month-and-year heading. The phone bar holds all six
+  keep `Edit weekly hours` beside its month-and-year heading and the week
+  pager at the row's right edge, as the month pagers are. The phone bar holds all six
   tabs in two balanced rows that fill the available width, without scrolling. Dates
   are centred evenly across the timetable header; omit the Porto gutter label.
   Arrow keys, Home and End move between
@@ -683,7 +684,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   existing reads; there is nothing new to store or dismiss.
 - Each date has one compact header cell: weekday and bold date centred together
   on one line (`Mon 7`), today's number in a filled blue lozenge with cream
-  type, and a booked dot that does not shift the date. Its Day off switch sits at the
+  type. On a phone, where one day shows at a time, a booked dot marks the
+  days with lessons without shifting the date; the whole week has none, since
+  its lessons are in view beneath. Its Day off switch sits at the
   right, moving to a second short line inside the cell when the column cannot
   fit both. It has a 44px hit area and keeps its full dated accessible name.
   There is no separate Day off row. On phones, the selected date appears only
@@ -1584,13 +1587,12 @@ Preserve these desktop and mobile states:
   elsewhere, and the `Earlier weeks` and `Later weeks` arrows on the right,
   solid blue with white arrows.
   `Later weeks` carries a small coral count of the booked lessons beyond the
-  page, so nothing booked is out of sight without a sign. On a wider card each
-  week starts with its month (`OCT`), in ink where a month begins and lilac ink
-  where it carries on, and a month that begins part-way through a week marks
-  its 1st (`1 NOV`); on a phone, on the lessons card and the booking calendar
-  alike, the header names the months and every 1st carries its own, so the
+  page, so nothing booked is out of sight without a sign. On every calendar
+  and at every width (the lessons card, booking, and moving a lesson) the
+  header names the months and every 1st carries its own (`1 OCT`), so the
   seven days take the card's whole width (13 October 2026, Dan: "less
-  cramped", and the same logic on every screen). There are no caption rows across the
+  cramped", and the same logic on every screen; since 9 November 2026 no
+  calendar has a month beside each week). There are no caption rows across the
   grid. A booked day's times are sized by the day itself, so they always sit
   inside its splat at any width. The key sits beneath the weeks it explains,
   on a phone in two short columns, the kinds of lesson on the left and the
@@ -1841,8 +1843,8 @@ where a calendar puts it and nothing taking room it doesn't earn:
   line;
 - the calendar's header holds its months, the clock (marked with a clock, since
   a globe means online) and the arrows; the `?` sits beside the months, and
-  the key beneath the weeks. Each week starts with
-  its month, instead of a caption row across the grid. The clock line names
+  the key beneath the weeks. Every 1st names its
+  own month, instead of a caption row across the grid or a month beside each week. The clock line names
   one clock at a time: while booking, the place chosen's (`Los Angeles time`
   online, `Porto time` in Porto); on Your lessons, the next lesson's, switching
   to the other while a lesson on it is hovered or focused, the two names
@@ -2053,7 +2055,8 @@ tools, again without new content:
   creating an account, including at the booking's `Almost there`, has no
   password to forget.
   Every sign-in card opens on one small full-colour mark centred above its
-  heading, clear of the words;
+  heading, clear of the words; it is one card, at one width and headed in
+  the display hand, on Inês's page as on a student's;
 - in Edit details each note sits under its own field when the fields are
   paired;
 - past lessons are cut in the tile hand on one surface (since 9 October 2026
@@ -2334,6 +2337,31 @@ published design system, with spacing given the same care:
   connection states she can act on.
 - FAQ directions lead through sign-in to Your lessons; homework stays under
   its own past lesson and the Meet link on its lesson.
+
+## One way for each thing — 9 November 2026
+
+Dan: "it makes it easier for the user both booking and ines too if things are
+consistent and repeated rather than loads of different ways of interfacing
+with things but still in a stylished beautiful way". Where two screens do the
+same job, they use the same piece, on a student's side and on Inês's:
+
+- Every calendar is the booking calendar's seven full-width days: the lessons
+  card and moving a lesson lose the month beside each week, at every width
+  and while loading.
+- Every calendar key is the one small capital hand; the Time off month's key
+  joins the Timetable's and a student's. Its swatches stay its own days'.
+- Every sign-in card is the one card. Inês's is no longer wider, and its
+  heading is in the display hand.
+- On the Timetable, `Edit weekly hours` sits beside the month and the pager
+  keeps the right edge, as on Time off and Receipts and as a phone lays them
+  out. The held place of `This week` is then part of the space between them,
+  never a gap inside a row of buttons.
+- Past-lesson rows in one line share a height, and a cancelled lesson's first
+  line is as tall as a homework chip, so the dates line up across the row.
+- On Lessons, the trial's `60 mins` tag is centred on its price and never
+  makes that line taller, so the three cards' rules and sentences are level.
+- An account page's band holds its title alone; the card beneath says what to
+  do (`New password` no longer runs a sentence across its splat on a phone).
 
 ## One schedule for students — 9 November 2026
 

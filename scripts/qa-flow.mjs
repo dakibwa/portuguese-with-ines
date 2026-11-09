@@ -206,14 +206,12 @@ try {
 await calendarZonePage.locator("#booking-calendar-weeks").waitFor({ state: "visible", timeout: 10_000 });
 
 // The calendar shows four weeks at a time; the end of September and October
-// are on the next page. Its title names the months the weeks start in, each
-// week starts with its own month, and a month beginning part-way through a
-// week marks its 1st.
+// are on the next page. Its title names the months the weeks start in, and
+// every 1st names its own; no month repeats beside each week.
 const readCalendarLabels = (keys) => calendarZonePage.evaluate((dateKeys) => {
   const title = document.querySelector(".unified-calendar__month");
   return {
     title: (title?.querySelector(".when-long") ?? title)?.textContent?.trim() ?? "",
-    rows: [...document.querySelectorAll(".calendar-week__month")].map((label) => label.textContent?.trim().toUpperCase()),
     days: Object.fromEntries(
       dateKeys.map((key) => {
         const cell = document.querySelector(`[data-date-key="${key}"]`);
@@ -233,12 +231,10 @@ const calendarDateLabels = { firstPageLabels, nextPageLabels };
 
 if (
   firstPageLabels.title !== "August – September 2026" ||
-  firstPageLabels.rows.join(" ") !== "AUG SEPT SEPT SEPT" ||
   firstPageLabels.days["2026-08-31"].month !== "" ||
   firstPageLabels.days["2026-08-31"].ariaLabel !== "Monday, 31 August 2026, unavailable" ||
   firstPageLabels.days["2026-09-01"].month !== "SEPT" ||
   nextPageLabels.title !== "September – October 2026" ||
-  nextPageLabels.rows.join(" ") !== "SEPT OCT OCT OCT" ||
   nextPageLabels.days["2026-09-28"].month !== "" ||
   nextPageLabels.days["2026-10-01"].month !== "OCT"
 ) {
@@ -2025,7 +2021,7 @@ await accountPage.locator("#upcoming-lessons-heading").waitFor({ state: "visible
 const mobileAccountLayout = await accountPage.evaluate(() => {
   const calendar = document.querySelector("#lesson-calendar .unified-calendar__grid");
   const calendarBounds = calendar?.getBoundingClientRect();
-  const firstWeekday = calendar?.querySelector(".calendar-weekdays span:not(.calendar-weekdays__corner)")?.getBoundingClientRect();
+  const firstWeekday = calendar?.querySelector(".calendar-weekdays span")?.getBoundingClientRect();
   const lastWeekday = calendar?.querySelector(".calendar-weekdays span:last-child")?.getBoundingClientRect();
   const legend = calendar?.querySelector(".unified-calendar__legend")?.getBoundingClientRect();
   return {

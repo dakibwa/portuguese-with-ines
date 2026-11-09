@@ -95,10 +95,6 @@
   flex: 1 0 auto;
   padding: 1.6rem var(--page-pad) 4rem;
 }
-.teacher-main > .auth-panel {
-  max-width: 600px;
-  margin: 0 auto;
-}
 .teacher-workspace {
   --teacher-slot-height: 25px;
   min-width: 0;
@@ -1731,6 +1727,20 @@
   .teacher-week-toolbar .teacher-pager-current.is-idle { display: none; }
 }
 
+/* From a side panel up, Edit weekly hours sits beside the month it belongs
+   to and the pager keeps the right edge, as on Time off and Receipts and as
+   a phone lays them out. The held place of `This week` is then part of the
+   space between the two, not a gap inside a row of buttons. The whole week
+   is in view here, so its lessons need no dot above their dates. */
+@media (min-width: 601px) {
+  .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar {
+    grid-template-areas: "title mode pager";
+    grid-template-columns: auto 1fr auto;
+  }
+  .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-week-mode { justify-self: start; }
+  .teacher-heading-booked-dot { display: none; }
+}
+
 /* Keep both lilac controls together on the narrowest phones. */
 @media (max-width: 360px) {
   .teacher-week-toolbar .button--compact { padding-inline: 0.65rem; }
@@ -2358,14 +2368,17 @@
   border-radius: 50%;
   background: currentColor;
 }
+/* The one key hand: the Timetable's and a student's calendar's. */
 .teacher-month-key {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 1rem;
+  gap: 0.65rem 1.15rem;
   margin-top: 1rem;
   color: var(--lavender-ink);
-  font: 500 0.7rem/1.4 var(--ui);
+  font: 700 0.63rem/1.3 var(--ui);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 .teacher-month-key span {
   display: inline-flex;
@@ -2571,7 +2584,7 @@
   .teacher-month-grid { gap: 0.2rem; }
   .teacher-month-day { min-height: 54px; }
   .teacher-month-state { font-size: 0.5rem; }
-  .teacher-month-key { column-gap: 0.65rem; font-size: 0.62rem; }
+  .teacher-month-key { column-gap: 0.65rem; }
 }
 /* Her students (12 October 2026, Dan): one row each, who first, then what
    is done and what isn't, and a way in to send. Done reads lilac; anything

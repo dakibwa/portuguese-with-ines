@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronRight } from "lucide-react";
-import { buildBookingWeeks, shortMonth } from "@/lib/booking-api";
+import { buildBookingWeeks } from "@/lib/booking-api";
 
 const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -54,15 +54,11 @@ export function LessonsLoading({ todayKey }: { todayKey: string }) {
         </div>
       </div>
       <div aria-hidden="true" className="calendar-weekdays">
-        <span className="calendar-weekdays__corner" />
         {weekdayLabels.map((label) => <span key={label}>{label}</span>)}
       </div>
       <div aria-hidden="true" className="calendar-weeks">
         {weeks.map((week, row) => (
           <div className="calendar-week" key={week.key}>
-            <span className={`calendar-week__month${row > 0 && weeks[row - 1].cells[0].month === week.cells[0].month ? " is-repeat" : ""}`}>
-              {shortMonth(week.cells[0].month, week.cells[0].key)}
-            </span>
             {week.cells.map((cell, column) => (
               <span
                 className={`lessons-loading__day${cell.key < todayKey ? " is-past" : ""}${cell.isToday ? " is-today" : ""}`}
