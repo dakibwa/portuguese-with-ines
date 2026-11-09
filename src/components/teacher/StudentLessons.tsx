@@ -4,9 +4,8 @@ import { addedByTeacher, paidByHand, setLessonPaid, type AdminBooking } from "@/
 import { PaidTick } from "@/components/teacher/PaidTick";
 import { formatBookedLessonLabel, formatSlotTime } from "@/lib/booking-api";
 import { dateKey, dateLabel } from "@/lib/teacher-calendar";
-import { Fragment, useEffect, useState } from "react";
-import { BookOpen, ChevronDown, Repeat } from "lucide-react";
-import { TeacherHomework } from "@/components/homework/TeacherHomework";
+import { Fragment, useState } from "react";
+import { ChevronDown, Repeat } from "lucide-react";
 
 function paymentLabel(booking: AdminBooking) {
   if (booking.payment_status === "refunded") return "Refunded";
@@ -64,9 +63,8 @@ export function upcomingEntries(upcoming: AdminBooking[], now: number): Upcoming
  * and cancelled, reading the records from the start of time rather than the
  * visible week.
  */
-export function StudentLessons({ bookings, error, now, onRetry, token, requestedHomeworkId, onRecordRefund, onPaid }: {
+export function StudentLessons({ bookings, error, now, onRetry, token, onRecordRefund, onPaid }: {
   token: string;
-  requestedHomeworkId?: string;
   /** Null until they have been read. */
   bookings: AdminBooking[] | null;
   error: string;
@@ -76,20 +74,11 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
   /** A past lesson ticked or unticked Already paid. */
   onPaid?: (booking: AdminBooking) => void;
 }) {
-  const [homeworkId, setHomeworkId] = useState<string | null>(null);
-  const [homeworkBusy, setHomeworkBusy] = useState(false);
   const [paying, setPaying] = useState("");
   const [paidError, setPaidError] = useState<{ id: string; message: string } | null>(null);
   const [openRuns, setOpenRuns] = useState<string[]>([]);
-  useEffect(() => { if (requestedHomeworkId) setHomeworkId(requestedHomeworkId); }, [requestedHomeworkId]);
   const upcoming = upcomingLessons(bookings ?? [], now);
   const entries = upcomingEntries(upcoming, now);
-  // Homework asked for on a week inside a closed run opens that run.
-  const requestedRun = entries.find(entry => "run" in entry && entry.run.lessons.some(lesson => lesson.id === requestedHomeworkId));
-  const requestedRunId = requestedRun && "run" in requestedRun ? requestedRun.run.id : "";
-  useEffect(() => {
-    if (requestedRunId) setOpenRuns(current => current.includes(requestedRunId) ? current : [...current, requestedRunId]);
-  }, [requestedRunId]);
   const past = (bookings ?? []).filter(booking => booking.status === "cancelled" || Date.parse(booking.ends_at) <= now)
     .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
   // Within half a year either way the year is plain from the month; further
@@ -143,17 +132,13 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
             </strong>
             {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
           </div>
-          {booking.student_id && !cancelled ? <button type="button" data-homework-exit className="teacher-history-homework" disabled={homeworkBusy}
-            aria-expanded={homeworkId === booking.id} onClick={() => setHomeworkId(homeworkId === booking.id ? null : booking.id)}>
-            <BookOpen size={15} aria-hidden="true" />{homeworkId === booking.id ? "Close homework" : "Homework"}
-          </button> : null}
         </div>
         <ul className="booking-payment-facts teacher-history-lesson__facts">
           <li>{booking.location === "porto" ? "In Porto" : "Online"}</li>
           {facts.map(fact => <li key={fact}>{fact}</li>)}
         </ul>
         {settle ? <div className="teacher-history-lesson__paid">
-          <PaidTick checked={paidByHand(booking)} disabled={Boolean(paying) || homeworkBusy} onChange={async (paid) => {
+          <PaidTick checked={paidByHand(booking)} disabled={Boolean(paying)} onChange={async (paid) => {
             setPaying(booking.id);
             setPaidError(null);
             try {
@@ -169,8 +154,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
         </div> : null}
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
         {booking.notes ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
-        {cancelled && paidByHand(booking) && booking.payment_status !== "refunded" ? <button className="button button--outline button--small" type="button" disabled={homeworkBusy} onClick={() => onRecordRefund(booking)}>Record refund</button> : null}
-        {homeworkId === booking.id ? <TeacherHomework key={`${booking.id}-${token}`} bookingId={booking.id} token={token} onBusy={setHomeworkBusy} /> : null}
+        {cancelled && paidByHand(booking) && booking.payment_status !== "refunded" ? <button className="button button--outline button--small" type="button" onClick={() => onRecordRefund(booking)}>Record refund</button> : null}
       </li>
     );
   }
@@ -216,7 +200,7 @@ export function StudentLessons({ bookings, error, now, onRetry, token, requested
               </strong>
             </div>
             <button type="button" className="teacher-history-homework teacher-history-run__toggle" aria-expanded={open} aria-controls={open ? weeksId : undefined}
-              disabled={homeworkBusy} onClick={() => setOpenRuns(current => open ? current.filter(id => id !== run.id) : [...current, run.id])}>
+              onClick={() => setOpenRuns(current => open ? current.filter(id => id !== run.id) : [...current, run.id])}>
               <ChevronDown size={15} aria-hidden="true" />{open ? "Hide weeks" : "Show weeks"}
             </button>
           </div>

@@ -768,3 +768,37 @@ export function connectGoogleMeet(token: string) {
     body: JSON.stringify({}),
   });
 }
+
+/**
+ * A student's notes, built up lesson by lesson (9 November 2026, Dan: "Ines
+ * can input notes about each lesson etc and it can build up over time"): her
+ * plan for them, then each lesson that has been, newest first, with what they
+ * worked on and where its homework is. Notes and plan are hers alone.
+ */
+export type NoteHomework = "none" | "draft" | "published" | "review" | "done";
+export type StudentNoteLesson = {
+  bookingId: string; lessonAt: string; minutes: number;
+  notes: string; level: string | null; homework: NoteHomework;
+};
+export type StudentNotes = { plan: string; planUpdatedAt: string | null; lessons: StudentNoteLesson[] };
+
+const noteHomework: NoteHomework[] = ["none", "draft", "published", "review", "done"];
+function studentNotes(data: StudentNotes) {
+  if (typeof data.plan !== "string" || (data.planUpdatedAt !== null && typeof data.planUpdatedAt !== "string") ||
+    !Array.isArray(data.lessons) || !data.lessons.every(row => isApiRecord(row) && typeof row.bookingId === "string" &&
+      isApiInstant(row.lessonAt) && Number.isFinite(row.minutes) && typeof row.notes === "string" &&
+      (row.level === null || typeof row.level === "string") && noteHomework.includes(row.homework as NoteHomework))) throw new Error(BOOKING_REPLY_ERROR);
+  return data;
+}
+
+export function fetchStudentNotes(token: string, studentId: string) {
+  return adminRequest<StudentNotes>(token, `/admin/students/${encodeURIComponent(studentId)}/notes`).then(studentNotes);
+}
+
+/** Her plan for a student; refused (409) if it changed in another window. */
+export function saveStudentPlan(token: string, studentId: string, plan: string, updatedAt: string | null) {
+  return adminRequest<StudentNotes>(token, `/admin/students/${encodeURIComponent(studentId)}/plan`, {
+    method: "POST",
+    body: JSON.stringify({ plan, updatedAt }),
+  }).then(studentNotes);
+}
