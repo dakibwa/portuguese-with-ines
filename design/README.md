@@ -7,6 +7,13 @@ published site is the acceptance surface. When this contract and the site
 diverge, reconcile them in the repository rather than maintaining a second
 design system elsewhere.
 
+The published [Português com a Inês design system](https://claude.ai/artifact/XrweSPkR5KgKC8mF5xYhcY)
+is a mirror of this file, the stylesheets and the running site, for designing
+with: colour and squiggle tokens named as the CSS variables, the site's own
+stylesheets, and cards cut from the live pages. It is rebuilt from the repository when the look
+changes and is never edited into a competing specification; where it and this
+file differ, this file wins.
+
 The current direction is:
 
 - the footer's dark blue (`#203e82`) across the interface and logo, lilac
