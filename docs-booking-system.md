@@ -420,12 +420,14 @@ also outside this change. Students' own translations are below.
 
 ## Students' translations of an expression
 
-Added 30 October 2026 (Dan, for Inês). Under a painted expression, beside
-`Notas e/ou origem`, a `Translations` toggle opens a panel the same way: hidden
-until pressed, below the reading's last row, so opening it never moves the row.
-The panel loads on first open. Everyone reading sees the translations Inês has
-approved, as a language label and the text. A signed-in student can add their
-own in any language; it waits for Inês and is shown only once she approves it.
+Added 30 October 2026 (Dan, for Inês); since 7 November 2026 it is one of
+the painted reading's facts, `Noutras línguas`, after its examples, rather
+than a toggle at its foot. It loads when the reading opens. Everyone reading
+sees the versions Inês has approved, as a language label and the text. A
+signed-in student's `Add yours` opens a small form in place that asks only
+how they say it; its `language` is their device's language setting, named in
+English (`Other` when the browser can't name it). It waits for Inês and is
+shown only once she approves it. The Worker and the `expression_translations` table are unchanged.
 The painting page needs an account, so a visitor who is signed out sees its
 sign-in panel, which says they can add translations once signed in. If a
 student's session has lapsed when they send one, the 401 forgets it and the

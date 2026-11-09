@@ -817,11 +817,14 @@ opening `/idioms/` with the same signed-in account.
   right, and each label sits beside its value; narrower cards and the
   preview keep labels above values: `Tradução à letra` (the literal
   translation, when there is one; restored 30 October 2026 at Inês's request),
-  `Quer dizer` (the Portuguese meaning,
-  a step larger than the rest) and `Em inglês`; then
+  `Quer dizer` (the Portuguese meaning) and `Em inglês`; then
   `Exemplo`/`Exemplos`, where the expression's own words are marked with a
-  soft wash of the paint, taking in a verb the example has conjugated. Notes/origin and reference links
-  open in a quiet disclosure. Optional themes use a lilac pill fill.
+  soft wash of the paint, taking in a verb the example has conjugated.
+  Notes/origin are one of the facts, `Notas e/ou origem`, never a
+  disclosure, and the reference link is not shown (7 November 2026, Dan;
+  the editor still keeps it). Every value shares one type style, the
+  meaning included (7 November 2026, Dan: "same font styles"). Optional
+  themes use a lilac pill fill.
 - Reuse blue for Edit, soft lilac for Preview and publication changes, coral
   for saving, and outline for Cancel/Done. Up/down buttons reorder the whole
   collection; clear filters first. Every phone action is at least 44px.
@@ -829,11 +832,15 @@ opening `/idioms/` with the same signed-in account.
   the same close button, backdrop dismissal, scroll lock and focus return.
   Failed writes retain the draft. Discarding edits and deleting an expression
   each require an explicit confirmation. Stale versions never overwrite an edit.
-- Students' translations (30 October 2026): a `Translations` toggle beside
-  `Notas e/ou origem` in the painted reading's foot row, the same quiet
-  disclosure, opening its own panel below the row. Only translations Inês
-  approved are shown, never with a name. Her `Translations to check` panel sits
-  in the Expressions tab with a waiting count. See
+- Students' own versions (30 October 2026; moved 7 November 2026, Dan: "get
+  rid of the notes and translations at the bottom, they can go in main
+  bullets"): `Noutras línguas` is one of the painted reading's facts, after
+  its examples, listing each version's language and text. A student's quiet
+  `Add yours` opens a small form in place: only `How you say it` and
+  `Send to Inês` (7 November 2026, Dan: no language box); the language is
+  taken from their device's language setting. Only versions Inês approved are shown, never with a name.
+  Her `Translations to check` panel sits in the Expressions tab with a
+  waiting count. See
   [the booking-system contract](../docs-booking-system.md#students-translations-of-an-expression).
 - `Preview as students see it` renders the same reading-card component, without
   teacher actions or publication pills. The surrounding private-preview note
@@ -858,7 +865,9 @@ centre is `Pinta e descobre` (13 October 2026, at Dan's choice; it replaced a
 spinning wheel he rejected): Inês has written the expression in wax on a cream
 sheet, and a gouache brush sweeps across it line by line so the phrase shows
 through the paint in Beth Ellen, in reading order. The painted phrase is the
-reading's title; the facts follow it.
+reading's title. The first press shows the painting alone; the same button
+then reads `Show meaning`, and its second press opens the facts beneath it
+(7 November 2026, Dan: the information appears on a second click).
 
 - No visible heading and no helper text (Dan: "do we even need the top
   stuff"). The section keeps `Uma expressão para ti` as a visually hidden
@@ -866,21 +875,17 @@ reading's title; the facts follow it.
   and `Paint it`: no phrase hints, paint marks, meanings or fact labels are
   visible before the press (27 October 2026, Dan). A returning student
   repaints their saved expression on that first press without spending
-  another pick; `Paint another` asks for a new one. Once painted, the card is
-  the whole section, and it ends in a footer separated by a quiet rule:
-  the reading's themes, then `Notas e/ou origem` (when Inês has written notes or
-  a source) and the compact `Paint another` at the row's end. The notes'
-  toggle reads like the facts' labels, its chevron in the dabs' column when it
-  leads the row. On desktop the footer spans both reading columns; notes
-  open below the whole row with a comfortable line length, so opening them
-  never moves the action row or leaves an empty half beside the notes. On a
-  narrow column the row starts at the dabs' column and runs to
-  the card's edge, so two short themes, or the notes' toggle, share it with
-  the button; the toggle and the button drop beneath the themes together only
-  for a longer set of themes, and only on the narrowest phones (320px) does the
-  button take a line of its own. The button keeps the width of its longest
-  label, so `Painting…` and `Try again` never reflow the row; it stays a 48px
-  target and never becomes a full-width slab.
+  another pick; `Paint another` asks for a new one. Painted, the card holds
+  the painting and `Show meaning` beneath it (beside it from a landscape
+  phone up), exactly where `Paint it` stood. Opened, the card is the whole
+  section: its facts (`Notas e/ou origem` among them), then the examples
+  and `Noutras línguas`, each version followed
+  quietly by its language, all in one rhythm. There is no footer band, rule
+  or toggle row (7 November 2026, Dan: "no need for the divider"):
+  `Paint another` ends the card at its foot, in the same place as `Paint it`
+  and `Show meaning`. The one button keeps the width of its longest label,
+  so `Painting…`, `Show meaning` and `Try again` never reflow it; it stays a
+  48px target and never becomes a full-width slab.
 - Colour: each painting uses the site's paints, every one with lettering
   clear of AA: dark blue `#203E82`, coral `#B43A26` and
   lavender ink `#554F91` carry cream `#FBF4E5` lettering; lavender `#AAA4E6`
@@ -906,18 +911,26 @@ reading's title; the facts follow it.
   Nothing is ever cut: a phrase too long for every size takes as many lines as
   it needs at the smallest, and the sheet grows to hold them.
 - Composition: on a phone the sheet fills the cream card and the reading opens
-  beneath it. From a landscape phone up, the painting with its example
-  straight beneath it sits beside the meanings. Both columns begin at the
-  top, and the footer follows the taller of them. Notes and the next-paint
-  action use that shared footer rather than extending only the right column
-  (27 October 2026, Dan: the layout should feel cleaner). Keep two reading
+  beneath it: facts, example, other languages, then the button at the
+  right. A student's card shows no theme pills (7 November 2026, Dan); they
+  stay in Inês's collection, where she filters by them. From a landscape
+  phone up, the painting with its example and `Noutras línguas` straight
+  beneath it sits beside the facts.
+  Both columns begin at the top; the button ends the facts' column at the
+  card's foot, level with the end of the taller column. Keep two reading
   columns on larger screens as well. At rest the blank
   sheet reserves room for the first strokes, with the button at the card's
-  foot. The paint lands where it stays and never slides on the sheet. The
-  painted sheet closes round its phrase as the reading opens, only its foot
-  rising, so a one-line phrase never sits in a
-  tall empty sheet. Nothing above the section moves, and the card grows and
-  shrinks smoothly below.
+  foot. The paint lands where it stays and never slides on the sheet, and the
+  card keeps its size while `Show meaning` waits. The painted sheet closes
+  round its phrase as the reading opens, only its foot rising, so a one-line
+  phrase never sits in a tall empty sheet beside the facts. Nothing above the section moves, and the card grows and
+  shrinks smoothly below. As it opens, each fact rises gently in after the
+  last, in reading order (both columns together on a wide card), and
+  `Paint another` follows at the foot, so nothing arrives as one block (7
+  November 2026, Dan: "animated as it comes in"). The page scrolls in the
+  same motion, only as far as the card's foot needs and never past its top.
+  The other languages load while the expression paints, so the reading
+  opens whole.
 - The idle canvas reveals nothing from the collection. The first paint
   appears only after the press. Gouache is matte: nothing glossy. Finished
   lettering stays cream on dark paint and dark on lavender.
@@ -947,18 +960,21 @@ reading's title; the facts follow it.
   at rest. `Paint another`
   brings the sheet into view and the last reading waits in wax where it
   stands, out of reach: its labels and dabs stay, taking the new paint's
-  colours, its words dry to wax lines and its themes and notes fade, while
+  colours, its words dry to wax lines and `Add yours` fades, while
   the button reads `Painting…` and the focus waits on the section. The card
   never shortens while it paints, and grows
   smoothly only when a longer phrase needs the room, so nothing below jumps
-  under the student.
+  under the student. Once the new phrase is painted, the last reading closes
+  smoothly beneath it to `Show meaning`.
 - Only the button paints: no swipe or drag on the sheet, and no loose chapéu at
   the card's corner.
 - The painting is decorative: the pick is the Worker's and the brush paints only
   what it saved, so nothing done mid-stroke can change or lose a pick. Assistive
-  technology hears the result in words and the reading takes the focus.
-  Reduced-motion users see the finished painting and reading at once, and the
-  card keeps the colours it shows until the new reading replaces it. Where the
+  technology hears the result in words, the focus waits on `Show meaning`,
+  and the opened reading takes it.
+  Reduced-motion users see the finished painting at once, and its reading at
+  once on the second press; the card keeps the colours it shows until the new
+  painting replaces it. Where the
   sheet cannot be painted at all, the reading shows the expression in the hand
   as its title instead.
 - The strokes, pool, drops and wax are drawn in code for now.

@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 
-// One UI journey for students' translations: a student sends one, Inês
-// approves it, and then it shows to everyone reading the expression. Every
+// One UI journey for students' own versions of an expression ("Noutras
+// línguas", stored as translations): a student sends one, Inês approves it,
+// and then it shows to everyone reading the expression. Every
 // Worker request is a fixture. Real SQL, the one-waiting rule, the daily limit,
 // privacy and who may review are proven in workers/booking/integration-test.mjs.
 const base = process.env.QA_BASE_URL;
@@ -49,6 +50,7 @@ try {
         assert.equal(viewer.role, "student", "only a student sends a translation");
         const body = request.postDataJSON();
         assert.deepEqual(Object.keys(body).sort(), ["language", "text"]);
+        assert.equal(body.language, "English", "the form asks no language: it is the device's");
         translations.push({ id: translations.length + 1, ...body, status: "pending", createdAt: new Date().toISOString() });
         return json({ status: "pending" }, 201);
       }
@@ -74,23 +76,22 @@ try {
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
 
-    // A student paints their expression and opens Translations: nothing yet.
+    // A student paints their expression and opens its meaning: Inês's notes
+    // and the other languages are among its facts, with nothing at the foot.
     async function openTranslations() {
       await page.goto(`${base}/idioms/`);
       await page.getByRole("button", { name: "Paint it", exact: true }).click();
+      await page.getByRole("button", { name: "Show meaning", exact: true }).click();
       const card = page.locator(".expression-reading__text");
       await card.getByRole("heading", { name: expression.expression }).waitFor();
-      const toggle = card.getByRole("button", { name: "Translations", exact: true });
-      const before = await toggle.boundingBox();
-      await toggle.click();
-      await expect(toggle).toHaveAttribute("aria-expanded", "true");
-      assert.deepEqual(await toggle.boundingBox(), before, "opening the panel never moves the row");
+      await expect(card.locator(".expression-card__meanings")).toContainText(expression.notes);
+      await expect(card.getByRole("button")).toHaveText(["Add yours"]);
       return card.locator(".expression-translations");
     }
     let panel = await openTranslations();
-    await expect(panel).toContainText("No translations yet. Be the first to add one.");
-    await panel.getByLabel("Language", { exact: true }).fill("English");
-    await panel.getByLabel("Translation", { exact: true }).fill("To laugh your head off");
+    await expect(panel).toContainText("Do you say it another way in your language?");
+    await panel.getByRole("button", { name: "Add yours", exact: true }).click();
+    await panel.getByLabel("How you say it", { exact: true }).fill("To laugh your head off");
     await expect(panel).toContainText("478 characters left");
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scroll on a phone");
     await panel.screenshot({ path: `${output}/student-form-${width}.png` });
@@ -118,10 +119,10 @@ try {
     await expect(panel.locator(".expression-translations__list li")).toHaveCount(1);
     await expect(panel.locator(".expression-translations__list")).toContainText("To laugh your head off");
     await expect(panel.locator(".expression-translations__list")).not.toContainText("Ana");
-    await expect(panel.locator(".expression-translations__list p")).toHaveAttribute("lang", "en");
+    await expect(panel.locator(".expression-translations__list .expression-card__value")).toHaveAttribute("lang", "en");
     await panel.screenshot({ path: `${output}/student-approved-${width}.png` });
     assert.deepEqual(errors, []);
     await context.close();
   }
-  console.log("Expression translations passed: a student sends one from the Translations panel without moving the row, Inês sees the waiting count and approves it, and it then shows without a name; desktop and phone.");
+  console.log("Expression translations passed: a student opens the meaning on the second press, sends their own version from Noutras línguas, Inês sees the waiting count and approves it, and it then shows without a name; desktop and phone.");
 } finally { await browser.close(); }
