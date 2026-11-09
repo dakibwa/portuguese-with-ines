@@ -58,10 +58,12 @@ All of these were decided on 9 November 2026.
 - **Design system**, Inês's site and the bar for the templates:
   [artifact](https://claude.ai/artifact/XrweSPkR5KgKC8mF5xYhcY), and
   [design/README.md](../../design/README.md).
-- **The 10 templates** are being drawn in the project thread "Design the 10 tutor
-  site templates". Dan picks from its concept previews before any are built.
-- **The name** is being chosen in the project thread "Name and brand the tutor
-  platform". The onboarding plan uses "Chapeau" as a working name only.
+- **The 10 templates**: [templates.md](./templates.md) and the concepts in
+  [templates/](./templates/). Dan still has to pick which layouts to keep, so
+  nothing is built into `src/` yet.
+- **The name and brand**: [brand/README.md](./brand/README.md). The name is not
+  picked. Chapeau, the working name in the onboarding plan, is ruled out, and a
+  shortlist of English and Latin words is with Dan.
 
 ## Build steps
 
@@ -146,7 +148,13 @@ SQLite-backed Durable Object:
 ## Step 3 contract (agreed with the templates thread)
 
 - **The look.** `tutor.json` gains `look: { layout, palette }`. Inês's is
-  `atelier` + `porto`. A palette holds role tokens only.
+  `atelier` + `porto`. The layout ids are `atelier`, `lexicon`, `grid`,
+  `postcard`, `play`, `still`, `scholar`, `poster`, `portrait` and `garden`. The
+  palettes are the lower-case set names (`porto`, `plum`, `newsprint`,
+  `riviera`, `sherbet`, `matcha`, `oxford`, `signal`, `midnight`,
+  `eucalyptus`). A palette holds role tokens only, and the one shared booking
+  set is skinned by `--bk-*`, `--btn-*` and `--r-*` (see
+  [templates.md](./templates.md)).
 - **The content.** `tutors/<id>/content.json` holds:
   - `hero {title, line}`;
   - three `principles {title, body}`;
@@ -206,8 +214,8 @@ Numbers in brackets are the systems map's findings.
 
 ## Open questions for Dan
 
-- The platform's name and domain, which the naming thread is working on.
-- Which of the 10 template concepts to build, from the templates thread.
+- The platform's name and domain ([brand/README.md](./brand/README.md)).
+- Which of the 10 template concepts to keep ([templates.md](./templates.md)).
 - Whether Workers Paid is on, which decides the sweep cost above.
 - From the systems map: packages paid up front and paying before a first lesson
   (not in the plan yet), and whether WhatsApp messages for students without
