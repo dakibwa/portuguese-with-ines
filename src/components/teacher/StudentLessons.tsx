@@ -268,7 +268,7 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
    * A weekly run as one row: the usual day and time, how many weeks and until
    * when, the facts its weeks share, and Show weeks at its end (9 November
    * 2026, Dan: it "could be reworked to save space"). Opening it lists each
-   * week beneath as a row of the same flat kind.
+   * week beneath as a tile of the same kind.
    */
   function runRow(run: WeeklyRun) {
     const open = openRuns.includes(run.id);

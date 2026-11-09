@@ -350,7 +350,7 @@ export function LessonDetails({
       {inline ? "Close" : <X size={20} aria-hidden="true" />}
     </button>
   );
-  // Inline, every routine action is the one quiet text style; the dialog keeps its buttons.
+  // Inline, every routine action is the one small soft lilac button; the dialog keeps its buttons.
   const routine = (dialogClass: string) => inline ? "teacher-quiet" : dialogClass;
   // Set as a student's own lesson is (10 October 2026, at Dan's request): the
   // status, who, then when in bold with its length and place beneath, and the

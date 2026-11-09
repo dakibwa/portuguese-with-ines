@@ -131,7 +131,7 @@ Use these names in review so recurring problems are easy to recognise:
   at the side of it to save lots of space", for "all little boxes like
   this"): a status or toggle ends the line it belongs to (`Already paid`
   beside the lesson's date, `Show weeks` beside the run's day; on Students
-  these are plain checkboxes and quiet text, not paint dabs), a fact's
+  these are small soft toggles and lilac buttons), a fact's
   name, value and action share one row, a card is as tall as its content,
   and nothing it says is said by its neighbour or its parent too. On a
   narrow card an action wraps beneath its line at the right, whole, rather
@@ -598,24 +598,27 @@ usual lesson starts and days off; avoid a wall of administration forms.
     payment link: the same operations, explicit confirmations and busy guards
     as her timetable's dialog, which stays a dialog there) and whose press area
     is the whole row, with the hover wash and keyboard outline on the row (the
-    controls beside it sit above that area, so none is swallowed). Rows are
-    flat (9 November 2026, Dan: "simple unified UX", not "loads of competing
-    little motifs"): one light rule above each lesson or run, spacing inside,
-    no box in a box and no dashed outline, and one open lesson marked by a blue
-    edge. At the end of that same line, a plain `Already paid` checkbox (same
-    words and state, as the progress checks look) on a past lesson she added,
-    and its notes as a small pencil named `Add notes`, `Notes` or, while open,
-    `Close`, with its homework as plain text beside it (`Draft`, `With them`,
+    controls beside it sit above that area, so none is swallowed). Each lesson
+    is one soft cream tile with the organic edge and a fine lilac border (9
+    November 2026, Dan: "I don't want it plain text", but "simple unified UX"):
+    closed or open it is the same tile, the open one spanning the list with a
+    slightly stronger blue border, with no rule above a week, no box in a box,
+    no dashed outline and no separator above its toolbar. At the end of that
+    same line, a small soft `Already paid` toggle (same words and state: organic
+    capsule, small checkbox, strong blue once checked) on a past lesson she
+    added, and its notes as a small pencil named `Add notes`, `Notes` or, while
+    open, `Close`, with its homework chip beside it (`Draft`, `With them`,
     `To review`, `Done`); on a narrow row those wrap together beneath. While a
     lesson's details are open the date row is its disclosure and the pencil
     steps aside, as Homework is among those details. Its own facts are the
-    second line, plain text in one wrapping line, as the shared facts are,
-    with no paint-dab bullets; `Cancelled`, `No-show` and `Happening now` are
+    second line, one wrapping line after the site's small lilac paint dab, as
+    the shared facts are; `Cancelled`, `No-show` and `Happening now` are bold
     words in that line, not pills. Every secondary action here (`Show weeks`,
     `Homework`, `Move lesson`, `Change length`, `Cancel lesson`, `Create
-    payment link`, `Close`) is one small quiet blue text button in sentence
-    case with the same size, hover and focus; coral stays for a save, a
-    confirmed cancel and the one next step on a closed student's card. A level shows only where it
+    payment link`, `Close`) is one small soft lilac button, dark blue words in
+    sentence case, with the same size, hover and focus. Close sits beside the
+    date, leaving the width beneath for those actions; coral stays for a save,
+    a confirmed cancel and the one next step on a closed student's card. A level shows only where it
     differs from theirs now; a few lines of her notes follow. Open details
     span the list's whole width, one lesson's at a time, as a named region
     (`Sam’s lesson, Tue 22 Sept, 09:30–10:30`) with no scrim, scroll lock or
@@ -734,11 +737,12 @@ usual lesson starts and days off; avoid a wall of administration forms.
     action. A student who has signed in changes their own email. A missing
     lesson never locks the email field (16 October 2026, Inês). Price uses the same editable rate form as onboarding.
   - Their lessons read Upcoming, then Past & cancelled. A weekly run's weeks
-    still to come are one flat row (9 November 2026, Dan: "just have them
+    still to come are one tile (9 November 2026, Dan: "just have them
     all as one card and you can expand out"): the weekly repeat mark, `Every
-    Wednesday · 09:30–10:30` with a quiet `Show weeks` at the end of that line,
-    then `12 weeks, Wed 18 Nov to Wed 3 Feb` and the facts its weeks share.
-    Shown, each week is a row inside it saying only what the run does not. A
+    Wednesday · 09:30–10:30`, `12 weeks, Wed 18 Nov to Wed 3 Feb` and the facts
+    its weeks share together where they fit, with a soft `Show weeks` button at
+    the end. Shown, the run adds no box of its own and each week is a tile
+    beneath it saying only what the run does not. A
     week moved off the usual slot is counted on the run's row. A lesson on
     now, a run with one week left and past lessons stay single rows.
   - Add a lesson opens the calendar in the row. Length, location, weekly repeat
