@@ -68,7 +68,7 @@ export function TeacherMeetConnection({ token, onConnectionChange }: { token: st
   const attention = !connection
     ? ""
     : !connection.configured
-      ? "Needs a one-time setup"
+      ? "Not set up yet"
       : connection.needsReconnect
         ? "Needs reconnecting"
         : !connection.connected
@@ -96,7 +96,7 @@ export function TeacherMeetConnection({ token, onConnectionChange }: { token: st
         <div>
           <h2 id="teacher-meet-title">Google Meet</h2>
           {attention ? (
-            <p className="teacher-meet-attention">{attention}</p>
+            <p className={connection?.configured ? "teacher-meet-attention" : "teacher-meet-setup"}>{attention}</p>
           ) : healthy ? (
             <p className="teacher-meet-connected"><Check size={15} strokeWidth={2.6} aria-hidden="true" />Connected{connection?.email ? ` as ${connection.email}` : ""}</p>
           ) : null}

@@ -55,7 +55,7 @@ export default function LessonsPage() {
                 </div>
                 <div className="lesson-product__pricing">
                   <p className="lesson-product__price">{product.price}</p>
-                  <p className="lesson-product__duration">{product.duration}</p>
+                  {product.id === "trial" ? <p className="lesson-product__duration">{product.duration}</p> : null}
                 </div>
                 <p className="lesson-product__description">{product.description}</p>
                 <div className="lesson-product__action">

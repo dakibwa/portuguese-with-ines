@@ -70,7 +70,7 @@ const faqSections = [
       {
         question: "Is there homework?",
         answer:
-          "Only if you’d like it. Your Homework tab has each lesson’s sheet. Do it online and submit it for feedback, which I check before sending back, or print a black-and-white copy. It’s fine if you don’t have time."
+          "Only if you’d like it. Open a sheet from its lesson under Past lessons in Your lessons. Do it online for feedback from me, or print it. It’s fine if you don’t have time."
       }
     ]
   },
@@ -117,7 +117,7 @@ const faqSections = [
       {
         question: "What do I need for an online lesson?",
         answer:
-          "You’ll need an internet connection and a phone, tablet or computer with a camera and microphone. I’ll send you a Google Meet link to join. Headphones can help you hear more clearly."
+          "You’ll need an internet connection and a phone, tablet or computer with a camera and microphone. Open your Google Meet link from Your lessons. Headphones can help you hear more clearly."
       },
       {
         question: "Do online lessons work as well as in person?",
@@ -186,7 +186,7 @@ const faqSections = [
       },
       {
         question: "How do I change or cancel a lesson?",
-        answer: `Open it from Your lessons on the booking page, or use the link in your confirmation email. Change or cancel it at least ${notice} before it starts and there’s no charge.`
+        answer: `Sign in on the booking page and open the lesson in Your lessons, or use the link in your confirmation email. Change or cancel it at least ${notice} before it starts and there’s no charge.`
       },
       {
         question: `What if my lesson is less than ${notice} away?`,

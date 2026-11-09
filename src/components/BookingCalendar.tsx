@@ -2994,23 +2994,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             </div>
           </fieldset>
           {bookingKind === "trial" ? (
-            <fieldset className="booking-bar__group" disabled={choicesLocked}>
+            <fieldset className="booking-bar__group booking-bar__group--fixed">
               <legend>Length</legend>
-              {/* The trial's length is fixed: the same control, with nothing to switch. */}
-              <div className="segmented segmented--single">
-                <span aria-hidden="true" className="segmented__thumb" />
-                <label className="is-active">
-                  <input
-                    aria-label={`${formatLessonDuration(lessonType.duration_minutes)} lesson · ${formatPriceCents(lessonType.price_cents)}`}
-                    checked
-                    name="booking-duration"
-                    readOnly
-                    type="radio"
-                    value={lessonType.id}
-                  />
-                  {lessonType.duration_minutes} mins · {formatPriceCents(lessonType.price_cents)}
-                </label>
-              </div>
+              <p className="booking-bar__fixed">
+                {lessonType.duration_minutes} mins · {formatPriceCents(lessonType.price_cents)}
+              </p>
             </fieldset>
           ) : (
             <fieldset className="booking-bar__group" disabled={choicesLocked}>

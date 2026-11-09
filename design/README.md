@@ -2317,6 +2317,24 @@ published design system, with spacing given the same care:
   hairline, `Your schedule`, and the band's splat cut off at the right edge
   (let go on the narrowest phones). Her tools reach the first screen.
 
+## UX refinement after Fable 5.2 review — 9 November 2026
+
+- A trial's fixed length and price read as one quiet fact, not a selected
+  control with nothing to choose. On a phone it takes one short line; real
+  lesson and location choices keep their blue selection.
+- The booking calendar uses seven full-width day columns at every width.
+  The heading names its months and each 1st names its own, without a repeated
+  month beside every week.
+- On Inês's phone timetable, the month and pager share the first row; Edit
+  weekly hours and Day off share the next. The month uses the same short
+  phone label as Time off and Receipts, including while loading.
+- The lesson cards keep a duration tag only where the title does not already
+  name it. Student search uses the raised cream of the other fields. Google
+  Meet's unconfigured state is a quiet `Not set up yet`; coral remains for
+  connection states she can act on.
+- FAQ directions lead through sign-in to Your lessons; homework stays under
+  its own past lesson and the Meet link on its lesson.
+
 ## One schedule for students — 9 November 2026
 
 Dan: "even the idea of a student having your lessons, past lessons, homework,
