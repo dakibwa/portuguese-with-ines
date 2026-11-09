@@ -130,7 +130,8 @@ Use these names in review so recurring problems are easy to recognise:
   Small cards are compact (9 November 2026, Dan: "the already paid could be
   at the side of it to save lots of space", for "all little boxes like
   this"): a status or toggle ends the line it belongs to (`Already paid`
-  beside the lesson's date, `Show weeks` beside the run's day), a fact's
+  beside the lesson's date, `Show weeks` beside the run's day; on Students
+  these are plain checkboxes and quiet text, not paint dabs), a fact's
   name, value and action share one row, a card is as tall as its content,
   and nothing it says is said by its neighbour or its parent too. On a
   narrow card an action wraps beneath its line at the right, whole, rather
@@ -593,18 +594,28 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - Their lessons beside, `Upcoming` then `Past & cancelled`, each named in
     the legend's small capitals. Every lesson is one row of two lines at most:
     its day and time, which open the lesson's own details in place inside the
-    tile (move, length, cancel, no-show, already paid, refund, homework, a
+    row (move, length, cancel, no-show, already paid, refund, homework, a
     payment link: the same operations, explicit confirmations and busy guards
     as her timetable's dialog, which stays a dialog there) and whose press area
-    is the whole tile, following its
-    organic edge, with the hover wash and keyboard outline on the tile (the
-    controls beside it sit above that area, so none is swallowed); at the end
-    of that same line, a compact `Already paid` tick (same words, tick and
-    colours, smaller) on a past lesson she added, and its notes as a small
-    pencil named `Add notes`, `Notes` or, while open, `Close`, with its
-    homework as one chip beside it (`Draft`, `With them`, coral `To review`,
-    blue `Done`); on a narrow tile those wrap together beneath. Its own facts
-    are the second line. A level shows only where it
+    is the whole row, with the hover wash and keyboard outline on the row (the
+    controls beside it sit above that area, so none is swallowed). Rows are
+    flat (9 November 2026, Dan: "simple unified UX", not "loads of competing
+    little motifs"): one light rule above each lesson or run, spacing inside,
+    no box in a box and no dashed outline, and one open lesson marked by a blue
+    edge. At the end of that same line, a plain `Already paid` checkbox (same
+    words and state, as the progress checks look) on a past lesson she added,
+    and its notes as a small pencil named `Add notes`, `Notes` or, while open,
+    `Close`, with its homework as plain text beside it (`Draft`, `With them`,
+    `To review`, `Done`); on a narrow row those wrap together beneath. While a
+    lesson's details are open the date row is its disclosure and the pencil
+    steps aside, as Homework is among those details. Its own facts are the
+    second line, plain text in one wrapping line, as the shared facts are,
+    with no paint-dab bullets; `Cancelled`, `No-show` and `Happening now` are
+    words in that line, not pills. Every secondary action here (`Show weeks`,
+    `Homework`, `Move lesson`, `Change length`, `Cancel lesson`, `Create
+    payment link`, `Close`) is one small quiet blue text button in sentence
+    case with the same size, hover and focus; coral stays for a save, a
+    confirmed cancel and the one next step on a closed student's card. A level shows only where it
     differs from theirs now; a few lines of her notes follow. Open details
     span the list's whole width, one lesson's at a time, as a named region
     (`Sam’s lesson, Tue 22 Sept, 09:30–10:30`) with no scrim, scroll lock or
@@ -723,9 +734,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
     action. A student who has signed in changes their own email. A missing
     lesson never locks the email field (16 October 2026, Inês). Price uses the same editable rate form as onboarding.
   - Their lessons read Upcoming, then Past & cancelled. A weekly run's weeks
-    still to come are one dashed row (9 November 2026, Dan: "just have them
+    still to come are one flat row (9 November 2026, Dan: "just have them
     all as one card and you can expand out"): the weekly repeat mark, `Every
-    Wednesday · 09:30–10:30` with lilac `Show weeks` at the end of that line,
+    Wednesday · 09:30–10:30` with a quiet `Show weeks` at the end of that line,
     then `12 weeks, Wed 18 Nov to Wed 3 Feb` and the facts its weeks share.
     Shown, each week is a row inside it saying only what the run does not. A
     week moved off the usual slot is counted on the run's row. A lesson on

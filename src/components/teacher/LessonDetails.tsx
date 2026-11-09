@@ -2,7 +2,7 @@
 
 import { IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { X, ArrowLeft, CheckCircle2, CircleX, UserX } from "lucide-react";
+import { X, ArrowLeft, Check, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
   addedByTeacher,
   cancelBookingAs,
@@ -340,24 +340,25 @@ export function LessonDetails({
   );
   const closeButton = (
     <button
-      className="teacher-dialog-close"
+      className={inline ? "teacher-quiet" : "teacher-dialog-close"}
       data-homework-exit
       type="button"
       aria-label="Close lesson details"
       disabled={busy}
       onClick={onClose}
     >
-      <X size={20} aria-hidden="true" />
+      {inline ? "Close" : <X size={20} aria-hidden="true" />}
     </button>
   );
+  // Inline, every routine action is the one quiet text style; the dialog keeps its buttons.
+  const routine = (dialogClass: string) => inline ? "teacher-quiet" : dialogClass;
   // Set as a student's own lesson is (10 October 2026, at Dan's request): the
   // status, who, then when in bold with its length and place beneath, and the
-  // actions side by side. Inline, the lesson's own row above already says who
-  // and when, so only its status, call link and close remain.
+  // actions side by side. Inline, the lesson's own row above already says who,
+  // when and any exceptional status, so only its close and call link remain.
   const head = inline ? (
     <>
       <div className="teacher-lesson-inline__head">
-        {status}
         {closeButton}
       </div>
       {action === "view" ? <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} /> : null}
@@ -411,6 +412,7 @@ export function LessonDetails({
           {tickable || (booking.status !== "cancelled" && (canMarkAttendance || noShowLater)) ? <div className="teacher-lesson-record">
           {tickable ? (
             <PaidTick
+              plain={inline}
               checked={ticked}
               disabled={busy || locked}
               onChange={async (next) => {
@@ -443,12 +445,14 @@ export function LessonDetails({
               <button
                 aria-describedby={noShowLater ? noShowHintId : undefined}
                 aria-label={noShow ? "Undo no-show" : "Mark no-show"}
-                className={`paid-tick paid-tick--action${noShow ? " is-checked" : ""}`}
+                className={`paid-tick ${inline ? "paid-tick--plain" : "paid-tick--action"}${noShow ? " is-checked" : ""}`}
                 type="button"
                 disabled={busy || !canMarkAttendance || locked}
                 onClick={() => setAction("no-show")}
               >
-                <span aria-hidden="true" className="paid-tick__dab"><UserX size={13} strokeWidth={2.6} /></span>
+                <span aria-hidden="true" className="paid-tick__dab">
+                  {inline ? noShow ? <Check size={13} strokeWidth={3.4} /> : null : <UserX size={13} strokeWidth={2.6} />}
+                </span>
                 No-show
               </button>
               {noShowLater ? (
@@ -461,7 +465,7 @@ export function LessonDetails({
           </div> : null}
           {!ticked && addedByTeacher(booking) && booking.status === "confirmed" &&
             booking.payment_status === "not_required" && !noShow && !locked && !booking.charge_started_at && Boolean(booking.amount_cents && booking.amount_cents > 0) ? (
-            <CardApprovalLink booking={booking} token={token} busy={busy} onBusy={setBusy} onError={setError} />
+            <CardApprovalLink booking={booking} token={token} busy={busy} onBusy={setBusy} onError={setError} quiet={inline} />
           ) : null}
         </>
       ) : null}
@@ -487,13 +491,13 @@ export function LessonDetails({
         </p>
       ) : null}
       {booking.status === "cancelled" && action === "view" ? <div className="teacher-dialog-actions">
-        {canRecordRefund ? <button className="button button--coral" type="button" onClick={() => setAction("refund")}>Record refund</button> : null}
-        <button className="button button--outline" type="button" onClick={onClose}>Done</button>
+        {canRecordRefund ? <button className={routine("button button--coral")} type="button" onClick={() => setAction("refund")}>Record refund</button> : null}
+        <button className={routine("button button--outline")} type="button" onClick={onClose}>Done</button>
       </div> : action === "view" ? (
         <div className="teacher-dialog-actions">
-          {booking.student_id ? <button className="button button--lilac" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null}
+          {booking.student_id ? <button className={routine("button button--lilac")} type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null}
           <button
-            className="button button--coral"
+            className={routine("button button--coral")}
             type="button"
             disabled={busy || locked}
             onClick={() => setAction("move")}
@@ -502,7 +506,7 @@ export function LessonDetails({
           </button>
           {toCome && booking.lesson_type_id !== "trial" ? (
             <button
-              className="button button--outline"
+              className={routine("button button--outline")}
               type="button"
               disabled={busy || locked}
               onClick={() => {
@@ -515,7 +519,7 @@ export function LessonDetails({
             </button>
           ) : null}
           <button
-            className="button button--outline"
+            className={routine("button button--outline")}
             type="button"
             disabled={busy || locked}
             onClick={() => {
