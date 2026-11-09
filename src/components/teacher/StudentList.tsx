@@ -1,49 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Mail, UserPlus } from "lucide-react";
 import { DefaultComeBackEmail } from "@/components/teacher/DormantEmail";
+import { useMasonry } from "@/components/teacher/masonry";
 import { NeedsYou } from "@/components/teacher/NeedsYou";
 import { StudentSetupRow, type StudentRowSelection } from "@/components/teacher/StudentSetupRow";
 import type { AdminBooking, AdminStudent } from "@/lib/admin-api";
 import type { StudentSection, StudentWorkspaceRow, studentWorkspace } from "@/lib/teacher-calendar";
 
 export type StudentOpenRequest = StudentRowSelection & { key: number };
-
-/**
- * Two across, cards of different heights leave no hole under the shorter one
- * (2 November 2026, Dan: no holes): with two or more columns each card spans
- * as many 2 px rows as it is tall, so the next card rises into whichever
- * column ends first, still in ranked order. One column is left alone.
- */
-function useMasonry() {
-  const stop = useRef<(() => void) | null>(null);
-  return useCallback((ul: HTMLUListElement | null) => {
-    stop.current?.();
-    stop.current = null;
-    if (!ul || typeof ResizeObserver === "undefined") return;
-    const ROW = 2;
-    const place = () => {
-      const style = getComputedStyle(ul);
-      const columns = style.gridTemplateColumns.split(" ").filter(Boolean).length;
-      const gap = parseFloat(style.columnGap) || 0;
-      const masonry = columns > 1;
-      ul.classList.toggle("is-masonry", masonry);
-      for (const item of Array.from(ul.children) as HTMLElement[]) {
-        item.style.gridRowEnd = masonry ? `span ${Math.ceil((item.getBoundingClientRect().height + gap) / ROW)}` : "";
-      }
-    };
-    const sizes = new ResizeObserver(() => place());
-    // The cards alone are watched: a change of columns changes their widths,
-    // and watching the list too would answer its own growth.
-    const watch = () => { sizes.disconnect(); for (const item of Array.from(ul.children)) sizes.observe(item); };
-    const children = new MutationObserver(() => { watch(); place(); });
-    children.observe(ul, { childList: true });
-    watch();
-    place();
-    stop.current = () => { sizes.disconnect(); children.disconnect(); };
-  }, []);
-}
 
 type Group = StudentSection | "dormant";
 

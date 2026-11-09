@@ -423,6 +423,8 @@ export type StudentProgress = {
   signedIn: boolean;
   /** Null when there is no card to ask for. */
   card: boolean | null;
+  /** A card saved that her lessons are not on yet. */
+  cardSaved: boolean;
   /** Lessons she added that have begun and no card or tick has settled. */
   openLessons: number;
   openCents: number;
@@ -435,14 +437,19 @@ export type StudentProgress = {
 export function studentProgress(student: AdminStudent, cardsAccepted: boolean): StudentProgress {
   const cardAsked = cardsAccepted && !paysNothing(student);
   const signedIn = Boolean(student.signedIn);
-  const card = cardAsked ? Boolean(student.cardForAllLessons) : null;
+  // Already paying by card (9 November 2026, Dan: "don't have a button for
+  // ask for card if they are already paying? like roman"): a saved card and
+  // nothing she added still to be paid needs nothing more. A saved card with
+  // her lessons to come not on it still asks for them.
+  const cardSaved = Boolean(student.hasCard);
+  const card = cardAsked ? Boolean(student.cardForAllLessons || (cardSaved && !student.unpaidUpcoming)) : null;
   const openLessons = cardAsked ? student.unpaidPast ?? 0 : 0;
   const openCents = openLessons ? student.unpaidPastCents ?? 0 : 0;
   const invitedAt = student.invitedAt ?? null;
   const next: StudentNext | null = !signedIn ? "invite" : openLessons ? "pay" : card === false ? "card" : null;
   // A link they have yet to open leaves the next move theirs.
   const stage: StudentStage = !next ? "set" : invitedAt ? "waiting" : "todo";
-  return { signedIn, card, openLessons, openCents, invitedAt, stage, next };
+  return { signedIn, card, cardSaved, openLessons, openCents, invitedAt, stage, next };
 }
 
 export type StudentWorkspaceRow = {

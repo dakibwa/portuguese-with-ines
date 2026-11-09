@@ -29,7 +29,7 @@ function ProgressChecks({ progress }: { progress: StudentProgress }) {
   const checks: { key: string; done: boolean; label: string; owed?: boolean }[] = [
     { key: "in", done: progress.signedIn, label: progress.signedIn ? "Signed in" : progress.invitedAt ? `Link sent ${shortDate(progress.invitedAt)}` : "Not signed in" },
     ...(progress.card === null ? [] : [
-      { key: "card", done: progress.card, label: progress.card ? "Card saved" : "No card yet" },
+      { key: "card", done: progress.card, label: progress.card ? "Card saved" : progress.cardSaved ? "Lessons not on card" : "No card yet" },
       { key: "paid", done: !progress.openLessons, owed: Boolean(progress.openLessons),
         label: progress.openLessons ? `${formatMoneyCents(progress.openCents)} open` : "Paid up" },
     ]),
