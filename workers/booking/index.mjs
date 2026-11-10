@@ -349,7 +349,7 @@ function emailIncludedMeeting(result, row, allowAlreadySent = false) {
  * Every student-facing and teacher-facing message for one lifecycle event.
  * Kept in one place so a change to wording cannot drift between the two sides.
  */
-async function notify(env, { event, row, lessonType, settings, manageUrl, previousStartsAt, previousLessonType, byTeacher = false, welcome = null }) {
+async function notify(env, { event, row, lessonType, settings, manageUrl, previousStartsAt, previousLessonType, previousLocation, teacherChange = null, byTeacher = false, welcome = null }) {
   const held = byTeacher && await awaitingWelcomeAt(env, row.student_email);
   const notifyingSequence = row.sequence;
   const notifyingStatus = row.status;
@@ -433,6 +433,12 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const shortWhen = formatShort(start, homeZone());
   const studentShortWhen = formatShort(start, studentClock);
   const lessonTypeChanged = Boolean(previousLessonType && previousLessonType.id !== lessonType.id);
+  // Her one change of when, how long and where (10 November 2026), as words.
+  const change = byTeacher && teacherChange ? {
+    time: teacherChange.time, minutes: teacherChange.length ? lessonType.duration_minutes : null,
+    fromMinutes: teacherChange.length ? previousLessonType?.duration_minutes : null,
+    place: teacherChange.place ? row.location : null, fromPlace: teacherChange.place ? previousLocation : null
+  } : null;
   const refundNote = wasRefunded
     ? `Refunded in full: your ${formatEuros(row.amount_cents ?? lessonType.price_cents)} is on its way back to your card and usually shows within a few days.`
     : "";
@@ -451,7 +457,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
       })
     : event === "rescheduled"
       ? studentMoved({ tutor: tutorOf(env),
-          ...facts, ...policyArgs, first, byTeacher, lengthChanged: lessonTypeChanged, minutes: lessonType.duration_minutes,
+          ...facts, ...policyArgs, first, byTeacher, lengthChanged: lessonTypeChanged, minutes: lessonType.duration_minutes, change,
           when: studentWhen, shortWhen: studentShortWhen, price, lateNote: sameDayNotice,
           policy: row.same_day_change && isOnCard ? "late" : isPaid ? "paid" : isOnCard ? "card" : "again"
         })
@@ -474,7 +480,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
     : event === "rescheduled"
       ? lessonMovedTeacher({ tutor: tutorOf(env),
           ...teacherFacts, lengthChanged: lessonTypeChanged, fromMinutes: previousLessonType?.duration_minutes,
-          minutes: lessonType.duration_minutes, late: Boolean(row.same_day_change),
+          minutes: lessonType.duration_minutes, late: Boolean(row.same_day_change), change,
           previousWhen: previousStartsAt ? formatInZone(new Date(previousStartsAt), homeZone()) : "",
           lateNote: row.same_day_change
             ? `This was changed less than ${notice} before the lesson, so the ${fee} fee ${automaticSameDayFee ? "is charged automatically to the student's saved card" : "is due"}.`
@@ -677,7 +683,7 @@ export async function sendLessonReminders(env, now = new Date()) {
  * the added time in her external calendar. Changing a single week later goes
  * out through the ordinary per-lesson path and matches that event by UID.
  */
-export async function notifySeries(env, { rows, lessonType, settings, series, manageUrls, skipped, reason = "booked", byTeacher = false, welcome = null, kept = [] }) {
+export async function notifySeries(env, { rows, lessonType, settings, series, manageUrls, skipped, reason = "booked", byTeacher = false, welcome = null, kept = [], teacherChange = null }) {
   lessonType = { ...lessonType, price_cents: rows[0]?.amount_cents ?? lessonType.price_cents };
   if (!rows.length) return [];
   const held = byTeacher && await awaitingWelcomeAt(env, rows[0].student_email);
@@ -772,7 +778,17 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     .format(new Date(first.starts_at));
   // Inês changed how long they are, at the same times (9 November 2026, Dan).
   const lengthChanged = reason === "length";
-  const moved = reason === "moved" || lengthChanged;
+  // Her one change of when, how long and where, from a week on (10 November 2026).
+  const changed = reason === "changed";
+  const moved = reason === "moved" || lengthChanged || changed;
+  const slotOn = (zone) => ({
+    weekday: new Intl.DateTimeFormat("en-GB", { timeZone: zone, weekday: "long" }).format(new Date(first.starts_at)),
+    time: new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(first.starts_at))
+  });
+  const change = (zone) => changed && teacherChange ? {
+    slot: teacherChange.time ? slotOn(zone) : null, minutes: teacherChange.length ? lessonType.duration_minutes : null,
+    place: teacherChange.place ? first.location : null
+  } : null;
   const common = {
     tutor: tutorOf(env), lengthChanged, minutes: lessonType.duration_minutes,
     lesson: lessonLine(lessonType), lessonName: lessonName(lessonType), place: placeLabel(first),
@@ -783,7 +799,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
     when: lessonWhen(new Date(first.starts_at), studentClock), shortWhen: formatShort(new Date(first.starts_at), studentClock),
     policy: seriesFree ? "free" : seriesOnCard ? "card" : "unpaid",
     lessonsUrl: siteUrl(env, "/book/?view=lessons"),
-    run: { ...runOn(studentClock), slot: reason === "booked" ? { weekday: slotWeekday, time: slotTime } : null }
+    run: { ...runOn(studentClock), slot: reason === "booked" ? { weekday: slotWeekday, time: slotTime } : null },
+    change: change(studentClock)
   };
 
   const sends = [];
@@ -804,6 +821,8 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
         lifecycle: emailLifecycle(rows),
         dedupeKey: lengthChanged
           ? `student:series-length:${series.id}:${first.id}:${first.sequence}`
+          // Within the weekly-move keys, so the day-before reminder stays quiet as after one.
+          : changed ? `student:series-moved:${series.id}:${first.id}:${first.sequence}`
           : moved
           ? `student:series-moved:${series.id}:${first.sequence}`
           : `student:series:${series.id}:${rows[0].id}`,
@@ -822,7 +841,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
       ...common, byTeacher, held, noEmailYet: isNoEmailYet(first.student_email), welcome,
       student: { name: first.student_name, email: shownEmail(first.student_email), phone: first.student_phone, nif: await studentNif(env, first.student_id), notes: first.notes },
       when: `${formatInZone(new Date(first.starts_at), homeZone())}, ${zoneName(homeZone())}`, shortWhen: formatShort(new Date(first.starts_at), homeZone()),
-      run: runOn(homeZone(), true), extended: reason === "extended"
+      run: runOn(homeZone(), true), extended: reason === "extended", change: change(homeZone())
     };
     const { subject, content } = moved ? lessonMovedTeacher(teacherFacts) : lessonBookedTeacher(teacherFacts);
     sends.push(
@@ -834,6 +853,7 @@ export async function notifySeries(env, { rows, lessonType, settings, series, ma
         lifecycle: emailLifecycle(rows),
         dedupeKey: lengthChanged
           ? `teacher:series-length:${series.id}:${first.id}:${first.sequence}`
+          : changed ? `teacher:series-moved:${series.id}:${first.id}:${first.sequence}`
           : moved
           ? `teacher:series-moved:${series.id}:${first.sequence}`
           : `teacher:series:${series.id}:${rows[0].id}`,
@@ -6166,6 +6186,279 @@ async function teacherChangeLength(request, env, ctx, bookingId, body, authoriza
   }, 200, request, env);
 }
 
+/** Days from one Porto date key to another. */
+function daysBetweenKeys(fromKey, toKey) {
+  const from = parseDateKey(fromKey);
+  const to = parseDateKey(toKey);
+  return Math.round((Date.UTC(to.year, to.month - 1, to.day) - Date.UTC(from.year, from.month - 1, from.day)) / 86400000);
+}
+
+/**
+ * Her one change to a lesson, or to it and every later week of its run
+ * (10 November 2026, Dan: "allow her malleability to change wholesale
+ * recurring stuff from 60 to 90, 90 to 60, the dates, the in porto or online
+ * etc"): when, how long and where, saved together with one email.
+ *
+ * Built as `teacherChangeLength` is, and a change of length alone is handed
+ * to it, so it is exactly that change. Otherwise each lesson is planned:
+ * every later week takes the new day and Porto time in its own week, counted
+ * from the lesson she opened and stepped by date keys as a student's weekly
+ * move is, so the clock changes never shift it. A week the student had moved
+ * on its own comes back to the new day and time with the rest, so what her
+ * page says before she saves ("3 lessons move to Thursdays at 16:00") is
+ * what happens. A lesson that cannot take all of the change
+ * (being paid, the length rules, a clock-change gap, or another lesson in the
+ * way) takes none of it and is named in the reply. A place change is the
+ * student's own: the new place and a new sequence, after which `notify`
+ * reconciles the one Google event and its Meet room. She is held only by
+ * overlap, never by her hours, time off or online-only periods, and no fee
+ * is ever created.
+ */
+async function teacherChangeLesson(request, env, ctx, bookingId, body, authorization) {
+  const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(bookingId).first();
+  if (!row || row.status !== "confirmed") return fail("That lesson could not be found.", 404, request, env);
+  if (row.payment_status === RECORDED) return fail("A recorded lesson stays in the past. Add a new lesson instead.", 409, request, env);
+  const nowMs = Date.now();
+  if (Date.parse(row.starts_at) <= nowMs) return fail("A lesson already had stays as it was.", 409, request, env);
+  const following = body.following === true;
+  if (following && !row.series_id) return fail("This lesson isn't part of a weekly run.", 400, request, env);
+
+  let start = null;
+  if (body.startAt !== undefined && body.startAt !== null) {
+    start = new Date(body.startAt);
+    if (typeof body.startAt !== "string" || Number.isNaN(start.getTime())) return fail("That time could not be understood.", 400, request, env);
+    if (start.getTime() <= nowMs) return fail("Choose a time still to come.", 409, request, env);
+  }
+  const timeMoves = Boolean(start) && start.toISOString() !== row.starts_at;
+  let location = null;
+  if (body.location !== undefined && body.location !== null) {
+    if (body.location !== "online" && body.location !== tutorOf(env).place.inPersonKey) return fail("Choose online or in person.", 400, request, env);
+    location = body.location;
+  }
+  let lessonType = null;
+  let amountCents = null;
+  if (body.lessonType !== undefined && body.lessonType !== null) {
+    lessonType = await loadLessonType(env, cleanText(body.lessonType, 40));
+    if (!lessonType || lessonType.id === "trial") return fail("Choose 60 or 90 minutes.", 400, request, env);
+    amountCents = (await studentLessonType(env, row.student_id, lessonType)).price_cents;
+    if (body.expectedPriceCents !== amountCents) {
+      return fail("Their price for that length has changed. Please reload and check it.", 409, request, env);
+    }
+  }
+
+  const lessons = following
+    ? (await env.DB.prepare("SELECT * FROM bookings WHERE series_id = ? AND status = 'confirmed' AND starts_at >= ? ORDER BY starts_at")
+        .bind(row.series_id, row.starts_at).all()).results ?? []
+    : [row];
+  // Only a length to change: that is her length change, word for word.
+  if (!timeMoves && !lessons.some((lesson) => location && lesson.location !== location)) {
+    if (lessonType) return await teacherChangeLength(request, env, ctx, bookingId, body, authorization);
+    return fail(`Nothing to change: ${following ? "these lessons are" : "this lesson is"} already as you chose.`, 409, request, env);
+  }
+
+  // Every week: the new day and Porto time in that lesson's own week, by date key.
+  const fromSlot = slotOf(row.starts_at);
+  const toSlot = timeMoves ? slotOf(start) : null;
+  const types = new Map();
+  const candidates = [];
+  const kept = [];
+  for (const lesson of lessons) {
+    if (!types.has(lesson.lesson_type_id)) {
+      types.set(lesson.lesson_type_id, await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(lesson.lesson_type_id).first());
+    }
+    const currentType = types.get(lesson.lesson_type_id);
+    const nextType = lessonType && lesson.lesson_type_id !== lessonType.id ? lessonType : currentType;
+    const lengthChanges = nextType.id !== currentType.id;
+    let startAt = lesson.starts_at;
+    let reason = "";
+    if (timeMoves && lesson.id === row.id) {
+      startAt = start.toISOString();
+    } else if (timeMoves) {
+      // Its week is the one it sits nearest, counted from the lesson she opened.
+      const weeks = Math.round(daysBetweenKeys(fromSlot.dateKey, slotOf(lesson.starts_at).dateKey) / 7);
+      const key = addDaysToKey(toSlot.dateKey, weeks * 7);
+      const parsed = parseDateKey(key);
+      const instant = zonedToUtc(parsed.year, parsed.month, parsed.day, toSlot.minuteOfDay, homeZone());
+      const actual = slotOf(instant);
+      if (actual.dateKey !== key || actual.minuteOfDay !== toSlot.minuteOfDay) reason = "that time doesn't exist when the clocks change";
+      startAt = instant.toISOString();
+    }
+    const nextLocation = location ?? lesson.location;
+    if (startAt === lesson.starts_at && !lengthChanges && nextLocation === lesson.location) continue;
+    const endAt = new Date(Date.parse(startAt) + nextType.duration_minutes * 60000).toISOString();
+    if (lesson.payment_status === "processing" || lesson.charge_started_at || lesson.same_day_fee_status === "processing" ||
+        await env.DB.prepare("SELECT 1 FROM booking_refunds WHERE booking_id = ? AND status = 'pending'").bind(lesson.id).first()) {
+      reason = "its payment is going through";
+    }
+    reason ||= lengthChanges ? lengthKeptReason(lesson, currentType, nextType, amountCents) : "";
+    if (reason) {
+      kept.push({ lesson, reason });
+      continue;
+    }
+    candidates.push({
+      lesson, startAt, endAt, lessonTypeId: nextType.id, lengthChanges, location: nextLocation,
+      amountCents: lengthChanges ? amountCents : lesson.amount_cents ?? null
+    });
+  }
+
+  // Another lesson in the way keeps the week where it is. A week kept stays
+  // where it was and may then be in the way of another, so this settles. Of
+  // two of these lessons that would meet, the later stays: the lesson she
+  // opened comes first, then each week in turn.
+  for (let settled = false; !settled;) {
+    settled = true;
+    const moving = JSON.stringify(candidates.map((entry) => entry.lesson.id));
+    for (const [index, entry] of candidates.entries()) {
+      const clash = candidates.slice(0, index).some((other) => other.startAt < entry.endAt && other.endAt > entry.startAt) ||
+        kept.some(({ lesson }) => lesson.starts_at < entry.endAt && lesson.ends_at > entry.startAt) ||
+        await env.DB.prepare(
+          `SELECT 1 FROM bookings WHERE id NOT IN (SELECT value FROM json_each(?))
+             AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))
+             AND starts_at < ? AND ends_at > ? LIMIT 1`
+        ).bind(moving, new Date().toISOString(), entry.endAt, entry.startAt).first();
+      if (!clash) continue;
+      candidates.splice(index, 1);
+      kept.push({ lesson: entry.lesson, reason: "it would run into another lesson" });
+      settled = false;
+      break;
+    }
+  }
+  kept.sort((a, b) => a.lesson.starts_at.localeCompare(b.lesson.starts_at));
+  const keptReply = kept.map(({ lesson, reason }) => ({ startsAt: lesson.starts_at, reason }));
+  if (!candidates.length) {
+    return fail(
+      kept.length === 1 ? `This lesson stays as it was: ${kept[0].reason}.` : "None of these lessons can change. Open each one to see why.",
+      409, request, env
+    );
+  }
+
+  const planned = candidates.map(({ lesson, ...entry }) => ({
+    id: lesson.id, startAt: entry.startAt, endAt: entry.endAt, lessonType: entry.lessonTypeId, location: entry.location,
+    amount: entry.amountCents, lengthChanges: entry.lengthChanges ? 1 : 0,
+    oldStart: lesson.starts_at, oldEnd: lesson.ends_at, oldSequence: lesson.sequence, oldLessonType: lesson.lesson_type_id,
+    oldLocation: lesson.location, oldPaymentStatus: lesson.payment_status, oldAmount: lesson.amount_cents ?? null,
+    oldConsentAt: lesson.payment_consent_at ?? null, oldConsentVersion: lesson.payment_consent_version ?? null
+  }));
+  const lengthChanges = planned.some((entry) => entry.lengthChanges);
+  const nowIso = new Date().toISOString();
+  const proposed = JSON.stringify(planned);
+  // One write for every lesson, as her length change is: all of them or none,
+  // refused if any lesson, or the run, changed since it was read.
+  const statements = [env.DB.prepare(
+    `WITH proposed AS MATERIALIZED (
+       SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.startAt') AS start_at, json_extract(value, '$.endAt') AS end_at,
+         json_extract(value, '$.lessonType') AS lesson_type, json_extract(value, '$.location') AS location,
+         json_extract(value, '$.amount') AS amount, json_extract(value, '$.lengthChanges') AS length_changes,
+         json_extract(value, '$.oldStart') AS old_start, json_extract(value, '$.oldEnd') AS old_end,
+         json_extract(value, '$.oldSequence') AS old_sequence, json_extract(value, '$.oldLessonType') AS old_lesson_type,
+         json_extract(value, '$.oldLocation') AS old_location, json_extract(value, '$.oldPaymentStatus') AS old_payment_status,
+         json_extract(value, '$.oldAmount') AS old_amount, json_extract(value, '$.oldConsentAt') AS old_consent_at,
+         json_extract(value, '$.oldConsentVersion') AS old_consent_version
+       FROM json_each(?)
+     )
+     UPDATE bookings
+     SET starts_at = (SELECT start_at FROM proposed WHERE id = bookings.id),
+       ends_at = (SELECT end_at FROM proposed WHERE id = bookings.id),
+       lesson_type_id = (SELECT lesson_type FROM proposed WHERE id = bookings.id),
+       location = (SELECT location FROM proposed WHERE id = bookings.id),
+       amount_cents = (SELECT amount FROM proposed WHERE id = bookings.id),
+       payment_status = CASE WHEN (SELECT length_changes = 1 AND amount = 0 FROM proposed WHERE id = bookings.id) THEN '${FREE}' ELSE payment_status END,
+       payment_consent_at = CASE WHEN (SELECT length_changes = 1 AND amount = 0 FROM proposed WHERE id = bookings.id) THEN NULL ELSE payment_consent_at END,
+       payment_consent_version = CASE WHEN (SELECT length_changes = 1 AND amount = 0 FROM proposed WHERE id = bookings.id) THEN NULL ELSE payment_consent_version END,
+       previous_starts_at = starts_at, reschedule_count = reschedule_count + 1,
+       sequence = sequence + 1, same_day_change = 0, updated_at = ?,
+       attendance_status = CASE WHEN payment_status = 'scheduled' AND charge_started_at IS NULL
+         AND (SELECT start_at != bookings.starts_at OR end_at != bookings.ends_at FROM proposed WHERE id = bookings.id) THEN 'expected' ELSE attendance_status END,
+       no_show_marked_at = CASE WHEN payment_status = 'scheduled' AND charge_started_at IS NULL
+         AND (SELECT start_at != bookings.starts_at OR end_at != bookings.ends_at FROM proposed WHERE id = bookings.id) THEN NULL ELSE no_show_marked_at END
+     WHERE id IN (SELECT id FROM proposed)
+       AND (SELECT COUNT(*) FROM bookings current JOIN proposed p ON p.id = current.id
+              AND p.old_start = current.starts_at AND p.old_end = current.ends_at AND p.old_sequence = current.sequence
+              AND p.old_lesson_type = current.lesson_type_id AND p.old_location = current.location
+              AND p.old_payment_status = current.payment_status AND p.old_amount IS current.amount_cents
+              AND p.old_consent_at IS current.payment_consent_at AND p.old_consent_version IS current.payment_consent_version
+            WHERE current.status = 'confirmed' AND current.starts_at > ? AND current.charge_started_at IS NULL
+              AND current.payment_status != 'processing' AND current.same_day_fee_status != 'processing'
+              AND NOT EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = current.id AND status = 'pending')) = ?
+       AND (? IS NULL OR (SELECT COUNT(*) FROM bookings current
+            WHERE current.series_id = ? AND current.status = 'confirmed' AND current.starts_at >= ?) = ?)
+       AND NOT EXISTS (SELECT 1 FROM bookings other JOIN proposed p ON other.starts_at < p.end_at AND other.ends_at > p.start_at
+         WHERE (other.status = 'confirmed' OR (other.status = 'pending_payment' AND other.hold_expires_at > ?))
+           AND other.id NOT IN (SELECT id FROM proposed))
+       ${lengthChanges ? `AND ${lessonPriceSnapshotSql()}` : ""} AND (${authorization.sql})`
+  ).bind(
+    proposed, nowIso,
+    nowIso, planned.length,
+    following ? row.series_id : null, row.series_id, row.starts_at, lessons.length,
+    nowIso,
+    ...(lengthChanges ? lessonPriceSnapshot(row.student_id, { ...lessonType, price_cents: amountCents }) : []), ...authorization.values
+  )];
+  if (following) {
+    // Weeks added later follow her: the new weekday and time, length and
+    // place. Later weeks are stepped from the bookmark, so it takes the new
+    // day in its own week, as each lesson did, worked out in the write itself.
+    statements.push(env.DB.prepare(
+      `UPDATE booking_series SET
+         ${timeMoves ? `weekday = ?, minute_of_day = ?,
+         filled_to = CASE WHEN filled_to IS NULL THEN NULL
+           ELSE date(?, (CAST(ROUND((julianday(filled_to) - julianday(?)) / 7.0) AS INTEGER) * 7) || ' days') END,` : ""}
+         lesson_type_id = COALESCE(?, lesson_type_id), location = COALESCE(?, location), updated_at = ?
+       WHERE id = ? AND changes() = ? AND (${authorization.sql})`
+    ).bind(
+      ...(timeMoves ? [toSlot.weekday, toSlot.minuteOfDay, toSlot.dateKey, fromSlot.dateKey] : []),
+      lessonType?.id ?? null, location, nowIso,
+      row.series_id, planned.length, ...authorization.values
+    ));
+  }
+  const [changed] = await env.DB.batch(statements);
+  if ((changed?.meta?.changes ?? 0) !== planned.length) {
+    return fail("Those lessons have just changed. Please reload and try again.", 409, request, env);
+  }
+
+  // Her own change is not news to her: it clears the student's change on the
+  // versions she wrote, and only those.
+  try {
+    await env.DB.prepare(
+      `UPDATE bookings SET student_changed_at = NULL WHERE EXISTS (SELECT 1 FROM json_each(?) p
+         WHERE json_extract(p.value, '$.id') = bookings.id AND json_extract(p.value, '$.oldSequence') + 1 = bookings.sequence)`
+    ).bind(proposed).run();
+  } catch (error) {
+    console.warn("student-changed-at", row.id, String(error));
+  }
+
+  const { results: updated = [] } = await env.DB.prepare(
+    "SELECT * FROM bookings WHERE id IN (SELECT value FROM json_each(?)) ORDER BY starts_at"
+  ).bind(JSON.stringify(planned.map((entry) => entry.id))).all();
+  const settings = await loadSettings(env);
+  const manageUrls = {};
+  for (const lesson of updated) {
+    manageUrls[lesson.id] = studentManageUrl(env, await createManageToken(lesson.id, env.BOOKING_TOKEN_SECRET));
+  }
+  const first = planned.find((entry) => entry.id === updated[0]?.id);
+  const change = {
+    time: planned.some((entry) => entry.startAt !== entry.oldStart),
+    length: lengthChanges,
+    place: planned.some((entry) => entry.location !== entry.oldLocation)
+  };
+  const newType = lessonType ?? types.get(updated[0].lesson_type_id);
+  ctx.waitUntil(updated.length === 1
+    ? notify(env, {
+        event: "rescheduled", row: updated[0], lessonType: types.get(updated[0].lesson_type_id) ?? newType, settings, manageUrl: manageUrls[updated[0].id],
+        previousStartsAt: first.startAt !== first.oldStart ? first.oldStart : undefined,
+        previousLessonType: types.get(first.oldLessonType), previousLocation: first.oldLocation, teacherChange: change, byTeacher: true
+      })
+    : notifySeries(env, {
+        rows: updated, lessonType: newType, settings, manageUrls, skipped: [], reason: "changed", byTeacher: true,
+        kept: kept.map(({ lesson }) => lesson), teacherChange: change,
+        series: await env.DB.prepare("SELECT * FROM booking_series WHERE id = ?").bind(row.series_id).first()
+      }));
+  return json({
+    changed: updated.map((lesson) => lesson.starts_at),
+    kept: keptReply,
+    emailed: !await awaitingWelcomeAt(env, row.student_email)
+  }, 200, request, env);
+}
+
 async function handleAdmin(request, env, ctx, url, path) {
   const admin = await isAdmin(request, env);
   if (admin === "throttled") return fail("Too many attempts. Please wait 15 minutes.", 429, request, env);
@@ -7123,6 +7416,11 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
   const adminLength = path.match(/^\/admin\/bookings\/([^/]+)\/length$/);
   if (adminLength && request.method === "POST") {
     return await teacherChangeLength(request, env, ctx, adminLength[1], adminBody, authorization);
+  }
+
+  const adminChange = path.match(/^\/admin\/bookings\/([^/]+)\/change$/);
+  if (adminChange && request.method === "POST") {
+    return await teacherChangeLesson(request, env, ctx, adminChange[1], adminBody, authorization);
   }
 
   const adminNoShow = path.match(/^\/admin\/bookings\/([^/]+)\/no-show$/);

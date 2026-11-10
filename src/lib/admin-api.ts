@@ -625,14 +625,17 @@ function validKept(value: unknown): value is KeptLesson[] {
 }
 
 /**
- * Change a lesson to 60 or 90 minutes, or it and every later week of its
- * weekly run (9 November 2026, Dan). Each is priced at the student's own
- * price for that length; a lesson paid, being paid, or that would run into
- * another, stays as it is and comes back under `kept`.
+ * Her one change of a lesson's time, length and place, or of it and every
+ * later week of its run (10 November 2026, Dan). Only what differs is sent; a
+ * new length is at the student's own price for it. A lesson that can't take
+ * all of it (paid, being paid, or another lesson in the way) stays as it is
+ * and comes back under `kept`.
  */
-export function changeLessonLength(token: string, bookingId: string, lessonType: "single" | "long", expectedPriceCents: number, following: boolean) {
-  return adminRequest<{ changed: string[]; kept: KeptLesson[]; emailed?: boolean }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/length`, {
-    method: "POST", body: JSON.stringify({ lessonType, expectedPriceCents, following }),
+export function changeLesson(token: string, bookingId: string, change: {
+  startAt?: string; lessonType?: "single" | "long"; expectedPriceCents?: number; location?: "online" | "porto"; following: boolean;
+}) {
+  return adminRequest<{ changed: string[]; kept: KeptLesson[]; emailed?: boolean }>(token, `/admin/bookings/${encodeURIComponent(bookingId)}/change`, {
+    method: "POST", body: JSON.stringify(change),
   }).then(data => {
     if (!Array.isArray(data.changed) || !data.changed.length || !data.changed.every(isApiInstant) || !validKept(data.kept)) throw new Error(BOOKING_REPLY_ERROR);
     return data;

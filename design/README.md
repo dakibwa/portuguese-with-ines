@@ -632,17 +632,16 @@ free times and removes selected times that cannot be booked in the new place.
     second line, one wrapping line after the site's small lilac paint dab, as
     the shared facts are; `Cancelled`, `No-show` and `Happening now` are bold
     words in that line, not pills. Every secondary action here (`Show weeks`,
-    `Homework`, `Move or cancel`, `Change length`, `Create
+    `Homework`, `Change`, `Cancel`, `Create
     payment link`, `Close`) is one small soft lilac button, dark blue words in
     sentence case, with the same size, hover and focus. In an open lesson the
-    date and the controls (`Homework`, `Close`, `Move or cancel`, `Change
-    length`, `Already paid` / `No-show` and `Create payment link`) flow together
+    date and the controls (`Homework`, `Close`, `Change`, `Cancel`,
+    `Already paid` / `No-show` and `Create payment link`) flow together
     as one group with one shared gap, wrapping naturally where they do not fit
     and never pinned or spread apart, with the facts below. On narrow cards
     the controls expand to fill each row while keeping the same gap.
-    `Move or cancel` is one entry inline: it opens
-    the move form, with `Move lesson` / `Cancel lesson` choices, and a cancel
-    still needs its explicit confirmation; coral stays for a save,
+    `Change` opens her one change form in place, and `Cancel` the cancel
+    step, which still needs its explicit confirmation; coral stays for a save,
     a confirmed cancel and the one next step on a closed student's card. A level shows only where it
     differs from theirs now; a few lines of her notes follow. Open details
     span the list's whole width, one lesson's at a time, as a named region
@@ -2135,20 +2134,26 @@ together as one row of ticks, `Already paid` and `No-show` (named `Mark
 no-show` / `Undo no-show` for a screen reader), each the same capsule whose dab
 fills when ticked. Last, one wrapping row of quiet chips at their own width,
 the same at every width and the same as an open lesson in a student's card (10
-November 2026; they were a grid of loud buttons): `Homework`, `Move or cancel`,
-and `Change length` for a lesson still to come (not a trial), with `Create
-payment link` where one applies. `Join Google Meet` is the dialog's one filled
-button; a lesson in person has none. `Move or cancel` opens a `Move lesson |
-Cancel lesson` toggle whose pressed chip names the step, so moving and changing
-length carry no heading of their own; cancelling keeps `Cancel this lesson?`, with what happens as a
-dab (`Sam gets an email with the new time`). A weekly lesson with later weeks
-asks which with the lesson form's slider, `This lesson` or `Every week` (this
-one and every later week; 9 November 2026, Dan): Change length starts on
-`Every week`, Cancel on `This lesson`. Change length's second slider is the
-length with the student's price for each (`60 mins · €22`), and its dabs say
-how many lessons change and between which days, at what price each, which
-stay as they are and why (`Tue 1 Dec stays as it is: it's already paid`), and
-that one email goes. Cancelling every week reads `Cancel these lessons?`,
+November 2026; they were a grid of loud buttons): `Homework`, `Change` and
+`Cancel`, with `Create payment link` where one applies. `Join Google Meet` is
+the dialog's one filled button; a lesson in person has none. There is one way
+to change a lesson and one to cancel it (10 November 2026, Dan: "allow her
+malleability to change wholesale recurring stuff from 60 to 90, 90 to 60, the
+dates, the in porto or online etc"). `Change` opens in place, with no heading
+of its own: `This lesson | Every week` on the lesson form's slider where the
+run has later weeks (this one and every later week; 9 November 2026, Dan),
+the date and time in Porto, the length with the student's price for each
+(`60 mins · €22`; not for a trial) and `Online | In Porto`, all starting on
+the lesson as it stands. Its dabs say what will happen (`3 lessons move to
+Thursdays at 16:00`, `They become 90 minutes, €35 each`, `They move online`,
+which stay as they are and why, `Tue 1 Dec stays as it is: it's already
+paid`, and that one email goes), and `Save changes` waits as the quiet
+outline until something differs. Where the form has room, date sits beside
+time and length beside place. Every week means every later lesson takes the
+new day and time in its own week, so the dab is what happens. A lesson
+already had, or a record, offers only the date and time. Both `Change` and
+`Cancel` start on `This lesson`; cancelling keeps `Cancel this lesson?`, with
+what happens as a dab. Cancelling every week reads `Cancel these lessons?`,
 lists how many and between which days, and confirms with `Yes, cancel 8
 lessons`. `No-show` is live from the lesson's start until its end
 (2 November 2026), and before that it shows greyed out with `Available 11:00–12:00` beneath, so
@@ -2479,8 +2484,8 @@ for).
   the one thing to do next; the outline for its pair (`Cancel`, `Sign out`,
   `Not now`); and the quiet lilac chip in sentence case for a lesser action
   beside the thing it acts on (`Show weeks`, `Record refund`, `Remove card`,
-  `Send reset link`, an open lesson's `Homework`, `Move or cancel` and
-  `Change length`). A question only some people have (`Have a code from
+  `Send reset link`, an open lesson's `Homework`, `Change` and
+  `Cancel`). A question only some people have (`Have a code from
   Inês?`) is a quiet underlined line of text, not a button.
 - A control that repeats another is removed, not moved: `All students` went
   because an open student's Close already returns to the board.

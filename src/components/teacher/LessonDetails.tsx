@@ -7,7 +7,7 @@ import {
   addedByTeacher,
   cancelBookingAs,
   cancelFollowingAs,
-  changeLessonLength,
+  changeLesson,
   rescheduleBookingAs,
   paidByHand,
   recordRefundByHand,
@@ -92,6 +92,13 @@ function lengthHeld(lesson: AdminBooking, cents: number) {
   return "";
 }
 
+/** Why a lesson can't take her change, as the Worker decides it, or "". Only the Worker can see another lesson in the way. */
+function changeHeld(lesson: AdminBooking, length: "single" | "long" | null, cents: number) {
+  if (lesson.payment_status === "processing" || lesson.charge_started_at || lesson.same_day_fee_status === "processing") return "its payment is going through";
+  if (!length || lesson.lesson_type_id === length) return "";
+  return lesson.lesson_type_id === "trial" ? "it's a trial lesson" : lengthHeld(lesson, cents);
+}
+
 /**
  * This lesson, or every week of its run from here (9 November 2026, Dan:
  * "change recurring ones from 60 to 90 and they all change and she can cancel
@@ -144,16 +151,18 @@ export function LessonDetails({
   const noShowHintId = inline ? `teacher-no-show-hint-${ids}` : "teacher-no-show-hint";
   const cancelMessageId = inline ? `teacher-cancel-message-${ids}` : "teacher-cancel-message";
   const changed = useRef(false);
-  const [action, setAction] = useState<"view" | "move" | "length" | "cancel" | "no-show" | "homework" | "refund">(
+  const [action, setAction] = useState<"view" | "change" | "cancel" | "no-show" | "homework" | "refund">(
     initialAction,
   );
-  // The other length: a 60-minute lesson is most likely becoming 90.
-  const [length, setLength] = useState<"single" | "long">(booking.lesson_type_id === "long" ? "single" : "long");
+  // Her one Change form starts on the lesson as it stands: when, how long,
+  // where. Nothing is saved until one of them differs.
+  const ownLength = booking.lesson_type_id === "long" ? "long" : "single";
+  const [length, setLength] = useState<"single" | "long">(ownLength);
+  const [place, setPlace] = useState<"online" | "porto">(booking.location);
   const [following, setFollowing] = useState(false);
   const [date, setDate] = useState(dateKey(new Date(booking.starts_at)));
   const [time, setTime] = useState(formatSlotTime(booking.starts_at));
-  // Pre-filled with the current slot: nothing to save until she changes it.
-  const unchanged = date === dateKey(new Date(booking.starts_at)) && time === formatSlotTime(booking.starts_at);
+  const timeMoves = Boolean(date && time) && (date !== dateKey(new Date(booking.starts_at)) || time !== formatSlotTime(booking.starts_at));
   const [cancelMessage, setCancelMessage] = useState("");
   const firstName = booking.student_name.split(" ")[0];
   // Set up by her and not welcomed yet: the site emails them nothing.
@@ -188,10 +197,35 @@ export function LessonDetails({
   const everyWeek = following && repeats;
   const lengthMinutes = length === "long" ? 90 : 60;
   const lengthCents = priceFor(student, lengthMinutes);
-  const lengthScope = (everyWeek ? later : [booking]).filter(lesson => lesson.lesson_type_id !== length);
-  const lengthChanging = lengthScope.filter(lesson => !lengthHeld(lesson, lengthCents));
-  const lengthKept = lengthScope.filter(lesson => lengthHeld(lesson, lengthCents))
-    .map(lesson => ({ startsAt: lesson.starts_at, reason: lengthHeld(lesson, lengthCents) }));
+  // Length and place are hers to change on a lesson to come; one had, or a
+  // record, can still be corrected to another time, as before.
+  const lengthOffered = toCome && booking.lesson_type_id !== "trial";
+  const lengthChanges = lengthOffered && length !== ownLength;
+  const placeChanges = toCome && place !== booking.location;
+  const differs = (lesson: AdminBooking) => timeMoves || (lengthChanges && lesson.lesson_type_id !== length) || (placeChanges && lesson.location !== place);
+  const changeScope = (everyWeek ? later : [booking]).filter(differs);
+  const changing = changeScope.filter(lesson => !changeHeld(lesson, lengthChanges ? length : null, lengthCents));
+  const changeKept = changeScope.filter(lesson => changeHeld(lesson, lengthChanges ? length : null, lengthCents))
+    .map(lesson => ({ startsAt: lesson.starts_at, reason: changeHeld(lesson, lengthChanges ? length : null, lengthCents) }));
+  // What will happen, a dab each: the first names how many, the rest say "They".
+  const changeDabs = (() => {
+    if (!toCome || !changing.length) return [];
+    const many = everyWeek ? changing.length : 0;
+    const dabs: string[] = [];
+    // "3 lessons move", then "They become"; for one lesson "Moves", "Becomes".
+    const lead = (verb: string, verbs: string) => many > 1
+      ? dabs.length ? `They ${verb}` : `${many} lessons ${verb}`
+      : many && !dabs.length ? `1 lesson ${verbs}` : verbs.charAt(0).toUpperCase() + verbs.slice(1);
+    if (timeMoves) {
+      dabs.push(everyWeek
+        ? `${lead("move", "moves")} to ${dateLabel(date, { weekday: "long" })}s at ${time}`
+        : `Moves to ${dateLabel(date, { weekday: "short", day: "numeric", month: "short" })} at ${time}`);
+    }
+    if (lengthChanges) dabs.push(`${lead("become", "becomes")} ${lengthMinutes} minutes, ${formatPriceCents(lengthCents)}${many > 1 ? " each" : ""}`);
+    if (placeChanges) dabs.push(`${lead("move", "moves")} ${place === "online" ? "online" : `to ${TUTOR_CITY}`}`);
+    return dabs;
+  })();
+  const changeDirty = timeMoves || lengthChanges || placeChanges;
   // Its price and how it is paid, one dab: "€25 · paid by card". A
   // cancelled lesson's money matters only if some moved.
   const ticked = paidByHand(booking);
@@ -273,11 +307,8 @@ export function LessonDetails({
     []);
   // A step replaces the button that opened it, so focus follows to the details.
   const firstAction = useRef(true);
-  // Switching between Move and Cancel leaves focus on the choice pressed.
-  const keepFocus = useRef(false);
   useEffect(() => {
     if (firstAction.current) { firstAction.current = false; return; }
-    if (keepFocus.current) { keepFocus.current = false; return; }
     if (inline) panelRef.current?.focus({ preventScroll: true });
   }, [action, inline]);
 
@@ -302,7 +333,8 @@ export function LessonDetails({
     setBusy(true);
     setError("");
     try {
-      if (action === "move") {
+      if (action === "change" && !toCome) {
+        // A lesson had, or a record, is corrected to another time, as before.
         const moved = await rescheduleBookingAs(
           token,
           booking.id,
@@ -310,10 +342,16 @@ export function LessonDetails({
         );
         changed.current = true;
         onChanged(moved.emailed === false ? "Lesson moved." : "Lesson moved. The student has been emailed the new time.");
-      } else if (action === "length") {
-        const result = await changeLessonLength(token, booking.id, length, lengthCents, everyWeek);
+      } else if (action === "change") {
+        const result = await changeLesson(token, booking.id, {
+          startAt: timeMoves ? portoTimeToUtc(date, time, booking.starts_at) : undefined,
+          lessonType: lengthChanges ? length : undefined,
+          expectedPriceCents: lengthChanges ? lengthCents : undefined,
+          location: placeChanges ? place : undefined,
+          following: everyWeek,
+        });
         changed.current = true;
-        onChanged(`${result.changed.length === 1 ? "The lesson is" : `${result.changed.length} lessons are`} now ${lengthMinutes} minutes.${keptLine(result.kept)}${result.emailed === false ? "" : " The student has been emailed."}`);
+        onChanged(`${result.changed.length === 1 ? "Lesson changed." : `${result.changed.length} lessons changed.`}${keptLine(result.kept)}${result.emailed === false ? "" : " The student has been emailed."}`);
       } else if (action === "cancel" && everyWeek) {
         const result = await cancelFollowingAs(token, booking.id, awaiting ? "" : cancelMessage);
         changed.current = true;
@@ -468,30 +506,38 @@ export function LessonDetails({
   // at their own width (10 November 2026, Dan: one way for each thing); the
   // modal's one filled button is its call.
   const homeworkTrigger = booking.student_id ? <button className="teacher-quiet teacher-lesson-homework" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null;
+  // One way to change a lesson, as a student has, and one to cancel it
+  // (10 November 2026, Dan). Each starts on This lesson.
   const defaultActions = (
     <>
       <button
+        aria-label="Change lesson"
         className="teacher-quiet"
         type="button"
         disabled={busy || locked}
-        onClick={() => setAction("move")}
+        onClick={() => {
+          setFollowing(false);
+          setDate(dateKey(new Date(booking.starts_at)));
+          setTime(formatSlotTime(booking.starts_at));
+          setLength(ownLength);
+          setPlace(booking.location);
+          setAction("change");
+        }}
       >
-        Move or cancel
+        Change
       </button>
-      {toCome && booking.lesson_type_id !== "trial" ? (
-        <button
-          className="teacher-quiet"
-          type="button"
-          disabled={busy || locked}
-          onClick={() => {
-            // Weekly, she most likely means every week from here.
-            setFollowing(repeats);
-            setAction("length");
-          }}
-        >
-          Change length
-        </button>
-      ) : null}
+      <button
+        aria-label="Cancel lesson"
+        className="teacher-quiet"
+        type="button"
+        disabled={busy || locked}
+        onClick={() => {
+          setFollowing(false);
+          setAction("cancel");
+        }}
+      >
+        Cancel
+      </button>
     </>
   );
   // Inline, the row's own line: the lesson's date, then what she does with it
@@ -572,127 +618,100 @@ export function LessonDetails({
         <TeacherHomework bookingId={booking.id} token={token} onBusy={setBusy} />
       </div> : (
         <div className="teacher-dialog-confirmation">
-          {action === "move" || action === "cancel" ? (
-            <div className="teacher-move-cancel" role="group" aria-label="Move or cancel">
-              {(["move", "cancel"] as const).map(choice => (
-                <button
-                  aria-pressed={action === choice}
-                  className="teacher-quiet"
-                  disabled={busy || locked}
-                  key={choice}
-                  type="button"
-                  onClick={() => {
-                    if (action === choice) return;
-                    keepFocus.current = true;
-                    setError("");
-                    setFollowing(false);
-                    setAction(choice);
-                  }}
-                >
-                  {choice === "move" ? "Move lesson" : "Cancel lesson"}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {action === "length" ? (
+          {action === "change" ? (
             <form
-              className="teacher-form teacher-length-form"
+              className="teacher-form teacher-change-form"
               onSubmit={(event) => {
                 event.preventDefault();
                 void perform();
               }}
             >
-              {/* Its Length choice and Save length name the step. */}
+              {/* The pressed Change names the step; what will happen is a dab. */}
               {repeats ? <WeekChoice verb="Change" following={following} disabled={busy} onChange={setFollowing} /> : null}
-              {/* Each length with what this student pays for it, as her lesson form shows them. */}
-              <fieldset className="teacher-manual-choice">
-                <legend>Length</legend>
-                <div className={`segmented${length === "long" ? " segmented--second" : ""}`}>
-                  <span aria-hidden="true" className="segmented__thumb" />
-                  {([["single", 60], ["long", 90]] as const).map(([value, mins]) => (
-                    <label className={length === value ? "is-active" : ""} key={value}>
-                      <input
-                        aria-label={`${mins} mins, ${formatPriceCents(priceFor(student, mins))}`}
-                        checked={length === value}
-                        disabled={busy}
-                        name="teacher-lesson-length"
-                        onChange={() => setLength(value)}
-                        type="radio"
-                        value={value}
-                      />
-                      <span>{mins} mins</span>
-                      <span className="teacher-manual-price">{formatPriceCents(priceFor(student, mins))}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
+              <label>
+                <span>Date</span>
+                <input
+                  type="date"
+                  required
+                  disabled={busy}
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Time in {TUTOR_CITY}</span>
+                <input
+                  type="time"
+                  required
+                  disabled={busy}
+                  value={time}
+                  onChange={(event) => setTime(event.target.value)}
+                />
+              </label>
+              {lengthOffered ? (
+                // Each length with what this student pays for it, as her lesson form shows them.
+                <fieldset className="teacher-manual-choice">
+                  <legend>Length</legend>
+                  <div className={`segmented${length === "long" ? " segmented--second" : ""}`}>
+                    <span aria-hidden="true" className="segmented__thumb" />
+                    {([["single", 60], ["long", 90]] as const).map(([value, mins]) => (
+                      <label className={length === value ? "is-active" : ""} key={value}>
+                        <input
+                          aria-label={`${mins} mins, ${formatPriceCents(priceFor(student, mins))}`}
+                          checked={length === value}
+                          disabled={busy}
+                          name={`teacher-lesson-length-${ids}`}
+                          onChange={() => setLength(value)}
+                          type="radio"
+                          value={value}
+                        />
+                        <span>{mins} mins</span>
+                        <span className="teacher-manual-price">{formatPriceCents(priceFor(student, mins))}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
+              {toCome ? (
+                <fieldset className="teacher-manual-choice">
+                  <legend>Where</legend>
+                  <div className={`segmented${place === "porto" ? " segmented--second" : ""}`}>
+                    <span aria-hidden="true" className="segmented__thumb" />
+                    {([["online", "Online"], ["porto", IN_PERSON]] as const).map(([value, label]) => (
+                      <label className={place === value ? "is-active" : ""} key={value}>
+                        <input
+                          checked={place === value}
+                          disabled={busy}
+                          name={`teacher-lesson-place-${ids}`}
+                          onChange={() => setPlace(value)}
+                          type="radio"
+                          value={value}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
               <ul className="booking-payment-facts teacher-confirm-facts">
-                {lengthChanging.length ? (
-                  <li>
-                    {lengthChanging.length === 1
-                      ? `${everyWeek ? `${shortDay(lengthChanging[0].starts_at)} becomes` : "Becomes"} ${lengthMinutes} minutes at the same time, ${formatPriceCents(lengthCents)}`
-                      : `${lengthChanging.length} lessons, ${daySpan(lengthChanging)}, become ${lengthMinutes} minutes at the same times, ${formatPriceCents(lengthCents)} each`}
-                  </li>
-                ) : (
-                  <li>{lengthKept.length ? "Nothing to change" : `${everyWeek ? "These lessons are" : "This lesson is"} already ${lengthMinutes} minutes`}</li>
-                )}
-                {lengthKept.length ? <li>{keptLine(lengthKept).trim().replace(/\.$/, "")}</li> : null}
-                {lengthChanging.length ? (
-                  <li>{awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets one email with the change`}</li>
-                ) : null}
+                {!toCome ? (
+                  <li>{recorded ? "This past lesson stays a record only; no email is sent" : awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets an email with the new time`}</li>
+                ) : changeDirty ? <>
+                  {changeDabs.map(dab => <li key={dab}>{dab}</li>)}
+                  {!changing.length ? <li>Nothing to change</li> : null}
+                  {changeKept.length ? <li>{keptLine(changeKept).trim().replace(/\.$/, "")}</li> : null}
+                  {changing.length ? (
+                    <li>{awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets one email with the change`}</li>
+                  ) : null}
+                </> : null}
               </ul>
               <div className="teacher-dialog-actions">
-                <button className="button button--coral" type="submit" disabled={busy || !lengthChanging.length}>
-                  {busy ? "Saving…" : "Save length"}
+                <button className="button button--coral" type="submit" disabled={busy || !changeDirty || (toCome && !changing.length)}>
+                  {busy ? "Saving…" : "Save changes"}
                 </button>
                 {backToLesson}
               </div>
             </form>
-          ) : action === "move" ? (
-            <>
-              {/* The pressed Move lesson names it; what happens is a dab. */}
-              <form
-                className="teacher-form teacher-move-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void perform();
-                }}
-              >
-                <label>
-                  <span>New date</span>
-                  <input
-                    type="date"
-                    required
-                    disabled={busy}
-                    value={date}
-                    onChange={(event) => setDate(event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>Time in {TUTOR_CITY}</span>
-                  <input
-                    type="time"
-                    required
-                    disabled={busy}
-                    value={time}
-                    onChange={(event) => setTime(event.target.value)}
-                  />
-                </label>
-                <ul className="booking-payment-facts teacher-confirm-facts">
-                  <li>{recorded ? "This past lesson stays a record only; no email is sent" : awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets an email with the new time`}</li>
-                </ul>
-                <div className="teacher-dialog-actions">
-                  <button
-                    className="button button--coral"
-                    type="submit"
-                    disabled={busy || unchanged}
-                  >
-                    {busy ? "Moving…" : "Save new time"}
-                  </button>
-                  {backToLesson}
-                </div>
-              </form>
-            </>
           ) : (
             <>
               <h3>

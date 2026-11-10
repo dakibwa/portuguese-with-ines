@@ -66,6 +66,8 @@ Inês on /schedule                     (her own account, role=teacher)
   → POST /admin/bookings/:id/cancel { following }    this lesson and every later week of its run; the run stops
   → POST /admin/bookings/:id/length                  60 or 90 minutes, for this lesson or (`following`) every
                                                      later week of its run, at the student's own price
+  → POST /admin/bookings/:id/change                  time, length and place together, for this lesson or
+                                                     (`following`) every later week of its run; one email
 Stripe → POST /stripe/webhook                        signature-verified
 ```
 
@@ -1245,6 +1247,37 @@ while validation runs. Inês's explicit calendar additions retain their override
   run's recipe takes the new length so later top-ups use it. One email tells
   the student (`Inês has changed your lessons to 90 minutes`), or the single
   lesson's own when only one changed.
+- **Inês can change when, how long and where in one go** (10 November 2026,
+  Dan: "allow her malleability to change wholesale recurring stuff from 60 to
+  90, 90 to 60, the dates, the in porto or online etc"). `POST
+  /admin/bookings/:id/change` takes any of `startAt`, `lessonType` with
+  `expectedPriceCents`, and `location`, plus `following`. It starts from a
+  lesson still to come (not a record), and a new time must be to come too. A
+  length alone is exactly `/length`. Otherwise the lesson she opened takes
+  the new instant, and with `following` every later lesson takes the new day
+  and Porto time in its own week: the week of the run it sits nearest,
+  counted from the lesson she opened and stepped by date keys, so clock
+  changes never shift it and a week the student had moved on its own comes
+  back to the new day with the rest. What her page says before she saves
+  (`3 lessons move to Thursdays at 16:00`) is therefore what happens. A
+  lesson whose payment is going through, that cannot take the new length (as
+  `/length` decides), whose new time does not exist on a clock-change day, or
+  that would run into another lesson takes none of the change and comes back
+  under `kept` with a short reason; of two of the run's lessons that would
+  meet, the later stays. The rest change in one JSON-backed write guarded
+  like `/length`'s (each row exactly as read, the run's count, no overlap,
+  the price snapshot when the length changes, her authority). Each keeps its
+  UID with a higher sequence, counts as a move and never takes a fee. With
+  `following` the recipe takes the new weekday, time, length and place, and
+  `filled_to` moves to the new day in its own week inside the same guarded
+  batch, so later top-ups follow. A place change is handled as a student's:
+  the new sequence makes the Meet sync patch the one Google event, adding or
+  removing its room. She is held only by overlap, never by her hours, time
+  off or online-only periods. One email tells the student (`Inês has changed
+  your lesson` / `Inês has changed your weekly lessons`), naming any week
+  that stayed; a time-only move of one lesson keeps the words it always had.
+  Her page still corrects a lesson already had, or a record, to another time
+  through `/reschedule`.
   `POST /admin/bookings/:id/cancel` with `following: true` ends the run first,
   so the nightly top-up cannot add a week, then cancels each confirmed lesson
   from this one on exactly as her single cancellation does: a card payment is
