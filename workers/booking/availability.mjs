@@ -140,6 +140,24 @@ function blockedInstantSpans(key, spans) {
   return intervals;
 }
 
+/**
+ * True when one-off time off covers any part of the lesson on its Porto
+ * date(s): a whole day off, or hours that overlap it. Weekly blocks and her
+ * published hours are not consulted, so a lesson she placed outside them is
+ * not refused here.
+ */
+export async function inTimeOff(env, startAt, endAt) {
+  const start = new Date(startAt), end = new Date(endAt);
+  const fromKey = dateKey(start), toKey = dateKey(new Date(end.getTime() - 1));
+  const { results } = await env.DB.prepare(
+    "SELECT date, start_minute, end_minute FROM availability_exceptions WHERE weekday IS NULL AND kind = 'blocked' AND date BETWEEN ? AND ?"
+  ).bind(fromKey, toKey).all();
+  const spans = eachDateKey(fromKey, toKey).flatMap(key => blockedInstantSpans(key, (results ?? [])
+    .filter(exception => exception.date === key)
+    .map(exception => ({ start: exception.start_minute ?? 0, end: exception.end_minute ?? 1440 }))));
+  return spans.some(span => overlaps(start.getTime(), end.getTime(), span.start, span.end));
+}
+
 export async function loadSettings(env) {
   const { results } = await env.DB.prepare("SELECT key, value FROM settings").all();
   const settings = Object.fromEntries((results ?? []).map((row) => [row.key, row.value]));

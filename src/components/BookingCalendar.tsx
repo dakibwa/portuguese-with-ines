@@ -43,7 +43,7 @@ const { Component: AuthPanel, load: loadAuthPanel } = deferred(() => import("@/c
 const { Component: AccountControls, load: loadAccountControls } = deferred(() => import("@/components/MyLessons").then((m) => m.MyLessons));
 if (typeof window !== "undefined" && readSession()) void loadAccountControls();
 import { LessonMark } from "@/components/LessonMarks";
-import { clearSession, confirmSignInLink, fetchMe, requestEmailChange, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, SessionStorageError, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
+import { clearSession, confirmSignInLink, fetchMe, requestEmailChange, requestSignInLink, isReturningDevice, readSession, rememberedAccount, rememberReturningStudent, SessionStorageError, SIGN_IN_LINK_SENT, storeSession, subscribeToSession, type LessonSeries, type MyBooking, type Student } from "@/lib/auth-api";
 import { keepDialogFocus, restoreDialogFocus } from "@/lib/dialog-focus";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { SITE_BASE_PATH } from "@/lib/paths";
@@ -78,6 +78,7 @@ import {
   slotsByDateIn,
   weekKeyOf,
   previewSeries,
+  rebookBooking,
   rescheduleBooking,
   rescheduleSeries,
   shortMonth,
@@ -1091,6 +1092,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [manageWorking, setManageWorking] = useState(false);
   const [manageError, setManageError] = useState("");
   const [manageOutcome, setManageOutcome] = useState("");
+  // The way into the account from an email link, asked for from the lesson (10 November 2026).
+  const [lessonSignInLink, setLessonSignInLink] = useState<{ state: "idle" | "sending" | "sent"; error: string }>({ state: "idle", error: "" });
   const [managedCalendarPlaceholderHeight, setManagedCalendarPlaceholderHeight] = useState(0);
   const [showAccountSignIn, setShowAccountSignIn] = useState(false);
   const [upcomingRequestKey, setUpcomingRequestKey] = useState(0);
@@ -1505,6 +1508,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     setManageLoading(true);
     setManageError("");
     setManageOutcome("");
+    setLessonSignInLink({ state: "idle", error: "" });
     setManagedCalendarPlaceholderHeight(0);
     setManageMode(initialMode);
     setSelectedSlot("");
@@ -1984,6 +1988,9 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     ? lessonSeries.find((entry) => entry.id === resolvedManagedSeriesId) ?? null
     : null;
   const manageDialogOpen = Boolean(manageLoading || manageError || managed);
+  const rebookOffered = Boolean(managed && managed.booking.status === "cancelled" && managed.canRebook);
+  const offersAccountLink = Boolean(managed && !student && postpay && managed.booking.addedByTeacher &&
+    managed.booking.paymentStatus === "not_required" && !managed.booking.paidByHand && managed.booking.studentEmail);
   const lessonPreview = manageLoading && managePreview?.manageToken === managedToken ? managePreview : null;
   const regularLessonTypes = lessonTypes.filter((type) => type.id !== "trial");
   const trialLessonType = lessonTypes.find((type) => type.id === "trial") ?? null;
@@ -2421,7 +2428,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       const result = await cancelBooking(managedToken, managed.sameDayFeeApplies ? managed.booking.sameDayFeeCents : 0);
       if (request !== managedRequest.current) return;
       transitionBooking(() => {
-        setManaged({ ...managed, booking: result.booking });
+        setManaged({ ...managed, booking: result.booking, canRebook: false });
         setManageMode("view");
         setManageOutcome(
           result.booking.paymentStatus === "refunded"
@@ -2429,6 +2436,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
             : `Your lesson has been cancelled. We’ve emailed you and updated your calendar.${lateFeeNote(result.sameDayFeeApplied, result.booking.sameDayFeeCents)}`
         );
       });
+      // Whether the time can be booked again is the lesson's own read to give.
+      const token = managedToken;
+      void fetchBooking(token).then((fresh) => {
+        if (request === managedRequest.current && fresh.booking.status === "cancelled") setManaged(fresh);
+      }).catch(() => { /* Book again waits for the next time the lesson is opened. */ });
       refreshStudentInBackground();
     } catch (caught) {
       await refreshChangedFee(caught, request);
@@ -2436,6 +2448,61 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       setManageError(caught instanceof Error ? caught.message : "That lesson couldn’t be cancelled.");
     } finally {
       if (request === managedRequest.current) setManageWorking(false);
+    }
+  }
+
+  /**
+   * Book again the lesson this link cancelled (10 November 2026): a new lesson
+   * at the same time and the price shown, whose own link the page then holds.
+   */
+  async function rebookManagedLesson() {
+    if (!managedToken || !managed?.canRebook || managed.rebookPriceCents === undefined || manageWorking) return;
+    const request = ++managedRequest.current;
+    setManageWorking(true);
+    setManageError("");
+    try {
+      const result = await rebookBooking(managedToken, managed.rebookPriceCents);
+      if (request !== managedRequest.current) return;
+      const booked: ManagedBooking = {
+        booking: result.booking, isPast: false, sameDayFeeApplies: false, sameDayFeeAutomatic: result.booking.sameDayFeeAutomatic,
+        changeLocked: false, refundOnCancel: false, recurring: managed.recurring, durationPrices: managed.durationPrices, canRebook: false
+      };
+      transitionBooking(() => {
+        setManaged(booked);
+        setManagedToken(result.manageToken);
+        setManagedLessonTypeId(booked.booking.lessonType.id);
+        setManagedLocation(booked.booking.location);
+        setManageMode("view");
+        setManageOutcome(`Your lesson is booked again.${result.emailed ? " We’ve emailed you and updated your calendar." : ""}`);
+      });
+      // A reload opens the new lesson, not the cancelled one.
+      if (new URLSearchParams(window.location.search).has("manage")) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("manage", result.manageToken);
+        window.history.replaceState({}, "", url);
+      }
+      refreshStudentInBackground();
+    } catch (caught) {
+      if (request !== managedRequest.current) return;
+      setManageError(caught instanceof Error ? caught.message : "That lesson couldn’t be booked again.");
+    } finally {
+      if (request === managedRequest.current) setManageWorking(false);
+    }
+  }
+
+  /** One link into the account for a student who came from an email, to the booking's own address. */
+  async function emailLessonSignInLink() {
+    const email = managed?.booking.studentEmail;
+    if (!email || lessonSignInLink.state !== "idle") return;
+    const request = managedRequest.current;
+    setLessonSignInLink({ state: "sending", error: "" });
+    try {
+      await requestSignInLink(email);
+      if (request === managedRequest.current) setLessonSignInLink({ state: "sent", error: "" });
+    } catch (caught) {
+      if (request === managedRequest.current) {
+        setLessonSignInLink({ state: "idle", error: caught instanceof Error ? caught.message : "That link couldn’t be sent. Please try again." });
+      }
     }
   }
 
@@ -2486,6 +2553,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     setManageMode("view");
     setManageError("");
     setManageOutcome("");
+    setLessonSignInLink({ state: "idle", error: "" });
     setManagedCalendarPlaceholderHeight(0);
     setSelectedSlot("");
     setSelectedDate("");
@@ -3592,6 +3660,34 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
 
                   {accountRefreshNotice}
 
+                  {/* Their own cancellation, while its time is still free
+                      (10 November 2026): one press puts it back. What it
+                      costs and how it is paid are dabs, said once. On a
+                      card, pressing is the agreement, so the change and
+                      no-show rule it agrees to is here in the site's words. */}
+                  {rebookOffered && managed.rebookPriceCents !== undefined && manageMode === "view" ? (
+                    <>
+                      <ul className="booking-payment-facts">
+                        <li>Same time, {managed.rebookPriceCents === 0 ? "free" : formatMoneyCents(managed.rebookPriceCents)}</li>
+                        {managed.rebookPayment === "direct" ? <li>Paid to {TUTOR_NAME} directly</li>
+                          : managed.rebookPayment === "card" ? <>
+                            <li>Charged to your card at the end of the lesson</li>
+                            {lateFeeCents ? <>
+                              <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
+                              <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later, or if you don&rsquo;t show up</li>
+                            </> : <li>No fee to change or cancel, or for a missed lesson</li>}
+                          </> : null}
+                      </ul>
+                      <div className="lesson-manage-dialog__actions">
+                        <button className="button button--coral" disabled={manageWorking} onClick={rebookManagedLesson} type="button">
+                          {manageWorking ? "Booking…" : "Book again"}
+                        </button>
+                        <button className="button button--quiet" disabled={manageWorking} onClick={dismissManagedDialog} type="button">
+                          Done
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
                   {!manageOutcome && manageMode === "view" ? (
                     <>
                       {managed.booking.status === "pending_payment" ? (
@@ -3770,10 +3866,26 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     </div>
                   ) : null}
 
-                  {manageOutcome || managed.booking.status === "cancelled" || managed.isPast || managed.changeLocked ? (
+                  {(manageOutcome || managed.booking.status === "cancelled" || managed.isPast || managed.changeLocked) && !(rebookOffered && manageMode === "view") ? (
                     <button className="button button--quiet lesson-manage-dialog__done" onClick={dismissManagedDialog} type="button">
                       Done
                     </button>
+                  ) : null}
+
+                  {/* From an email link, a lesson Inês added and is paid for
+                      directly: one way into the account, where a card can be
+                      added (10 November 2026). It signs nobody in itself. */}
+                  {offersAccountLink && manageMode === "view" ? (
+                    lessonSignInLink.state === "sent" ? (
+                      <p className="lesson-manage-dialog__way-in" role="status">{SIGN_IN_LINK_SENT}</p>
+                    ) : (
+                      <div className="lesson-manage-dialog__way-in">
+                        <p>{lessonSignInLink.error || "See all your lessons and pay by card"}</p>
+                        <button className="teacher-quiet" disabled={lessonSignInLink.state === "sending"} onClick={emailLessonSignInLink} type="button">
+                          {lessonSignInLink.state === "sending" ? "Sending…" : "Email me a sign-in link"}
+                        </button>
+                      </div>
+                    )
                   ) : null}
                 </>
               ) : (
@@ -4364,6 +4476,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   setHomeworkId(id);
                   openAccountView("homework");
                 }}
+                onOpenLesson={openBookedLesson}
                 zone={studentZone}
               />
             ) : null}

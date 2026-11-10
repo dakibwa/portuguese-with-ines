@@ -2608,6 +2608,24 @@ with a band across the page afterwards) "this is ugly".
 - `Switch to online` is exactly pressing Online in Where. A student's place
   never changes unless they press something that says so.
 
+**Booking a cancelled lesson again.**
+
+- A lesson the student cancelled, whose time is still free, says so in its
+  own dialog with two dabs under its lines: `Same time, €25`, and how it is
+  paid (`Paid to Inês directly`; on a card, `Charged to your card at the end
+  of the lesson` with the site's two change-and-fee lines, because the press
+  is the agreement; nothing more for a free lesson). `Book again` is the
+  dialog's one filled action, `Done` its quiet pair. This holds right after
+  cancelling and when the link is opened later.
+- Booked again, the dialog shows the new lesson under `All sorted`: `Your
+  lesson is booked again. We’ve emailed you and updated your calendar.`
+- In `Your lessons`, such a lesson has a quiet `Book again` chip at its
+  row's end, which opens it.
+- From an email link, when nobody is signed in and the lesson is one Inês
+  added and is paid to her directly, one quiet line beneath the actions
+  reads `See all your lessons and pay by card`, with the chip `Email me a
+  sign-in link`. Pressed, it is replaced by the sign-in panel's own words.
+
 **One layout for one kind of thing.**
 
 - A student's lessons on Inês's page are a ledger, one row each: day and

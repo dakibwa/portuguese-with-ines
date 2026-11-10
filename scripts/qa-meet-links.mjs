@@ -37,6 +37,10 @@ try {
     let lateReady = false;
     let lateReads = 0;
     let pending = bookings.find(entry => entry.reference === "PENDING"), pendingReads = 0, lateFee = false, cancelAttempts = 0;
+    // The lesson in Porto is cancelled with notice to spare and booked again: a new lesson, with its own link.
+    const porto = bookings.find(entry => entry.reference === "PORTO");
+    const rebooked = { ...porto, reference: "REBOOKED", manageToken: "REBOOKED", paymentStatus: "not_required" };
+    let freed = false;
     const oldPollStarted = deferred(), oldPollWaiting = deferred();
     page.on("pageerror", error => errors.push(error.message));
     await page.clock.setFixedTime(new Date("2026-09-14T10:00:00Z"));
@@ -66,7 +70,21 @@ try {
           pending = { ...pending, status: "cancelled" };
           return route.fulfill({ json: { booking: pending, sameDayFeeApplied: true } });
         }
+        if (path === "/bookings/PORTO/cancel") {
+          assert.equal(route.request().postDataJSON().expectedLateFeeCents, 0, "A cancellation with notice to spare carries no fee");
+          freed = true;
+          return route.fulfill({ json: { booking: { ...porto, status: "cancelled" }, sameDayFeeApplied: false } });
+        }
+        if (path === "/bookings/PORTO/rebook") {
+          assert.equal(route.request().postDataJSON().expectedPriceCents, 2500, "Book again carries the price it showed");
+          return route.fulfill({ status: 201, json: { booking: rebooked, manageToken: "REBOOKED", emailed: true } });
+        }
+        if (path === "/bookings/REBOOKED") return route.fulfill({ json: { booking: rebooked, isPast: false, sameDayFeeApplies: false } });
         const booking = bookings.find(entry => entry.manageToken === path.split("/")[2]);
+        // Once cancelled, its own read says the time can be booked again, and how it would be paid.
+        if (booking.reference === "PORTO" && freed) {
+          return route.fulfill({ json: { booking: { ...booking, status: "cancelled" }, isPast: false, sameDayFeeApplies: false, canRebook: true, rebookPriceCents: 2500, rebookPayment: "direct" } });
+        }
         if (booking.reference === "PENDING") {
           const snapshot = pending;
           if (++pendingReads === 2) { oldPollStarted.resolve(); await oldPollWaiting.promise; }
@@ -111,6 +129,19 @@ try {
         await expect(join).toHaveAttribute("target", "_blank");
         await dialog.screenshot({ path: `tmp/qa/meet/details-${width}.png` });
       }
+      if (booking.reference === "PORTO") {
+        // Cancelled with notice to spare, its time still free: Book again puts
+        // it back in the same dialog, and the page then holds the new lesson's link.
+        await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+        await dialog.getByRole("button", { name: "Yes, cancel it", exact: true }).click();
+        await expect(dialog.locator(".booking-outcome")).toContainText("cancelled");
+        await expect(dialog.locator(".booking-payment-facts")).toHaveText(["Same time, €25Paid to Inês directly"]);
+        await dialog.getByRole("button", { name: "Book again", exact: true }).click();
+        await expect(dialog.locator(".booking-outcome")).toHaveText("Your lesson is booked again. We’ve emailed you and updated your calendar.");
+        await expect(dialog.locator(".lesson-calendar__status")).toHaveText("Booked");
+        assert.equal(new URL(page.url()).searchParams.get("manage"), "REBOOKED");
+        await dialog.screenshot({ path: `tmp/qa/meet/booked-again-${width}.png` });
+      }
       if (booking.reference === "PENDING") {
         // Hold a missing-link poll across an accepted online move. Its older
         // booking snapshot must not put the lesson back on the original date.
@@ -134,6 +165,8 @@ try {
         await currentDialog.getByRole("button", { name: "Yes, cancel it", exact: true }).click();
         await expect(currentDialog.locator(".booking-outcome")).toContainText("cancelled");
         assert.equal(cancelAttempts, 2, "A changed quote needs a second confirmation");
+        // A late cancellation is never offered Book again.
+        await expect(currentDialog.getByRole("button", { name: "Book again", exact: true })).toHaveCount(0);
       }
     }
     assert.deepEqual(errors, []);

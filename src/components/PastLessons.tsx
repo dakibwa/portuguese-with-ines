@@ -20,6 +20,8 @@ type Row = {
   length: string;
   cancelled: boolean;
   homework?: HomeworkSummary;
+  /** A cancelled lesson still to come whose time can be booked again. */
+  bookAgain?: MyBooking;
 };
 
 function historyTime(booking: MyBooking) {
@@ -45,11 +47,13 @@ function homeworkState(item: HomeworkSummary) {
  * when, and its homework or Cancelled at the line's end; then how long and
  * where.
  */
-export function PastLessons({ bookings, clock, onOpenHomework, zone }: {
+export function PastLessons({ bookings, clock, onOpenHomework, onOpenLesson, zone }: {
   bookings: MyBooking[];
   clock: number;
   /** Opens a lesson's homework sheet in the card's place. */
   onOpenHomework: (bookingId: string) => void;
+  /** Opens a lesson's own dialog, where it can be booked again. */
+  onOpenLesson: (booking: MyBooking, trigger: HTMLElement) => void;
   /** The student's own clock; lessons in Porto keep Porto's. */
   zone: string;
 }) {
@@ -86,7 +90,8 @@ export function PastLessons({ bookings, clock, onOpenHomework, zone }: {
       location: booking.location,
       length: formatBookedLessonLabel(booking.lessonType),
       cancelled: booking.status === "cancelled",
-      homework: item
+      homework: item,
+      bookAgain: booking.status === "cancelled" && booking.canRebook && Date.parse(booking.startAt) > clock ? booking : undefined
     };
   });
   // Homework from a lesson this account no longer lists still has a row.
@@ -130,6 +135,9 @@ export function PastLessons({ bookings, clock, onOpenHomework, zone }: {
           <div className="past-lesson__line past-lesson__facts">
             <span>{row.length} · {row.location === "porto" ? IN_PERSON : "Online"}</span>
             {row.homework ? <span className="past-lesson__title" lang={LANGUAGE_CODE}>{row.homework.title}</span> : null}
+            {row.bookAgain ? <button className="teacher-quiet" type="button" onClick={(event) => onOpenLesson(row.bookAgain!, event.currentTarget)}>
+              Book again<span className="visually-hidden">: {day(row.at, lessonZone, clock)}</span>
+            </button> : null}
           </div>
         </li>;
       })}
