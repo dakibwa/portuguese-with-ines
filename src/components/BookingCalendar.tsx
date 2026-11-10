@@ -20,6 +20,7 @@ import {
   CircleX,
   Mail,
   MessageSquareText,
+  Pencil,
   Plus,
   Repeat,
   UserRound,
@@ -150,9 +151,11 @@ function calendarMonths(weeks: BookingWeek[]) {
  * sit side by side. It opens on the half holding the time already chosen, or
  * the first with free times.
  */
-function TimePicker({ halves, renderTime, selected = "", slots, zone }: {
+function TimePicker({ halves, listLabel, renderTime, selected = "", slots, zone }: {
   /** Where the day divides and the span its halves are named by; null keeps one list. */
   halves: { first: string; last: string; split: string } | null;
+  /** Times shown but not chosen here are a named list rather than buttons. */
+  listLabel?: string;
   renderTime: (slot: Slot, place: CSSProperties | undefined) => ReactNode;
   selected?: string;
   slots: Slot[];
@@ -204,8 +207,10 @@ function TimePicker({ halves, renderTime, selected = "", slots, zone }: {
       ) : null}
       {current.slots.length ? (
         <div
+          aria-label={listLabel}
           className="slot-grid time-picker__times"
           key={current.id}
+          role={listLabel ? "list" : undefined}
           // At least three columns, so one free time is a time, not a bar
           // across the dialog (13 October 2026, Dan).
           style={timetable ? { gridTemplateColumns: `repeat(${Math.max(minutes.length, 3)}, minmax(0, 1fr))` } : undefined}
@@ -362,7 +367,6 @@ function shortWhen(startAt: string, zone: string) {
 
 function BookingSelectionSummary({
   actionLabel,
-  actionText,
   ariaLabel,
   detail,
   disabled = false,
@@ -371,9 +375,8 @@ function BookingSelectionSummary({
   shortTitle,
   title
 }: {
+  /** Names the row's pencil, such as "Change lesson 2". */
   actionLabel?: string;
-  /** Visible text when the accessible label, like "Change lesson 2", would crowd the row. */
-  actionText?: string;
   ariaLabel: string;
   detail?: string;
   disabled?: boolean;
@@ -392,20 +395,18 @@ function BookingSelectionSummary({
         </strong>
         {detail ? <small>{detail}</small> : null}
       </span>
+      {/* The one pencil that changes a thing anywhere on the site (10
+          November 2026); here the whole row answers to it. */}
       {actionLabel && onAction ? (
         <button
           aria-label={actionLabel}
-          className="booking-choice-summary__change"
+          className="teacher-pencil booking-choice-summary__change"
           disabled={disabled}
           onClick={onAction}
+          title="Change"
           type="button"
         >
-          {actionText ?? (
-            <>
-              <span className="booking-choice-summary__change-label">{actionLabel}</span>
-              <span className="booking-choice-summary__change-short" aria-hidden="true">Change</span>
-            </>
-          )}
+          <Pencil size={15} strokeWidth={2.4} aria-hidden="true" />
         </button>
       ) : null}
     </div>
@@ -939,6 +940,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // them just as the Worker will insist when they are booked.
   const [lessonGapMinutes, setLessonGapMinutes] = useState(0);
   const [slotsByDate, setSlotsByDate] = useState<Record<string, Slot[]>>({});
+  const [currentSlotOnlineOnly, setCurrentSlotOnlineOnly] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [bookingPromptDate, setBookingPromptDate] = useState("");
   const [calendarWeekCount, setCalendarWeekCount] = useState<CalendarWeekCount>(4);
@@ -1146,6 +1148,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     : type.price_cents;
   const managedPrice = managed && selectedManagedType ? managedPriceOf(selectedManagedType) : undefined;
   const isManagedReschedule = manageMode === "reschedule" || manageMode === "reschedule-sequence";
+  // Changing a lesson opens on the lesson as it stands: until its time,
+  // length or place differs there is nothing to save, so Save changes waits.
+  const managedChangeIsEmpty = Boolean(
+    managed &&
+    manageMode === "reschedule" &&
+    selectedSlot === managed.booking.startAt &&
+    (managedLessonTypeId || managed.booking.lessonType.id) === managed.booking.lessonType.id &&
+    managedLocation === managed.booking.location
+  );
 
   /*
    * The clock each view reads. Online, a lesson is at the student's own time,
@@ -1570,9 +1581,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     isManagedReschedule && managed
       ? managedLessonTypeId || managed.booking.lessonType.id
       : lessonTypeId;
+  const availabilityLocation = isManagedReschedule ? managedLocation : form.location;
 
   // The lesson being moved, so availability does not count it against itself.
-  const movingToken = manageMode === "reschedule" ? managedToken : "";
+  const movingToken = isManagedReschedule ? managedToken : "";
   const movingSeriesId = manageMode === "reschedule-sequence"
     ? managedSeriesId ?? myBookings.find((booking) => booking.manageToken === managedToken)?.seriesId ?? ""
     : "";
@@ -1596,12 +1608,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
        * been a lie rather than a gap.
        */
       const until = addDaysToKey(todayKey, 140);
-      const moving = { manageToken: movingToken, seriesId: movingSeriesId, session: movingSeriesId ? readSession() : "" };
+      const moving = { manageToken: movingToken, seriesId: movingSeriesId, session: movingSeriesId ? readSession() : "", location: availabilityLocation };
       // Times fetched a moment ago (or ahead of time, while the page was idle)
       // show at once, with no "Checking what's free…" in between.
       const ready = peekAvailability(availabilityLessonTypeId, todayKey, until, moving);
       if (ready) {
         setSlotsByDate(ready.slotsByDate);
+        setCurrentSlotOnlineOnly(ready.currentSlotOnlineOnly ?? false);
         setHorizonDays(ready.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
         setNoticeHours(ready.minimumNoticeHours ?? NOTICE_HOURS);
         setLateFeeCents(ready.sameDayFeeCents ?? SAME_DAY_RESCHEDULE_FEE_CENTS);
@@ -1618,6 +1631,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         .then((data) => {
           if (request !== availabilityVersion.current || signal?.aborted || readSession() !== session) return;
           setSlotsByDate(data.slotsByDate);
+          setCurrentSlotOnlineOnly(data.currentSlotOnlineOnly ?? false);
           setHorizonDays(data.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
           setNoticeHours(data.minimumNoticeHours ?? NOTICE_HOURS);
           setLateFeeCents(data.sameDayFeeCents ?? SAME_DAY_RESCHEDULE_FEE_CENTS);
@@ -1634,7 +1648,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     },
     // availabilityRequest is a deliberate trigger: see where it is declared.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [availabilityLessonTypeId, todayKey, availabilityRequest, movingToken, movingSeriesId]
+    [availabilityLessonTypeId, todayKey, availabilityRequest, movingToken, movingSeriesId, availabilityLocation]
   );
 
   useEffect(() => {
@@ -1645,6 +1659,35 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       controller.abort();
     };
   }, [loadAvailability]);
+
+  /*
+   * In Porto the free times leave out those Inês teaches only online. Read
+   * beside them (the very request Online makes, so from its cache when it is
+   * fresh), they mark the days that could still be had online. It is only a
+   * read: nothing booked, moved or previewed changes, and if it fails or is
+   * slow the calendar is simply as it would be without it.
+   */
+  const marksOnlineOnly = availabilityLocation === "porto" && ((intent === "book" && !managed) || isManagedReschedule);
+  const onlineOnlyRequest = marksOnlineOnly && availabilityLessonTypeId && todayKey
+    ? [availabilityLessonTypeId, todayKey, movingToken, movingSeriesId, availabilityRequest].join(" ")
+    : "";
+  const [onlineSlots, setOnlineSlots] = useState<{ request: string; slotsByDate: Record<string, Slot[]> } | null>(null);
+  useEffect(() => {
+    if (!onlineOnlyRequest) return;
+    let live = true;
+    const moving = { manageToken: movingToken, seriesId: movingSeriesId, session: movingSeriesId ? readSession() : "" };
+    fetchAvailability(availabilityLessonTypeId, todayKey, addDaysToKey(todayKey, 140), undefined, moving)
+      .then((data) => { if (live) setOnlineSlots({ request: onlineOnlyRequest, slotsByDate: data.slotsByDate }); })
+      .catch(() => {});
+    return () => { live = false; };
+    // The request names everything this read depends on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlineOnlyRequest]);
+  const onlineSlotsByDate = useMemo(
+    () => onlineSlots && onlineSlots.request === onlineOnlyRequest ? slotsByDateIn(onlineSlots.slotsByDate, viewZone) : null,
+    [onlineSlots, onlineOnlyRequest, viewZone]
+  );
+  const portoStarts = useMemo(() => new Set(Object.values(slotsByDate).flat().map((slot) => slot.startAt)), [slotsByDate]);
 
   /*
    * While the page is idle, fetch what the next likely step needs, so it shows
@@ -1672,7 +1715,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     if (!wanted.length && !signedOut) return;
     const run = () => {
       for (const { typeId, manageToken } of wanted) {
-        if (typeId) void fetchAvailability(typeId, todayKey, until, undefined, { manageToken }).catch(() => {});
+        if (typeId) void fetchAvailability(typeId, todayKey, until, undefined, { manageToken, location: availabilityLocation }).catch(() => {});
       }
       if (signedOut) void loadAuthPanel();
     };
@@ -1683,7 +1726,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     };
   // defaultLessonChoice reads the lesson types and preferences listed here.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayKey, checkingSession, loadingSlots, managed, isManagedReschedule, managedToken, intent, lessonTypes, lessonTypeId, offerTrial, hasPriorBooking, student, preferredLessonTypeId]);
+  }, [todayKey, checkingSession, loadingSlots, managed, isManagedReschedule, managedToken, intent, lessonTypes, lessonTypeId, offerTrial, hasPriorBooking, student, preferredLessonTypeId, availabilityLocation]);
 
   const calendarBookings = myBookings
     .filter((booking) => booking.status === "confirmed" && Date.parse(booking.endAt) > clock)
@@ -1810,12 +1853,20 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const selectionWeek = !managed && bookingKind === "recurring" && savedChoices.length
     ? portoWeekKey(savedChoices[0].startAt) : "";
   const lessonGapMs = lessonGapMinutes * 60000;
-  const selectableSlots = (date: string) => (viewSlotsByDate[date] ?? []).filter((slot) => managed || intent !== "book" || (
+  const keepSelectable = (slots: Slot[]) => slots.filter((slot) => managed || intent !== "book" || (
     (!selectionWeek || portoWeekKey(slot.startAt) === selectionWeek) &&
     !savedChoices.some((choice) =>
       Date.parse(choice.startAt) < Date.parse(slot.endAt) + lessonGapMs &&
       Date.parse(choice.endAt) + lessonGapMs > Date.parse(slot.startAt))
   ));
+  const selectableSlots = (date: string) => keepSelectable(viewSlotsByDate[date] ?? []);
+  // Free online but not in Porto, while In Porto is chosen; never choosable here.
+  const onlineOnlySlots = (date: string) => !onlineSlotsByDate || loadingSlots || availabilityError
+    ? []
+    : keepSelectable((onlineSlotsByDate[date] ?? []).filter((slot) => !portoStarts.has(slot.startAt)));
+  const dayOnlineOnly = selectedDate ? onlineOnlySlots(selectedDate) : [];
+  const onlineOnlyOnScreen = Boolean(onlineSlotsByDate) && displayedCalendarWeeks.some((week) =>
+    week.cells.some((cell) => !selectableSlots(cell.key).length && onlineOnlySlots(cell.key).length));
   const rawDaySlots = selectedDate ? selectableSlots(selectedDate) : [];
   // Until a day is chosen the times panel waits out of sight, so a window with
   // nothing free says so on the calendar itself.
@@ -1828,6 +1879,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     isManagedReschedule &&
     selectedDate === managedDate &&
     (managedLessonTypeId || managed.booking.lessonType.id) === managed.booking.lessonType.id &&
+    !(managedLocation === "porto" && managed.booking.location === "online" && currentSlotOnlineOnly) &&
     !rawDaySlots.some((slot) => slot.startAt === managed.booking.startAt)
   );
   const daySlots = shouldShowCurrentManagedSlot && managed
@@ -1837,6 +1889,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       ].sort((a, b) => a.startAt.localeCompare(b.startAt))
     : rawDaySlots;
   const managedStartAt = shouldShowCurrentManagedSlot && managed ? managed.booking.startAt : "";
+  useEffect(() => {
+    if (!managed || !isManagedReschedule || loadingSlots || availabilityError || !selectedSlot) return;
+    const keepingTime = selectedSlot === managed.booking.startAt &&
+      (managedLessonTypeId || managed.booking.lessonType.id) === managed.booking.lessonType.id &&
+      !(managedLocation === "porto" && managed.booking.location === "online" && currentSlotOnlineOnly);
+    if (!keepingTime && !Object.values(slotsByDate).some(slots => slots.some(slot => slot.startAt === selectedSlot))) setSelectedSlot("");
+  }, [managed, isManagedReschedule, loadingSlots, availabilityError, selectedSlot, managedLessonTypeId, managedLocation, currentSlotOnlineOnly, slotsByDate]);
   /*
    * Inês's day divides at 14:00 in Porto. On another clock it divides at that
    * same moment, unless her day runs across the student's midnight, when it
@@ -1952,7 +2011,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     setSeriesPreviewError("");
     setPreviewing(true);
 
-    Promise.all(choiceStarts.map((startAt) => previewSeries(readSession(), { lessonType: lessonType.id, startAt, weeks: repeat })))
+    Promise.all(choiceStarts.map((startAt) => previewSeries(readSession(), { lessonType: lessonType.id, startAt, weeks: repeat, location: form.location })))
       .then((results) => {
         if (cancelled) return;
         setSeriesPreview({ bookable: results.flatMap((result) => result.bookable).sort(), skipped: results.flatMap((result) => result.skipped).sort() });
@@ -1972,7 +2031,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     return () => {
       cancelled = true;
     };
-  }, [form.repeat, chosen, lessonType, choiceStarts]);
+  }, [form.repeat, form.location, chosen, lessonType, choiceStarts]);
 
   useEffect(() => { setPaymentConsent(false); }, [choiceKey, lessonType?.id, lessonType?.price_cents, form.location, form.repeat]);
 
@@ -2278,7 +2337,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   }
 
   async function moveManagedLesson() {
-    if (!managedToken || !selectedSlot || !managed || manageWorking) return;
+    if (!managedToken || !selectedSlot || !managed || manageWorking || loadingSlots) return;
     const request = ++managedRequest.current;
     setManageWorking(true);
     setManageError("");
@@ -2571,6 +2630,58 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     }, true);
   }
 
+  // Where, while booking and while changing a lesson. Switch to online on an
+  // online-only day comes through here too, so it is exactly pressing Online.
+  function chooseBookingLocation(option: "online" | "porto") {
+    slotRecheck.current = [...savedChoices.map(choice => choice.startAt), ...(selectedSlot ? [selectedSlot] : [])];
+    setLoadingSlots(true);
+    setForm((current) => ({ ...current, location: option }));
+  }
+
+  function chooseManagedLocation(option: "online" | "porto") {
+    setLoadingSlots(true);
+    setManagedLocation(option);
+  }
+
+  // One quiet line under a Porto day's times: the globe, what it means, and
+  // the one way to act on it. The times panel takes focus as the chip goes.
+  function onlineOnlyLine(allOnline: boolean) {
+    return (
+      <p className="online-only-line">
+        <span><Globe aria-hidden="true" size={14} strokeWidth={2.4} />{allOnline ? "Online only on this day" : "More times online"}</span>
+        <button
+          className="teacher-quiet"
+          disabled={manageWorking}
+          onClick={() => {
+            if (isManagedReschedule) chooseManagedLocation("online");
+            else chooseBookingLocation("online");
+            document.getElementById("booking-next-step")?.focus({ preventScroll: true });
+          }}
+          type="button"
+        >
+          Switch to online
+        </button>
+      </p>
+    );
+  }
+
+  function onlineOnlyTimes() {
+    return (
+      <TimePicker
+        halves={timeHalves}
+        key={`${selectedDate}-online`}
+        listLabel="Times online only"
+        renderTime={(slot, place) => (
+          <span className="slot-grid__online-only" key={slot.startAt} role="listitem" style={place}>
+            {formatSlotTime(slot.startAt, viewZone)}
+          </span>
+        )}
+        slots={dayOnlineOnly}
+        zone={viewZone}
+      />
+    );
+  }
+
   function chooseLessonLength(typeId: string) {
     if (typeId === lessonTypeId) return;
     changeLesson(typeId);
@@ -2591,7 +2702,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         ? `${dropped.length === 1 ? "Your other chosen lesson" : `Your other ${dropped.length} chosen lessons`} came off with the change of lesson. Add ${dropped.length === 1 ? "it" : "them"} again if you need to.`
         : "");
       if (typeId !== lessonTypeId) {
-        const ready = todayKey ? peekAvailability(typeId, todayKey, addDaysToKey(todayKey, 140)) : null;
+        const ready = todayKey ? peekAvailability(typeId, todayKey, addDaysToKey(todayKey, 140), { location: form.location }) : null;
         if (ready) {
           // Usually fetched while the page was idle: the days simply change,
           // with the new lesson's gap in the same commit, so the times kept
@@ -2729,7 +2840,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           <li key={choice.startAt}>
             <BookingSelectionSummary
               actionLabel={editable && !payment ? `Change lesson ${index + 1}` : undefined}
-              actionText="Change"
               ariaLabel={`Lesson ${index + 1}`}
               detail={index === 0 ? viewZoneName : undefined}
               disabled={submitting}
@@ -2757,7 +2867,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         {bookingChoices.length <= 1 && chosen ? (
           <BookingSelectionSummary
             actionLabel={!payment ? "Change date or time" : undefined}
-            actionText="Change"
             ariaLabel="Selected lesson"
             detail={viewZoneName}
             disabled={submitting}
@@ -2977,7 +3086,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     aria-label={option === "online" ? "Online" : IN_PERSON}
                     checked={form.location === option}
                     name="booking-location"
-                    onChange={() => setForm((current) => ({ ...current, location: option }))}
+                    onChange={() => chooseBookingLocation(option)}
                     type="radio"
                     value={option}
                   />
@@ -3558,7 +3667,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             {activeManagedSeries ? null : <span>The lessons already booked stay in your calendar.</span>}
                           </div>
                           {activeManagedSeries ? (
-                            <button className="button button--outline button--compact" onClick={() => transitionBooking(() => setManageMode("sequence"))} type="button">
+                            <button className="teacher-quiet" onClick={() => transitionBooking(() => setManageMode("sequence"))} type="button">
                               Manage weekly lessons
                             </button>
                           ) : null}
@@ -3603,13 +3712,15 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   {activeManagedSeries && manageMode === "sequence" ? (
                     <div className="lesson-manage-dialog__decision">
                       <div className="lesson-manage-dialog__actions lesson-manage-dialog__actions--sequence">
-                        <button className="button button--blue" onClick={beginManagedSeriesReschedule} type="button">
+                        {/* One filled button, for the one next thing; cancelling
+                            them all is asked again, in coral, before it happens. */}
+                        <button className="button button--coral" onClick={beginManagedSeriesReschedule} type="button">
                           Move weekly time
                         </button>
                         <button className="button button--quiet" onClick={() => transitionBooking(() => setManageMode("confirm-stop-sequence"))} type="button">
                           Stop repeating
                         </button>
-                        <button className="button button--coral" onClick={() => transitionBooking(() => setManageMode("confirm-cancel-sequence"))} type="button">
+                        <button className="button button--quiet" onClick={() => transitionBooking(() => setManageMode("confirm-cancel-sequence"))} type="button">
                           Cancel all booked lessons
                         </button>
                         <button className="booking-back booking-back--tertiary" onClick={() => transitionBooking(() => setManageMode("view"))} type="button">
@@ -4046,7 +4157,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 {returnCalendarWeekCount && !restrictedWeeks ? (
                   <button
                     aria-controls="booking-calendar-weeks"
-                    className="button button--lilac button--small unified-calendar__expand"
+                    className="teacher-quiet unified-calendar__expand"
                     disabled={manageWorking}
                     onClick={() => transitionBooking(() => setCalendarWeekCount(returnCalendarWeekCount))}
                     type="button"
@@ -4079,6 +4190,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       days' own labels carry the full date. */}
                   {week.cells.map((cell, column) => {
                     const slots = selectableSlots(cell.key);
+                    const onlineOnly = slots.length ? [] : onlineOnlySlots(cell.key);
                     const lessons = bookingsByDate[cell.key] ?? [];
                     const lessonLabel = lessons.length === 1 ? "1 lesson" : `${lessons.length} lessons`;
                     const dateLabel = formatLongDate(`${cell.key}T12:00:00Z`);
@@ -4095,25 +4207,28 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         : lessons.every((booking) => booking.location !== "porto") ? " is-own-day" : "";
                     return (
                       <button
+                        aria-current={cell.isToday ? "date" : undefined}
                         aria-describedby={lessonTip}
                         aria-label={`${dateLabel}${
                           lessons.length ? `, ${lessonLabel}` : ""
                         }${
                           slots.length
                             ? `, ${slots.length} times free`
+                            : onlineOnly.length
+                              ? `, online only, ${onlineOnly.length} ${onlineOnly.length === 1 ? "time" : "times"}`
                             : lessons.length
                               ? isLessonsCalendarOverview ? (lessons.length === 1 ? ", open lesson" : ", choose a lesson to open") : ""
                               : canStartBooking ? ", book a lesson" : ", unavailable"
                         }`}
                         aria-haspopup={isLessonsCalendarOverview && lessons.length ? "dialog" : undefined}
                         aria-pressed={!isLessonsCalendarOverview && selectedDate === cell.key}
-                        className={`${slots.length ? "has-availability" : ""}${canStartBooking ? " can-start-booking" : ""}${
+                        className={`${slots.length ? "has-availability" : onlineOnly.length ? "is-online-only" : ""}${canStartBooking ? " can-start-booking" : ""}${
                           lessons.length ? " has-booking" : ""
                         }${weeklyDay ? " has-weekly-booking" : ""}${!isLessonsCalendarOverview && selectedDate === cell.key ? " is-selected" : ""}${cell.isToday ? " is-today" : ""}${
                           nextDay ? " is-next" : ""
                         }${dayClock}${lessonTip && row === 0 ? " has-tip-below" : ""}`}
                         data-date-key={cell.key}
-                        disabled={manageWorking || (!canStartBooking && !slots.length && !lessons.length)}
+                        disabled={manageWorking || (!canStartBooking && !slots.length && !onlineOnly.length && !lessons.length)}
                         key={cell.key}
                         onClick={(event) => {
                           if (isLessonsCalendarOverview && lessons.length === 1) {
@@ -4153,7 +4268,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         type="button"
                       >
                         <span>
-                          {cell.day}
+                          {/* Today's date sits in the site's one blob, which needs no key. */}
+                          {cell.isToday ? <b className="today-pill">{cell.day}</b> : cell.day}
                           {cell.day === 1 ? <em>{shortMonth(cell.month, cell.key)}</em> : null}
                           {lessons.length ? (
                             <small className="calendar-booking-times">
@@ -4183,6 +4299,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                             id={lessonTip}
                             role="tooltip"
                           >
+                            {/* A day of several lessons names its date once, above them. */}
+                            {lessons.length > 1 ? <strong className="calendar-lesson-tip__day">{formatLongDate(lessons[0].startAt, zoneOf(lessons[0]))}</strong> : null}
                             {lessons.map((booking) => (
                               <span className="calendar-lesson-tip__lesson" key={booking.reference}>
                                 {booking.reference === nextLesson?.reference ? (
@@ -4190,7 +4308,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                                     {Date.parse(booking.startAt) <= clock ? "Happening now" : "Next lesson"}
                                   </span>
                                 ) : null}
-                                <strong>{formatLongDate(booking.startAt, zoneOf(booking))}, {lessonTime(booking.startAt, zoneOf(booking))}</strong>
+                                <strong>{lessons.length > 1 ? null : `${formatLongDate(booking.startAt, zoneOf(booking))}, `}{lessonTime(booking.startAt, zoneOf(booking))}</strong>
                                 <span>
                                   {formatBookedLessonLabel(booking.lessonType)} · {booking.location === "porto" ? IN_PERSON : "Online"}{freeMark(booking.paymentStatus)}
                                   {isWeeklyLesson(booking) ? " · Weekly" : ""}
@@ -4227,6 +4345,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               {/* Only while there are free days to explain. */}
               {(intent === "book" || isManagedReschedule) && !noFreeTimes && !availabilityError && !loadingSlots ? (
                 <span><i className="is-free" aria-hidden="true" /> Free to book</span>
+              ) : null}
+              {/* The colour and these words say it; the globe is kept for a
+                  lesson that is online (10 November 2026, Dan). */}
+              {onlineOnlyOnScreen ? (
+                <span><i className="is-online-only" aria-hidden="true" /> Online only</span>
               ) : null}
             </div>
             {loadingSlots ? <p className="booking-state-note">Checking what&rsquo;s free…</p> : null}
@@ -4329,7 +4452,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           checked={managedLocation === option}
                           disabled={manageWorking}
                           name="managed-lesson-location"
-                          onChange={() => setManagedLocation(option)}
+                          onChange={() => chooseManagedLocation(option)}
                           type="radio"
                           value={option}
                         />
@@ -4355,6 +4478,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 {loadingSlots ? (
                   <p className="booking-state-note">Checking what&rsquo;s free…</p>
                 ) : daySlots.length ? (
+                  <>
                   <TimePicker
                     halves={timeHalves}
                     key={selectedDate}
@@ -4375,6 +4499,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     selected={selectedSlot}
                     slots={daySlots}
                   />
+                  {dayOnlineOnly.length ? onlineOnlyLine(false) : null}
+                  </>
+                ) : dayOnlineOnly.length ? (
+                  <>
+                    {onlineOnlyLine(true)}
+                    {onlineOnlyTimes()}
+                  </>
                 ) : selectedDate ? (
                   <p className="booking-state-note">No free times on this day.</p>
                 ) : null}
@@ -4389,7 +4520,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   <button
                     aria-describedby={manageMode === "reschedule" && managed.sameDayFeeApplies ? "managed-change-fee" : undefined}
                     className="button button--coral"
-                    disabled={!selectedSlot || manageWorking}
+                    disabled={!selectedSlot || manageWorking || loadingSlots || managedChangeIsEmpty}
                     onClick={moveManagedLesson}
                     type="button"
                   >
@@ -4445,8 +4576,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       back to it sits beside the date, which is short enough to
                       share the row. */}
                   {bookingDateChosen ? (
-                    <button aria-label="Change date" className="button button--outline button--compact unified-calendar__change-date" onClick={changeDateChoice} type="button">
-                      Change
+                    <button aria-label="Change date" className="teacher-pencil unified-calendar__change-date" onClick={changeDateChoice} title="Change date" type="button">
+                      <Pencil size={15} strokeWidth={2.4} aria-hidden="true" />
                     </button>
                   ) : null}
                 </div>
@@ -4491,6 +4622,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     {!selectedDate ? null : loadingSlots ? (
                       <p className="booking-state-note">Checking what&rsquo;s free…</p>
                     ) : daySlots.length ? (
+                      <>
                       <TimePicker
                         halves={timeHalves}
                         key={selectedDate}
@@ -4508,6 +4640,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         selected={selectedSlot}
                         slots={daySlots}
                       />
+                      {dayOnlineOnly.length ? onlineOnlyLine(false) : null}
+                      </>
+                    ) : dayOnlineOnly.length ? (
+                      <>
+                        {onlineOnlyLine(true)}
+                        {onlineOnlyTimes()}
+                      </>
                     ) : (
                       <p className="booking-state-note">No free times on this day.</p>
                     )}

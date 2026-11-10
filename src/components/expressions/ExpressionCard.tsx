@@ -1,5 +1,6 @@
 import { LANGUAGE_CODE } from "@/lib/tutor";
 import { ExpressionTranslations, type TranslationsViewer } from "@/components/expressions/ExpressionTranslations";
+import type { ReactNode } from "react";
 import type { ExpressionInput } from "@/lib/expressions";
 import { publicAssetPath } from "@/lib/paths";
 
@@ -113,10 +114,11 @@ export function ExpressionImage({ item }: { item: ExpressionInput }) {
  * paints the title instead and lays the same parts out round the painting.
  * No teacher controls or publication state belong in the student content.
  */
-export function ExpressionCard({ expression: item }: { expression: ExpressionInput }) {
+export function ExpressionCard({ expression: item, edit }: { expression: ExpressionInput; /** Her pencil, at the title's end. */ edit?: ReactNode }) {
+  const title = <h3 className="expression-card__title">{item.expression}</h3>;
   return (
     <article className="expression-card" lang={LANGUAGE_CODE}>
-      <h3 className="expression-card__title">{item.expression}</h3>
+      {edit ? <div className="expression-card__head">{title}{edit}</div> : title}
       {item.imageUrl ? <ExpressionImage item={item} /> : null}
       <ExpressionMeanings item={item} />
       <ExpressionExamples item={item} />

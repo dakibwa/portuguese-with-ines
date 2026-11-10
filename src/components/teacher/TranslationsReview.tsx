@@ -62,11 +62,11 @@ export function TranslationsReview({ token, initialPending }: { token: string; i
           </select>
         </label></div>
       </div>
-      <p className="teacher-expressions__hint">Students add their own translations of an expression. Only the ones you approve are shown, and never with their name.</p>
       {notice ? <p className="teacher-inline-success" role="status">{notice}</p> : null}
       {error ? <div className="teacher-inline-error" role="alert"><p>{error}</p><button className="button button--outline button--small" disabled={busy} onClick={() => { setError(""); setAttempt((value) => value + 1); }} type="button">Reload</button></div> : null}
       {!rows && !error ? <p className="teacher-expressions__hint" role="status">Loading translations…</p> : null}
       {rows && !rows.length ? <p className="teacher-expressions__hint">{status === "pending" ? "Nothing to check just now." : status === "approved" ? "No approved translations yet." : "No rejected translations."}</p> : null}
+      {rows?.length ? <p className="teacher-expressions__hint">Only those you approve are shown, never with a name.</p> : null}
       {rows?.length ? (
         <ul className="teacher-translations__list">
           {rows.map((row) => (
@@ -74,10 +74,10 @@ export function TranslationsReview({ token, initialPending }: { token: string; i
               <p className="teacher-translation__expression" lang={LANGUAGE_CODE}>{row.expression}</p>
               <p className="teacher-translation__text"><span className="teacher-translation__language">{row.language}</span>{row.text}</p>
               <p className="teacher-translation__meta">From {row.studentFirstName}, {dateLabel(row.createdAt)}</p>
-              <div className="teacher-expression__actions">
-                {row.status !== "approved" ? <button className="button button--lilac button--compact" type="button" disabled={busy} onClick={() => void act(row, "approve")}>Approve<span className="visually-hidden"> {row.language} translation of {row.expression}</span></button> : null}
-                {row.status === "pending" ? <button className="button button--outline button--compact" type="button" disabled={busy} onClick={() => void act(row, "reject")}>Reject<span className="visually-hidden"> {row.language} translation of {row.expression}</span></button> : null}
-                {row.status !== "pending" ? <button className="button button--outline button--compact" type="button" disabled={busy} onClick={() => void act(row, "delete")}>Delete<span className="visually-hidden"> {row.language} translation of {row.expression}</span></button> : null}
+              <div className="teacher-translation__actions">
+                {row.status !== "approved" ? <button className="teacher-quiet" type="button" disabled={busy} onClick={() => void act(row, "approve")}>Approve<span className="visually-hidden"> {row.language} translation of {row.expression}</span></button> : null}
+                {row.status === "pending" ? <button className="teacher-quiet" type="button" disabled={busy} onClick={() => void act(row, "reject")}>Reject<span className="visually-hidden"> {row.language} translation of {row.expression}</span></button> : null}
+                {row.status !== "pending" ? <button className="teacher-quiet" type="button" disabled={busy} onClick={() => void act(row, "delete")}>Delete<span className="visually-hidden"> {row.language} translation of {row.expression}</span></button> : null}
               </div>
             </li>
           ))}

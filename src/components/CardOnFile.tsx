@@ -158,12 +158,13 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
    * A payment approval link (27 October 2026, Dan: "simple and beautiful"),
    * in the booking confirm step's own words and marks: what is outstanding
    * as the booking step's time tiles, with what is charged now as their
-   * total, then what is paid from then on, under a label that says when
-   * (2 November 2026, Dan: make it obvious it covers their weekly lessons
-   * too). Over the agreement, only the rules nothing above says, as the
-   * confirm step's dabs: the fee, two of them (2 November 2026, Dan: the list
-   * was too long, but "I liked the bullets they are cute"). On a wide card
-   * what is agreed sits on the left and agreeing on the right.
+   * total, then what is paid from then on as dashed tiles (2 November 2026,
+   * Dan: make it obvious it covers their weekly lessons too). Over the
+   * agreement, the rules as the confirm step's dabs: when future lessons are
+   * charged, then the fee's two (2 November 2026, Dan: "I liked the bullets
+   * they are cute"; 10 November: when they are charged is a dab too, not a
+   * heading). On a wide card what is agreed sits on the left and agreeing on
+   * the right.
    */
   const dueNow = chargedOnAgreement !== "none";
   // "Now" is the hourly charge, so within the hour; a lesson whose hour has
@@ -192,11 +193,11 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
             {caption ? <p className="card-terms__note">{caption}</p> : null}
           </section> : null}
           {then.length ? (
-            <section aria-labelledby="card-terms-then" className="card-terms__lessons card-terms__lessons--then">
-              <p className="card-terms__label">
-                <span id="card-terms-then">{lessons.length ? `Then ${CHARGED_EACH}` : `Paid ${CHARGED_EACH}`}</span>
-                {lessons.length ? null : <small>{HOME_CLOCK}</small>}
-              </p>
+            <section aria-label="Lessons to come" className="card-terms__lessons card-terms__lessons--then">
+              {/* When they are charged is the first dab below, never a heading
+                  over them (10 November 2026, Dan: "just be a bullet point").
+                  Their clock is named once, here if nothing above names it. */}
+              {lessons.length ? null : <p className="card-terms__label"><small>{HOME_CLOCK}</small></p>}
               <ul className="booking-chosen-lessons">
                 {then.map(lesson => (
                   <li key={lesson.key}>
@@ -215,7 +216,7 @@ export function CardTerms({ change = false, setup = false, onCancel, onSkip, boo
       <div className="card-terms__consent">
         {ready ? (
           <ul className="booking-payment-facts" id="card-terms-rules">
-            {then.length ? null : <li>Future lessons are charged {CHARGED_EACH}</li>}
+            <li>Future lessons are charged {CHARGED_EACH}</li>
             <FeeFacts feeCents={fee} noticeHours={notice} />
           </ul>
         ) : null}

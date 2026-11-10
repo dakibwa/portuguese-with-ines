@@ -68,6 +68,13 @@ export type AvailabilityException = {
   end_minute?: number | null;
   weekday?: number | null;
 };
+export type OnlineOnlyPeriod = {
+  id: string;
+  fromDate: string;
+  toDate: string;
+  startMinute: number;
+  endMinute: number;
+};
 export type AdminBooking = {
   id: string;
   student_id?: string | null;
@@ -205,13 +212,14 @@ export function fetchSchedule(token: string) {
   return adminRequest<{
     rules: AvailabilityRule[];
     exceptions: AvailabilityException[];
-    settings?: { slotIntervalMinutes: number };
+    settings?: { slotIntervalMinutes: number; onlineOnlyPeriods?: OnlineOnlyPeriod[]; onlineOnlyRevision?: string };
   }>(token, "/admin/availability").then((data) => {
     if (!Array.isArray(data.rules) || !data.rules.every((row) =>
       isApiRecord(row) && Number.isInteger(row.weekday) && Number(row.weekday) >= 0 && Number(row.weekday) <= 6 &&
       Number.isInteger(row.start_minute) && Number.isInteger(row.last_start_minute) &&
       Number(row.start_minute) >= 0 && Number(row.last_start_minute) <= 1440 && Number(row.start_minute) <= Number(row.last_start_minute)
     ) || !Array.isArray(data.exceptions) || !data.exceptions.every(validException)) throw new Error(BOOKING_REPLY_ERROR);
+    if (data.settings?.onlineOnlyPeriods !== undefined && !validOnlineOnlyPeriods(data.settings.onlineOnlyPeriods)) throw new Error(BOOKING_REPLY_ERROR);
     return data;
   });
 }
@@ -251,6 +259,23 @@ export function saveRules(
     },
   ).then((data) => {
     if (data.ok !== true || !Number.isInteger(data.count) || data.count < 0) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
+}
+
+function validOnlineOnlyPeriods(value: unknown): value is OnlineOnlyPeriod[] {
+  return Array.isArray(value) && value.every(period => isApiRecord(period) && typeof period.id === "string" &&
+    typeof period.fromDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(period.fromDate) &&
+    typeof period.toDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(period.toDate) && period.fromDate <= period.toDate &&
+    Number.isInteger(period.startMinute) && Number.isInteger(period.endMinute) &&
+    Number(period.startMinute) >= 0 && Number(period.endMinute) <= 1440 && Number(period.startMinute) < Number(period.endMinute));
+}
+
+export function saveOnlineOnlyPeriods(token: string, periods: OnlineOnlyPeriod[], expectedRevision: string) {
+  return adminRequest<{ ok: true; periods: OnlineOnlyPeriod[]; revision: string }>(token, "/admin/online-only", {
+    method: "POST", body: JSON.stringify({ periods, expectedRevision }),
+  }).then(data => {
+    if (data.ok !== true || !validOnlineOnlyPeriods(data.periods) || typeof data.revision !== "string") throw new Error(BOOKING_REPLY_ERROR);
     return data;
   });
 }

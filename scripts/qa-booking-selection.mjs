@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 
@@ -21,7 +22,8 @@ try {
     const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce", timezoneId: "Europe/Lisbon" });
     const student = { id: "selection-preview", name: "Preview Student", email: "preview@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "student" };
     const requests = [];
-    let bookings = [], series = [], rejectNext = false, rates = { 60: 1500 };
+    let bookings = [], series = [], rejectNext = false, rates = { 60: 1500 }, onlineOnly = true;
+    const availabilityPlaces = [];
     const json = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     await context.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-selection-fixture"));
     await context.route("**/me/expressions", route => route.fulfill({ json: { expression: null, canPick: false, hasPublished: false, shuffleLabels: [] } }));
@@ -31,12 +33,14 @@ try {
     await context.route("**/lesson-types", route => json(route, { lessonTypes: types, paymentMode: "postpay", postpay: true, paymentReady: true }));
     await context.route("**/availability?*", route => {
       const url = new URL(route.request().url());
+      availabilityPlaces.push(url.searchParams.get("location") ?? "online");
       const type = types.find(type => type.id === url.searchParams.get("lessonType")) ?? types[1];
       const slotsByDate = {};
       for (let index = 0; index < 56; index++) {
         const date = new Date(Date.UTC(2026, 8, 14 + index));
         if ([0, 6].includes(date.getUTCDay())) continue;
         const key = date.toISOString().slice(0, 10);
+        if (onlineOnly && key === "2026-09-14" && url.searchParams.get("location") === "porto") continue;
         slotsByDate[key] = [9, 10, 14, 16].map(hour => ({
           startAt: new Date(Date.UTC(2026, 8, 14 + index, hour)).toISOString(),
           endAt: new Date(Date.UTC(2026, 8, 14 + index, hour, type.duration_minutes)).toISOString()
@@ -85,7 +89,7 @@ try {
     await page.clock.setFixedTime(new Date("2026-09-11T12:00:00Z"));
     async function start(recurring = false) {
       await page.goto(`${base}/book/?view=book`);
-      await page.getByRole("radio", { name: recurring ? "Weekly" : "Single", exact: true }).check();
+      await page.getByRole("radio", { name: recurring ? "Weekly" : "Single", exact: true }).press("Space");
     }
     async function choosePart(time) {
       const part = page.locator(`.time-picker__parts input[value="${time < "14:00" ? "early" : "late"}"]`);
@@ -126,6 +130,28 @@ try {
     async function checkOverflow() {
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `No overflow at ${width}px`);
     }
+    await start();
+    await choose("2026-09-14");
+    await page.getByRole("radio", { name: "In Porto", exact: true }).check();
+    await expect.poll(() => availabilityPlaces.includes("porto")).toBe(true);
+    // In Porto the day is marked online only and its times are shown, not offered.
+    await expect(page.locator('button[data-date-key="2026-09-14"]')).toHaveAttribute("aria-label", /, online only, 4 times$/);
+    await page.getByText("Online only on this day", { exact: true }).waitFor();
+    await choosePart("10:00");
+    assert.equal(await page.getByRole("button", { name: "10:00", exact: true }).count(), 0, "An online-only time cannot be chosen in Porto");
+    // Switch to online is pressing Online: the place changes, the day stays.
+    await page.getByRole("button", { name: "Switch to online", exact: true }).click();
+    await expect(page.getByRole("radio", { name: "Online", exact: true })).toBeChecked();
+    await choosePart("10:00");
+    await page.getByRole("button", { name: "10:00", exact: true }).click();
+    assert.deepEqual(requests, [], "Switching places never submits an unavailable lesson");
+    await page.getByRole("button", { name: "Agree to terms & privacy", exact: true }).click();
+    await page.getByRole("button", { name: "Book lesson & agree to pay", exact: true }).click();
+    await page.getByRole("heading", { name: "You’re booked in.", exact: true }).waitFor();
+    assert.deepEqual(Object.keys(requests.at(-1)).sort(), ["expectedPriceCents", "lessonType", "location", "notes", "paymentConsent", "startAt", "timezone"]);
+    assert.equal(requests.at(-1).location, "online");
+    assert.equal(requests.at(-1).startAt, "2026-09-14T09:00:00.000Z");
+    onlineOnly = false; bookings = []; series = [];
     await start();
     await choose("2026-09-14");
     await page.getByRole("button", { name: /Add another lesson/ }).click();
@@ -249,7 +275,7 @@ try {
     const distantPage = await distant.newPage();
     await distantPage.clock.setFixedTime(new Date("2026-09-11T12:00:00Z"));
     await distantPage.goto(`${base}/book/?view=book`);
-    await distantPage.getByRole("radio", { name: "Weekly", exact: true }).check();
+    await distantPage.getByRole("radio", { name: "Weekly", exact: true }).press("Space");
     await distantPage.locator('button[data-date-key="2026-09-13"]').click();
     await distantPage.getByRole("button", { name: "23:00", exact: true }).click();
     await distantPage.getByRole("button", { name: "Add a second weekly time", exact: true }).click();

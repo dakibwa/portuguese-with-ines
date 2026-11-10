@@ -65,8 +65,7 @@ export function LessonsLoading({ todayKey }: { todayKey: string }) {
                 key={cell.key}
                 style={{ animationDelay: `${(row + column) * 70}ms` }}
               >
-                {cell.day}
-                {cell.isToday ? <small>Today</small> : null}
+                {cell.isToday ? <b className="today-pill">{cell.day}</b> : cell.day}
               </span>
             ))}
           </div>

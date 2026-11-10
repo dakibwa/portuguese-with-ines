@@ -72,13 +72,13 @@ try {
     await signUp.page.getByRole("tab", { name: "Create an account", exact: true }).click();
     const form = signUp.page.locator(".auth-panel__form");
     const fields = await form.locator("label > span").allInnerTexts();
-    assert.match(fields.at(-1).replace(/\s+/g, " "), /^NIF \(optional, for your receipts\)$/i, `NIF should be the last, optional field, saying what it is for: ${fields}`);
+    assert.match(fields.at(-1).replace(/\s+/g, " "), /^NIF$/i, `NIF should be the last field, its purpose in its placeholder: ${fields}`);
     await form.getByLabel("Your name").fill("Ana");
     await form.getByLabel("Email").fill("ana@example.invalid");
     await form.getByLabel("Password").fill("a-long-password");
     const nif = form.getByLabel(/^NIF \(optional/);
     await expect(nif).toHaveAttribute("inputmode", "numeric");
-    await expect(form).toContainText("NIF (optional, for your receipts)");
+    await expect(nif).toHaveAttribute("placeholder", "Optional, for your receipts");
     await nif.fill(" 123456788 ");
     await oneBlueBoundary(nif);
     await form.getByRole("button", { name: "Create my account", exact: true }).click();
@@ -200,7 +200,7 @@ try {
     assert.ok(await noOverflow(schedule.page), "Receipts fit the phone");
     await schedule.page.getByRole("tab", { name: "Timetable", exact: true }).click();
     await schedule.page.getByRole("button", { name: /^Carla, .*View lesson$/ }).click();
-    await schedule.page.getByRole("button", { name: "Move lesson", exact: true }).click();
+    await schedule.page.getByRole("button", { name: "Move or cancel", exact: true }).click();
     const newDate = schedule.page.getByLabel("New date");
     await newDate.focus();
     await oneBlueBoundary(newDate);

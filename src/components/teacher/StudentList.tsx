@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { ArrowLeft, Check, Mail, UserPlus } from "lucide-react";
+import { Check, Mail, UserPlus } from "lucide-react";
 import { DefaultComeBackEmail } from "@/components/teacher/DormantEmail";
 import { NeedsYou } from "@/components/teacher/NeedsYou";
 import { StudentSetupRow, type StudentRowSelection } from "@/components/teacher/StudentSetupRow";
@@ -56,13 +56,9 @@ export function StudentList({ token, students, workspace, error, sending, reques
   const [notices, setNotices] = useState<Record<string, string>>({});
   // Whose name takes focus once their card is back in its lane.
   const focusBack = useRef("");
-  // The field a pencil was pressed for, kept here because the card remounts
-  // when it is taken out of its lane.
-  const [edited, setEdited] = useState("");
   const search = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!request) return;
-    setEdited("");
     setQuery("");
     setExpanded(request);
   }, [request]);
@@ -94,8 +90,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
   }, [expanded, busyStudent]);
   const noticeProps = {
     sending, onMeet, onView, onWelcome,
-    onStudent: (student: AdminStudent, editDetails?: boolean) => {
-      if (!busyStudent) setExpanded({ studentId: student.id, panel: editDetails ? "details" : "lessons" });
+    onStudent: (student: AdminStudent) => {
+      if (!busyStudent) setExpanded({ studentId: student.id, panel: "lessons" });
     },
   };
 
@@ -124,8 +120,6 @@ export function StudentList({ token, students, workspace, error, sending, reques
       homeworkId={selected?.homeworkId}
       homeworkRequestKey={selected?.homeworkRequestKey}
       comeBackDefaultVersion={defaultVersion}
-      editedField={edited}
-      onEdited={setEdited}
       token={token}
     />;
   };
@@ -134,7 +128,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
   return <section className="teacher-students" aria-labelledby="teacher-students-title">
     <h2 className="visually-hidden" id="teacher-students-title">Students</h2>
     {/* Open, one student is the whole screen: the board and its toolbar wait
-        (search is kept) and All students, or the card's Close, brings them back. */}
+        (search is kept) and the card's Close brings them back. All students
+        said the same on a row of its own, so it went (10 November 2026). */}
     {openRow ? null : <>
       <div className="teacher-students__bar">
         <label className="teacher-students__search">
@@ -158,9 +153,6 @@ export function StudentList({ token, students, workspace, error, sending, reques
     {students && !students.length ? <p>No students yet. Press Add a student to set up your first.</p> : students && !anyShown ? <p role="status">No students match “{query.trim()}”.</p> : null}
     {/* The open student, once, across the whole width: never squeezed into a lane. */}
     {openRow ? <>
-      <button className="button button--outline button--small teacher-students__back" data-homework-exit disabled={Boolean(busyStudent)} onClick={() => { focusBack.current = openId; setEdited(""); setExpanded(null); }} type="button">
-        <ArrowLeft size={15} aria-hidden="true" />All students
-      </button>
       <ul className="teacher-students__open" aria-label="Open student">{row(openRow)}</ul>
     </> : null}
     {/* Keep the hidden board mounted so a default come-back email draft survives. */}

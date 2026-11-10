@@ -55,7 +55,7 @@ export function StudentPicker({ token, known, start, onSelect, onClose }: {
         {known.length ? <ul className="teacher-profile__choices">
           {[...known].sort((a, b) => a.name.localeCompare(b.name, "pt")).map(student => <li key={student.id}><button onClick={() => choose(student)} type="button"><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span>{student.name}</span></button></li>)}
         </ul> : <p>No students yet. Add them first, then their lesson.</p>}
-        <button className="button button--lilac teacher-profile__new" onClick={() => setAdding(true)} type="button"><UserPlus size={16} aria-hidden="true" />Add a new student</button>
+        <button className="teacher-quiet teacher-profile__new" onClick={() => setAdding(true)} type="button"><UserPlus size={14} aria-hidden="true" />Add a new student</button>
       </div>
     </>}
   </dialog>;

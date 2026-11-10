@@ -35,6 +35,7 @@ Student on /book                                     (browse without an account)
 Legacy /my-lessons and /booking links resolve into /book without losing state
 Inês on /schedule                     (her own account, role=teacher)
   → GET/POST /admin/availability, /admin/exceptions
+  → POST /admin/online-only                          online-only date ranges and daily hours
   → GET  /admin/lesson-availability                 teacher lesson picker
   → POST /admin/exceptions/day                       one date's day off and blocked hours
   → GET  /admin/bookings, /admin/students            her lessons; her students and how far
@@ -511,16 +512,23 @@ The week itself is where Inês takes time off. Choosing a free time offers
 `Add a lesson here` or `Take this time off`; dragging across times on a date
 blocks them all for that date only, and choosing a blocked time reopens it.
 The `Day off` switch above each date blocks the whole day. The `Time off`
-tab shows a month calendar beside one card. Tapping dates chooses them, one or
-several, across months; chosen dates survive tab changes. The card offers
-`Take the day off` / `Take N days off`, `Take some hours off` for a single
-date, and `Make available` when a chosen date is off. Some hours opens a draft
-of one or more timed breaks; in the time picker, `00:00` means the end of that
-day (stored as minute 1440). That draft saves explicitly through the same
+tab shows a month calendar. Tapping dates chooses them, one or several, across
+months; chosen dates survive tab changes. One line at the month's foot then
+offers `Off` and `Online only` (10 November 2026): `Off` takes the chosen
+dates not already off as whole days, and pressed again opens them, removing
+only the whole-day block. A single date that is off shows its hours beneath
+(`All day`, or its breaks), whose pencil opens a draft of one or more timed
+breaks; in the time picker, `00:00` means the end of that day (stored as
+minute 1440). That draft saves explicitly through the same
 `/admin/exceptions/day` endpoint; saving breaks removes that date's whole-day
 block, and `Remove hours off` clears its breaks. Weekly blocks and extra hours
 stay. The month marks whole days off and booked lessons, without displaying
-weekly unavailability or partial blocks from the week.
+weekly unavailability or partial blocks from the week. Beside the month,
+`Clashes` lists each lesson to come that time off left standing: booked on a
+day off, inside hours off, or in person inside online-only hours
+(`timeOffClashes` in `src/lib/teacher-calendar.ts`, proved in
+`scripts/test-teacher-calendar.mjs`). It is a read of what the page already
+holds; no lesson is moved or cancelled by taking time off.
 Booked lessons on the chosen dates are listed as cards whose `Change` opens
 that lesson's own move/cancel dialog, and unavailable booking data must be
 retried before applying changes. Each bulk-selected date uses the same queue;
@@ -582,8 +590,8 @@ who isn't on the site is refused ("Add them as a student first.", 404), and
 students come from `POST /admin/students`. Each student's card is their profile
 from their first invite to regular use (14 October 2026, Dan; 2 November 2026).
 Its name opens their details, prices and all-time lesson history in place;
-the student fills the Students view, and `All students` returns to the lanes.
-Editing details, price and lesson creation use the same card. A past lesson she
+the student fills the Students view, and the card's Close returns to the lanes.
+Each detail and price is edited where it stands; lesson creation uses the same card. A past lesson she
 added and nothing charged can be ticked paid there (`POST
 /admin/bookings/:id/paid`), which takes it out of `unpaidPast`. A new student or a
 free timetable time can start in the creation/student-choice dialog, then opens
@@ -1678,6 +1686,55 @@ get wrong:
 - `METHOD` is `REQUEST` for a booking or change, `CANCEL` for a cancellation.
 
 ### Time and availability
+
+**Online-only periods** (10 November 2026). Inês labels days as online only
+on the Time off month: she taps days and presses `Online only` at its foot,
+and edits their hours in place (`All day`, or the same From/Until hours each
+day, on the teaching clock). The service stores periods, not days: each
+includes both dates and is either all day or one daily window, with `00:00`
+as Until meaning the end of that day. The website converts between the two
+(`labelOnlineOnly`, `onlineOnlyHours` in `src/lib/teacher-calendar.ts`, proved
+in `scripts/test-teacher-calendar.mjs`): neighbouring days with the same
+hours are one period, a period splits around days taken out of it, and each
+save sends the whole list with periods wholly in the past left out. A failed
+save keeps her days chosen. Her Time off month and Timetable show
+online-only time; the Timetable does not edit it.
+
+A student who has chosen In Porto is shown which days could still be had
+online. The calendar reads the online availability beside the Porto one (the
+same `GET /availability` request the Online choice makes, from the same
+cache), and a time free online but absent from the Porto reply is drawn as
+online only. It is a read alone: such a time cannot be chosen or sent while
+In Porto is chosen, a failed read leaves the calendar as it was, and no
+booking, move or preview request changes. `Switch to online` is the Where
+control's own change of place.
+
+These periods restrict the place of new student bookings, without adding
+teaching hours or overriding time off, notice, gaps or clashes. A lesson whose
+elapsed duration overlaps any part of a period must be online, including a
+90-minute lesson starting before it, an overnight lesson and repeated hours
+on a clock-change day. Touching the start or end without overlapping is allowed.
+`GET /availability?location=porto` omits those starts; the default is online.
+The booking calendar caches each place separately, checks retained selections
+when the place changes, and weekly previews use the selected place too.
+Booking writes, selections, moves (including online-to-Porto at the same time),
+weekly moves and future student-series extensions enforce the same rule.
+Unavailable later weeks are skipped under the existing series rules.
+
+Existing lessons keep their place and time. Inês can still deliberately add or
+move a lesson herself using her normal teacher override; an existing series
+she created keeps that override too. No period changes a lesson, sends mail,
+changes a meeting link or charges anyone.
+
+The bounded list (at most 100) lives as JSON in `settings.online_only_periods`;
+no migration is needed. `POST /admin/online-only` takes `{ periods,
+expectedRevision }`, with period fields `{ id, fromDate, toDate, startMinute,
+endMinute }`, and returns the saved list and its new `revision`.
+`GET /admin/availability` supplies `settings.onlineOnlyPeriods` and
+`settings.onlineOnlyRevision`. Saves check the teacher's live session and
+`online_only_revision` in the transaction, returning 409 for a stale editor,
+and bump `availability_revision` so already-planned booking writes cannot
+ignore a newly saved restriction. Deploy the Worker before the website.
 
 Instants are stored as ISO-8601 UTC. Inês's weekly hours are stored as
 minutes-from-midnight in Porto time and resolved against `Europe/Lisbon` at query

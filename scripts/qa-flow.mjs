@@ -1401,16 +1401,16 @@ if (
 ) {
   throw new Error(`Your details should be one account card, headed like the lessons card with its places where they were, and no cards inside it: ${JSON.stringify({ detailsCard, detailsPlaces })}.`);
 }
-// Each detail reads as itself with its own Change, or Add where it is empty,
-// on one line: the splat, the name, the email and the NIF. Sign out waits at
+// Each detail reads as itself and is its own button (named Change, or Add
+// where it is empty), its pencil straight after its value on one line: the splat, the name, the email and the NIF. Sign out waits at
 // the card's foot.
 const desktopDetailRows = await accountPanel.locator(".my-lessons__fact").evaluateAll((rows) =>
   rows.map((row) => {
-    const value = row.querySelector(".my-lessons__fact-value")?.getBoundingClientRect();
-    const action = row.querySelector(".my-lessons__change")?.getBoundingClientRect();
+    const value = row.querySelector(".teacher-edit__value")?.getBoundingClientRect();
+    const action = row.querySelector("[data-edit] > svg")?.getBoundingClientRect();
     return {
       field: row.dataset.field,
-      action: row.querySelector(".my-lessons__change")?.textContent?.trim() ?? "",
+      action: row.querySelector("[data-edit]")?.getAttribute("aria-label") ?? "",
       beside: Boolean(value && action && action.left >= value.right - 1 && Math.abs((value.top + value.bottom) / 2 - (action.top + action.bottom) / 2) < 12)
     };
   })

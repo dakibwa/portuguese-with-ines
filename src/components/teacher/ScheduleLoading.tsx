@@ -32,10 +32,10 @@ export function WeekLoading({ weekStart }: { weekStart: string }) {
               <h2>{awake ? <MonthLabel month={weekStart} /> : "\u00a0"}</h2>
             </div>
           </div>
-          <span className="button button--lilac button--compact teacher-week-mode">Edit weekly hours</span>
+          <span className="teacher-quiet teacher-week-mode">Edit weekly hours</span>
           <div className="teacher-week-day-control" />
           <span className="teacher-pager">
-            <span className="button button--lilac button--compact teacher-pager-current is-idle">This week</span>
+            <span className="teacher-quiet teacher-pager-current is-idle">This week</span>
             <span className="teacher-icon-button"><ChevronLeft size={19} /></span>
             <span className="teacher-icon-button"><ChevronRight size={19} /></span>
           </span>

@@ -2,7 +2,7 @@
 
 import { BRAND } from "@/lib/tutor";
 import { useEffect, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { readSession } from "@/lib/auth-api";
 import {
   connectGoogleMeet,
@@ -123,8 +123,8 @@ export function TeacherMeetConnection({ token, onConnectionChange }: { token: st
           <div className="teacher-meet-actions">
             {healthy ? (
               <>
-                <a className="button button--lilac" href="https://calendar.google.com/" target="_blank" rel="noopener noreferrer">Open Google Calendar</a>
-                <button className="button button--outline button--small" disabled={busy} onClick={() => void connect()} type="button">
+                <a className="teacher-quiet" href="https://calendar.google.com/" target="_blank" rel="noopener noreferrer">Open Google Calendar</a>
+                <button className="teacher-quiet" disabled={busy} onClick={() => void connect()} type="button">
                   {busy ? "Opening Google…" : "Reconnect Google Meet"}
                 </button>
               </>
@@ -135,7 +135,7 @@ export function TeacherMeetConnection({ token, onConnectionChange }: { token: st
             )}
           </div>
           {connection.connected ? (
-            <details className="teacher-meet-note"><summary>Share your calendar</summary><p>In Google Calendar, open “{BRAND} — lessons” → Settings and sharing → Add people.</p></details>
+            <details className="teacher-meet-note"><summary className="teacher-quiet"><ChevronDown size={15} aria-hidden="true" />Share your calendar</summary><p>In Google Calendar, open “{BRAND} — lessons” → Settings and sharing → Add people.</p></details>
           ) : null}
         </>
       ) : null}

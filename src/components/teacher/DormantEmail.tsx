@@ -138,8 +138,8 @@ export function DefaultComeBackEmail({ token, onSaved, onClose }: {
     {words ? <form className="teacher-form" onSubmit={event => { event.preventDefault(); void save(); }}>
       <Fields disabled={busy} onChange={setWords} words={words} />
       {problem ? <p className="teacher-inline-error" role="alert">{problem}</p> : null}
+      {/* Its cross closes it, as a student's own come-back email's does. */}
       <div className="teacher-dialog-actions">
-        <button className="button button--outline button--compact" disabled={busy} onClick={onClose} type="button">Cancel</button>
         <button className="button button--coral button--compact" disabled={!ready || busy} type="submit">{busy ? "Saving…" : "Save default"}</button>
       </div>
     </form> : <Loading problem={loadProblem} retry={retry} />}

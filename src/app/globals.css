@@ -45,6 +45,19 @@
   --raised: var(--paper-light);
   --booked: #f9ddcc;
   --weekly: #d2cce6;
+  /* Time that can only be booked online (10 November 2026, Dan: "a different
+     colour on the timetable if it's online only"). One soft sky blue with one
+     meaning, on Inês's timetable and month and on a student's booking
+     calendar, always beside the globe so it never rests on colour alone. */
+  --online-only: #cfe4f6;
+  /* Calendar marks are drawn, never an underline or a dot, and each is in
+     its key (10 November 2026, Dan: "distinct ways of showing it while being
+     simple"; a first crosshatch was "a bit strong"). A day off is hatched one
+     way, as it always was; a day with a lesson booked takes a finer, fainter
+     hatch leaning the other way, so each reads alone and a day that is both
+     shows both. The light one is for a day already filled in a deep colour. */
+  --hatch-booked: repeating-linear-gradient(45deg, transparent 0 6px, rgba(32, 62, 130, 0.15) 6px 7px);
+  --hatch-booked-light: repeating-linear-gradient(45deg, transparent 0 6px, rgba(251, 244, 229, 0.26) 6px 7px);
   /*
    * The colours the design system lists as "set in code" (9 November 2026),
    * named once here so every button, menu and dialog draws from the same
@@ -3123,29 +3136,6 @@ textarea,
   color: var(--coral-pressed);
 }
 
-/* The control sits beside the heading rather than above it, which cost a whole
-   row of vertical space on every step after the first. */
-/* Smaller than a page-level call to action: it is the way out for the minority
-   who are already booked, not the thing this page is for. */
-/*
- * Two classes deliberately: `.button` goes full width on a phone, which is right
- * for the calls to action a page is built around and wrong for this one. It is
- * the way out for the minority who are already booked, and at full width it read
- * as the main thing to do on the booking page.
- */
-
-.booking-step-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  margin-bottom: 0.2rem;
-  gap: 0.35rem 1rem;
-}
-
-.booking-step-head .booking-step-heading {
-  margin: 0;
-}
-
 /* Room beneath for Beth Ellen's descenders, which reach about 0.4em below
    the line: the f of "Confirm" never touches the label under it. */
 .booking-step-heading {
@@ -3289,43 +3279,60 @@ textarea,
   opacity: 0.72;
 }
 
-/* A small outline button, of a piece with `Change date`, rather than an
-   underlined word whose rule floated beneath it. */
+/* A chosen lesson is changed by the site's one pencil, at its row's end
+   (10 November 2026; it was an outline Change). The whole row answers to
+   it: a press anywhere on the lesson opens it. Its ink is the deep one, so
+   it reads on the booking column's lilac as text does. */
+.booking-selection-summary {
+  position: relative;
+}
+
 .booking-provider button.booking-choice-summary__change {
-  display: inline-flex;
-  align-items: center;
+  position: static;
+  width: 44px;
+  height: 44px;
   justify-self: end;
-  min-height: 44px;
   margin-left: auto;
-  border: 1.5px solid var(--outline-edge);
-  border-radius: var(--squiggle-button-alt);
-  padding: 0.4rem 1rem;
-  background: transparent;
   color: var(--ink);
-  cursor: pointer;
-  font-family: var(--ui);
   font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  transition: background var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
 }
 
-.booking-provider button.booking-choice-summary__change:hover,
+.booking-provider button.booking-choice-summary__change::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--squiggle-field);
+}
+
 .booking-provider button.booking-choice-summary__change:focus-visible {
-  border-color: var(--ink);
-  background: var(--hover-wash);
+  outline: none;
+}
+
+.booking-selection-summary:has(> .booking-choice-summary__change:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .booking-selection-summary:has(> .booking-choice-summary__change:hover:not(:disabled)) {
+    border-color: var(--ink);
+    background-image: linear-gradient(var(--hover-wash), var(--hover-wash));
+  }
+
+  .booking-provider button.booking-choice-summary__change:hover:not(:disabled) {
+    background: none;
+  }
+}
+
+.booking-provider button.booking-choice-summary__change:disabled::after {
+  content: none;
+}
+
+/* The chosen date's way back to the calendar, on a phone, is that pencil too. */
+.booking-provider .unified-calendar__change-date {
+  width: 44px;
+  height: 44px;
   color: var(--ink);
-}
-
-.booking-provider button.booking-choice-summary__change:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.booking-choice-summary__change-short {
-  display: none;
 }
 
 /* A long date and its short form: the short one only where the booking
@@ -3596,7 +3603,6 @@ textarea,
 /* Every choice's legend is set alike, in the booking bar and in the change
    overlay. */
 .booking-bar__group legend,
-.booking-bar__legend,
 .managed-lesson__duration legend {
   display: block;
   margin: 0 0 0.35rem;
@@ -3752,8 +3758,7 @@ textarea,
 @media (max-width: 560px) {
   /* The options name themselves; on a phone their labels would only push the
      calendar down. They stay for screen readers. */
-  .booking-bar__group legend,
-  .booking-bar__legend {
+  .booking-bar__group legend {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -3920,11 +3925,10 @@ textarea,
  * where there is room, its homework or Cancelled at the end of the first
  * line, how long and where beneath it; nothing in a stacked card of its own.
  */
+/* Its small-capital name sets it apart from the calendar's key; no rule. */
 .past-lessons {
   display: grid;
-  margin-top: 1.25rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--rule-soft);
+  margin-top: 1.75rem;
   gap: 0.6rem;
 }
 
@@ -3981,8 +3985,8 @@ textarea,
   font: 700 0.82rem / 1.4 var(--ui);
 }
 
+/* Day and time are one bold line, as on the next lesson and in the tip. */
 .past-lesson__when span {
-  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -4120,10 +4124,13 @@ textarea,
   gap: 0.35rem;
 }
 
+/* Each swatch is a small copy of the day it explains, never a dot (10
+   November 2026). */
 .unified-calendar__legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 4px 5px 4px 6px;
 }
 
 .unified-calendar__legend .is-booked {
@@ -4133,6 +4140,11 @@ textarea,
 /* As the days themselves: a free day is a raised cream tile. */
 .unified-calendar__legend .is-free {
   background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.unified-calendar__legend .is-online-only {
+  background: var(--online-only);
   box-shadow: inset 0 0 0 1px var(--rule);
 }
 
@@ -4354,10 +4366,6 @@ textarea,
   background: var(--lavender-ink);
 }
 
-.unified-calendar--overview .calendar-week button.is-next.is-today > span:not(.calendar-lesson-tip)::after {
-  color: inherit;
-}
-
 @container booking (min-width: 700px) {
   .lesson-overview__next--on-calendar {
     display: none;
@@ -4440,6 +4448,11 @@ textarea,
   font-family: var(--ui);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+/* A day of several lessons: its date once, then each lesson from its time. */
+.calendar-lesson-tip__day {
+  margin-bottom: -0.25rem;
 }
 
 /* The tip's point hangs from the day itself, so it always meets the day's
@@ -4934,22 +4947,27 @@ p.lesson-when > span {
   }
 }
 
+/* The weekly run is one line under the lesson, its Manage weekly lessons a
+   quiet chip at that line's end; where the line is too narrow the chip
+   wraps beneath it at the right, whole. Space sets it apart, not a rule. */
 .lesson-manage-dialog__series {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  border-top: 1px solid var(--rule-soft);
-  padding-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 0.2rem;
   color: var(--lavender-ink);
-  gap: 0.1rem 0.55rem;
+  gap: 0.45rem 0.55rem;
 }
 
 .lesson-manage-dialog__series > svg {
-  margin-top: 0.1rem;
+  flex: none;
 }
 
+/* The weekly time keeps its one line; the chip, not the words, gives way. */
 .lesson-manage-dialog__series > div {
   display: grid;
+  flex: 1 0 auto;
+  max-width: calc(100% - 17px - 0.55rem);
   gap: 0.12rem;
 }
 
@@ -4963,17 +4981,8 @@ p.lesson-when > span {
   line-height: 1.4;
 }
 
-/* A small outline button, as every secondary action is, not underlined text.
-   It starts on the dialog's own left edge, with Change above it, rather than
-   stepped in under the weekly time. */
-.lesson-manage-dialog__series .button {
-  grid-column: 1 / -1;
-  justify-self: start;
-  width: auto;
-  min-height: 44px;
-  margin-top: 0.45rem;
-  padding: 0.55rem 1.1rem;
-  font-size: 0.68rem;
+.lesson-manage-dialog__series > .teacher-quiet {
+  margin-left: auto;
 }
 
 /* On a 320px phone the longest label, "Cancel all booked lessons", broke onto
@@ -5016,17 +5025,6 @@ p.lesson-when > span {
     gap: 0.8rem;
   }
 
-  .lesson-manage-dialog__series {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    padding-top: 0.7rem;
-  }
-
-  .lesson-manage-dialog__series .button {
-    grid-column: 3;
-    grid-row: 1;
-    margin-top: 0;
-  }
 }
 
 .managed-lesson__current-time {
@@ -5163,32 +5161,6 @@ p.lesson-when > span {
   background: rgba(194, 58, 39, 0.14);
 }
 
-.upcoming-lesson-group__summary {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-  align-items: center;
-  padding: 0.8rem;
-  gap: 0.75rem;
-}
-
-@container booking (max-width: 480px) {
-
-  .upcoming-lesson-group__summary {
-    grid-template-columns: 38px minmax(0, 1fr);
-    grid-template-areas:
-      "mark copy"
-      "actions actions";
-  }
-
-  .upcoming-lesson-group__summary .lesson-calendar__mark {
-    grid-area: mark;
-  }
-
-  .upcoming-lesson-group__summary .lesson-calendar__lesson-copy {
-    grid-area: copy;
-  }
-}
-
 .lesson-calendar__status {
   display: inline-flex;
   width: max-content;
@@ -5219,6 +5191,25 @@ p.lesson-when > span {
 
 .unified-calendar__availability .time-picker {
   margin-top: 0.75rem;
+}
+
+/* In Porto, a day's online-only times: one quiet line, its words and globe
+   kept together, the chip beside them or whole on the next line. */
+.online-only-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+  margin: 0.75rem 0 0;
+  color: var(--lavender-ink);
+  font: 600 0.82rem/1.3 var(--ui);
+}
+
+.online-only-line > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
 }
 
 .unified-calendar__prompt {
@@ -5401,23 +5392,8 @@ p.lesson-when > span {
     height: 44px;
   }
 
-  .booking-choice-summary__change {
-    grid-column: auto;
-    justify-self: end;
-  }
-
   .unified-calendar__toolbar {
     align-items: flex-start;
-  }
-}
-
-@container booking (max-width: 480px) {
-  .booking-choice-summary__change-label {
-    display: none;
-  }
-
-  .booking-choice-summary__change-short {
-    display: inline;
   }
 }
 
@@ -5442,7 +5418,6 @@ p.lesson-when > span {
     height: 36px;
   }
 
-  .booking-provider button.booking-choice-summary__change,
   .unified-calendar__panel-head .button {
     padding-inline: 0.75rem;
     letter-spacing: 0.04em;
@@ -5462,10 +5437,6 @@ p.lesson-when > span {
 }
 
 /* Step 2 — day */
-
-.booking-step-head + .calendar-panel {
-  margin-top: 0.9rem;
-}
 
 .calendar-panel {
   position: relative;
@@ -5581,6 +5552,16 @@ p.lesson-when > span {
   font-weight: 700;
 }
 
+/* In Porto, a day free only online takes the sky tint, which the key names
+   (the globe went on 10 November 2026: Dan, "is it necessary if it's already
+   in the legend what the colour means?"). It opens like any day, to say so. */
+.calendar-week button.is-online-only {
+  background: var(--online-only);
+  color: var(--green-deep);
+  font-weight: 700;
+}
+
+
 /* The grid rolls forward from this week rather than showing a calendar month,
    so the 1st is labelled to make the crossing into the next month legible. */
 .calendar-week button em {
@@ -5597,17 +5578,39 @@ p.lesson-when > span {
   opacity: 0.75;
 }
 
-/* Marked, but not as a selection — a ring read as "already chosen". */
-.calendar-week button.is-today > span:not(.calendar-lesson-tip)::after {
-  display: block;
-  margin-top: 0.1rem;
-  color: var(--lavender-ink);
-  content: "today";
-  font-family: var(--ui);
-  font-size: 0.5rem;
+/* Today, the same on every calendar on the site (10 November 2026, Dan: no
+   underline, no dot, no "today" beneath the number): its date in the deep
+   blue blob Inês's Timetable has always used. It explains itself, so it has
+   no entry in a key. It marks the number alone, so it never reads as a
+   chosen day; on a day already filled in a deep colour the blob is paper. */
+.today-pill {
+  display: inline-grid;
+  min-width: 1.7em;
+  min-height: 1.7em;
+  place-items: center;
+  border-radius: var(--squiggle-pill);
+  padding: 0 0.3em;
+  background: var(--blue-deep);
+  color: var(--paper-light);
+  font-style: normal;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  line-height: 1;
+}
+
+.calendar-week button:is(.is-selected, .is-next) .today-pill,
+.calendar-week button:is(.has-availability, .is-online-only, .has-booking):is(:hover, :focus-visible) .today-pill {
+  background: var(--paper-light);
+  color: var(--blue-deep);
+}
+
+/* Today is today whether or not it can be booked: its blob keeps its
+   strength on a day that cannot be pressed, while the rest of that day fades. */
+.calendar-week button.is-today:disabled > span {
+  opacity: 1;
+}
+
+.calendar-week button.is-today:disabled > span > :not(.today-pill) {
+  opacity: 0.38;
 }
 
 /* A 320px phone: the chosen lesson's row gives up its mark so its words keep
@@ -5621,13 +5624,6 @@ p.lesson-when > span {
 
   .booking-selection-summary__mark {
     display: none;
-  }
-
-  .calendar-week button.is-today > span:not(.calendar-lesson-tip)::after {
-    content: "•";
-    font-size: 0.75rem;
-    letter-spacing: 0;
-    line-height: 0.7;
   }
 
   /* The tiles close up a little, so a booked time fits inside its own. */
@@ -5660,7 +5656,9 @@ p.lesson-when > span {
    marker beside it repeated what three other signals were saying. */
 
 .calendar-week button.has-availability:hover,
-.calendar-week button.has-availability:focus-visible {
+.calendar-week button.has-availability:focus-visible,
+.calendar-week button.is-online-only:hover,
+.calendar-week button.is-online-only:focus-visible {
   background: var(--green);
   color: var(--paper);
 }
@@ -5705,6 +5703,20 @@ p.lesson-when > span {
   border-color: var(--green);
   background: var(--green);
   color: var(--paper);
+}
+
+/* Shown, not chosen: the online-only tint, until Switch to online. */
+.slot-grid .slot-grid__online-only {
+  display: grid;
+  min-height: 48px;
+  place-items: center;
+  border-radius: var(--squiggle-chip);
+  padding: 0.45rem 0.4rem;
+  background: var(--online-only);
+  color: var(--green-deep);
+  font-family: var(--ui);
+  font-size: 0.94rem;
+  font-weight: 700;
 }
 
 .slot-grid button small {
@@ -6339,12 +6351,6 @@ p.lesson-when > span {
   margin: 1rem 0 0;
 }
 
-/* Set a touch closer than other small buttons, so the pair keeps one row
-   down to a 360px phone. */
-.auth-panel .auth-panel__aside > .button {
-  padding-inline: 0.75rem;
-  letter-spacing: 0.1em;
-}
 
 /* The menu shares the header's geometry so its wordmark stays still. Only
    the links drop down. Its own scroll area also works from a footer opener. */
@@ -6786,7 +6792,6 @@ p.lesson-when > span {
   align-items: center;
   justify-content: space-between;
   border: 0;
-  border-bottom: 1px solid var(--rule-soft);
   padding: 0.7rem 0.85rem;
   background: transparent;
   color: var(--navy);
@@ -6800,8 +6805,10 @@ p.lesson-when > span {
   text-transform: uppercase;
 }
 
+/* The places are one kind of row and need no rules between them; one rule
+   marks where they meet Sign out, which is not a place. */
 .account-menu__panel .account-menu__sign-out {
-  border-bottom: 0;
+  border-top: 1px solid var(--rule-soft);
 }
 
 .account-menu__panel button:hover,
@@ -7079,15 +7086,6 @@ p.lesson-when > span {
   gap: 0.65rem 0.8rem;
 }
 
-/* A field with the note that explains it, kept together in one cell. */
-.my-lessons__field {
-  min-width: 0;
-}
-
-.my-lessons__field > .my-lessons__details-note {
-  margin-bottom: 0;
-}
-
 .my-lessons__details label {
   display: block;
   width: 100%;
@@ -7154,27 +7152,6 @@ p.lesson-when > span {
   translate: 0 -4px;
 }
 
-/* On a phone each note sits straight under its field, and the action's place
-   beneath the note, where it reads as the field's last word. */
-@container booking (max-width: 519.98px) {
-  .my-lessons__field {
-    display: grid;
-  }
-
-  .my-lessons__field > .my-lessons__details-row {
-    display: contents;
-  }
-
-  .my-lessons__field > .my-lessons__details-note {
-    order: 1;
-  }
-
-  .my-lessons__field .button {
-    order: 2;
-    margin-top: 0.65rem;
-  }
-}
-
 @container booking (min-width: 520px) {
   .my-lessons__details-row {
     grid-template-columns: minmax(220px, 1fr) auto;
@@ -7198,18 +7175,97 @@ p.lesson-when > span {
  */
 .my-lessons__facts {
   display: grid;
-  border-top: 1px solid var(--rule-soft);
+  gap: 0.6rem;
 }
 
+/* No rules between them: the names in small capitals and the space do the
+   grouping. Each value is its own button with a small pencil at its end,
+   and its field opens in the value's place while its name stays put (10
+   November 2026, Dan: one way to edit, on a student's side and on Inês's). */
 .my-lessons__fact {
   display: grid;
-  min-height: 64px;
-  grid-template-columns: 9rem minmax(0, 1fr) auto;
+  min-height: 44px;
+  grid-template-columns: 9rem minmax(0, 1fr);
   align-items: center;
-  border-bottom: 1px solid var(--rule-soft);
-  padding: 0.75rem 0;
-  gap: 0.35rem 1rem;
+  gap: 0.15rem 1rem;
 }
+
+/* What closes or undoes an open detail follows it: the cross after the
+   splat's choices, Remove card beside the card's terms. */
+.my-lessons__fact:not([data-field="password"]):has(> :is(.teacher-pencil, .teacher-quiet)) {
+  grid-template-columns: 9rem fit-content(100%) auto;
+  justify-content: start;
+}
+
+/* The splat's pencil stands level with it. */
+.my-lessons__fact[data-field="mark"] .teacher-edit {
+  align-items: center;
+}
+
+.my-lessons__fact[data-field="mark"] .teacher-edit > svg {
+  margin-top: 0;
+}
+
+/* Open, a detail's name stays level with its field, whatever follows it. */
+.my-lessons__fact:has(> .my-lessons__edit) {
+  align-items: start;
+}
+
+.my-lessons__fact:has(> .my-lessons__edit) > .my-lessons__fact-label {
+  margin-top: 0.85rem;
+}
+
+/* A detail with no value to show (a password) has its action where the
+   value would be. */
+.my-lessons__fact[data-field="password"] > .teacher-quiet {
+  justify-self: start;
+}
+
+/* Editing in place (9 November 2026, Dan: tiny pencils, not big buttons): a
+   pencil alone beside a name, or a value that is the button with its pencil at
+   its end. The pencil is small to see and, where a finger is the pointer,
+   reaches 44 px. */
+.teacher-pencil, .teacher-edit { position: relative; border: 0; background: none; color: var(--lavender-ink); cursor: pointer; font: inherit; transition: background var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease); }
+.teacher-pencil { display: inline-grid; flex: none; place-items: center; width: 28px; height: 28px; padding: 0; border-radius: var(--squiggle-chip); }
+.teacher-edit { display: inline-flex; align-items: flex-start; gap: 0.4rem; max-width: 100%; margin-inline: -0.4rem; padding: 0.2rem 0.4rem; border-radius: var(--squiggle-chip); color: var(--ink); text-align: left; line-height: 1.5; }
+.teacher-edit.is-empty { color: var(--lavender-ink); }
+.teacher-edit__value { display: grid; gap: 0.05rem; min-width: 0; overflow-wrap: anywhere; }
+.teacher-edit > svg { flex: none; margin-top: 0.3em; color: var(--lavender-ink); }
+@media (hover: hover) {
+  .teacher-pencil:hover:not(:disabled), .teacher-edit:hover:not(:disabled) { background: var(--hover-wash); color: var(--blue-deep); }
+  .teacher-edit:hover:not(:disabled) > svg { color: var(--blue-deep); }
+}
+.teacher-pencil:focus-visible, .teacher-edit:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.teacher-pencil[aria-expanded="true"] { background: var(--blue-deep); color: var(--paper-light); }
+.teacher-pencil:disabled, .teacher-edit:disabled { opacity: 0.55; }
+@media (pointer: coarse) {
+  .teacher-pencil::after { content: ""; position: absolute; inset: -8px; }
+  .teacher-edit { padding-block: 0.5rem; }
+}
+@media (prefers-reduced-motion: reduce) { .teacher-pencil, .teacher-edit { transition: none; } }
+/* Save and cancel, at the end of whatever is being edited: a coral tick and
+   a quiet cross, the pencil's size. */
+.teacher-edit-actions { display: inline-flex; flex: none; align-items: center; gap: 0.25rem; }
+.teacher-edit-save { position: relative; display: inline-grid; flex: none; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--squiggle-chip); background: var(--coral-action); color: var(--paper-light); cursor: pointer; transition: background var(--motion-surface) var(--motion-ease); }
+@media (hover: hover) { .teacher-edit-save:hover:not(:disabled) { background: var(--coral-pressed); } }
+.teacher-edit-save:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* With nothing to save yet it waits as the site's quiet outline, never a
+   faded fill. */
+.teacher-edit-save:disabled { box-shadow: inset 0 0 0 1.5px var(--outline-edge); background: transparent; color: var(--ink); opacity: 0.55; cursor: default; }
+@media (pointer: coarse) { .teacher-edit-save::after { content: ""; position: absolute; inset: -7px; } }
+/* The one secondary button beside the thing it acts on (Show weeks, Record
+   refund, Remove card), on Inês's side and a student's: soft lilac, dark
+   blue words in sentence case, the site's organic edge. Hover deepens the
+   lilac, focus outlines it, and it keeps a comfortable press area. Coral
+   stays for a save, a confirmed cancel and the single next step. */
+.teacher-quiet { display: inline-flex; flex: none; align-items: center; gap: 0.3rem; min-height: 32px; margin: 0; padding: 0.25rem 0.8rem; border: 0; border-radius: var(--squiggle-chip); background: var(--lavender-soft); color: var(--blue-deep); cursor: pointer; font: 600 0.78rem/1.3 var(--ui); letter-spacing: 0; text-transform: none; white-space: nowrap; transition: background var(--motion-surface) var(--motion-ease); }
+@media (hover: hover) { .teacher-quiet:hover:not(:disabled) { background: var(--lavender); } }
+.teacher-quiet:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.teacher-quiet:disabled { cursor: default; opacity: 0.55; }
+.teacher-quiet svg { flex: none; }
+@media (pointer: coarse) { .teacher-quiet { min-height: 40px; } }
+@media (prefers-reduced-motion: reduce) { .teacher-quiet { transition: none; } }
+
 
 .my-lessons__fact-label {
   color: var(--lavender-ink);
@@ -7238,12 +7294,11 @@ p.lesson-when > span {
   margin: 0;
 }
 
-/* The small outline button every other card's Change is: the same edge, cut
-   and 14px label as the times panel's Change and a lesson row's. Sign out and
-   Have a code from Inês? take it too, so Your details speaks at one size
-   (27 October 2026, Dan). */
-.my-lessons__change,
-.my-lessons__code summary {
+/* The small outline button for an action that is not an edit: Sign out,
+   Send reset link, a card's Not now. The same edge, cut and 14px label as
+   the times panel's Change and a lesson row's (27 October 2026, Dan). What
+   changes a value is its pencil, never this. */
+.my-lessons__change {
   min-height: 44px;
   justify-self: end;
   border: 1.5px solid var(--outline-edge);
@@ -7277,21 +7332,29 @@ p.lesson-when > span {
   opacity: 0.5;
 }
 
-/* Open, a detail is its field with Save and Cancel beside it. Where the
-   pair does not fit beside a field wide enough to read an address in (a
-   narrow card, or Inês's Profile beside Google Meet), it wraps beneath the
-   field, whole, rather than squeezing it (9 November 2026). */
+/* Open, a detail is its field in the value's place, ending in a tick and a
+   cross (or the words of an action a tick cannot say, such as Send
+   confirmation link). They share the field's line, and wrap beneath it,
+   whole, only where the field would be too narrow to read an address in. */
 .my-lessons__edit {
   display: flex;
   flex-wrap: wrap;
-  grid-column: 1 / -1;
-  align-items: flex-end;
-  gap: 0.6rem 0.8rem;
+  align-items: center;
+  min-width: 0;
+  gap: 0.5rem;
 }
 
-.my-lessons__edit > label {
-  flex: 1 1 15rem;
-  max-width: 26rem;
+.my-lessons__edit > input {
+  flex: 1 1 11rem;
+  width: auto;
+  min-width: 0;
+  max-width: 24rem;
+}
+
+.my-lessons__edit > .teacher-edit-actions .button {
+  width: auto;
+  min-height: 44px;
+  white-space: nowrap;
 }
 
 .my-lessons__edit-actions {
@@ -7322,11 +7385,6 @@ p.lesson-when > span {
    width when they don't, so Cancel never dangles alone under Send
    confirmation link or Agree & add card. */
 @container booking (max-width: 519.98px) {
-  .my-lessons__edit > :is(label, .my-lessons__edit-actions) {
-    flex: 1 1 100%;
-    max-width: none;
-  }
-
   .my-lessons__edit-actions > :is(.button, .my-lessons__change) {
     flex: 1 1 0;
     min-width: fit-content;
@@ -7335,26 +7393,35 @@ p.lesson-when > span {
 
 .my-lessons__edit > .my-lessons__details-note {
   flex: 0 0 100%;
+  max-width: none;
   margin: 0;
 }
 
-/* On a phone the detail's name sits above its value, Change to the right. */
+/* On a phone the detail's name sits above its value. */
 @container booking (max-width: 519.98px) {
   .my-lessons__fact {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.1rem;
+  }
+
+  .my-lessons__fact:not([data-field="password"]):has(> :is(.teacher-pencil, .teacher-quiet)) {
     grid-template-columns: minmax(0, 1fr) auto;
+    justify-content: stretch;
   }
 
-  .my-lessons__fact-label {
-    grid-column: 1;
+  .my-lessons__fact:has(> .my-lessons__edit) > .my-lessons__fact-label {
+    margin-top: 0;
   }
 
-  .my-lessons__fact-value {
-    grid-column: 1;
-  }
-
-  .my-lessons__fact > .my-lessons__change {
+  /* The cross that closes the splats, and Remove card, end their name's line. */
+  .my-lessons__fact:not([data-field="password"]) > :is(.teacher-pencil, .teacher-quiet) {
     grid-column: 2;
-    grid-row: 1 / span 2;
+    grid-row: 1;
+  }
+
+  .my-lessons__edit > input {
+    max-width: none;
   }
 }
 
@@ -7481,17 +7548,36 @@ p.lesson-when > span {
   display: grid;
   margin: 0;
   padding: 0;
-  gap: 0.4rem;
+  gap: 0.6rem;
   list-style: none;
 }
 
+/* A saved price is a detail like the rest: its name in small capitals, then
+   what it is, in the same two columns (one on a phone). */
 .my-lessons__rates-list li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.15rem 1rem;
-  font-size: 0.92rem;
+  display: grid;
+  min-height: 44px;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.1rem 1rem;
+  font-size: 1rem;
   line-height: 1.5;
+}
+
+.my-lessons__rates-list li > span {
+  color: var(--lavender-ink);
+  font-family: var(--ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@container booking (max-width: 519.98px) {
+  .my-lessons__rates-list li {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .my-lessons__rates-list strong {
@@ -7807,10 +7893,19 @@ p.lesson-when > span {
 
 /* The code's disclosure is a small outline button like the site's others,
    never an underlined line (27 October 2026, Dan). */
+/* Only some students have a code, so asking is a quiet line of text, never
+   a button among the details (10 November 2026). */
 .my-lessons__code summary {
   display: inline-flex;
   align-items: center;
+  min-height: 44px;
+  color: var(--lavender-ink);
+  cursor: pointer;
+  font-size: 0.84rem;
   list-style: none;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 0.25em;
 }
 
 .my-lessons__code summary::-webkit-details-marker {
@@ -7820,12 +7915,18 @@ p.lesson-when > span {
 .my-lessons__code summary:hover,
 .my-lessons__code summary:focus-visible,
 .my-lessons__code[open] > summary {
-  border-color: var(--ink);
-  background: var(--hover-wash);
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+
+.my-lessons__code summary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: var(--squiggle-chip);
 }
 
 .my-lessons__code[open] > summary {
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.3rem;
 }
 
 .booking-payment {
@@ -8211,10 +8312,11 @@ p.lesson-when > span {
   min-height: 44px;
 }
 
-/* On a phone they share the row between them rather than huddling left. */
+/* On a phone they keep their own width at the row's end, as across a wide
+   page: a single way on never stretches to fill the alert (10 November 2026). */
 @media (max-width: 560px) {
-  .booking-alert__actions > .button {
-    flex: 1 1 auto;
+  .booking-alert__actions {
+    justify-content: flex-end;
   }
 }
 
@@ -9077,8 +9179,7 @@ dialog[open]::backdrop {
     display: none;
   }
 
-  .booking-bar__group legend,
-  .booking-bar__legend {
+  .booking-bar__group legend {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -9328,11 +9429,6 @@ dialog[open]::backdrop {
   opacity: 0.3;
 }
 
-.lessons-loading__day small {
-  font: 700 0.5rem / 1 var(--ui);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
 
 /* Heard, not seen: kept out of the card's flow so nothing shifts on arrival. */
 .calendar-panel.lessons-loading > .visually-hidden {
@@ -9564,8 +9660,7 @@ dialog[open]::backdrop {
     font-size: 0.68rem;
   }
 
-  .unified-calendar--overview .calendar-week button em,
-  .unified-calendar--overview .calendar-week button.is-today > span:not(.calendar-lesson-tip)::after {
+  .unified-calendar--overview .calendar-week button em {
     font-size: 0.6rem;
     letter-spacing: 0.04em;
   }
@@ -9681,10 +9776,6 @@ dialog[open]::backdrop {
     letter-spacing: -0.02em;
   }
 
-  .unified-calendar--overview .calendar-week button.is-today > span:not(.calendar-lesson-tip)::after {
-    font-size: 0.75rem;
-    letter-spacing: 0;
-  }
 
   .unified-calendar--overview .unified-calendar__legend:not(:empty) {
     column-gap: 1rem;
@@ -9983,27 +10074,40 @@ dialog[open]::backdrop {
 }
 
 .card-terms__agreement {
+  container-type: inline-size;
   margin-top: 0;
 }
 
 .card-terms__agreement .booking-agreement__control {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   justify-content: stretch;
-  padding: 0.15rem 0.9rem 0.45rem 0;
+  column-gap: 0.75rem;
 }
 
 .card-terms__agreement .booking-agreement__button {
-  padding-bottom: 0.15rem;
   white-space: normal;
 }
 
-/* Under the words it belongs to, its own quiet action. */
+/* Its own quiet action at the pill's right-hand side, beside the words it
+   belongs to, so the pill is no taller than those words (10 November 2026,
+   Dan). On a narrow pill it breaks after the ampersand. */
 .card-terms__agreement .booking-agreement__control > a {
-  justify-self: start;
-  min-height: 32px;
-  margin-left: calc(0.9rem + 20px + 0.6rem);
+  justify-self: end;
+  max-width: 5.75rem;
   font-size: 0.76rem;
   font-weight: 500;
+  line-height: 1.3;
+  text-align: right;
+}
+
+/* Where the pill is wide enough for both on one line, the link stays whole. */
+@container (min-width: 30rem) {
+  .card-terms__agreement .booking-agreement__control > a {
+    max-width: none;
+    white-space: nowrap;
+  }
 }
 
 .card-terms--approval .my-lessons__edit-actions > .button {
@@ -10036,7 +10140,7 @@ dialog[open]::backdrop {
 }
 
 .my-lessons__fact[data-field="card"] > .card-row-open {
-  grid-column: 2 / -1;
+  grid-column: 2;
 }
 
 @container booking (max-width: 519.98px) {
@@ -10044,7 +10148,6 @@ dialog[open]::backdrop {
     grid-column: 1 / -1;
   }
 }
-
 
 /* The reading card, the same in her collection, its preview and a student's
    own painting (13 October 2026): what the words say, what they mean and the
@@ -10428,9 +10531,10 @@ dialog[open]::backdrop {
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
-  margin: 0.1rem 0 0;
-  border-top: 1px solid var(--rule-soft);
-  padding: 0.55rem var(--pad-card) 0;
+  margin: 0;
+  /* No rule over it (10 November 2026, Dan): its place under the prices and
+     its weight say it is their total. */
+  padding: 0.2rem var(--pad-card) 0;
   font: 600 0.9rem/1.3 var(--ui);
 }
 .card-terms__lessons--then {

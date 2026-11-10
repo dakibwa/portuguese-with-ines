@@ -1,5 +1,6 @@
 "use client";
 
+import { CancelEdit, EditActions, EditValue } from "@/components/teacher/EditControls";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Mail } from "lucide-react";
 import { AccountAvatar, AccountMenu, type AccountSection } from "@/components/AccountMenu";
@@ -208,11 +209,25 @@ export function MyLessons({
 
   // Focus a field as it opens, before a student can select anything else: a
   // queued frame could otherwise steal their focus or subsequent typing.
+  // Closed again, saved or not, focus goes back to the value that opened it
+  // (10 November 2026), unless they have already moved on to something else.
+  const lastOpenField = useRef<typeof openField>(null);
   useLayoutEffect(() => {
+    const closed = lastOpenField.current;
+    lastOpenField.current = openField;
     if (openField && openField !== "mark" && openField !== "card") {
       detailsRef.current?.querySelector<HTMLInputElement>(`[data-field="${openField}"] input`)?.focus({ preventScroll: true });
+    } else if (!openField && closed && (document.activeElement === document.body || !document.activeElement)) {
+      detailsRef.current?.querySelector<HTMLElement>(`[data-field="${closed}"] [data-edit]`)?.focus({ preventScroll: true });
     }
   }, [openField]);
+  // Escape puts an open detail back as it was.
+  const cancelOnEscape = (event: React.KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    setOpenField(null);
+  };
 
   // Read when the details open, so a rate Inês set by hand shows without a
   // reload, and tell booking what came back: it prices weekly lessons from it.
@@ -601,9 +616,10 @@ export function MyLessons({
             Sign out
           </button>
         )}
-        {/* Each detail reads as itself with its own Change, or Add where it
-            is empty; changing one opens it in place (10 October 2026, at
-            Dan's request). */}
+        {/* Each detail reads as itself and is its own button, a small pencil
+            at its end; pressed, its field opens in the value's place with a
+            tick and a cross, its name staying where it was (10 October and
+            10 November 2026, at Dan's request). */}
         <div className="my-lessons__facts">
           {student.mark !== undefined ? (
             <div className="my-lessons__fact" data-field="mark">
@@ -628,113 +644,97 @@ export function MyLessons({
                 </div>
               ) : (
                 <span className="my-lessons__fact-value">
-                  <AccountAvatar className={`my-lessons__avatar${markLanding ? " is-landing" : ""}`} mark={student.mark} name={student.name} />
+                  <EditValue field="mark" label="Change splat" onEdit={() => openDetail("mark")}>
+                    <AccountAvatar className={`my-lessons__avatar${markLanding ? " is-landing" : ""}`} mark={student.mark} name={student.name} />
+                  </EditValue>
                 </span>
               )}
-              {openField === "mark" ? (
-                <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
-              ) : (
-                <button className="my-lessons__change" onClick={() => openDetail("mark")} type="button">
-                  Change<span className="visually-hidden"> splat</span>
-                </button>
-              )}
+              {openField === "mark" ? <CancelEdit onCancel={() => setOpenField(null)} /> : null}
             </div>
           ) : null}
 
           <div className="my-lessons__fact" data-field="name">
+            <span className="my-lessons__fact-label">Your name</span>
             {openField === "name" ? (
               <form
                 className="my-lessons__edit"
+                onKeyDown={cancelOnEscape}
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (!savingName && details.name.trim() && details.name.trim() !== student.name) void saveName();
                 }}
               >
-                <label>
-                  <span>Your name</span>
-                  <input
-                    autoComplete="name"
-                    maxLength={120}
-                    onChange={(event) => setDetails((current) => ({ ...current, name: event.target.value }))}
-                    spellCheck={false}
-                    value={details.name}
-                  />
-                </label>
-                <div className="my-lessons__edit-actions">
-                  <button
-                    className="button button--coral"
-                    disabled={savingName || !details.name.trim() || details.name.trim() === student.name}
-                    type="submit"
-                  >
-                    {savingName ? "Saving…" : "Save name"}
-                  </button>
-                  <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
-                </div>
+                <input
+                  aria-label="Your name"
+                  autoComplete="name"
+                  maxLength={120}
+                  onChange={(event) => setDetails((current) => ({ ...current, name: event.target.value }))}
+                  spellCheck={false}
+                  value={details.name}
+                />
+                <EditActions
+                  busy={savingName}
+                  onCancel={() => setOpenField(null)}
+                  saveDisabled={!details.name.trim() || details.name.trim() === student.name}
+                  saveLabel="Save name"
+                />
               </form>
             ) : (
-              <>
-                <span className="my-lessons__fact-label">Your name</span>
-                <span className="my-lessons__fact-value">{student.name}</span>
-                <button className="my-lessons__change" onClick={() => openDetail("name")} type="button">
-                  Change<span className="visually-hidden"> name</span>
-                </button>
-              </>
+              <span className="my-lessons__fact-value">
+                <EditValue field="name" label="Change name" onEdit={() => openDetail("name")}>{student.name}</EditValue>
+              </span>
             )}
           </div>
 
           <div className="my-lessons__fact" data-field="email">
+            <span className="my-lessons__fact-label">Email</span>
             {openField === "email" ? (
               <form
                 className="my-lessons__edit"
+                onKeyDown={cancelOnEscape}
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (!emailBusy && details.email.trim() && details.email.trim() !== student.email) void changeEmail();
                 }}
               >
-                <label>
-                  <span>Email</span>
-                  <input
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    autoCorrect="off"
-                    onChange={(event) => draftEmail(event.target.value)}
-                    spellCheck={false}
-                    type="email"
-                    value={details.email}
-                  />
-                </label>
+                <input
+                  aria-label="Email"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  autoCorrect="off"
+                  onChange={(event) => draftEmail(event.target.value)}
+                  spellCheck={false}
+                  type="email"
+                  value={details.email}
+                />
                 {/* Changing the address you sign in with is deliberately the slower
-                    of the two: nothing moves until the new address answers. */}
-                <div className="my-lessons__edit-actions">
+                    of the two: nothing moves until the new address answers. A
+                    tick could not say that, so this one keeps its words. */}
+                <span className="teacher-edit-actions">
                   <button
-                    className="button button--blue"
+                    className="button button--blue button--small"
                     disabled={emailBusy || !details.email.trim() || details.email.trim() === student.email}
                     type="submit"
                   >
                     {emailBusy ? "Sending…" : "Send confirmation link"}
                   </button>
-                  <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
-                </div>
+                  <CancelEdit onCancel={() => setOpenField(null)} />
+                </span>
                 <p className="my-lessons__details-note">{student.email ? "It changes once you open the link we send to the new address." : "It’s added once you open the link we send to it, on this phone or computer."}</p>
               </form>
             ) : (
-              <>
-                <span className="my-lessons__fact-label">Email</span>
-                <span className={`my-lessons__fact-value${student.email || emailPending ? "" : " my-lessons__fact-value--empty"}`}>
-                  {/* A long address breaks after its @, never mid-word, so
-                      it keeps its row beside Change as every detail does. A
-                      student Inês invited on WhatsApp may have none yet. */}
-                  {student.email ? <span>{student.email.split("@")[0]}{student.email.includes("@") ? <>@<wbr />{student.email.slice(student.email.indexOf("@") + 1)}</> : null}</span> : emailPending ? null : "Not added"}
-                  {emailPending ? (
-                    <small className="my-lessons__details-note">
-                      Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.
-                    </small>
-                  ) : null}
-                </span>
-                <button className="my-lessons__change" onClick={() => openDetail("email")} type="button">
-                  {student.email ? <>Change<span className="visually-hidden"> email</span></> : "Add email"}
-                </button>
-              </>
+              <span className={`my-lessons__fact-value${student.email || emailPending ? "" : " my-lessons__fact-value--empty"}`}>
+                {/* A long address breaks after its @, never mid-word. A
+                    student Inês invited on WhatsApp may have none yet. */}
+                <EditValue empty={!student.email} field="email" label={student.email ? "Change email" : "Add email"} onEdit={() => openDetail("email")}>
+                  {student.email ? <span>{student.email.split("@")[0]}{student.email.includes("@") ? <>@<wbr />{student.email.slice(student.email.indexOf("@") + 1)}</> : null}</span> : emailPending ? "Not confirmed yet" : "Not added"}
+                </EditValue>
+                {emailPending ? (
+                  <small className="my-lessons__details-note">
+                    Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.
+                  </small>
+                ) : null}
+              </span>
             )}
           </div>
 
@@ -746,11 +746,13 @@ export function MyLessons({
             <div className="my-lessons__fact" data-field="card">
               <span className="my-lessons__fact-label">Card</span>
               {openField === "card" ? (
-                <div className="card-row-open">
-                  <CardTerms change={student.cardForAllLessons} onCancel={() => setOpenField(null)} {...cardRules} />
+                <>
+                  <div className="card-row-open">
+                    <CardTerms change={student.cardForAllLessons} onCancel={() => setOpenField(null)} {...cardRules} />
+                  </div>
                   {student.cardForAllLessons ? (
                     <button
-                      className="button button--outline button--small"
+                      className="teacher-quiet"
                       disabled={removingCard}
                       onClick={async () => {
                         const session = readSession();
@@ -780,62 +782,50 @@ export function MyLessons({
                       Remove card
                     </button>
                   ) : null}
-                </div>
-              ) : (
-                <>
-                  <span className={`my-lessons__fact-value${student.cardForAllLessons ? "" : " my-lessons__fact-value--empty"}`}>
-                    {student.cardForAllLessons ? "Saved" : student.hasCard ? "Saved for lessons you book" : "Not added"}
-                  </span>
-                  <button className="my-lessons__change" onClick={() => openDetail("card")} type="button">
-                    {student.cardForAllLessons ? <>Change<span className="visually-hidden"> card</span></> : "Add card"}
-                  </button>
                 </>
+              ) : (
+                <span className="my-lessons__fact-value">
+                  <EditValue empty={!student.cardForAllLessons} field="card" label={student.cardForAllLessons ? "Change card" : "Add card"} onEdit={() => openDetail("card")}>
+                    {student.cardForAllLessons ? "Saved" : student.hasCard ? "Saved for lessons you book" : "Not added"}
+                  </EditValue>
+                </span>
               )}
             </div>
           ) : null}
 
           <div className="my-lessons__fact" data-field="nif">
+            <span className="my-lessons__fact-label">NIF</span>
             {openField === "nif" ? (
               <form
                 className="my-lessons__edit"
+                onKeyDown={cancelOnEscape}
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (!savingNif && details.nif.trim() !== (student.nif ?? "")) void saveNif();
                 }}
               >
-                <label>
-                  <span>
-                    NIF <em>(optional, for your receipts)</em>
-                  </span>
-                  <input
-                    autoComplete="off"
-                    inputMode="numeric"
-                    maxLength={20}
-                    onChange={(event) => setDetails((current) => ({ ...current, nif: event.target.value }))}
-                    value={details.nif}
-                  />
-                </label>
-                <div className="my-lessons__edit-actions">
-                  <button
-                    className="button button--coral"
-                    disabled={savingNif || details.nif.trim() === (student.nif ?? "")}
-                    type="submit"
-                  >
-                    {savingNif ? "Saving…" : "Save NIF"}
-                  </button>
-                  <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
-                </div>
+                <input
+                  aria-label="NIF (optional, for your receipts)"
+                  autoComplete="off"
+                  inputMode="numeric"
+                  maxLength={20}
+                  onChange={(event) => setDetails((current) => ({ ...current, nif: event.target.value }))}
+                  placeholder="Optional, for your receipts"
+                  value={details.nif}
+                />
+                <EditActions
+                  busy={savingNif}
+                  onCancel={() => setOpenField(null)}
+                  saveDisabled={details.nif.trim() === (student.nif ?? "")}
+                  saveLabel="Save NIF"
+                />
               </form>
             ) : (
-              <>
-                <span className="my-lessons__fact-label">NIF</span>
-                <span className={`my-lessons__fact-value${student.nif ? "" : " my-lessons__fact-value--empty"}`}>
+              <span className="my-lessons__fact-value">
+                <EditValue empty={!student.nif} field="nif" label={student.nif ? "Change NIF" : "Add NIF"} onEdit={() => openDetail("nif")}>
                   {student.nif || "Not added"}
-                </span>
-                <button className="my-lessons__change" onClick={() => openDetail("nif")} type="button">
-                  {student.nif ? <>Change<span className="visually-hidden"> NIF</span></> : "Add NIF"}
-                </button>
-              </>
+                </EditValue>
+              </span>
             )}
           </div>
         </div>

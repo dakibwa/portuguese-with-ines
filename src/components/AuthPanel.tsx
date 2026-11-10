@@ -305,13 +305,16 @@ export function AuthPanel({
           <label>
             <span>
               <ReceiptText size={16} aria-hidden="true" />
-              NIF <em>(optional, for your receipts)</em>
+              NIF
             </span>
+            {/* What it is for is its placeholder, as in Your details. */}
             <input
+              aria-label="NIF (optional, for your receipts)"
               autoComplete="off"
               inputMode="numeric"
               maxLength={20}
               onChange={(event) => update({ nif: event.target.value })}
+              placeholder="Optional, for your receipts"
               value={form.nif}
             />
           </label>
@@ -360,7 +363,7 @@ export function AuthPanel({
       {mode !== "register" ? (
         <p className="auth-panel__aside">
           {byEmail ? (
-            <button className="button button--outline button--small" onClick={() => switchMode("signin")} type="button">
+            <button className="teacher-quiet" onClick={() => switchMode("signin")} type="button">
               Back to signing in
             </button>
           ) : (
@@ -370,11 +373,11 @@ export function AuthPanel({
                   short labels, so they share a row on a phone (27 October
                   2026, Dan). */}
               {!signInOnly ? (
-                <button className="button button--outline button--small" onClick={() => switchMode("link")} type="button">
+                <button className="teacher-quiet" onClick={() => switchMode("link")} type="button">
                   Email a link
                 </button>
               ) : null}
-              <button className="button button--outline button--small" onClick={() => switchMode("forgot")} type="button">
+              <button className="teacher-quiet" onClick={() => switchMode("forgot")} type="button">
                 Forgot password
               </button>
             </>

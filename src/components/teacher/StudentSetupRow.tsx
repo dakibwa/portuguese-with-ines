@@ -4,19 +4,18 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { CalendarPlus, Check, Euro, KeyRound, Repeat, X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { ComeBackEmail, firstName } from "@/components/teacher/DormantEmail";
-import { EditPencil, EditValue } from "@/components/teacher/EditControls";
+import { EditActions, EditPencil, InlineEdit } from "@/components/teacher/EditControls";
 import { LessonForm } from "@/components/teacher/LessonForm";
 import { StudentDashboard, FactRow } from "@/components/teacher/StudentDashboard";
-import { StudentDetailsForm } from "@/components/teacher/StudentDetailsForm";
-import { StudentPrice, priceLabel } from "@/components/teacher/StudentPrice";
+import { StudentPrice } from "@/components/teacher/StudentPrice";
 import { WhatsAppInvite } from "@/components/teacher/WhatsAppInvite";
-import { setStudentDormant, type AdminStudent } from "@/lib/admin-api";
+import { setStudentDormant, updateStudentDetails, type AdminStudent } from "@/lib/admin-api";
 import { dateKey, dateLabel, hasLessons, type StudentProgress } from "@/lib/teacher-calendar";
 import { formatMoneyCents } from "@/lib/booking-api";
 import { defaultStudentMark } from "@/lib/student-marks";
 
 /** Their profile, or one piece of it open in its place. */
-export type StudentPanel = "history" | "details" | "price" | "lessons" | "invite" | "come-back";
+export type StudentPanel = "history" | "lessons" | "invite" | "come-back";
 export type StudentRowSelection = { studentId: string; panel: StudentPanel; date?: string; time?: string; homeworkId?: string; homeworkRequestKey?: number };
 
 const shortDate = (at: string) => dateLabel(dateKey(new Date(at)), { day: "numeric", month: "short" });
@@ -43,13 +42,34 @@ function ProgressChecks({ progress }: { progress: StudentProgress }) {
   </ul>;
 }
 
+/** Their name, changed in the card's top row where it reads. */
+function NameEdit({ name, onSave, onClose, onBusy }: { name: string; onSave: (name: string) => Promise<void>; onClose: () => void; onBusy: (busy: boolean) => void }) {
+  const [draft, setDraft] = useState(name);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return <form className="teacher-inline-edit teacher-inline-edit--name" onKeyDown={event => { if (event.key === "Escape" && !busy) { event.preventDefault(); event.stopPropagation(); onClose(); } }}
+    onSubmit={async event => {
+      event.preventDefault();
+      if (busy) return;
+      if (draft.trim() === name) { onClose(); return; }
+      setBusy(true); onBusy(true); setError("");
+      try { await onSave(draft.trim()); onClose(); }
+      catch (caught) { setError(caught instanceof Error ? caught.message : "Their name couldn’t be saved."); }
+      finally { setBusy(false); onBusy(false); }
+    }}>
+    <input aria-label="Full name" autoCapitalize="words" autoComplete="off" autoFocus disabled={busy} name="name" onChange={event => setDraft(event.target.value)} required spellCheck={false} type="text" value={draft} />
+    <EditActions busy={busy} onCancel={onClose} />
+    {error ? <span className="teacher-inline-error teacher-inline-edit__error" role="alert">{error}</span> : null}
+  </form>;
+}
+
 /**
  * One student, one card: who they are, their three checks and the one thing
  * to press next (2 November 2026, Dan: "simplify and make all the student
  * management stuff more simple for Ines"). Their name opens their profile in
  * the same card: details, price and lessons, and from there the rest.
  */
-export function StudentSetupRow({ student, progress, token, step: requestedStep, date, time, homeworkId, homeworkRequestKey, comeBackDefaultVersion, editedField = "", onEdited, sending, locked, attention, notice, onNotice, onSelect, onHomework, onChanged, onWelcome, onBusy }: {
+export function StudentSetupRow({ student, progress, token, step: requestedStep, date, time, homeworkId, homeworkRequestKey, comeBackDefaultVersion, sending, locked, attention, notice, onNotice, onSelect, onHomework, onChanged, onWelcome, onBusy }: {
   student: AdminStudent;
   progress: StudentProgress;
   token: string;
@@ -60,9 +80,6 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
   homeworkRequestKey?: number;
   /** Changes when she saves a new default come-back email. */
   comeBackDefaultVersion?: number;
-  /** The field a pencil was pressed for, and how the list is told. */
-  editedField?: string;
-  onEdited?: (field: string) => void;
   sending: string;
   locked?: boolean;
   /** Lesson changes or payment notes belong to this student's one card. */
@@ -96,17 +113,12 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
   const body = useRef<HTMLDivElement>(null);
   const nameControl = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLButtonElement | null>(null);
-  // The field a pencil was pressed for: focused when its editor opens, and
-  // its pencil is where focus returns when the editor is saved or cancelled.
-  // The list keeps a copy: this card remounts when it leaves its lane.
-  const edited = useRef(editedField);
-  const remember = (field: string) => { edited.current = field; onEdited?.(field); };
   const paneId = `teacher-setup-${student.id}`;
   const disabled = busy || locked || sending === student.id;
   const open = (panel: StudentPanel | null) => { setNotice(""); setProblem(""); onSelect(panel); };
-  const edit = (panel: "details" | "price", field: string) => { open(panel); remember(field); };
+  // Their name is changed where it stands, in the card's top row.
+  const [renaming, setRenaming] = useState(false);
   const close = () => {
-    remember("");
     returnFocus.current = row.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]') ?? nameControl.current;
     onSelect(null);
   };
@@ -136,11 +148,7 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
 
   useEffect(() => {
     if (!step || !body.current) return;
-    // A pencil's own field first, where it can be typed in (a signed-in
-    // student's email can't), otherwise the first text field.
-    const field = step === "details" || step === "price"
-      ? (edited.current && body.current.querySelector<HTMLInputElement>(`[name="${edited.current}"]:not(:disabled)`)) || body.current.querySelector<HTMLInputElement>('input[type="text"]')
-      : step === "lessons" ? body.current.querySelector<HTMLButtonElement>('.teacher-lesson-picker [data-lesson-date][tabindex="0"]') : null;
+    const field = step === "lessons" ? body.current.querySelector<HTMLButtonElement>('.teacher-lesson-picker [data-lesson-date][tabindex="0"]') : null;
     (field ?? body.current).focus({ preventScroll: true });
     if (!header.current) return;
     const bounds = header.current.getBoundingClientRect();
@@ -153,13 +161,14 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
     if (bounds.top < top || body.current.getBoundingClientRect().bottom > window.innerHeight - 16)
       window.scrollBy({ top: bounds.top - top, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
   }, [step, date, time]);
-  // Back on their profile from an editor, focus returns to the pencil that opened it.
+  // Renamed or not, focus goes back to the name's pencil.
+  const renamed = useRef(false);
   useEffect(() => {
-    if (step !== "history" || disabled || !edited.current) return;
-    row.current?.querySelector<HTMLElement>(`[data-edit="${edited.current}"]`)?.focus({ preventScroll: true });
-    edited.current = "";
-    onEdited?.("");
-  }, [step, disabled, onEdited]);
+    if (renaming) { renamed.current = true; return; }
+    if (!renamed.current) return;
+    renamed.current = false;
+    row.current?.querySelector<HTMLElement>('[data-edit="name"]')?.focus({ preventScroll: true });
+  }, [renaming]);
 
   // The sheet grows around its contents; the name stays still at its top.
   useLayoutEffect(() => {
@@ -234,21 +243,31 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
   >{next.label}<span className="visually-hidden"> for {student.name}</span></button> : null;
 
   const profile = step === "history";
-  const heading = step === "details" ? "Their details" : step === "price" ? "Their price" : step === "lessons" ? "Add a lesson"
+  const heading = step === "lessons" ? "Add a lesson"
     : step === "invite" ? `Send ${first} their link` : step === "come-back" ? `Come-back email to ${first}` : "";
   const comeBackSent = student.dormantEmailedAt ? shortDate(student.dormantEmailedAt) : "";
   const help: string[] = step === "invite" ? ["Signs them in once, within 14 days."]
-    : step === "price" ? [Object.keys(student.ownPrices ?? student.prices ?? {}).length ? "Custom lesson price set." : "Standard lesson price applies."]
     : step === "lessons" ? [
       ...(!hasLessons(student) ? ["No lessons added yet."] : []),
       student.awaitingWelcome ? "Lesson emails wait for the welcome email." : "Lessons to come email the student.",
     ] : step === "come-back" ? ["Ends with a button to sign in and book.", comeBackSent ? `Last sent ${comeBackSent}.` : "Not sent yet."] : [];
-  // A piece of the profile goes back to the profile once it is done.
-  const backToProfile = (message: string) => { setNotice(message); onSelect("history"); };
-
   // A fact she can change is its own button, with a tiny pencil at its end
   // (9 November 2026, Dan); one still empty offers itself in place, as Add.
+  // Pressed, it becomes its field right there (10 November 2026, Dan).
   const label = (what: string, empty = false) => `${empty ? "Add" : "Change"} ${what} for ${student.name}`;
+  async function saveDetail(field: "name" | "email" | "phone" | "nif", value: string) {
+    setNotice(""); setProblem("");
+    const { student: updated } = await updateStudentDetails(token, student.id, {
+      name: student.name, email: student.email, phone: student.phone, nif: student.nif ?? "", [field]: value,
+    });
+    onChanged?.(updated);
+    setNotice("Their details are saved.");
+  }
+  const detail = (field: "email" | "phone" | "nif", what: string, shown: string, placeholder: string, extra: Partial<Parameters<typeof InlineEdit>[0]> = {}) => {
+    const value = (field === "nif" ? student.nif : student[field]) ?? "";
+    return <InlineEdit disabled={disabled} empty={!value} field={field} inputLabel={what === "NIF" ? "NIF" : what[0].toUpperCase() + what.slice(1)}
+      label={label(what, !value)} onBusy={setBusy} onSave={next => saveDetail(field, next)} placeholder={placeholder} value={value} {...extra}>{shown}</InlineEdit>;
+  };
   const tool = (panel: StudentPanel, label: string, Icon: typeof Euro) => <button
     aria-controls={paneId}
     className="button button--outline button--small"
@@ -276,24 +295,31 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
       {/* Opening and closing their card is the name's button; changing the
           name is its own pencil beside it, never a button inside one. */}
       <div className="teacher-setup__who">
-        <button
+        {renaming ? <><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><NameEdit
+          name={student.name}
+          onBusy={setBusy}
+          onClose={() => setRenaming(false)}
+          onSave={next => saveDetail("name", next)}
+        /></> : <><button
           className="teacher-setup__profile"
           aria-controls={paneId}
           aria-expanded={profile}
           aria-label={`Open ${student.name}’s profile`}
           ref={nameControl}
           disabled={disabled}
-          onClick={() => { remember(""); open(profile ? null : "history"); }}
+          onClick={() => open(profile ? null : "history")}
           type="button"
         ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{student.dormant ? <span className="teacher-student__label">Dormant</span> : null}</span></button>
-        <EditPencil controls={paneId} disabled={disabled} field="name" label={`Change name for ${student.name}`} onEdit={() => edit("details", "name")} />
+        <EditPencil disabled={disabled} field="name" label={`Change name for ${student.name}`} onEdit={() => setRenaming(true)} /></>}
       </div>
       {/* Open, how far they have got and what she can do sit in this one row
-          (9 November 2026, Dan: "more consolidate and simple"): their checks,
-          her actions, then close. */}
-      {profile ? <div className="teacher-student__bar">
+          (9 November 2026, Dan: "more consolidate and simple"): their checks
+          beside their name, her actions, then close. The checks keep the top
+          bar while one of her panels is open too (10 November 2026, Dan:
+          "could the little bits not appear in the top bar"). */}
+      {step ? <div className="teacher-student__bar">
         {student.dormant ? null : <ProgressChecks progress={progress} />}
-        {actions}
+        {profile ? actions : null}
       </div> : null}
       {step ? <div className="teacher-setup__action teacher-setup__close">
         <button className="teacher-dialog-close" aria-label="Close" aria-controls={paneId} disabled={disabled} onClick={close} type="button"><X size={20} aria-hidden="true" /></button>
@@ -302,8 +328,9 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
         <span className="teacher-student__weekly"><Repeat size={12} strokeWidth={2.4} aria-hidden="true" />Weekly</span>
       </div> : null}
     </div>
-    {/* A dormant student's checks wait until they come back. */}
-    {!profile && (!student.dormant || nextButton) ? <div className="teacher-student__progress">
+    {/* Closed, their checks and the one next step sit beneath their name. A
+        dormant student's checks wait until they come back. */}
+    {!step && (!student.dormant || nextButton) ? <div className="teacher-student__progress">
       {student.dormant ? null : <ProgressChecks progress={progress} />}
       {nextButton}
     </div> : null}
@@ -336,35 +363,25 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
             <FactRow label="Details">
               {student.signedIn
                 ? <span className="teacher-fact__line">{student.email || "No email"}</span>
-                : <EditValue controls={paneId} disabled={disabled} empty={!student.email} field="email" label={label("email", !student.email)} onEdit={() => edit("details", "email")}>{student.email || "No email"}</EditValue>}
-              <EditValue controls={paneId} disabled={disabled} empty={!student.phone} field="phone" label={label("phone", !student.phone)} onEdit={() => edit("details", "phone")}>{student.phone || "Add phone"}</EditValue>
-              <EditValue controls={paneId} disabled={disabled} empty={!student.nif} field="nif" label={label("NIF", !student.nif)} onEdit={() => edit("details", "nif")}>{student.nif ? `NIF ${student.nif}` : "Add NIF"}</EditValue>
+                : detail("email", "email", student.email || "Add email", "name@example.com", { type: "email", inputMode: "email", required: Boolean(student.email) })}
+              {detail("phone", "phone", student.phone || "Add phone", "Phone", { type: "tel", inputMode: "tel" })}
+              {detail("nif", "NIF", student.nif ? `NIF ${student.nif}` : "Add NIF", "NIF, for receipts", { inputMode: "numeric" })}
             </FactRow>
-            <FactRow label="Price">
-              <EditValue controls={paneId} disabled={disabled} field="price-60" label={label("60-minute price")} onEdit={() => edit("price", "price-60")}>{priceLabel(student, 60)}</EditValue>
-              <EditValue controls={paneId} disabled={disabled} field="price-90" label={label("90-minute price")} onEdit={() => edit("price", "price-90")}>{priceLabel(student, 90)}</EditValue>
+            <FactRow label="Price" labelId={`${paneId}-price-label`}>
+              <StudentPrice
+                disabled={disabled}
+                idPrefix={`${paneId}-price`}
+                labelledBy={`${paneId}-price-label`}
+                onBusy={setBusy}
+                onChanged={updated => onChanged?.(updated)}
+                student={student}
+                token={token}
+              />
             </FactRow>
             {student.dormant && comeBackSent ? <FactRow label="Come-back email"><span>Sent {comeBackSent}</span></FactRow> : null}
           </>}
         />
-      </> : step === "details" ? <StudentDetailsForm
-        key={`${student.id}-details`}
-        onBusy={setBusy}
-        onSaved={updated => { onChanged?.(updated); backToProfile("Their details are saved."); }}
-        onCancel={() => open("history")}
-        student={student}
-        token={token}
-      /> : step === "price" ? <StudentPrice
-        key={`${student.id}-price`}
-        idPrefix={`${paneId}-price`}
-        labelledBy={`${paneId}-heading`}
-        onBusy={setBusy}
-        onCancel={() => open("history")}
-        onChanged={updated => onChanged?.(updated)}
-        startEditing
-        student={student}
-        token={token}
-      /> : step === "come-back" ? <ComeBackEmail
+      </> : step === "come-back" ? <ComeBackEmail
         key={`${student.id}-come-back`}
         defaultVersion={comeBackDefaultVersion}
         onBusy={setBusy}

@@ -12,8 +12,8 @@ import { bookingSegments, dateBlocks, dateLabel, mergeSpans, minuteLabel, monday
 
 /**
  * Some hours off on one day: one or more breaks, in Porto time. A whole day
- * off is the card's own button, so this asks only for the hours. Nothing is
- * saved until she presses Save.
+ * off is the month's own `Off` chip, so this asks only for the hours. Nothing
+ * is saved until she presses Save.
  */
 export function TimeOffDayDialog({ date, exceptions, bookings, onSave, onClose }: {
   date: string;
@@ -72,7 +72,7 @@ export function TimeOffDayDialog({ date, exceptions, bookings, onSave, onClose }
             <label><span>Until</span><input aria-label={`Until ${index + 1}`} disabled={busy} type="time" value={time.until} onChange={event => edit(index, "until", event.target.value)} /></label>
             <button className="teacher-icon-button" type="button" aria-label={`Remove break ${index + 1}`} disabled={busy || times.length === 1} onClick={() => setTimes(current => current.filter((_, position) => position !== index))}><Trash2 size={16} aria-hidden="true" /></button>
           </div>)}
-          <button className="button button--lilac button--small" disabled={busy} onClick={() => setTimes(current => [...current, { from: "14:00", until: "15:00" }])} type="button"><Plus size={15} aria-hidden="true" />Add another break</button>
+          <button className="teacher-quiet" disabled={busy} onClick={() => setTimes(current => [...current, { from: "14:00", until: "15:00" }])} type="button"><Plus size={15} aria-hidden="true" />Add another break</button>
         </div>
         {overlap.length ? (
           <ul className="booking-payment-facts teacher-timeoff-facts" role="status">

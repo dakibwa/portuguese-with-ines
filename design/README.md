@@ -438,6 +438,14 @@ palette. Keep expressive type in the page/section headings and clear Montserrat
 type in dates, times and lesson details. Use colour to distinguish booked lessons,
 usual lesson starts and days off; avoid a wall of administration forms.
 
+Online only (10 November 2026): Inês labels days as online only where she
+takes days off, on the Time off month and its card, never in a dialog and
+never from the Timetable, which only shows it. The details are under "Online
+only, in one colour" in the 10 November section below. Labelled time affects
+new student choices alone: usual hours and time off still apply, and already
+booked lessons keep their place and time. The student's Where choice refreshes
+free times and removes selected times that cannot be booked in the new place.
+
 - Open on the current Porto week with booked lessons placed at their actual
   times. One calendar holds everything: clicking or dragging a time on a date
   takes it off for that date only, and a `Day off` switch above each date
@@ -458,8 +466,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   connection and Sign out, keeping account controls away from daily work.
 - One pager turns the Timetable's week and the Time off and Receipts months
   (14 October 2026, Dan: "there feels inconsistencies here"): two solid blue
-  arrows that never move, and `This week` / `This month` as a compact lilac
-  site button, matching `Edit weekly hours`, to their left only while she is
+  arrows that never move, and `This week` / `This month` as the quiet lilac
+  chip (10 November 2026; it was a compact lilac site button), matching
+  `Edit weekly hours`, to their left only while she is
   away from the current one, because the heading already names where she is.
   Its place is held while it is out of sight, so the arrows, the heading and
   the grid beneath never shift between states, and a narrow screen lays
@@ -492,29 +501,38 @@ usual lesson starts and days off; avoid a wall of administration forms.
   mixed state; clearing it removes its selected starts, and enabling an empty
   cell enables both. Dragging includes the final cell, and the exact-time
   editor retains control of off-grid windows.
-- `Time off` is a month beside one card, with one way to choose: tap days,
-  one or several, across months and tabs (13 October 2026, Dan). The card
-  starts `Tap the days you want off`; with days chosen it reads the same for
-  one as for many (14 October 2026, Dan: "rather than it be different if its
-  one or two days"): `1 day chosen` / `3 days chosen` with `Clear`, over a
-  removable chip for every chosen day. Beneath the chips, a single day also
-  shows what it already holds (`A day off`, `Off 10:00–11:30`); under
-  `Already booked`, each lesson on the chosen days is a booked-lesson card with
-  its date. Then `Take the day off` / `Take 3 days off` in coral, counting only
-  the days not already off,
-  `Take some hours off` (one day, because hours belong to one date) in soft
-  lilac, and `Make available` only when a
-  chosen day is off. Some hours opens a small dialog of one or more breaks in
-  Porto time, saved only with `Save hours off`; a failed save keeps the draft.
-  `Remove hours off` clears that date's breaks. Making days available removes
-  only the whole-day block and keeps their hours off and weekly rules. On a
-  phone held upright the card rides at the foot of the screen once a day is
-  chosen, its chips in one row that scrolls sideways (the month behind it is
-  mostly hidden, so it still names the days without growing taller); held
-  sideways, and on a tablet, it sits beside the month (beneath it on the
-  smallest), never over it. The upright sticky card has a half-screen maximum
-  height and scrolls inside when several booked lessons fill it.
-  The month marks whole days off and booked lessons, without repeating weekly
+- `Time off` is a month with one way to choose: tap days, one or several,
+  across months and tabs (13 October 2026, Dan). The choice is one line at
+  the month's foot, and no second card opens (10 November 2026, Dan: "can you
+  literally just click 3 days then the option is there to mark as online only
+  or off?"). Before a day is chosen the line reads `Tap the days you want
+  off, or online only`. With days chosen it reads the same for one as for
+  many (14 October 2026, Dan: "rather than it be different if its one or two
+  days"): `1 day` / `3 days`, the chips `Off` and `Online only`, and a quiet
+  cross that lets the days go. The month itself names the days, so there is
+  no chip for each. A chip wears the swatch of the day it makes, as the key
+  does, and is the deep blue of a chosen tab while every chosen day is
+  already that, so the same press takes it back; `Off` takes only the days
+  not already off. Hours are the exception and come after: once the days are
+  off or online only, `All day` stands beneath the chips behind the same
+  swatch, with its pencil. A day off's hours open a small dialog of one or
+  more breaks in Porto time, saved only with `Save hours off`; a failed save
+  keeps the draft, and `Remove hours off` clears that date's breaks. `Off`
+  means a whole day, as the month draws it: a day with only some hours off
+  shows those hours beneath and leaves the chip unpressed, and opening a day
+  again removes only the whole-day block and keeps its hours off and weekly
+  rules.
+  Beside the month (beneath it on a phone) one card always says what is set:
+  `Clashes` first, when there are any (10 November 2026, Dan: "display the
+  clashes somewhere suitable in a clean simple way"), then `Coming up`. A
+  clash is a lesson to come that her time off left standing: booked on a day
+  off, inside hours off, or in person inside online-only hours. Each is a
+  booked-lesson card with its date and the reason in two words (`day off`,
+  `hours off`, `online only`), and its `Change` opens the lesson. Nothing
+  here moves or cancels a lesson on its own. What was saved shows on the
+  month, so only a failure is written out beneath the choice.
+  The month marks whole days off, online-only days, booked lessons and today
+  (see "Calendar marks" in the 10 November section), without repeating weekly
   unavailability or partial blocks from the timetable.
   Time off prevents new bookings; existing lessons stay until she changes them.
 - A booked lesson in her way (outside new weekly hours, or on days she is
@@ -557,8 +575,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   absent when they are all set. A dormant card shows no checks, only lilac
   `Come-back email` (or `Invite back` with no email). The card she opens is
   taken out of its lane and shown once at full width as the focused student
-  view. The board and its toolbar wait until she returns with `All students`
-  or Close. A paid lesson or newly sent link never moves the open card; on
+  view. The board and its toolbar wait until she returns with Close. A paid lesson or newly sent link never moves the open card; on
   return its current lane, saved search and notices appear, with focus on its
   name (or search when a renamed name no longer matches).
   Their name opens their dashboard in the same card (9 November 2026, Dan: "a
@@ -684,8 +701,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   existing reads; there is nothing new to store or dismiss.
 - Each date has one compact header cell: weekday and bold date centred together
   on one line (`Mon 7`), today's number in a filled blue lozenge with cream
-  type. On a phone, where one day shows at a time, a booked dot marks the
-  days with lessons without shifting the date; the whole week has none, since
+  type. On a phone, where one day shows at a time, the booked hatch marks the
+  tabs of days with lessons (10 November 2026; it was a coral dot) without
+  shifting the date; the whole week has none, since
   its lessons are in view beneath. Its Day off switch sits at the
   right, moving to a second short line inside the cell when the column cannot
   fit both. It has a 44px hit area and keeps its full dated accessible name.
@@ -744,8 +762,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - Opening and closing gently changes the sheet's height. Its contents fade
     into place, and scrolling keeps the student's name visible. Reduced-motion
     users get the same result without animation.
-  - Details contains full name, email, phone and NIF, with one Save details
-    action. A student who has signed in changes their own email. A missing
+  - Name, email, phone and NIF are each edited where they stand, from their
+    own pencil (10 November 2026). A student who has signed in changes their own email. A missing
     lesson never locks the email field (16 October 2026, Inês). Price uses the same editable rate form as onboarding.
   - Their lessons read Upcoming, then Past & cancelled. A weekly run's weeks
     still to come are one tile (9 November 2026, Dan: "just have them
@@ -764,8 +782,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - The Students toolbar stays on one row: Find a student on the left and
     Add a student on the right. Opening a student makes them the whole screen
     (9 November 2026, Dan): the board, toolbar and progress give way to that one
-    full-width card, with a compact `All students` button (or the card's Close)
-    to go back. Search, notices and focus come back with the board; the site's
+    full-width card, whose Close goes back. Search, notices and focus come back with the board; the site's
     navigation stays as it is, and it is not a modal. A completed student's closed card has a
     stretched name-button hit area; its section controls keep their own actions.
   - Add a student opens a short creation dialog with name, optional email,
@@ -877,9 +894,11 @@ usual lesson starts and days off; avoid a wall of administration forms.
   actions share a row rather than stacking full width (a student card's blue
   `Add lesson` beside its coral `Send welcome email`, a lesson's `Move` beside
   `Cancel`), and coral marks the one thing still to do. A quieter constructive
-  choice is filled in the palette's soft lilac (`Take some hours off`, `Make
-  available`, `Add a new student`, `Open Google Calendar`, a booked lesson's
-  `Change`; 13 October 2026, Dan: "just the subtle lilac"); a way out
+  choice is the palette's soft lilac (`Off`, `Online only`, `Open Google
+  Calendar`, a booked lesson's `Change`; 13 October
+  2026, Dan: "just the subtle lilac"), since 10 November 2026 as the quiet
+  chip in sentence case at its own width rather than the capital-letter
+  site button; a way out
   (`Cancel`, `Back`, `Done`) stays an outline. On a phone every tab
   is in view at once, as a grid. Booked is the calendar's navy everywhere. A lesson's details read as dabs (their address, NIF, how
   it is paid, whether they have been emailed) rather than sentences.
@@ -948,13 +967,21 @@ opening `/idioms/` with the same signed-in account.
   the editor still keeps it). Every value shares one type style, the
   meaning included (7 November 2026, Dan: "same font styles"). Optional
   themes use a lilac pill fill.
-- Reuse blue for Edit, soft lilac for Preview and publication changes, coral
-  for saving, and outline for Cancel/Done. Up/down buttons reorder the whole
-  collection; clear filters first. Every phone action is at least 44px.
-- The editor and preview use the shared flat lilac dialog, cream fields,
-  the same close button, backdrop dismissal, scroll lock and focus return.
-  Failed writes retain the draft. Discarding edits and deleting an expression
-  each require an explicit confirmation. Stale versions never overwrite an edit.
+- An expression is edited where it stands (10 November 2026; it was a
+  separate dialog): the pencil at the end of its title turns the card into
+  its own editor, the title and each line becoming fields in their own
+  places under the labels the card already shows, the reference link, image
+  and image description behind a small `Image and link` disclosure, and the
+  card ending in a quiet `Delete expression` chip, the tick and the cross.
+  `Add an expression` opens the same card, empty, at the head of the list.
+  A card's head is one line: its state, a quiet `Publish` or `Unpublish`
+  beside it, and the up/down arrows that reorder the whole collection (clear
+  filters first).
+- Failed writes keep the card open with what was typed. Discarding typed
+  changes and deleting an expression are each asked in the card's foot, in
+  place (`Discard your changes?`, `Delete “…”?`, a small coral button and
+  the cross); with nothing changed the cross and Escape close at once. Stale
+  versions never overwrite an edit.
 - Students' own versions (30 October 2026; moved 7 November 2026, Dan: "get
   rid of the notes and translations at the bottom, they can go in main
   bullets"): `Noutras línguas` is one of the painted reading's facts, after
@@ -965,16 +992,14 @@ opening `/idioms/` with the same signed-in account.
   Her `Translations to check` panel sits in the Expressions tab with a
   waiting count. See
   [the booking-system contract](../docs-booking-system.md#students-translations-of-an-expression).
-- `Preview as students see it` renders the same reading-card component, without
-  teacher actions or publication pills. The surrounding private-preview note
-  is for Inês only. Previewing a draft does not publish it.
+- There is no separate preview (10 November 2026): her card in the list is
+  the same reading-card component a student gets, so it already is that view.
 - A 26rem minimum card grid uses at most four columns, with cards aligned at
-  their tops and hugging their contents. Phones use one column. Edit, Preview
-  and Publish share one row, except at 320px where the last action may fill
-  its own row. The shared preview and try-out reading stay unchanged. All eight
+  their tops and hugging their contents. Phones use one column. The try-out
+  reading stays unchanged. All eight
   tabs remain reachable without horizontal page overflow, including at 320px.
-  Long expressions, notes and examples wrap within the card. Fields and actions
-  also fit a 320px dialog.
+  Long expressions, notes and examples wrap within the card, and its fields
+  and actions fit a 320px card while it is being edited.
 - All imported entries are drafts. The reference bundle has no usage examples
   or themes; leave those blank instead of inventing them. Publishing needs both
   meanings and at least one example. Preserve Inês's punctuation and accents.
@@ -1152,9 +1177,10 @@ lesson and €5 rules, with the full terms available by link.
 
 Use different treatments for neighbouring booking controls instead of two coral
 fills. Selected agreement uses blue beside the coral booking action. Weekly
-lesson management pairs blue `Move weekly time`, an outline `Stop repeating`, and
-coral `Cancel all booked lessons`; profile editing pairs coral `Save name` with
-blue `Send confirmation link`. Keep the existing labels and state indicators so
+lesson management has one filled button, coral `Move weekly time`, with `Stop
+repeating` and `Cancel all booked lessons` as outlines (10 November 2026:
+cancelling all is asked again, in coral, before it happens); profile editing
+ends a name in the coral tick and an email in blue `Send confirmation link`. Keep the existing labels and state indicators so
 colour is never the only way to tell the controls apart. A filled button that
 cannot act yet is drawn as the same quiet outline as the booking's final
 action, so coral and blue appear only when the action is live.
@@ -1318,17 +1344,18 @@ two.
 Choosing a free day keeps the four weeks in view on wide screens, with the day
 highlighted and its times beside it under the date, with no eyebrow above it
 to say what the times already say. On a phone the times take the calendar's
-place, headed by a short date (`Thu 24 Sept 2026`) with an outline `Change`
-beside it on the same row, which returns to the calendar (named `Change date`
-for assistive technology). Before a day is chosen there are no times to show,
+place, headed by a short date (`Thu 24 Sept 2026`) with the site's pencil
+beside it on the same row (10 November 2026; it was an outline `Change`),
+which returns to the calendar (named `Change date` for assistive technology). Before a day is chosen there are no times to show,
 so the times panel stays out of sight at every width and the calendar takes the
 whole row, as Your lessons does; a chosen day brings its times in beside it.
 `Soonest times` went on 9 October 2026, when Dan found it unnecessary. A window
 with nothing free says so beneath the calendar.
 
 Students can collect several single-lesson dates and confirm them together.
-Each chosen lesson is its own row: its own splat, the date and time, and one
-`Change`; the clock is named once, on the first row (`Porto time`, `Los
+Each chosen lesson is its own row: its own splat, the date and time, and the
+site's pencil at its end, the whole row answering to it (10 November 2026; it
+was an outline `Change`); the clock is named once, on the first row (`Porto time`, `Los
 Angeles time`). Beneath the rows a dashed card of the same shape,
 in the choices' blue with a plus mark (coral is kept for clashes), offers `Add
 another lesson`, or `Add a second weekly time` for weekly lessons; it is absent for a trial and once the limit is reached, and it
@@ -1451,11 +1478,12 @@ Preserve these desktop and mobile states:
   beneath it, with the sheet's own `Your lessons` back.
   Your details reads as a short list of what is saved rather than a form (10
   October 2026, at Dan's request): the student's splat, name, email and NIF,
-  each with its value and a quiet outline `Change` beside it, or `Add NIF`
-  where there is none. Changing one opens its field in place with its action
-  (`Save name`, `Send confirmation link`, `Save NIF`) and `Cancel`, and closes
-  once saved; only an open email carries a short note, the NIF's purpose being
-  in its label. A `Card` row follows the email where the site takes cards
+  each value its own button with a small pencil at its end (10 November
+  2026; it was an outline `Change`), named `Add NIF` where there is none.
+  Changing one opens its field in the value's place, ending in a tick and a
+  cross (`Send confirmation link` keeps its words), and closes once saved;
+  only an open email carries a short note, the NIF's purpose being its
+  field's placeholder. A `Card` row follows the email where the site takes cards
   (12 October 2026, Dan): `Saved`, `Saved for lessons you book` or `Not
   added`, with `Change` or `Add card`; opening it shows the confirm step's
   dabbed terms in place (the two €5 fees among them) and `Agree & add
@@ -1463,8 +1491,10 @@ Preserve these desktop and mobile states:
   paid to her by hand, Your lessons opens on one sheet card alone, its
   calendar held back until the card is agreed, the same card a payment link opens (2 November 2026, Dan: "just
   have it as one single thing"): a card icon in a lilac disc, `Confirm your
-  card payments`, `Paid at the end of each lesson` with `Porto time` over their
-  weekly run or the lessons she added as dashed tiles, the fee's two dabs, the
+  card payments`, `Porto time` over their weekly run or the lessons she added
+  as dashed tiles, then three dabs (when future lessons are charged, said as
+  a dab and not as a label over the tiles since 10 November 2026, and the
+  fee's two), the
   agreement capsule `I authorise card payments for my future lessons`, then `Agree &
   add card` alone: the card comes first, with no `Not now` (2 November 2026,
   Dan: "card first"), and only a card that can't go ahead (its lessons
@@ -1496,17 +1526,17 @@ Preserve these desktop and mobile states:
   chosen lessons do, each a smaller tile with its own splat, one line each
   (day and start, never wrapped; Dan: "always fits on the same line") under
   an `Outstanding lessons` label that names `Porto time` once for every tile,
-  then a receipt's ruled `Charged now €45` under the prices, worked out from
+  then `Charged now €45` under the prices as a receipt's total (with no rule
+  over it since 10 November 2026), worked out from
   the lessons whose charge time has passed (`Total` with `Charged at the end of
   each lesson` under it while none has). Their lessons still to come that
-  Inês added follow under `Then at the end of each lesson`, each weekly run once as
+  Inês added follow with no label of their own (10 November 2026), each weekly run once as
   `Every Tuesday, 17:00` in a dashed tile with the weekly lilac repeat mark
   (Dan: make it obvious it covers their weekly lessons), and the capsule
   reads `these and future lessons`. The dabs stay few (2 November 2026,
-  Dan: the list was too long, but "I liked the bullets they are cute"): the
-  labels and total say what is charged and when, so only the fee's two dabs
-  sit over the capsule, with `Future lessons are charged at the end of each lesson`
-  first only when no later lesson is shown. Inês gets the same tick list from an unpaid
+  Dan: the list was too long, but "I liked the bullets they are cute"): three
+  sit over the capsule, `Future lessons are charged at the end of each lesson`
+  always first (10 November 2026), then the fee's two. Inês gets the same tick list from an unpaid
   lesson's dialog (`Create payment link`, small outline, the opened lesson
   ticked) and from a student's card on Students (`Payment link`, nothing
   ticked): `Tick what Jess still owes` and `Their future lessons then go on
@@ -1518,8 +1548,9 @@ Preserve these desktop and mobile states:
   `Copy link`; the WhatsApp message is one short line
   in her voice and the link (2 November 2026, Dan: not wordy). In Inês's
   lesson dialog a lesson a card now pays for
-  offers the `Already paid` tick (below). The sign-in panel's small outline buttons read `Email a link` and
-  `Forgot password`, side by side down to a 360 px phone (27 October 2026, Dan); asking for a link is its own
+  offers the `Already paid` tick (below). The sign-in panel's other ways in read `Email a link` and
+  `Forgot password`, side by side down to a 360 px phone (27 October 2026, Dan),
+  as quiet chips in sentence case since 10 November 2026; asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.
   Text fields are 44 px tall, the usual touch height. The change dialog is
   the same flat lilac as every dialog, so its sliders' tracks and free days
@@ -1737,7 +1768,8 @@ calmer, without new content:
 - the lesson dialog drops the question that repeated its heading and buttons,
   and the rules around the lesson's date. Its pill is `Weekly lesson` only
   while the repeat is running, `Booked` once it stops, and `Cancelled` carries
-  the past lessons' ⊗. `Manage weekly lessons` is a compact outline button.
+  the past lessons' ⊗. `Manage weekly lessons` is a quiet chip at the end of the weekly line (10
+  November 2026; it was a compact outline button on a row of its own).
   Cancelling weekly lessons states what happens rather than asking again. A
   decision's pair of actions (`Yes, cancel it` / `Keep lesson` and the like)
   shares a row while both labels fit on one line, and stacks when they don't,
@@ -1957,8 +1989,9 @@ as a form:
   in their name (`Already one of your students`): everything she does here
   should take as few steps as it can. A lesson opens in the student's own dialog: the student
   with its status beside their name, the time in bold with its length and place
-  beneath, the `Already paid` and `No-show` ticks as one pair, then `Move lesson`
-  in coral beside `Cancel lesson`.
+  beneath, the `Already paid` and `No-show` ticks as one pair, then her other actions
+  as one row of quiet chips (10 November 2026; they were coral `Move lesson`
+  beside `Cancel lesson`).
   Confirming a change keeps to who and when (the Meet button, address and
   NIF step aside until `Back to lesson`): the question under a quiet rule,
   what it does as dabs (`Alex is emailed`, `It comes off your calendar`,
@@ -2100,10 +2133,14 @@ then `Join Google Meet` as a solid blue button carrying Meet's own mark, and the
 lesson's dabs (place, length, price and how it is paid). What she records sits
 together as one row of ticks, `Already paid` and `No-show` (named `Mark
 no-show` / `Undo no-show` for a screen reader), each the same capsule whose dab
-fills when ticked. Last, `Move lesson` in coral and `Cancel lesson` in outline
-share a row while both labels fit, with `Change length` in outline between
-them for a lesson still to come (not a trial). Moving opens under its own `Move this lesson`
-heading, as cancelling does under `Cancel this lesson?`, with what happens as a
+fills when ticked. Last, one wrapping row of quiet chips at their own width,
+the same at every width and the same as an open lesson in a student's card (10
+November 2026; they were a grid of loud buttons): `Homework`, `Move or cancel`,
+and `Change length` for a lesson still to come (not a trial), with `Create
+payment link` where one applies. `Join Google Meet` is the dialog's one filled
+button; a lesson in person has none. `Move or cancel` opens a `Move lesson |
+Cancel lesson` toggle whose pressed chip names the step, so moving and changing
+length carry no heading of their own; cancelling keeps `Cancel this lesson?`, with what happens as a
 dab (`Sam gets an email with the new time`). A weekly lesson with later weeks
 asks which with the lesson form's slider, `This lesson` or `Every week` (this
 one and every later week; 9 November 2026, Dan): Change length starts on
@@ -2129,8 +2166,9 @@ page, and for onboarding to feel easy:
   `Clear`, `Edit details`, `Mark as dormant`,
   `Reconnect Google Meet`, the sign-in panel's other ways in) is the site's
   small button: 40 px tall (44 px on touch), the compact label type, in
-  outline, or soft lilac where it adds something (`Show all`, `Add another
-  break`). It keeps its own width on a phone, where other buttons still run
+  outline, or, for a lesser action beside the thing it acts on (`Show all`,
+  `Add another break`), the quiet lilac chip in sentence case (10 November
+  2026). It keeps its own width on a phone, where other buttons still run
   full width. Disclosures that fold a rare choice away (`Set exact hours`,
   a clash list's rest, Meet's note, `Have a code from Inês?`) are the same
   small button and look pressed while open. Underlines stay for links inside sentences, the
@@ -2166,8 +2204,9 @@ time") took each busy place back to one voice:
   email breaks after its `@`;
 - a student's Welcome, Sign-in and Saved card panels name the address as their
   first dab (`Goes to sam@…`), never as a bare line after the dabs;
-- an expression's `Edit`, `Preview` and `Publish` are one family of lilac
-  buttons;
+- an expression's pencil, and its `Publish` beside its state, follow the
+  site's one pencil and one quiet chip (10 November 2026; they were a row of
+  lilac `Edit`, `Preview` and `Publish` buttons);
 - the card prompt and a payment approval state the fee once, the free part
   first (2 November 2026, Dan, the same words across the site): `**Free to
   change or cancel** a lesson up to 14 hours before`, then `**€5** to move or
@@ -2212,9 +2251,10 @@ gave an email, and only two had ever signed in.
   the total and the panel says `Asks them to pay €45 for 3 lessons. Nothing
   is charged until they agree.` A lesson paid in cash is ticked `Already
   paid` in their profile instead, and leaves what is open. While she ticks
-  (9 November 2026, Dan), a short block under the list keeps two things
-  apart: `Owed now`, the ticked total, charged once they agree, and `Future
-  lessons`, which are not owed yet and, if they agree, go on their card
+  (9 November 2026, Dan), a short list of dabs under the list keeps two things
+  apart (10 November 2026: dabs, no longer small-capital headings in a dashed
+  box): what is owed now, the ticked total, charged once they agree, and the
+  lessons to come, which are not owed yet and, if they agree, go on their card
   charged at the end of each lesson (the same words as the card page), each
   weekly run once (`Every Tuesday, 09:30–10:30 · €25 a lesson · 12 lessons to
   Tue 24 Nov`, never a row a week; weeks moved to another time are counted
@@ -2254,9 +2294,11 @@ gave an email, and only two had ever signed in.
   email row reads `Not added` with `Add email`.
 - Students' cards on a wide list each keep their own height, packed in
   columns, so a short card never leaves a hole under it.
-- `Time off`'s card lists what is `Coming up` (consecutive whole days as one
-  line, `Wed 25 Nov – Fri 27 Nov` / `3 days off`; hours as `Off 09:00–12:00`),
-  the next few and `And 3 more later on`; tapping one chooses it.
+- Beside the `Time off` month, `Coming up` lists what is set (consecutive
+  whole days as one line, `Wed 25 Nov – Fri 27 Nov` / `3 days off`; hours as
+  `Off 09:00–12:00`; an online-only stretch as `3 days online only`), the
+  next few and `And 3 more later on`; tapping one chooses it. With nothing
+  ahead it reads `Nothing off ahead`, and on a phone it is left out.
 - `Receipts` opens on last month during the first ten days of a month when
   last month still has receipts to issue and this one has none yet.
 - Notes and empty states speak at the hint size, never a paragraph's:
@@ -2351,7 +2393,8 @@ same job, they use the same piece, on a student's side and on Inês's:
   card and moving a lesson lose the month beside each week, at every width
   and while loading.
 - Every calendar key is the one small capital hand; the Time off month's key
-  joins the Timetable's and a student's. Its swatches stay its own days'.
+  joins the Timetable's and a student's. Each swatch is a small copy of the
+  day or cell it explains (10 November 2026; some were dots).
 - Every sign-in card is the one card. Inês's is no longer wider, and its
   heading is in the display hand.
 - On the Timetable, `Edit weekly hours` sits beside the month and the pager
@@ -2390,6 +2433,191 @@ same job, they use the same piece, on a student's side and on Inês's:
   on a tablet), and the field keeps its 26 rem.
 - The account's failure notice is laid out as booking's: across a wide page
   the message and `Try again` share one row.
+
+## Edit where it stands, and fewer lines — 10 November 2026
+
+Dan: "the edit button should let you edit it from that interface and not bring
+up a new one", "all instances of weird buttons taking up entire rows is bad",
+"do we need the dividers", "apply this logic across the entire system", and of
+the whole: "simple, intuitive, feels unique in its design and fun to use".
+These hold on a student's side and on Inês's, and replace the earlier bullets
+they contradict (the 14 px `Change` on a detail and on a chosen lesson, `Save
+name` and `Save NIF` as worded buttons, the two-across lesson tiles, `All
+students`, the rules between details, the label over the lessons a card pays
+for).
+
+**One way to change a value.**
+
+- A value that can be changed is its own button: the value, then a small
+  pencil at its end. Pressing either opens it. A thing with no words of its
+  own to press (a student's name beside the button that opens their card)
+  has the pencil alone beside it.
+- Pressed, the value becomes its field in the value's own place. Its name in
+  small capitals stays where it was. The field ends in a small coral tick
+  (save) and a quiet cross (cancel), each the pencil's size, on the field's
+  own line. Enter saves, Escape cancels, and focus returns to the value.
+  With nothing to save yet the tick waits as the quiet outline, never a faded
+  fill. What the field cannot save is said beneath it and it stays open.
+- Nothing opens a second panel or dialog to edit what is already on the
+  screen. A student's Your details, Inês's Profile and her students' cards
+  use the same pieces (`EditValue`, `InlineEdit`, `EditActions`, `CancelEdit`
+  in `components/teacher/EditControls.tsx`).
+- Where saving does something a tick cannot say (`Send confirmation link`,
+  `Agree & add card`), the open field keeps those words as its button, with
+  the same cross beside it.
+- The same pencil changes a chosen lesson while booking, at its row's end,
+  and a phone's chosen date; a press anywhere on the lesson's row opens it.
+
+**Buttons.**
+
+- A button is as wide as its words. It shares a line with the thing it acts
+  on, at that line's end, and never takes a row to itself; when it must wrap
+  it keeps its own width. The exceptions are the one main action of a step
+  (booking's Confirm, a card's `Agree & add card`) and a dialog's paired
+  buttons on a phone.
+- There are three weights and no more: the coral or blue filled button for
+  the one thing to do next; the outline for its pair (`Cancel`, `Sign out`,
+  `Not now`); and the quiet lilac chip in sentence case for a lesser action
+  beside the thing it acts on (`Show weeks`, `Record refund`, `Remove card`,
+  `Send reset link`, an open lesson's `Homework`, `Move or cancel` and
+  `Change length`). A question only some people have (`Have a code from
+  Inês?`) is a quiet underlined line of text, not a button.
+- A control that repeats another is removed, not moved: `All students` went
+  because an open student's Close already returns to the board.
+- On Inês's tabs the capital-letter filled lilac site button is retired for
+  lesser actions: the quiet chip is the third weight everywhere (`Edit
+  weekly hours`, `This week`, `Set exact hours`, a notice's `View`, `Download
+  CSV`, Time off's `Off` and `Online only`). A disclosure is that chip with a
+  chevron that turns, never a fill when open. A chip that is a state and not
+  a step (`Off`, `Online only`) is the deep blue of a chosen tab while it
+  holds. On a phone `Discard` and `Save` wrap together as a pair.
+- An alert's way on (`Try again`, `Message Inês`) keeps its own width at the
+  alert's end, on a phone as across a wide page.
+
+- A form that changes something saves only once something differs from what
+  is saved: a student's `Save changes` on `Choose a new date and time` waits
+  as the tick does, so a press never sends a move to the lesson's own time.
+- A set of choices about one thing has one filled button. A destructive
+  choice is an outline when a coral confirmation follows it (`Cancel all
+  booked lessons`, then `Yes, cancel all`).
+- A cancelled lesson has no `Done`: its cross closes it.
+
+**Lines, labels and words.**
+
+- Space and the small-capital labels group things; a rule is drawn only where
+  two different kinds of thing meet (a card's header and its body). Lists of
+  facts carry no rules between their rows, and a total needs none above it:
+  its place under the prices and its weight say what it is.
+- A heading is not used to say a fact. What a sentence can say as one of the
+  dabs is a dab: on the card page `Future lessons are charged at the end of
+  each lesson` is the first dab, the same sentence as on every other card
+  screen, and the lessons to come stand under no label of their own.
+- A link that belongs to a pill sits at the pill's right-hand side, beside
+  the words it belongs to (`Terms & privacy` in the authorise pill), so the
+  pill is no taller than those words.
+- Explanations shrink to what the control cannot say: the price editor's
+  three hints are one line; a NIF field's "optional, for your receipts" is
+  its placeholder, at sign-up and in Add a student as in Your details.
+- A tooltip or menu about one thing says it once: a day's tooltip names its
+  date once above its lessons, and a menu has no rules between places of one
+  kind, only where places meet an action (`Sign out`).
+- Money terms are dabs, never small-capital headings in a box (the invite's
+  owed-now and not-owed-yet lines).
+
+**Calendar marks.**
+
+Dan: "the underline and dot is ugly it doesn't fit our styling ... add it to
+the legend, do this across the entire site", then, of a first crosshatch,
+"a bit strong" and "distinct ways of showing it while being simple". A
+calendar's marks are drawn in the site's own hand, one way on every calendar
+(Inês's Timetable, Time off month and Add a lesson month; a student's booking
+and lessons calendars; the loading placeholder), and never an underline, a
+dot, or a word under the number:
+
+- Today is its date in the deep blue blob (the squiggle pill her Timetable
+  has always used, `.today-pill`). It marks the number alone, so it never
+  reads as a chosen day; on a day already filled in a deep colour (chosen,
+  the next lesson, a pressed day) the blob is paper. It keeps its strength
+  on a day that cannot be pressed. It explains itself, so no key lists it
+  (Dan: "does today need a little thing like that?").
+- A day off is hatched in lilac, with `Off`, as it always was.
+- A day with a lesson booked, on her side, takes one fine, faint hatch
+  leaning the other way (`--hatch-booked`), over whatever else the day is: a
+  day that is both shows both hatches. On her phone Timetable the same hatch
+  marks the tabs of days with lessons. A student's own booked day keeps its
+  tint with the lesson's time.
+- Online-only time is the one sky blue (below).
+- A cream day has times free; a day without lies flat. In Add a lesson a flat
+  day can still be pressed, since she can add a lesson at any time; until the
+  month's times are known every day keeps its cream.
+- A key lists the marks on its calendar that need saying, and no other. Each
+  swatch is a small copy of the day or cell it explains.
+
+**Online only, in one colour.**
+
+Dan: "label days as online only", "can we use a different colour on the
+timetable if it's online only", "can it also be obvious for her students when
+they try and book", "even if they book for in person can it show the days
+where there is online only as they may still buy in that case", and of the
+first editor (a button above the Timetable opening a dialog of date boxes,
+with a band across the page afterwards) "this is ugly".
+
+- One colour, `--online-only`, a soft sky blue, means online-only time on
+  every calendar, and the key names it. A day carries no globe for it (Dan,
+  of a globe in each day's corner: "is it necessary if it's already in the
+  legend what the colour means?"): the globe is kept for a lesson that is
+  online. The colour is not the only way to learn it: a day's spoken name
+  says "online only", pressing an online-only day says so in words, and her
+  chip is pressed.
+- Inês labels days the way she takes them off: she taps them on the Time off
+  month and presses `Online only` on the line at its foot, beside `Off`. The
+  chip wears the colour as its swatch (so it is its own key), is pressed
+  while every chosen day is online only, and takes the label off when
+  pressed again. Days already online only at set hours keep them when others
+  are added.
+- The chosen days' hours are one value under the chips, `All day` (or
+  `12:00–16:00`, or `Different hours`), edited where it stands: `All day |
+  Some hours` on the site's slider, two time fields, the tick and the cross.
+- Her Time off month tints online-only days; her Timetable draws weekly hours
+  inside online-only time in the colour and names it in the key while the
+  week has some. The Timetable shows it and does not edit it.
+- What happened shows on the month, the chip and `Coming up`, and is said to
+  a screen reader (`Tue 15 Sept is online only.`, `3 selected days can be
+  booked in Porto again.`), never a band across the page. A failed save
+  keeps her days chosen and says why beneath the choice. A lesson already
+  booked in person inside the hours is listed under `Clashes`.
+- For a student who has chosen In Porto, in booking and in `Choose a new date
+  and time`: a day free only online is tinted and can be pressed, where it
+  used to be blank. Pressed, it says `Online only on this
+  day` beside a quiet `Switch to online` chip and shows its times tinted, as
+  a list that cannot be chosen. A day with both kinds keeps its Porto times
+  and adds one line, `More times online`, with the same chip.
+- `Switch to online` is exactly pressing Online in Where. A student's place
+  never changes unless they press something that says so.
+
+**One layout for one kind of thing.**
+
+- A student's lessons on Inês's page are a ledger, one row each: day and
+  time, facts, then status, notes pencil and `Already paid` at the row's end,
+  in columns that line up down the list. A weekly run is a row of the same
+  kind with `Show weeks` at its end. Where the list is narrow a row folds in
+  two (day and pencil, then facts and money).
+- An open lesson is that same row: its day and time, what she does with it
+  as quiet chips at their own width (beside the day where there is room,
+  beneath it on a phone), `Already paid` at their end and the cross that
+  closes it at the row's end, where the closed row's pencil was. An online
+  lesson's call leads those chips as a filled pill their size, `Join Meet`
+  (Dan: the wide button on a row of its own "feels badly placed"); the wide
+  `Join Google Meet` button stays for a dialog, where it is the main action.
+- What was said about a lesson is one quiet quote with who said it (`You:
+  “…”`), never a labelled block. It follows the lesson's facts on the row's
+  own line where there is room, and wraps beneath them where there is not.
+- An open student's card has one top bar: their name, their three checks
+  beside it, her actions, then close (Dan: "could the little bits not appear
+  in the top bar"). The checks keep the bar while one of her panels is open,
+  and take a line of their own only on a phone and on a closed card in its
+  lane.
+- A saved price in Your details is a row like every other detail.
 
 ## One schedule for students — 9 November 2026
 

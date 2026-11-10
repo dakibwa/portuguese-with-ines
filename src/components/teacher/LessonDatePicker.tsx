@@ -2,7 +2,7 @@
 
 import { HOME_CLOCK, TUTOR_CITY } from "@/lib/tutor";
 import { useEffect, useRef, useState } from "react";
-import { TeacherPager } from "@/components/teacher/TeacherPager";
+import { MonthLabel, TeacherPager } from "@/components/teacher/TeacherPager";
 import { fetchAvailability, forgetAvailability, formatSlotTime, portoDateKey, portoTimeToUtc, type AvailabilityResponse } from "@/lib/booking-api";
 import { dateLabel, minuteLabel, mondayOf, shiftDate, WEEKDAYS } from "@/lib/teacher-calendar";
 
@@ -72,6 +72,8 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
   const loading = !current;
   const slots: AvailabilityResponse["slotsByDate"] = current?.slots ?? {};
   const dayInView = Boolean(date && date.startsWith(month.slice(0, 7)));
+  // Once the month's times are known, the days that have some are cream.
+  const timesKnown = Boolean(current && !current.error && !pastMonth);
   const selectedTimes = dayInView ? slots[date] ?? [] : [];
   const gone = dayInView && date <= today ? pastTimes(date, today, time, now) : [];
   const last = shiftDate(shiftMonth(month, 1), -1);
@@ -109,7 +111,7 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
     <div className="teacher-lesson-picker__layout">
       <div className="teacher-month">
         <div className="teacher-month-heading">
-          <h3 id={monthId} ref={heading} tabIndex={-1} aria-live="polite">{dateLabel(month, { month: "long", year: "numeric" })}</h3>
+          <h3 id={monthId} ref={heading} tabIndex={-1} aria-live="polite"><MonthLabel month={month} /></h3>
           <TeacherPager
             away={month !== currentMonth}
             headingRef={heading}
@@ -121,13 +123,13 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
             unit="month"
           />
         </div>
-        <div className="teacher-month-grid" aria-labelledby={monthId} ref={calendar}>
+        <div className={`teacher-month-grid${timesKnown ? " knows-times" : ""}`} aria-labelledby={monthId} ref={calendar}>
           {WEEKDAYS.map(day => <span className="teacher-month-weekday" aria-hidden="true" key={day.value}>{day.short}</span>)}
           {dates.map(key => <button
             aria-current={key === today ? "date" : undefined}
             aria-label={dateLabel(key)}
             aria-pressed={date === key}
-            className={`teacher-month-day${!key.startsWith(month.slice(0, 7)) ? " is-outside" : ""}${key < today ? " is-past" : ""}`}
+            className={`teacher-month-day${!key.startsWith(month.slice(0, 7)) ? " is-outside" : ""}${key < today ? " is-past" : ""}${slots[key]?.length ? " has-times" : ""}`}
             data-lesson-date={key}
             disabled={disabled}
             key={key}
@@ -149,12 +151,17 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
             }}
             tabIndex={key === focusDate ? 0 : -1}
             type="button"
-          ><span className="teacher-month-date">{Number(key.slice(-2))}</span>{slots[key]?.length ? <span className="teacher-month-booked" aria-hidden="true" /> : null}</button>)}
+          ><span className={`teacher-month-date${key === today ? " today-pill" : ""}`}>{Number(key.slice(-2))}</span></button>)}
         </div>
-        <p className="teacher-lesson-picker__key"><i aria-hidden="true" />Times available · {HOME_CLOCK}</p>
+        {/* Every mark on the month is in its key: a cream day has times free. */}
+        <div className="teacher-month-key teacher-lesson-picker__key">
+          {timesKnown ? <span><i className="is-free" aria-hidden="true" /> Times available · {HOME_CLOCK}</span> : null}
+        </div>
       </div>
       <div className="teacher-lesson-picker__times" aria-live="polite">
-        <h4>{dayInView ? dateLabel(date, { weekday: "short", day: "numeric", month: "short" }) : "Choose a day"}</h4>
+        {/* The legend already asks for a day: until one is chosen this
+            column is empty, and once it is, the day names its times. */}
+        {dayInView ? <h4>{dateLabel(date, { weekday: "short", day: "numeric", month: "short" })}</h4> : null}
         {loading ? <p role="status">Checking available times…</p> : current?.error ? <div className="teacher-inline-error" role="alert">
           <p>Available times couldn’t be checked.</p>
           <button className="button button--outline button--small" disabled={disabled} onClick={() => { forgetAvailability(); setRetry(value => value + 1); }} type="button">Try again</button>
@@ -178,8 +185,10 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
             onClick={() => onChange({ date: portoDateKey(new Date(slot.startAt)), time: formatSlotTime(slot.startAt), startAt: slot.startAt })}
             type="button"
           >{formatSlotTime(slot.startAt)}</button>)}
-        </div> : <p>No available times. Choose another day.</p> : <p>Its free times show here.</p>}
-        {date && time ? <p className="teacher-lesson-picker__chosen">Chosen: <strong>{dateLabel(date, { day: "numeric", month: "short" })}, {time}</strong> · {HOME_CLOCK}</p> : null}
+        </div> : <p>No available times. Choose another day.</p> : null}
+        {/* Said only while the month shown is another: in view, the day and
+            its pressed time already say it. */}
+        {date && time && !dayInView ? <p className="teacher-lesson-picker__chosen">Chosen: <strong>{dateLabel(date, { day: "numeric", month: "short" })}, {time}</strong> · {HOME_CLOCK}</p> : null}
       </div>
     </div>
   </fieldset>;
