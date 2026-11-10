@@ -59,6 +59,40 @@ export function normaliseBlockedSpans(blocks) {
   return merged.some((span) => span.start === 0 && span.end === 1440) ? null : merged;
 }
 
+/** Date ranges are inclusive; the same real span of teaching-clock time applies each day. */
+export function normaliseOnlineOnlyPeriods(periods) {
+  if (!Array.isArray(periods) || periods.length > 100) return null;
+  const ids = new Set();
+  const result = [];
+  for (const period of periods) {
+    if (typeof period?.id !== "string" || !/^[a-z0-9-]{1,64}$/i.test(period.id) || ids.has(period.id) ||
+        typeof period.fromDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(period.fromDate) || !parseDateKey(period.fromDate) ||
+        typeof period.toDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(period.toDate) || !parseDateKey(period.toDate) || period.toDate < period.fromDate ||
+        !Number.isInteger(period.startMinute) || !Number.isInteger(period.endMinute) ||
+        period.startMinute < 0 || period.endMinute > 1440 || period.endMinute <= period.startMinute) return null;
+    ids.add(period.id);
+    result.push({ id: period.id, fromDate: period.fromDate, toDate: period.toDate, startMinute: period.startMinute, endMinute: period.endMinute });
+  }
+  return result;
+}
+
+function onlineOnlySpans(periods, from, to) {
+  if (!periods.length) return [];
+  return eachDateKey(from, to).flatMap(key => blockedInstantSpans(key, periods
+    .filter(period => period.fromDate <= key && key <= period.toDate)
+    .map(period => ({ start: period.startMinute, end: period.endMinute }))));
+}
+
+/** A lesson crossing into an online-only period must also be online. */
+export function onlineOnlyProblem(settings, startAt, endAt, location) {
+  if (location !== "porto") return "";
+  const start = new Date(startAt), end = new Date(endAt);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return "";
+  const spans = onlineOnlySpans(settings.onlineOnlyPeriods, dateKey(start), dateKey(end));
+  return spans.some(span => overlaps(start.getTime(), end.getTime(), span.start, span.end))
+    ? "That time is online only. Choose Online or another time." : "";
+}
+
 /**
  * Candidate start times (minutes from midnight, Porto) for one day.
  *
@@ -109,8 +143,12 @@ function blockedInstantSpans(key, spans) {
 export async function loadSettings(env) {
   const { results } = await env.DB.prepare("SELECT key, value FROM settings").all();
   const settings = Object.fromEntries((results ?? []).map((row) => [row.key, row.value]));
+  const onlineOnlyPeriods = normaliseOnlineOnlyPeriods(JSON.parse(settings.online_only_periods ?? "[]"));
+  if (!onlineOnlyPeriods) throw new Error("Online-only availability could not be read.");
 
   return {
+    onlineOnlyPeriods,
+    onlineOnlyRevision: String(settings.online_only_revision ?? "0"),
     availabilityRevision: String(settings.availability_revision ?? "0"),
     minimumNoticeHours: Number(settings.minimum_notice_hours ?? tutorOf(env).defaults.noticeHours),
     // Matches what seed.sql writes. The two disagreed for a while, which meant
@@ -153,7 +191,7 @@ export async function listLessonTypes(env) {
  */
 export async function computeAvailability(
   env,
-  { fromKey, toKey, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false, teacher = false }
+  { fromKey, toKey, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false, teacher = false, location = "online" }
 ) {
   const settings = await loadSettings(env);
   const duration = Number(lessonType.duration_minutes);
@@ -242,6 +280,7 @@ export async function computeAvailability(
     ...(exceptionsByDate.get(key) ?? [])
   ].filter(exception => exception.kind === "blocked")
     .map(exception => ({ start: exception.start_minute ?? 0, end: exception.end_minute ?? 1440 }))));
+  if (!teacher && location === "porto") blocked.push(...onlineOnlySpans(settings.onlineOnlyPeriods, start, exceptionsEnd));
 
   const slotsByDate = {};
 
@@ -292,7 +331,7 @@ export async function computeAvailability(
  */
 export async function isSlotBookable(
   env,
-  { startAt, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false }
+  { startAt, lessonType, now, ignoreBookingId = null, ignoreSeriesId = null, ignoreHoldsOf = null, ignoreHorizon = false, location = "online" }
 ) {
   const start = new Date(startAt);
   if (Number.isNaN(start.getTime())) return { ok: false, reason: "That time could not be understood." };
@@ -306,11 +345,14 @@ export async function isSlotBookable(
     ignoreBookingId,
     ignoreSeriesId,
     ignoreHoldsOf,
-    ignoreHorizon
+    ignoreHorizon,
+    location
   });
 
   const match = (slotsByDate?.[key] ?? []).some((slot) => slot.startAt === start.toISOString());
   if (match) return { ok: true, endAt: new Date(start.getTime() + lessonType.duration_minutes * 60000), availabilityRevision: checkedSettings.availabilityRevision };
+  const placeProblem = onlineOnlyProblem(checkedSettings, start, new Date(start.getTime() + lessonType.duration_minutes * 60000), location);
+  if (placeProblem) return { ok: false, reason: placeProblem };
 
   /*
    * Say which of these it was. One message covered all of them, so a student

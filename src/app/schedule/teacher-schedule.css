@@ -2196,6 +2196,15 @@
 .teacher-timeoff-times > .teacher-quiet { justify-self: start; }
 .teacher-timeoff-time { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 0.5rem; align-items: end; }
 .teacher-timeoff-time input { width: 100%; min-width: 0; }
+.teacher-online-only-control { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; margin-bottom: 0.8rem; }
+.teacher-online-only-control > span { font-size: 0.75rem; color: var(--lavender-ink); }
+.teacher-online-only-form, .teacher-online-only-period { display: grid; gap: 0.8rem; min-width: 0; }
+.teacher-online-only-form > .button { justify-self: start; }
+.teacher-online-only-period { margin: 0; padding: 0.6rem 0 1rem; border: 0; border-bottom: 1px solid var(--rule); }
+.teacher-online-only-period legend { font-size: 0.8rem; font-weight: 600; }
+.teacher-online-only-form .teacher-online-only-allday { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; min-height: 44px; }
+.teacher-online-only-form .teacher-online-only-allday input { flex: none; width: 20px; height: 20px; min-height: 20px; padding: 0; accent-color: var(--blue-deep); }
+.teacher-online-only-form .teacher-online-only-allday > span { margin: 0; }
 /* At 320 px both times keep their digits whole. */
 @media (max-width: 360px) {
   .teacher-timeoff-time { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; gap: 0.35rem; }

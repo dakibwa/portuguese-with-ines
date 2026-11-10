@@ -35,6 +35,7 @@ Student on /book                                     (browse without an account)
 Legacy /my-lessons and /booking links resolve into /book without losing state
 Inês on /schedule                     (her own account, role=teacher)
   → GET/POST /admin/availability, /admin/exceptions
+  → POST /admin/online-only                          online-only date ranges and daily hours
   → GET  /admin/lesson-availability                 teacher lesson picker
   → POST /admin/exceptions/day                       one date's day off and blocked hours
   → GET  /admin/bookings, /admin/students            her lessons; her students and how far
@@ -1678,6 +1679,40 @@ get wrong:
 - `METHOD` is `REQUEST` for a booking or change, `CANCEL` for a cancellation.
 
 ### Time and availability
+
+**Online-only periods** (10 November 2026). The Timetable's `Online only`
+control opens a date-range editor. Each period includes both dates, and is
+either all day or the same From/Until hours each day, on the teaching clock.
+`00:00` as Until means the end of that day. Periods can be added, edited and
+removed; Save is explicit and a failed save keeps the draft. Expired periods
+are left out of the editor and pruned on its next save.
+
+These periods restrict the place of new student bookings, without adding
+teaching hours or overriding time off, notice, gaps or clashes. A lesson whose
+elapsed duration overlaps any part of a period must be online, including a
+90-minute lesson starting before it, an overnight lesson and repeated hours
+on a clock-change day. Touching the start or end without overlapping is allowed.
+`GET /availability?location=porto` omits those starts; the default is online.
+The booking calendar caches each place separately, checks retained selections
+when the place changes, and weekly previews use the selected place too.
+Booking writes, selections, moves (including online-to-Porto at the same time),
+weekly moves and future student-series extensions enforce the same rule.
+Unavailable later weeks are skipped under the existing series rules.
+
+Existing lessons keep their place and time. Inês can still deliberately add or
+move a lesson herself using her normal teacher override; an existing series
+she created keeps that override too. No period changes a lesson, sends mail,
+changes a meeting link or charges anyone.
+
+The bounded list (at most 100) lives as JSON in `settings.online_only_periods`;
+no migration is needed. `POST /admin/online-only` takes `{ periods,
+expectedRevision }`, with period fields `{ id, fromDate, toDate, startMinute,
+endMinute }`, and returns the saved list and its new `revision`.
+`GET /admin/availability` supplies `settings.onlineOnlyPeriods` and
+`settings.onlineOnlyRevision`. Saves check the teacher's live session and
+`online_only_revision` in the transaction, returning 409 for a stale editor,
+and bump `availability_revision` so already-planned booking writes cannot
+ignore a newly saved restriction. Deploy the Worker before the website.
 
 Instants are stored as ISO-8601 UTC. Inês's weekly hours are stored as
 minutes-from-midnight in Porto time and resolved against `Europe/Lisbon` at query

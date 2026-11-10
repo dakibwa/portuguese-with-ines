@@ -214,34 +214,40 @@ await test("a late lesson checks bookings after midnight before offering its sta
   assert.deepEqual(slotsByDate["2026-11-02"].map(slot => slot.startAt), ["2026-11-02T23:00:00.000Z"]);
 });
 
-await test("time off follows elapsed lessons across midnight and both clock changes", async () => {
-  for (const scenario of [
-    { day: "2026-11-02", minute: 1410, duration: 60, blockedDay: "2026-11-03", blockedStart: null, blockedEnd: null, free: false },
-    { day: "2027-03-28", minute: 30, duration: 60, blockedStart: 120, blockedEnd: 180, free: false },
-    { day: "2027-03-28", minute: 30, duration: 60, blockedStart: 60, blockedEnd: 120, free: true },
-    { day: "2027-03-28", minute: 30, duration: 60, blockedStart: 90, blockedEnd: 150, free: false },
-    { day: "2026-10-25", minute: 45, duration: 90, blockedStart: 120, blockedEnd: 180, free: true },
-    { day: "2026-10-25", minute: 45, duration: 60, blockedStart: 60, blockedEnd: 90, free: false },
-    { day: "2026-10-25", minute: 75, duration: 60, blockedStart: 60, blockedEnd: 90, free: false },
-    { day: "2026-10-25", minute: 90, duration: 60, blockedStart: 60, blockedEnd: 90, free: true }
-  ]) {
-    const blockedDay = scenario.blockedDay ?? scenario.day;
-    const env = { DB: { prepare(sql) {
-      let values = [];
-      return {
-        bind(...args) { values = args; return this; },
-        async all() {
-          if (sql.includes("FROM availability_rules")) return { results: [{ weekday: weekdayOf(scenario.day), start_minute: scenario.minute, last_start_minute: scenario.minute }] };
-          if (sql.includes("FROM availability_exceptions") && blockedDay >= values[0] && blockedDay <= values[1]) return { results: [{ date: blockedDay, kind: "blocked", start_minute: scenario.blockedStart, end_minute: scenario.blockedEnd }] };
-          return { results: [] };
-        }
-      };
-    } } };
-    const { slotsByDate } = await computeAvailability(env, {
-      fromKey: scenario.day, toKey: scenario.day, lessonType: { duration_minutes: scenario.duration },
-      now: new Date(`${addDaysToKey(scenario.day, -2)}T08:00:00Z`)
-    });
-    assert.equal(Boolean(slotsByDate[scenario.day]?.length), scenario.free, scenario.day);
+await test("time off and online-only hours follow elapsed lessons across midnight and both clock changes", async () => {
+  for (const mode of ["blocked", "online-only"]) {
+    for (const scenario of [
+      { day: "2026-11-02", minute: 1410, duration: 60, blockedDay: "2026-11-03", blockedStart: null, blockedEnd: null, free: false },
+      { day: "2027-03-28", minute: 30, duration: 60, blockedStart: 120, blockedEnd: 180, free: false },
+      { day: "2027-03-28", minute: 30, duration: 60, blockedStart: 60, blockedEnd: 120, free: true },
+      { day: "2027-03-28", minute: 30, duration: 60, blockedStart: 90, blockedEnd: 150, free: false },
+      { day: "2026-10-25", minute: 45, duration: 90, blockedStart: 120, blockedEnd: 180, free: true },
+      { day: "2026-10-25", minute: 45, duration: 60, blockedStart: 60, blockedEnd: 90, free: false },
+      { day: "2026-10-25", minute: 75, duration: 60, blockedStart: 60, blockedEnd: 90, free: false },
+      { day: "2026-10-25", minute: 90, duration: 60, blockedStart: 60, blockedEnd: 90, free: true }
+    ]) {
+      const blockedDay = scenario.blockedDay ?? scenario.day;
+      const env = { DB: { prepare(sql) {
+        let values = [];
+        return {
+          bind(...args) { values = args; return this; },
+          async all() {
+            if (mode === "online-only" && sql.includes("FROM settings")) return { results: [{ key: "online_only_periods", value: JSON.stringify([
+              { id: "clock-test", fromDate: blockedDay, toDate: blockedDay, startMinute: scenario.blockedStart ?? 0, endMinute: scenario.blockedEnd ?? 1440 }
+            ]) }] };
+            if (sql.includes("FROM availability_rules")) return { results: [{ weekday: weekdayOf(scenario.day), start_minute: scenario.minute, last_start_minute: scenario.minute }] };
+            if (mode === "blocked" && sql.includes("FROM availability_exceptions") && blockedDay >= values[0] && blockedDay <= values[1]) return { results: [{ date: blockedDay, kind: "blocked", start_minute: scenario.blockedStart, end_minute: scenario.blockedEnd }] };
+            return { results: [] };
+          }
+        };
+      } } };
+      const { slotsByDate } = await computeAvailability(env, {
+        fromKey: scenario.day, toKey: scenario.day, lessonType: { duration_minutes: scenario.duration },
+        location: "porto",
+        now: new Date(`${addDaysToKey(scenario.day, -2)}T08:00:00Z`)
+      });
+      assert.equal(Boolean(slotsByDate[scenario.day]?.length), scenario.free, `${mode}: ${scenario.day}`);
+    }
   }
 });
 

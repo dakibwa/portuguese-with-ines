@@ -186,6 +186,79 @@ async function googleCredential(claims) {
   return `${payload}.${signature}`;
 }
 
+await test("online-only periods are teacher-owned, versioned, and protect new bookings and changes", async () => {
+  const keys = ["online_only_periods", "online_only_revision", "availability_revision"];
+  const original = keys.map(key => db.prepare("SELECT value FROM settings WHERE key=?").get(key)?.value);
+  const period = { id: "online-period", fromDate: "2026-09-07", toDate: "2026-09-14", startMinute: 720, endMinute: 840 };
+  let existing;
+  try {
+    for (const user of [null, "alice"]) {
+      assert.equal((await call("/admin/online-only", { user, body: { periods: [period], expectedRevision: "0" } })).status, 401);
+    }
+    for (const invalid of [
+      { ...period, toDate: "2026-09-06" }, { ...period, fromDate: "2026-02-30" },
+      { ...period, endMinute: 720 }, { ...period, startMinute: -1 }, { ...period, endMinute: 1441 }
+    ]) assert.equal((await call("/admin/online-only", { user: "teacher", body: { periods: [invalid], expectedRevision: "0" } })).status, 400);
+    const saved = await call("/admin/online-only", { user: "teacher", body: { periods: [period], expectedRevision: "0" } });
+    assert.equal(saved.status, 200, await saved.clone().text());
+    assert.equal((await saved.json()).revision, "1");
+    assert.equal((await call("/admin/online-only", { user: "teacher", body: { periods: [], expectedRevision: "0" } })).status, 409, "A stale editor cannot erase another save");
+    const schedule = await (await call("/admin/availability", { user: "teacher", method: "GET" })).json();
+    assert.deepEqual(schedule.settings.onlineOnlyPeriods, [period]);
+
+    const query = "/availability?lessonType=single&from=2026-09-07&to=2026-09-15";
+    const online = await (await call(query, { method: "GET", user: null })).json();
+    const porto = await (await call(`${query}&location=porto`, { method: "GET", user: null })).json();
+    const has = (reply, day, start) => reply.slotsByDate[day]?.some(slot => slot.startAt === `${day}T${start}:00.000Z`);
+    assert.ok(has(online, "2026-09-07", "11:00"));
+    assert.ok(!has(porto, "2026-09-07", "11:00"));
+    assert.ok(!has(porto, "2026-09-14", "11:00"), "The final date is included");
+    assert.ok(has(porto, "2026-09-15", "11:00"), "Both places return after the period");
+    assert.ok(has(porto, "2026-09-07", "10:00"), "A lesson ending exactly at the restriction is allowed");
+    const longer = await (await call(`${query.replace("single", "long")}&location=porto`, { method: "GET", user: null })).json();
+    assert.ok(!has(longer, "2026-09-07", "10:00"), "The full 90-minute lesson must fit");
+    const teacher = await (await call(`/admin/lesson-availability${query.slice(query.indexOf("?"))}&location=porto`, { method: "GET", user: "teacher" })).json();
+    assert.ok(has(teacher, "2026-09-07", "11:00"), "Inês retains her deliberate booking override");
+
+    for (const times of [{ startAt: "2026-09-07T11:00:00Z" }, { startAts: ["2026-09-07T09:00:00Z", "2026-09-07T11:00:00Z"] }]) {
+      const refused = await call("/bookings", { body: { lessonType: "single", location: "porto", ...times } });
+      assert.equal(refused.status, 409, await refused.clone().text());
+      assert.match(await refused.text(), /online only/);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings").get().n, 0, "A refused selection books nothing");
+    }
+    const previewBody = { lessonType: "single", startAt: "2026-09-07T11:00:00Z", weeks: 4 };
+    const preview = await (await call("/bookings/series/preview", { body: { ...previewBody, location: "porto" } })).json();
+    assert.equal(preview.skipped.length, 2);
+    const onlinePreview = await (await call("/bookings/series/preview", { body: { ...previewBody, location: "online" } })).json();
+    assert.equal(onlinePreview.skipped.length, 0);
+
+    existing = linkedBooking("online-only-existing", { start: "2026-09-07T11:00:00.000Z", end: "2026-09-07T12:00:00.000Z" });
+    const current = await (await call(`${query}&manage=${await token(existing)}`, { method: "GET" })).json();
+    assert.equal(current.currentSlotOnlineOnly, true, "The change form must not restore this time for an online-to-Porto switch");
+    const move = await call(`/bookings/${await token(existing)}/reschedule`, { body: { startAt: "2026-09-07T11:00:00Z", location: "porto" } });
+    assert.equal(move.status, 409, await move.clone().text());
+    assert.match(await move.text(), /online only/);
+    assert.equal(db.prepare("SELECT location FROM bookings WHERE id=?").get(existing).location, "online");
+
+    beforeRun = sql => {
+      if (sql.includes("SELECT 'online_only_periods'")) db.prepare("UPDATE students SET role='student' WHERE id='teacher'").run();
+    };
+    assert.equal((await call("/admin/online-only", { user: "teacher", body: { periods: [], expectedRevision: "1" } })).status, 401);
+    assert.equal(db.prepare("SELECT value FROM settings WHERE key='online_only_revision'").get().value, "1", "Revoked authority cannot write");
+    beforeRun = null;
+    db.prepare("UPDATE students SET role='teacher' WHERE id='teacher'").run();
+    assert.equal((await call("/admin/online-only", { user: "teacher", body: { periods: [], expectedRevision: "1" } })).status, 200);
+    assert.equal(db.prepare("SELECT location FROM bookings WHERE id=?").get(existing).location, "online", "Saving never changes existing lessons");
+  } finally {
+    beforeRun = null;
+    db.prepare("UPDATE students SET role='teacher' WHERE id='teacher'").run();
+    if (existing) db.prepare("DELETE FROM bookings WHERE id=?").run(existing);
+    keys.forEach((key, index) => original[index] === undefined
+      ? db.prepare("DELETE FROM settings WHERE key=?").run(key)
+      : db.prepare("INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)").run(key, original[index]));
+  }
+});
+
 await test("the seeded 14-hour rule filters availability and protects booking and move submissions", async () => {
   const extra = db.prepare(`INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,created_at)
     VALUES ('2026-09-06','extra',30,120,?)`).run(new Date().toISOString()).lastInsertRowid;

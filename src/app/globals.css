@@ -45,6 +45,11 @@
   --raised: var(--paper-light);
   --booked: #f9ddcc;
   --weekly: #d2cce6;
+  /* Time that can only be booked online (10 November 2026, Dan: "a different
+     colour on the timetable if it's online only"). One soft sky blue with one
+     meaning, on Inês's timetable and month and on a student's booking
+     calendar, always beside the globe so it never rests on colour alone. */
+  --online-only: #cfe4f6;
   /*
    * The colours the design system lists as "set in code" (9 November 2026),
    * named once here so every button, menu and dialog draws from the same
