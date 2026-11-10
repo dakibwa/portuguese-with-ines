@@ -53,6 +53,8 @@ export type MyBooking = {
   addedByTeacher?: boolean;
   /** Inês has been paid for it by hand, so no card is asked for it. */
   paidByHand?: boolean;
+  /** A cancelled lesson still to come that can be booked again now. */
+  canRebook?: boolean;
   manageToken: string;
 };
 
@@ -257,6 +259,9 @@ export function requestPasswordReset(email: string) {
     return data;
   });
 }
+
+/** What is said once a sign-in link has been asked for, wherever it was asked. */
+export const SIGN_IN_LINK_SENT = "If you have an account, a link is on its way.";
 
 /** One-click sign-in by email, for an account that already exists. */
 export function requestSignInLink(email: string) {

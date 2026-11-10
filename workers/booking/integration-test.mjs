@@ -6091,6 +6091,247 @@ await test("a weekly time change keeps Porto's wall clock across the March clock
   }
 });
 
+// 10 November 2026, Dan relaying Inês: a student who cancelled "can see the
+// time still available" and take it back. Book again makes a new lesson from
+// the cancelled one's own link; the cancelled row is never revived.
+const rebook = (manage, expectedPriceCents) => call(`/bookings/${manage}/rebook`, { user: null, body: { expectedPriceCents } });
+const rebookOffered = async (manage) => {
+  const reply = await (await call(`/bookings/${manage}`, { user: null, method: "GET" })).json();
+  return [reply.canRebook, reply.rebookPriceCents];
+};
+const forgetRebookLimits = () => db.prepare("DELETE FROM request_limits WHERE key LIKE 'rebook:%'").run();
+/** One of a student's lessons, cancelled by them well ahead from its link, then changed as a case needs. */
+async function cancelledLesson(owner, name, start, patch = {}) {
+  const id = crypto.randomUUID();
+  booking(id, { owner, start, end: new Date(Date.parse(start) + 3600000).toISOString(), reference: name });
+  db.prepare("UPDATE bookings SET status='cancelled', cancelled_by='student', cancelled_at=?, sequence=1, amount_cents=2500 WHERE id=?").run(new Date().toISOString(), id);
+  for (const [column, value] of Object.entries(patch)) db.prepare(`UPDATE bookings SET ${column}=? WHERE id=?`).run(value, id);
+  return { id, manage: await token(id) };
+}
+
+await test("a student Inês set up books their cancelled weekly lesson again: a new lesson in the run at the same time and price, emailed once each way", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  // Set up by hand: never signed in, no password, no card, address unproven.
+  const email = "rebook-hand@example.invalid";
+  db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('hana',?,'Hana Hand','',?)").run(email, new Date().toISOString());
+  sessions.hana = await createSession("hana", env.BOOKING_TOKEN_SECRET);
+  captureEmail();
+  Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "1", TEACHER_EMAIL: "ines@example.invalid" });
+  try {
+    // Wednesdays at 11:00 in Porto, paid to her directly, outside her published hours.
+    const added = await call("/admin/bookings", { user: "teacher", body: { studentId: "hana", lessonType: "single", startAt: "2026-09-16T10:00:00.000Z", repeat: 4 } });
+    assert.equal(added.status, 201, await added.clone().text());
+    await drain();
+    const rows = () => db.prepare("SELECT * FROM bookings WHERE student_id='hana' ORDER BY starts_at, created_at").all();
+    const [first, second] = rows();
+    assert.deepEqual([first.added_by_teacher, first.payment_status, first.amount_cents], [1, "not_required", 2500]);
+    const manage = await token(first.id);
+    assert.equal((await call(`/bookings/${manage}/cancel`, { user: null, body: { expectedLateFeeCents: 0 } })).status, 200);
+    await drain();
+    // Bob's lesson ends as hers begins: her lesson keeps no gap, as when she adds one.
+    booking("bob-before-hana", { owner: "bob", start: "2026-09-16T09:00:00.000Z", end: "2026-09-16T10:00:00.000Z" });
+    const cancelled = { ...db.prepare("SELECT * FROM bookings WHERE id=?").get(first.id) };
+    const listed = async () => (await (await call("/me", { user: "hana", method: "GET" })).json()).bookings.find((row) => row.reference === first.reference);
+    assert.deepEqual(await rebookOffered(manage), [true, 2500]);
+    assert.equal((await (await call(`/bookings/${manage}`, { user: null, method: "GET" })).json()).rebookPayment, "direct", "paid to her, as before");
+    const offeredInList = await listed();
+    assert.deepEqual([offeredInList.canRebook, offeredInList.rebookPriceCents, offeredInList.rebookPayment], [true, 2500, "direct"]);
+    sentEmails.length = 0;
+
+    const again = await rebook(manage, 2500);
+    assert.equal(again.status, 201, await again.clone().text());
+    const reply = await again.json();
+    const lesson = db.prepare("SELECT * FROM bookings WHERE id=?").get(await readManageToken(reply.manageToken, env.BOOKING_TOKEN_SECRET));
+    assert.deepEqual([reply.emailed, reply.booking.reference, reply.booking.status, reply.booking.addedByTeacher, reply.booking.paymentStatus],
+      [true, lesson.reference, "confirmed", true, "not_required"]);
+    assert.notEqual(lesson.id, first.id);
+    assert.notEqual(lesson.reference, first.reference);
+    assert.deepEqual([lesson.status, lesson.sequence, lesson.series_id, lesson.starts_at, lesson.ends_at, lesson.amount_cents, lesson.added_by_teacher,
+      lesson.payment_status, lesson.payment_consent_version, lesson.student_id, lesson.location],
+    ["confirmed", 0, first.series_id, first.starts_at, first.ends_at, 2500, 1, "not_required", null, "hana", "online"]);
+    assert.deepEqual({ ...db.prepare("SELECT * FROM bookings WHERE id=?").get(first.id) }, cancelled, "the cancelled lesson is untouched");
+
+    await drain();
+    const toStudent = sentEmails.filter((mail) => mail.to[0] === email);
+    const toInes = sentEmails.filter((mail) => mail.to[0] === "ines@example.invalid");
+    assert.deepEqual([toStudent.length, toInes.length], [1, 1]);
+    assert.match(toStudent[0].subject, /^Your Portuguese lesson is booked — /);
+    assert.match(toStudent[0].text, /€25 · pay Inês as usual/);
+    assert.match(toInes[0].subject, /^Booked again after cancelling — Hana Hand, /);
+    assert.match(toInes[0].text, /Hana Hand cancelled this lesson and has booked it again\./);
+    const ics = Buffer.from(toStudent[0].attachments[0].content, "base64").toString("utf8").replace(/\r\n /g, "");
+    assert.ok(ics.includes(`UID:booking-${lesson.id}@`) && /SEQUENCE:0\r?\n/.test(ics), "a new calendar entry");
+    assert.ok(!ics.includes(`UID:booking-${first.id}@`));
+
+    // A second press, or a second tab, finds the time taken by their own lesson.
+    sentEmails.length = 0;
+    const twice = await rebook(manage, 2500);
+    assert.equal(twice.status, 409);
+    assert.equal((await twice.json()).error, "You already have this lesson.");
+    assert.equal(rows().length, 5);
+    assert.deepEqual(await rebookOffered(manage), [false, undefined]);
+    assert.equal((await listed()).canRebook, false);
+
+    // A run stopped since: the lesson booked again stands on its own.
+    assert.equal((await call(`/bookings/${await token(second.id)}/cancel`, { user: null, body: { expectedLateFeeCents: 0 } })).status, 200);
+    db.prepare("UPDATE booking_series SET status='ended' WHERE id=?").run(first.series_id);
+    const alone = await rebook(await token(second.id), 2500);
+    assert.equal(alone.status, 201, await alone.clone().text());
+    assert.equal(db.prepare("SELECT series_id FROM bookings WHERE reference=?").get((await alone.json()).booking.reference).series_id, null);
+  } finally {
+    releaseEmail();
+    Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0" }); delete env.TEACHER_EMAIL;
+    delete sessions.hana;
+    forgetRebookLimits();
+    db.prepare("DELETE FROM bookings WHERE id='bob-before-hana'").run();
+    forgetStudent(email);
+  }
+});
+
+await test("Book again refuses all but their own free, settled cancellation, outside the notice window, free of other lessons and time off, at their price, writing and sending nothing", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const email = "rita@example.invalid";
+  db.prepare("INSERT INTO students (id,email,name,password_hash,created_at,stripe_customer_id,stripe_payment_method) VALUES ('rita',?,'Rita Refused','',?,'cus_rita','pm_rita')")
+    .run(email, new Date().toISOString());
+  const periods = db.prepare("SELECT value FROM settings WHERE key='online_only_periods'").get()?.value;
+  const exceptions = [];
+  captureEmail();
+  Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "1", TEACHER_EMAIL: "ines@example.invalid" });
+  const before = { charges: charges.length, refunds: refunds.length };
+  try {
+    // Since she cancelled: Bob's lesson 5 minutes before hers, inside the 15-minute gap a student's lesson keeps.
+    booking("bob-in-the-way", { owner: "bob", start: "2026-10-12T08:55:00.000Z", end: "2026-10-12T09:55:00.000Z" });
+    // A day off, and hours off from 11:30 in Porto across her 11:00 lesson.
+    for (const [date, start, end] of [["2026-10-13", null, null], ["2026-10-14", 690, 780]]) {
+      exceptions.push(db.prepare("INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,note,created_at) VALUES (?,'blocked',?,?,'',?)")
+        .run(date, start, end, new Date().toISOString()).lastInsertRowid);
+    }
+    db.prepare("INSERT OR REPLACE INTO settings VALUES ('online_only_periods', ?)")
+      .run(JSON.stringify([{ id: "rebook-online", fromDate: "2026-10-15", toDate: "2026-10-15", startMinute: 600, endMinute: 720 }]));
+
+    const refused = [
+      ["by-ines", "2026-10-05T10:00:00.000Z", { cancelled_by: "teacher" }, /^Only a lesson you cancelled yourself/],
+      ["late", "2026-10-06T10:00:00.000Z", { same_day_change: 1, same_day_fee_status: "scheduled", same_day_fee_cents: 500 }, /cancelled late/],
+      ["refunded", "2026-10-07T10:00:00.000Z", { payment_status: "refunded", stripe_payment_intent: "pi_rebook_refunded" }, /payment to sort out/],
+      ["refund-on-record", "2026-10-09T10:00:00.000Z", {}, /payment to sort out/],
+      ["charge-started", "2026-10-10T10:00:00.000Z", { charge_started_at: "2026-09-04T10:00:00.000Z" }, /payment to sort out/],
+      ["paid-by-hand", "2026-10-08T10:00:00.000Z", { payment_status: "not_required", payment_consent_version: "paid-by-hand", added_by_teacher: 1 }, /payment to sort out/],
+      ["too-close", new Date(Date.now() + 13 * 3600000).toISOString(), {}, /too close now/],
+      ["in-the-way", "2026-10-12T10:00:00.000Z", {}, /taken since/],
+      ["day-off", "2026-10-13T10:00:00.000Z", {}, /taken that time off since/],
+      ["hours-off", "2026-10-14T10:00:00.000Z", {}, /taken that time off since/],
+      ["online-only", "2026-10-15T10:00:00.000Z", { location: "porto" }, /online only/],
+      ["no-longer-free", "2026-10-17T10:00:00.000Z", { payment_status: "free" }, /no longer free/]
+    ];
+    const count = () => db.prepare("SELECT COUNT(*) AS n FROM bookings").get().n;
+    for (const [name, start, patch, problem] of refused) {
+      const lesson = await cancelledLesson("rita", `rebook-${name}`, start, patch);
+      if (name === "refunded" || name === "refund-on-record") {
+        db.prepare("INSERT INTO booking_refunds (booking_id,request,requested_by,status,created_at) VALUES (?,'{}','student','completed',?)").run(lesson.id, new Date().toISOString());
+      }
+      const snapshot = { ...db.prepare("SELECT * FROM bookings WHERE id=?").get(lesson.id) };
+      const rows = count();
+      assert.deepEqual(await rebookOffered(lesson.manage), [false, undefined], name);
+      forgetRebookLimits();
+      const response = await rebook(lesson.manage, 2500);
+      assert.equal(response.status, 409, name);
+      assert.match((await response.json()).error, problem, name);
+      assert.equal(count(), rows, `${name}: nothing is written`);
+      assert.deepEqual({ ...db.prepare("SELECT * FROM bookings WHERE id=?").get(lesson.id) }, snapshot, name);
+    }
+
+    // Their price for that length is the one it is booked at; another is refused.
+    const priced = await cancelledLesson("rita", "rebook-price", "2026-10-16T10:00:00.000Z");
+    assert.deepEqual(await rebookOffered(priced.manage), [true, 2500]);
+    const rows = count();
+    forgetRebookLimits();
+    const wrong = await rebook(priced.manage, 1500);
+    assert.equal(wrong.status, 409);
+    assert.match((await wrong.json()).error, /price has changed/);
+    assert.equal(count(), rows);
+
+    // Eight presses in fifteen minutes, then a wait, as a payment link is limited.
+    for (let press = 1; press < 8; press += 1) assert.equal((await rebook(priced.manage, 1500)).status, 409);
+    assert.equal((await rebook(priced.manage, 2500)).status, 429);
+    assert.equal(count(), rows);
+
+    await drain();
+    assert.deepEqual(sentEmails, [], "no email for a refusal");
+    assert.deepEqual({ charges: charges.length, refunds: refunds.length }, before);
+  } finally {
+    releaseEmail();
+    Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0" }); delete env.TEACHER_EMAIL;
+    forgetRebookLimits();
+    if (periods === undefined) db.prepare("DELETE FROM settings WHERE key='online_only_periods'").run();
+    else db.prepare("INSERT OR REPLACE INTO settings VALUES ('online_only_periods', ?)").run(periods);
+    for (const id of exceptions) db.prepare("DELETE FROM availability_exceptions WHERE id=?").run(id);
+    db.prepare("DELETE FROM booking_refunds WHERE booking_id IN (SELECT id FROM bookings WHERE student_id='rita')").run();
+    db.prepare("DELETE FROM bookings WHERE id='bob-in-the-way'").run();
+    forgetStudent(email);
+  }
+});
+
+await test("a lesson the student booked on their card is booked again on it, agreed afresh; with no card now it is refused; nothing is charged", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const email = "carla@example.invalid";
+  db.prepare("INSERT INTO students (id,email,name,password_hash,created_at,stripe_customer_id,stripe_payment_method) VALUES ('carla',?,'Carla Card','',?,'cus_carla','pm_carla')")
+    .run(email, new Date().toISOString());
+  const before = { charges: charges.length, refunds: refunds.length, checkouts: checkoutRequests.length };
+  try {
+    const own = await cancelledLesson("carla", "rebook-own-card", "2026-10-19T10:00:00.000Z",
+      { payment_consent_at: "2026-09-01T08:00:00.000Z", payment_consent_version: "2026-09-01-after-lesson-v1" });
+    const again = await rebook(own.manage, 2500);
+    assert.equal(again.status, 201, await again.clone().text());
+    const lesson = db.prepare("SELECT * FROM bookings WHERE reference=?").get((await again.json()).booking.reference);
+    assert.deepEqual([lesson.payment_status, lesson.payment_consent_at, lesson.payment_consent_version, lesson.added_by_teacher, lesson.amount_cents],
+      ["scheduled", new Date().toISOString(), "2026-09-21-fourteen-hours-v1", 0, 2500], "on their card, agreed today on today's terms");
+    await drain();
+
+    db.prepare("UPDATE students SET stripe_payment_method=NULL WHERE id='carla'").run();
+    const cardless = await cancelledLesson("carla", "rebook-no-card", "2026-10-20T10:00:00.000Z");
+    assert.deepEqual(await rebookOffered(cardless.manage), [false, undefined]);
+    const refused = await rebook(cardless.manage, 2500);
+    assert.equal(refused.status, 409);
+    assert.match((await refused.json()).error, /no saved card now, so please book this lesson from the calendar/);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id='carla'").get().n, 3);
+    await drain();
+    assert.deepEqual({ charges: charges.length, refunds: refunds.length, checkouts: checkoutRequests.length }, before);
+  } finally {
+    forgetRebookLimits();
+    forgetStudent(email);
+  }
+});
+
+await test("a lesson Inês added for a student with a standing card is booked again on that card, as a lesson she adds would be", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const email = "sian@example.invalid";
+  const agreed = "2026-09-01T09:00:00.000Z";
+  db.prepare(`INSERT INTO students (id,email,name,password_hash,created_at,email_verified_at,card_consent_at,stripe_customer_id,stripe_payment_method)
+    VALUES ('sian',?,'Sian Standing','',?,?,?,'cus_sian','pm_sian')`).run(email, new Date().toISOString(), agreed, agreed);
+  const before = charges.length;
+  try {
+    const added = await call("/admin/bookings", { user: "teacher", body: { studentId: "sian", lessonType: "single", startAt: "2026-10-21T10:00:00.000Z" } });
+    assert.equal(added.status, 201, await added.clone().text());
+    const first = db.prepare("SELECT * FROM bookings WHERE student_id='sian'").get();
+    assert.equal(first.payment_status, "scheduled");
+    const manage = await token(first.id);
+    assert.equal((await call(`/bookings/${manage}/cancel`, { user: null, body: { expectedLateFeeCents: 0 } })).status, 200);
+    assert.equal((await (await call(`/bookings/${manage}`, { user: null, method: "GET" })).json()).rebookPayment, "card");
+    const again = await rebook(manage, 2500);
+    assert.equal(again.status, 201, await again.clone().text());
+    const { booking: rebooked } = await again.json();
+    assert.equal(rebooked.paymentStatus, "scheduled", "the reply confirms the card the offer named");
+    const lesson = db.prepare("SELECT * FROM bookings WHERE reference=?").get(rebooked.reference);
+    assert.deepEqual([lesson.payment_status, lesson.payment_consent_at, lesson.payment_consent_version, lesson.added_by_teacher],
+      ["scheduled", agreed, "2026-10-12-card-on-file-v1", 1]);
+    await drain();
+    assert.equal(charges.length, before);
+  } finally {
+    forgetRebookLimits();
+    forgetStudent(email);
+  }
+});
+
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;

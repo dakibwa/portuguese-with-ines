@@ -31,6 +31,7 @@ Student on /book                                     (browse without an account)
   → GET/POST /me/recurring-rates      (Bearer)       → their own prices; POST saves a code
   → GET  /bookings/:token                            one lesson; HMAC-signed token
   → POST /bookings/:token/reschedule | /cancel       → optional lessonType, sequence++, updated ICS
+  → POST /bookings/:token/rebook                     a lesson they cancelled, booked again as a new lesson
   → POST /series/:id/reschedule | /stop (Bearer)     → move or end an owned weekly sequence
 Legacy /my-lessons and /booking links resolve into /book without losing state
 Inês on /schedule                     (her own account, role=teacher)
@@ -2160,6 +2161,61 @@ keep their original parameters.
 - **Booked without automatic payment**: the original pay-in-person promise is
   retained and no new card charge is invented. Emails say the fee applies (to
   Inês, that it is due) rather than that a card is charged.
+
+### Booking a cancelled lesson again
+
+A student who cancelled a lesson can take the time back from the same link
+(10 November 2026, Dan relaying Inês: a student she had set up by hand
+cancelled, "wanted to book a lesson" and could not, because booking asked for
+an account and a card they did not have). `POST /bookings/:token/rebook` with
+`{ expectedPriceCents }` needs no session: the link is the authority, as for
+cancelling.
+
+- **Only their own free cancellation.** The lesson must be cancelled by the
+  student, not late (`same_day_change = 0`, no late fee on it), and with
+  nothing taken, owed, refunded or paid by hand on it. One Inês cancelled, a
+  late cancellation, or a lesson with money to sort out is refused with a
+  sentence saying to message her.
+- **The same notice as any booking.** It must start at least
+  `minimum_notice_hours` from now; inside that only Inês can add it back.
+- **A new lesson, never the old row revived.** New id, reference, manage link
+  and calendar UID at SEQUENCE 0, so the invitation and the Google event are
+  clean; the cancelled row is not changed. It keeps the same time, place,
+  notes and student, and stays in its weekly run while that run is still
+  going (a stopped run's lesson stands on its own).
+- **Claimed like any booking.** The atomic slot claim decides: nothing
+  overlapping, with no gap for a lesson Inês added and the usual gap for one
+  the student booked, the availability revision, the notice window and the
+  price snapshot. It is refused inside time off she has taken since (a whole
+  day, or blocked hours) and, in person, inside online-only hours. Her
+  published hours are not required, so a lesson she placed outside them can
+  be booked again.
+- **Priced and paid as a new lesson of its kind would be today.** The
+  student's current price, which must match what the page showed. A lesson
+  Inês added follows her rule for adding one (`teacherLessonPayment`, shared
+  with `POST /admin/bookings`): on their standing card if they have one,
+  otherwise paid to her directly. A lesson the student booked on their card
+  goes on their saved card, agreed afresh at `PAYMENT_CONSENT_VERSION`, and
+  is refused without one. At €0 it is free. Nothing is charged, refunded or
+  linked by it, and no fee can come of it.
+- **What the page is told.** `GET /bookings/:token` and `GET /me` say
+  `canRebook`, and with it `rebookPriceCents` and `rebookPayment` (`card`,
+  `free` or `direct`), so the page states the terms before the press; the
+  write decides for real. `/me` asks only of the three soonest cancelled
+  lessons to come, with the student it already holds and one price look-up
+  per lesson type, so it stays cheap. The lesson's own reply also says
+  whether Inês added it and whether it is paid by hand.
+- **Emails.** The student gets the ordinary confirmation and invitation.
+  Inês's copy is headed `Booked again` (`Booked again after cancelling — …`),
+  and the cancellation leaves her Needs you once the student has a confirmed
+  lesson at that start.
+
+The rate limit is 8 a quarter-hour per student. From an email link, a student
+who is not signed in and whose lesson Inês added and is paid to her directly
+is offered `Email me a sign-in link` (the existing `/auth/email-link`, to the
+booking's own address): the way into the account, where the card step puts
+every lesson she booked on their card. Nothing signs anyone in from a manage
+link.
 
 ### A student's own price, private codes and security
 

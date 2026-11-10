@@ -394,6 +394,8 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
     row("first-changed", "2026-09-15", { first_lesson: 1, student_changed_at: ago(2) }),
     // A lesson she added is never read as the student's first, moved or not.
     row("added-changed", "2026-09-15", { first_lesson: 1, added_by_teacher: 1, student_changed_at: ago(2) }),
+    // Booked again after they cancelled it: the cancellation no longer waits on her.
+    row("booked-again", "2026-09-14", { student_id: "sam" }),
     // Set up with no email yet, so nothing is listed or sent about them.
     row("no-email", "2026-09-09", { first_lesson: 1, student_email: "no-email:abc" }),
   ];
@@ -404,6 +406,7 @@ test("Needs you lists only what waits on her, once each, and empties on its own"
     row("r1", "2026-09-16", { status: "cancelled", cancelled_by: "student", series_id: "s2", cancelled_at: ago(10) }),
     row("r2", "2026-09-23", { status: "cancelled", cancelled_by: "student", series_id: "s2", cancelled_at: ago(9) }),
     row("c-old", "2026-09-13", { status: "cancelled", cancelled_by: "student", cancelled_at: ago(73) }),
+    row("c-again", "2026-09-14", { status: "cancelled", cancelled_by: "student", cancelled_at: ago(3), student_id: "sam" }),
   ];
   const students = [
     student("Ana", { nextLessonAt: "2026-09-09T10:00:00Z" }),

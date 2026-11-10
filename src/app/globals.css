@@ -3996,6 +3996,11 @@ textarea,
   font: 500 0.74rem / 1.4 var(--ui);
 }
 
+/* Book again sits at the row's end (10 November 2026). */
+.past-lesson__facts > .teacher-quiet {
+  margin-left: auto;
+}
+
 .past-lesson__title {
   min-width: 0;
   color: var(--ink);
@@ -4983,6 +4988,24 @@ p.lesson-when > span {
 
 .lesson-manage-dialog__series > .teacher-quiet {
   margin-left: auto;
+}
+
+/* From an email link, the way into the account: one quiet line beneath the
+   actions, its chip at the line's end (10 November 2026). */
+.lesson-manage-dialog__way-in {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  color: var(--lavender-ink);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  gap: 0.45rem 0.75rem;
+}
+
+.lesson-manage-dialog__way-in > p {
+  margin: 0;
 }
 
 /* On a 320px phone the longest label, "Cancel all booked lessons", broke onto

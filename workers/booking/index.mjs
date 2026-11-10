@@ -1,4 +1,4 @@
-import { availabilityRevisionSql, computeAvailability, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans, normaliseOnlineOnlyPeriods, onlineOnlyProblem } from "./availability.mjs";
+import { availabilityRevisionSql, computeAvailability, inTimeOff, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans, normaliseOnlineOnlyPeriods, onlineOnlyProblem } from "./availability.mjs";
 import {
   OPEN_ENDED_HORIZON_WEEKS,
   SERIES_LENGTHS,
@@ -349,7 +349,7 @@ function emailIncludedMeeting(result, row, allowAlreadySent = false) {
  * Every student-facing and teacher-facing message for one lifecycle event.
  * Kept in one place so a change to wording cannot drift between the two sides.
  */
-async function notify(env, { event, row, lessonType, settings, manageUrl, previousStartsAt, previousLessonType, previousLocation, teacherChange = null, byTeacher = false, welcome = null }) {
+async function notify(env, { event, row, lessonType, settings, manageUrl, previousStartsAt, previousLessonType, previousLocation, teacherChange = null, byTeacher = false, welcome = null, again = false }) {
   const held = byTeacher && await awaitingWelcomeAt(env, row.student_email);
   const notifyingSequence = row.sequence;
   const notifyingStatus = row.status;
@@ -396,7 +396,9 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const isFree = row.payment_status === FREE;
   // Ticked "Already paid": paid to Inês by hand, so nothing is owed.
   const isPaidByHand = row.payment_consent_version === PAID_BY_HAND_MARK;
-  const priceTerms = isFree ? "free" : isPaid || isPaidByHand ? "paid" : isOnCard ? "card" : welcome?.card ? "untilCard" : byTeacher ? "asUsual" : "onTheDay";
+  // A lesson of hers booked again is paid to her as before, as her own booking email said.
+  const priceTerms = isFree ? "free" : isPaid || isPaidByHand ? "paid" : isOnCard ? "card" : welcome?.card ? "untilCard"
+    : byTeacher || (again && row.added_by_teacher) ? "asUsual" : "onTheDay";
   const price = event === "cancelled" ? null : priceValue({ tutor: tutorOf(env), terms: priceTerms, amount: formatEuros(lessonType.price_cents) });
   const uid = calendarUid(row.id);
   const method = event === "cancelled" ? "CANCEL" : "REQUEST";
@@ -474,7 +476,7 @@ async function notify(env, { event, row, lessonType, settings, manageUrl, previo
   const teacherFacts = { ...facts, student: who, byTeacher, held, when: hero, heroNote: teacherHeroNote, shortWhen, notice };
   const teacher = event === "booked"
     ? lessonBookedTeacher({ tutor: tutorOf(env),
-        ...teacherFacts, noEmailYet: isNoEmailYet(row.student_email), welcome, calendarAttached,
+        ...teacherFacts, noEmailYet: isNoEmailYet(row.student_email), welcome, calendarAttached, again,
         paidAmount: isPaid ? formatEuros(row.amount_cents ?? lessonType.price_cents) : ""
       })
     : event === "rescheduled"
@@ -1115,6 +1117,20 @@ function cardPaysFor(env, settings, student) {
   return cardsTaken(env, settings) && Boolean(
     student.email_verified_at && student.card_consent_at && student.stripe_customer_id && student.stripe_payment_method
   );
+}
+
+/**
+ * How a lesson Inês adds for this student now is paid, the one decision
+ * behind adding a lesson and a student booking one of hers again. On the card
+ * only with their standing agreement; at €0 free, card or none; ticked
+ * "Already paid" never charged or owed; one already had is a record.
+ */
+function teacherLessonPayment(env, settings, student, priceCents, { past = false, paid = false } = {}) {
+  const cardPays = cardPaysFor(env, settings, student);
+  const free = !past && priceCents === 0;
+  const paidByHand = paid && priceCents > 0;
+  const onCard = cardPays && !past && !free && !paidByHand;
+  return { cardPays, free, paidByHand, onCard, status: past ? RECORDED : free ? FREE : onCard ? "scheduled" : "not_required" };
 }
 
 /** Check standing consent in the same statement that starts a new obligation. */
@@ -2176,6 +2192,9 @@ async function answer(request, env, ctx) {
 
     const cancel = path.match(/^\/bookings\/([^/]+)\/cancel$/);
     if (cancel && request.method === "POST") return await handleCancel(request, env, ctx, cancel[1]);
+
+    const rebook = path.match(/^\/bookings\/([^/]+)\/rebook$/);
+    if (rebook && request.method === "POST") return await handleRebook(request, env, ctx, rebook[1]);
 
     const payment = path.match(/^\/bookings\/([^/]+)\/payment$/);
     if (payment && request.method === "POST") return await handlePaymentRecovery(request, env, payment[1]);
@@ -3561,6 +3580,14 @@ function prepareSeriesBookmark(env, series, key, now, sessionIdentity = null, pr
       ...(availabilityRevision !== null ? [availabilityRevision] : []));
 }
 
+/** Every column a new lesson row is claimed with: a weekly occurrence, or a lesson booked again. */
+const LESSON_CLAIM_COLUMNS = [
+  "id", "reference", "lesson_type_id", "student_id", "student_name", "student_email", "student_phone",
+  "student_timezone", "location", "notes", "starts_at", "ends_at", "status", "sequence", "created_at",
+  "updated_at", "payment_status", "amount_cents", "hold_expires_at", "series_id", "payment_consent_at",
+  "payment_consent_version", "added_by_teacher"
+];
+
 async function insertOccurrence(env, { series, key, student, lessonType, timezone, location, notes, startAt, endAt, now, paymentState = "none", holdExpiresAt = null, paymentConsentAt = null, paymentConsentVersion = null, bufferMinutes = 0, teacher = false, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null, minimumNoticeHours = null }) {
   const id = crypto.randomUUID();
   const timestamp = now.toISOString();
@@ -3571,12 +3598,7 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
   const free = paymentState !== "hold" && lessonType.price_cents === 0;
 
   const claim = prepareSlotClaim(env, {
-    columns: [
-      "id", "reference", "lesson_type_id", "student_id", "student_name", "student_email", "student_phone",
-      "student_timezone", "location", "notes", "starts_at", "ends_at", "status", "sequence", "created_at",
-      "updated_at", "payment_status", "amount_cents", "hold_expires_at", "series_id", "payment_consent_at",
-      "payment_consent_version", "added_by_teacher"
-    ],
+    columns: LESSON_CLAIM_COLUMNS,
     values: [
       id,
       bookingReference(tutorOf(env).bookings.referencePrefix),
@@ -4206,10 +4228,13 @@ async function handleGetBooking(request, env, token) {
   const settings = await loadSettings(env);
 
   const policy = changePolicy(row, new Date(), settings.minimumNoticeHours);
+  // Only a cancelled lesson is ever offered Book again; the write decides for real.
+  const offer = row.status === "cancelled" ? await rebookOffer(env, row, settings) : { canRebook: false };
 
   return json(
     {
-      booking: publicBooking(row, lessonType, settings),
+      booking: managedBooking(row, lessonType, settings),
+      ...offer,
       isPast: new Date(row.starts_at) <= new Date(),
       // The field keeps its original name for the site; it now means "inside
       // the 14-hour window". A saved-card booking charges the fee automatically.
@@ -4589,6 +4614,199 @@ async function handleCancel(request, env, ctx, token) {
   ctx.waitUntil(notify(env, { event: "cancelled", row: updated, lessonType, settings, manageUrl: "" }));
 
   return json({ booking: publicBooking(updated, lessonType, settings), sameDayFeeApplied: Boolean(sameDay) }, 200, request, env);
+}
+
+// --- Booking a cancelled lesson again (10 November 2026) -------------------
+
+/**
+ * A lesson's public shape as its own link reads it: also whether Inês added
+ * it and whether she has been paid for it by hand, so the page knows when to
+ * offer the way into the account and a card.
+ */
+function managedBooking(row, lessonType, settings) {
+  return {
+    ...publicBooking(row, lessonType, settings),
+    addedByTeacher: Boolean(row.added_by_teacher),
+    paidByHand: row.payment_consent_version === PAID_BY_HAND_MARK
+  };
+}
+
+/**
+ * Whether a lesson the student cancelled can be booked again from its link,
+ * and on what terms (10 November 2026, Inês: a student who cancelled wanted
+ * the time back and could not take it). Only their own free cancellation
+ * whose money needs nothing undone, at least the notice window away, outside
+ * any time off she has taken since, at the student's current price, paid as a
+ * new lesson of its kind would be today. The time itself being free is left
+ * to the write (or to `rebookOffer` for a read).
+ *
+ * Returns `{ problem, status }` to refuse, or the new lesson's terms.
+ */
+async function rebookTerms(env, row, settings, now = new Date(), known = {}) {
+  const tutor = tutorOf(env);
+  const refuse = (problem, status = 409) => ({ problem, status });
+  if (row.status !== "cancelled") return refuse("This lesson hasn't been cancelled.");
+  if (row.cancelled_by !== "student") return refuse(`Only a lesson you cancelled yourself can be booked again here, so please message ${tutor.shortName}.`);
+  if (Number(row.same_day_change) !== 0 || row.same_day_fee_status !== "not_required") {
+    return refuse(`This lesson was cancelled late, so please message ${tutor.shortName} to book it again.`);
+  }
+  const unsettled = !["not_required", FREE, "scheduled"].includes(row.payment_status) || row.payment_consent_version === PAID_BY_HAND_MARK ||
+    row.charge_started_at || row.stripe_payment_intent ||
+    await env.DB.prepare("SELECT 1 FROM booking_refunds WHERE booking_id = ?").bind(row.id).first();
+  if (unsettled) return refuse(`This lesson has a payment to sort out, so please message ${tutor.shortName} to book it again.`);
+  // The same rule and clock as a student booking a lesson; the claim checks it again.
+  if (Date.parse(row.starts_at) < now.getTime() + settings.minimumNoticeHours * 3600000) {
+    return refuse(`This lesson is too close now to book again here, so please message ${tutor.shortName}.`);
+  }
+
+  // `known` lets a list of lessons (Your lessons) pass the student it holds
+  // and share one price look-up per lesson type, rather than asking per row.
+  const student = known.student?.id === row.student_id && isStudentLike(known.student) ? known.student
+    : row.student_id ? await env.DB.prepare(`SELECT * FROM students WHERE id = ? AND ${studentLikeSql()}`).bind(row.student_id).first() : null;
+  if (!student) return refuse(`This lesson can't be booked again here, so please message ${tutor.shortName}.`);
+  const priced = known.lessonTypes?.get(row.lesson_type_id) ??
+    loadLessonType(env, row.lesson_type_id).then((type) => type ? studentLessonType(env, student.id, type) : null);
+  known.lessonTypes?.set(row.lesson_type_id, priced);
+  const lessonType = await priced;
+  if (!lessonType) return refuse(`This lesson can't be booked again here, so please message ${tutor.shortName}.`);
+  const priceCents = lessonType.price_cents;
+  // Booked with no card and no agreement to pay, it comes back only while free.
+  if (row.payment_status === FREE && priceCents !== 0) return refuse("This lesson is no longer free, so please book it from the calendar.");
+
+  // Time off she has taken since; her published hours are not asked for, so a
+  // lesson she placed outside them can still be booked again.
+  if (await inTimeOff(env, row.starts_at, row.ends_at)) {
+    return refuse(`${tutor.shortName} has taken that time off since, so it can't be booked again.`);
+  }
+  if (onlineOnlyProblem(settings, row.starts_at, row.ends_at, row.location)) {
+    return refuse("That time is now online only, so please book an online lesson from the calendar.");
+  }
+
+  const teacher = Boolean(row.added_by_teacher);
+  let payment;
+  if (teacher) {
+    // Exactly what she would give a lesson she adds for them now.
+    const decided = teacherLessonPayment(env, settings, student, priceCents);
+    payment = decided.onCard
+      ? { status: "scheduled", consentAt: student.card_consent_at, version: STUDENT_CARD_CONSENT_VERSION, standingCardStudent: student }
+      : { status: decided.status, consentAt: null, version: null, standingCardStudent: null };
+  } else if (priceCents === 0) {
+    payment = { status: FREE, consentAt: null, version: null, standingCardStudent: null };
+  } else if (settings.paymentMode === "prepay") {
+    return refuse("Online payment is being updated. Please try again shortly.", 503);
+  } else if (settings.paymentMode === "postpay") {
+    // As a new booking of theirs today: on their saved card, agreed now.
+    if (!stripeReady(env)) return refuse(`Payment isn't available just now, so please try again in a few minutes or message ${tutor.shortName}.`, 503);
+    if (!student.stripe_customer_id || !student.stripe_payment_method) {
+      return refuse("You have no saved card now, so please book this lesson from the calendar, where you can add one.");
+    }
+    payment = { status: "scheduled", consentAt: now.toISOString(), version: PAYMENT_CONSENT_VERSION, standingCardStudent: null };
+  } else {
+    payment = { status: "not_required", consentAt: null, version: null, standingCardStudent: null };
+  }
+
+  return {
+    student, lessonType, priceCents, payment, teacher,
+    // Her lesson is checked with no gap, as when she adds one; theirs keeps the setting's.
+    bufferMinutes: teacher ? 0 : settings.lessonBufferMinutes
+  };
+}
+
+/** How many cancelled lessons to come Your lessons asks Book again of, soonest first. */
+const REBOOK_OFFERS_LISTED = 3;
+
+/**
+ * Whether the page should offer Book again now: the terms, and nothing in the
+ * way just now. With it, the price and how it would be paid: on their card,
+ * free, or to Inês directly.
+ */
+async function rebookOffer(env, row, settings, now = new Date(), known = {}) {
+  const terms = await rebookTerms(env, row, settings, now, known);
+  if (terms.problem) return { canRebook: false };
+  const gap = terms.bufferMinutes * 60000;
+  const taken = await env.DB.prepare(
+    `SELECT 1 FROM bookings WHERE (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))
+       AND starts_at < ? AND ends_at > ? LIMIT 1`
+  ).bind(now.toISOString(), new Date(Date.parse(row.ends_at) + gap).toISOString(), new Date(Date.parse(row.starts_at) - gap).toISOString()).first();
+  if (taken) return { canRebook: false };
+  const paidBy = terms.payment.status === "scheduled" ? "card" : terms.payment.status === FREE ? "free" : "direct";
+  return { canRebook: true, rebookPriceCents: terms.priceCents, rebookPayment: paidBy };
+}
+
+/**
+ * Book again the lesson this link's cancellation freed: a new lesson, never
+ * the cancelled row revived, so its calendar invitation and Meet are new and
+ * the cancelled row stays exactly as it was. The link is the authority, as
+ * for cancelling. Nothing is charged, refunded or linked here.
+ */
+async function handleRebook(request, env, ctx, token) {
+  const row = await getBookingByToken(env, token);
+  if (!row) return fail("That booking link is not valid.", 404, request, env);
+  if (!await takeRateLimit(env, `rebook:${row.student_id ?? row.id}`, 8)) return fail("Please wait 15 minutes before trying again.", 429, request, env);
+
+  const body = await readJson(request);
+  const settings = await loadSettings(env);
+  const now = new Date();
+  const terms = await rebookTerms(env, row, settings, now);
+  if (terms.problem) return fail(terms.problem, terms.status, request, env);
+  const { student, lessonType, payment } = terms;
+  if (body.expectedPriceCents !== lessonType.price_cents) {
+    return fail("Your lesson price has changed, so please reload and check it before booking again.", 409, request, env);
+  }
+
+  // The run it came from, while that run still goes on; stopped, it stands alone.
+  const series = row.series_id
+    ? await env.DB.prepare("SELECT status FROM booking_series WHERE id = ?").bind(row.series_id).first()
+    : null;
+  const seriesId = series?.status === "active" ? row.series_id : null;
+
+  const id = crypto.randomUUID();
+  const timestamp = now.toISOString();
+  const claimed = await claimSlot(env, {
+    columns: LESSON_CLAIM_COLUMNS,
+    values: [
+      id, bookingReference(tutorOf(env).bookings.referencePrefix), lessonType.id, student.id, row.student_name, row.student_email,
+      row.student_phone, row.student_timezone, row.location, row.notes, row.starts_at, row.ends_at, "confirmed", 0, timestamp,
+      timestamp, payment.status, lessonType.price_cents, null, seriesId, payment.consentAt, payment.version, terms.teacher ? 1 : 0
+    ],
+    startAt: row.starts_at,
+    endAt: row.ends_at,
+    studentId: student.id,
+    bufferMinutes: terms.bufferMinutes,
+    standingCardStudent: payment.standingCardStudent,
+    priceSnapshot: lessonPriceSnapshot(student.id, lessonType),
+    availabilityRevision: settings.availabilityRevision,
+    minimumNoticeHours: settings.minimumNoticeHours
+  });
+
+  if (!claimed) {
+    // Say which it was: their own lesson already there (a second press or
+    // tab), someone else's, or terms that moved under the request.
+    const gap = terms.bufferMinutes * 60000;
+    const { results } = await env.DB.prepare(
+      `SELECT student_id, starts_at FROM bookings WHERE (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))
+         AND starts_at < ? AND ends_at > ?`
+    ).bind(new Date().toISOString(), new Date(Date.parse(row.ends_at) + gap).toISOString(), new Date(Date.parse(row.starts_at) - gap).toISOString()).all();
+    if ((results ?? []).some((other) => other.student_id === student.id && Date.parse(other.starts_at) === Date.parse(row.starts_at))) {
+      return fail("You already have this lesson.", 409, request, env);
+    }
+    if (results?.length) return fail("That time has been taken since, so please choose another from the calendar.", 409, request, env);
+    return fail("This lesson or its terms have just changed, so please reload and try again.", 409, request, env);
+  }
+
+  const created = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(id).first();
+  const manageToken = await createManageToken(id, env.BOOKING_TOKEN_SECRET);
+  // The ordinary confirmation and calendar invitation, a new UID at SEQUENCE 0;
+  // Inês's copy says it was booked again. A student still awaiting their
+  // welcome is held, as every lesson email is.
+  ctx.waitUntil(notify(env, { event: "booked", row: created, lessonType, settings, manageUrl: studentManageUrl(env, manageToken), again: true }));
+
+  return json(
+    { booking: managedBooking(created, lessonType, settings), manageToken, emailed: Boolean(realEmail(created.student_email)) && !awaitingWelcome(student) },
+    201,
+    request,
+    env
+  );
 }
 
 
@@ -5478,6 +5696,17 @@ async function handleMe(request, env) {
       .all()
   ]);
 
+  /*
+   * Book again is asked only of the soonest few cancelled lessons to come,
+   * with the student already held here and one price per lesson type, so a
+   * stopped weekly run does not cost a dozen reads per row. Any other one
+   * still gets the real answer from its own link.
+   */
+  const offered = new Set((results ?? [])
+    .filter((row) => row.status === "cancelled" && Date.parse(row.starts_at) > now.getTime())
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))
+    .slice(0, REBOOK_OFFERS_LISTED).map((row) => row.id));
+  const known = { student, lessonTypes: new Map() };
   const bookings = await Promise.all(
     (results ?? []).map(async (row) => ({
       reference: row.reference,
@@ -5504,6 +5733,8 @@ async function handleMe(request, env) {
       addedByTeacher: Boolean(row.added_by_teacher),
       // She has been paid for it by hand, so no card is asked for it.
       paidByHand: row.payment_consent_version === PAID_BY_HAND_MARK,
+      // Asked only of a cancelled lesson still to come.
+      ...(offered.has(row.id) ? await rebookOffer(env, row, settings, now, known) : { canRebook: false }),
       manageToken: await createManageToken(row.id, env.BOOKING_TOKEN_SECRET)
     }))
   );
@@ -7166,14 +7397,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
      * agreed to that booking alone. Without it the lesson is paid as it always
      * was, and becomes automatic from the moment they add one.
      */
-    const cardPays = cardPaysFor(env, settings, student);
-    // A lesson at a price she set to €0 is free, card or none.
-    const free = !past && lessonType.price_cents === 0;
-    // Ticked "Already paid": never charged or owed, in Receipts as paid by hand.
-    const paidByHand = paid && lessonType.price_cents > 0;
-    // A lesson already had is never charged: she is recording it.
-    const onCard = cardPays && !past && !free && !paidByHand;
-    const paymentStatus = past ? RECORDED : free ? FREE : onCard ? "scheduled" : "not_required";
+    const { cardPays, paidByHand, onCard, status: paymentStatus } = teacherLessonPayment(env, settings, student, lessonType.price_cents, { past, paid });
     const location = body.location === "porto" ? "porto" : "online";
     const notes = cleanText(body.notes, 1000);
 

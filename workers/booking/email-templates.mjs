@@ -245,18 +245,19 @@ export function studentBooked({ tutor = currentTutor(), first, byTeacher, welcom
  * an open-ended run carried forward (`extended`).
  */
 export function lessonBookedTeacher({ student, byTeacher, held = false, noEmailYet = false, welcome = null, lesson, lessonName, place, meetingUrl, reference,
-  when, heroNote = "", shortWhen, paidAmount = "", calendarAttached = true, run = null, extended = false }) {
+  when, heroNote = "", shortWhen, paidAmount = "", calendarAttached = true, run = null, extended = false, again = false }) {
   const name = student.name;
   if (!run) {
+    // `again`: a lesson the student cancelled, booked again from its link (10 November 2026).
     return {
-      subject: byTeacher ? `You added a lesson — ${name}, ${shortWhen}` : `New booking — ${name}, ${shortWhen}`,
+      subject: byTeacher ? `You added a lesson — ${name}, ${shortWhen}` : again ? `Booked again after cancelling — ${name}, ${shortWhen}` : `New booking — ${name}, ${shortWhen}`,
       content: {
-        heading: byTeacher ? "You added a lesson" : "New booking",
+        heading: byTeacher ? "You added a lesson" : again ? "Booked again" : "New booking",
         preheader: `${name} · ${lessonName} · ${when}`,
         intro: byTeacher
           ? held ? `You added a lesson for ${name}. ${notEmailed(noEmailYet)}.` : `You added a lesson for ${name}. They have been emailed the details${welcomeNote(welcome)}.`
           // The invitation carries PARTSTAT=ACCEPTED: there is nothing to accept.
-          : `${name} has booked a lesson. ${calendarAttached ? "The attached invitation goes straight into your calendar." : "It is in your calendar."}`,
+          : `${name} ${again ? "cancelled this lesson and has booked it again" : "has booked a lesson"}. ${calendarAttached ? "The attached invitation goes straight into your calendar." : "It is in your calendar."}`,
         callout: paidAmount ? `Stripe received ${paidAmount} today. Issue the appropriate Portal das Finanças document for this payment today.` : "",
         hero: when,
         heroNote,

@@ -49,6 +49,10 @@ export type Booking = {
   /** Automatic-payment states appear once Stripe is on; older bookings say 'not_required'. */
   paymentStatus?: "not_required" | "pending" | "scheduled" | "processing" | "paid" | "payment_due" | "refunded" | "recorded" | "free";
   amountCents?: number | null;
+  /** Inês added it herself; read from the lesson's own link. */
+  addedByTeacher?: boolean;
+  /** Inês has been paid for it by hand. */
+  paidByHand?: boolean;
 };
 
 export type ManagedBooking = {
@@ -64,6 +68,11 @@ export type ManagedBooking = {
   changeLocked?: boolean;
   /** Cancelling now returns the money automatically. */
   refundOnCancel?: boolean;
+  /** A lesson the student cancelled that can be booked again now, at this price. */
+  canRebook?: boolean;
+  rebookPriceCents?: number;
+  /** How the lesson booked again would be paid. */
+  rebookPayment?: "card" | "free" | "direct";
 };
 
 export type LessonTypesResponse = {
@@ -449,8 +458,10 @@ export function rescheduleSeries(
 export function fetchBooking(token: string) {
   return request<ManagedBooking>(`/bookings/${encodeURIComponent(token)}`).then((data) => {
     validateBookingReply(data);
-    if ([data.isPast, data.sameDayFeeApplies, data.recurring, data.sameDayFeeAutomatic, data.changeLocked, data.refundOnCancel]
+    if ([data.isPast, data.sameDayFeeApplies, data.recurring, data.sameDayFeeAutomatic, data.changeLocked, data.refundOnCancel, data.canRebook,
+      data.booking.addedByTeacher, data.booking.paidByHand]
       .some((value) => value !== undefined && typeof value !== "boolean") ||
+      (data.canRebook === true && (!isApiAmount(data.rebookPriceCents) || !["card", "free", "direct"].includes(data.rebookPayment ?? ""))) ||
       (data.paymentsDue !== undefined && (!isRecord(data.paymentsDue) ||
         ![data.paymentsDue.lesson, data.paymentsDue.sameDayFee].every((amount) => amount === null || isApiAmount(amount)))) ||
       (data.durationPrices !== undefined && (!isRecord(data.durationPrices) || !Object.values(data.durationPrices).every(isApiAmount)))) unreadableReply();
@@ -492,6 +503,22 @@ export function cancelBooking(token: string, expectedLateFeeCents?: number) {
     `/bookings/${encodeURIComponent(token)}/cancel`,
     { method: "POST", body: JSON.stringify(expectedLateFeeCents === undefined ? {} : { expectedLateFeeCents }) }
   ).then(validateLessonChange);
+}
+
+/**
+ * Book again a lesson the student cancelled, from its own link: a new lesson
+ * at the same time and the price shown. The reply carries the new lesson's
+ * manage token, and whether it was emailed.
+ */
+export function rebookBooking(token: string, expectedPriceCents: number) {
+  return request<{ booking: Booking; manageToken: string; emailed: boolean }>(
+    `/bookings/${encodeURIComponent(token)}/rebook`,
+    { method: "POST", body: JSON.stringify({ expectedPriceCents }) }
+  ).then((data) => {
+    validateBookingReply(data);
+    if (typeof data.manageToken !== "string" || !data.manageToken || typeof data.emailed !== "boolean") unreadableReply();
+    return data;
+  });
 }
 
 /** The student's own zone, so times can be shown in it alongside Porto time. */

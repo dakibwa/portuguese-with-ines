@@ -719,7 +719,10 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
     for (const row of group) shown.add(row.id);
     timed.push({ time: Date.parse(booking.starts_at), changed: Date.parse(booking.student_changed_at!), item: { kind: "changed", key: `changed:${booking.id}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
   }
-  const cancelledRows = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at) && ahead(row.starts_at));
+  // Booked again since (10 November 2026): their confirmed lesson at that start settles it.
+  const bookedAgain = (row: AdminBooking) => lessons.some((other) => other.status === "confirmed" &&
+    (other.student_id ?? other.student_email) === (row.student_id ?? row.student_email) && Date.parse(other.starts_at) === Date.parse(row.starts_at));
+  const cancelledRows = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at) && ahead(row.starts_at) && !bookedAgain(row));
   for (const group of grouped(cancelledRows, (row) => row.series_id || row.id)) {
     const [booking] = group;
     timed.push({ time: Date.parse(booking.starts_at), changed: Math.max(...group.map(row => Date.parse(row.cancelled_at!))), item: { kind: "cancelled", key: `cancelled:${booking.id}`, booking, count: group.length } });

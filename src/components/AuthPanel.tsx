@@ -5,7 +5,7 @@ import { AlertCircle, CheckCircle2, Lock, Mail, ReceiptText, UserRound } from "l
 import { AssetMark } from "@/components/BrandMarks";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { browserTimeZone } from "@/lib/booking-api";
-import { AuthApiError, SessionStorageError, login, readSession, register, requestPasswordReset, requestSignInLink, storeSession, type Student } from "@/lib/auth-api";
+import { AuthApiError, SessionStorageError, SIGN_IN_LINK_SENT, login, readSession, register, requestPasswordReset, requestSignInLink, storeSession, type Student } from "@/lib/auth-api";
 
 /** `link` signs in by email, with no password (12 October 2026, Dan). */
 type Mode = "signin" | "register" | "forgot" | "link";
@@ -141,7 +141,7 @@ export function AuthPanel({
         await requestSignInLink(form.email.trim());
         if (request !== authRequest.current || readSession() !== session) return;
         setNoticeFrom("link");
-        setNotice("If you have an account, a link is on its way.");
+        setNotice(SIGN_IN_LINK_SENT);
         return;
       }
 
