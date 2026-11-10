@@ -17,7 +17,7 @@ export function EditPencil({ label, field, controls, disabled, onEdit }: {
   disabled?: boolean;
   onEdit: () => void;
 }) {
-  return <button aria-controls={controls} aria-label={label} className="teacher-pencil" data-edit={field} disabled={disabled} onClick={onEdit} type="button">
+  return <button aria-controls={controls} aria-label={label} className="teacher-pencil" data-edit={field} disabled={disabled} onClick={onEdit} title={label} type="button">
     <Pencil size={13} strokeWidth={2.4} aria-hidden="true" />
   </button>;
 }

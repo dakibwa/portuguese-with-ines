@@ -209,11 +209,25 @@ export function MyLessons({
 
   // Focus a field as it opens, before a student can select anything else: a
   // queued frame could otherwise steal their focus or subsequent typing.
+  // Closed again, saved or not, focus goes back to the value that opened it
+  // (10 November 2026), unless they have already moved on to something else.
+  const lastOpenField = useRef<typeof openField>(null);
   useLayoutEffect(() => {
+    const closed = lastOpenField.current;
+    lastOpenField.current = openField;
     if (openField && openField !== "mark" && openField !== "card") {
       detailsRef.current?.querySelector<HTMLInputElement>(`[data-field="${openField}"] input`)?.focus({ preventScroll: true });
+    } else if (!openField && closed && (document.activeElement === document.body || !document.activeElement)) {
+      detailsRef.current?.querySelector<HTMLElement>(`[data-field="${closed}"] [data-edit]`)?.focus({ preventScroll: true });
     }
   }, [openField]);
+  // Escape puts an open detail back as it was.
+  const cancelOnEscape = (event: React.KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    setOpenField(null);
+  };
 
   // Read when the details open, so a rate Inês set by hand shows without a
   // reload, and tell booking what came back: it prices weekly lessons from it.
@@ -644,6 +658,7 @@ export function MyLessons({
             {openField === "name" ? (
               <form
                 className="my-lessons__edit"
+                onKeyDown={cancelOnEscape}
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (!savingName && details.name.trim() && details.name.trim() !== student.name) void saveName();
@@ -676,6 +691,7 @@ export function MyLessons({
             {openField === "email" ? (
               <form
                 className="my-lessons__edit"
+                onKeyDown={cancelOnEscape}
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (!emailBusy && details.email.trim() && details.email.trim() !== student.email) void changeEmail();
@@ -782,6 +798,7 @@ export function MyLessons({
             {openField === "nif" ? (
               <form
                 className="my-lessons__edit"
+                onKeyDown={cancelOnEscape}
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (!savingNif && details.nif.trim() !== (student.nif ?? "")) void saveNif();

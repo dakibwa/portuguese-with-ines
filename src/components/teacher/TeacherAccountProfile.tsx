@@ -110,10 +110,19 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
     }
   }
 
+  // Closed again, focus goes back to the value that opened the field.
+  const card = useRef<HTMLElement>(null);
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (wasEditing.current && !editingEmail && (document.activeElement === document.body || !document.activeElement))
+      card.current?.querySelector<HTMLElement>('[data-field="email"] [data-edit]')?.focus({ preventScroll: true });
+    wasEditing.current = editingEmail;
+  }, [editingEmail]);
+
   const locked = disabled || Boolean(busy);
   const at = student.email.indexOf("@");
   return (
-    <section className="teacher-account my-lessons__details" aria-labelledby="teacher-account-title">
+    <section className="teacher-account my-lessons__details" aria-labelledby="teacher-account-title" ref={card}>
       {/* Her sign-in details are a student's Your details (9 November 2026,
           Dan: one way for each thing): a short list of what is saved, each
           value its own button with a small pencil; a detail opens in the
@@ -131,7 +140,8 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
         <div className="my-lessons__fact" data-field="email">
           <span className="my-lessons__fact-label">Sign-in email</span>
           {editingEmail ? (
-            <form className="my-lessons__edit" onSubmit={changeEmail}>
+            <form className="my-lessons__edit" onSubmit={changeEmail}
+              onKeyDown={event => { if (event.key === "Escape" && !locked) { event.preventDefault(); event.stopPropagation(); setEditingEmail(false); } }}>
               <input aria-label="Sign-in email" autoCapitalize="none" autoComplete="email" autoCorrect="off" autoFocus disabled={locked} onChange={event => { setEmail(event.target.value); setError(""); }} required spellCheck={false} type="email" value={email} />
               <span className="teacher-edit-actions">
                 <button className="button button--blue button--small" disabled={locked || !email.trim() || email.trim().toLowerCase() === student.email.toLowerCase()} type="submit">{busy === "email" ? "Sending…" : "Send confirmation link"}</button>
