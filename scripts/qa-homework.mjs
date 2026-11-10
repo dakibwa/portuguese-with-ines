@@ -286,10 +286,9 @@ try {
     await expect(page.locator(".student-homework [role=alert]")).toContainText("Answers could not be saved");
     await expect(page.locator(".student-homework textarea").nth(2)).toHaveValue("café");
     answerSaveFails = false;
-    if (width < 821) {
-      await page.getByRole("button", { name: "Open menu", exact: true }).click();
-      await page.getByRole("dialog", { name: "Site navigation" }).getByRole("link", { name: "Approach", exact: true }).click();
-    } else await page.locator(".site-header").getByRole("link", { name: "Approach", exact: true }).click();
+    // A student's bar keeps the site's pages behind its menu at every width.
+    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    await page.getByRole("dialog", { name: "Site navigation" }).getByRole("link", { name: "Approach", exact: true }).click();
     await page.waitForURL("**/approach/");
     assert.equal(homework.progress.answers.q3, "café");
     assert.deepEqual(errors, []);

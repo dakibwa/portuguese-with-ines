@@ -23,7 +23,13 @@ const navigation: NavItem[] = [
   { href: "/book", id: "book", label: "Booking", note: "Book or manage your lessons", mark: "/visuals/v2-splats/booking-availability-splat-v2.svg" }
 ];
 
-export function SiteNav({ currentPage }: { currentPage: SitePage }) {
+/**
+ * `bar` is an account's bar (SiteHeader): there the pages are behind the menu
+ * button at every width, always or only once the page is a student's, and the
+ * menu's heading repeats the bar, name, splat and all, so nothing in it
+ * moves: the menu button turns into the close where it stands.
+ */
+export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { title: string; mark: string; when: "always" | "account" } }) {
   const [open, setOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
   const [ready, setReady] = useState(false);
@@ -79,7 +85,11 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
     const focusFrame = requestAnimationFrame(() => closeRef.current?.focus({ preventScroll: true }));
 
     const desktop = window.matchMedia("(min-width: 821px)");
-    const closeOnDesktop = () => { if (desktop.matches) setOpen(false); };
+    // A wide screen shows the links themselves, except on an account's bar,
+    // which keeps its menu button.
+    const closeOnDesktop = () => {
+      if (desktop.matches && toggleRef.current && getComputedStyle(toggleRef.current).display === "none") setOpen(false);
+    };
     desktop.addEventListener("change", closeOnDesktop);
     window.addEventListener("resize", positionMenu);
 
@@ -110,9 +120,14 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
     };
   }, [open, positionMenu]);
 
+  function close() {
+    setOpen(false);
+    requestAnimationFrame(() => openerRef.current?.focus({ preventScroll: true }));
+  }
+
   return (
     <>
-      <nav className="site-nav" aria-label="Main navigation">
+      {bar?.when === "always" ? null : <nav className="site-nav" aria-label="Main navigation">
         {navigation.map((item) => {
           const Destination = item.id === "book" ? "a" : Link;
           return <Destination
@@ -126,7 +141,7 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
             {item.id === "book" ? <span className="site-nav__book">{item.label}</span> : item.label}
           </Destination>;
         })}
-      </nav>
+      </nav>}
 
       <button
         aria-controls={hasOpened ? "site-nav-mobile" : undefined}
@@ -158,8 +173,11 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
       {/* Mount on first opening so an invisible menu does not download its art
           or prefetch its destinations during the initial page load. Retain it
           afterwards so closing transitions and focus restoration still work. */}
+      {/* On a wide screen an account's menu is a sheet at the right, and a
+          press on the page beside it closes it. */}
       {ready && hasOpened ? createPortal(<div
-        className={`nav-mobile${open ? " is-open" : ""}`}
+        className={`nav-mobile${open ? " is-open" : ""}${bar ? (bar.when === "always" ? " is-bar" : " is-account-bar") : ""}`}
+        onClick={(event) => { if (event.target === event.currentTarget) close(); }}
         style={{ top: menuTop }}
         id="site-nav-mobile"
         ref={menuRef}
@@ -179,18 +197,17 @@ export function SiteNav({ currentPage }: { currentPage: SitePage }) {
             >
               <BrandWordmark className="header-wordmark" />
             </Link>
+            {bar ? <p aria-hidden="true" className="site-header__title">{bar.title}</p> : null}
             <button
               aria-label="Close menu"
               className="nav-mobile__close"
               ref={closeRef}
-              onClick={() => {
-                setOpen(false);
-                requestAnimationFrame(() => openerRef.current?.focus({ preventScroll: true }));
-              }}
+              onClick={close}
               type="button"
             >
               <X aria-hidden="true" size={26} strokeWidth={1.8} />
             </button>
+            {bar ? <AssetMark asset={bar.mark} className="site-header__mark" /> : null}
           </div>
           <div className="nav-mobile__links">
             {navigation.map((item) => {

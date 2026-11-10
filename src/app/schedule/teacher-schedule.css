@@ -1,23 +1,3 @@
-/* Her schedule starts on the page's left edge, under the wordmark, as every
-   other page does, rather than in a centred box of its own. */
-.teacher-page .account-hero {
-  min-height: 132px;
-  padding: 1.4rem var(--page-pad);
-}
-
-.teacher-page .account-hero h1 {
-  font-size: clamp(2.2rem, 3.6vw, 2.8rem);
-}
-.teacher-page .account-hero p {
-  margin: 0.65rem 0 0;
-  font-size: 1rem;
-  line-height: 1.6;
-}
-.teacher-page .account-hero__mark {
-  right: var(--page-pad);
-  width: 140px;
-  opacity: 0.75;
-}
 /* Her page is a column the window's height, as the booking page is, so a
    short tab (Receipts, Profile) ends on the footer rather than a strip of
    paper beneath it (27 October 2026, Dan: no empty space). */
@@ -25,71 +5,6 @@
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
-}
-/* One slim banner for her workspace (9 November 2026, Dan: "could it all be
-   consolidated into one smaller banner that has her logo"): the cream
-   wordmark, which still leads home, a hairline, then the page's name in her
-   hand, on the booking band's blue and grain, with the band's splat cut off
-   at the right edge. No site links: her tools are the page. */
-.teacher-banner {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--gap-wide);
-  min-height: 76px;
-  overflow: hidden;
-  padding: 0.7rem var(--page-pad);
-  background-color: var(--blue-deep);
-  background-image: var(--paper-texture);
-  color: var(--paper);
-}
-.teacher-banner__brand {
-  position: relative;
-  z-index: 2;
-  display: block;
-  flex: none;
-  border-radius: var(--squiggle-chip);
-}
-.teacher-banner .teacher-banner__wordmark {
-  width: calc(52px * 760 / 236);
-}
-.teacher-banner__title {
-  position: relative;
-  z-index: 2;
-  margin: 0;
-  padding-left: var(--gap-wide);
-  border-left: 1px solid var(--outline-light-edge);
-  font-family: var(--display);
-  font-size: clamp(1.55rem, 2.4vw, 2.1rem);
-  font-weight: 400;
-  letter-spacing: -0.035em;
-  line-height: 1.1;
-  white-space: nowrap;
-}
-.teacher-banner__mark {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  right: clamp(-44px, -2.5vw, -24px);
-  width: clamp(118px, 10vw, 158px);
-  margin: 0;
-  aspect-ratio: 1;
-  opacity: 0.96;
-  transform: translateY(-50%);
-}
-@media (max-width: 560px) {
-  .teacher-banner { gap: var(--gap-block); min-height: 64px; padding-block: 0.6rem; }
-  .teacher-banner .teacher-banner__wordmark { width: calc(42px * 760 / 236); }
-  .teacher-banner__title { padding-left: var(--gap-block); font-size: 1.35rem; }
-  .teacher-banner__mark { right: -38px; width: 86px; }
-}
-/* The narrowest phones keep the wordmark and the name clear of each other
-   and let the splat go. */
-@media (max-width: 360px) {
-  .teacher-banner { gap: var(--gap-list); }
-  .teacher-banner .teacher-banner__wordmark { width: calc(36px * 760 / 236); }
-  .teacher-banner__title { padding-left: var(--gap-list); font-size: 1.25rem; }
-  .teacher-banner__mark { display: none; }
 }
 .teacher-main {
   flex: 1 0 auto;
@@ -1537,22 +1452,6 @@
 }
 
 @media (max-width: 600px) {
-  .teacher-page .account-hero {
-    min-height: 126px;
-    padding: 1.4rem var(--page-pad);
-  }
-  .teacher-page .account-hero h1 {
-    font-size: 2.2rem;
-  }
-  .teacher-page .account-hero p {
-    max-width: 23ch;
-    font-size: 0.82rem;
-  }
-  .teacher-page .account-hero__mark {
-    width: 135px;
-    right: -20px;
-    opacity: 0.5;
-  }
   .teacher-main {
     padding-top: 1.6rem;
   }

@@ -1667,26 +1667,29 @@ const desktopAccountLayout = await accountPage.evaluate(() => {
   };
   return {
     composition: bounds(".booking-composition"),
-    intro: bounds(".booking-intro"),
+    bar: bounds(".site-header.is-account-bar .site-header__inner"),
     provider: bounds(".booking-provider"),
     calendar: bounds("#lesson-calendar .calendar-panel")
   };
 });
+// A student's one bar (wordmark, Your Lessons, menu) sits straight on the
+// workspace, with no band between them.
 if (
   Object.values(desktopAccountLayout).some((box) => !box) ||
-  desktopAccountLayout.intro.bottom > desktopAccountLayout.provider.top + 1 ||
+  desktopAccountLayout.bar.bottom > desktopAccountLayout.provider.top + 1 ||
+  desktopAccountLayout.bar.bottom > 80 ||
   desktopAccountLayout.calendar.left < desktopAccountLayout.provider.left ||
   desktopAccountLayout.calendar.right > desktopAccountLayout.provider.right
 ) {
   throw new Error(
-    `The compact banner and signed-in desktop overview should form one aligned workspace: ${JSON.stringify(desktopAccountLayout)}.`
+    `The student's bar and signed-in desktop overview should form one aligned workspace: ${JSON.stringify(desktopAccountLayout)}.`
   );
 }
 if (
-  Math.abs(desktopAccountLayout.intro.width - desktopAccountLayout.composition.width) > 2 ||
+  Math.abs(desktopAccountLayout.bar.width - desktopAccountLayout.composition.width) > 2 ||
   Math.abs(desktopAccountLayout.provider.width - desktopAccountLayout.composition.width) > 2
 ) {
-  throw new Error("The desktop banner and booking workspace should both use the full available width.");
+  throw new Error("The student's bar and booking workspace should both use the full available width.");
 }
 await accountPage.screenshot({ path: path.join(outDir, "booking-account-desktop.png"), fullPage: true });
 
@@ -2534,7 +2537,16 @@ await changeLessonTime.click();
 await accountPage.locator(".booking-bar__head--account").waitFor({ state: "visible" });
 {
   const bannerTitle = (await accountPage.locator("#booking-title").innerText()).replace(/\s+/g, " ").trim();
-  if (bannerTitle !== "Your Lessons") throw new Error(`Signed in, the booking banner should read Your Lessons; it read ${bannerTitle}.`);
+  if (bannerTitle !== "Your Lessons") throw new Error(`Signed in, the page's heading should read Your Lessons; it read ${bannerTitle}.`);
+  // What a student sees is their one bar: the name once, with the site's
+  // pages behind its menu button.
+  const bar = accountPage.locator(".site-header");
+  const barTitles = bar.locator(".site-header__title:visible");
+  if ((await barTitles.count()) !== 1 || (await barTitles.innerText()).trim() !== "Your Lessons" ||
+      !await bar.getByRole("button", { name: "Open menu", exact: true }).isVisible() ||
+      await accountPage.locator(".booking-intro .asset-mark").isVisible()) {
+    throw new Error("Signed in, the header should be the one Your Lessons bar with its menu button, and no band beneath it.");
+  }
 }
 const bookingBarMenu = accountPage.locator(".booking-bar__head #account-menu-button");
 await bookingBarMenu.waitFor({ state: "visible" });

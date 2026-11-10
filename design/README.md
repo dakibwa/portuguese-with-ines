@@ -1120,10 +1120,11 @@ The full source inventory and later-stage feature map are in
 
 ## Wording and confirmation — 13 September 2026
 
-Use `Portuguese Lessons` on the home page. Booking's banner reads `Book a
-Lesson` to a visitor without an account and `Your Lessons` to a student, or to
-anyone arriving by a lesson's own link or a link to Your lessons (12 October
-2026, at Dan's request). The banner names the page, so the booking card
+Use `Portuguese Lessons` on the home page. A visitor without an account books
+under the `Book a Lesson` banner. A student, or anyone arriving by a lesson's
+own link or a link to Your lessons, has the account's one bar, `Your Lessons`,
+in place of the header and banner (12 October and 9 November 2026, at Dan's
+request). The banner or bar names the page, so the booking card
 carries no second `Book a lesson` title of its own (its title is kept for
 screen readers): a first-time visitor's card opens on the lesson's choices,
 and a returning one's on `Already booked? Sign in`. Signing in or making an
@@ -2361,8 +2362,22 @@ same job, they use the same piece, on a student's side and on Inês's:
   line is as tall as a homework chip, so the dates line up across the row.
 - On Lessons, the trial's `60 mins` tag is centred on its price and never
   makes that line taller, so the three cards' rules and sentences are level.
-- An account page's band holds its title alone; the card beneath says what to
-  do (`New password` no longer runs a sentence across its splat on a phone).
+- An account has one bar (Dan: "similarly for students can the top bar merge
+  too into the same thing?", "with a menu button if they care to go back ?"):
+  the cream wordmark leading home, a hairline, the page's name in the display
+  hand and the availability splat cut off at the right edge, on blue; 76 px,
+  64 px on a phone. It heads a student's `Your Lessons`, `New password` and
+  Inês's `Your schedule`, with no site header or band above it. A visitor
+  booking keeps the site's header and the `Book a Lesson` band.
+- A student's bar holds the site's menu button at every width; Inês's has
+  none. It opens the site's one menu, whose heading repeats the bar so the
+  button becomes the close where it stands: the whole screen on a phone, a
+  sheet at the right of a wide one, closed by a press beside it. On a phone
+  the splat gives way to the button, and the wordmark shrinks before the name.
+- The least text that does the job (Dan: "the simplest amount of text is
+  always the best in my view"). A screen says a thing once, and a button's own
+  words stand in for the sentence that would explain it. Before adding a
+  sentence, look for one to remove.
 - Inês's sign-in details are a student's Your details, in her Profile card
   under its own title and her name: the same rows (name, value, button, with
   the name above the value on a narrow card), the 14 px `Change`, a field that
