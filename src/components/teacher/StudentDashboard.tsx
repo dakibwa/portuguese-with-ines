@@ -3,21 +3,25 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { StudentLessons, sharedFacts } from "@/components/teacher/StudentLessons";
-import { EditActions, EditValue } from "@/components/teacher/EditControls";
+import { EditActions, EditPencil } from "@/components/teacher/EditControls";
 import { fetchBookings, fetchStudentNotes, isStudentsBooking, saveStudentPlan, type AdminBooking, type AdminStudent, type StudentNotes } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
 
 /**
- * One fact about a student on one row: its name in small capitals and what it
- * is beneath. What she can change is its own EditValue, a tiny pencil at its
- * end (9 November 2026, Dan); a row's own action, such as Try again, ends the
- * name's line.
+ * One thing about a student: its name in small capitals and what it is
+ * beneath. What she can change has one pencil, beside its name, that opens
+ * everything under it as fields where they stand (10 November 2026, Dan:
+ * "the amount of pencils here is kind of ugly can we just have it by each
+ * thing like price / details / plan?"). A row's own action, such as Try
+ * again, ends the name's line.
  */
-export function FactRow({ label, labelId, extra, action, children, wide }: {
+export function FactRow({ label, labelId, edit, extra, action, children, wide }: {
   label: string;
   /** For a control that names itself by the row. */
   labelId?: string;
-  /** Beside the label, such as their level beside Plan. */
+  /** The one pencil for everything under this name; left out while it is open. */
+  edit?: ReactNode;
+  /** After the name, such as their level beside Plan. */
   extra?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
@@ -25,7 +29,7 @@ export function FactRow({ label, labelId, extra, action, children, wide }: {
   wide?: boolean;
 }) {
   return <div className={`teacher-fact${wide ? " teacher-fact--wide" : ""}`}>
-    <span className="teacher-fact__label" id={labelId}>{label}{extra}</span>
+    <div className="teacher-fact__head"><span className="teacher-fact__label" id={labelId}>{label}</span>{edit}{extra}</div>
     <div className="teacher-fact__value">{children}</div>
     {action ? <div className="teacher-fact__action">{action}</div> : null}
   </div>;
@@ -152,6 +156,7 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
   }
 
   const planRow = currentNotes?.notes ? <FactRow label="Plan" wide
+    edit={plan === null ? <EditPencil field="plan" label={`${currentNotes.notes.plan ? "Change" : "Write"} ${student.name}’s plan`} disabled={busy} onEdit={() => setPlan(currentNotes.notes!.plan)} /> : null}
     extra={level ? <span className="teacher-notes__level">{level}</span> : null}>
     {plan !== null ? <form className="teacher-plan__edit" onSubmit={event => { event.preventDefault(); void savePlan(); }}
       onKeyDown={event => { if (event.key === "Escape" && !busy) { event.preventDefault(); event.stopPropagation(); closePlan(); } }}>
@@ -159,9 +164,9 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
         placeholder="What they’re working towards, what you’ve covered, what comes next" onChange={event => setPlan(event.target.value)} />
       <EditActions busy={busy} onCancel={closePlan} saveLabel="Save plan" />
       {planError ? <p className="teacher-inline-error" role="alert">{planError}</p> : null}
-    </form> : <EditValue field="plan" label={`${currentNotes.notes.plan ? "Change" : "Write"} ${student.name}’s plan`} disabled={busy} empty={!currentNotes.notes.plan} onEdit={() => setPlan(currentNotes.notes!.plan)}>
-      <span className="teacher-plan__text">{currentNotes.notes.plan || "What they’re working towards"}</span>
-    </EditValue>}
+    </form> : currentNotes.notes.plan
+      ? <p className="teacher-plan__text">{currentNotes.notes.plan}</p>
+      : <span className="teacher-fact__line teacher-fact__empty">What they’re working towards</span>}
   </FactRow> : currentNotes?.error ? <FactRow label="Plan" wide action={<button className="button button--outline button--small" type="button" onClick={() => setNotesAttempt(value => value + 1)}>Try again</button>}>
     <span className="teacher-fact__empty" role="alert">{currentNotes.error}</span>
   </FactRow> : null;

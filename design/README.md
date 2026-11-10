@@ -582,7 +582,7 @@ free times and removes selected times that cannot be booked in the new place.
   simple dashboard for all things for that student, a lesson plan, area,
   home work … payments", "no repeated information"). One page, no switch:
   - The top row holds everything she does with the student, so no rail of
-    tools sits below it: name with its pencil, the three checks, her actions
+    tools sits below it: name, the three checks, her actions
     (the next button, `Add a lesson`, then `Sign-in link` when all set and
     `Mark as dormant` or `Mark as active` where they apply, each once) and X,
     which stays at the top right. All on one line where the card is wide;
@@ -594,21 +594,24 @@ free times and removes selected times that cannot be booked in the new place.
     Porto · Added by you`, so no lesson repeats them) and `Plan`, her plan
     for them with their latest level as a chip beside its name. Nothing here
     is changed with a big `Change`, `Edit details` or `Write` button (9
-    November 2026, Dan): a value she can change is itself the button, with a
-    tiny lucide pencil at its end, so pressing the value or the pencil opens
-    the existing form, its own field focused (email, phone, NIF, the 60 or the
-    90-minute price, the plan's text). A detail with nothing yet shows a quiet
-    placeholder (`No email`, `Add phone`, `Add NIF`) with the same pencil. A
-    signed-in student's email is only read: it is theirs to change from their
-    account, and the form still says so. Their name has its own pencil beside
-    it in the card's header, a button of its own and never inside the one that
-    opens and closes the card, and the name is one size, closed or open. The
-    forms, their `Save` and `Cancel`, validation and the explicit `Save
-    price` are unchanged; saved or cancelled, keyboard focus returns to the
-    pencil that opened them. The pencil is small to see and, for a finger,
-    reaches a 36 px row or a 44 px target. The plan (4,000 characters) is the
-    same, edited in the row. Where the card is wide these rows are a slim
-    column beside the lessons, kept tight; narrower, they pair up above them.
+    November 2026, Dan), and there is one tiny lucide pencil for each thing,
+    beside its name: `Details`, `Price` and `Plan` (10 November 2026, Dan, of
+    a pencil on every line: "the amount of pencils here is kind of ugly can
+    we just have it by each thing like price / details / plan?"). The values
+    beneath are plain lines. Pressed, the pencil opens everything under that
+    name as fields where it reads, ending in the tick and cross: Details as
+    `Name`, `Email`, `Phone` and `NIF`, each named at its left; Price as both
+    lengths; Plan as its text. What is not yet known is left out of the
+    lines (a missing email reads `No email yet`), and its field waits under
+    the pencil. A signed-in student's email is only read: it is theirs to
+    change from their account. Their name carries no pencil in the card's
+    header, closed or open, and is one size; it is changed under Details.
+    Validation and the price's hint are unchanged; saved or cancelled,
+    keyboard focus returns to the pencil that opened it. The pencil is small
+    to see and, for a finger, reaches a 44 px target. The plan (4,000
+    characters) is the same, edited in the row. Where the card is wide these
+    rows are a slim column beside the lessons, kept tight; narrower, they
+    pair up above them.
   - Their lessons beside, `Upcoming` then `Past & cancelled`, each named in
     the legend's small capitals. Every lesson is one row of two lines at most:
     its day and time, which open the lesson's own details in place inside the
@@ -761,8 +764,8 @@ free times and removes selected times that cannot be booked in the new place.
   - Opening and closing gently changes the sheet's height. Its contents fade
     into place, and scrolling keeps the student's name visible. Reduced-motion
     users get the same result without animation.
-  - Name, email, phone and NIF are each edited where they stand, from their
-    own pencil (10 November 2026). A student who has signed in changes their own email. A missing
+  - Name, email, phone and NIF are edited together where they stand, from
+    the one pencil by `Details` (10 November 2026). A student who has signed in changes their own email. A missing
     lesson never locks the email field (16 October 2026, Inês). Price uses the same editable rate form as onboarding.
   - Their lessons read Upcoming, then Past & cancelled. A weekly run's weeks
     still to come are one tile (9 November 2026, Dan: "just have them
@@ -2454,9 +2457,14 @@ for).
 **One way to change a value.**
 
 - A value that can be changed is its own button: the value, then a small
-  pencil at its end. Pressing either opens it. A thing with no words of its
-  own to press (a student's name beside the button that opens their card)
-  has the pencil alone beside it.
+  pencil at its end. Pressing either opens it.
+- Where several values sit under one name, the name has the one pencil and
+  the values are plain lines (Dan, of a student's card with a pencil on
+  every line: "the amount of pencils here is kind of ugly can we just have
+  it by each thing like price / details / plan?"). It opens everything
+  under that name as fields where it reads, with one tick and one cross.
+  So a student's card has three pencils, by `Details`, `Price` and `Plan`,
+  and none beside their name.
 - Pressed, the value becomes its field in the value's own place. Its name in
   small capitals stays where it was. The field ends in a small coral tick
   (save) and a quiet cross (cancel), each the pencil's size, on the field's
@@ -2465,7 +2473,7 @@ for).
   fill. What the field cannot save is said beneath it and it stays open.
 - Nothing opens a second panel or dialog to edit what is already on the
   screen. A student's Your details, Inês's Profile and her students' cards
-  use the same pieces (`EditValue`, `InlineEdit`, `EditActions`, `CancelEdit`
+  use the same pieces (`EditValue`, `EditPencil`, `EditActions`, `CancelEdit`
   in `components/teacher/EditControls.tsx`).
 - Where saving does something a tick cannot say (`Send confirmation link`,
   `Agree & add card`), the open field keeps those words as its button, with
