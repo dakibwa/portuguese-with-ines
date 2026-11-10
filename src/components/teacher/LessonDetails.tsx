@@ -353,15 +353,18 @@ export function LessonDetails({
     </p>
   );
   const closeButton = (
+    // Inline it is the quiet cross that closes anything open in place, at the
+    // row's end where the notes pencil was (10 November 2026).
     <button
-      className={inline ? "teacher-quiet" : "teacher-dialog-close"}
+      className={inline ? "teacher-pencil teacher-lesson-inline__close" : "teacher-dialog-close"}
       data-homework-exit
       type="button"
       aria-label="Close lesson details"
+      title={inline ? "Close" : undefined}
       disabled={busy}
       onClick={onClose}
     >
-      {inline ? "Close" : <X size={20} aria-hidden="true" />}
+      {inline ? <X size={15} strokeWidth={2.4} aria-hidden="true" /> : <X size={20} aria-hidden="true" />}
     </button>
   );
   // Inline, every routine action is the one small soft lilac button; the dialog keeps its buttons.
@@ -504,21 +507,22 @@ export function LessonDetails({
       )}
     </>
   );
-  // Inline, one flowing header: the lesson's date, Homework and Close, then
-  // the other controls, all sharing one gap and wrapping naturally.
+  // Inline, the row's own line: the lesson's date, then what she does with it
+  // as small buttons at their own width (beside the date where there is room,
+  // beneath it on a phone), and the cross that closes it at the row's end.
   const inlineHead = (
     <>
       <div className="teacher-lesson-inline__head">
         {inlineHeading}
-        {action === "view" && booking.status !== "cancelled" ? homeworkTrigger : null}
-        {closeButton}
         {action === "view" && booking.status !== "cancelled" ? (
           <div className="teacher-dialog-actions">
+            {homeworkTrigger}
             {defaultActions}
             {recordBlock}
             {approvalBlock}
           </div>
         ) : null}
+        {closeButton}
       </div>
       {action === "view" ? <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} /> : null}
     </>

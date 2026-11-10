@@ -1316,17 +1316,18 @@ two.
 Choosing a free day keeps the four weeks in view on wide screens, with the day
 highlighted and its times beside it under the date, with no eyebrow above it
 to say what the times already say. On a phone the times take the calendar's
-place, headed by a short date (`Thu 24 Sept 2026`) with an outline `Change`
-beside it on the same row, which returns to the calendar (named `Change date`
-for assistive technology). Before a day is chosen there are no times to show,
+place, headed by a short date (`Thu 24 Sept 2026`) with the site's pencil
+beside it on the same row (10 November 2026; it was an outline `Change`),
+which returns to the calendar (named `Change date` for assistive technology). Before a day is chosen there are no times to show,
 so the times panel stays out of sight at every width and the calendar takes the
 whole row, as Your lessons does; a chosen day brings its times in beside it.
 `Soonest times` went on 9 October 2026, when Dan found it unnecessary. A window
 with nothing free says so beneath the calendar.
 
 Students can collect several single-lesson dates and confirm them together.
-Each chosen lesson is its own row: its own splat, the date and time, and one
-`Change`; the clock is named once, on the first row (`Porto time`, `Los
+Each chosen lesson is its own row: its own splat, the date and time, and the
+site's pencil at its end, the whole row answering to it (10 November 2026; it
+was an outline `Change`); the clock is named once, on the first row (`Porto time`, `Los
 Angeles time`). Beneath the rows a dashed card of the same shape,
 in the choices' blue with a plus mark (coral is kept for clashes), offers `Add
 another lesson`, or `Add a second weekly time` for weekly lessons; it is absent for a trial and once the limit is reached, and it
@@ -1449,11 +1450,12 @@ Preserve these desktop and mobile states:
   beneath it, with the sheet's own `Your lessons` back.
   Your details reads as a short list of what is saved rather than a form (10
   October 2026, at Dan's request): the student's splat, name, email and NIF,
-  each with its value and a quiet outline `Change` beside it, or `Add NIF`
-  where there is none. Changing one opens its field in place with its action
-  (`Save name`, `Send confirmation link`, `Save NIF`) and `Cancel`, and closes
-  once saved; only an open email carries a short note, the NIF's purpose being
-  in its label. A `Card` row follows the email where the site takes cards
+  each value its own button with a small pencil at its end (10 November
+  2026; it was an outline `Change`), named `Add NIF` where there is none.
+  Changing one opens its field in the value's place, ending in a tick and a
+  cross (`Send confirmation link` keeps its words), and closes once saved;
+  only an open email carries a short note, the NIF's purpose being its
+  field's placeholder. A `Card` row follows the email where the site takes cards
   (12 October 2026, Dan): `Saved`, `Saved for lessons you book` or `Not
   added`, with `Change` or `Add card`; opening it shows the confirm step's
   dabbed terms in place (the two €5 fees among them) and `Agree & add
@@ -1461,8 +1463,10 @@ Preserve these desktop and mobile states:
   paid to her by hand, Your lessons opens on one sheet card alone, its
   calendar held back until the card is agreed, the same card a payment link opens (2 November 2026, Dan: "just
   have it as one single thing"): a card icon in a lilac disc, `Confirm your
-  card payments`, `Paid at the end of each lesson` with `Porto time` over their
-  weekly run or the lessons she added as dashed tiles, the fee's two dabs, the
+  card payments`, `Porto time` over their weekly run or the lessons she added
+  as dashed tiles, then three dabs (when future lessons are charged, said as
+  a dab and not as a label over the tiles since 10 November 2026, and the
+  fee's two), the
   agreement capsule `I authorise card payments for my future lessons`, then `Agree &
   add card` alone: the card comes first, with no `Not now` (2 November 2026,
   Dan: "card first"), and only a card that can't go ahead (its lessons
@@ -1494,17 +1498,17 @@ Preserve these desktop and mobile states:
   chosen lessons do, each a smaller tile with its own splat, one line each
   (day and start, never wrapped; Dan: "always fits on the same line") under
   an `Outstanding lessons` label that names `Porto time` once for every tile,
-  then a receipt's ruled `Charged now €45` under the prices, worked out from
+  then `Charged now €45` under the prices as a receipt's total (with no rule
+  over it since 10 November 2026), worked out from
   the lessons whose charge time has passed (`Total` with `Charged at the end of
   each lesson` under it while none has). Their lessons still to come that
-  Inês added follow under `Then at the end of each lesson`, each weekly run once as
+  Inês added follow with no label of their own (10 November 2026), each weekly run once as
   `Every Tuesday, 17:00` in a dashed tile with the weekly lilac repeat mark
   (Dan: make it obvious it covers their weekly lessons), and the capsule
   reads `these and future lessons`. The dabs stay few (2 November 2026,
-  Dan: the list was too long, but "I liked the bullets they are cute"): the
-  labels and total say what is charged and when, so only the fee's two dabs
-  sit over the capsule, with `Future lessons are charged at the end of each lesson`
-  first only when no later lesson is shown. Inês gets the same tick list from an unpaid
+  Dan: the list was too long, but "I liked the bullets they are cute"): three
+  sit over the capsule, `Future lessons are charged at the end of each lesson`
+  always first (10 November 2026), then the fee's two. Inês gets the same tick list from an unpaid
   lesson's dialog (`Create payment link`, small outline, the opened lesson
   ticked) and from a student's card on Students (`Payment link`, nothing
   ticked): `Tick what Jess still owes` and `Their future lessons then go on
@@ -2393,36 +2397,86 @@ same job, they use the same piece, on a student's side and on Inês's:
 
 Dan: "the edit button should let you edit it from that interface and not bring
 up a new one", "all instances of weird buttons taking up entire rows is bad",
-"do we need the dividers", and of the whole: "simple, intuitive, feels unique
-in its design and fun to use". These hold on a student's side and on Inês's,
-and replace the earlier bullets they contradict (the 14 px `Change`, the
-two-across lesson tiles, `All students`, the rules between details):
+"do we need the dividers", "apply this logic across the entire system", and of
+the whole: "simple, intuitive, feels unique in its design and fun to use".
+These hold on a student's side and on Inês's, and replace the earlier bullets
+they contradict (the 14 px `Change` on a detail and on a chosen lesson, `Save
+name` and `Save NIF` as worded buttons, the two-across lesson tiles, `All
+students`, the rules between details, the label over the lessons a card pays
+for).
 
-- One way to change a value: its small pencil. Pressed, the value becomes its
-  own field right there, ending in a small coral tick (save) and a quiet
-  cross (cancel), each the pencil's size. Enter saves, Escape cancels, focus
-  returns to the value. Nothing opens a second panel to edit what is already
-  on the screen. A student's Your details and Inês's Profile use the same
-  pencil; where saving does something a tick cannot say (`Send confirmation
-  link`, `Agree & add card`), the open field keeps its words.
+**One way to change a value.**
+
+- A value that can be changed is its own button: the value, then a small
+  pencil at its end. Pressing either opens it. A thing with no words of its
+  own to press (a student's name beside the button that opens their card)
+  has the pencil alone beside it.
+- Pressed, the value becomes its field in the value's own place. Its name in
+  small capitals stays where it was. The field ends in a small coral tick
+  (save) and a quiet cross (cancel), each the pencil's size, on the field's
+  own line. Enter saves, Escape cancels, and focus returns to the value.
+  With nothing to save yet the tick waits as the quiet outline, never a faded
+  fill. What the field cannot save is said beneath it and it stays open.
+- Nothing opens a second panel or dialog to edit what is already on the
+  screen. A student's Your details, Inês's Profile and her students' cards
+  use the same pieces (`EditValue`, `InlineEdit`, `EditActions`, `CancelEdit`
+  in `components/teacher/EditControls.tsx`).
+- Where saving does something a tick cannot say (`Send confirmation link`,
+  `Agree & add card`), the open field keeps those words as its button, with
+  the same cross beside it.
+- The same pencil changes a chosen lesson while booking, at its row's end,
+  and a phone's chosen date; a press anywhere on the lesson's row opens it.
+
+**Buttons.**
+
 - A button is as wide as its words. It shares a line with the thing it acts
   on, at that line's end, and never takes a row to itself; when it must wrap
-  it keeps its own width at the right. The exceptions are the one main action
-  of a step (booking's Confirm) and a dialog's paired buttons on a phone.
+  it keeps its own width. The exceptions are the one main action of a step
+  (booking's Confirm, a card's `Agree & add card`) and a dialog's paired
+  buttons on a phone.
+- There are three weights and no more: the coral or blue filled button for
+  the one thing to do next; the outline for its pair (`Cancel`, `Sign out`,
+  `Not now`); and the quiet lilac chip in sentence case for a lesser action
+  beside the thing it acts on (`Show weeks`, `Record refund`, `Remove card`,
+  `Send reset link`, an open lesson's `Homework`, `Move or cancel` and
+  `Change length`). A question only some people have (`Have a code from
+  Inês?`) is a quiet underlined line of text, not a button.
 - A control that repeats another is removed, not moved: `All students` went
   because an open student's Close already returns to the board.
+- An alert's way on (`Try again`, `Message Inês`) keeps its own width at the
+  alert's end, on a phone as across a wide page.
+
+**Lines, labels and words.**
+
 - Space and the small-capital labels group things; a rule is drawn only where
   two different kinds of thing meet (a card's header and its body). Lists of
-  facts carry no rules between their rows.
-- Things of one kind share one layout. A student's lessons on Inês's page are
-  a ledger, one row each: day and time, facts, then status, notes pencil and
-  `Already paid` at the row's end, in columns that line up down the list. A
-  weekly run is a row of the same kind with `Show weeks` at its end. Where
-  the list is narrow a row folds in two (day and pencil, then facts and
-  money). What was said about a lesson is one quiet quoted line with who said
-  it (`You: “…”`), never a labelled block.
+  facts carry no rules between their rows, and a total needs none above it:
+  its place under the prices and its weight say what it is.
+- A heading is not used to say a fact. What a sentence can say as one of the
+  dabs is a dab: on the card page `Future lessons are charged at the end of
+  each lesson` is the first dab, the same sentence as on every other card
+  screen, and the lessons to come stand under no label of their own.
+- A link that belongs to a pill sits at the pill's right-hand side, beside
+  the words it belongs to (`Terms & privacy` in the authorise pill), so the
+  pill is no taller than those words.
 - Explanations shrink to what the control cannot say: the price editor's
-  three hints are one line.
+  three hints are one line; a NIF field's "optional, for your receipts" is
+  its placeholder.
+
+**One layout for one kind of thing.**
+
+- A student's lessons on Inês's page are a ledger, one row each: day and
+  time, facts, then status, notes pencil and `Already paid` at the row's end,
+  in columns that line up down the list. A weekly run is a row of the same
+  kind with `Show weeks` at its end. Where the list is narrow a row folds in
+  two (day and pencil, then facts and money).
+- An open lesson is that same row: its day and time, what she does with it
+  as quiet chips at their own width (beside the day where there is room,
+  beneath it on a phone), `Already paid` at their end and the cross that
+  closes it at the row's end, where the closed row's pencil was.
+- What was said about a lesson is one quiet quoted line with who said it
+  (`You: “…”`), never a labelled block.
+- A saved price in Your details is a row like every other detail.
 
 ## One schedule for students — 9 November 2026
 

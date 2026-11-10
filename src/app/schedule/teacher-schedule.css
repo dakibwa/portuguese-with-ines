@@ -3321,22 +3321,24 @@
 .teacher-lesson-dialog--inline > * { grid-column: 1 / -1; }
 .teacher-lesson-dialog--inline:focus { outline: 0; }
 .teacher-lesson-dialog--inline:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; border-radius: var(--squiggle-field); }
-/* One flowing header: the date summary, Homework, Close, then the other
-   controls, all in one wrapping row with one gap and no pinned slots. */
-.teacher-lesson-dialog--inline > .teacher-lesson-inline__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 0.5rem; min-width: 0; }
+/* The open row's own line (10 November 2026): its date, then what she does
+   with it as small buttons at their own width, beside the date where there
+   is room and beneath it on a phone; the cross that closes it keeps the
+   row's end, where a closed row's pencil is. Nothing stretches. */
+.teacher-lesson-dialog--inline > .teacher-lesson-inline__head { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 0.4rem 0.75rem; min-width: 0; min-height: 28px; padding-right: 2.1rem; }
 .teacher-lesson-inline__head > .teacher-lesson-row__what { flex: 0 1 auto; }
+.teacher-lesson-inline__close { position: absolute; top: 0; right: -0.3rem; }
 /* The visible date is never the row's stretched press area. */
 .teacher-lesson-inline__head .teacher-lesson-row__when::after { content: none; }
 .teacher-lesson-inline__head .teacher-lesson-row__when:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: var(--squiggle-chip); }
-/* Plain wrappers let their controls flow as header items. */
-.teacher-lesson-dialog--inline .teacher-lesson-inline__head :is(.teacher-dialog-actions, .teacher-lesson-record, .teacher-no-show) { display: contents; }
+/* Her actions are one wrapping row of their own; the plain wrappers inside
+   let their controls flow as its items. Already paid and No-show end it, as
+   Already paid ends a closed row. */
+.teacher-lesson-dialog--inline .teacher-lesson-inline__head > .teacher-dialog-actions { display: flex; flex: 1 1 16rem; flex-wrap: wrap; align-items: center; gap: 0.4rem; min-width: 0; margin: 0; }
+.teacher-lesson-dialog--inline .teacher-lesson-inline__head :is(.teacher-lesson-record, .teacher-no-show) { display: contents; }
 .teacher-lesson-inline__head :is(.teacher-quiet, .paid-tick--plain) { flex: 0 0 auto; justify-content: center; }
+.teacher-lesson-inline__head .teacher-dialog-actions > .teacher-lesson-record > :first-child { margin-left: auto; }
 .teacher-lesson-inline__head .teacher-no-show__hint { order: 1; flex: 1 1 100%; margin: 0; }
-@container (max-width: 35.99rem) {
-  .teacher-lesson-inline__head :is(.teacher-quiet, .paid-tick--plain) { padding-inline: 0.6rem; }
-  .teacher-lesson-inline__head .paid-tick--plain { gap: 0.35rem; }
-  .teacher-lesson-inline__head:has(> .teacher-dialog-actions) :is(.teacher-quiet, .paid-tick--plain) { flex: 1 1 auto; }
-}
 .teacher-lesson-dialog--inline .meeting-link { width: auto; justify-self: start; }
 .teacher-lesson-dialog--inline > .teacher-lesson-facts { margin: 0; }
 /* Paid, no-show and Create payment link join the toolbar: the record group
