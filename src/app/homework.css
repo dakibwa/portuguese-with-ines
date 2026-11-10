@@ -139,7 +139,7 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 /* A new sheet is the booking journey again: one decision per step on its
    panel, the question in Beth Ellen under a splat, choices as filled blobs.
    Each choice moves on; decisions already taken fold into summary rows above
-   with Change, and Back steps one back. */
+   that are their own pencilled buttons, and Back steps one back. */
 .homework-steps { display: grid; gap: 0.75rem; max-width: 46rem; }
 .teacher-homework > .homework-working { max-width: 46rem; }
 .homework-step, .homework-working {
@@ -190,7 +190,7 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 
 /* A decision already taken, as booking folds its date and time. */
 .homework-summary {
-  display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; padding: 0.6rem var(--pad-card);
+  display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 0.75rem; padding: 0.6rem var(--pad-card);
   border: 1px solid var(--rule); border-radius: var(--squiggle-field); background: var(--sheet);
   animation: booking-content-in var(--motion-surface) var(--motion-ease) both;
 }
@@ -199,12 +199,9 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .homework-summary__copy { display: grid; min-width: 0; }
 .homework-summary__copy small { color: var(--lavender-ink); font: 700 0.68rem/1.3 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; }
 .homework-summary__copy strong { overflow: hidden; font: 700 0.98rem/1.3 var(--ui); text-overflow: ellipsis; white-space: nowrap; }
-.homework-summary__change {
-  min-height: 44px; padding: 0.4rem 1rem; border: 1.5px solid var(--outline-edge); border-radius: var(--squiggle-button-alt); background: transparent; color: var(--ink);
-  cursor: pointer; font: 700 0.8rem/1.2 var(--ui); letter-spacing: 0.06em; text-transform: uppercase; transition: background var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
-}
-.homework-summary__change:hover, .homework-summary__change:focus-visible { border-color: var(--ink); background: var(--hover-wash); }
-.homework-summary__change:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* The decision is its own button, the pencil at its end; on a phone it keeps 44 px. */
+.homework-summary > .teacher-edit { justify-self: start; min-width: 0; min-height: 44px; align-items: center; margin-inline: -0.5rem; padding-inline: 0.5rem; }
+.homework-summary > .teacher-edit > svg { margin-top: 0; }
 
 /* Private is a lock, not a sentence; its words are for screen readers and on hover. */
 .homework-private { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--squiggle-chip); background: rgba(170, 164, 230, 0.26); color: var(--lavender-ink); }
@@ -295,8 +292,9 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .homework-editor section > .homework-toolbar { margin: 0; }
 .homework-editor section h4 { color: var(--lavender-ink); font: 700 0.78rem/1.4 var(--ui); letter-spacing: 0.14em; text-transform: uppercase; }
 .homework-editor__pair, .homework-editor__intro { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem 1rem; align-items: start; }
-.homework-editor__question { display: grid; gap: 0.85rem; padding: 1.1rem; border-radius: var(--squiggle-tile); background: var(--raised); }
-.homework-editor__question .homework-link { background: var(--raised); }
+.homework-editor__question { position: relative; display: grid; gap: 0.85rem; padding: 1.1rem; border-radius: var(--squiggle-tile); background: var(--raised); }
+/* A question's bin sits in its tile's corner, on its first label's line. */
+.homework-editor__remove.teacher-pencil { position: absolute; top: 0.55rem; right: 0.55rem; }
 .homework-editor__add, .homework-link { justify-self: start; }
 
 /* Publish: one confirmation and its action on one row. */
@@ -360,7 +358,7 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .segmented.homework-mark--unset .segmented__thumb { opacity: 0; }
 .segmented.homework-mark .segmented__thumb { transition: transform 260ms var(--motion-ease), opacity 160ms ease; }
 /* A settled answer folds to the student's words beside its mark and
-   feedback, blue when right and coral to try again; Change reopens it. */
+   feedback, blue when right and coral to try again; pressing them reopens it. */
 .homework-review__tally { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.9rem 0 0; padding: 0; list-style: none; }
 .homework-review__count { padding: 0.4rem 0.85rem; border-radius: var(--squiggle-chip); font: 700 0.7rem/1.3 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; }
 .homework-review__count--correct { background: var(--blue-deep); color: var(--paper-light); }
@@ -368,8 +366,9 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 .homework-review__count--open { background: var(--coral-action); color: var(--paper-light); }
 .homework-review__question--folded { gap: 0.75rem; padding-block: 1rem; }
 .homework-review__question--folded .homework-review__answer { padding-block: 0.5rem; }
-.homework-review__verdict { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.6rem 0.9rem; align-content: start; min-width: 0; }
-.homework-review__verdict p { margin: 0; font-size: 0.95rem; line-height: 1.5; }
+.homework-review__verdict { display: flex; align-items: flex-start; min-width: 0; }
+.homework-review__verdict .teacher-edit__value { gap: 0.2rem; }
+.homework-review__said { font-size: 0.95rem; line-height: 1.5; }
 .homework-review__status { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--blue-deep); font: 700 0.72rem/1.3 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
 .homework-review__question--retry .homework-review__status { color: var(--warning-ink); }
 @container homework (min-width: 44rem) {
@@ -378,9 +377,6 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 }
 @container homework (max-width: 30rem) {
   .homework-capture { grid-template-columns: minmax(0, 1fr); padding-right: 5.5rem; }
-  .homework-review__verdict { grid-template-columns: auto minmax(0, 1fr); }
-  .homework-review__verdict p { grid-column: 1 / -1; grid-row: 2; }
-  .homework-review__verdict .homework-link { justify-self: end; }
 }
 @container homework (max-width: 30rem) {
   .homework-editor__pair, .homework-editor__intro { grid-template-columns: 1fr; }
@@ -570,11 +566,12 @@ ul.homework-help.booking-payment-facts { gap: 0.35rem; color: var(--lavender-ink
 @media (max-width: 600px) {
   .homework-editor__pair, .homework-editor__intro { grid-template-columns: 1fr; }
   .segmented.homework-toggle { width: 100%; }
-  .homework-paper-tools .homework-print-tools .button { width: 100%; margin-left: 0; }
   .homework-settings label { flex: 1 1 7rem; }
-  .homework-settings .button, .homework-publish .button { width: 100%; margin-left: 0; }
-  .homework-save__actions { width: 100%; }
-  .homework-save__actions .button { flex: 1; padding-inline: 0.6rem; }
+  /* The site's phone buttons fill the row; here only a step's one main action
+     does (publishing, sending back). The rest keep the width of their words. */
+  :is(.homework-print-tools, .homework-save__actions, .homework-toolbar, .homework-error) .button, .homework-remake.button { width: auto; }
+  .homework-publish .button { width: 100%; margin-left: 0; }
+  .homework-save__actions { margin-left: auto; }
   /* The head's splat moves into the corner, so it costs the phone no band of its own. */
   .homework-sheet:not(.homework-sheet--paper) .homework-sheet__head { padding-right: var(--pad); }
   .homework-sheet:not(.homework-sheet--paper) :is(.homework-sheet__meta, .homework-sheet__head h3) { padding-right: 4.5rem; }

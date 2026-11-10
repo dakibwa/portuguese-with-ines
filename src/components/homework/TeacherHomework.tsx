@@ -1,10 +1,11 @@
 "use client";
 
-import { LANGUAGE, LANGUAGE_CODE, LANGUAGE_VARIETY } from "@/lib/tutor";
+import { LANGUAGE, LANGUAGE_CODE } from "@/lib/tutor";
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Camera, Sparkles, CheckCircle2, ChevronDown, Image as ImageIcon, Lock, PenLine, Plus, RotateCcw, Send, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { HOMEWORK_PHOTO_LIMIT, prepareHomeworkPhoto, teacherHomeworkRequest, transcribeHomeworkPhotos, type HomeworkSheet, type TeacherHomeworkData, type HomeworkMark } from "@/lib/homework-api";
 import { readSession } from "@/lib/auth-api";
+import { EditValue } from "@/components/teacher/EditControls";
 import { HomeworkSplat } from "./HomeworkArt";
 import { HomeworkWorksheet } from "./HomeworkWorksheet";
 
@@ -233,8 +234,10 @@ export function TeacherHomework({ bookingId, token, onBusy }: { bookingId: strin
       {summaries.map(([id, label, value, image]) => <div className="homework-summary" key={id}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {image ? <img className="homework-summary__photo" src={image} alt="" /> : <HomeworkSplat seed={`${bookingId}-${id}`} className="homework-summary__mark" />}
-        <span className="homework-summary__copy"><small>{label}</small><strong>{value}</strong></span>
-        <button type="button" className="homework-summary__change" aria-label={`Change ${label.toLowerCase()}`} disabled={Boolean(busy)} onClick={() => go(id)}>Change</button>
+        {/* A decision taken is its own button, as a chosen lesson is while booking. */}
+        <EditValue label={`Change ${label.toLowerCase()}`} disabled={Boolean(busy)} onEdit={() => go(id)}>
+          <span className="homework-summary__copy"><small>{label}</small><strong>{value}</strong></span>
+        </EditValue>
       </div>)}
       <div className="homework-step" key={step}>
         {step === "what" ? <>
@@ -358,25 +361,31 @@ function SheetEditor({ sheet, disabled, ai, onChange }: { sheet: HomeworkSheet; 
     <div className="homework-editor__intro"><label>Title<input maxLength={160} value={sheet.title} onChange={e => onChange({ ...sheet, title: e.target.value })} /></label>
       <label>Learning goal<textarea maxLength={400} value={sheet.objective} onChange={e => onChange({ ...sheet, objective: e.target.value })} rows={2} /></label></div>
     {sheet.sections.map((section, si) => <section key={si}>
-      <div className="homework-toolbar"><h4>Section {si + 1}</h4>{sheet.sections.length > 1 ? <button className="homework-link" type="button" onClick={() => onChange({ ...sheet, sections: sheet.sections.filter((_, i) => si !== i) })}>Remove section</button> : null}</div>
+      <div className="homework-toolbar"><h4>Section {si + 1}</h4>{sheet.sections.length > 1 ? <RemoveButton label={`Remove section ${si + 1}`} onRemove={() => onChange({ ...sheet, sections: sheet.sections.filter((_, i) => si !== i) })} /> : null}</div>
       <label>Heading<input maxLength={120} value={section.title} onChange={e => sectionChange(si, { title: e.target.value })} /></label>
       <div className="homework-editor__pair"><label>Instruction<textarea maxLength={600} rows={2} value={section.instruction} onChange={e => sectionChange(si, { instruction: e.target.value })} /></label>
-        <label>Worked example <small>Optional</small><textarea maxLength={800} rows={2} value={section.example} onChange={e => sectionChange(si, { example: e.target.value })} /></label></div>
+        <label>Worked example<textarea maxLength={800} rows={2} placeholder="Optional" value={section.example} onChange={e => sectionChange(si, { example: e.target.value })} /></label></div>
       {section.questions.map((q, qi) => <div className="homework-editor__question" key={qi}>
+        {/* Removing is a small bin at the tile's corner, never a row of its own. */}
+        {section.questions.length > 1 ? <RemoveButton label={`Remove question ${qi + 1}`} className="homework-editor__remove" onRemove={() => sectionChange(si, { questions: section.questions.filter((_, i) => i !== qi) })} /> : null}
         <div className="homework-editor__pair"><label>Question {qi + 1}<textarea rows={2} maxLength={800} value={q.prompt} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, prompt: e.target.value } : item) })} /></label>
           <label>Answer or example answer<textarea rows={2} maxLength={1200} value={q.answer} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, answer: e.target.value } : item) })} /></label></div>
-        <label>Explanation <small>Optional</small><textarea rows={2} maxLength={800} value={q.explanation} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, explanation: e.target.value } : item) })} /></label>
+        <label>Explanation<textarea rows={2} maxLength={800} placeholder="Optional" value={q.explanation} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, explanation: e.target.value } : item) })} /></label>
         <label>Marking<select value={q.marking ?? "written"} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, marking: e.target.value as "exact" | "written", acceptedAnswers: item.acceptedAnswers ?? [] } : item) })}>
-          <option value="written">{ai ? "Written answer · AI suggestion, then your approval" : "Written answer · you mark it"}</option><option value="exact">Short answer · checked against accepted answers</option>
+          <option value="written">{ai ? "AI suggests, you approve" : "You mark it"}</option><option value="exact">Match accepted answers</option>
         </select></label>
-        {q.marking === "exact" ? <label>Accepted answers <small>One per line. Include every valid alternative.</small><textarea rows={3} maxLength={9600} value={(q.acceptedAnswers ?? []).join("\n")} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, acceptedAnswers: e.target.value.split("\n") } : item) })} /></label> : null}
-        {section.questions.length > 1 ? <button className="homework-link" type="button" onClick={() => sectionChange(si, { questions: section.questions.filter((_, i) => i !== qi) })}><Trash2 size={15} aria-hidden="true" />Remove question {qi + 1}</button> : null}
+        {q.marking === "exact" ? <label>Accepted answers<textarea rows={3} maxLength={9600} placeholder="One per line, every valid alternative" value={(q.acceptedAnswers ?? []).join("\n")} onChange={e => sectionChange(si, { questions: section.questions.map((item, i) => i === qi ? { ...item, acceptedAnswers: e.target.value.split("\n") } : item) })} /></label> : null}
       </div>)}
-      {section.questions.length < 6 && sheet.sections.flatMap(s => s.questions).length < 12 ? <button className="homework-link" type="button" onClick={() => sectionChange(si, { questions: [...section.questions, { id: `new-${Date.now()}`, prompt: "", answer: "", explanation: "" }] })}><Plus size={16} aria-hidden="true" />Add question</button> : null}
+      {section.questions.length < 6 && sheet.sections.flatMap(s => s.questions).length < 12 ? <button className="teacher-quiet homework-editor__add" type="button" onClick={() => sectionChange(si, { questions: [...section.questions, { id: `new-${Date.now()}`, prompt: "", answer: "", explanation: "" }] })}><Plus size={15} aria-hidden="true" />Add question</button> : null}
     </section>)}
-    {sheet.sections.length < 4 && sheet.sections.flatMap(s => s.questions).length < 12 ? <button type="button" className="button button--outline homework-editor__add" onClick={() => onChange({ ...sheet, sections: [...sheet.sections, { title: "", instruction: "", example: "", questions: [{ id: `new-${Date.now()}`, prompt: "", answer: "", explanation: "" }] }] })}>Add section</button> : null}
+    {sheet.sections.length < 4 && sheet.sections.flatMap(s => s.questions).length < 12 ? <button type="button" className="teacher-quiet homework-editor__add" onClick={() => onChange({ ...sheet, sections: [...sheet.sections, { title: "", instruction: "", example: "", questions: [{ id: `new-${Date.now()}`, prompt: "", answer: "", explanation: "" }] }] })}><Plus size={15} aria-hidden="true" />Add section</button> : null}
     <label>Review reminder<textarea maxLength={400} rows={2} value={sheet.reminder} onChange={e => onChange({ ...sheet, reminder: e.target.value })} /></label>
   </fieldset>;
+}
+
+/** The pencil's quiet square, carrying a bin: removing is a lesser action at the end of what it removes. */
+function RemoveButton({ label, className = "", onRemove }: { label: string; className?: string; onRemove: () => void }) {
+  return <button type="button" className={`teacher-pencil ${className}`.trim()} aria-label={label} title={label} onClick={onRemove}><Trash2 size={15} strokeWidth={2.2} aria-hidden="true" /></button>;
 }
 
 function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, onApprove }: {
@@ -386,6 +395,15 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
   const id = useId();
   // Answers she has opened to change stay open until she sends the review back.
   const [opened, setOpened] = useState<string[]>([]);
+  // Opening a mark hands focus to its chosen option, where the pressed value was.
+  const sheetRef = useRef<HTMLFieldSetElement>(null);
+  const focusOpened = useRef("");
+  useEffect(() => {
+    if (!focusOpened.current) return;
+    const tile = sheetRef.current?.querySelector(`[data-question="${focusOpened.current}"]`);
+    (tile?.querySelector<HTMLInputElement>("input:checked") ?? tile?.querySelector<HTMLInputElement>("input"))?.focus();
+    focusOpened.current = "";
+  }, [opened]);
   const questions = sheet.sections.flatMap(section => section.questions);
   // A pending placeholder ("A Inês vai rever…") is not feedback; it must never be approved as hers.
   const feedbackOf = (mark?: HomeworkMark) => !mark || mark.source === "pending" ? "" : mark.feedback;
@@ -395,7 +413,8 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
   const retry = questions.length - open - right;
   return <div className="homework-review">
     <div className="homework-review__intro">
-      <h4>Homework to review</h4>
+      {/* The tally beneath says what this is; the heading stays for screen readers. */}
+      <h4 className="visually-hidden">Homework to review</h4>
       {marking ? <div className="homework-review__marking" role="status"><span>Checking answers…</span><span className="homework-working__bar" aria-hidden="true"><span /></span></div> : <ul className="homework-review__tally" aria-label="Marks so far">
         <li className="homework-review__count homework-review__count--correct">{right} correct</li>
         <li className="homework-review__count homework-review__count--retry">{retry} to try again</li>
@@ -403,7 +422,7 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
       </ul>}
       {note ? <p className="homework-review__note">{note}</p> : null}
     </div>
-    <fieldset className="homework-review__sheet" disabled={busy || marking}>
+    <fieldset className="homework-review__sheet" ref={sheetRef} disabled={busy || marking}>
       {sheet.sections.map((section, index) => <section key={index}>
         <h5 lang={LANGUAGE_CODE}><HomeworkSplat seed={sheet.title} offset={index + 1} className="homework-section-mark" /><span className="homework-num" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><span className="homework-section-title">{section.title}</span></h5>
         <p className="homework-review__instruction" lang={LANGUAGE_CODE}>{section.instruction}</p>
@@ -417,13 +436,15 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
           const answer = <p className="homework-review__answer" lang={LANGUAGE_CODE}>{answers[question.id] || <em lang="en">No answer</em>}</p>;
           if (!unresolved && !opened.includes(question.id)) return <div className={`homework-review__question homework-review__question--folded homework-review__question--${mark.status}`} key={question.id}>
             <div className="homework-review__work">{prompt}{answer}</div>
+            {/* The mark and its feedback are the value: pressing them opens them here. */}
             <div className="homework-review__verdict">
-              <span className="homework-review__status">{mark.status === "correct" ? <><CheckCircle2 size={15} aria-hidden="true" />Correct</> : <><RotateCcw size={15} aria-hidden="true" />Try again</>}</span>
-              <p lang={LANGUAGE_CODE}>{feedback}</p>
-              <button type="button" className="homework-link" aria-label={`Change mark for ${section.title}, question ${qi + 1}`} onClick={() => setOpened(list => [...list, question.id])}>Change</button>
+              <EditValue label={`Change mark for ${section.title}, question ${qi + 1}`} onEdit={() => { focusOpened.current = question.id; setOpened(list => [...list, question.id]); }}>
+                <span className="homework-review__status">{mark.status === "correct" ? <><CheckCircle2 size={15} aria-hidden="true" />Correct</> : <><RotateCcw size={15} aria-hidden="true" />Try again</>}</span>
+                <span className="homework-review__said" lang={LANGUAGE_CODE}>{feedback}</span>
+              </EditValue>
             </div>
           </div>;
-          return <div className={`homework-review__question${unresolved ? " is-open" : ""}`} key={question.id}>
+          return <div className={`homework-review__question${unresolved ? " is-open" : ""}`} key={question.id} data-question={question.id}>
             <div className="homework-review__work">
               {prompt}{answer}
               <details><summary>Answer guide</summary><p lang={LANGUAGE_CODE}>{question.answer}</p>{question.explanation ? <p lang={LANGUAGE_CODE}>{question.explanation}</p> : null}</details>
@@ -438,7 +459,7 @@ function HomeworkReview({ sheet, answers, marks, marking, note, busy, onChange, 
                   </label>)}
                 </div>
               </fieldset>
-              <label className="homework-review__feedback">Feedback <small>In {LANGUAGE_VARIETY}</small>
+              <label className="homework-review__feedback">Feedback
                 <textarea lang={LANGUAGE_CODE} rows={2} maxLength={800} value={feedback} placeholder="Ex.: Muito bem! O teu pedido está claro." onChange={event => edit({ feedback: event.target.value })} /></label>
             </div>
           </div>;

@@ -161,7 +161,7 @@ export function HomeworkWorksheet({ sheet, lessonAt, location, level, minutes, a
       return tools ? <div className="homework-toolbar homework-toolbar--format">{toggle}<div className="homework-toolbar__tools">{tools}</div></div> : toggle;
     })()}
     {view === "print" ? <div className="homework-paper-tools">
-      <p className="homework-help">Black-and-white pages with room to write. The answer key is optional and starts on a separate page.</p>
+      <p className="homework-help">Black-and-white pages with room to write.</p>
       <div className="homework-print-tools">
         {hasAnswers ? <label><input type="checkbox" checked={includeAnswers} onChange={event => setIncludeAnswers(event.target.checked)} />{preview ? "Include student answers" : "Include my answers"}</label> : null}
         <label><input type="checkbox" checked={printAnswers} onChange={event => setPrintAnswers(event.target.checked)} />Include answer key</label>
