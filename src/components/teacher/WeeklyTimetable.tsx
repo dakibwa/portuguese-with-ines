@@ -16,7 +16,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { CalendarOff, CalendarPlus, ChevronDown, Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
-import { addedByTeacher, type AdminBooking, type AvailabilityException } from "@/lib/admin-api";
+import { addedByTeacher, type AdminBooking, type AvailabilityException, type OnlineOnlyPeriod } from "@/lib/admin-api";
 import { meetingHref } from "@/components/MeetingLink";
 import { formatSlotTime } from "@/lib/booking-api";
 import { timetableBounds } from "@/lib/timetable-bounds";
@@ -30,6 +30,8 @@ import {
   daysOff,
   lessonStarts,
   minuteLabel,
+  onlineOnlyHours,
+  onlineOnlyLabel,
   overlapsSpan,
   paintHours,
   parseMinute,
@@ -46,6 +48,8 @@ type Props = {
   hours: WeekHours;
   bookings: AdminBooking[];
   exceptions: AvailabilityException[];
+  /** Shown, not edited, here: her weekly hours in them take the online-only colour. */
+  onlineOnly: OnlineOnlyPeriod[];
   editing: boolean;
   interval: number;
   disabled: boolean;
@@ -78,6 +82,7 @@ export function WeeklyTimetable({
   hours,
   bookings,
   exceptions,
+  onlineOnly,
   editing,
   interval,
   disabled,
@@ -150,6 +155,7 @@ export function WeeklyTimetable({
     step,
     editing,
   });
+  const onlineShown = !editing && shown.some(index => onlineOnlyHours(onlineOnly, shiftDate(weekStart, index)).length > 0);
   const minutes = Array.from(
     { length: Math.ceil((end - start) / step) },
     (_, index) => start + index * step,
@@ -460,6 +466,11 @@ export function WeeklyTimetable({
     </button>;
   }
 
+  /** A date online only all day; its hours otherwise show in its cells. */
+  function onlineAllDay(date: string) {
+    return !editing && onlineOnlyLabel(onlineOnlyHours(onlineOnly, date)) === "All day";
+  }
+
   function dayLabel(index: number) {
     const date = shiftDate(weekStart, index);
     return <>
@@ -467,6 +478,7 @@ export function WeeklyTimetable({
       {!editing ? <strong className={date === today ? "teacher-day-today" : undefined}>
         {date === today ? <span className="visually-hidden">Today, </span> : null}{Number(date.slice(-2))}
       </strong> : <span className="teacher-day-full-name">{WEEKDAYS[index].name.slice(3)}</span>}
+      {onlineAllDay(date) ? <span className="teacher-day-online" title="Online only"><Globe size={11} strokeWidth={2.4} aria-hidden="true" /></span> : null}
       {!editing && segments.some(segment => segment.date === date) ? <i className="teacher-heading-booked-dot" aria-label="Lessons booked" /> : null}
     </>;
   }
@@ -590,7 +602,7 @@ export function WeeklyTimetable({
             return <div className="teacher-day-cell" key={day.value}>
               <div className="teacher-day-cell__band">
                 <button className={`teacher-day-heading ${activeDay === index ? "is-selected" : ""}`}
-                  type="button" aria-label={editing ? `${day.name}, show weekly hours` : `${dateLabel(date)}, show lessons`}
+                  type="button" aria-label={editing ? `${day.name}, show weekly hours` : `${dateLabel(date)}${onlineAllDay(date) ? ", online only" : ""}, show lessons`}
                   aria-pressed={activeDay === index} onClick={() => {
                     if (index !== activeDay) openDay(index);
                     onSelectDay(index);
@@ -638,6 +650,7 @@ export function WeeklyTimetable({
               const starts = lessonStarts(windows, interval);
               const weekly = weeklyBlocks(exceptions, day.value);
               const blocks = editing ? [] : dateBlocks(exceptions, date);
+              const online = editing ? [] : onlineOnlyHours(onlineOnly, date);
               const daySegments = segments.filter(
                 (segment) => segment.date === date,
               );
@@ -731,6 +744,7 @@ export function WeeklyTimetable({
                         Math.max(span.start, start) >= minute &&
                         Math.max(span.start, start) < cellEnd,
                     );
+                    const onlineHere = usual && !off && !blocked && overlapsSpan(online, minute, cellEnd);
                     const fixed = past || off || inWeekly;
                     const blockedHere = !fixed && overlapsSpan(blocks, minute, cellEnd);
                     const reason = past
@@ -742,7 +756,7 @@ export function WeeklyTimetable({
                       <button
                         key={minute}
                         type="button"
-                        className={`teacher-time-slot ${usual && !off && !blocked ? "is-available" : ""} ${blocked && !off ? "is-blocked" : ""} ${labelled ? "is-labelled" : ""} ${weeklyClass} ${hourClass}`}
+                        className={`teacher-time-slot ${usual && !off && !blocked ? "is-available" : ""} ${onlineHere ? "is-online-only" : ""} ${blocked && !off ? "is-blocked" : ""} ${labelled ? "is-labelled" : ""} ${weeklyClass} ${hourClass}`}
                         aria-pressed={fixed ? undefined : blocked}
                         aria-disabled={(past && !onAddLesson) || undefined}
                         aria-haspopup={past ? (onAddLesson ? "menu" : undefined) : blockedHere ? undefined : "menu"}
@@ -751,7 +765,7 @@ export function WeeklyTimetable({
                             ? `${minuteLabel(minute)}, ${dateLabel(date)}, ${reason}${past && onAddLesson ? ": add a past lesson" : ""}`
                             : blockedHere
                               ? `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}, off: reopen`
-                              : `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}: add a lesson or take it off`
+                              : `${minuteLabel(minute)}–${minuteLabel(cellEnd)}, ${dateLabel(date)}${usual ? ", in your weekly hours" : ""}${onlineHere ? ", online only" : ""}: add a lesson or take it off`
                         }
                         {...pointer}
                         onClick={() => {
@@ -887,6 +901,12 @@ export function WeeklyTimetable({
               <i className="teacher-key-off" aria-hidden="true" />
               Time off
             </span>
+            {onlineShown ? (
+              <span>
+                <i className="teacher-key-online-only" aria-hidden="true" />
+                Online only
+              </span>
+            ) : null}
             <span>
               <Globe size={12} strokeWidth={2.4} aria-hidden="true" />
               Online

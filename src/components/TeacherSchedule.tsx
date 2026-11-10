@@ -1,6 +1,6 @@
 "use client";
 
-import { TUTOR_NAME } from "@/lib/tutor";
+import { IN_PERSON, TUTOR_NAME } from "@/lib/tutor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Check, CheckCircle2, ChevronDown } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
@@ -14,7 +14,6 @@ import { NextLesson } from "@/components/teacher/NextLesson";
 import { NeedsYou } from "@/components/teacher/NeedsYou";
 import { MonthLabel, TeacherPager } from "@/components/teacher/TeacherPager";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
-import { OnlineOnlyPeriods } from "@/components/teacher/OnlineOnlyPeriods";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
 import { ScheduleLoading, WeekLoading } from "@/components/teacher/ScheduleLoading";
@@ -49,6 +48,7 @@ import {
   dateLabel,
   hoursFromRules,
   hoursProblem,
+  labelOnlineOnly,
   mondayOf,
   needsYou,
   studentWorkspace,
@@ -605,6 +605,45 @@ export function TeacherSchedule() {
     }
   }
 
+  /**
+   * Online only replaces the Worker's whole list against the revision it was
+   * read at, then forgets cached student availability. Its outcome is said on
+   * the Time off card, never as a band across the page.
+   */
+  async function saveOnlineOnly(said: string[], dates: string[], hours: Span | null) {
+    const subject = said.length === 1 ? shortDate(said[0]) : `${said.length} selected days`;
+    const account = accountGeneration.current;
+    try {
+      if (sendingDays.current) throw new Error("Please wait until your calendar has finished saving.");
+      sendingDays.current = true;
+      setSavingDays(true);
+      try {
+        const saved = await saveOnlineOnlyPeriods(token, labelOnlineOnly(onlineOnlyPeriods, dates, hours, today), onlineOnlyRevision);
+        if (account !== accountGeneration.current || readSession() !== token) throw new Error("Your sign-in has changed. Please sign in again.");
+        setOnlineOnlyPeriods(saved.periods);
+        setOnlineOnlyRevision(saved.revision);
+        forgetAvailability();
+      } finally {
+        if (account === accountGeneration.current) {
+          sendingDays.current = false;
+          setSavingDays(false);
+        }
+      }
+      const many = said.length > 1;
+      setDayNote({
+        error: false,
+        text: hours
+          ? `${subject} ${many ? "are" : "is"} online only${hours.start === 0 && hours.end === 1440 ? "" : `, ${spanLabel(hours)}`}.`
+          : `${subject} can be booked ${IN_PERSON.replace(/^In /, "in ")} again.`,
+      });
+    } catch (caught) {
+      if (account === accountGeneration.current) {
+        setDayNote({ error: true, text: `${subject} ${said.length > 1 ? "were" : "was"} not changed. ${caught instanceof Error ? caught.message : "Please try again."}` });
+      }
+      throw caught;
+    }
+  }
+
   const weekEnd = shiftDate(weekStart, 6);
   const weekCount = bookings.filter(
     (booking) =>
@@ -797,15 +836,6 @@ export function TeacherSchedule() {
             />
           ) : null}
         </div>
-        <OnlineOnlyPeriods today={today} periods={onlineOnlyPeriods} onSave={async periods => {
-          const generation = accountGeneration.current;
-          const saved = await saveOnlineOnlyPeriods(token, periods, onlineOnlyRevision);
-          if (generation !== accountGeneration.current || readSession() !== token) throw new Error("Your sign-in has changed. Please sign in again.");
-          setOnlineOnlyPeriods(saved.periods);
-          setOnlineOnlyRevision(saved.revision);
-          forgetAvailability();
-          setStatus("Online-only periods saved.");
-        }} />
         {editing && hoursDirty ? (
           <div className="teacher-hours-warning" aria-live="polite">
             {bookingsLoading ? <p>Checking booked lessons…</p> : bookingsError ? <div role="alert"><p>Booked lessons couldn’t be checked.</p><button className="button button--outline button--small" onClick={() => void reloadBookings()} type="button">Try again</button></div> : affectedLessons.length ? <>
@@ -847,6 +877,7 @@ export function TeacherSchedule() {
             hours={editing ? draftHours : savedHours}
             bookings={bookings}
             exceptions={shownExceptions}
+            onlineOnly={onlineOnlyPeriods}
             editing={editing}
             interval={interval}
             disabled={savingHours}
@@ -898,6 +929,7 @@ export function TeacherSchedule() {
         <TimeOffCalendar
           today={today}
           exceptions={shownExceptions}
+          onlineOnly={onlineOnlyPeriods}
           bookings={bookings}
           bookingsLoading={bookingsLoading}
           bookingsError={bookingsError}
@@ -909,6 +941,7 @@ export function TeacherSchedule() {
             </p>
           }
           onChange={takeTimeOff}
+          onOnlineOnly={saveOnlineOnly}
           onSaveDay={saveTimeOffDay}
           onOpenBooking={setSelectedBooking}
         />

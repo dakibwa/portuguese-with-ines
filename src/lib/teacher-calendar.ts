@@ -8,6 +8,7 @@ import type {
   AvailabilityException,
   AvailabilityRule,
   GoogleMeetConnection,
+  OnlineOnlyPeriod,
   PaymentReview,
 } from "./admin-api";
 
@@ -279,6 +280,81 @@ export function weeklyBlocks(
       note: exception.note,
     }))
     .sort((a, b) => a.start - b.start);
+}
+
+/**
+ * Online only (10 November 2026, Dan: Inês can "label days as online only").
+ * She labels days; the Worker stores periods, each a run of dates with one
+ * daily window, and replaces the whole list on each save.
+ */
+export const ALL_DAY: Span = { start: 0, end: 1440 };
+/** Beyond this the Worker refuses the list, as the first editor did. */
+export const MAX_ONLINE_ONLY_PERIODS = 100;
+
+/** One date's online-only hours, merged; empty when either place can be booked. */
+export function onlineOnlyHours(periods: OnlineOnlyPeriod[], date: string): Span[] {
+  return mergeSpans(periods
+    .filter((period) => period.fromDate <= date && date <= period.toDate)
+    .map((period) => ({ start: period.startMinute, end: period.endMinute })));
+}
+
+/** `All day`, `12:00–16:00`, or nothing when the date isn't online only. */
+export function onlineOnlyLabel(hours: Span[]) {
+  if (hours.length === 1 && hours[0].start === 0 && hours[0].end === 1440) return "All day";
+  return hours.map(spanLabel).join(", ");
+}
+
+/**
+ * Labels `dates` online only for `hours` each day, or takes the label off
+ * them when `hours` is null. Other dates keep theirs: a period the dates
+ * fall inside splits around them, each part keeping its hours, and the first
+ * part its id. Neighbouring dates with the same hours become one period;
+ * periods wholly before `today` are dropped. Throws past the Worker's limit.
+ */
+export function labelOnlineOnly(
+  periods: OnlineOnlyPeriod[],
+  dates: string[],
+  hours: Span | null,
+  today: string,
+  newId: () => string = () => crypto.randomUUID(),
+): OnlineOnlyPeriod[] {
+  const chosen = [...new Set(dates)].sort();
+  const pieces: OnlineOnlyPeriod[] = [];
+  for (const period of periods) {
+    if (period.toDate < today) continue;
+    let from = period.fromDate;
+    let id = period.id;
+    const take = (toDate: string) => {
+      if (from <= toDate) { pieces.push({ ...period, id: id || newId(), fromDate: from, toDate }); id = ""; }
+    };
+    for (const date of chosen.filter((date) => period.fromDate <= date && date <= period.toDate)) {
+      take(shiftDate(date, -1));
+      from = shiftDate(date, 1);
+    }
+    take(period.toDate);
+  }
+  if (hours) {
+    for (const date of chosen) {
+      const last = pieces.at(-1);
+      if (last && !last.id && shiftDate(last.toDate, 1) === date) last.toDate = date;
+      else pieces.push({ id: "", fromDate: date, toDate: date, startMinute: hours.start, endMinute: hours.end });
+    }
+  }
+  const merged: OnlineOnlyPeriod[] = [];
+  for (const period of pieces.sort((a, b) =>
+    a.startMinute - b.startMinute || a.endMinute - b.endMinute || a.fromDate.localeCompare(b.fromDate))) {
+    const last = merged.at(-1);
+    if (last && last.startMinute === period.startMinute && last.endMinute === period.endMinute && shiftDate(last.toDate, 1) >= period.fromDate) {
+      if (period.toDate > last.toDate) last.toDate = period.toDate;
+      if (!last.id) last.id = period.id;
+    } else merged.push({ ...period });
+  }
+  const result = merged
+    .map((period) => ({ ...period, id: period.id || newId() }))
+    .sort((a, b) => a.fromDate.localeCompare(b.fromDate) || a.startMinute - b.startMinute);
+  if (result.length > MAX_ONLINE_ONLY_PERIODS)
+    throw new Error(`Online only can cover at most ${MAX_ONLINE_ONLY_PERIODS} separate runs of days.`);
+  return result;
 }
 
 function localMinute(value: string) {

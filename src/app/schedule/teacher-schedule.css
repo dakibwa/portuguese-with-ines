@@ -342,6 +342,7 @@
 .teacher-day-heading > span { opacity: 0.7; }
 .teacher-day-heading strong { display: inline-grid; place-items: center; min-width: 1.85rem; min-height: 1.85rem; font-size: 1rem; font-weight: 700; letter-spacing: 0; }
 .teacher-day-heading .teacher-day-today { padding: 0.15rem 0.35rem; border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); }
+.teacher-day-online { display: inline-grid; place-items: center; color: var(--blue-deep); }
 .teacher-heading-booked-dot { position: absolute; top: 0.35rem; right: 0.25rem; width: 4px; height: 4px; border-radius: 50%; background: var(--coral-action); }
 .teacher-day-full-name { display: none; }
 .teacher-week-day-control { display: none; }
@@ -454,6 +455,12 @@
    cream outside her hours. Labels and hatching also distinguish time off. */
 .teacher-time-slot.is-available {
   background: rgba(170, 164, 230, 0.22);
+}
+/* Her weekly hours that can only be booked online take the one online-only
+   colour (10 November 2026, Dan); the key names it, and a day online only
+   all day has a globe by its date. */
+.teacher-time-slot.is-available.is-online-only {
+  background: var(--online-only);
 }
 .teacher-timetable--editing .teacher-time-slot.is-available {
   background: var(--lavender-soft);
@@ -731,6 +738,10 @@
 }
 .teacher-key-booked {
   background: var(--blue-deep);
+}
+.teacher-key-online-only {
+  background: var(--online-only);
+  border-color: var(--rule) !important;
 }
 .teacher-key-off {
   border-color: var(--rule) !important;
@@ -1576,6 +1587,8 @@
   .teacher-day-cell { border-left: 0; }
   .teacher-day-cell__band > .teacher-day-toggle { display: none; }
   .teacher-day-cell__band > .teacher-day-heading { width: 100%; min-height: 44px; }
+  /* Too narrow to follow the date, the globe takes the corner the booked dot leaves. */
+  .teacher-day-online { position: absolute; top: 0.3rem; left: 0.25rem; }
   .teacher-block-label {
     font-size: 0.68rem;
   }
@@ -2196,15 +2209,6 @@
 .teacher-timeoff-times > .teacher-quiet { justify-self: start; }
 .teacher-timeoff-time { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 0.5rem; align-items: end; }
 .teacher-timeoff-time input { width: 100%; min-width: 0; }
-.teacher-online-only-control { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; margin-bottom: 0.8rem; }
-.teacher-online-only-control > span { font-size: 0.75rem; color: var(--lavender-ink); }
-.teacher-online-only-form, .teacher-online-only-period { display: grid; gap: 0.8rem; min-width: 0; }
-.teacher-online-only-form > .button { justify-self: start; }
-.teacher-online-only-period { margin: 0; padding: 0.6rem 0 1rem; border: 0; border-bottom: 1px solid var(--rule); }
-.teacher-online-only-period legend { font-size: 0.8rem; font-weight: 600; }
-.teacher-online-only-form .teacher-online-only-allday { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; min-height: 44px; }
-.teacher-online-only-form .teacher-online-only-allday input { flex: none; width: 20px; height: 20px; min-height: 20px; padding: 0; accent-color: var(--blue-deep); }
-.teacher-online-only-form .teacher-online-only-allday > span { margin: 0; }
 /* At 320 px both times keep their digits whole. */
 @media (max-width: 360px) {
   .teacher-timeoff-time { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; gap: 0.35rem; }
@@ -2294,6 +2298,16 @@
 .teacher-month-day.is-off {
   background: repeating-linear-gradient(-45deg, transparent, transparent 5px, var(--hover-wash) 5px, var(--hover-wash) 7px), var(--lavender-soft);
 }
+/* Online only tints the day and marks it with a globe; a day off keeps its
+   hatching, with the globe beside it. */
+.teacher-month-day.is-online:not(.is-off):not([aria-pressed="true"]) {
+  background: var(--online-only);
+}
+.teacher-month-online {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+}
 .teacher-month-day.is-outside:not([aria-pressed="true"]) {
   background-color: transparent;
 }
@@ -2357,6 +2371,9 @@
 }
 .teacher-month-key .is-off {
   background: var(--lavender-soft);
+}
+.teacher-month-key .is-online {
+  background: var(--online-only);
 }
 .teacher-month-key .is-booked {
   width: 4px;
@@ -2428,6 +2445,20 @@
   flex: 1 1 100%;
   gap: 0.5rem;
 }
+/* Pressed, the Online only chip is filled with the colour it gives the month. */
+.teacher-online-chip[aria-pressed="true"],
+.teacher-online-chip[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--online-only);
+}
+/* The chosen days' online-only hours: a value with its pencil, opening in place. */
+.teacher-online-hours { display: flex; min-width: 0; margin-top: -0.35rem; }
+.teacher-online-hours .teacher-edit { margin-inline: 0; font: 600 0.82rem/1.5 var(--ui); }
+.teacher-online-hours .teacher-edit__value > span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.teacher-online-hours__edit { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; width: 100%; min-width: 0; }
+.teacher-online-hours__edit .teacher-manual-choice { flex: 1 1 100%; }
+.teacher-online-hours__times { display: grid; flex: 1 1 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; min-width: 0; }
+.teacher-online-hours__edit > .teacher-edit-actions { min-height: 44px; margin-left: auto; }
+.teacher-online-hours__edit > .teacher-inline-edit__error { flex: 1 1 100%; }
 /* With nothing chosen and nothing off ahead it is only a hint, not a card. */
 .teacher-timeoff-selection:not(.has-days):not(.has-upcoming) {
   border-color: transparent;
@@ -2544,6 +2575,7 @@
   .teacher-month-grid { gap: 0.2rem; }
   .teacher-month-day { min-height: 54px; }
   .teacher-month-state { font-size: 0.5rem; }
+  .teacher-month-online { top: 3px; right: 3px; width: 9px; height: 9px; }
   .teacher-month-key { column-gap: 0.65rem; }
 }
 /* Her students (12 October 2026, Dan): one row each, who first, then what

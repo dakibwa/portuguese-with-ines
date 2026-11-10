@@ -484,32 +484,41 @@ async function lessonLocation(page, name, location) {
 }
 
 try {
-  // One date-range editor journey, with a failed save retaining her choice.
+  // One online-only journey on the Time off card, with a failed save retaining her choice.
   for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
-    await page.getByRole("button", { name: "Online only", exact: true }).click();
-    const dialog = page.getByRole("dialog", { name: "Online only", exact: true });
-    await dialog.getByLabel("From date 1", { exact: true }).fill("2026-09-14");
-    await dialog.getByLabel("Through date 1", { exact: true }).fill("2026-09-18");
-    await dialog.getByLabel("All day", { exact: true }).uncheck();
-    await dialog.getByLabel("From time 1", { exact: true }).fill("12:00");
-    await dialog.getByLabel("Until time 1", { exact: true }).fill("16:00");
+    const days = ["2026-09-14", "2026-09-15", "2026-09-16"];
+    const card = page.locator(".teacher-timeoff-selection");
+    const chip = card.getByRole("button", { name: "Online only", exact: true });
+    const choose = async () => {
+      await page.getByRole("tab", { name: "Time off", exact: true }).click();
+      for (const date of days) await page.locator(`[data-timeoff-date="${date}"]`).click();
+    };
+    await choose();
     state.failOnlineOnly = true;
-    await dialog.getByRole("button", { name: "Save online-only periods", exact: true }).click();
-    await expect(dialog.getByRole("alert")).toContainText("couldn’t be saved");
-    await expect(dialog.getByLabel("From time 1", { exact: true })).toHaveValue("12:00");
-    await dialog.screenshot({ path: `tmp/qa/teacher/online-only-${width}.png` });
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-    assert.ok(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1), "The editor fits on a phone");
-    await dialog.getByRole("button", { name: "Save online-only periods", exact: true }).click();
-    await expect(dialog).toHaveCount(0);
-    assert.deepEqual(state.onlineOnlyPeriods, [{ id: state.onlineOnlyPeriods[0].id, fromDate: "2026-09-14", toDate: "2026-09-18", startMinute: 720, endMinute: 960 }]);
+    await chip.click();
+    await expect(card.getByRole("alert")).toContainText("couldn’t be saved");
+    await expect(chip).toHaveAttribute("aria-pressed", "false");
+    await expect(card.getByRole("button", { name: /^Remove / })).toHaveCount(3);
+    await chip.click();
+    await expect(chip).toHaveAttribute("aria-pressed", "true");
+    await card.getByRole("button", { name: "Change online-only hours", exact: true }).click();
+    await card.getByRole("radio", { name: "Some hours", exact: true }).check();
+    await card.getByLabel("From", { exact: true }).fill("12:00");
+    await card.getByLabel("Until", { exact: true }).fill("16:00");
+    await card.getByLabel("Until", { exact: true }).press("Enter");
+    await expect(card.getByRole("status")).toContainText("3 selected days are online only, 12:00–16:00.");
+    await expect(card.getByRole("button", { name: "Change online-only hours", exact: true })).toBeFocused();
+    assert.deepEqual(state.onlineOnlyPeriods, [{ id: state.onlineOnlyPeriods[0].id, fromDate: "2026-09-14", toDate: "2026-09-16", startMinute: 720, endMinute: 960 }]);
+    await page.locator(".teacher-timeoff").screenshot({ path: `tmp/qa/teacher/online-only-${width}.png` });
+    await noOverflow(page);
     await page.reload();
-    await page.getByRole("button", { name: "Online only · 1", exact: true }).click();
-    await expect(dialog.getByLabel("From date 1", { exact: true })).toHaveValue("2026-09-14");
-    await dialog.getByRole("button", { name: "Remove period 1", exact: true }).click();
-    await dialog.getByRole("button", { name: "Save online-only periods", exact: true }).click();
-    await expect(dialog).toHaveCount(0);
+    await page.getByRole("tab", { name: "Time off", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Tuesday 15 September, online only 12:00–16:00", exact: true })).toBeVisible();
+    await choose();
+    await chip.click();
+    await expect(card.getByRole("status")).toContainText("3 selected days can be booked in Porto again.");
+    await expect(chip).toHaveAttribute("aria-pressed", "false");
     assert.deepEqual(state.onlineOnlyPeriods, []);
     assert.equal(state.bookings.length, 2, "Her existing lessons remain booked");
     assert.deepEqual(state.errors, []);
@@ -2001,7 +2010,7 @@ try {
   assert.deepEqual(student.state.writes, []);
   await student.page.close();
   console.log(
-    "Teacher calendar passed: online-only periods, visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, student cards with their checks, invites and profiles, teacher email/password links and verified session renewal, responsive layout and access gate.",
+    "Teacher calendar passed: online-only days, visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, student cards with their checks, invites and profiles, teacher email/password links and verified session renewal, responsive layout and access gate.",
   );
 } finally {
   await browser.close();

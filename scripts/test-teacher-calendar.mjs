@@ -16,9 +16,12 @@ import {
   daysOff,
   hoursFromRules,
   hoursProblem,
+  labelOnlineOnly,
   lessonStarts,
   mondayOf,
   needsYou,
+  onlineOnlyHours,
+  onlineOnlyLabel,
   studentProgress,
   studentWorkspace,
   paintHours,
@@ -540,4 +543,55 @@ test("a teacher who is also a student opens Your lessons only when asked; every 
   assert.equal(opensSchedule({ role: "student" }, false), false);
   assert.equal(opensSchedule(null, false), false);
   assert.deepEqual([teacher, dual, { role: "student" }].map(hasStudentSide), [false, true, true]);
+});
+
+test("online only: her labelled days become the Worker's periods and back", () => {
+  let next = 0;
+  const id = () => `new-${++next}`;
+  const today = "2026-09-07";
+  const allDay = { start: 0, end: 1440 };
+  const midday = { start: 720, end: 960 };
+  // Neighbouring days with the same hours are one period; a gap or other hours are another.
+  const labelled = labelOnlineOnly([], ["2026-09-16", "2026-09-14", "2026-09-15", "2026-09-18"], allDay, today, id);
+  assert.deepEqual(labelled, [
+    { id: "new-1", fromDate: "2026-09-14", toDate: "2026-09-16", startMinute: 0, endMinute: 1440 },
+    { id: "new-2", fromDate: "2026-09-18", toDate: "2026-09-18", startMinute: 0, endMinute: 1440 },
+  ]);
+  assert.deepEqual(labelOnlineOnly(labelled, ["2026-09-17"], allDay, today, id),
+    [{ id: "new-1", fromDate: "2026-09-14", toDate: "2026-09-18", startMinute: 0, endMinute: 1440 }], "filling the gap joins them, keeping the first id");
+  assert.deepEqual(onlineOnlyHours(labelled, "2026-09-15"), [allDay]);
+  assert.deepEqual(onlineOnlyHours(labelled, "2026-09-17"), []);
+  assert.equal(onlineOnlyLabel([allDay]), "All day");
+  assert.equal(onlineOnlyLabel([midday]), "12:00–16:00");
+  assert.equal(onlineOnlyLabel([]), "");
+
+  // Taking the label off days in the middle splits the range; both parts keep their hours.
+  const week = [{ id: "week", fromDate: "2026-09-14", toDate: "2026-09-20", startMinute: 720, endMinute: 960 }];
+  next = 0;
+  assert.deepEqual(labelOnlineOnly(week, ["2026-09-16", "2026-09-17"], null, today, id), [
+    { id: "week", fromDate: "2026-09-14", toDate: "2026-09-15", startMinute: 720, endMinute: 960 },
+    { id: "new-1", fromDate: "2026-09-18", toDate: "2026-09-20", startMinute: 720, endMinute: 960 },
+  ]);
+  // New hours for those days sit between the two parts; an edge day just shortens it.
+  next = 0;
+  assert.deepEqual(labelOnlineOnly(week, ["2026-09-16"], allDay, today, id).map(({ fromDate, toDate, startMinute }) => [fromDate, toDate, startMinute]),
+    [["2026-09-14", "2026-09-15", 720], ["2026-09-16", "2026-09-16", 0], ["2026-09-17", "2026-09-20", 720]]);
+  assert.deepEqual(labelOnlineOnly(week, ["2026-09-14"], null, today, id), [{ ...week[0], fromDate: "2026-09-15" }]);
+  assert.deepEqual(labelOnlineOnly(week, ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20"], null, today, id), [], "removing every day clears the list");
+  // A date covered by two windows reads as both, merged; labelling it replaces them with one.
+  const two = [...week, { id: "morning", fromDate: "2026-09-16", toDate: "2026-09-16", startMinute: 540, endMinute: 600 }];
+  assert.equal(onlineOnlyLabel(onlineOnlyHours(two, "2026-09-16")), "09:00–10:00, 12:00–16:00");
+  assert.deepEqual(labelOnlineOnly(two, ["2026-09-16"], midday, today, id), [week[0]], "the same hours rejoin the week, keeping its id");
+
+  // Periods wholly past are dropped when saving; one running through today stays whole.
+  const past = { id: "past", fromDate: "2026-08-01", toDate: "2026-09-06", startMinute: 0, endMinute: 1440 };
+  const running = { id: "running", fromDate: "2026-09-01", toDate: "2026-09-08", startMinute: 0, endMinute: 1440 };
+  assert.deepEqual(labelOnlineOnly([past, running], ["2026-10-01"], allDay, today, () => "october").map(period => period.id), ["running", "october"]);
+
+  // Never more than the Worker's 100 periods.
+  const alternate = Array.from({ length: 100 }, (_, index) => shiftDate("2026-09-08", index * 2));
+  assert.equal(labelOnlineOnly([], alternate, allDay, today, id).length, 100);
+  assert.throws(() => labelOnlineOnly([], [...alternate, "2027-06-01"], allDay, today, id), /at most 100/);
+  // Its own ids are real UUIDs unless told otherwise.
+  assert.match(labelOnlineOnly([], ["2026-09-14"], allDay, today)[0].id, /^[0-9a-f-]{36}$/);
 });
