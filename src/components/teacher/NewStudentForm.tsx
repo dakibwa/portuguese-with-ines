@@ -37,8 +37,8 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
 
   return (
     <>
+      {/* Next: their lessons says what follows; this is what it can't say. */}
       <ul className="booking-payment-facts teacher-profile__facts">
-        <li>Their details now, any lessons next</li>
         <li>Nothing is emailed until you send their welcome</li>
       </ul>
       <form
@@ -78,29 +78,30 @@ export function NewStudentForm({ token, onBusy, onAdded, onCancel, cancelLabel, 
         </label>
         {/* A name is enough to start; she can add the rest later (13 October 2026, Dan). */}
         <label>
-          <span>Email <span className="teacher-field-optional">(optional, their welcome needs one)</span></span>
-          <input autoComplete="off" disabled={busy} onChange={set("email")} type="email" value={details.email} />
+          {/* Its aside is its placeholder, as a NIF's is (10 November 2026). */}
+          <span>Email</span>
+          <input autoComplete="off" disabled={busy} onChange={set("email")} placeholder="Optional, their welcome needs one" type="email" value={details.email} />
         </label>
         {/* Name and email are all most students need on day one, so the rest
             waits, folded, a press away (27 October 2026, Dan: onboarding
             should feel easy). Their price still goes in from the start. */}
         <details className="teacher-profile__more" ref={more}>
-          <summary>Phone, NIF, price and splat</summary>
+          <summary className="teacher-quiet">Phone, NIF, price and splat</summary>
           <div className="teacher-profile__more-body">
             <label>
-              <span>Phone <span className="teacher-field-optional">(optional)</span></span>
-              <input autoComplete="off" disabled={busy} onChange={set("phone")} type="tel" value={details.phone} />
+              <span>Phone</span>
+              <input autoComplete="off" disabled={busy} onChange={set("phone")} placeholder="Optional" type="tel" value={details.phone} />
             </label>
             <label>
-              <span>NIF <span className="teacher-field-optional">(optional, for receipts)</span></span>
-              <input autoComplete="off" autoCorrect="off" disabled={busy} inputMode="numeric" spellCheck={false} onChange={set("nif")} type="text" value={details.nif} />
+              <span>NIF</span>
+              <input autoComplete="off" autoCorrect="off" disabled={busy} inputMode="numeric" spellCheck={false} onChange={set("nif")} placeholder="Optional, for receipts" type="text" value={details.nif} />
             </label>
             <fieldset className="teacher-profile__price">
               <legend>Their price <span className="teacher-field-optional">(optional, per lesson)</span></legend>
               <PriceFields draft={prices} disabled={busy} idPrefix="teacher-student-price" invalid={error === PRICE_RANGE_ERROR} onChange={setPrices} />
             </fieldset>
             <div className="teacher-profile__splat">
-              <span id="teacher-student-splat">Their splat <span className="teacher-field-optional">(optional)</span></span>
+              <span id="teacher-student-splat">Their splat</span>
               <div aria-labelledby="teacher-student-splat" className="my-lessons__marks" role="group">
                 {[{ id: "", label: "Their initial" }, ...STUDENT_MARKS].map((choice) => (
                   <button

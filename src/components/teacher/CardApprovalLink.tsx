@@ -188,12 +188,13 @@ export function CardApprovalLink({ booking, student, token, busy, onBusy, onErro
     </div>
   );
 
-  // Inline the button joins the lesson's toolbar; its sentence stays for
-  // assistive technology rather than as a footer.
+  // The button joins the lesson's other actions as their quiet chip, inline
+  // and in the timetable's dialog alike; its sentence stays for assistive
+  // technology rather than as a footer.
   return (
-    <div className={quiet ? `${box} teacher-card-link--trigger` : box}>
-      <p className={quiet ? "visually-hidden" : undefined} id={quiet ? headingId : undefined}>Let {firstName} pay by card for this and other unpaid lessons.</p>
-      <button aria-describedby={quiet ? headingId : undefined} className={secondary} type="button" disabled={busy} onClick={() => void start()}>
+    <div className={`${box} teacher-card-link--trigger`}>
+      <p className="visually-hidden" id={headingId}>Let {firstName} pay by card for this and other unpaid lessons.</p>
+      <button aria-describedby={headingId} className="teacher-quiet" type="button" disabled={busy} onClick={() => void start()}>
         {working ? "Checking their lessons…" : "Create payment link"}
       </button>
     </div>

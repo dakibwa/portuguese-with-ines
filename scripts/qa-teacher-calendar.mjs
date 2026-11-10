@@ -654,7 +654,7 @@ try {
   ).toBeDisabled();
   // Open from the start until the end, when the lesson is charged.
   await expect(page.getByRole("dialog")).toContainText(/Available \d\d:\d\d–\d\d:\d\d/);
-  await page.getByRole("button", { name: "Move lesson", exact: true }).click();
+  await page.getByRole("button", { name: "Move or cancel", exact: true }).click();
   await page.getByLabel("New date").fill("2026-09-10");
   await page.getByRole("dialog").getByLabel("Time in Porto").fill("00:30");
   state.failMove = 1;
@@ -855,6 +855,7 @@ try {
   assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.startAt, "2026-09-11T16:00:00.000Z", "The free time keeps its Porto date and time");
   await showLessons(page);
   await page.getByRole("button", { name: /^Sam Known, .*11 September.*View lesson$/ }).click();
+  await page.getByRole("button", { name: "Move or cancel", exact: true }).click();
   await page
     .getByRole("button", { name: "Cancel lesson", exact: true })
     .click();
@@ -870,6 +871,7 @@ try {
   await expect(messageField).toHaveAttribute("maxlength", "1000");
   await messageField.fill(cancellationMessage);
   await page.getByRole("button", { name: "Back to lesson" }).click();
+  await page.getByRole("button", { name: "Move or cancel", exact: true }).click();
   await page.getByRole("button", { name: "Cancel lesson", exact: true }).click();
   await expect(messageField).toHaveValue(cancellationMessage);
   const dialogBounds = await page.getByRole("dialog").boundingBox();
@@ -961,12 +963,12 @@ try {
   // Nothing ticked: the link only signs them in, with nothing to agree to.
   const terms = forSamForm.locator(".teacher-invite__terms");
   await expect(terms).toContainText("Nothing ticked: this link only signs Sam in");
-  await expect(terms).not.toContainText("Future lessons");
+  await expect(terms).not.toContainText("Not owed yet");
   await owed.getByRole("checkbox").first().click();
   await expect(terms).toContainText("€25 for the 1 lesson ticked, charged once Sam agrees.");
-  await expect(terms).toContainText("Nothing is charged until Sam agrees. Making or sending the link doesn’t agree to anything for them.");
+  await expect(terms).toContainText("Making or sending the link doesn’t agree to anything for them.");
   await expect(terms).toContainText("Not owed yet. If Sam agrees, these go on their card, charged at the end of each lesson:");
-  const weeklyLine = terms.locator("li").filter({ hasText: "Every Tuesday, 09:30–10:30" });
+  const weeklyLine = terms.locator("li li").filter({ hasText: "Every Tuesday, 09:30–10:30" });
   await expect(weeklyLine).toHaveCount(1);
   await expect(weeklyLine).toContainText(/€25–€30 a lesson, prices differ · 3 lessons to Tue 29 Sept?, 1 week moved/);
   await expect(weeklyLine).not.toContainText(/€25 a lesson/);
@@ -1331,6 +1333,7 @@ try {
   await showLessons(mobile.page);
   await mobile.page.getByRole("button", { name: "Tuesday 8 September, show lessons" }).tap();
   await mobile.page.getByRole("button", { name: /^Sam,.*View lesson$/ }).tap();
+  await mobile.page.getByRole("button", { name: "Move or cancel", exact: true }).tap();
   await mobile.page.getByRole("button", { name: "Cancel lesson", exact: true }).tap();
   const phoneMessage = mobile.page.getByLabel(/^Add a message to the email \(optional\)/);
   const longMessage = "Obrigada! ".repeat(100);
@@ -1454,6 +1457,7 @@ try {
     await expect(details).toContainText(/paid to you by hand/i);
     await expect(details.getByRole("button", { name: "Mark no-show", exact: true })).toHaveCount(0);
     await details.screenshot({ path: `tmp/qa/free-price/teacher-details-paid-${width}.png` });
+    await details.getByRole("button", { name: "Move or cancel", exact: true }).click();
     await details.getByRole("button", { name: "Cancel lesson", exact: true }).click();
     await expect(details).toContainText("Refund Sam directly for the payment made by hand");
     await expect(details).not.toContainText("refunded in full, automatically");
@@ -1768,7 +1772,7 @@ try {
     await page.getByRole("button", { name: /^Change lesson for Repeat 5/ }).click();
     await expect(page.getByRole("dialog", { name: "Repeat 5", exact: true })).toBeVisible();
     assert.deepEqual(state.writes, []);
-    await page.getByRole("button", { name: "Move lesson", exact: true }).click();
+    await page.getByRole("button", { name: "Move or cancel", exact: true }).click();
     await page.getByLabel("New date").fill("2026-10-13");
     await page.getByRole("dialog").getByLabel("Time in Porto").fill("11:00");
     await page.getByRole("button", { name: "Save new time", exact: true }).click();

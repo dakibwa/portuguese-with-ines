@@ -1326,6 +1326,38 @@
   min-height: 40px;
   padding: 0.6rem 1rem;
 }
+/* Her lesson, open over the timetable or in a student's card, and Add a
+   student (10 November 2026, Dan: "weird buttons taking up entire rows"):
+   a button is as wide as its words, and only a dialog's pair shares the row
+   on a phone. The lesser actions are the quiet chip at their own width, one
+   wrapping row beneath what happened; a payment link opened from them takes
+   the row's width beneath them, with no rule of its own. */
+:is(.teacher-lesson-dialog--lesson, .teacher-lesson-dialog--inline, .teacher-profile) :is(.teacher-dialog-actions, .teacher-card-link__actions) > .button {
+  flex: none;
+  width: auto;
+}
+:is(.teacher-lesson-dialog--lesson, .teacher-lesson-dialog--inline) .teacher-dialog-actions > .teacher-quiet {
+  flex: none;
+}
+.teacher-lesson-dialog--lesson > .teacher-dialog-actions {
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0;
+}
+.teacher-lesson-dialog--lesson > .teacher-dialog-actions > .teacher-card-link--trigger {
+  display: contents;
+}
+.teacher-lesson-dialog--lesson > .teacher-dialog-actions > .teacher-card-link:not(.teacher-card-link--trigger) {
+  margin-top: 0.6rem;
+  padding-top: 0;
+  border-top: 0;
+}
+@media (max-width: 480px) {
+  :is(.teacher-lesson-dialog--lesson, .teacher-profile) :is(.teacher-dialog-actions, .teacher-card-link__actions) > .button {
+    flex: 1 1 0;
+    min-width: fit-content;
+  }
+}
 /* What happened to a lesson, recorded on one row: Already paid and the
    no-show beside it, the same capsule each, with Move and Cancel left as
    the dialog's foot. */
@@ -2689,8 +2721,8 @@
   height: 34px;
   flex: none;
 }
-.teacher-profile__new.button {
-  gap: 0.5rem;
+.teacher-profile__new {
+  justify-self: start;
 }
 /* Their details, whether adding a student or bringing them out with Edit
    details: labelled fields two to a row where the dialog is wide, one column
@@ -2721,6 +2753,21 @@
 }
 /* A new student's phone, NIF, price and splat, folded under one small
    button; opened, they keep the form's own two columns. */
+/* Its disclosure is the quiet chip in sentence case, a lesser action
+   (10 November 2026); open, it is pressed as a chosen chip is. */
+.teacher-profile__more > summary.teacher-quiet {
+  min-height: 32px;
+  border-radius: var(--squiggle-chip);
+  padding: 0.25rem 0.8rem;
+  background: var(--lavender-soft);
+  color: var(--blue-deep);
+  font: 600 0.78rem/1.3 var(--ui);
+  letter-spacing: 0;
+  text-transform: none;
+}
+@media (hover: hover) { .teacher-profile__more > summary.teacher-quiet:hover { background: var(--lavender); } }
+.teacher-profile__more[open] > summary.teacher-quiet { background: var(--lavender); color: var(--blue-deep); box-shadow: inset 0 0 0 2px var(--blue); }
+@media (pointer: coarse) { .teacher-profile__more > summary.teacher-quiet { min-height: 40px; } }
 .teacher-profile__more-body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3272,17 +3319,15 @@
 .teacher-invite__owes { display: flex; align-items: flex-start; gap: 0.4rem; margin: 0; font-size: 0.78rem; }
 .teacher-invite__owes svg { flex: none; margin-top: 0.15em; color: var(--blue); }
 /* What is owed now, then what they would agree to for lessons still to come,
-   apart (9 November 2026): small-capitals names, one short answer each. */
-.teacher-invite__terms { display: grid; gap: 0.35rem; max-width: 28rem; padding: 0.55rem 0.8rem; border: 1px dashed var(--lavender); border-radius: var(--squiggle-field); font-size: 0.78rem; line-height: 1.5; }
-.teacher-invite__terms dl { display: grid; gap: 0.45rem; margin: 0; }
-.teacher-invite__terms dl > div { display: grid; grid-template-columns: minmax(5.5rem, auto) minmax(0, 1fr); gap: 0.1rem 0.75rem; }
-.teacher-invite__terms dt { color: var(--lavender-ink); font: 600 0.66rem/1.7 var(--ui); letter-spacing: 0.08em; text-transform: uppercase; }
-.teacher-invite__terms dd { margin: 0; }
+   as dabs (10 November 2026: a heading never says a fact, and no box round
+   them); a weekly run's lines beneath their dab carry none of their own. */
+.teacher-invite__terms.booking-payment-facts { max-width: 28rem; gap: 0.35rem; font-size: 0.78rem; }
 .teacher-invite__terms ul { display: grid; gap: 0.1rem; margin: 0.2rem 0; padding: 0; list-style: none; }
-.teacher-invite__terms li > span { color: var(--lavender-ink); }
-.teacher-invite__terms > p { margin: 0; color: var(--lavender-ink); }
-@media (max-width: 30rem) { .teacher-invite__terms dl > div { grid-template-columns: minmax(0, 1fr); } }
-.teacher-invite__terms dd .button { margin-top: 0.3rem; }
+.teacher-invite__terms li li { padding-left: 0; }
+.teacher-invite__terms li li::before { content: none; }
+.teacher-invite__terms li li > span { color: var(--lavender-ink); }
+.teacher-invite__terms li li strong { color: var(--ink); }
+.teacher-invite__terms .teacher-quiet { margin-top: 0.3rem; }
 /* The lessons she ticks and what agreeing means sit side by side where the card
    is wide, rather than a narrow stack with the right empty; on a phone they
    stack. The Make link button keeps a row of its own beneath. */

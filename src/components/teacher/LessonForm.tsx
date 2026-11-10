@@ -112,7 +112,7 @@ export function LessonForm({
   };
   const submit = (
     <>
-      {!startAt && !busy ? <p className="teacher-manual-hint" id={`${idPrefix}-needs-time`}>Choose a date and a time first.</p> : null}
+      {!startAt && !busy ? <p className="visually-hidden" id={`${idPrefix}-needs-time`}>Choose a date and a time first.</p> : null}
       <div className="teacher-manual-submit teacher-dialog-actions">
         <button
           className={`button button--${past ? "coral" : tone}`}

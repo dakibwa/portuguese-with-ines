@@ -367,8 +367,6 @@ export function LessonDetails({
       {inline ? <X size={15} strokeWidth={2.4} aria-hidden="true" /> : <X size={20} aria-hidden="true" />}
     </button>
   );
-  // Inline, every routine action is the one small soft lilac button; the dialog keeps its buttons.
-  const routine = (dialogClass: string) => inline ? "teacher-quiet" : dialogClass;
   // Set as a student's own lesson is (10 October 2026, at Dan's request): the
   // status, who, then when in bold with its length and place beneath, and the
   // actions side by side. Inline, the lesson's own row above already says who,
@@ -466,21 +464,23 @@ export function LessonDetails({
     <CardApprovalLink booking={booking} token={token} busy={busy} onBusy={setBusy} onError={setError} quiet={inline} />
   ) : null;
   // The default actions, rendered once: in the inline header beside the date,
-  // and in the timetable modal's toolbar where they have always been.
-  const homeworkTrigger = booking.student_id ? <button className={`${routine("button button--lilac")} teacher-lesson-homework`} type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null;
+  // and in the timetable modal beneath what happened. Both are the quiet chip
+  // at their own width (10 November 2026, Dan: one way for each thing); the
+  // modal's one filled button is its call.
+  const homeworkTrigger = booking.student_id ? <button className="teacher-quiet teacher-lesson-homework" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null;
   const defaultActions = (
     <>
       <button
-        className={routine("button button--coral")}
+        className="teacher-quiet"
         type="button"
         disabled={busy || locked}
         onClick={() => setAction("move")}
       >
-        {inline ? "Move or cancel" : "Move lesson"}
+        Move or cancel
       </button>
       {toCome && booking.lesson_type_id !== "trial" ? (
         <button
-          className={routine("button button--outline")}
+          className="teacher-quiet"
           type="button"
           disabled={busy || locked}
           onClick={() => {
@@ -492,19 +492,6 @@ export function LessonDetails({
           Change length
         </button>
       ) : null}
-      {inline ? null : (
-        <button
-          className="button button--outline"
-          type="button"
-          disabled={busy || locked}
-          onClick={() => {
-            setFollowing(false);
-            setAction("cancel");
-          }}
-        >
-          Cancel lesson
-        </button>
-      )}
     </>
   );
   // Inline, the row's own line: the lesson's date, then what she does with it
@@ -548,7 +535,6 @@ export function LessonDetails({
             {awaiting ? <li>{noEmail ? "No email yet: add it from their details on Students, then send their welcome" : "Not emailed yet: send their welcome from Students"}</li> : null}
           </ul>
           {inline ? null : recordBlock}
-          {inline ? null : approvalBlock}
         </>
       ) : null}
       {action === "view" && booking.notes ? (
@@ -572,20 +558,21 @@ export function LessonDetails({
           A payment is being processed. Try making changes once it finishes.
         </p>
       ) : null}
-      {booking.status === "cancelled" && action === "view" ? <div className="teacher-dialog-actions">
-        {canRecordRefund ? <button className={routine("button button--coral")} type="button" onClick={() => setAction("refund")}>Record refund</button> : null}
-        <button className={routine("button button--outline")} type="button" onClick={onClose}>Done</button>
-      </div> : action === "view" ? (
+      {/* A cancelled lesson's one action, if any; its close is the cross. */}
+      {booking.status === "cancelled" && action === "view" ? canRecordRefund ? <div className="teacher-dialog-actions">
+        <button className="teacher-quiet" type="button" onClick={() => setAction("refund")}>Record refund</button>
+      </div> : null : action === "view" ? (
         inline ? null : <div className="teacher-dialog-actions">
           {homeworkTrigger}
           {defaultActions}
+          {approvalBlock}
         </div>
       ) : action === "homework" ? <div className="teacher-dialog-homework">
         {backToLesson}
         <TeacherHomework bookingId={booking.id} token={token} onBusy={setBusy} />
       </div> : (
         <div className="teacher-dialog-confirmation">
-          {inline && (action === "move" || action === "cancel") ? (
+          {action === "move" || action === "cancel" ? (
             <div className="teacher-move-cancel" role="group" aria-label="Move or cancel">
               {(["move", "cancel"] as const).map(choice => (
                 <button
@@ -615,7 +602,7 @@ export function LessonDetails({
                 void perform();
               }}
             >
-              <h3>Change length</h3>
+              {/* Its Length choice and Save length name the step. */}
               {repeats ? <WeekChoice verb="Change" following={following} disabled={busy} onChange={setFollowing} /> : null}
               {/* Each length with what this student pays for it, as her lesson form shows them. */}
               <fieldset className="teacher-manual-choice">
@@ -663,8 +650,7 @@ export function LessonDetails({
             </form>
           ) : action === "move" ? (
             <>
-              {/* Headed as Cancel this lesson? is, with what happens as a dab. */}
-              <h3>Move this lesson</h3>
+              {/* The pressed Move lesson names it; what happens is a dab. */}
               <form
                 className="teacher-form teacher-move-form"
                 onSubmit={(event) => {
@@ -819,7 +805,7 @@ export function LessonDetails({
   }
   return (
     <dialog
-      className={`teacher-lesson-dialog${action === "homework" ? " teacher-lesson-dialog--homework" : ""}`}
+      className={`teacher-lesson-dialog teacher-lesson-dialog--lesson${action === "homework" ? " teacher-lesson-dialog--homework" : ""}`}
       ref={dialogRef}
       {...backdropHandlers}
       aria-labelledby="teacher-lesson-title"

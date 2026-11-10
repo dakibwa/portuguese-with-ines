@@ -200,7 +200,7 @@ try {
     assert.ok(await noOverflow(schedule.page), "Receipts fit the phone");
     await schedule.page.getByRole("tab", { name: "Timetable", exact: true }).click();
     await schedule.page.getByRole("button", { name: /^Carla, .*View lesson$/ }).click();
-    await schedule.page.getByRole("button", { name: "Move lesson", exact: true }).click();
+    await schedule.page.getByRole("button", { name: "Move or cancel", exact: true }).click();
     const newDate = schedule.page.getByLabel("New date");
     await newDate.focus();
     await oneBlueBoundary(newDate);

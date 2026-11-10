@@ -100,7 +100,8 @@ function futureLines(student: AdminStudent, bookings: AdminBooking[], now: numbe
  * Before the link is made and in its summary: what is owed now apart from what
  * they would agree to for the lessons still to come. The ticked lessons are
  * charged once they agree; the future ones are not owed yet; and making or
- * sending the link agrees to and charges nothing.
+ * sending the link agrees to and charges nothing. Said as dabs, never under
+ * headings of their own (10 November 2026, Dan: a heading never says a fact).
  */
 function ApprovalTerms({ first, owed, future, showOwed, onRetry }: { first: string; owed: CardApprovalLesson[]; future: Future; showOwed: boolean; onRetry: () => void }) {
   const later = future.status === "ready" && future.lines.length
@@ -114,24 +115,16 @@ function ApprovalTerms({ first, owed, future, showOwed, onRetry }: { first: stri
     : future.status === "loading" ? "Checking their upcoming lessons…"
     : future.status === "failed" ? <>
       Their upcoming lessons couldn’t be checked, so what goes on their card besides the lessons ticked isn’t shown. If {first} agrees, lessons you add go on their card, charged {CHARGED_EACH}.
-      {" "}<button className="button button--outline button--small" onClick={onRetry} type="button">Check again</button>
+      {" "}<button className="teacher-quiet" onClick={onRetry} type="button">Check again</button>
     </>
     : <>None booked yet. If {first} agrees, lessons you add go on their card, charged {CHARGED_EACH}.</>;
-  return <div className="teacher-invite__terms">
-    <dl>
-      {showOwed ? <div>
-        <dt>Owed now</dt>
-        <dd>{owed.length
-          ? `${formatMoneyCents(sum(owed))} for the ${owed.length === 1 ? "1 lesson" : `${owed.length} lessons`} ticked, charged once ${first} agrees.`
-          : `Nothing ticked: this link only signs ${first} in, with no payment to agree to.`}</dd>
-      </div> : null}
-      {owed.length ? <div>
-        <dt>Future lessons</dt>
-        <dd>{later}</dd>
-      </div> : null}
-    </dl>
-    {showOwed && owed.length ? <p>Nothing is charged until {first} agrees. Making or sending the link doesn’t agree to anything for them.</p> : null}
-  </div>;
+  return <ul className="booking-payment-facts teacher-invite__terms">
+    {showOwed ? <li>{owed.length
+      ? `${formatMoneyCents(sum(owed))} for the ${owed.length === 1 ? "1 lesson" : `${owed.length} lessons`} ticked, charged once ${first} agrees.`
+      : `Nothing ticked: this link only signs ${first} in.`}</li> : null}
+    {owed.length ? <li>{later}</li> : null}
+    {showOwed && owed.length ? <li>Making or sending the link doesn’t agree to anything for them.</li> : null}
+  </ul>;
 }
 
 /**
