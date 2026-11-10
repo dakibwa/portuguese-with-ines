@@ -1443,26 +1443,32 @@
   line-height: 1.6;
   margin-bottom: 1.2rem;
 }
-/* Under its own heading, as Cancel this lesson? is, with what happens as a
-   dab rather than a sentence. */
-.teacher-move-form {
+/* Her one Change (10 November 2026): which lessons, then date beside time,
+   then length and place, then what will happen as dabs. Where the form has
+   room each choice keeps a column, so nothing stretches across the row. */
+.teacher-change-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  container-type: inline-size;
 }
-.teacher-move-form > ul,
-.teacher-move-form > .teacher-dialog-actions {
+.teacher-change-form > :is(.teacher-manual-choice, ul, .teacher-dialog-actions) {
   grid-column: 1/-1;
   margin: 0;
 }
-/* Changing a length: which lessons, the length, then what happens, one
-   above the other as the move form's fields. */
-.teacher-length-form {
-  display: grid;
-  gap: 1rem;
+/* Twice the class: a student's card spans its own sliders across. */
+@container (min-width: 34rem) {
+  .teacher-change-form.teacher-change-form > .teacher-manual-choice {
+    grid-column: auto;
+  }
+  .teacher-change-form.teacher-change-form > .teacher-week-choice,
+  .teacher-change-form > .teacher-week-choice + label {
+    grid-column: 1;
+  }
 }
-.teacher-length-form > :is(h3, ul, .teacher-dialog-actions) {
-  margin: 0;
+/* In a lesson's cream tile a slider's track is the lilac sheet, so it shows. */
+.teacher-lesson-dialog--inline .teacher-change-form .segmented {
+  background: var(--sheet);
 }
 /* This lesson or every week, between Cancel these lessons? and its dabs. */
 .teacher-dialog-confirmation > .teacher-week-choice {
@@ -3442,8 +3448,6 @@
    to its display:flex) and the same summary leads the details' header. */
 .teacher-lesson-row__what[hidden] { display: none; }
 .teacher-lesson-row.is-selected > .teacher-lesson-row__line:not(:has(> :not([hidden]))) { display: none; }
-.teacher-move-cancel { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
-.teacher-move-cancel .teacher-quiet[aria-pressed="true"] { background: var(--lavender); box-shadow: inset 0 0 0 2px var(--blue); }
 /* The lesson dialog's own layout, laid out in the lesson's tile: no box and no
    rule of its own. One toolbar of small buttons, then the facts. */
 .teacher-lesson-dialog.teacher-lesson-dialog--inline { position: static; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.35rem 0.75rem; width: auto; max-width: none; max-height: none; margin: 0; padding: 0.15rem 0 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }

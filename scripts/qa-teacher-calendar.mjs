@@ -17,6 +17,7 @@ const teacher = {
 const lesson = (id, name, start, location = "online", durationMinutes = 60) => ({
   id,
   reference: `TEST-${id}`,
+  lesson_type_id: durationMinutes === 90 ? "long" : "single",
   lesson_name: `${durationMinutes} minutes`,
   student_name: name,
   student_email: `${id}@example.invalid`,
@@ -370,7 +371,7 @@ async function fixture(width, options = {}) {
       return route.fulfill({ json: { lessons: [unpaid(opened, "2026-09-08T13:00:00.000Z"), unpaid("earlier-unpaid", "2026-09-01T13:00:00.000Z")] } });
     }
     const match = path.match(
-      /^\/admin\/bookings\/([^/]+)\/(reschedule|cancel|no-show|paid|refund-by-hand)$/,
+      /^\/admin\/bookings\/([^/]+)\/(reschedule|change|cancel|no-show|paid|refund-by-hand)$/,
     );
     if (match) {
       const booking = state.bookings.find((entry) => entry.id === match[1]);
@@ -388,6 +389,32 @@ async function fixture(width, options = {}) {
           starts_at: data.startAt,
           ends_at: new Date(Date.parse(data.startAt) + duration).toISOString(),
         });
+      } else if (match[2] === "change") {
+        // As the Worker answers her one change: every week from the one she
+        // opened takes it, except a week the fixture says is in the way.
+        if (state.failMove-- > 0) return fail("That time is unavailable. Choose another time.");
+        const pool = state.history ?? state.bookings;
+        const opened = pool.find((entry) => entry.id === match[1]);
+        const lessons = data.following
+          ? pool.filter((entry) => entry.series_id === opened.series_id && entry.status === "confirmed" && entry.starts_at >= opened.starts_at)
+          : [opened];
+        const shift = data.startAt ? Date.parse(data.startAt) - Date.parse(opened.starts_at) : 0;
+        const changed = [];
+        const kept = [];
+        for (const entry of lessons) {
+          if (state.inTheWay?.includes(entry.id)) {
+            kept.push({ startsAt: entry.starts_at, reason: "it would run into another lesson" });
+            continue;
+          }
+          const minutes = data.lessonType ? (data.lessonType === "long" ? 90 : 60) : (Date.parse(entry.ends_at) - Date.parse(entry.starts_at)) / 60000;
+          const start = new Date(Date.parse(entry.starts_at) + shift).toISOString();
+          Object.assign(entry, {
+            starts_at: start, ends_at: new Date(Date.parse(start) + minutes * 60000).toISOString(),
+            ...(data.location ? { location: data.location } : {}), ...(data.lessonType ? { lesson_type_id: data.lessonType } : {}),
+          });
+          changed.push(start);
+        }
+        return route.fulfill({ json: { changed, kept, emailed: true } });
       } else if (match[2] === "cancel") {
         if (state.failCancel-- > 0) return fail("The booking system is busy. Please try again.");
         booking.status = "cancelled";
@@ -708,23 +735,25 @@ try {
   ).toBeDisabled();
   // Open from the start until the end, when the lesson is charged.
   await expect(page.getByRole("dialog")).toContainText(/Available \d\d:\d\d–\d\d:\d\d/);
-  await page.getByRole("button", { name: "Move or cancel", exact: true }).click();
-  await page.getByLabel("New date").fill("2026-09-10");
+  await page.getByRole("button", { name: "Change lesson", exact: true }).click();
+  await page.getByRole("dialog").getByLabel("Date", { exact: true }).fill("2026-09-10");
   await page.getByRole("dialog").getByLabel("Time in Porto").fill("00:30");
   state.failMove = 1;
-  await page.getByRole("button", { name: "Save new time" }).click();
+  await page.getByRole("button", { name: "Save changes" }).click();
   await page
     .getByRole("alert")
     .filter({ hasText: "That time is unavailable" })
     .waitFor();
-  await expect(page.getByLabel("New date")).toHaveValue("2026-09-10");
-  await page.getByRole("button", { name: "Save new time" }).click();
+  await expect(page.getByRole("dialog").getByLabel("Date", { exact: true })).toHaveValue("2026-09-10");
+  await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   assert.equal(
     state.bookings[1].starts_at,
     "2026-09-09T23:30:00.000Z",
     "Move must use Porto time across the UTC date boundary",
   );
+  assert.deepEqual(state.writes.at(-1), { path: "/admin/bookings/next/change", data: { startAt: "2026-09-09T23:30:00.000Z", following: false } },
+    "only what differs is sent: her length and place stay as they are");
 
   // A free time offers a choice rather than taking itself off: Escape puts
   // the choice away and keeps her place.
@@ -909,7 +938,6 @@ try {
   assert.equal(state.writes.find((entry) => entry.path === "/admin/bookings").data.startAt, "2026-09-11T16:00:00.000Z", "The free time keeps its Porto date and time");
   await showLessons(page);
   await page.getByRole("button", { name: /^Sam Known, .*11 September.*View lesson$/ }).click();
-  await page.getByRole("button", { name: "Move or cancel", exact: true }).click();
   await page
     .getByRole("button", { name: "Cancel lesson", exact: true })
     .click();
@@ -925,7 +953,6 @@ try {
   await expect(messageField).toHaveAttribute("maxlength", "1000");
   await messageField.fill(cancellationMessage);
   await page.getByRole("button", { name: "Back to lesson" }).click();
-  await page.getByRole("button", { name: "Move or cancel", exact: true }).click();
   await page.getByRole("button", { name: "Cancel lesson", exact: true }).click();
   await expect(messageField).toHaveValue(cancellationMessage);
   const dialogBounds = await page.getByRole("dialog").boundingBox();
@@ -1387,7 +1414,6 @@ try {
   await showLessons(mobile.page);
   await mobile.page.getByRole("button", { name: "Tuesday 8 September, show lessons" }).tap();
   await mobile.page.getByRole("button", { name: /^Sam,.*View lesson$/ }).tap();
-  await mobile.page.getByRole("button", { name: "Move or cancel", exact: true }).tap();
   await mobile.page.getByRole("button", { name: "Cancel lesson", exact: true }).tap();
   const phoneMessage = mobile.page.getByLabel(/^Add a message to the email \(optional\)/);
   const longMessage = "Obrigada! ".repeat(100);
@@ -1511,7 +1537,6 @@ try {
     await expect(details).toContainText(/paid to you by hand/i);
     await expect(details.getByRole("button", { name: "Mark no-show", exact: true })).toHaveCount(0);
     await details.screenshot({ path: `tmp/qa/free-price/teacher-details-paid-${width}.png` });
-    await details.getByRole("button", { name: "Move or cancel", exact: true }).click();
     await details.getByRole("button", { name: "Cancel lesson", exact: true }).click();
     await expect(details).toContainText("Refund Sam directly for the payment made by hand");
     await expect(details).not.toContainText("refunded in full, automatically");
@@ -1614,16 +1639,17 @@ try {
     await expect(lessonDetails).toHaveCount(1);
     await expect(week.getByRole("region", { name: /^Sam Known’s lesson, Tue,? 22 Sept/ })).toBeFocused();
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    // The inline view has one entry for moving or cancelling. Choosing
-    // either opens its existing form; neither choice writes anything itself.
+    // The inline view has one Change and one Cancel. Opening either shows
+    // its form; neither writes anything itself.
     const writesBeforeChange = state.writes.length;
-    await lessonDetails.getByRole("button", { name: "Move or cancel", exact: true }).click();
-    await expect(lessonDetails.getByLabel("New date", { exact: true })).toBeVisible();
-    await expect(lessonDetails.getByRole("button", { name: "Save new time", exact: true })).toBeDisabled();
+    await lessonDetails.getByRole("button", { name: "Change lesson", exact: true }).click();
+    await expect(lessonDetails.getByLabel("Date", { exact: true })).toBeVisible();
+    await expect(lessonDetails.getByRole("button", { name: "Save changes", exact: true })).toBeDisabled();
+    await lessonDetails.getByRole("button", { name: "Back to lesson", exact: true }).click();
     await lessonDetails.getByRole("button", { name: "Cancel lesson", exact: true }).click();
     await expect(lessonDetails.getByRole("heading", { name: "Cancel this lesson?", exact: true })).toBeVisible();
     await expect(lessonDetails.getByRole("button", { name: "Yes, cancel lesson", exact: true })).toBeVisible();
-    assert.equal(state.writes.length, writesBeforeChange, "Opening Move or cancel and choosing Cancel must not save or cancel a lesson");
+    assert.equal(state.writes.length, writesBeforeChange, "Opening Change or Cancel must not save or cancel a lesson");
     await lessonDetails.getByRole("button", { name: "Back to lesson", exact: true }).click();
     const nextWeek = run.locator(".teacher-history-run__weeks > li").filter({ hasText: "Tue 29 Sept" });
     await nextWeek.locator(".teacher-lesson-row__when").click();
@@ -1825,6 +1851,36 @@ try {
     await page.close();
   }
 
+  // Her one Change for every week of a run (10 November 2026): a new day, time
+  // and place from the week she opened, one write; a week in the way is named.
+  for (const width of [1280, 390]) {
+    const { page, state } = await fixture(width);
+    state.history = ["2026-09-15T08:30:00Z", "2026-09-22T08:30:00Z", "2026-09-29T08:30:00Z"].map((start, week) =>
+      ({ ...lesson(`weekly-${week}`, "Sam Known", start, "porto"), student_id: "sam", series_id: "sam-weekly", added_by_teacher: 1, payment_status: "not_required" }));
+    state.inTheWay = ["weekly-2"];
+    await page.getByRole("tab", { name: /^Students/ }).click();
+    await page.getByRole("button", { name: "Open Sam Known’s profile", exact: true }).click();
+    const history = studentRow(page, "Sam Known").getByRole("region", { name: "Sam Known’s profile", exact: true });
+    const run = history.locator(".teacher-history-run");
+    await run.getByRole("button", { name: "Show weeks", exact: true }).click();
+    await run.locator(".teacher-history-run__weeks > li").filter({ hasText: "Tue 22 Sept" }).locator(".teacher-lesson-row__when").click();
+    const details = history.getByRole("region", { name: /’s lesson, / });
+    await details.getByRole("button", { name: "Change lesson", exact: true }).click();
+    await details.getByRole("radio", { name: "Every week", exact: true }).check();
+    await details.getByLabel("Date", { exact: true }).fill("2026-09-23");
+    await details.getByLabel("Time in Porto").fill("10:00");
+    await details.getByRole("radio", { name: "Online", exact: true }).check();
+    await expect(details.locator(".teacher-confirm-facts > li")).toHaveText(["2 lessons move to Wednesdays at 10:00", "They move online", "Sam gets one email with the change"]);
+    await noOverflow(page);
+    await details.getByRole("button", { name: "Save changes", exact: true }).click();
+    await expect(history.locator(".teacher-inline-success")).toHaveText("Lesson changed. Tue 29 Sept stays as it is: it would run into another lesson. The student has been emailed.");
+    assert.deepEqual(state.writes.map(({ path, data }) => [path, data]), [
+      ["/admin/bookings/weekly-1/change", { startAt: "2026-09-23T09:00:00.000Z", location: "online", following: true }],
+    ], "one write for the run, holding only what differs");
+    assert.deepEqual(state.errors, []);
+    await page.close();
+  }
+
   // A clash card uses the existing lesson editor, including lessons hidden
   // under More. Moving one refreshes the cards and preserves unsaved hours.
   for (const width of [1280, 390]) {
@@ -1839,10 +1895,10 @@ try {
     await page.getByRole("button", { name: /^Change lesson for Repeat 5/ }).click();
     await expect(page.getByRole("dialog", { name: "Repeat 5", exact: true })).toBeVisible();
     assert.deepEqual(state.writes, []);
-    await page.getByRole("button", { name: "Move or cancel", exact: true }).click();
-    await page.getByLabel("New date").fill("2026-10-13");
+    await page.getByRole("button", { name: "Change lesson", exact: true }).click();
+    await page.getByRole("dialog").getByLabel("Date", { exact: true }).fill("2026-10-13");
     await page.getByRole("dialog").getByLabel("Time in Porto").fill("11:00");
-    await page.getByRole("button", { name: "Save new time", exact: true }).click();
+    await page.getByRole("button", { name: "Save changes", exact: true }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.locator(".teacher-hours-warning .teacher-lesson-card")).toHaveCount(5);
     await expect(page.locator(".teacher-hours-warning")).not.toContainText("Repeat 5");
@@ -1850,7 +1906,7 @@ try {
     await expect(slot(page, 1, 660)).toHaveAttribute("aria-pressed", "false");
     await expect(page.getByRole("button", { name: "Save weekly hours", exact: true })).toBeEnabled();
     await expect(page.getByRole("heading", { name: "Your weekly hours", exact: true })).toBeFocused();
-    assert.deepEqual(state.writes.map(({ path }) => path), ["/admin/bookings/repeat-5/reschedule"]);
+    assert.deepEqual(state.writes.map(({ path }) => path), ["/admin/bookings/repeat-5/change"]);
     assert.ok(state.bookings.every(booking => booking.status === "confirmed"));
     await noOverflow(page);
     assert.deepEqual(state.errors, []);
