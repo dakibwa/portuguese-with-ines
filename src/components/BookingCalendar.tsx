@@ -1865,6 +1865,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     ? []
     : keepSelectable((onlineSlotsByDate[date] ?? []).filter((slot) => !portoStarts.has(slot.startAt)));
   const dayOnlineOnly = selectedDate ? onlineOnlySlots(selectedDate) : [];
+  const todayOnScreen = displayedCalendarWeeks.flatMap((week) => week.cells).find((cell) => cell.isToday);
   const onlineOnlyOnScreen = Boolean(onlineSlotsByDate) && displayedCalendarWeeks.some((week) =>
     week.cells.some((cell) => !selectableSlots(cell.key).length && onlineOnlySlots(cell.key).length));
   const rawDaySlots = selectedDate ? selectableSlots(selectedDate) : [];
@@ -4207,6 +4208,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         : lessons.every((booking) => booking.location !== "porto") ? " is-own-day" : "";
                     return (
                       <button
+                        aria-current={cell.isToday ? "date" : undefined}
                         aria-describedby={lessonTip}
                         aria-label={`${dateLabel}${
                           lessons.length ? `, ${lessonLabel}` : ""
@@ -4268,7 +4270,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       >
                         {onlineOnly.length ? <Globe aria-hidden="true" className="calendar-week__online" size={11} strokeWidth={2.4} /> : null}
                         <span>
-                          {cell.day}
+                          {/* Today's date sits in the site's one blob; its name says so too. */}
+                          {cell.isToday ? <b className="today-pill">{cell.day}</b> : cell.day}
                           {cell.day === 1 ? <em>{shortMonth(cell.month, cell.key)}</em> : null}
                           {lessons.length ? (
                             <small className="calendar-booking-times">
@@ -4347,6 +4350,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
               ) : null}
               {onlineOnlyOnScreen ? (
                 <span><i className="is-online-only" aria-hidden="true" /><Globe aria-hidden="true" size={12} strokeWidth={2.4} /> Online only</span>
+              ) : null}
+              {/* Every mark on the calendar is in its key, today's included. */}
+              {todayOnScreen ? (
+                <span><b aria-hidden="true" className="today-pill today-pill--key">{todayOnScreen.day}</b> Today</span>
               ) : null}
             </div>
             {loadingSlots ? <p className="booking-state-note">Checking what&rsquo;s free…</p> : null}

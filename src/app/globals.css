@@ -50,6 +50,14 @@
      meaning, on Inês's timetable and month and on a student's booking
      calendar, always beside the globe so it never rests on colour alone. */
   --online-only: #cfe4f6;
+  /* Calendar marks are drawn, never an underline or a dot, and each is in
+     its key (10 November 2026, Dan: "distinct ways of showing it while being
+     simple"; a first crosshatch was "a bit strong"). A day off is hatched one
+     way, as it always was; a day with a lesson booked takes a finer, fainter
+     hatch leaning the other way, so each reads alone and a day that is both
+     shows both. The light one is for a day already filled in a deep colour. */
+  --hatch-booked: repeating-linear-gradient(45deg, transparent 0 6px, rgba(32, 62, 130, 0.15) 6px 7px);
+  --hatch-booked-light: repeating-linear-gradient(45deg, transparent 0 6px, rgba(251, 244, 229, 0.26) 6px 7px);
   /*
    * The colours the design system lists as "set in code" (9 November 2026),
    * named once here so every button, menu and dialog draws from the same
@@ -4116,10 +4124,13 @@ textarea,
   gap: 0.35rem;
 }
 
+/* Each swatch is a small copy of the day it explains, never a dot (10
+   November 2026). */
 .unified-calendar__legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 4px 5px 4px 6px;
 }
 
 .unified-calendar__legend .is-booked {
@@ -4353,10 +4364,6 @@ textarea,
 
 .unified-calendar--overview .calendar-week button.has-booking.has-weekly-booking.is-next {
   background: var(--lavender-ink);
-}
-
-.unified-calendar--overview .calendar-week button.is-next.is-today > span:not(.calendar-lesson-tip)::after {
-  color: inherit;
 }
 
 @container booking (min-width: 700px) {
@@ -5576,17 +5583,47 @@ p.lesson-when > span {
   opacity: 0.75;
 }
 
-/* Marked, but not as a selection — a ring read as "already chosen". */
-.calendar-week button.is-today > span:not(.calendar-lesson-tip)::after {
-  display: block;
-  margin-top: 0.1rem;
-  color: var(--lavender-ink);
-  content: "today";
-  font-family: var(--ui);
-  font-size: 0.5rem;
+/* Today, the same on every calendar on the site (10 November 2026, Dan: no
+   underline, no dot, no "today" beneath the number): its date in the deep
+   blue blob Inês's Timetable has always used, and in the key beside the
+   word. It marks the number alone, so it never reads as a chosen day; on a
+   day already filled in a deep colour the blob is paper instead. */
+.today-pill {
+  display: inline-grid;
+  min-width: 1.7em;
+  min-height: 1.7em;
+  place-items: center;
+  border-radius: var(--squiggle-pill);
+  padding: 0 0.3em;
+  background: var(--blue-deep);
+  color: var(--paper-light);
+  font-style: normal;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* In a key: the same blob, the key's size, holding today's own date. */
+.today-pill--key {
+  min-width: 1.9em;
+  min-height: 1.6em;
+  font-size: 0.6rem;
+  letter-spacing: 0;
+}
+
+.calendar-week button:is(.is-selected, .is-next) .today-pill,
+.calendar-week button:is(.has-availability, .is-online-only, .has-booking):is(:hover, :focus-visible) .today-pill {
+  background: var(--paper-light);
+  color: var(--blue-deep);
+}
+
+/* Today is today whether or not it can be booked: its blob keeps its
+   strength on a day that cannot be pressed, while the rest of that day fades. */
+.calendar-week button.is-today:disabled > span {
+  opacity: 1;
+}
+
+.calendar-week button.is-today:disabled > span > :not(.today-pill) {
+  opacity: 0.38;
 }
 
 /* A 320px phone: the chosen lesson's row gives up its mark so its words keep
@@ -5600,13 +5637,6 @@ p.lesson-when > span {
 
   .booking-selection-summary__mark {
     display: none;
-  }
-
-  .calendar-week button.is-today > span:not(.calendar-lesson-tip)::after {
-    content: "•";
-    font-size: 0.75rem;
-    letter-spacing: 0;
-    line-height: 0.7;
   }
 
   /* The tiles close up a little, so a booked time fits inside its own. */
@@ -9412,11 +9442,6 @@ dialog[open]::backdrop {
   opacity: 0.3;
 }
 
-.lessons-loading__day small {
-  font: 700 0.5rem / 1 var(--ui);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
 
 /* Heard, not seen: kept out of the card's flow so nothing shifts on arrival. */
 .calendar-panel.lessons-loading > .visually-hidden {
@@ -9648,8 +9673,7 @@ dialog[open]::backdrop {
     font-size: 0.68rem;
   }
 
-  .unified-calendar--overview .calendar-week button em,
-  .unified-calendar--overview .calendar-week button.is-today > span:not(.calendar-lesson-tip)::after {
+  .unified-calendar--overview .calendar-week button em {
     font-size: 0.6rem;
     letter-spacing: 0.04em;
   }
@@ -9765,10 +9789,6 @@ dialog[open]::backdrop {
     letter-spacing: -0.02em;
   }
 
-  .unified-calendar--overview .calendar-week button.is-today > span:not(.calendar-lesson-tip)::after {
-    font-size: 0.75rem;
-    letter-spacing: 0;
-  }
 
   .unified-calendar--overview .unified-calendar__legend:not(:empty) {
     column-gap: 1rem;

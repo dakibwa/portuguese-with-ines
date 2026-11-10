@@ -155,7 +155,7 @@ export function TimeOffCalendar({ today, exceptions, onlineOnly, bookings, booki
                   aria-label={`${dateLabel(date)}${dayOff ? ", day off" : ""}${onlineHours ? `, online only${onlineHours === "All day" ? "" : ` ${onlineHours}`}` : ""}${lessons ? `, ${lessons} ${lessons === 1 ? "lesson" : "lessons"} booked` : ""}`}
                   aria-pressed={selected.has(date)}
                   aria-current={date === today ? "date" : undefined}
-                  className={`teacher-month-day${dayOff ? " is-off" : ""}${onlineHours ? " is-online" : ""}${!date.startsWith(month.slice(0, 7)) ? " is-outside" : ""}`}
+                  className={`teacher-month-day${dayOff ? " is-off" : ""}${onlineHours ? " is-online" : ""}${lessons ? " is-booked" : ""}${!date.startsWith(month.slice(0, 7)) ? " is-outside" : ""}`}
                   data-timeoff-date={date}
                   disabled={date < today || busy}
                   key={date}
@@ -173,9 +173,11 @@ export function TimeOffCalendar({ today, exceptions, onlineOnly, bookings, booki
                   tabIndex={date === firstFocus ? 0 : -1}
                   type="button"
                 >
-                  <span className="teacher-month-date">{Number(date.slice(-2))}</span>
-                  <span aria-hidden="true" className="teacher-month-state">{dayOff ? "Off" : date === today ? "Today" : ""}</span>
-                  {lessons ? <span aria-hidden="true" className="teacher-month-booked" /> : null}
+                  {/* Drawn marks, never an underline or a dot (10 November 2026,
+                      Dan): today's date in the site's blob, a booked day in
+                      its fine hatch, each named in the key beneath. */}
+                  <span className={`teacher-month-date${date === today ? " today-pill" : ""}`}>{Number(date.slice(-2))}</span>
+                  <span aria-hidden="true" className="teacher-month-state">{dayOff ? "Off" : ""}</span>
                   {onlineHours ? <Globe aria-hidden="true" className="teacher-month-online" size={11} strokeWidth={2.4} /> : null}
                 </button>
               );
@@ -186,13 +188,15 @@ export function TimeOffCalendar({ today, exceptions, onlineOnly, bookings, booki
             <span><i className="is-off" aria-hidden="true" /> Day off</span>
             <span><i className="is-online" aria-hidden="true" /> Online only</span>
             <span><i className="is-booked" aria-hidden="true" /> Lesson booked</span>
+            {dates.includes(today) ? <span><b aria-hidden="true" className="today-pill today-pill--key">{Number(today.slice(-2))}</b> Today</span> : null}
           </div>
         </div>
 
         <div className={`teacher-timeoff-selection${chosen.length ? " has-days" : upcoming.length ? " has-upcoming" : ""}`}>
           <div className="teacher-timeoff-selection-heading">
-            <h3 aria-live="polite">{chosen.length ? `${chosen.length} ${chosen.length === 1 ? "day" : "days"} chosen` : "Tap the days you want off"}</h3>
-            {chosen.length ? <button className="button button--outline button--small" disabled={busy} onClick={() => setSelected(new Set())} type="button">Clear</button> : null}
+            {/* The empty card is where she learns what the month is for, online only included. */}
+            <h3 aria-live="polite">{chosen.length ? `${chosen.length} ${chosen.length === 1 ? "day" : "days"} chosen` : "Tap the days you want off, or online only"}</h3>
+            {chosen.length ? <button className="teacher-quiet" disabled={busy} onClick={() => setSelected(new Set())} type="button">Clear</button> : null}
           </div>
           {!chosen.length && upcoming.length ? (
             <div className="teacher-timeoff-upcoming">

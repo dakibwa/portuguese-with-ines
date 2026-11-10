@@ -726,7 +726,11 @@ export function TeacherSchedule() {
   return (
     <div className="teacher-workspace">
       <div className="teacher-tools-header">
-        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} needsCount={studentWork.attentionCount} onSelect={tab => { if (tab !== activeTab) { setStatus(""); setError(""); } setActiveTab(tab); }} />
+        <TeacherTabs current={activeTab} hoursDirty={hoursDirty} needsCount={studentWork.attentionCount} onSelect={tab => {
+          // A note about the days she had chosen means nothing on another tab; one that says a save failed stays.
+          if (tab !== activeTab) { setStatus(""); setError(""); setDayNote(note => note?.error ? note : undefined); }
+          setActiveTab(tab);
+        }} />
         {/* Only for a teacher Inês has also added as a student (17 October 2026, Dan). */}
         {me?.alsoStudent ? (
           <a className="button button--outline button--compact teacher-my-lessons" href={`${SITE_BASE_PATH}/book/?view=lessons`}>My lessons</a>

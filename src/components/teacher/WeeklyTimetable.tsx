@@ -156,6 +156,7 @@ export function WeeklyTimetable({
     editing,
   });
   const onlineShown = !editing && shown.some(index => onlineOnlyHours(onlineOnly, shiftDate(weekStart, index)).length > 0);
+  const shownDates = shown.map(index => shiftDate(weekStart, index));
   const minutes = Array.from(
     { length: Math.ceil((end - start) / step) },
     (_, index) => start + index * step,
@@ -479,7 +480,6 @@ export function WeeklyTimetable({
         {date === today ? <span className="visually-hidden">Today, </span> : null}{Number(date.slice(-2))}
       </strong> : <span className="teacher-day-full-name">{WEEKDAYS[index].name.slice(3)}</span>}
       {onlineAllDay(date) ? <span className="teacher-day-online" title="Online only"><Globe size={11} strokeWidth={2.4} aria-hidden="true" /></span> : null}
-      {!editing && segments.some(segment => segment.date === date) ? <i className="teacher-heading-booked-dot" aria-label="Lessons booked" /> : null}
     </>;
   }
 
@@ -601,7 +601,7 @@ export function WeeklyTimetable({
             const date = shiftDate(weekStart, index);
             return <div className="teacher-day-cell" key={day.value}>
               <div className="teacher-day-cell__band">
-                <button className={`teacher-day-heading ${activeDay === index ? "is-selected" : ""}`}
+                <button className={`teacher-day-heading ${activeDay === index ? "is-selected" : ""}${!editing && segments.some(segment => segment.date === date) ? " has-lessons" : ""}`}
                   type="button" aria-label={editing ? `${day.name}, show weekly hours` : `${dateLabel(date)}${onlineAllDay(date) ? ", online only" : ""}, show lessons`}
                   aria-pressed={activeDay === index} onClick={() => {
                     if (index !== activeDay) openDay(index);
@@ -893,6 +893,13 @@ export function WeeklyTimetable({
               <i className="teacher-key-booked" aria-hidden="true" />
               Booked
             </span>
+            {/* A phone's day tabs take the booked hatch where a day has lessons. */}
+            {shownDates.some(date => segments.some(segment => segment.date === date)) ? (
+              <span className="teacher-key-tabs">
+                <i className="teacher-key-lessons" aria-hidden="true" />
+                Day with lessons
+              </span>
+            ) : null}
             <span>
               <i className="teacher-key-added" aria-hidden="true" />
               Added by you
@@ -915,6 +922,9 @@ export function WeeklyTimetable({
               <UserRound size={12} strokeWidth={2.4} aria-hidden="true" />
               {IN_PERSON}
             </span>
+            {shownDates.includes(today) ? (
+              <span><b aria-hidden="true" className="today-pill today-pill--key">{Number(today.slice(-2))}</b> Today</span>
+            ) : null}
           </div>
           {status}
         </div>

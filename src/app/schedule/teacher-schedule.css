@@ -343,7 +343,6 @@
 .teacher-day-heading strong { display: inline-grid; place-items: center; min-width: 1.85rem; min-height: 1.85rem; font-size: 1rem; font-weight: 700; letter-spacing: 0; }
 .teacher-day-heading .teacher-day-today { padding: 0.15rem 0.35rem; border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); }
 .teacher-day-online { display: inline-grid; place-items: center; color: var(--blue-deep); }
-.teacher-heading-booked-dot { position: absolute; top: 0.35rem; right: 0.25rem; width: 4px; height: 4px; border-radius: 50%; background: var(--coral-action); }
 .teacher-day-full-name { display: none; }
 .teacher-week-day-control { display: none; }
 @container teacher-day (max-width: 160px) {
@@ -725,11 +724,12 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
+/* Each swatch is a small copy of the cell it explains, never a dot. */
 .teacher-calendar-key i {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   flex: none;
-  border-radius: 50%;
+  border-radius: 4px 5px 4px 6px;
   border: 1px solid transparent;
 }
 .teacher-key-starts {
@@ -738,6 +738,10 @@
 }
 .teacher-key-booked {
   background: var(--blue-deep);
+}
+.teacher-key-lessons {
+  border-color: var(--rule) !important;
+  background: repeating-linear-gradient(45deg, transparent 0 2px, rgba(32, 62, 130, 0.42) 2px 3px);
 }
 .teacher-key-online-only {
   background: var(--online-only);
@@ -1566,7 +1570,13 @@
     font-size: 0.61rem;
   }
   .teacher-day-heading.is-selected {
-    background: var(--lavender-soft);
+    background-color: var(--lavender-soft);
+  }
+  /* On a phone a day with lessons takes the booked hatch on its tab, as on
+     the Time off month, so she sees where her lessons are without opening
+     each day. */
+  .teacher-day-heading.has-lessons {
+    background-image: var(--hatch-booked);
   }
   .teacher-day-heading.is-selected::after {
     content: "";
@@ -1707,7 +1717,8 @@
     grid-template-columns: auto 1fr auto;
   }
   .teacher-week:not(.teacher-week--editing) .teacher-week-toolbar .teacher-week-mode { justify-self: start; }
-  .teacher-heading-booked-dot { display: none; }
+  /* The key's booked hatch belongs to the phone's day tabs. */
+  .teacher-calendar-key > .teacher-key-tabs { display: none; }
 }
 
 /* Keep both lilac controls together on the narrowest phones. */
@@ -2280,6 +2291,7 @@
 }
 .teacher-month-day {
   position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2321,9 +2333,24 @@
   background: var(--blue-deep);
   color: var(--paper-light);
 }
-.teacher-month-day[aria-current="date"] .teacher-month-date {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
+/* A day with a lesson booked takes the fine booked hatch, over whatever else
+   the day is: on a day off the two hatches cross, on a chosen day it is
+   drawn in paper (10 November 2026, Dan: no dot). */
+.teacher-month-day.is-booked::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--hatch-booked);
+}
+.teacher-month-day.is-booked[aria-pressed="true"]::before {
+  background: var(--hatch-booked-light);
+}
+/* Today's blob is paper on a chosen day. */
+.teacher-month-day[aria-pressed="true"] .today-pill {
+  background: var(--paper-light);
+  color: var(--blue-deep);
 }
 .teacher-month-day:focus-visible {
   outline: 2px solid var(--blue);
@@ -2333,14 +2360,6 @@
 .teacher-month-state {
   min-height: 1.2em;
   font: 600 0.58rem/1.2 var(--ui);
-}
-.teacher-month-booked {
-  position: absolute;
-  bottom: 6px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: currentColor;
 }
 /* The one key hand: the Timetable's and a student's calendar's. */
 .teacher-month-key {
@@ -2359,29 +2378,29 @@
   align-items: center;
   gap: 0.35rem;
 }
+/* Each swatch is a small copy of the day it explains. */
 .teacher-month-key i {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
+  flex: none;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: 4px 5px 4px 6px;
 }
 .teacher-month-key .is-selected {
   border-color: var(--blue-deep);
   background: var(--blue-deep);
 }
 .teacher-month-key .is-off {
-  background: var(--lavender-soft);
+  background: repeating-linear-gradient(-45deg, transparent 0 2px, var(--lavender) 2px 3px), var(--lavender-soft);
 }
 .teacher-month-key .is-online {
   background: var(--online-only);
 }
 .teacher-month-key .is-booked {
-  width: 4px;
-  height: 4px;
-  margin: 0 3px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--blue-deep);
+  background: repeating-linear-gradient(45deg, transparent 0 2px, rgba(32, 62, 130, 0.42) 2px 3px), var(--raised);
+}
+.teacher-month-key .is-free {
+  background: var(--raised);
 }
 /* The chosen days' card sits beside the month, the same sheet and edge. */
 .teacher-timeoff-selection {
@@ -3227,9 +3246,12 @@
 .teacher-lesson-picker .teacher-month-grid { gap: 0.2rem; }
 .teacher-lesson-picker .teacher-month-weekday { font-size: 0.6rem; letter-spacing: 0.02em; }
 .teacher-lesson-picker .teacher-month-day { min-height: 44px; font-size: 0.8rem; padding: 0.35rem 0; }
-.teacher-lesson-picker .teacher-month-booked { bottom: 4px; }
-.teacher-lesson-picker__key { display: flex; align-items: center; gap: 0.4rem; margin: 0.6rem 0 0; color: var(--lavender-ink); font-size: 0.66rem; }
-.teacher-lesson-picker__key i { width: 4px; height: 4px; border-radius: 50%; background: var(--blue); }
+/* A cream day has times free in her hours, as on a student's calendar; the
+   rest lie flat and can still be pressed, since she can add a lesson at any
+   time (10 November 2026, Dan: no dot). Until the times are known every day
+   keeps its cream. */
+.teacher-lesson-picker .teacher-month-grid.knows-times .teacher-month-day:not(.has-times):not([aria-pressed="true"]) { background: transparent; }
+.teacher-lesson-picker__key.teacher-month-key { margin-top: 0.7rem; }
 .teacher-lesson-picker__times { display: grid; gap: 0.7rem; align-content: start; min-width: 0; }
 .teacher-lesson-picker__times h4 { margin: 0; font-size: 0.8rem; }
 .teacher-lesson-picker__times p { margin: 0; color: var(--lavender-ink); font-size: 0.75rem; line-height: 1.5; }

@@ -72,6 +72,8 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
   const loading = !current;
   const slots: AvailabilityResponse["slotsByDate"] = current?.slots ?? {};
   const dayInView = Boolean(date && date.startsWith(month.slice(0, 7)));
+  // Once the month's times are known, the days that have some are cream.
+  const timesKnown = Boolean(current && !current.error && !pastMonth);
   const selectedTimes = dayInView ? slots[date] ?? [] : [];
   const gone = dayInView && date <= today ? pastTimes(date, today, time, now) : [];
   const last = shiftDate(shiftMonth(month, 1), -1);
@@ -121,13 +123,13 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
             unit="month"
           />
         </div>
-        <div className="teacher-month-grid" aria-labelledby={monthId} ref={calendar}>
+        <div className={`teacher-month-grid${timesKnown ? " knows-times" : ""}`} aria-labelledby={monthId} ref={calendar}>
           {WEEKDAYS.map(day => <span className="teacher-month-weekday" aria-hidden="true" key={day.value}>{day.short}</span>)}
           {dates.map(key => <button
             aria-current={key === today ? "date" : undefined}
             aria-label={dateLabel(key)}
             aria-pressed={date === key}
-            className={`teacher-month-day${!key.startsWith(month.slice(0, 7)) ? " is-outside" : ""}${key < today ? " is-past" : ""}`}
+            className={`teacher-month-day${!key.startsWith(month.slice(0, 7)) ? " is-outside" : ""}${key < today ? " is-past" : ""}${slots[key]?.length ? " has-times" : ""}`}
             data-lesson-date={key}
             disabled={disabled}
             key={key}
@@ -149,9 +151,13 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
             }}
             tabIndex={key === focusDate ? 0 : -1}
             type="button"
-          ><span className="teacher-month-date">{Number(key.slice(-2))}</span>{slots[key]?.length ? <span className="teacher-month-booked" aria-hidden="true" /> : null}</button>)}
+          ><span className={`teacher-month-date${key === today ? " today-pill" : ""}`}>{Number(key.slice(-2))}</span></button>)}
         </div>
-        <p className="teacher-lesson-picker__key"><i aria-hidden="true" />Times available · {HOME_CLOCK}</p>
+        {/* Every mark on the month is in its key: a cream day has times free. */}
+        <div className="teacher-month-key teacher-lesson-picker__key">
+          {timesKnown ? <span><i className="is-free" aria-hidden="true" /> Times available · {HOME_CLOCK}</span> : null}
+          {dates.includes(today) ? <span><b aria-hidden="true" className="today-pill today-pill--key">{Number(today.slice(-2))}</b> Today</span> : null}
+        </div>
       </div>
       <div className="teacher-lesson-picker__times" aria-live="polite">
         {/* The legend already asks for a day: until one is chosen this
