@@ -252,6 +252,12 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     // dates read down the left and what she does lines up down the right. A
     // narrow row folds in two: day and pencil, then facts and money. The day
     // and time button stretches over the whole row; the controls sit above it.
+    // What was said about it, as one quiet quoted line each, with who said it.
+    const cancelSaid = booking.cancellation_message ? <p className="teacher-history-lesson__note" key="you"><span>You:</span> “{booking.cancellation_message}”</p> : null;
+    const said = [
+      cancelSaid,
+      booking.notes ? <p className="teacher-history-lesson__note" key="them"><span>{booking.student_name.split(" ")[0]}:</span> “{booking.notes}”</p> : null,
+    ].filter(Boolean);
     const money = settle ? <PaidTick plain checked={paidByHand(booking)} disabled={Boolean(paying) || busy} onChange={paid => void markPaid(booking, paid)} />
       : refund ? <button className="teacher-quiet" data-homework-exit disabled={busy} onClick={() => onRecordRefund(booking)} type="button">Record refund</button> : null;
     return (
@@ -267,15 +273,17 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
         </div>
         {openDetails ? <div className="teacher-lesson-row__details" id={detailsId}>{openDetails}</div> : null}
         {/* Open details say these facts themselves. */}
-        {!openDetails && (facts || money) ? <div className="teacher-lesson-row__foot">
-          {facts ? <div className="teacher-lesson-row__facts">{facts}</div> : null}
+        {!openDetails && (facts || money || said.length) ? <div className="teacher-lesson-row__foot">
+          {/* What was said about it follows its facts on the row's own line
+              where there is room (10 November 2026, Dan), and wraps beneath
+              them where there is not. */}
+          {facts || said.length ? <div className="teacher-lesson-row__facts">{facts}{said}</div> : null}
           {money}
         </div> : null}
         {paidError?.id === booking.id ? <p className="teacher-inline-error" role="alert">{paidError.message}</p> : null}
         {note?.notes.trim() && !opened ? <p className="teacher-notes__text">{note.notes.trim()}</p> : null}
-        {/* What was said about it, as one quiet line each, with who said it. */}
-        {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>You:</span> “{booking.cancellation_message}”</p> : null}
-        {booking.notes && !openDetails ? <p className="teacher-history-lesson__note"><span>{booking.student_name.split(" ")[0]}:</span> “{booking.notes}”</p> : null}
+        {/* Open, its details say the student's note; her own message stays. */}
+        {openDetails && booking.cancellation_message ? cancelSaid : null}
         {opened ? <TeacherHomework key={`${booking.id}-${token}`} bookingId={booking.id} token={token} onBusy={onBusy} /> : null}
       </li>
     );

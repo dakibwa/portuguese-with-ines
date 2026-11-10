@@ -313,11 +313,13 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
         <EditPencil disabled={disabled} field="name" label={`Change name for ${student.name}`} onEdit={() => setRenaming(true)} /></>}
       </div>
       {/* Open, how far they have got and what she can do sit in this one row
-          (9 November 2026, Dan: "more consolidate and simple"): their checks,
-          her actions, then close. */}
-      {profile ? <div className="teacher-student__bar">
+          (9 November 2026, Dan: "more consolidate and simple"): their checks
+          beside their name, her actions, then close. The checks keep the top
+          bar while one of her panels is open too (10 November 2026, Dan:
+          "could the little bits not appear in the top bar"). */}
+      {step ? <div className="teacher-student__bar">
         {student.dormant ? null : <ProgressChecks progress={progress} />}
-        {actions}
+        {profile ? actions : null}
       </div> : null}
       {step ? <div className="teacher-setup__action teacher-setup__close">
         <button className="teacher-dialog-close" aria-label="Close" aria-controls={paneId} disabled={disabled} onClick={close} type="button"><X size={20} aria-hidden="true" /></button>
@@ -326,8 +328,9 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
         <span className="teacher-student__weekly"><Repeat size={12} strokeWidth={2.4} aria-hidden="true" />Weekly</span>
       </div> : null}
     </div>
-    {/* A dormant student's checks wait until they come back. */}
-    {!profile && (!student.dormant || nextButton) ? <div className="teacher-student__progress">
+    {/* Closed, their checks and the one next step sit beneath their name. A
+        dormant student's checks wait until they come back. */}
+    {!step && (!student.dormant || nextButton) ? <div className="teacher-student__progress">
       {student.dormant ? null : <ProgressChecks progress={progress} />}
       {nextButton}
     </div> : null}

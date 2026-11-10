@@ -2524,11 +2524,14 @@
 /* The open card's one top row (9 November 2026, Dan: everything she does with
    a student beside their name, nothing said twice, no rail of tools beneath):
    name, how far they have got, her actions (the next step, Add a lesson, the
-   rarer ones, wrapping among themselves), close. Wide, all on one line; a
-   little narrower the checks drop beneath the name; on a phone the actions
-   wrap in a row of their own. Close stays at the top right throughout. */
+   rarer ones, wrapping among themselves), close. All on one line wherever the
+   card is wider than a phone's (10 November 2026, Dan: "could the little bits
+   not appear in the top bar"): the checks keep at least the width of their
+   longest and wrap among themselves, and her actions wrap before the checks
+   are squeezed. On a phone the checks and then the actions take rows of
+   their own. Close stays at the top right throughout. */
 .teacher-setup__header:has(> .teacher-student__bar) {
-  grid-template-columns: max-content minmax(0, 1fr) max-content; grid-template-areas: "name actions close" "checks checks checks";
+  grid-template-columns: minmax(0, max-content) minmax(9.5rem, 1fr) auto max-content; grid-template-areas: "name checks actions close";
   gap: 0.5rem 1.25rem;
 }
 .teacher-student__bar { display: contents; }
@@ -2537,9 +2540,6 @@
 .teacher-student__bar > .teacher-student__checks { grid-area: checks; }
 .teacher-student__actions { grid-area: actions; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.4rem 0.5rem; min-width: 0; }
 .teacher-student__actions .button { position: relative; z-index: 2; width: auto; min-height: 40px; padding: 0.45rem 0.95rem; }
-@container student-card (min-width: 80rem) {
-  .teacher-setup__header:has(> .teacher-student__bar) { grid-template-columns: max-content minmax(0, 1fr) max-content max-content; grid-template-areas: "name checks actions close"; }
-}
 @container student-card (max-width: 57.99rem) {
   .teacher-setup__header:has(> .teacher-student__bar) { grid-template-columns: minmax(0, 1fr) max-content; grid-template-areas: "name close" "checks checks" "actions actions"; }
   .teacher-student__actions { justify-content: flex-start; }

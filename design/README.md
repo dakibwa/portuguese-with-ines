@@ -2477,8 +2477,14 @@ for).
   lesson's call leads those chips as a filled pill their size, `Join Meet`
   (Dan: the wide button on a row of its own "feels badly placed"); the wide
   `Join Google Meet` button stays for a dialog, where it is the main action.
-- What was said about a lesson is one quiet quoted line with who said it
-  (`You: “…”`), never a labelled block.
+- What was said about a lesson is one quiet quote with who said it (`You:
+  “…”`), never a labelled block. It follows the lesson's facts on the row's
+  own line where there is room, and wraps beneath them where there is not.
+- An open student's card has one top bar: their name, their three checks
+  beside it, her actions, then close (Dan: "could the little bits not appear
+  in the top bar"). The checks keep the bar while one of her panels is open,
+  and take a line of their own only on a phone and on a closed card in its
+  lane.
 - A saved price in Your details is a row like every other detail.
 
 ## One schedule for students — 9 November 2026
