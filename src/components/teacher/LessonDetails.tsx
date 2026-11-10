@@ -509,13 +509,17 @@ export function LessonDetails({
   );
   // Inline, the row's own line: the lesson's date, then what she does with it
   // as small buttons at their own width (beside the date where there is room,
-  // beneath it on a phone), and the cross that closes it at the row's end.
+  // beneath it on a phone), its call first, and the cross that closes it at
+  // the row's end.
   const inlineHead = (
     <>
       <div className="teacher-lesson-inline__head">
         {inlineHeading}
         {action === "view" && booking.status !== "cancelled" ? (
           <div className="teacher-dialog-actions">
+            {/* The call leads her actions as a pill their size, never a
+                block on a row of its own (10 November 2026, Dan). */}
+            <MeetingLink compact meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} />
             {homeworkTrigger}
             {defaultActions}
             {recordBlock}
@@ -524,7 +528,6 @@ export function LessonDetails({
         ) : null}
         {closeButton}
       </div>
-      {action === "view" ? <MeetingLink meetingUrl={booking.meeting_url} location={booking.location} status={booking.status} /> : null}
     </>
   );
   const main = (

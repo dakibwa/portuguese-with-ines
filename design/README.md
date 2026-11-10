@@ -2473,7 +2473,10 @@ for).
 - An open lesson is that same row: its day and time, what she does with it
   as quiet chips at their own width (beside the day where there is room,
   beneath it on a phone), `Already paid` at their end and the cross that
-  closes it at the row's end, where the closed row's pencil was.
+  closes it at the row's end, where the closed row's pencil was. An online
+  lesson's call leads those chips as a filled pill their size, `Join Meet`
+  (Dan: the wide button on a row of its own "feels badly placed"); the wide
+  `Join Google Meet` button stays for a dialog, where it is the main action.
 - What was said about a lesson is one quiet quoted line with who said it
   (`You: “…”`), never a labelled block.
 - A saved price in Your details is a row like every other detail.

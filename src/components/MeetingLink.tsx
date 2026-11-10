@@ -24,15 +24,20 @@ export function meetingHref({ meetingUrl, location, status }: Props) {
   return url.href;
 }
 
-export function MeetingLink(props: Props) {
+/**
+ * `compact` is the pill among a row's other actions (an open lesson on
+ * Inês's page, 10 November 2026): `Join Meet`, as her next-lesson band says
+ * it, still named in full for assistive technology.
+ */
+export function MeetingLink({ compact = false, ...props }: Props & { compact?: boolean }) {
   const href = meetingHref(props);
   if (!href) return null;
 
   return (
-    <a className="meeting-link" href={href} target="_blank" rel="noopener noreferrer">
+    <a aria-label={compact ? "Join Google Meet" : undefined} className={`meeting-link${compact ? " meeting-link--compact" : ""}`} href={href} target="_blank" rel="noopener noreferrer">
       {/* Meet's own mark rather than a generic camera (13 October 2026, Dan). */}
       <span className="meeting-link__logo"><GoogleMeetLogo /></span>
-      Join Google Meet
+      {compact ? "Join Meet" : "Join Google Meet"}
     </a>
   );
 }
