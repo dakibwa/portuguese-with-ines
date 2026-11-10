@@ -24,6 +24,8 @@ export type AvailabilityResponse = {
   horizonDays: number;
   /** Free time Inês keeps after every lesson; absent from an older Worker. */
   bufferMinutes?: number;
+  /** Whether an online lesson's current time can only stay online. */
+  currentSlotOnlineOnly?: boolean;
   lessonType: { id: string; name: string; durationMinutes: number; priceCents: number };
 };
 
@@ -168,7 +170,7 @@ export function fetchAvailability(
   from: string,
   to: string,
   signal?: AbortSignal,
-  moving?: { manageToken?: string; seriesId?: string; session?: string; teacher?: boolean }
+  moving?: { manageToken?: string; seriesId?: string; session?: string; teacher?: boolean; location?: "online" | "porto" }
 ) {
   const { path, session, key } = availabilityRequest(lessonType, from, to, moving);
   const cached = availabilityCache.get(key);
@@ -226,9 +228,10 @@ function availabilityRequest(
   lessonType: string,
   from: string,
   to: string,
-  moving?: { manageToken?: string; seriesId?: string; session?: string; teacher?: boolean }
+  moving?: { manageToken?: string; seriesId?: string; session?: string; teacher?: boolean; location?: "online" | "porto" }
 ) {
   const query = new URLSearchParams({ lessonType, from, to });
+  if (moving?.location === "porto") query.set("location", "porto");
   if (moving?.manageToken) query.set("manage", moving.manageToken);
   if (moving?.seriesId) query.set("series", moving.seriesId);
   // Signed in, the student's own unfinished card-setup hold is not shown as
@@ -244,7 +247,7 @@ export function peekAvailability(
   lessonType: string,
   from: string,
   to: string,
-  moving?: { manageToken?: string; seriesId?: string; session?: string; teacher?: boolean }
+  moving?: { manageToken?: string; seriesId?: string; session?: string; teacher?: boolean; location?: "online" | "porto" }
 ) {
   const entry = availabilityCache.get(availabilityRequest(lessonType, from, to, moving).key);
   return entry?.data && Date.now() - entry.at < AVAILABILITY_REUSE_MS ? entry.data : null;
@@ -281,7 +284,7 @@ export type SelectionOutcome = {
  */
 export function previewSeries(
   session: string,
-  payload: { lessonType: string; startAt: string; weeks: RepeatChoice }
+  payload: { lessonType: string; startAt: string; weeks: RepeatChoice; location?: "online" | "porto" }
 ) {
   return request<{
     weeks: number | null;

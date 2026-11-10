@@ -438,6 +438,17 @@ palette. Keep expressive type in the page/section headings and clear Montserrat
 type in dates, times and lesson details. Use colour to distinguish booked lessons,
 usual lesson starts and days off; avoid a wall of administration forms.
 
+The Timetable's `Online only` control (10 November 2026) opens the same style
+of dialog as hours off. She selects an inclusive date range and either All day
+or daily From/Until hours, adds another period if needed, and saves explicitly.
+The control shows how many current or upcoming periods are set; reopening it
+edits or removes them. A failed save retains her choices. Use the existing
+field, dialog and button styles, and keep the date and time pairs usable on a
+phone. These periods affect new student choices: usual hours and time off
+still apply, and already booked lessons keep their place and time. The
+student's Where choice refreshes free times and removes selected times that
+cannot be booked in the new place.
+
 - Open on the current Porto week with booked lessons placed at their actual
   times. One calendar holds everything: clicking or dragging a time on a date
   takes it off for that date only, and a `Day off` switch above each date

@@ -92,6 +92,9 @@ async function fixture(width, options = {}) {
     pendingEmail: "",
     errors: [],
     failHours: 0,
+    onlineOnlyPeriods: [],
+    onlineOnlyRevision: "0",
+    failOnlineOnly: false,
     failDay: "",
     delay: 0,
     dayGate: null,
@@ -194,9 +197,16 @@ async function fixture(width, options = {}) {
         json: {
           rules: state.rules,
           exceptions: state.exceptions,
-          settings: { slotIntervalMinutes: 30 },
+          settings: { slotIntervalMinutes: 30, onlineOnlyPeriods: state.onlineOnlyPeriods, onlineOnlyRevision: state.onlineOnlyRevision },
         },
       });
+    }
+    if (path === "/admin/online-only") {
+      if (state.failOnlineOnly) { state.failOnlineOnly = false; return fail("Online-only periods couldn’t be saved. Try again."); }
+      assert.equal(data.expectedRevision, state.onlineOnlyRevision);
+      state.onlineOnlyPeriods = data.periods;
+      state.onlineOnlyRevision = String(Number(state.onlineOnlyRevision) + 1);
+      return route.fulfill({ json: { ok: true, periods: state.onlineOnlyPeriods, revision: state.onlineOnlyRevision } });
     }
     if (path === "/admin/exceptions/day") {
       // Mirrors the Worker: a day off and hour blocks replace only their own rows.
@@ -474,6 +484,37 @@ async function lessonLocation(page, name, location) {
 }
 
 try {
+  // One date-range editor journey, with a failed save retaining her choice.
+  for (const width of [1280, 390]) {
+    const { page, state } = await fixture(width);
+    await page.getByRole("button", { name: "Online only", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Online only", exact: true });
+    await dialog.getByLabel("From date 1", { exact: true }).fill("2026-09-14");
+    await dialog.getByLabel("Through date 1", { exact: true }).fill("2026-09-18");
+    await dialog.getByLabel("All day", { exact: true }).uncheck();
+    await dialog.getByLabel("From time 1", { exact: true }).fill("12:00");
+    await dialog.getByLabel("Until time 1", { exact: true }).fill("16:00");
+    state.failOnlineOnly = true;
+    await dialog.getByRole("button", { name: "Save online-only periods", exact: true }).click();
+    await expect(dialog.getByRole("alert")).toContainText("couldn’t be saved");
+    await expect(dialog.getByLabel("From time 1", { exact: true })).toHaveValue("12:00");
+    await dialog.screenshot({ path: `tmp/qa/teacher/online-only-${width}.png` });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    assert.ok(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1), "The editor fits on a phone");
+    await dialog.getByRole("button", { name: "Save online-only periods", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    assert.deepEqual(state.onlineOnlyPeriods, [{ id: state.onlineOnlyPeriods[0].id, fromDate: "2026-09-14", toDate: "2026-09-18", startMinute: 720, endMinute: 960 }]);
+    await page.reload();
+    await page.getByRole("button", { name: "Online only · 1", exact: true }).click();
+    await expect(dialog.getByLabel("From date 1", { exact: true })).toHaveValue("2026-09-14");
+    await dialog.getByRole("button", { name: "Remove period 1", exact: true }).click();
+    await dialog.getByRole("button", { name: "Save online-only periods", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    assert.deepEqual(state.onlineOnlyPeriods, []);
+    assert.equal(state.bookings.length, 2, "Her existing lessons remain booked");
+    assert.deepEqual(state.errors, []);
+    await page.close();
+  }
   // Incomplete successful replies must leave a retryable screen, including
   // malformed individual rows, rather than crashing her students or receipts.
   for (const width of [1280, 390]) {
@@ -1935,7 +1976,7 @@ try {
   assert.deepEqual(student.state.writes, []);
   await student.page.close();
   console.log(
-    "Teacher calendar passed: visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, student cards with their checks, invites and profiles, teacher email/password links and verified session renewal, responsive layout and access gate.",
+    "Teacher calendar passed: online-only periods, visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, student cards with their checks, invites and profiles, teacher email/password links and verified session renewal, responsive layout and access gate.",
   );
 } finally {
   await browser.close();

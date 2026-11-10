@@ -14,6 +14,7 @@ import { NextLesson } from "@/components/teacher/NextLesson";
 import { NeedsYou } from "@/components/teacher/NeedsYou";
 import { MonthLabel, TeacherPager } from "@/components/teacher/TeacherPager";
 import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
+import { OnlineOnlyPeriods } from "@/components/teacher/OnlineOnlyPeriods";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
 import { ScheduleLoading, WeekLoading } from "@/components/teacher/ScheduleLoading";
@@ -25,15 +26,17 @@ import {
   fetchStudents,
   saveDayOff,
   saveRules,
+  saveOnlineOnlyPeriods,
   sendStudentWelcome,
   type AdminBooking,
   type AdminStudent,
   type AvailabilityException,
+  type OnlineOnlyPeriod,
   type GoogleMeetConnection,
   type PaymentReview,
 } from "@/lib/admin-api";
 import { clearSession, fetchMe, readSession, subscribeToSession, type Student } from "@/lib/auth-api";
-import { portoTimeToUtc } from "@/lib/booking-api";
+import { forgetAvailability, portoTimeToUtc } from "@/lib/booking-api";
 import { BOOKING_CONFIGURED } from "@/lib/config";
 import { SITE_BASE_PATH } from "@/lib/paths";
 import {
@@ -94,6 +97,8 @@ export function TeacherSchedule() {
   const [savedHours, setSavedHours] = useState<WeekHours>(emptyWeek);
   const [draftHours, setDraftHours] = useState<WeekHours>(emptyWeek);
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
+  const [onlineOnlyPeriods, setOnlineOnlyPeriods] = useState<OnlineOnlyPeriod[]>([]);
+  const [onlineOnlyRevision, setOnlineOnlyRevision] = useState("0");
   const [dayChanges, setDayChanges] = useState<Map<string, DayChange>>(
     () => new Map(),
   );
@@ -190,6 +195,8 @@ export function TeacherSchedule() {
     setSavedHours(emptyWeek);
     setDraftHours(emptyWeek);
     setExceptions([]);
+    setOnlineOnlyPeriods([]);
+    setOnlineOnlyRevision("0");
     dayChangesRef.current = new Map();
     setDayChanges(new Map());
     sendingDays.current = false;
@@ -286,6 +293,8 @@ export function TeacherSchedule() {
         setSavedHours(hours);
         setDraftHours(hours);
         setExceptions(schedule.exceptions);
+        setOnlineOnlyPeriods(schedule.settings?.onlineOnlyPeriods ?? []);
+        setOnlineOnlyRevision(schedule.settings?.onlineOnlyRevision ?? "0");
         setIntervalMinutes(schedule.settings?.slotIntervalMinutes ?? 30);
         setInitialised(true);
       })
@@ -785,6 +794,15 @@ export function TeacherSchedule() {
             />
           ) : null}
         </div>
+        <OnlineOnlyPeriods today={today} periods={onlineOnlyPeriods} onSave={async periods => {
+          const generation = accountGeneration.current;
+          const saved = await saveOnlineOnlyPeriods(token, periods, onlineOnlyRevision);
+          if (generation !== accountGeneration.current || readSession() !== token) throw new Error("Your sign-in has changed. Please sign in again.");
+          setOnlineOnlyPeriods(saved.periods);
+          setOnlineOnlyRevision(saved.revision);
+          forgetAvailability();
+          setStatus("Online-only periods saved.");
+        }} />
         {editing && hoursDirty ? (
           <div className="teacher-hours-warning" aria-live="polite">
             {bookingsLoading ? <p>Checking booked lessons…</p> : bookingsError ? <div role="alert"><p>Booked lessons couldn’t be checked.</p><button className="button button--outline button--small" onClick={() => void reloadBookings()} type="button">Try again</button></div> : affectedLessons.length ? <>
