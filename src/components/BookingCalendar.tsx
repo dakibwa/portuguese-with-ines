@@ -20,6 +20,7 @@ import {
   CircleX,
   Mail,
   MessageSquareText,
+  Pencil,
   Plus,
   Repeat,
   UserRound,
@@ -362,7 +363,6 @@ function shortWhen(startAt: string, zone: string) {
 
 function BookingSelectionSummary({
   actionLabel,
-  actionText,
   ariaLabel,
   detail,
   disabled = false,
@@ -371,9 +371,8 @@ function BookingSelectionSummary({
   shortTitle,
   title
 }: {
+  /** Names the row's pencil, such as "Change lesson 2". */
   actionLabel?: string;
-  /** Visible text when the accessible label, like "Change lesson 2", would crowd the row. */
-  actionText?: string;
   ariaLabel: string;
   detail?: string;
   disabled?: boolean;
@@ -392,20 +391,18 @@ function BookingSelectionSummary({
         </strong>
         {detail ? <small>{detail}</small> : null}
       </span>
+      {/* The one pencil that changes a thing anywhere on the site (10
+          November 2026); here the whole row answers to it. */}
       {actionLabel && onAction ? (
         <button
           aria-label={actionLabel}
-          className="booking-choice-summary__change"
+          className="teacher-pencil booking-choice-summary__change"
           disabled={disabled}
           onClick={onAction}
+          title="Change"
           type="button"
         >
-          {actionText ?? (
-            <>
-              <span className="booking-choice-summary__change-label">{actionLabel}</span>
-              <span className="booking-choice-summary__change-short" aria-hidden="true">Change</span>
-            </>
-          )}
+          <Pencil size={15} strokeWidth={2.4} aria-hidden="true" />
         </button>
       ) : null}
     </div>
@@ -2729,7 +2726,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           <li key={choice.startAt}>
             <BookingSelectionSummary
               actionLabel={editable && !payment ? `Change lesson ${index + 1}` : undefined}
-              actionText="Change"
               ariaLabel={`Lesson ${index + 1}`}
               detail={index === 0 ? viewZoneName : undefined}
               disabled={submitting}
@@ -2757,7 +2753,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         {bookingChoices.length <= 1 && chosen ? (
           <BookingSelectionSummary
             actionLabel={!payment ? "Change date or time" : undefined}
-            actionText="Change"
             ariaLabel="Selected lesson"
             detail={viewZoneName}
             disabled={submitting}
@@ -4445,8 +4440,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                       back to it sits beside the date, which is short enough to
                       share the row. */}
                   {bookingDateChosen ? (
-                    <button aria-label="Change date" className="button button--outline button--compact unified-calendar__change-date" onClick={changeDateChoice} type="button">
-                      Change
+                    <button aria-label="Change date" className="teacher-pencil unified-calendar__change-date" onClick={changeDateChoice} title="Change date" type="button">
+                      <Pencil size={15} strokeWidth={2.4} aria-hidden="true" />
                     </button>
                   ) : null}
                 </div>

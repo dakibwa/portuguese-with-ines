@@ -3266,43 +3266,60 @@ textarea,
   opacity: 0.72;
 }
 
-/* A small outline button, of a piece with `Change date`, rather than an
-   underlined word whose rule floated beneath it. */
+/* A chosen lesson is changed by the site's one pencil, at its row's end
+   (10 November 2026; it was an outline Change). The whole row answers to
+   it: a press anywhere on the lesson opens it. Its ink is the deep one, so
+   it reads on the booking column's lilac as text does. */
+.booking-selection-summary {
+  position: relative;
+}
+
 .booking-provider button.booking-choice-summary__change {
-  display: inline-flex;
-  align-items: center;
+  position: static;
+  width: 44px;
+  height: 44px;
   justify-self: end;
-  min-height: 44px;
   margin-left: auto;
-  border: 1.5px solid var(--outline-edge);
-  border-radius: var(--squiggle-button-alt);
-  padding: 0.4rem 1rem;
-  background: transparent;
   color: var(--ink);
-  cursor: pointer;
-  font-family: var(--ui);
   font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  transition: background var(--motion-surface) var(--motion-ease), border-color var(--motion-surface) var(--motion-ease);
 }
 
-.booking-provider button.booking-choice-summary__change:hover,
+.booking-provider button.booking-choice-summary__change::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--squiggle-field);
+}
+
 .booking-provider button.booking-choice-summary__change:focus-visible {
-  border-color: var(--ink);
-  background: var(--hover-wash);
+  outline: none;
+}
+
+.booking-selection-summary:has(> .booking-choice-summary__change:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .booking-selection-summary:has(> .booking-choice-summary__change:hover:not(:disabled)) {
+    border-color: var(--ink);
+    background-image: linear-gradient(var(--hover-wash), var(--hover-wash));
+  }
+
+  .booking-provider button.booking-choice-summary__change:hover:not(:disabled) {
+    background: none;
+  }
+}
+
+.booking-provider button.booking-choice-summary__change:disabled::after {
+  content: none;
+}
+
+/* The chosen date's way back to the calendar, on a phone, is that pencil too. */
+.booking-provider .unified-calendar__change-date {
+  width: 44px;
+  height: 44px;
   color: var(--ink);
-}
-
-.booking-provider button.booking-choice-summary__change:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.booking-choice-summary__change-short {
-  display: none;
 }
 
 /* A long date and its short form: the short one only where the booking
@@ -5350,23 +5367,8 @@ p.lesson-when > span {
     height: 44px;
   }
 
-  .booking-choice-summary__change {
-    grid-column: auto;
-    justify-self: end;
-  }
-
   .unified-calendar__toolbar {
     align-items: flex-start;
-  }
-}
-
-@container booking (max-width: 480px) {
-  .booking-choice-summary__change-label {
-    display: none;
-  }
-
-  .booking-choice-summary__change-short {
-    display: inline;
   }
 }
 
@@ -5391,7 +5393,6 @@ p.lesson-when > span {
     height: 36px;
   }
 
-  .booking-provider button.booking-choice-summary__change,
   .unified-calendar__panel-head .button {
     padding-inline: 0.75rem;
     letter-spacing: 0.04em;
@@ -8250,10 +8251,11 @@ p.lesson-when > span {
   min-height: 44px;
 }
 
-/* On a phone they share the row between them rather than huddling left. */
+/* On a phone they keep their own width at the row's end, as across a wide
+   page: a single way on never stretches to fill the alert (10 November 2026). */
 @media (max-width: 560px) {
-  .booking-alert__actions > .button {
-    flex: 1 1 auto;
+  .booking-alert__actions {
+    justify-content: flex-end;
   }
 }
 
@@ -10021,27 +10023,40 @@ dialog[open]::backdrop {
 }
 
 .card-terms__agreement {
+  container-type: inline-size;
   margin-top: 0;
 }
 
 .card-terms__agreement .booking-agreement__control {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   justify-content: stretch;
-  padding: 0.15rem 0.9rem 0.45rem 0;
+  column-gap: 0.75rem;
 }
 
 .card-terms__agreement .booking-agreement__button {
-  padding-bottom: 0.15rem;
   white-space: normal;
 }
 
-/* Under the words it belongs to, its own quiet action. */
+/* Its own quiet action at the pill's right-hand side, beside the words it
+   belongs to, so the pill is no taller than those words (10 November 2026,
+   Dan). On a narrow pill it breaks after the ampersand. */
 .card-terms__agreement .booking-agreement__control > a {
-  justify-self: start;
-  min-height: 32px;
-  margin-left: calc(0.9rem + 20px + 0.6rem);
+  justify-self: end;
+  max-width: 5.75rem;
   font-size: 0.76rem;
   font-weight: 500;
+  line-height: 1.3;
+  text-align: right;
+}
+
+/* Where the pill is wide enough for both on one line, the link stays whole. */
+@container (min-width: 30rem) {
+  .card-terms__agreement .booking-agreement__control > a {
+    max-width: none;
+    white-space: nowrap;
+  }
 }
 
 .card-terms--approval .my-lessons__edit-actions > .button {
