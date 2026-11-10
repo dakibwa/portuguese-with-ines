@@ -939,6 +939,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   // them just as the Worker will insist when they are booked.
   const [lessonGapMinutes, setLessonGapMinutes] = useState(0);
   const [slotsByDate, setSlotsByDate] = useState<Record<string, Slot[]>>({});
+  const [currentSlotOnlineOnly, setCurrentSlotOnlineOnly] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [bookingPromptDate, setBookingPromptDate] = useState("");
   const [calendarWeekCount, setCalendarWeekCount] = useState<CalendarWeekCount>(4);
@@ -1570,9 +1571,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     isManagedReschedule && managed
       ? managedLessonTypeId || managed.booking.lessonType.id
       : lessonTypeId;
+  const availabilityLocation = isManagedReschedule ? managedLocation : form.location;
 
   // The lesson being moved, so availability does not count it against itself.
-  const movingToken = manageMode === "reschedule" ? managedToken : "";
+  const movingToken = isManagedReschedule ? managedToken : "";
   const movingSeriesId = manageMode === "reschedule-sequence"
     ? managedSeriesId ?? myBookings.find((booking) => booking.manageToken === managedToken)?.seriesId ?? ""
     : "";
@@ -1596,12 +1598,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
        * been a lie rather than a gap.
        */
       const until = addDaysToKey(todayKey, 140);
-      const moving = { manageToken: movingToken, seriesId: movingSeriesId, session: movingSeriesId ? readSession() : "" };
+      const moving = { manageToken: movingToken, seriesId: movingSeriesId, session: movingSeriesId ? readSession() : "", location: availabilityLocation };
       // Times fetched a moment ago (or ahead of time, while the page was idle)
       // show at once, with no "Checking what's free…" in between.
       const ready = peekAvailability(availabilityLessonTypeId, todayKey, until, moving);
       if (ready) {
         setSlotsByDate(ready.slotsByDate);
+        setCurrentSlotOnlineOnly(ready.currentSlotOnlineOnly ?? false);
         setHorizonDays(ready.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
         setNoticeHours(ready.minimumNoticeHours ?? NOTICE_HOURS);
         setLateFeeCents(ready.sameDayFeeCents ?? SAME_DAY_RESCHEDULE_FEE_CENTS);
@@ -1618,6 +1621,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         .then((data) => {
           if (request !== availabilityVersion.current || signal?.aborted || readSession() !== session) return;
           setSlotsByDate(data.slotsByDate);
+          setCurrentSlotOnlineOnly(data.currentSlotOnlineOnly ?? false);
           setHorizonDays(data.horizonDays || BOOKING_HORIZON_DAYS_FALLBACK);
           setNoticeHours(data.minimumNoticeHours ?? NOTICE_HOURS);
           setLateFeeCents(data.sameDayFeeCents ?? SAME_DAY_RESCHEDULE_FEE_CENTS);
@@ -1634,7 +1638,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     },
     // availabilityRequest is a deliberate trigger: see where it is declared.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [availabilityLessonTypeId, todayKey, availabilityRequest, movingToken, movingSeriesId]
+    [availabilityLessonTypeId, todayKey, availabilityRequest, movingToken, movingSeriesId, availabilityLocation]
   );
 
   useEffect(() => {
@@ -1672,7 +1676,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     if (!wanted.length && !signedOut) return;
     const run = () => {
       for (const { typeId, manageToken } of wanted) {
-        if (typeId) void fetchAvailability(typeId, todayKey, until, undefined, { manageToken }).catch(() => {});
+        if (typeId) void fetchAvailability(typeId, todayKey, until, undefined, { manageToken, location: availabilityLocation }).catch(() => {});
       }
       if (signedOut) void loadAuthPanel();
     };
@@ -1683,7 +1687,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     };
   // defaultLessonChoice reads the lesson types and preferences listed here.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayKey, checkingSession, loadingSlots, managed, isManagedReschedule, managedToken, intent, lessonTypes, lessonTypeId, offerTrial, hasPriorBooking, student, preferredLessonTypeId]);
+  }, [todayKey, checkingSession, loadingSlots, managed, isManagedReschedule, managedToken, intent, lessonTypes, lessonTypeId, offerTrial, hasPriorBooking, student, preferredLessonTypeId, availabilityLocation]);
 
   const calendarBookings = myBookings
     .filter((booking) => booking.status === "confirmed" && Date.parse(booking.endAt) > clock)
@@ -1828,6 +1832,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     isManagedReschedule &&
     selectedDate === managedDate &&
     (managedLessonTypeId || managed.booking.lessonType.id) === managed.booking.lessonType.id &&
+    !(managedLocation === "porto" && managed.booking.location === "online" && currentSlotOnlineOnly) &&
     !rawDaySlots.some((slot) => slot.startAt === managed.booking.startAt)
   );
   const daySlots = shouldShowCurrentManagedSlot && managed
@@ -1837,6 +1842,13 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       ].sort((a, b) => a.startAt.localeCompare(b.startAt))
     : rawDaySlots;
   const managedStartAt = shouldShowCurrentManagedSlot && managed ? managed.booking.startAt : "";
+  useEffect(() => {
+    if (!managed || !isManagedReschedule || loadingSlots || availabilityError || !selectedSlot) return;
+    const keepingTime = selectedSlot === managed.booking.startAt &&
+      (managedLessonTypeId || managed.booking.lessonType.id) === managed.booking.lessonType.id &&
+      !(managedLocation === "porto" && managed.booking.location === "online" && currentSlotOnlineOnly);
+    if (!keepingTime && !Object.values(slotsByDate).some(slots => slots.some(slot => slot.startAt === selectedSlot))) setSelectedSlot("");
+  }, [managed, isManagedReschedule, loadingSlots, availabilityError, selectedSlot, managedLessonTypeId, managedLocation, currentSlotOnlineOnly, slotsByDate]);
   /*
    * Inês's day divides at 14:00 in Porto. On another clock it divides at that
    * same moment, unless her day runs across the student's midnight, when it
@@ -1952,7 +1964,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     setSeriesPreviewError("");
     setPreviewing(true);
 
-    Promise.all(choiceStarts.map((startAt) => previewSeries(readSession(), { lessonType: lessonType.id, startAt, weeks: repeat })))
+    Promise.all(choiceStarts.map((startAt) => previewSeries(readSession(), { lessonType: lessonType.id, startAt, weeks: repeat, location: form.location })))
       .then((results) => {
         if (cancelled) return;
         setSeriesPreview({ bookable: results.flatMap((result) => result.bookable).sort(), skipped: results.flatMap((result) => result.skipped).sort() });
@@ -1972,7 +1984,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     return () => {
       cancelled = true;
     };
-  }, [form.repeat, chosen, lessonType, choiceStarts]);
+  }, [form.repeat, form.location, chosen, lessonType, choiceStarts]);
 
   useEffect(() => { setPaymentConsent(false); }, [choiceKey, lessonType?.id, lessonType?.price_cents, form.location, form.repeat]);
 
@@ -2278,7 +2290,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   }
 
   async function moveManagedLesson() {
-    if (!managedToken || !selectedSlot || !managed || manageWorking) return;
+    if (!managedToken || !selectedSlot || !managed || manageWorking || loadingSlots) return;
     const request = ++managedRequest.current;
     setManageWorking(true);
     setManageError("");
@@ -2591,7 +2603,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
         ? `${dropped.length === 1 ? "Your other chosen lesson" : `Your other ${dropped.length} chosen lessons`} came off with the change of lesson. Add ${dropped.length === 1 ? "it" : "them"} again if you need to.`
         : "");
       if (typeId !== lessonTypeId) {
-        const ready = todayKey ? peekAvailability(typeId, todayKey, addDaysToKey(todayKey, 140)) : null;
+        const ready = todayKey ? peekAvailability(typeId, todayKey, addDaysToKey(todayKey, 140), { location: form.location }) : null;
         if (ready) {
           // Usually fetched while the page was idle: the days simply change,
           // with the new lesson's gap in the same commit, so the times kept
@@ -2977,7 +2989,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     aria-label={option === "online" ? "Online" : IN_PERSON}
                     checked={form.location === option}
                     name="booking-location"
-                    onChange={() => setForm((current) => ({ ...current, location: option }))}
+                    onChange={() => {
+                      slotRecheck.current = [...savedChoices.map(choice => choice.startAt), ...(selectedSlot ? [selectedSlot] : [])];
+                      setLoadingSlots(true);
+                      setForm((current) => ({ ...current, location: option }));
+                    }}
                     type="radio"
                     value={option}
                   />
@@ -4329,7 +4345,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                           checked={managedLocation === option}
                           disabled={manageWorking}
                           name="managed-lesson-location"
-                          onChange={() => setManagedLocation(option)}
+                          onChange={() => { setLoadingSlots(true); setManagedLocation(option); }}
                           type="radio"
                           value={option}
                         />
@@ -4389,7 +4405,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   <button
                     aria-describedby={manageMode === "reschedule" && managed.sameDayFeeApplies ? "managed-change-fee" : undefined}
                     className="button button--coral"
-                    disabled={!selectedSlot || manageWorking}
+                    disabled={!selectedSlot || manageWorking || loadingSlots}
                     onClick={moveManagedLesson}
                     type="button"
                   >

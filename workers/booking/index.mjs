@@ -1,4 +1,4 @@
-import { availabilityRevisionSql, computeAvailability, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans } from "./availability.mjs";
+import { availabilityRevisionSql, computeAvailability, isSlotBookable, listLessonTypes, loadLessonType, loadSettings, normaliseBlockedSpans, normaliseOnlineOnlyPeriods, onlineOnlyProblem } from "./availability.mjs";
 import {
   OPEN_ENDED_HORIZON_WEEKS,
   SERIES_LENGTHS,
@@ -2965,12 +2965,20 @@ async function handleAvailability(request, env, url, teacher = false) {
 
   ctx_releaseHolds(env);
   const { slotsByDate, settings } = await computeAvailability(env, {
-    fromKey, toKey, lessonType, now, ignoreBookingId, ignoreSeriesId, ignoreHoldsOf: student?.id ?? null, teacher
+    fromKey, toKey, lessonType, now, ignoreBookingId, ignoreSeriesId, ignoreHoldsOf: student?.id ?? null, teacher,
+    location: normaliseLocation(url.searchParams.get("location"))
   });
+  // The current time remains usable outside published hours for a place-only
+  // change, but an online lesson cannot become in person in an online-only span.
+  const currentLesson = ignoreBookingId
+    ? await env.DB.prepare("SELECT starts_at FROM bookings WHERE id = ?").bind(ignoreBookingId).first() : null;
+  const currentSlotOnlineOnly = Boolean(currentLesson && onlineOnlyProblem(settings, currentLesson.starts_at,
+    new Date(Date.parse(currentLesson.starts_at) + lessonType.duration_minutes * 60000), "porto"));
 
   return json(
     {
       slotsByDate: slotsByDate ?? {},
+      currentSlotOnlineOnly,
       timeZone: homeZone(),
       minimumNoticeHours: teacher ? 0 : settings.minimumNoticeHours,
       sameDayFeeCents: settings.sameDayChangeFeeCents,
@@ -3080,7 +3088,7 @@ async function handleCreate(request, env, ctx) {
     return fail(`That's several bookings in a short time. Please email ${tutorOf(env).shortName} directly instead.`, 429, request, env);
   }
 
-  const check = await isSlotBookable(env, { startAt: body.startAt, lessonType, now });
+  const check = await isSlotBookable(env, { startAt: body.startAt, lessonType, now, location });
   if (!check.ok) return fail(check.reason, 409, request, env);
 
   const settings = await loadSettings(env);
@@ -3394,12 +3402,12 @@ async function handleCreateSelection(request, env, ctx, {
   const plannedRows = [];
   const skipped = [];
   for (const startAt of starts) {
-    const check = await isSlotBookable(env, { startAt, lessonType, now });
+    const check = await isSlotBookable(env, { startAt, lessonType, now, location });
     if (!check.ok) return fail(`${formatInZone(new Date(startAt), homeZone())}: ${check.reason} Nothing has been booked.`, 409, request, env);
     const slot = slotOf(startAt);
     const count = wantsRepeat ? repeatWeeks ?? OPEN_ENDED_HORIZON_WEEKS : 1;
     const plan = wantsRepeat
-      ? await planOccurrences(env, { fromKey: slot.dateKey, minuteOfDay: slot.minuteOfDay, count, lessonType, now })
+      ? await planOccurrences(env, { fromKey: slot.dateKey, minuteOfDay: slot.minuteOfDay, count, lessonType, now, location })
       : { bookable: [{ startAt: new Date(startAt), endAt: check.endAt }], skipped: [] };
     // Both starting lessons must still be available; only later occurrences
     // may be skipped after the preview has shown their dates.
@@ -3613,6 +3621,7 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
   const { bookable, skipped } = await planOccurrences(env, {
     fromKey,
     minuteOfDay: series.minute_of_day,
+    location: series.location,
     count,
     lessonType,
     now,
@@ -3696,7 +3705,8 @@ async function handleSeriesPreview(request, env) {
     count,
     lessonType,
     now,
-    ignoreHoldsOf: student?.id ?? null
+    ignoreHoldsOf: student?.id ?? null,
+    location: normaliseLocation(body.location)
   });
 
   return json(
@@ -3932,6 +3942,7 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
       lessonType,
       now,
       ignoreSeriesId: seriesId,
+      location,
       ignoreHorizon: true
     });
     if (!check.ok) {
@@ -4234,13 +4245,15 @@ async function handleReschedule(request, env, ctx, token) {
 
   const typeChangeProblem = lessonTypeChangeProblem(row, previousLessonType, lessonType, tutorOf(env));
   if (typeChangeProblem) return fail(typeChangeProblem, 409, request, env);
+  const placeProblem = onlineOnlyProblem(settings, body.startAt, new Date(Date.parse(body.startAt) + lessonType.duration_minutes * 60000), location);
+  if (placeProblem) return fail(placeProblem, 409, request, env);
 
   // Switching only between online and Porto keeps the time the lesson already
   // holds, so the notice window and published hours, which judge a new time,
   // do not apply. The overlap guard in the write below still does.
   const check = sameTime
     ? { ok: true, endAt: new Date(row.ends_at) }
-    : await isSlotBookable(env, { startAt: body.startAt, lessonType, now, ignoreBookingId: row.id });
+    : await isSlotBookable(env, { startAt: body.startAt, lessonType, now, ignoreBookingId: row.id, location });
   if (!check.ok) return fail(check.reason, 409, request, env);
 
   const startsAt = new Date(body.startAt).toISOString();
@@ -6283,6 +6296,31 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
         .all()
     ]);
     return json({ rules: rules.results ?? [], exceptions: exceptions.results ?? [], settings: await loadSettings(env) }, 200, request, env);
+  }
+
+  if (request.method === "POST" && path === "/admin/online-only") {
+    const periods = normaliseOnlineOnlyPeriods(adminBody.periods);
+    const revision = adminBody.expectedRevision;
+    if (!periods || typeof revision !== "string" || !/^\d{1,15}$/.test(revision)) {
+      return fail("Check the dates and hours for each online-only period. Nothing was changed.", 400, request, env);
+    }
+    // Keep these bounded rules in settings: existing databases need no migration.
+    // Every write checks both the teacher session and the editor's revision.
+    const guard = `COALESCE((SELECT value FROM settings WHERE key = 'online_only_revision'), '0') = ? AND (${authorization.sql})`;
+    const values = [revision, ...authorization.values];
+    const results = await env.DB.batch([
+      env.DB.prepare(`INSERT INTO settings (key, value) SELECT 'online_only_periods', ? WHERE ${guard}
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(JSON.stringify(periods), ...values),
+      env.DB.prepare(`INSERT INTO settings (key, value) SELECT 'availability_revision', '1' WHERE ${guard}
+        ON CONFLICT(key) DO UPDATE SET value = CAST(settings.value AS INTEGER) + 1`).bind(...values),
+      env.DB.prepare(`INSERT INTO settings (key, value) SELECT 'online_only_revision', '1' WHERE ${guard}
+        ON CONFLICT(key) DO UPDATE SET value = CAST(settings.value AS INTEGER) + 1`).bind(...values)
+    ]);
+    if (!results[0].meta.changes) {
+      await authorization.assert();
+      return fail("Online-only periods have changed. Reload your schedule before saving again.", 409, request, env);
+    }
+    return json({ ok: true, periods, revision: String(Number(revision) + 1) }, 200, request, env);
   }
 
   if (request.method === "POST" && path === "/admin/availability") {

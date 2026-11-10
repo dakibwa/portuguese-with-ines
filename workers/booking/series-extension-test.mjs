@@ -309,6 +309,22 @@ try {
     const before = f.lessons(); await f.tick(); assert.deepEqual(f.lessons(), before);
   });
 
+  await test("online-only periods invalidate a planned in-person extension and skip only the affected weeks", async f => {
+    f.db.prepare("UPDATE booking_series SET location='porto'").run();
+    f.db.prepare("UPDATE bookings SET location='porto'").run();
+    const recipe = { ...f.series() };
+    const gate = f.pause("batch", extension);
+    const tick = f.tick(); await gate.arrival;
+    await expectOk(await f.request("/admin/online-only", { expectedRevision: "0", periods: [
+      { id: "away", fromDate: "2026-10-13", toDate: "2026-10-13", startMinute: 0, endMinute: 1440 }
+    ] }, "teacher"));
+    gate.resume(); await tick;
+    assert.equal(f.lessons().length, 1); assert.deepEqual({ ...f.series() }, recipe);
+    await f.tick(); assert.ok(f.lessons().length > 1);
+    assert.ok(!f.lessons().some(row => row.starts_at === "2026-10-13T09:00:00.000Z"));
+    assert.equal(f.lessons()[0].location, "porto", "The existing lesson stays in person");
+  });
+
   await test("new time off invalidates a planned teacher extension without advancing its bookmark", async f => {
     f.db.prepare("UPDATE booking_series SET added_by_teacher=1").run();
     const recipe = { ...f.series() };

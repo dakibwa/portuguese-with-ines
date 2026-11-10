@@ -79,7 +79,7 @@ export function occurrenceInstants({ fromKey, minuteOfDay, count }) {
  * booking the other eleven. The skipped dates are returned so the student is
  * told before they commit, never after.
  */
-export async function planOccurrences(env, { fromKey, minuteOfDay, count, lessonType, now, ignoreBookingId = null, ignoreHoldsOf = null, teacher = false }) {
+export async function planOccurrences(env, { fromKey, minuteOfDay, count, lessonType, now, ignoreBookingId = null, ignoreHoldsOf = null, teacher = false, location = "online" }) {
   const wanted = occurrenceInstants({ fromKey, minuteOfDay, count: Math.min(count, MAX_OCCURRENCES_PER_RUN) });
 
   const bookable = [];
@@ -102,6 +102,7 @@ export async function planOccurrences(env, { fromKey, minuteOfDay, count, lesson
     const check = await isSlotBookable(env, {
       startAt: occurrence.startAt.toISOString(),
       lessonType,
+      location,
       now,
       ignoreBookingId,
       ignoreHoldsOf,
