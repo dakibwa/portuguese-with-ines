@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
 import { StudentLessons, sharedFacts } from "@/components/teacher/StudentLessons";
-import { useMasonryWithin } from "@/components/teacher/masonry";
-import { EditValue } from "@/components/teacher/EditControls";
-import { fetchBookings, fetchStudentNotes, isStudentsBooking, saveStudentPlan, type AdminBooking, type AdminStudent, type StudentNotes } from "@/lib/admin-api";import { readSession } from "@/lib/auth-api";
+import { EditActions, EditValue } from "@/components/teacher/EditControls";
+import { fetchBookings, fetchStudentNotes, isStudentsBooking, saveStudentPlan, type AdminBooking, type AdminStudent, type StudentNotes } from "@/lib/admin-api";
+import { readSession } from "@/lib/auth-api";
 
 /**
  * One fact about a student on one row: its name in small capitals and what it
@@ -13,8 +13,10 @@ import { fetchBookings, fetchStudentNotes, isStudentsBooking, saveStudentPlan, t
  * end (9 November 2026, Dan); a row's own action, such as Try again, ends the
  * name's line.
  */
-export function FactRow({ label, extra, action, children, wide }: {
+export function FactRow({ label, labelId, extra, action, children, wide }: {
   label: string;
+  /** For a control that names itself by the row. */
+  labelId?: string;
   /** Beside the label, such as their level beside Plan. */
   extra?: ReactNode;
   action?: ReactNode;
@@ -23,7 +25,7 @@ export function FactRow({ label, extra, action, children, wide }: {
   wide?: boolean;
 }) {
   return <div className={`teacher-fact${wide ? " teacher-fact--wide" : ""}`}>
-    <span className="teacher-fact__label">{label}{extra}</span>
+    <span className="teacher-fact__label" id={labelId}>{label}{extra}</span>
     <div className="teacher-fact__value">{children}</div>
     {action ? <div className="teacher-fact__action">{action}</div> : null}
   </div>;
@@ -71,8 +73,6 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
   const [now, setNow] = useState(() => Date.now());
   const studentId = student.id;
   const email = student.email?.trim().toLowerCase() ?? "";
-  // Their lessons pack two across without holes where there is room.
-  useMasonryWithin(root, ".teacher-history-list");
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -153,15 +153,13 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
 
   const planRow = currentNotes?.notes ? <FactRow label="Plan" wide
     extra={level ? <span className="teacher-notes__level">{level}</span> : null}>
-    {plan !== null ? <div className="teacher-plan__edit">
+    {plan !== null ? <form className="teacher-plan__edit" onSubmit={event => { event.preventDefault(); void savePlan(); }}
+      onKeyDown={event => { if (event.key === "Escape" && !busy) { event.preventDefault(); event.stopPropagation(); closePlan(); } }}>
       <textarea ref={planField} className="homework-notes__field" aria-label={`${student.name}’s plan`} rows={5} maxLength={4000} value={plan} disabled={busy}
         placeholder="What they’re working towards, what you’ve covered, what comes next" onChange={event => setPlan(event.target.value)} />
+      <EditActions busy={busy} onCancel={closePlan} saveLabel="Save plan" />
       {planError ? <p className="teacher-inline-error" role="alert">{planError}</p> : null}
-      <div className="teacher-plan__actions">
-        <button className="button button--coral button--small" type="button" disabled={busy} onClick={() => void savePlan()}>{busy ? "Saving…" : "Save plan"}</button>
-        <button className="button button--outline button--small" type="button" disabled={busy} onClick={closePlan}>Cancel</button>
-      </div>
-    </div> : <EditValue field="plan" label={`${currentNotes.notes.plan ? "Change" : "Write"} ${student.name}’s plan`} disabled={busy} empty={!currentNotes.notes.plan} onEdit={() => setPlan(currentNotes.notes!.plan)}>
+    </form> : <EditValue field="plan" label={`${currentNotes.notes.plan ? "Change" : "Write"} ${student.name}’s plan`} disabled={busy} empty={!currentNotes.notes.plan} onEdit={() => setPlan(currentNotes.notes!.plan)}>
       <span className="teacher-plan__text">{currentNotes.notes.plan || "What they’re working towards"}</span>
     </EditValue>}
   </FactRow> : currentNotes?.error ? <FactRow label="Plan" wide action={<button className="button button--outline button--small" type="button" onClick={() => setNotesAttempt(value => value + 1)}>Try again</button>}>

@@ -245,24 +245,29 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
       </div>
     );
     const openDetails = selected && details ? details(summary(false)) : null;
-    // One line of what she does and one of facts: the day and time, then at
-    // its end the homework chip, notes pencil and the compact Already paid
-    // tick, which wrap together beneath on a narrow tile. The day and time
-    // button stretches over the whole tile; those controls sit above it.
+    // Every lesson is one row of a ledger, laid out alike (10 November 2026,
+    // Dan: "not unified"): its day and time, its facts, then at the row's end
+    // its homework chip, notes pencil and Already paid or Record refund, so
+    // dates read down the left and what she does lines up down the right. A
+    // narrow row folds in two: day and pencil, then facts and money. The day
+    // and time button stretches over the whole row; the controls sit above it.
+    const money = settle ? <PaidTick plain checked={paidByHand(booking)} disabled={Boolean(paying) || busy} onChange={paid => void markPaid(booking, paid)} />
+      : refund ? <button className="teacher-quiet" data-homework-exit disabled={busy} onClick={() => onRecordRefund(booking)} type="button">Record refund</button> : null;
     return (
       <li className={`teacher-history-lesson teacher-lesson-row${cancelled || noShow ? " is-cancelled" : ""}${opened ? " is-open" : ""}${selected ? " is-selected" : ""}`} key={booking.id}>
         <div className="teacher-lesson-row__line">
           {summary(selected && Boolean(openDetails))}
-          {notesButton || settle || refund ? <div className="teacher-lesson-row__side">
+          {notesButton || (note && state) ? <div className="teacher-lesson-row__side">
             {note && state ? <span className={`teacher-notes__state is-${note.homework}`}>{state}</span> : null}
             {notesButton}
-            {settle ? <PaidTick plain checked={paidByHand(booking)} disabled={Boolean(paying) || busy} onChange={paid => void markPaid(booking, paid)} />
-              : refund ? <button className="teacher-quiet" data-homework-exit disabled={busy} onClick={() => onRecordRefund(booking)} type="button">Record refund</button> : null}
           </div> : null}
         </div>
         {openDetails ? <div className="teacher-lesson-row__details" id={detailsId}>{openDetails}</div> : null}
         {/* Open details say these facts themselves. */}
-        {openDetails ? null : facts}
+        {!openDetails && (facts || money) ? <div className="teacher-lesson-row__foot">
+          {facts ? <div className="teacher-lesson-row__facts">{facts}</div> : null}
+          {money}
+        </div> : null}
         {paidError?.id === booking.id ? <p className="teacher-inline-error" role="alert">{paidError.message}</p> : null}
         {note?.notes.trim() && !opened ? <p className="teacher-notes__text">{note.notes.trim()}</p> : null}
         {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
@@ -295,22 +300,24 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     return (
       <li className={`teacher-history-lesson teacher-history-run teacher-lesson-row${open ? " is-open" : ""}`} key={`run-${run.id}`}>
         <div className="teacher-lesson-row__line">
-          <strong className="teacher-history-run__when">
+          <strong className="teacher-lesson-row__what teacher-history-run__when">
             <Repeat className="teacher-history-run__mark" size={14} strokeWidth={2.4} aria-hidden="true" />
             Every {dateLabel(dateKey(new Date(pattern.starts_at)), { weekday: "long" })}
             {" "}<span className="teacher-history-lesson__time"><i aria-hidden="true">· </i><span className="visually-hidden">, </span>{formatSlotTime(pattern.starts_at)}–{formatSlotTime(pattern.ends_at)}</span>
           </strong>
-          <span className="teacher-history-run__span">{run.lessons.length} weeks, <span>{day(first)} to {day(last)}</span></span>
-          {factList(facts)}
-          <button type="button" className="teacher-quiet teacher-history-run__toggle" data-homework-exit aria-expanded={open} aria-controls={open ? weeksId : undefined}
+          <div className="teacher-lesson-row__side"><button type="button" className="teacher-quiet teacher-history-run__toggle" data-homework-exit aria-expanded={open} aria-controls={open ? weeksId : undefined}
             onClick={() => {
               // Hiding its weeks hides the week whose details are open in one.
               if (open && run.lessons.some(lesson => lesson.id === selectedId)) onCloseLesson();
               setOpenRuns(current => open ? current.filter(id => id !== run.id) : [...current, run.id]);
             }}>
             <ChevronDown size={15} aria-hidden="true" />{open ? "Hide weeks" : "Show weeks"}
-          </button>
+          </button></div>
         </div>
+        <div className="teacher-lesson-row__foot"><div className="teacher-lesson-row__facts">
+          <span className="teacher-history-run__span">{run.lessons.length} weeks, <span>{day(first)} to {day(last)}</span></span>
+          {factList(facts)}
+        </div></div>
         {open ? <ul className="teacher-history-list teacher-history-run__weeks" id={weeksId}>{run.lessons.map(lesson => <Fragment key={lesson.id}>{lessonRow(lesson, facts)}</Fragment>)}</ul> : null}
       </li>
     );

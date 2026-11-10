@@ -714,7 +714,7 @@ export function TeacherSchedule() {
           }}
           onView={setSelectedBooking}
           onWelcome={(student) => void sendWelcome(student)}
-          onStudent={(student, editDetails) => openStudent(student, editDetails ? "details" : "lessons")}
+          onStudent={student => openStudent(student, "lessons")}
           onSeeAll={() => { setActiveTab("students"); document.getElementById("teacher-tab-students")?.focus({ preventScroll: true }); }}
         />
       ) : null}

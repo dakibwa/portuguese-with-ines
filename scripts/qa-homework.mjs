@@ -143,10 +143,10 @@ try {
     await heading("Ready");
     await expect(editor.locator(".homework-summary")).toHaveCount(3);
     await shot("04-ready");
-    // Both the notes close and the focused student's way back protect unread photos.
-    for (const exit of ["Close homework", "All students"]) {
+    // Both the notes close and the student card's Close protect unread photos.
+    for (const exit of [page.getByRole("button", { name: "Close homework", exact: true }), page.locator(".teacher-setup__close").getByRole("button", { name: "Close", exact: true })]) {
       page.once("dialog", dialog => dialog.dismiss());
-      await page.getByRole("button", { name: exit, exact: true }).click();
+      await exit.click();
       await expect(editor.locator(".homework-summary").first()).toContainText("2 photos");
     }
     // One press reads both pages and makes the draft, with gentle progress meanwhile.

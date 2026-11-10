@@ -1050,21 +1050,21 @@ try {
     await expect(alex.getByRole("button", { name: action, exact: true })).toHaveCount(1);
   await expect(profile.getByRole("button", { name: /^(Sign-in link|Add a lesson|Mark as)/ })).toHaveCount(0);
   // A signed-in student's email is theirs to change: shown, never an edit
-  // control, and locked in the details form her name's pencil opens. A new
-  // name is kept once saved.
+  // control. Their name is changed where it reads, in the card's top row
+  // (10 November 2026, Dan), and kept once saved.
   await expect(alex.getByRole("button", { name: /^(Change|Add) email for Alex/ })).toHaveCount(0);
+  const alexCard = page.locator('.teacher-students [data-student-id="alex"]');
   await alex.getByRole("button", { name: "Change name for Alex", exact: true }).click();
-  await expect(profile.getByLabel(/^Email/)).toBeDisabled();
-  await profile.getByLabel("Full name", { exact: true }).fill("Alex Rowe");
-  await profile.getByRole("button", { name: "Save details", exact: true }).click();
+  await expect(alexCard.getByLabel("Full name", { exact: true })).toBeFocused();
+  await alexCard.getByLabel("Full name", { exact: true }).fill("Alex Rowe");
+  await alexCard.getByRole("button", { name: "Save", exact: true }).click();
   const renamed = studentRow(page, "Alex Rowe");
   await expect(renamed.getByRole("button", { name: "Open Alex Rowe’s profile", exact: true })).toBeVisible();
   assert.equal(state.students.find(student => student.id === "alex").name, "Alex Rowe");
   await renamed.getByRole("button", { name: "Change name for Alex Rowe", exact: true }).click();
-  const renamedProfile = renamed.getByRole("region", { name: "Alex Rowe’s profile", exact: true });
-  await expect(renamedProfile.getByLabel("Full name", { exact: true })).toHaveValue("Alex Rowe");
-  await renamedProfile.getByLabel("Full name", { exact: true }).fill("Alex");
-  await renamedProfile.getByRole("button", { name: "Save details", exact: true }).click();
+  await expect(alexCard.getByLabel("Full name", { exact: true })).toHaveValue("Alex Rowe");
+  await alexCard.getByLabel("Full name", { exact: true }).fill("Alex");
+  await alexCard.getByRole("button", { name: "Save", exact: true }).click();
   await expect(alex.getByRole("button", { name: "Open Alex’s profile", exact: true })).toBeVisible();
   await alex.getByRole("button", { name: "Sign-in link for Alex", exact: true }).click();
   await expect(profile.getByRole("link", { name: /^Send on WhatsApp/ })).toHaveAttribute("href", /signin%3Dinvite-alex$/);
@@ -1106,14 +1106,14 @@ try {
     await nora.getByRole("button", { name: "Open Nora Lima’s profile", exact: true }).click();
     await nora.getByRole("button", { name: `${tool} for Nora Lima`, exact: true }).click();
   };
-  // A price is changed from its own value's pencil, which focuses that field.
+  // A price is changed in its own row, from its value's pencil, which focuses that field.
   await openNora("Change 60-minute price");
   await expect(noraProfile.getByLabel("Price for 60 minutes, in euros", { exact: true })).toBeFocused();
   await noraProfile.getByLabel("Price for 60 minutes, in euros", { exact: true }).fill("24");
   await noraProfile.getByRole("button", { name: "Save price", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/nora/prices").at(-1)?.data).toEqual({ prices: { 60: 2400, 90: null } });
-  await nora.getByRole("button", { name: "Close", exact: true }).click();
-  await openNora("Add a lesson");
+  await expect(nora.getByRole("button", { name: "Change 60-minute price for Nora Lima", exact: true })).toBeFocused();
+  await nora.getByRole("button", { name: "Add a lesson for Nora Lima", exact: true }).click();
   await expect(noraProfile.getByRole("radio", { name: "60 mins, €24" })).toBeVisible();
   const picker = noraProfile.getByRole("group", { name: "Choose a date and time", exact: true });
   // Earlier days are hers to choose too, for a lesson already had (15 October 2026).
@@ -1167,9 +1167,8 @@ try {
   // Once she has an email, her link can go by email too.
   // With no email yet, the empty line offers itself and the email field takes focus.
   await openNora("Add email");
-  await expect(noraProfile.getByLabel(/^Email/)).toBeFocused();
-  await expect(noraProfile.getByLabel("Full name", { exact: true })).toHaveValue("Nora Lima");
-  await noraProfile.getByLabel(/^Email/).fill("nora@example.invalid");
+  await expect(noraProfile.getByLabel("Email", { exact: true })).toBeFocused();
+  await noraProfile.getByLabel("Email", { exact: true }).fill("nora@example.invalid");
   // A background read started before the save must not replace its newer data.
   let releaseOlderStudents;
   state.studentsGate = new Promise(resolve => { releaseOlderStudents = resolve; });
@@ -1187,7 +1186,7 @@ try {
   await expect.poll(() => state.studentsReads).toBeGreaterThan(beforeStudentsRead);
   const isStudentRead = response => new URL(response.url()).pathname === "/admin/students" && response.request().method() === "GET";
   const savedStudents = page.waitForResponse(isStudentRead);
-  await noraProfile.getByRole("button", { name: "Save details", exact: true }).click();
+  await noraProfile.getByRole("button", { name: "Save", exact: true }).click();
   assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/students/nora/details").at(-1).data,
     { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "" });
   await expect(nora.locator(".teacher-setup__notice")).toHaveText("Their details are saved.");
@@ -1370,7 +1369,7 @@ try {
     await pane.getByRole("button", { name: "Change 60-minute price for Alex", exact: true }).click();
     await pane.getByLabel("Price for 60 minutes, in euros", { exact: true }).fill("0");
     await expect(pane.getByLabel("Price for 90 minutes, in euros", { exact: true })).toHaveAttribute("placeholder", "0");
-    await expect(pane).toContainText("0: free, with no card needed.");
+    await expect(pane).toContainText("0 is free, with no card needed.");
     await pane.screenshot({ path: `tmp/qa/free-price/teacher-price-${width}.png` });
     await pane.getByRole("button", { name: "Save price", exact: true }).click();
     await expect.poll(() => state.writes.at(-1)?.data).toEqual({ prices: { 60: 0, 90: null } });
@@ -1524,7 +1523,8 @@ try {
     const history = samRow.getByRole("region", { name: "Sam Known’s profile", exact: true });
     await expect(page.locator(".teacher-board")).toBeHidden();
     await expect(page.getByRole("searchbox", { name: "Find a student", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "All students", exact: true })).toBeVisible();
+    // The card's own Close is the one way back (10 November 2026).
+    await expect(page.getByRole("button", { name: "All students", exact: true })).toHaveCount(0);
     await expect(history.getByRole("heading", { name: "Upcoming · 5" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 4" })).toBeVisible();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
@@ -1538,9 +1538,9 @@ try {
     await expect(run).toContainText("In Porto");
     await run.getByRole("button", { name: "Show weeks", exact: true }).click();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(10);
-    // Its weeks fit three across a wide card and one on a phone.
+    // Its weeks are rows of the same ledger, one under another at every width.
     const weekColumns = await run.locator(".teacher-history-run__weeks").evaluate(list => getComputedStyle(list).gridTemplateColumns.split(" ").length);
-    assert.equal(weekColumns >= 3, width === 1280, `An opened run's weeks fit ${width === 1280 ? "three or more across" : "one column"} at ${width}px, not ${weekColumns}`);
+    assert.equal(weekColumns, 1, `An opened run's weeks are one column at ${width}px, not ${weekColumns}`);
     // A week's whole tile opens it, not a small rectangle around its date: a
     // press at the tile's far side, well away from its words, opens its
     // details in place (no dialog, nothing locked), one lesson's at a time.
@@ -1598,24 +1598,28 @@ try {
     // and closes the card; cancelling puts focus back on that pencil.
     const renamePencil = samRow.getByRole("button", { name: "Change name for Sam Known", exact: true });
     await renamePencil.click();
-    await expect(history.getByLabel("Full name", { exact: true })).toBeFocused();
-    await history.getByRole("button", { name: "Cancel", exact: true }).click();
+    const samCard = page.locator('.teacher-students [data-student-id="sam"]');
+    await expect(samCard.getByLabel("Full name", { exact: true })).toBeFocused();
+    await samCard.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(renamePencil).toBeFocused();
     assert.equal(await open.locator("button").count(), 0, "The name's button holds no other button");
-    // Each detail is its own value and pencil, so the phone opens the form on the phone.
+    // Each detail is its own value and pencil, and opens as its own field
+    // right there (10 November 2026, Dan); Escape puts it back.
     await history.getByRole("button", { name: "Change phone for Sam Known", exact: true }).click();
-    await expect(history.getByLabel(/^Phone/)).toBeFocused();
-    await expect(history.getByLabel("Full name", { exact: true })).toHaveValue("Sam Known");
-    await expect(history.getByLabel(/^Email/)).toHaveValue("sam@example.invalid");
+    await expect(history.getByLabel("Phone", { exact: true })).toBeFocused();
+    await expect(history.getByLabel("Email", { exact: true })).toHaveCount(0);
+    await history.getByLabel("Phone", { exact: true }).press("Escape");
+    await expect(history.getByRole("button", { name: "Change phone for Sam Known", exact: true })).toBeFocused();
+    await history.getByRole("button", { name: "Change phone for Sam Known", exact: true }).click();
     // The student chooses their splat elsewhere while this unrelated editor
     // still holds its older account snapshot. Saving a phone never sends it.
     state.students.find(student => student.id === "sam").mark = "bloom";
-    await history.getByLabel(/^Phone/).fill("+351 922 222 222");
-    await history.getByRole("button", { name: "Save details", exact: true }).click();
+    await history.getByLabel("Phone", { exact: true }).fill("+351 922 222 222");
+    await history.getByRole("button", { name: "Save", exact: true }).click();
     await expect.poll(() => state.writes.at(-1)?.path).toBe("/admin/students/sam/details");
     assert.equal(Object.hasOwn(state.writes.at(-1).data, "mark"), false);
     assert.equal(state.students.find(student => student.id === "sam").mark, "bloom");
-    // Saved, she is back on their profile; closing it returns her to their name.
+    // Saved, the value reads again with focus on it; closing returns her to their name.
     await expect(samRow.locator(".teacher-setup__notice")).toHaveText("Their details are saved.");
     await expect(history.getByRole("button", { name: "Change phone for Sam Known", exact: true })).toBeFocused();
     await samRow.getByRole("button", { name: "Close", exact: true }).click();

@@ -49,7 +49,7 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
   onMeet: () => void;
   onView: (booking: AdminBooking) => void;
   onWelcome: (student: AdminStudent, again?: boolean) => void;
-  onStudent: (student: AdminStudent, editDetails?: boolean) => void;
+  onStudent: (student: AdminStudent) => void;
   /** The Timetable shows only the first few notices. */
   onSeeAll?: () => void;
   embedded?: boolean;

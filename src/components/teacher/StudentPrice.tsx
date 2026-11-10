@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { EditValue } from "@/components/teacher/EditControls";
+import { EditActions, EditValue } from "@/components/teacher/EditControls";
 import { setStudentPrices, type AdminStudent, type StudentPrices } from "@/lib/admin-api";
 import { formatPriceCents } from "@/lib/booking-api";
 import { lessonProducts } from "@/lib/lesson-products";
@@ -113,22 +113,22 @@ export function PriceFields({ draft, disabled, idPrefix, invalid, onChange }: {
 }
 
 /**
- * Her price for one student, in their profile (13 October 2026, Dan): it
- * prices every lesson of theirs at that length, and lessons to come that
- * nothing is settled on follow it.
+ * Her price for one student, in their profile's Price row (13 October 2026,
+ * Dan): it prices every lesson of theirs at that length, and lessons to come
+ * that nothing is settled on follow it. Each length's pencil opens both
+ * fields right there, on its own (10 November 2026).
  */
-export function StudentPrice({ token, student, onChanged, startEditing = false, idPrefix = "teacher-price", labelledBy, onBusy, onCancel, showCancel = true }: {
+export function StudentPrice({ token, student, onChanged, idPrefix = "teacher-price", labelledBy, disabled, onBusy }: {
   token: string;
   student: AdminStudent;
   onChanged: (student: AdminStudent) => void;
-  startEditing?: boolean;
   idPrefix?: string;
-  labelledBy?: string;
+  /** The row's label. */
+  labelledBy: string;
+  disabled?: boolean;
   onBusy?: (busy: boolean) => void;
-  onCancel?: () => void;
-  showCancel?: boolean;
 }) {
-  const [editing, setEditing] = useState(startEditing);
+  const [editing, setEditing] = useState<Length | null>(null);
   const [draft, setDraft] = useState<PriceDraft>(() => priceDraft(student));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -136,12 +136,13 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
   const section = useRef<HTMLElement>(null);
   // Opened from its pencil, the price field takes focus; saved or cancelled,
   // focus goes back to that pencil rather than to the page.
-  const focus = useRef<"field" | "pencil" | null>(null);
+  const back = useRef<Length | null>(null);
   useEffect(() => {
-    if (focus.current === "field" && editing) document.getElementById(`${idPrefix}-60`)?.focus();
-    else if (focus.current === "pencil" && !editing) section.current?.querySelector<HTMLElement>("[data-edit]")?.focus();
-    focus.current = null;
+    if (editing) document.getElementById(`${idPrefix}-${editing}`)?.focus();
+    else if (back.current) section.current?.querySelector<HTMLElement>(`[data-edit="price-${back.current}"]`)?.focus();
+    if (!editing) back.current = null;
   }, [editing, idPrefix]);
+  const close = () => { back.current = editing; setEditing(null); setDraft(priceDraft(student)); setError(""); };
 
   async function save() {
     if (busy) return;
@@ -156,8 +157,8 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
     try {
       const result = await setStudentPrices(token, student.id, prices);
       onChanged(result.student);
-      focus.current = "pencil";
-      setEditing(false);
+      back.current = editing;
+      setEditing(null);
       const lessons = (count: number) => `${count} ${count === 1 ? "lesson" : "lessons"}`;
       setSaved([
         "Saved.",
@@ -174,27 +175,18 @@ export function StudentPrice({ token, student, onChanged, startEditing = false, 
   }
 
   return (
-    <section className="teacher-price" ref={section} aria-labelledby={labelledBy ?? `${idPrefix}-title`}>
-      {!labelledBy ? <h3 id={`${idPrefix}-title`}>Their price</h3> : null}
+    <section className="teacher-price" ref={section} aria-labelledby={labelledBy}>
       {editing ? (
-        <form className="teacher-form" noValidate onSubmit={(event) => { event.preventDefault(); void save(); }}>
-          <PriceFields draft={draft} disabled={busy} idPrefix={idPrefix} invalid={error === PRICE_RANGE_ERROR} onChange={setDraft} />
-          <ul className="booking-payment-facts teacher-price__hint">
-            <li>90 mins empty: 1.5× the 60-minute price.</li>
-            <li>Both empty: standard prices.</li>
-            <li>0: free, with no card needed.</li>
-          </ul>
-          <div className="teacher-dialog-actions">
-            <button className="button button--coral button--compact" disabled={busy} type="submit">{busy ? "Saving…" : "Save price"}</button>
-            {showCancel ? <button className="button button--outline button--compact" disabled={busy} onClick={() => { focus.current = "pencil"; setEditing(false); setDraft(priceDraft(student)); setError(""); onCancel?.(); }} type="button">Cancel</button> : null}
+        <form className="teacher-form" noValidate onKeyDown={(event) => { if (event.key === "Escape" && !busy) { event.preventDefault(); event.stopPropagation(); close(); } }} onSubmit={(event) => { event.preventDefault(); void save(); }}>
+          <div className="teacher-price__row">
+            <PriceFields draft={draft} disabled={busy} idPrefix={idPrefix} invalid={error === PRICE_RANGE_ERROR} onChange={setDraft} />
+            <EditActions busy={busy} onCancel={close} saveLabel="Save price" />
           </div>
+          <p className="teacher-price__hint">Empty is the standard price, and an empty 90 follows their 60. 0 is free, with no card needed.</p>
         </form>
       ) : (
-        <div className="teacher-price__view">
-          <EditValue field="price" label="Change price" onEdit={() => { focus.current = "field"; setEditing(true); setSaved(""); }}>
-            {LENGTHS.map((minutes) => <span className="teacher-price__line" key={minutes}>{priceLabel(student, minutes)}</span>)}
-          </EditValue>
-        </div>
+        LENGTHS.map((minutes) => <EditValue disabled={disabled} field={`price-${minutes}`} key={minutes} label={`Change ${minutes}-minute price for ${student.name}`}
+          onEdit={() => { setDraft(priceDraft(student)); setEditing(minutes); setSaved(""); }}>{priceLabel(student, minutes)}</EditValue>)
       )}
       {error ? <p className="teacher-inline-error" id={`${idPrefix}-error`} role="alert">{error}</p> : null}
       {saved ? <p className="teacher-inline-success" role="status"><CheckCircle2 size={18} aria-hidden="true" />{saved}</p> : null}
