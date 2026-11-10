@@ -178,7 +178,6 @@ export function TimeOffCalendar({ today, exceptions, onlineOnly, bookings, booki
                       its fine hatch, each named in the key beneath. */}
                   <span className={`teacher-month-date${date === today ? " today-pill" : ""}`}>{Number(date.slice(-2))}</span>
                   <span aria-hidden="true" className="teacher-month-state">{dayOff ? "Off" : ""}</span>
-                  {onlineHours ? <Globe aria-hidden="true" className="teacher-month-online" size={11} strokeWidth={2.4} /> : null}
                 </button>
               );
             })}
@@ -188,7 +187,6 @@ export function TimeOffCalendar({ today, exceptions, onlineOnly, bookings, booki
             <span><i className="is-off" aria-hidden="true" /> Day off</span>
             <span><i className="is-online" aria-hidden="true" /> Online only</span>
             <span><i className="is-booked" aria-hidden="true" /> Lesson booked</span>
-            {dates.includes(today) ? <span><b aria-hidden="true" className="today-pill today-pill--key">{Number(today.slice(-2))}</b> Today</span> : null}
           </div>
         </div>
 

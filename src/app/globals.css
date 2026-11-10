@@ -4144,8 +4144,8 @@ textarea,
 }
 
 .unified-calendar__legend .is-online-only {
-  margin-right: -0.1rem;
   background: var(--online-only);
+  box-shadow: inset 0 0 0 1px var(--rule);
 }
 
 /*
@@ -5552,20 +5552,15 @@ p.lesson-when > span {
   font-weight: 700;
 }
 
-/* In Porto, a day free only online: the sky tint and its globe, never the
-   tint alone. It opens like any day, to say so. */
+/* In Porto, a day free only online takes the sky tint, which the key names
+   (the globe went on 10 November 2026: Dan, "is it necessary if it's already
+   in the legend what the colour means?"). It opens like any day, to say so. */
 .calendar-week button.is-online-only {
   background: var(--online-only);
   color: var(--green-deep);
   font-weight: 700;
 }
 
-.calendar-week__online {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  opacity: 0.8;
-}
 
 /* The grid rolls forward from this week rather than showing a calendar month,
    so the 1st is labelled to make the crossing into the next month legible. */
@@ -5585,9 +5580,9 @@ p.lesson-when > span {
 
 /* Today, the same on every calendar on the site (10 November 2026, Dan: no
    underline, no dot, no "today" beneath the number): its date in the deep
-   blue blob Inês's Timetable has always used, and in the key beside the
-   word. It marks the number alone, so it never reads as a chosen day; on a
-   day already filled in a deep colour the blob is paper instead. */
+   blue blob Inês's Timetable has always used. It explains itself, so it has
+   no entry in a key. It marks the number alone, so it never reads as a
+   chosen day; on a day already filled in a deep colour the blob is paper. */
 .today-pill {
   display: inline-grid;
   min-width: 1.7em;
@@ -5600,14 +5595,6 @@ p.lesson-when > span {
   font-style: normal;
   font-weight: 700;
   line-height: 1;
-}
-
-/* In a key: the same blob, the key's size, holding today's own date. */
-.today-pill--key {
-  min-width: 1.9em;
-  min-height: 1.6em;
-  font-size: 0.6rem;
-  letter-spacing: 0;
 }
 
 .calendar-week button:is(.is-selected, .is-next) .today-pill,

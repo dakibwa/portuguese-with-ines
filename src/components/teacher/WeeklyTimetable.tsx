@@ -479,7 +479,6 @@ export function WeeklyTimetable({
       {!editing ? <strong className={date === today ? "teacher-day-today" : undefined}>
         {date === today ? <span className="visually-hidden">Today, </span> : null}{Number(date.slice(-2))}
       </strong> : <span className="teacher-day-full-name">{WEEKDAYS[index].name.slice(3)}</span>}
-      {onlineAllDay(date) ? <span className="teacher-day-online" title="Online only"><Globe size={11} strokeWidth={2.4} aria-hidden="true" /></span> : null}
     </>;
   }
 
@@ -922,9 +921,6 @@ export function WeeklyTimetable({
               <UserRound size={12} strokeWidth={2.4} aria-hidden="true" />
               {IN_PERSON}
             </span>
-            {shownDates.includes(today) ? (
-              <span><b aria-hidden="true" className="today-pill today-pill--key">{Number(today.slice(-2))}</b> Today</span>
-            ) : null}
           </div>
           {status}
         </div>

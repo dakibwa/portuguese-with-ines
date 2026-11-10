@@ -342,7 +342,6 @@
 .teacher-day-heading > span { opacity: 0.7; }
 .teacher-day-heading strong { display: inline-grid; place-items: center; min-width: 1.85rem; min-height: 1.85rem; font-size: 1rem; font-weight: 700; letter-spacing: 0; }
 .teacher-day-heading .teacher-day-today { padding: 0.15rem 0.35rem; border-radius: var(--squiggle-pill); background: var(--blue-deep); color: var(--paper-light); }
-.teacher-day-online { display: inline-grid; place-items: center; color: var(--blue-deep); }
 .teacher-day-full-name { display: none; }
 .teacher-week-day-control { display: none; }
 @container teacher-day (max-width: 160px) {
@@ -1598,7 +1597,6 @@
   .teacher-day-cell__band > .teacher-day-toggle { display: none; }
   .teacher-day-cell__band > .teacher-day-heading { width: 100%; min-height: 44px; }
   /* Too narrow to follow the date, the globe takes the corner the booked dot leaves. */
-  .teacher-day-online { position: absolute; top: 0.3rem; left: 0.25rem; }
   .teacher-block-label {
     font-size: 0.68rem;
   }
@@ -2310,15 +2308,11 @@
 .teacher-month-day.is-off {
   background: repeating-linear-gradient(-45deg, transparent, transparent 5px, var(--hover-wash) 5px, var(--hover-wash) 7px), var(--lavender-soft);
 }
-/* Online only tints the day and marks it with a globe; a day off keeps its
-   hatching, with the globe beside it. */
+/* Online only tints the day, which the key names (its corner globe went on
+   10 November 2026: Dan, "is it necessary if it's already in the legend what
+   the colour means?"). A day off keeps its hatching. */
 .teacher-month-day.is-online:not(.is-off):not([aria-pressed="true"]) {
   background: var(--online-only);
-}
-.teacher-month-online {
-  position: absolute;
-  top: 6px;
-  right: 7px;
 }
 .teacher-month-day.is-outside:not([aria-pressed="true"]) {
   background-color: transparent;
@@ -2594,7 +2588,6 @@
   .teacher-month-grid { gap: 0.2rem; }
   .teacher-month-day { min-height: 54px; }
   .teacher-month-state { font-size: 0.5rem; }
-  .teacher-month-online { top: 3px; right: 3px; width: 9px; height: 9px; }
   .teacher-month-key { column-gap: 0.65rem; }
 }
 /* Her students (12 October 2026, Dan): one row each, who first, then what

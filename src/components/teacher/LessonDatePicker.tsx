@@ -156,7 +156,6 @@ export function LessonDatePicker({ token, lessonType, date, time, startAt = "", 
         {/* Every mark on the month is in its key: a cream day has times free. */}
         <div className="teacher-month-key teacher-lesson-picker__key">
           {timesKnown ? <span><i className="is-free" aria-hidden="true" /> Times available · {HOME_CLOCK}</span> : null}
-          {dates.includes(today) ? <span><b aria-hidden="true" className="today-pill today-pill--key">{Number(today.slice(-2))}</b> Today</span> : null}
         </div>
       </div>
       <div className="teacher-lesson-picker__times" aria-live="polite">

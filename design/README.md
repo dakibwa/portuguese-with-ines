@@ -2529,20 +2529,20 @@ dot, or a word under the number:
   has always used, `.today-pill`). It marks the number alone, so it never
   reads as a chosen day; on a day already filled in a deep colour (chosen,
   the next lesson, a pressed day) the blob is paper. It keeps its strength
-  on a day that cannot be pressed.
+  on a day that cannot be pressed. It explains itself, so no key lists it
+  (Dan: "does today need a little thing like that?").
 - A day off is hatched in lilac, with `Off`, as it always was.
 - A day with a lesson booked, on her side, takes one fine, faint hatch
   leaning the other way (`--hatch-booked`), over whatever else the day is: a
   day that is both shows both hatches. On her phone Timetable the same hatch
   marks the tabs of days with lessons. A student's own booked day keeps its
   tint with the lesson's time.
-- Online-only time is the one sky blue with a globe (below).
+- Online-only time is the one sky blue (below).
 - A cream day has times free; a day without lies flat. In Add a lesson a flat
   day can still be pressed, since she can add a lesson at any time; until the
   month's times are known every day keeps its cream.
-- A key lists every mark on its calendar and no other, today included (the
-  blob holding today's own date beside `Today`). Each swatch is a small copy
-  of the day or cell it explains.
+- A key lists the marks on its calendar that need saying, and no other. Each
+  swatch is a small copy of the day or cell it explains.
 
 **Online only, in one colour.**
 
@@ -2554,8 +2554,12 @@ first editor (a button above the Timetable opening a dialog of date boxes,
 with a band across the page afterwards) "this is ugly".
 
 - One colour, `--online-only`, a soft sky blue, means online-only time on
-  every calendar. It is never the only signal: a small globe sits with it,
-  and the key names it.
+  every calendar, and the key names it. A day carries no globe for it (Dan,
+  of a globe in each day's corner: "is it necessary if it's already in the
+  legend what the colour means?"): the globe is kept for a lesson that is
+  online. The colour is not the only way to learn it: a day's spoken name
+  says "online only", pressing an online-only day says so in words, and her
+  card shows the chip pressed.
 - Inês labels days the way she takes them off: she taps them on the Time off
   month and presses the quiet `Online only` chip on the card, which fills
   with the colour while every chosen day is online only (so the chip is its
@@ -2565,15 +2569,14 @@ with a band across the page afterwards) "this is ugly".
   `12:00–16:00`, or `Different hours`), edited where it stands: `All day |
   Some hours` on the site's slider, two time fields, the tick and the cross.
 - Her Time off month tints online-only days; her Timetable draws weekly hours
-  inside online-only time in the colour, puts a globe after the date of a day
-  that is online only all day, and names it in the key while the week has
-  some. The Timetable shows it and does not edit it.
+  inside online-only time in the colour and names it in the key while the
+  week has some. The Timetable shows it and does not edit it.
 - What happened is said on the card's status line (`Tue 15 Sept is online
   only.`, `3 selected days can be booked in Porto again.`), never a band
   across the page. A failed save keeps her days chosen and says why.
 - For a student who has chosen In Porto, in booking and in `Choose a new date
-  and time`: a day free only online is tinted with its globe and can be
-  pressed, where it used to be blank. Pressed, it says `Online only on this
+  and time`: a day free only online is tinted and can be pressed, where it
+  used to be blank. Pressed, it says `Online only on this
   day` beside a quiet `Switch to online` chip and shows its times tinted, as
   a list that cannot be chosen. A day with both kinds keeps its Porto times
   and adds one line, `More times online`, with the same chip.
