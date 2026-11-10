@@ -1170,9 +1170,10 @@ lesson and €5 rules, with the full terms available by link.
 
 Use different treatments for neighbouring booking controls instead of two coral
 fills. Selected agreement uses blue beside the coral booking action. Weekly
-lesson management pairs blue `Move weekly time`, an outline `Stop repeating`, and
-coral `Cancel all booked lessons`; profile editing pairs coral `Save name` with
-blue `Send confirmation link`. Keep the existing labels and state indicators so
+lesson management has one filled button, coral `Move weekly time`, with `Stop
+repeating` and `Cancel all booked lessons` as outlines (10 November 2026:
+cancelling all is asked again, in coral, before it happens); profile editing
+ends a name in the coral tick and an email in blue `Send confirmation link`. Keep the existing labels and state indicators so
 colour is never the only way to tell the controls apart. A filled button that
 cannot act yet is drawn as the same quiet outline as the booking's final
 action, so coral and blue appear only when the action is live.
@@ -1540,8 +1541,9 @@ Preserve these desktop and mobile states:
   `Copy link`; the WhatsApp message is one short line
   in her voice and the link (2 November 2026, Dan: not wordy). In Inês's
   lesson dialog a lesson a card now pays for
-  offers the `Already paid` tick (below). The sign-in panel's small outline buttons read `Email a link` and
-  `Forgot password`, side by side down to a 360 px phone (27 October 2026, Dan); asking for a link is its own
+  offers the `Already paid` tick (below). The sign-in panel's other ways in read `Email a link` and
+  `Forgot password`, side by side down to a 360 px phone (27 October 2026, Dan),
+  as quiet chips in sentence case since 10 November 2026; asking for a link is its own
   small form, like a forgotten password, without the tabs or Google.
   Text fields are 44 px tall, the usual touch height. The change dialog is
   the same flat lilac as every dialog, so its sliders' tracks and free days
@@ -1759,7 +1761,8 @@ calmer, without new content:
 - the lesson dialog drops the question that repeated its heading and buttons,
   and the rules around the lesson's date. Its pill is `Weekly lesson` only
   while the repeat is running, `Booked` once it stops, and `Cancelled` carries
-  the past lessons' ⊗. `Manage weekly lessons` is a compact outline button.
+  the past lessons' ⊗. `Manage weekly lessons` is a quiet chip at the end of the weekly line (10
+  November 2026; it was a compact outline button on a row of its own).
   Cancelling weekly lessons states what happens rather than asking again. A
   decision's pair of actions (`Yes, cancel it` / `Keep lesson` and the like)
   shares a row while both labels fit on one line, and stacks when they don't,
@@ -1979,8 +1982,9 @@ as a form:
   in their name (`Already one of your students`): everything she does here
   should take as few steps as it can. A lesson opens in the student's own dialog: the student
   with its status beside their name, the time in bold with its length and place
-  beneath, the `Already paid` and `No-show` ticks as one pair, then `Move lesson`
-  in coral beside `Cancel lesson`.
+  beneath, the `Already paid` and `No-show` ticks as one pair, then her other actions
+  as one row of quiet chips (10 November 2026; they were coral `Move lesson`
+  beside `Cancel lesson`).
   Confirming a change keeps to who and when (the Meet button, address and
   NIF step aside until `Back to lesson`): the question under a quiet rule,
   what it does as dabs (`Alex is emailed`, `It comes off your calendar`,
@@ -2122,10 +2126,14 @@ then `Join Google Meet` as a solid blue button carrying Meet's own mark, and the
 lesson's dabs (place, length, price and how it is paid). What she records sits
 together as one row of ticks, `Already paid` and `No-show` (named `Mark
 no-show` / `Undo no-show` for a screen reader), each the same capsule whose dab
-fills when ticked. Last, `Move lesson` in coral and `Cancel lesson` in outline
-share a row while both labels fit, with `Change length` in outline between
-them for a lesson still to come (not a trial). Moving opens under its own `Move this lesson`
-heading, as cancelling does under `Cancel this lesson?`, with what happens as a
+fills when ticked. Last, one wrapping row of quiet chips at their own width,
+the same at every width and the same as an open lesson in a student's card (10
+November 2026; they were a grid of loud buttons): `Homework`, `Move or cancel`,
+and `Change length` for a lesson still to come (not a trial), with `Create
+payment link` where one applies. `Join Google Meet` is the dialog's one filled
+button; a lesson in person has none. `Move or cancel` opens a `Move lesson |
+Cancel lesson` toggle whose pressed chip names the step, so moving and changing
+length carry no heading of their own; cancelling keeps `Cancel this lesson?`, with what happens as a
 dab (`Sam gets an email with the new time`). A weekly lesson with later weeks
 asks which with the lesson form's slider, `This lesson` or `Every week` (this
 one and every later week; 9 November 2026, Dan): Change length starts on
@@ -2151,8 +2159,9 @@ page, and for onboarding to feel easy:
   `Clear`, `Edit details`, `Mark as dormant`,
   `Reconnect Google Meet`, the sign-in panel's other ways in) is the site's
   small button: 40 px tall (44 px on touch), the compact label type, in
-  outline, or soft lilac where it adds something (`Show all`, `Add another
-  break`). It keeps its own width on a phone, where other buttons still run
+  outline, or, for a lesser action beside the thing it acts on (`Show all`,
+  `Add another break`), the quiet lilac chip in sentence case (10 November
+  2026). It keeps its own width on a phone, where other buttons still run
   full width. Disclosures that fold a rare choice away (`Set exact hours`,
   a clash list's rest, Meet's note, `Have a code from Inês?`) are the same
   small button and look pressed while open. Underlines stay for links inside sentences, the
@@ -2235,9 +2244,10 @@ gave an email, and only two had ever signed in.
   the total and the panel says `Asks them to pay €45 for 3 lessons. Nothing
   is charged until they agree.` A lesson paid in cash is ticked `Already
   paid` in their profile instead, and leaves what is open. While she ticks
-  (9 November 2026, Dan), a short block under the list keeps two things
-  apart: `Owed now`, the ticked total, charged once they agree, and `Future
-  lessons`, which are not owed yet and, if they agree, go on their card
+  (9 November 2026, Dan), a short list of dabs under the list keeps two things
+  apart (10 November 2026: dabs, no longer small-capital headings in a dashed
+  box): what is owed now, the ticked total, charged once they agree, and the
+  lessons to come, which are not owed yet and, if they agree, go on their card
   charged at the end of each lesson (the same words as the card page), each
   weekly run once (`Every Tuesday, 09:30–10:30 · €25 a lesson · 12 lessons to
   Tue 24 Nov`, never a row a week; weeks moved to another time are counted
@@ -2475,6 +2485,14 @@ for).
 - An alert's way on (`Try again`, `Message Inês`) keeps its own width at the
   alert's end, on a phone as across a wide page.
 
+- A form that changes something saves only once something differs from what
+  is saved: a student's `Save changes` on `Choose a new date and time` waits
+  as the tick does, so a press never sends a move to the lesson's own time.
+- A set of choices about one thing has one filled button. A destructive
+  choice is an outline when a coral confirmation follows it (`Cancel all
+  booked lessons`, then `Yes, cancel all`).
+- A cancelled lesson has no `Done`: its cross closes it.
+
 **Lines, labels and words.**
 
 - Space and the small-capital labels group things; a rule is drawn only where
@@ -2490,7 +2508,12 @@ for).
   pill is no taller than those words.
 - Explanations shrink to what the control cannot say: the price editor's
   three hints are one line; a NIF field's "optional, for your receipts" is
-  its placeholder.
+  its placeholder, at sign-up and in Add a student as in Your details.
+- A tooltip or menu about one thing says it once: a day's tooltip names its
+  date once above its lessons, and a menu has no rules between places of one
+  kind, only where places meet an action (`Sign out`).
+- Money terms are dabs, never small-capital headings in a box (the invite's
+  owed-now and not-owed-yet lines).
 
 **One layout for one kind of thing.**
 
