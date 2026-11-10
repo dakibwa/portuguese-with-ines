@@ -72,13 +72,13 @@ try {
     await signUp.page.getByRole("tab", { name: "Create an account", exact: true }).click();
     const form = signUp.page.locator(".auth-panel__form");
     const fields = await form.locator("label > span").allInnerTexts();
-    assert.match(fields.at(-1).replace(/\s+/g, " "), /^NIF \(optional, for your receipts\)$/i, `NIF should be the last, optional field, saying what it is for: ${fields}`);
+    assert.match(fields.at(-1).replace(/\s+/g, " "), /^NIF$/i, `NIF should be the last field, its purpose in its placeholder: ${fields}`);
     await form.getByLabel("Your name").fill("Ana");
     await form.getByLabel("Email").fill("ana@example.invalid");
     await form.getByLabel("Password").fill("a-long-password");
     const nif = form.getByLabel(/^NIF \(optional/);
     await expect(nif).toHaveAttribute("inputmode", "numeric");
-    await expect(form).toContainText("NIF (optional, for your receipts)");
+    await expect(nif).toHaveAttribute("placeholder", "Optional, for your receipts");
     await nif.fill(" 123456788 ");
     await oneBlueBoundary(nif);
     await form.getByRole("button", { name: "Create my account", exact: true }).click();

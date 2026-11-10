@@ -3912,11 +3912,10 @@ textarea,
  * where there is room, its homework or Cancelled at the end of the first
  * line, how long and where beneath it; nothing in a stacked card of its own.
  */
+/* Its small-capital name sets it apart from the calendar's key; no rule. */
 .past-lessons {
   display: grid;
-  margin-top: 1.25rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--rule-soft);
+  margin-top: 1.75rem;
   gap: 0.6rem;
 }
 
@@ -3973,8 +3972,8 @@ textarea,
   font: 700 0.82rem / 1.4 var(--ui);
 }
 
+/* Day and time are one bold line, as on the next lesson and in the tip. */
 .past-lesson__when span {
-  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -4432,6 +4431,11 @@ textarea,
   font-family: var(--ui);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+/* A day of several lessons: its date once, then each lesson from its time. */
+.calendar-lesson-tip__day {
+  margin-bottom: -0.25rem;
 }
 
 /* The tip's point hangs from the day itself, so it always meets the day's
@@ -4926,22 +4930,27 @@ p.lesson-when > span {
   }
 }
 
+/* The weekly run is one line under the lesson, its Manage weekly lessons a
+   quiet chip at that line's end; where the line is too narrow the chip
+   wraps beneath it at the right, whole. Space sets it apart, not a rule. */
 .lesson-manage-dialog__series {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  border-top: 1px solid var(--rule-soft);
-  padding-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 0.2rem;
   color: var(--lavender-ink);
-  gap: 0.1rem 0.55rem;
+  gap: 0.45rem 0.55rem;
 }
 
 .lesson-manage-dialog__series > svg {
-  margin-top: 0.1rem;
+  flex: none;
 }
 
+/* The weekly time keeps its one line; the chip, not the words, gives way. */
 .lesson-manage-dialog__series > div {
   display: grid;
+  flex: 1 0 auto;
+  max-width: calc(100% - 17px - 0.55rem);
   gap: 0.12rem;
 }
 
@@ -4955,17 +4964,8 @@ p.lesson-when > span {
   line-height: 1.4;
 }
 
-/* A small outline button, as every secondary action is, not underlined text.
-   It starts on the dialog's own left edge, with Change above it, rather than
-   stepped in under the weekly time. */
-.lesson-manage-dialog__series .button {
-  grid-column: 1 / -1;
-  justify-self: start;
-  width: auto;
-  min-height: 44px;
-  margin-top: 0.45rem;
-  padding: 0.55rem 1.1rem;
-  font-size: 0.68rem;
+.lesson-manage-dialog__series > .teacher-quiet {
+  margin-left: auto;
 }
 
 /* On a 320px phone the longest label, "Cancel all booked lessons", broke onto
@@ -5008,17 +5008,6 @@ p.lesson-when > span {
     gap: 0.8rem;
   }
 
-  .lesson-manage-dialog__series {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    padding-top: 0.7rem;
-  }
-
-  .lesson-manage-dialog__series .button {
-    grid-column: 3;
-    grid-row: 1;
-    margin-top: 0;
-  }
 }
 
 .managed-lesson__current-time {
@@ -6285,12 +6274,6 @@ p.lesson-when > span {
   margin: 1rem 0 0;
 }
 
-/* Set a touch closer than other small buttons, so the pair keeps one row
-   down to a 360px phone. */
-.auth-panel .auth-panel__aside > .button {
-  padding-inline: 0.75rem;
-  letter-spacing: 0.1em;
-}
 
 /* The menu shares the header's geometry so its wordmark stays still. Only
    the links drop down. Its own scroll area also works from a footer opener. */
@@ -6732,7 +6715,6 @@ p.lesson-when > span {
   align-items: center;
   justify-content: space-between;
   border: 0;
-  border-bottom: 1px solid var(--rule-soft);
   padding: 0.7rem 0.85rem;
   background: transparent;
   color: var(--navy);
@@ -6746,8 +6728,10 @@ p.lesson-when > span {
   text-transform: uppercase;
 }
 
+/* The places are one kind of row and need no rules between them; one rule
+   marks where they meet Sign out, which is not a place. */
 .account-menu__panel .account-menu__sign-out {
-  border-bottom: 0;
+  border-top: 1px solid var(--rule-soft);
 }
 
 .account-menu__panel button:hover,
