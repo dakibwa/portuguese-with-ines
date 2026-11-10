@@ -458,8 +458,9 @@ usual lesson starts and days off; avoid a wall of administration forms.
   connection and Sign out, keeping account controls away from daily work.
 - One pager turns the Timetable's week and the Time off and Receipts months
   (14 October 2026, Dan: "there feels inconsistencies here"): two solid blue
-  arrows that never move, and `This week` / `This month` as a compact lilac
-  site button, matching `Edit weekly hours`, to their left only while she is
+  arrows that never move, and `This week` / `This month` as the quiet lilac
+  chip (10 November 2026; it was a compact lilac site button), matching
+  `Edit weekly hours`, to their left only while she is
   away from the current one, because the heading already names where she is.
   Its place is held while it is out of sight, so the arrows, the heading and
   the grid beneath never shift between states, and a narrow screen lays
@@ -875,9 +876,11 @@ usual lesson starts and days off; avoid a wall of administration forms.
   actions share a row rather than stacking full width (a student card's blue
   `Add lesson` beside its coral `Send welcome email`, a lesson's `Move` beside
   `Cancel`), and coral marks the one thing still to do. A quieter constructive
-  choice is filled in the palette's soft lilac (`Take some hours off`, `Make
-  available`, `Add a new student`, `Open Google Calendar`, a booked lesson's
-  `Change`; 13 October 2026, Dan: "just the subtle lilac"); a way out
+  choice is the palette's soft lilac (`Take some hours off`, `Make
+  available`, `Open Google Calendar`, a booked lesson's `Change`; 13 October
+  2026, Dan: "just the subtle lilac"), since 10 November 2026 as the quiet
+  chip in sentence case at its own width rather than the capital-letter
+  site button; a way out
   (`Cancel`, `Back`, `Done`) stays an outline. On a phone every tab
   is in view at once, as a grid. Booked is the calendar's navy everywhere. A lesson's details read as dabs (their address, NIF, how
   it is paid, whether they have been emailed) rather than sentences.
@@ -946,13 +949,21 @@ opening `/idioms/` with the same signed-in account.
   the editor still keeps it). Every value shares one type style, the
   meaning included (7 November 2026, Dan: "same font styles"). Optional
   themes use a lilac pill fill.
-- Reuse blue for Edit, soft lilac for Preview and publication changes, coral
-  for saving, and outline for Cancel/Done. Up/down buttons reorder the whole
-  collection; clear filters first. Every phone action is at least 44px.
-- The editor and preview use the shared flat lilac dialog, cream fields,
-  the same close button, backdrop dismissal, scroll lock and focus return.
-  Failed writes retain the draft. Discarding edits and deleting an expression
-  each require an explicit confirmation. Stale versions never overwrite an edit.
+- An expression is edited where it stands (10 November 2026; it was a
+  separate dialog): the pencil at the end of its title turns the card into
+  its own editor, the title and each line becoming fields in their own
+  places under the labels the card already shows, the reference link, image
+  and image description behind a small `Image and link` disclosure, and the
+  card ending in a quiet `Delete expression` chip, the tick and the cross.
+  `Add an expression` opens the same card, empty, at the head of the list.
+  A card's head is one line: its state, a quiet `Publish` or `Unpublish`
+  beside it, and the up/down arrows that reorder the whole collection (clear
+  filters first).
+- Failed writes keep the card open with what was typed. Discarding typed
+  changes and deleting an expression are each asked in the card's foot, in
+  place (`Discard your changes?`, `Delete “…”?`, a small coral button and
+  the cross); with nothing changed the cross and Escape close at once. Stale
+  versions never overwrite an edit.
 - Students' own versions (30 October 2026; moved 7 November 2026, Dan: "get
   rid of the notes and translations at the bottom, they can go in main
   bullets"): `Noutras línguas` is one of the painted reading's facts, after
@@ -963,16 +974,14 @@ opening `/idioms/` with the same signed-in account.
   Her `Translations to check` panel sits in the Expressions tab with a
   waiting count. See
   [the booking-system contract](../docs-booking-system.md#students-translations-of-an-expression).
-- `Preview as students see it` renders the same reading-card component, without
-  teacher actions or publication pills. The surrounding private-preview note
-  is for Inês only. Previewing a draft does not publish it.
+- There is no separate preview (10 November 2026): her card in the list is
+  the same reading-card component a student gets, so it already is that view.
 - A 26rem minimum card grid uses at most four columns, with cards aligned at
-  their tops and hugging their contents. Phones use one column. Edit, Preview
-  and Publish share one row, except at 320px where the last action may fill
-  its own row. The shared preview and try-out reading stay unchanged. All eight
+  their tops and hugging their contents. Phones use one column. The try-out
+  reading stays unchanged. All eight
   tabs remain reachable without horizontal page overflow, including at 320px.
-  Long expressions, notes and examples wrap within the card. Fields and actions
-  also fit a 320px dialog.
+  Long expressions, notes and examples wrap within the card, and its fields
+  and actions fit a 320px card while it is being edited.
 - All imported entries are drafts. The reference bundle has no usage examples
   or themes; leave those blank instead of inventing them. Publishing needs both
   meanings and at least one example. Preserve Inês's punctuation and accents.
@@ -2168,8 +2177,9 @@ time") took each busy place back to one voice:
   email breaks after its `@`;
 - a student's Welcome, Sign-in and Saved card panels name the address as their
   first dab (`Goes to sam@…`), never as a bare line after the dabs;
-- an expression's `Edit`, `Preview` and `Publish` are one family of lilac
-  buttons;
+- an expression's pencil, and its `Publish` beside its state, follow the
+  site's one pencil and one quiet chip (10 November 2026; they were a row of
+  lilac `Edit`, `Preview` and `Publish` buttons);
 - the card prompt and a payment approval state the fee once, the free part
   first (2 November 2026, Dan, the same words across the site): `**Free to
   change or cancel** a lesson up to 14 hours before`, then `**€5** to move or
@@ -2443,6 +2453,14 @@ for).
   Inês?`) is a quiet underlined line of text, not a button.
 - A control that repeats another is removed, not moved: `All students` went
   because an open student's Close already returns to the board.
+- On Inês's tabs the capital-letter filled lilac site button is retired for
+  lesser actions: the quiet chip is the third weight everywhere (`Edit
+  weekly hours`, `This week`, `Set exact hours`, a notice's `View`, `Download
+  CSV`, `Take some hours off`). A disclosure is that chip with a chevron
+  that turns, never a fill when open. Where a step's main action takes the
+  card's width (`Take the day off`), its lesser choices sit beneath it as
+  chips at their own width. On a phone `Discard` and `Save` wrap together
+  as a pair.
 - An alert's way on (`Try again`, `Message Inês`) keeps its own width at the
   alert's end, on a phone as across a wide page.
 
