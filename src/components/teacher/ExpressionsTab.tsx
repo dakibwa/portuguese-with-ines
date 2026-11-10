@@ -1,12 +1,13 @@
 "use client";
 
 import { LANGUAGE_CODE } from "@/lib/tutor";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Eye, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus } from "lucide-react";
+import { EditPencil } from "@/components/teacher/EditControls";
 import { ExpressionCard } from "@/components/expressions/ExpressionCard";
 import { TeacherExpressionTryOut } from "@/components/expressions/TeacherExpressionTryOut";
-import { ExpressionDialog } from "@/components/teacher/ExpressionDialog";
+import { ExpressionEditor } from "@/components/teacher/ExpressionEditor";
 import { TranslationsReview } from "@/components/teacher/TranslationsReview";
 import { deleteExpression, fetchExpressions, publishExpression, reorderExpressions, saveExpression } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
@@ -26,8 +27,12 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
   const active = useRef(true);
   const [search, setSearch] = useState("");
   const [theme, setTheme] = useState("");
-  const [dialog, setDialog] = useState<{ expression: Expression | null; preview: boolean } | null>(null);
+  /** The one card open for editing where it stands: an expression's id, or "new" at the head of the list. */
+  const [editing, setEditing] = useState<string | null>(null);
+  /** Where focus goes once the card closes: its pencil, or Add an expression. */
+  const [refocus, setRefocus] = useState<string | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     active.current = true;
@@ -44,19 +49,26 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
     return () => { current = false; };
   }, [token, attempt]);
 
+  useLayoutEffect(() => {
+    if (!refocus || editing) return;
+    const pencil = list.current?.querySelector<HTMLElement>(`[data-expression-id="${CSS.escape(refocus)}"] [data-edit="expression"]`);
+    (pencil ?? addButton.current)?.focus();
+    setRefocus(null);
+  }, [refocus, editing, expressions]);
+
   const canUpdate = () => active.current && readSession() === token;
+  const open = (id: string) => { setNotice(""); setError(""); setEditing(id); };
+  const close = (id: string) => { setEditing(null); setRefocus((saved) => saved ?? id); };
   const replace = (saved: Expression) => {
     if (!canUpdate()) return;
     setExpressions((rows) => [...(rows ?? []).filter((row) => row.id !== saved.id), saved]
       .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)));
   };
-  async function save(input: ExpressionInput) {
-    const saved = await saveExpression(token, input, dialog?.expression ?? undefined);
-    if (canUpdate()) { replace(saved); setNotice(saved.published ? "Expression saved." : "Draft saved."); }
+  async function save(input: ExpressionInput, previous: Expression | null) {
+    const saved = await saveExpression(token, input, previous ?? undefined);
+    if (canUpdate()) { replace(saved); setRefocus(saved.id); setNotice(saved.published ? "Expression saved." : "Draft saved."); }
   }
-  async function remove() {
-    if (!dialog?.expression) return;
-    const expression = dialog.expression;
+  async function remove(expression: Expression) {
     await deleteExpression(token, expression);
     if (canUpdate()) { setExpressions((rows) => rows?.filter((row) => row.id !== expression.id) ?? null); setNotice("Expression deleted."); }
   }
@@ -99,12 +111,11 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
           <dd>Conjunto de palavras com um significado próprio, diferente do seu sentido literal.</dd>
         </dl>
         <div className="teacher-expressions__intro-actions">
-          <Link className="button button--outline" href="/idioms/">
-            <Eye size={17} aria-hidden="true" />
+          <Link className="teacher-quiet" href="/idioms/">
             View page
           </Link>
-          <button className="button button--coral" ref={addButton} type="button" disabled={!expressions || busy}
-            onClick={() => setDialog({ expression: null, preview: false })}>
+          <button className="button button--coral button--small" ref={addButton} type="button" disabled={!expressions || busy || editing === "new"}
+            onClick={() => open("new")}>
             <Plus size={17} aria-hidden="true" />
             Add an expression
           </button>
@@ -113,17 +124,16 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
       {rows.length ? <TeacherExpressionTryOut accountId={accountId} rows={rows} token={token} /> : null}
       <ul className="booking-payment-facts teacher-expressions__help">
         {openToStudents === true ? <li>Your students can pick published expressions from Your lessons.</li> : null}
-        {openToStudents === false ? <li>Only you can see expressions for now.{rows.length ? " Paint one above to see what your students will get." : ""}</li> : null}
-        <li>Add both meanings and one or two examples before publishing.</li>
+        {openToStudents === false ? <li>Only you can see expressions for now.</li> : null}
       </ul>
       <div className="teacher-form teacher-expressions__filters">
-        <label><span>Search expressions</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Expression, meaning or example" /></label>
+        <label><span>Search</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="A word or phrase" /></label>
         <label><span>Theme</span><select value={theme} onChange={(event) => setTheme(event.target.value)}>
           <option value="">All themes</option>
           <option value="__unthemed">Without a theme</option>
           {themes.map((item) => <option key={item} value={item}>{item}</option>)}
         </select></label>
-        {filtered ? <button className="button button--outline button--compact" type="button" onClick={() => { setSearch(""); setTheme(""); }}>Clear filters</button> : null}
+        {filtered ? <button className="teacher-quiet" type="button" onClick={() => { setSearch(""); setTheme(""); }}>Clear filters</button> : null}
       </div>
       {pendingTranslations !== null ? <TranslationsReview initialPending={pendingTranslations} token={token} /> : null}
       {notice ? <p className="teacher-inline-success" role="status">{notice}</p> : null}
@@ -132,31 +142,34 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
       {expressions && !rows.length ? <p className="teacher-expressions__hint">Your collection is empty. Add your first expression.</p> : null}
       {rows.length > 0 && !visible.length ? <p className="teacher-expressions__hint" role="status">No expressions match those filters.</p> : null}
       {filtered && visible.length ? <p className="teacher-expressions__hint">Clear the filters to change the order.</p> : null}
-      <div className="teacher-expressions__list">
+      <div className="teacher-expressions__list" ref={list}>
+        {editing === "new" ? (
+          <div className="teacher-expression is-editing" data-expression-id="new">
+            <ExpressionEditor expression={null} onSave={(input) => save(input, null)} onDelete={async () => {}} onClose={() => close("new")} />
+          </div>
+        ) : null}
         {visible.map((item) => {
           const index = rows.findIndex((row) => row.id === item.id);
+          if (editing === item.id) return (
+            <div className="teacher-expression is-editing" data-expression-id={item.id} key={item.id}>
+              <ExpressionEditor expression={item} onSave={(input) => save(input, item)} onDelete={() => remove(item)} onClose={() => close(item.id)} />
+            </div>
+          );
           return (
             <div className="teacher-expression" data-expression-id={item.id} key={item.id}>
               <div className="teacher-expression__head">
                 <span className={`teacher-receipts__state${item.published ? " is-ready" : ""}`}>{item.published ? "Published" : "Draft"}</span>
+                <button className="teacher-quiet" type="button" disabled={busy} onClick={() => void change(() => publish(item))}>{item.published ? "Unpublish" : "Publish"}<span className="visually-hidden"> {item.expression}</span></button>
                 <div className="teacher-expression__order">
                   <button className="teacher-icon-button" type="button" disabled={busy || filtered || index === 0} aria-label={`Move ${item.expression} up`} onClick={() => void change(() => move(index, -1))}><ArrowUp size={18} aria-hidden="true" /></button>
                   <button className="teacher-icon-button" type="button" disabled={busy || filtered || index === rows.length - 1} aria-label={`Move ${item.expression} down`} onClick={() => void change(() => move(index, 1))}><ArrowDown size={18} aria-hidden="true" /></button>
                 </div>
               </div>
-              <ExpressionCard expression={item} />
-              <div className="teacher-expression__actions">
-                <button className="button button--lilac button--compact" type="button" disabled={busy} onClick={() => setDialog({ expression: item, preview: false })}>Edit</button>
-                <button className="button button--lilac button--compact" type="button" disabled={busy} onClick={() => setDialog({ expression: item, preview: true })}>
-                  <Eye size={16} aria-hidden="true" />Preview<span className="visually-hidden"> as students see it: {item.expression}</span>
-                </button>
-                <button className="button button--lilac button--compact" type="button" disabled={busy} onClick={() => void change(() => publish(item))}>{item.published ? "Unpublish" : "Publish"}</button>
-              </div>
+              <ExpressionCard expression={item} edit={<EditPencil field="expression" label="Edit" disabled={busy} onEdit={() => open(item.id)} />} />
             </div>
           );
         })}
       </div>
-      {dialog ? <ExpressionDialog key={`${dialog.expression?.id ?? "new"}-${dialog.preview}`} expression={dialog.expression} preview={dialog.preview} openToStudents={openToStudents === true} fallbackFocus={addButton} onSave={save} onDelete={remove} onClose={() => setDialog(null)} /> : null}
     </section>
   );
 }

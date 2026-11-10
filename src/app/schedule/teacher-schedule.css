@@ -2823,8 +2823,9 @@
 .teacher-expressions__intro dd { margin: 0.4rem 0 0; font-size: 0.88rem; line-height: 1.65; }
 /* The plus stands apart from its words, as on Add a student. JSX drops the
    space a line break between the icon and the label seems to give. */
-.teacher-expressions__intro-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.teacher-expressions__intro-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
 .teacher-expressions__intro-actions > .button { flex: 0 1 auto; gap: 0.5rem; }
+.teacher-expressions__intro-actions > .teacher-quiet { min-height: 40px; text-decoration: none; }
 /* Her try-out is the students' own card, already on her lilac sheet: no second sheet round it. */
 .teacher-expressions > .student-expressions { margin: 0; padding: 0; border: 0; border-radius: 0; background: none; }
 /* Its button is the students' too (the booking journey's 0.7 rem, 700,
@@ -2832,59 +2833,68 @@
 .teacher-expressions .expression-reading__actions .button { min-height: 48px; padding: 0.72rem 1.6rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; line-height: 1.2; }
 .teacher-expressions .teacher-expressions__help { margin: 0; font-size: 0.8rem; }
 .teacher-expressions__filters { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; gap: 0.75rem; }
-.teacher-expressions__filters .button { width: auto; }
+.teacher-expressions__filters > .teacher-quiet { min-height: 44px; }
 /* With no Clear beside them, the two fields run to the card's edge. */
 @media (min-width: 741px) {
   .teacher-expressions__filters:not(:has(> .button)) { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 }
 .teacher-expressions__list { --expression-gap: 1rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, max(26rem, (100% - 3 * var(--expression-gap)) / 4)), 1fr)); gap: var(--expression-gap); align-items: start; }
-.teacher-expressions__hint, .expression-dialog__hint { margin: 0; font-size: 0.8rem; line-height: 1.6; }
+.teacher-expressions__hint { margin: 0; font-size: 0.8rem; line-height: 1.6; }
 .teacher-expression { position: relative; container: teacher-expression / inline-size; min-width: 0; padding: 1.15rem 1.25rem 1.2rem; border-radius: var(--squiggle-field); background: var(--raised); }
+/* Its state, the button that changes it, then the arrows that move it, at the
+   line's end; the pencil ends the title (10 November 2026). */
 .teacher-expression__head { display: flex; align-items: center; gap: 0.5rem; margin: -0.35rem -0.45rem 0.35rem 0; }
-.teacher-expression__head > .teacher-receipts__state { margin: 0 auto 0 0; }
-.teacher-expression__order { display: flex; gap: 0.5rem; margin: 0; }
+.teacher-expression__head > .teacher-receipts__state { margin: 0; }
+.teacher-expression__order { display: flex; gap: 0.5rem; margin: 0 0 0 auto; }
 .teacher-expression__order .teacher-icon-button { width: 36px; height: 36px; }
-.teacher-expression__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 1.1rem; padding-top: 0; }
-.teacher-expression__actions .button { padding-inline: 0.8rem; letter-spacing: 0.1em; }
+.teacher-expression .expression-card__head { display: flex; align-items: flex-start; gap: 0.35rem; margin: 0 0 1rem; }
+.teacher-expression .expression-card__head > .expression-card__title { margin: 0; }
+.teacher-expression .expression-card__head > .teacher-pencil { margin-top: 0.55rem; }
+/* Open, the card is its own editor: each line its field where it stood. */
+.teacher-expression__editor { display: grid; gap: 0; background: none; }
+.teacher-expression__editor input.teacher-expression__title-field { min-height: 0; margin: 0 0 0.9rem; padding: 0.15rem 0.7rem; color: var(--blue-deep); font: 400 clamp(1.05rem, 1.6vw, 1.25rem)/2 var(--display); }
+.teacher-expression__editor textarea { display: block; min-height: 40px; padding-block: 0.5rem; resize: vertical; field-sizing: content; line-height: 1.55; font-size: 0.9rem; }
+.teacher-expression__editor .expression-card__fact dd { margin-top: 0.3rem; }
+.teacher-expression__editor .expression-card__examples ul { gap: 0.45rem; margin-top: 0.3rem; }
+.teacher-expression__editor .expression-card__examples li + li { padding-top: 0; border-top: 0; }
+.teacher-expression__editor .expression-card__extras { margin-top: 0.75rem; }
+.teacher-expression__editor .expression-card__extras > input { width: 100%; }
+.teacher-expression__editor label > :is(input, textarea) { margin: 0; }
+.expression-form__more { margin-top: 0.4rem; font-size: 0.85rem; }
+.expression-form__more > div { display: grid; gap: 0.8rem; padding-bottom: 0.4rem; }
+.teacher-expression__editor > .teacher-inline-error { margin: 0.5rem 0 0; }
+.teacher-expression__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem; margin-top: 0.6rem; }
+.teacher-expression__foot > .teacher-quiet { margin-right: auto; }
+/* A question keeps its button and cross on its line; its words wrap instead. */
+.teacher-expression__foot:has(> .teacher-expression__confirm) { flex-wrap: nowrap; }
+.teacher-expression__foot > .button { flex: none; width: auto; white-space: nowrap; }
+.teacher-expression__confirm { flex: 1 1 auto; min-width: 0; margin-right: auto; font-size: 0.85rem; font-weight: 600; }
 @container teacher-expression (min-width: 27rem) {
-  .teacher-expression__head { position: absolute; top: 0.9rem; right: 0.8rem; height: 2.5rem; margin: 0; }
-  .teacher-expression__head > .teacher-receipts__state { margin: 0; }
-  .teacher-expression .expression-card__title { margin-bottom: 0.7rem; padding-right: var(--expression-head-room, 10.5rem); text-wrap: balance; }
+  .teacher-expression .expression-card__title { margin-bottom: 0.7rem; text-wrap: balance; }
   .teacher-expression .expression-card__meanings { gap: 0.55rem; }
-  /* Wide enough for `Tradução à letra` on one line (9 November 2026). */
-  .teacher-expression :is(.expression-card__fact, .expression-card__examples) { display: grid; grid-template-columns: 9rem minmax(0, 1fr); column-gap: 1rem; align-items: start; --lead: 0.22rem; }
+  /* Wide enough for `Tradução à letra` and `Notas e/ou origem` on one line (10 November 2026). */
+  .teacher-expression :is(.expression-card__fact, .expression-card__examples) { display: grid; grid-template-columns: 10.25rem minmax(0, 1fr); column-gap: 1rem; align-items: start; --lead: 0.22rem; }
   .teacher-expression .expression-card__examples { --lead: 0.24rem; margin-top: 0.55rem; }
   .teacher-expression .expression-card__label { padding-top: var(--lead); }
   .teacher-expression .expression-card__label::before { top: calc(0.02rem + var(--lead)); }
   .teacher-expression dd, .teacher-expression .expression-card__examples ul { margin: 0; }
-  .teacher-expression .expression-card__extras { margin-top: 0.4rem; padding-left: 11.75rem; }
+  .teacher-expression .expression-card__extras { margin-top: 0.4rem; padding-left: 13rem; }
+  .teacher-expression__editor .expression-card__extras { margin-top: 0.6rem; }
+  .teacher-expression__editor .expression-card__label { padding-top: 0.7rem; }
+  .teacher-expression__editor :is(.expression-card__fact, .expression-card__examples)::before { top: 0.72rem; }
+  .teacher-expression__editor .expression-form__more { padding-left: 13rem; }
 }
 @media (max-width: 480px), (pointer: coarse) {
-  .teacher-expression { --expression-head-room: 11.25rem; }
   .teacher-expression__order { gap: 0.25rem; }
   .teacher-expression__order .teacher-icon-button { width: 44px; height: 44px; }
   .teacher-expression__order .teacher-icon-button::after { inset: 0; }
 }
 @media (max-width: 480px) { .teacher-expression { padding: 1rem; } }
-.expression-dialog { width: min(720px, calc(100vw - 2rem)); }
-.expression-dialog > h2 { margin-right: 2.8rem; line-height: 1.45; }
-.expression-dialog--preview { width: min(620px, calc(100vw - 2rem)); }
-.expression-dialog--preview > .expression-card { padding: clamp(1rem, 3vw, 1.5rem); border-radius: var(--squiggle-field); }
-.expression-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; }
-.expression-form__wide { grid-column: 1 / -1; }
-.expression-form textarea { resize: vertical; line-height: 1.6; }
-.expression-form__more { font-size: 0.85rem; }
-.expression-form__more > div { display: grid; gap: 0.8rem; }
-.expression-form__delete { justify-self: start; min-height: 44px; }
+/* On a phone search and theme still share their row, at one height; Clear
+   follows at its own width. */
 @media (max-width: 740px) {
-  .teacher-expressions__filters { grid-template-columns: minmax(0, 1fr); }
-  .teacher-expressions__filters .button { justify-self: start; }
-  .expression-form { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 480px) {
-  .teacher-expressions__intro-actions { width: 100%; }
-  .teacher-expressions__intro-actions > .button { width: 100%; }
-  .teacher-expression__actions .button { width: auto; flex: 1 1 auto; }
+  .teacher-expressions__filters { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  .teacher-expressions__filters > .teacher-quiet { grid-column: 1 / -1; justify-self: start; }
 }
 .teacher-receipts .teacher-month-heading {
   margin: 0;
@@ -3421,7 +3431,7 @@
 .teacher-translation__language { display: block; font: 700 0.62rem/1.5 var(--ui); letter-spacing: 0.11em; text-transform: uppercase; }
 .teacher-translation__text { white-space: pre-wrap; }
 .teacher-translation__meta { font-size: 0.78rem; opacity: 0.8; }
-.teacher-translation .teacher-expression__actions { margin-top: 0.6rem; }
+.teacher-translation__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; margin-top: 0.6rem; }
 /* A weekly run as one tile in a student's lessons (9 November 2026, Dan): its
    day and time, span and shared facts together where they fit, with Show
    weeks at the end. Open, it takes the full width without a box of its own;

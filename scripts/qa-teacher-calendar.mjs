@@ -1892,6 +1892,23 @@ try {
   await expect(tryOut.getByRole("button", { name: "Paint another", exact: true })).toBeEnabled({ timeout: 10_000 });
   await expect(tryOut.getByRole("heading", { name: "Partir o coco a rir", exact: true })).toBeAttached();
   assert.deepEqual(expressions.state.writes, []);
+  // Her pencil makes the card its own editor; the tick sends the whole expression, as the old form did.
+  const saved = [];
+  await expressions.page.route("**/admin/expressions/original-1", route => {
+    const data = route.request().postDataJSON();
+    saved.push(data);
+    const { updatedAt, ...input } = data;
+    return route.fulfill({ json: { expression: { ...input, id: "original-1", published: 0, sortOrder: 0, createdAt: updatedAt, updatedAt: "2026-10-14T00:00:00.000Z" } } });
+  });
+  const card = expressions.page.locator('[data-expression-id="original-1"]');
+  await card.getByRole("button", { name: "Edit", exact: true }).click();
+  await card.getByLabel("Quer dizer", { exact: true }).fill("Rir muitíssimo.");
+  await expressions.page.keyboard.press("Escape"); await expect(card.getByText("Discard your changes?")).toBeVisible(); await expressions.page.keyboard.press("Escape"); // typed text survives a stray Escape
+  await card.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(card.getByRole("button", { name: "Edit", exact: true })).toBeFocused();
+  assert.deepEqual(saved, [{ expression: "Partir o coco a rir", meaningPt: "Rir muitíssimo.", meaningEn: "To split your sides laughing", literalEn: "To crack the coconut laughing",
+    examples: ["Com aquela história, partimos o coco a rir."], notes: "", sourceUrl: "", tags: ["Humor"], imageUrl: "", imageAlt: "", updatedAt: "2026-10-13T00:00:00.000Z" }]);
+  await expect(card).toContainText("Rir muitíssimo.");
   assert.deepEqual(expressions.state.errors, []);
   await expressions.page.close();
 
