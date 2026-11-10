@@ -397,7 +397,7 @@ export function studentMoved({ tutor = currentTutor(), first, byTeacher, lengthC
       content: {
         heading: "Your lesson has changed",
         preheader: `${lessonName} · ${when}`,
-        intro: `${hello(first, tutor)} ${tutor.shortName} has changed your lesson: it’s now ${nowWords(change, tutor)}. An updated calendar invitation is attached.`,
+        intro: `${hello(first, tutor)} ${tutor.shortName} has changed your lesson: it’s now ${nowWords(change, tutor)}. An updated calendar invitation is attached.${change.time ? " If the new time doesn't suit, choose another time or reply to this email." : ""}`,
         hero: when,
         rows: lessonRows({ lesson, place, meetingUrl, reference, price }),
         action: manageUrl ? { label: MANAGE_LABEL, url: manageUrl } : null,

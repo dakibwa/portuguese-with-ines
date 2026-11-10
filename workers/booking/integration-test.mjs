@@ -6070,14 +6070,17 @@ await test("her change refuses a lesson had, recorded or cancelled, a trial leng
   }
 });
 
-await test("a weekly time change keeps Porto's wall clock across the March clock change", async () => {
+await test("a weekly time change keeps Porto's wall clock across the March clock change, and brings a week moved on its own back to the new day", async () => {
   const email = "march-change@example.invalid";
   db.prepare("INSERT INTO students (id,email,name,password_hash,created_at) VALUES ('marta',?,'Marta March','',?)").run(email, new Date().toISOString());
   try {
     // Tuesdays at 10:00 in Porto: 10:00 UTC before 28 March 2027, 09:00 after.
     const added = await call("/admin/bookings", { user: "teacher", body: { studentId: "marta", lessonType: "single", startAt: "2027-03-16T10:00:00.000Z", repeat: 4 } });
     assert.equal(added.status, 201, await added.clone().text());
-    const [first] = db.prepare("SELECT * FROM bookings WHERE student_id='marta' ORDER BY starts_at").all();
+    const [first, , third] = db.prepare("SELECT * FROM bookings WHERE student_id='marta' ORDER BY starts_at").all();
+    // The third week had been moved on its own, to Friday 2 April at 14:00. It
+    // takes Wednesday at 11:00 in its own week with the rest, not Saturday.
+    db.prepare("UPDATE bookings SET starts_at='2027-04-02T13:00:00.000Z', ends_at='2027-04-02T14:00:00.000Z' WHERE id=?").run(third.id);
     const result = await call(`/admin/bookings/${first.id}/change`, { user: "teacher", body: { startAt: "2027-03-17T11:00:00.000Z", following: true } });
     assert.equal(result.status, 200, await result.clone().text());
     assert.deepEqual((await result.json()).changed, ["2027-03-17T11:00:00.000Z", "2027-03-24T11:00:00.000Z", "2027-03-31T10:00:00.000Z", "2027-04-07T10:00:00.000Z"]);

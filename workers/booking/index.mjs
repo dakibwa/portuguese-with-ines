@@ -6201,9 +6201,12 @@ function daysBetweenKeys(fromKey, toKey) {
  *
  * Built as `teacherChangeLength` is, and a change of length alone is handed
  * to it, so it is exactly that change. Otherwise each lesson is planned:
- * every week keeps its own week and moves by the same number of days to the
- * new Porto time, stepped by date keys as a student's weekly move is, so the
- * clock changes never shift it. A lesson that cannot take all of the change
+ * every later week takes the new day and Porto time in its own week, counted
+ * from the lesson she opened and stepped by date keys as a student's weekly
+ * move is, so the clock changes never shift it. A week the student had moved
+ * on its own comes back to the new day and time with the rest, so what her
+ * page says before she saves ("3 lessons move to Thursdays at 16:00") is
+ * what happens. A lesson that cannot take all of the change
  * (being paid, the length rules, a clock-change gap, or another lesson in the
  * way) takes none of it and is named in the reply. A place change is the
  * student's own: the new place and a new sequence, after which `notify`
@@ -6253,10 +6256,9 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
     return fail(`Nothing to change: ${following ? "these lessons are" : "this lesson is"} already as you chose.`, 409, request, env);
   }
 
-  // Every week: the same number of days and the new Porto time, by date key.
+  // Every week: the new day and Porto time in that lesson's own week, by date key.
   const fromSlot = slotOf(row.starts_at);
   const toSlot = timeMoves ? slotOf(start) : null;
-  const dayShift = timeMoves ? daysBetweenKeys(fromSlot.dateKey, toSlot.dateKey) : 0;
   const types = new Map();
   const candidates = [];
   const kept = [];
@@ -6272,7 +6274,9 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
     if (timeMoves && lesson.id === row.id) {
       startAt = start.toISOString();
     } else if (timeMoves) {
-      const key = addDaysToKey(slotOf(lesson.starts_at).dateKey, dayShift);
+      // Its week is the one it sits nearest, counted from the lesson she opened.
+      const weeks = Math.round(daysBetweenKeys(fromSlot.dateKey, slotOf(lesson.starts_at).dateKey) / 7);
+      const key = addDaysToKey(toSlot.dateKey, weeks * 7);
       const parsed = parseDateKey(key);
       const instant = zonedToUtc(parsed.year, parsed.month, parsed.day, toSlot.minuteOfDay, homeZone());
       const actual = slotOf(instant);
@@ -6298,20 +6302,22 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
   }
 
   // Another lesson in the way keeps the week where it is. A week kept stays
-  // where it was and may then be in the way of another, so this settles.
+  // where it was and may then be in the way of another, so this settles. Of
+  // two of these lessons that would meet, the later stays: the lesson she
+  // opened comes first, then each week in turn.
   for (let settled = false; !settled;) {
     settled = true;
-    const moving = new Set(candidates.map((entry) => entry.lesson.id));
-    for (const entry of [...candidates]) {
-      const clash = candidates.some((other) => other !== entry && other.startAt < entry.endAt && other.endAt > entry.startAt) ||
+    const moving = JSON.stringify(candidates.map((entry) => entry.lesson.id));
+    for (const [index, entry] of candidates.entries()) {
+      const clash = candidates.slice(0, index).some((other) => other.startAt < entry.endAt && other.endAt > entry.startAt) ||
         kept.some(({ lesson }) => lesson.starts_at < entry.endAt && lesson.ends_at > entry.startAt) ||
         await env.DB.prepare(
           `SELECT 1 FROM bookings WHERE id NOT IN (SELECT value FROM json_each(?))
              AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))
              AND starts_at < ? AND ends_at > ? LIMIT 1`
-        ).bind(JSON.stringify([...moving]), new Date().toISOString(), entry.endAt, entry.startAt).first();
+        ).bind(moving, new Date().toISOString(), entry.endAt, entry.startAt).first();
       if (!clash) continue;
-      candidates.splice(candidates.indexOf(entry), 1);
+      candidates.splice(index, 1);
       kept.push({ lesson: entry.lesson, reason: "it would run into another lesson" });
       settled = false;
       break;
@@ -6388,17 +6394,19 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
     ...(lengthChanges ? lessonPriceSnapshot(row.student_id, { ...lessonType, price_cents: amountCents }) : []), ...authorization.values
   )];
   if (following) {
-    // Weeks added later follow her: the same weekday shift, so the bookmark
-    // later weeks step from moves with it, and the new time, length and place.
-    const series = await env.DB.prepare("SELECT * FROM booking_series WHERE id = ?").bind(row.series_id).first();
+    // Weeks added later follow her: the new weekday and time, length and
+    // place. Later weeks are stepped from the bookmark, so it takes the new
+    // day in its own week, as each lesson did, worked out in the write itself.
     statements.push(env.DB.prepare(
-      `UPDATE booking_series SET weekday = ?, minute_of_day = ?,
-         filled_to = CASE WHEN filled_to IS NULL THEN NULL ELSE date(filled_to, ?) END,
-         lesson_type_id = ?, location = ?, updated_at = ?
+      `UPDATE booking_series SET
+         ${timeMoves ? `weekday = ?, minute_of_day = ?,
+         filled_to = CASE WHEN filled_to IS NULL THEN NULL
+           ELSE date(?, (CAST(ROUND((julianday(filled_to) - julianday(?)) / 7.0) AS INTEGER) * 7) || ' days') END,` : ""}
+         lesson_type_id = COALESCE(?, lesson_type_id), location = COALESCE(?, location), updated_at = ?
        WHERE id = ? AND changes() = ? AND (${authorization.sql})`
     ).bind(
-      (((series?.weekday ?? fromSlot.weekday) + dayShift) % 7 + 7) % 7, timeMoves ? toSlot.minuteOfDay : series?.minute_of_day ?? fromSlot.minuteOfDay,
-      `${dayShift >= 0 ? "+" : ""}${dayShift} days`, lessonType?.id ?? series?.lesson_type_id ?? row.lesson_type_id, location ?? series?.location ?? row.location, nowIso,
+      ...(timeMoves ? [toSlot.weekday, toSlot.minuteOfDay, toSlot.dateKey, fromSlot.dateKey] : []),
+      lessonType?.id ?? null, location, nowIso,
       row.series_id, planned.length, ...authorization.values
     ));
   }
