@@ -70,7 +70,7 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
     let detail: ReactNode = "";
     let action: ReactNode = null;
     const view = (booking: AdminBooking) => (
-      <button className="button button--lilac button--compact" type="button" onClick={() => onView(booking)}>
+      <button className="teacher-quiet" type="button" onClick={() => onView(booking)}>
         View<span className="visually-hidden"> {booking.student_name}’s lesson on {day(booking.starts_at)}</span>
       </button>
     );
@@ -79,7 +79,7 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
       who = item.reconnect ? "Google Meet needs reconnecting" : "Google Meet isn’t connected";
       detail = item.reconnect ? "Until then, new lessons get no Meet link" : "Until then, online lessons get no Meet link";
       action = (
-        <button className="button button--lilac button--compact" type="button" onClick={onMeet}>
+        <button className="teacher-quiet" type="button" onClick={onMeet}>
           {item.reconnect ? "Reconnect" : "Connect"}<span className="visually-hidden"> Google Meet</span>
         </button>
       );
@@ -95,7 +95,7 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
       detail = <>{when}{when ? " · " : ""}<span className="teacher-needs-you__keep">{review.reference}</span></>;
       action = (
         <a
-          className="button button--lilac button--compact"
+          className="teacher-quiet"
           href={stripeHref(part === "fee" ? review.same_day_fee_payment_intent : review.stripe_payment_intent)}
           target="_blank"
           rel="noopener noreferrer"
@@ -113,7 +113,7 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
         Number.isFinite(Date.parse(payment.startsAt)) && `lesson on ${day(payment.startsAt)}, ${formatSlotTime(payment.startsAt)}`,
         "they’ve been sent a payment link",
       )} · <span className="teacher-needs-you__keep">{payment.reference}</span></>;
-      action = <button className="button button--lilac button--compact" type="button" onClick={() => onStudent(student)}>
+      action = <button className="teacher-quiet" type="button" onClick={() => onStudent(student)}>
         Open<span className="visually-hidden"> {student.name}</span>
       </button>;
     } else if (item.kind === "card") {
@@ -124,7 +124,7 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
       detail = count
         ? `${count} ${count === 1 ? "lesson" : "lessons"} you added ${count === 1 ? "is" : "are"} now charged after each one. Paid by hand? Open it and tick “Already paid”`
         : "Lessons you add for them are now charged to their card after each one";
-      action = <button className="button button--lilac button--compact" type="button" onClick={() => onStudent(student)}>
+      action = <button className="teacher-quiet" type="button" onClick={() => onStudent(student)}>
         {count ? "See lessons" : "Open"}<span className="visually-hidden"> for {student.name}</span>
       </button>;
     } else if (item.kind === "lessons") {
@@ -175,7 +175,7 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
     <section aria-label={heading}>
       <h2 className="teacher-eyebrow">{heading}</h2>
       <ul className="teacher-lesson-cards">{(onSeeAll ? items.slice(0, SHOWN) : items).map(card)}</ul>
-      {onSeeAll && items.length > SHOWN ? <button className="button button--outline button--small" onClick={onSeeAll} type="button">See all in Students</button> : null}
+      {onSeeAll && items.length > SHOWN ? <button className="teacher-quiet teacher-needs-you__all" onClick={onSeeAll} type="button">See all in Students</button> : null}
     </section>
   </div>;
 }

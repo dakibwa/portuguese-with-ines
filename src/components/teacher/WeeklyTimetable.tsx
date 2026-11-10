@@ -15,7 +15,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { CalendarOff, CalendarPlus, Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
+import { CalendarOff, CalendarPlus, ChevronDown, Plus, Trash2, Video, Globe, UserRound } from "lucide-react";
 import { addedByTeacher, type AdminBooking, type AvailabilityException } from "@/lib/admin-api";
 import { meetingHref } from "@/components/MeetingLink";
 import { formatSlotTime } from "@/lib/booking-api";
@@ -478,11 +478,11 @@ export function WeeklyTimetable({
         <button
           aria-controls={exactOpen ? exactId : undefined}
           aria-expanded={exactOpen}
-          className={`button button--lilac button--small teacher-exact-toggle${exactOpen ? " is-open" : ""}`}
+          className="teacher-quiet teacher-exact-toggle"
           onClick={() => setExactOpen(open => !open)}
           type="button"
         >
-          Set exact hours
+          <ChevronDown size={15} aria-hidden="true" />Set exact hours
         </button>,
         exactHost,
       ) : null}
@@ -560,7 +560,7 @@ export function WeeklyTimetable({
                 </div>
               ))}
               <button
-                className="button button--outline button--small"
+                className="teacher-quiet"
                 type="button"
                 disabled={disabled}
                 onClick={() =>

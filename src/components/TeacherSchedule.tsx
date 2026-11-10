@@ -2,7 +2,7 @@
 
 import { TUTOR_NAME } from "@/lib/tutor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Check, CheckCircle2 } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ChevronDown } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { WeeklyTimetable } from "@/components/teacher/WeeklyTimetable";
 import { LessonDetails } from "@/components/teacher/LessonDetails";
@@ -745,28 +745,31 @@ export function TeacherSchedule() {
               <span className="teacher-save-note visually-hidden" aria-live="polite">
                 {hoursDirty ? "Not saved yet" : ""}
               </span>
-              {hoursDirty ? (
+              {/* Discard and Save stay a pair when a phone wraps the row. */}
+              <span className="teacher-week-save">
+                {hoursDirty ? (
+                  <button
+                    className="button button--outline button--small"
+                    type="button"
+                    disabled={savingHours}
+                    onClick={() => setDraftHours(savedHours)}
+                  >
+                    Discard
+                  </button>
+                ) : null}
                 <button
-                  className="button button--outline button--small"
+                  className="button button--coral button--compact"
                   type="button"
-                  disabled={savingHours}
-                  onClick={() => setDraftHours(savedHours)}
+                  disabled={savingHours || !hoursDirty || Boolean(invalidHours) || bookingsLoading || Boolean(bookingsError)}
+                  onClick={() => void saveHours()}
                 >
-                  Discard
+                  {savingHours ? "Saving…" : "Save weekly hours"}
                 </button>
-              ) : null}
-              <button
-                className="button button--coral button--compact"
-                type="button"
-                disabled={savingHours || !hoursDirty || Boolean(invalidHours) || bookingsLoading || Boolean(bookingsError)}
-                onClick={() => void saveHours()}
-              >
-                {savingHours ? "Saving…" : "Save weekly hours"}
-              </button>
+              </span>
             </div>
           ) : null}
           <button
-            className={`button ${editing ? "button--blue" : "button--lilac"} button--compact teacher-week-mode`}
+            className={`${editing ? "button button--outline button--compact" : "teacher-quiet"} teacher-week-mode`}
             type="button"
             onClick={() => setEditingHours(value => !value)}
           >
@@ -797,7 +800,7 @@ export function TeacherSchedule() {
               </ul>
               {affectedLessons.length > 4 ? (
                 <details className="teacher-hours-clashes-more">
-                  <summary>{affectedLessons.length - 4} more {affectedLessons.length === 5 ? "lesson" : "lessons"}</summary>
+                  <summary className="teacher-quiet"><ChevronDown size={15} aria-hidden="true" />{affectedLessons.length - 4} more {affectedLessons.length === 5 ? "lesson" : "lessons"}</summary>
                   <ul className="teacher-lesson-cards" aria-label="More lessons that clash with your hours">
                     {affectedLessons.slice(4).map(booking => <BookedLessonCard key={booking.id} booking={booking} disabled={savingHours} onOpen={setSelectedBooking} />)}
                   </ul>

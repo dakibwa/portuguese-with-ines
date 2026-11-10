@@ -143,7 +143,7 @@ export function ReceiptsTab({ token, today }: { token: string; today: string }) 
               <li><strong>{ready.length} {ready.length === 1 ? "receipt" : "receipts"} to issue</strong> · {formatMoneyCents(total)}</li>
               {waiting.length ? <li>{waiting.length} still to be paid</li> : null}
             </ul>
-            <button className="button button--lilac button--compact" onClick={download} type="button">
+            <button className="teacher-quiet" onClick={download} type="button">
               <Download size={15} aria-hidden="true" />
               Download CSV
             </button>

@@ -349,6 +349,12 @@
   .teacher-day-cell__band { justify-content: center; padding-inline: 0; }
   .teacher-day-cell__band > .teacher-day-heading { flex-basis: 100%; padding-block: 0.35rem; min-height: 32px; }
 }
+/* A phone's seven-day strip (a week with weekend lessons) puts each date
+   under its day, so neighbouring days never run into each other. */
+@container teacher-day (max-width: 60px) {
+  .teacher-day-heading { flex-direction: column; gap: 0; padding-inline: 0; }
+  .teacher-day-heading strong { min-height: 1.6rem; }
+}
 .teacher-day-toggle {
   display: inline-flex;
   align-items: center;
@@ -755,6 +761,11 @@
 .teacher-week-exact {
   display: contents;
 }
+.teacher-week-save {
+  display: flex;
+  flex: none;
+  gap: 0.5rem;
+}
 .teacher-week-toolbar .teacher-week-actions .button {
   width: auto;
   white-space: nowrap;
@@ -766,18 +777,39 @@
     grid-template-columns: minmax(0, 1fr) auto auto;
   }
 }
+/* Narrower still, Set exact hours keeps the left and Discard and Save the
+   right; when they cannot share the line, the pair drops to the right
+   together, each at its own width (10 November 2026). */
 @media (max-width: 760px) {
   .teacher-week--editing .teacher-week-toolbar {
     grid-template-areas: "title mode" "hint hint" "actions actions";
     grid-template-columns: minmax(0, 1fr) auto;
   }
   .teacher-week-actions {
-    justify-content: space-between;
+    justify-content: flex-end;
+  }
+  .teacher-week-actions .teacher-exact-toggle {
+    margin-right: auto;
   }
 }
-.teacher-exact-toggle.is-open {
-  background: var(--blue-deep);
-  color: var(--paper-light);
+/* A disclosure is the quiet chip with a chevron that turns as it opens, as
+   a weekly run's Show weeks is (10 November 2026). */
+.teacher-exact-toggle svg,
+.teacher-hours-clashes-more > summary svg,
+.teacher-meet .teacher-meet-note summary svg {
+  transition: rotate var(--motion-surface) var(--motion-ease);
+}
+.teacher-exact-toggle[aria-expanded="true"] svg,
+.teacher-hours-clashes-more[open] > summary svg,
+.teacher-meet .teacher-meet-note[open] summary svg {
+  rotate: 180deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .teacher-exact-toggle svg,
+  .teacher-hours-clashes-more > summary svg,
+  .teacher-meet .teacher-meet-note summary svg {
+    transition: none;
+  }
 }
 .teacher-hours-invalid {
   margin-top: 0.8rem;
@@ -830,13 +862,15 @@
   background: var(--sheet);
   font-size: 0.8rem;
 }
-/* Her small disclosures (Set exact hours, more clashing lessons, sharing
-   her calendar) are the site's small lilac button, like Edit weekly hours,
-   never an underlined line (27 October 2026, Dan). Open, it turns blue as a
-   chosen thing does. */
+/* A disclosure is never an underlined line (27 October 2026, Dan). More
+   clashing lessons and sharing her calendar are the quiet chip (their
+   summaries carry `teacher-quiet`); this one keeps the small lilac button. */
 .teacher-hours-clashes-more > summary,
-.teacher-profile__more > summary,
 .teacher-meet .teacher-meet-note summary {
+  width: fit-content;
+  list-style: none;
+}
+.teacher-profile__more > summary {
   display: inline-flex;
   align-items: center;
   width: fit-content;
@@ -857,21 +891,15 @@
 .teacher-meet .teacher-meet-note summary::-webkit-details-marker {
   display: none;
 }
-.teacher-hours-clashes-more > summary:hover,
-.teacher-profile__more > summary:hover,
-.teacher-meet .teacher-meet-note summary:hover {
+.teacher-profile__more > summary:hover {
   background: var(--lilac-pressed);
 }
-.teacher-hours-clashes-more[open] > summary,
-.teacher-profile__more[open] > summary,
-.teacher-meet .teacher-meet-note[open] summary {
+.teacher-profile__more[open] > summary {
   background: var(--blue-deep);
   color: var(--paper-light);
 }
 @media (pointer: coarse) {
-  .teacher-hours-clashes-more > summary,
-  .teacher-profile__more > summary,
-  .teacher-meet .teacher-meet-note summary {
+  .teacher-profile__more > summary {
     min-height: 44px;
   }
 }
@@ -1481,7 +1509,7 @@
   .teacher-week-actions {
     flex: 1 0 100%;
     order: 2;
-    justify-content: space-between;
+    justify-content: flex-end;
   }
   .teacher-week-days {
     grid-template-columns: repeat(var(--teacher-days, 7), minmax(0, 1fr));
@@ -1737,8 +1765,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem 1.2rem;
+  gap: 0.5rem;
 }
+.teacher-meet-actions a.teacher-quiet { text-decoration: none; }
 .teacher-meet .teacher-meet-note {
   color: var(--lavender-ink);
   font-size: 0.75rem;
@@ -2124,13 +2153,15 @@
    leaving two words alone on its second line. */
 .teacher-needs-you .teacher-lesson-card__who > strong { text-wrap: balance; }
 .teacher-needs-you__keep { white-space: nowrap; }
-.teacher-needs-you .teacher-lesson-card .button { flex: none; margin-left: auto; }
+.teacher-needs-you .teacher-lesson-card :is(.button, .teacher-quiet) { flex: none; margin-left: auto; }
+/* More than three: a quiet chip at its own width, never a bar across the row. */
+.teacher-needs-you__all { justify-self: start; }
 .teacher-timeoff-dialog h2 { margin-right: 2.5rem; }
 .teacher-timeoff-dialog form { display: grid; gap: 1rem; }
 .teacher-timeoff-dialog .teacher-eyebrow { margin: 0 2.5rem -0.5rem 0; }
 .teacher-timeoff-times { display: grid; gap: 0.65rem; }
 .teacher-timeoff-times > p { margin: 0; }
-.teacher-timeoff-times > .button { justify-self: start; }
+.teacher-timeoff-times > .teacher-quiet { justify-self: start; }
 .teacher-timeoff-time { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 0.5rem; align-items: end; }
 .teacher-timeoff-time input { width: 100%; min-width: 0; }
 /* At 320 px both times keep their digits whole. */
@@ -2344,16 +2375,16 @@
   color: var(--lavender-ink);
   font-size: 1.1rem;
 }
-/* One rule for every row of buttons: they share a row while their labels
-   fit whole, and stack when they don't. */
+/* The coral step is the card's one main action and takes its width; the
+   lesser choices (some hours off, making days available) are quiet chips at
+   their own width on the line beneath (10 November 2026). */
 .teacher-timeoff-selection-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem;
+  gap: 0.65rem 0.5rem;
 }
 .teacher-timeoff-selection-actions > .button {
-  flex: 1 1 0;
-  min-width: fit-content;
+  flex: 1 1 100%;
   gap: 0.5rem;
 }
 /* With nothing chosen and nothing off ahead it is only a hint, not a card. */
@@ -3128,7 +3159,7 @@
 .teacher-student-notices { position: relative; z-index: 2; margin: 0; }
 .teacher-student-notices .teacher-lesson-card { flex-wrap: wrap; padding: 0.5rem 0.65rem; }
 .teacher-student-notices .teacher-lesson-card__who { flex: 999 1 11rem; text-wrap: pretty; }
-.teacher-student-notices .teacher-lesson-card .button { flex: none; margin-left: auto; }
+.teacher-student-notices .teacher-lesson-card :is(.button, .teacher-quiet) { flex: none; margin-left: auto; }
 
 /* One card a student (2 November 2026, Dan): their name, three checks and
    the one thing to press next; the name opens their profile in place. */

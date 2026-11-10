@@ -23,7 +23,7 @@ export function BookedLessonCard({ booking, disabled, onOpen }: {
         <span>{day} · <span className="teacher-lesson-card__time">{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span></span>
       </span>
       <button
-        className="button button--lilac button--compact"
+        className="teacher-quiet"
         type="button"
         disabled={disabled}
         aria-label={`Change lesson for ${booking.student_name} on ${day}`}
