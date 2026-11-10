@@ -551,6 +551,35 @@ try {
     assert.equal((await call("/admin/google-calendar", teacherSession)).status, 401);
     assert.equal((await call("/admin/google-calendar/connect", teacherSession, "POST")).status, 401);
   });
+  await test("her change of place moves the one calendar event, dropping the Meet room for Porto and asking for a new one online", async () => {
+    const runtime = { ...env, BOOKING_TOKEN_SECRET: "isolated-signing-only", ALLOWED_ORIGIN: "https://site.example.invalid", SITE_URL: "https://site.example.invalid", EMAIL_DRY_RUN: "1", TEACHER_NOTIFICATIONS_ENABLED: "0" };
+    const teacherSession = await createSession("teacher", runtime.BOOKING_TOKEN_SECRET);
+    const ready = await prepareMeeting(env, addBooking("teacher-place"));
+    const eventId = ready.meeting_event_id;
+    assert.equal(meetingUrl(ready), link);
+    const change = async location => {
+      const tasks = [];
+      const response = await worker.fetch(new Request(`https://api.example.invalid/admin/bookings/${ready.id}/change`, {
+        method: "POST", headers: { Origin: runtime.ALLOWED_ORIGIN, "Content-Type": "application/json", Authorization: `Bearer ${teacherSession}` },
+        body: JSON.stringify({ location, following: false })
+      }), runtime, { waitUntil(promise) { tasks.push(promise); } });
+      assert.equal(response.status, 200, await response.clone().text());
+      await Promise.all(tasks);
+      return row(ready.id);
+    };
+    const porto = await change("porto");
+    assert.equal(porto.sequence, 1);
+    assert.equal(porto.meeting_sequence, 1, "synced with the confirmation, not left for the sweep");
+    assert.equal(porto.meeting_event_id, eventId);
+    assert.equal(porto.meeting_url, null);
+    assert.equal(events.get(eventId).location, "Porto");
+    assert.equal(events.get(eventId).hangoutLink, undefined);
+    const online = await change("online");
+    assert.equal(online.meeting_event_id, eventId);
+    assert.equal(meetingUrl(online), link);
+    assert.equal(events.get(eventId).location, "Online");
+    assert.equal(events.size, 1);
+  });
   console.log(`${passed} meeting service integration tests passed (SQLite, isolated Google/notifications).`);
 } finally {
   globalThis.fetch = originalFetch;

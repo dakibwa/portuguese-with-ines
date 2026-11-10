@@ -339,9 +339,72 @@ export function lessonReminder({ tutor = currentTutor(), first, lessonName, less
 
 /* ------------------------------------------------------------------ moved */
 
+/** "90 minutes and online": a list in words. */
+function inWords(parts) {
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0] ?? "";
+}
+
+/*
+ * Her one change of when, how long and where (10 November 2026), as it now is
+ * for the student and as it was for her. `change` is { time | slot, minutes,
+ * place } for what changed, `from*` for what it was.
+ */
+function placeWords(place, tutor, { short = false } = {}) {
+  return place === "online" ? "online" : short ? `in ${tutor.place.city}` : `in person in ${tutor.place.city}`;
+}
+
+function nowWords(change, tutor, { run = false } = {}) {
+  const parts = [
+    ...(run ? change.slot ? [`on ${change.slot.weekday}s at ${change.slot.time}`] : [] : change.time ? ["at the time below"] : []),
+    ...(change.minutes ? [`${change.minutes} minutes`] : []),
+    ...(change.place ? [placeWords(change.place, tutor)] : [])
+  ];
+  const moved = run ? change.slot : change.time;
+  return `${inWords(parts)}${moved ? "" : run ? ", at the same times" : ", at the same time"}`;
+}
+
+/** A run's lessons her change left as they were. */
+function teacherKeptNote(kept) {
+  if (!kept) return "";
+  return kept.count === 1 ? " One lesson stays as it was." : ` ${kept.count} lessons stay as they were.`;
+}
+
+/** Only her move of one lesson's time keeps the words it always had. */
+function onlyTime(change) {
+  return Boolean(change?.time && !change.minutes && !change.place);
+}
+
 /** 11 12 15 — a student's lesson (or weekly run) has moved or changed length. */
 export function studentMoved({ tutor = currentTutor(), first, byTeacher, lengthChanged = false, minutes, lesson, lessonName, place, meetingUrl, reference, when, shortWhen,
-  price, lateNote = "", policy, notice, fee, manageUrl, lessonsUrl, welcome = null, run = null }) {
+  price, lateNote = "", policy, notice, fee, manageUrl, lessonsUrl, welcome = null, run = null, change = null }) {
+  if (run && byTeacher && change) {
+    return {
+      subject: `${tutor.shortName} has changed your weekly lessons — from ${shortWhen}`,
+      content: {
+        heading: "Your weekly lessons have changed",
+        preheader: `${lessonName} · ${run.repeats.value}`,
+        intro: `${hello(first, tutor)} ${tutor.shortName} has changed the lessons below: they’re now ${nowWords(change, tutor, { run: true })}.${teacherKeptNote(run.kept)} The updated lessons are in the calendar attachment, and you can still manage any one lesson from your lesson calendar.`,
+        hero: when,
+        rows: [...runRows({ lesson, place, price, repeats: run.repeats, occurrences: run.occurrences }), ...keptRows(run.kept)],
+        action: welcome ? welcomeAction(welcome) : { label: ALL_LESSONS_LABEL, url: lessonsUrl },
+        footer: `No charge for a change ${tutor.pronouns.subject} makes.`
+      }
+    };
+  }
+  if (!run && byTeacher && change && !onlyTime(change)) {
+    return {
+      subject: `${tutor.shortName} has changed your lesson — ${shortWhen}`,
+      content: {
+        heading: "Your lesson has changed",
+        preheader: `${lessonName} · ${when}`,
+        intro: `${hello(first, tutor)} ${tutor.shortName} has changed your lesson: it’s now ${nowWords(change, tutor)}. An updated calendar invitation is attached.`,
+        hero: when,
+        rows: lessonRows({ lesson, place, meetingUrl, reference, price }),
+        action: manageUrl ? { label: MANAGE_LABEL, url: manageUrl } : null,
+        footer: `No charge for a change ${tutor.pronouns.subject} makes.`
+      }
+    };
+  }
   if (run) {
     // Inês changed how long they are (9 November 2026, Dan), at the same times.
     const longer = byTeacher && lengthChanged;
@@ -387,9 +450,42 @@ export function studentMoved({ tutor = currentTutor(), first, byTeacher, lengthC
 }
 
 /** 13 14 16 — Inês's copy of a move: the student's, her own, or a weekly run's. */
-export function lessonMovedTeacher({ student, byTeacher, held = false, lengthChanged = false, fromMinutes, minutes, previousWhen = "", late = false,
-  lateNote = "", notice, lesson, lessonName, place, meetingUrl, reference, when, heroNote = "", shortWhen, run = null }) {
+export function lessonMovedTeacher({ tutor = currentTutor(), student, byTeacher, held = false, lengthChanged = false, fromMinutes, minutes, previousWhen = "", late = false,
+  lateNote = "", notice, lesson, lessonName, place, meetingUrl, reference, when, heroNote = "", shortWhen, run = null, change = null }) {
   const name = student.name;
+  const told = held ? "They haven't been emailed yet" : "They have been told";
+  if (run && byTeacher && change) {
+    return {
+      subject: `You changed ${name}'s weekly lessons — from ${shortWhen}`,
+      content: {
+        heading: "You changed these lessons",
+        preheader: `${name} · ${run.repeats.value}`,
+        intro: `You changed ${name}'s lessons below: they’re now ${nowWords(change, tutor, { run: true })}.${teacherKeptNote(run.kept)} ${told}, and your calendar has been updated.`,
+        hero: when,
+        rows: [...runRows({ lesson, place, repeats: run.repeats, occurrences: run.occurrences, forTeacher: true }), ...keptRows(run.kept), ...studentRows(student)],
+        footer: SIGN_OFF
+      }
+    };
+  }
+  if (!run && byTeacher && change && !onlyTime(change)) {
+    const was = [
+      ...(change.time && previousWhen ? [`on ${previousWhen}`] : []),
+      ...(change.minutes && fromMinutes ? [`${fromMinutes} minutes`] : []),
+      ...(change.place && change.fromPlace ? [placeWords(change.fromPlace, tutor, { short: true })] : [])
+    ];
+    return {
+      subject: `You changed ${name}'s lesson — ${shortWhen}`,
+      content: {
+        heading: "You changed this lesson",
+        preheader: `${name} · ${lessonName} · ${when}`,
+        intro: `You changed ${name}'s lesson${was.length ? `: it was ${inWords(was)}` : ""}. ${told}, and your calendar has been updated.`,
+        hero: when,
+        heroNote,
+        rows: [...lessonRows({ lesson, place, meetingUrl, reference }), ...studentRows(student)],
+        footer: SIGN_OFF
+      }
+    };
+  }
   if (run) {
     const longer = byTeacher && lengthChanged;
     return {
