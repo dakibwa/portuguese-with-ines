@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { CalendarPlus, Check, Euro, KeyRound, Repeat, X } from "lucide-react";
 import { AccountAvatar } from "@/components/AccountMenu";
 import { ComeBackEmail, firstName } from "@/components/teacher/DormantEmail";
-import { EditActions, EditPencil, InlineEdit } from "@/components/teacher/EditControls";
+import { EditActions, EditPencil } from "@/components/teacher/EditControls";
 import { LessonForm } from "@/components/teacher/LessonForm";
 import { StudentDashboard, FactRow } from "@/components/teacher/StudentDashboard";
 import { StudentPrice } from "@/components/teacher/StudentPrice";
@@ -42,24 +42,42 @@ function ProgressChecks({ progress }: { progress: StudentProgress }) {
   </ul>;
 }
 
-/** Their name, changed in the card's top row where it reads. */
-function NameEdit({ name, onSave, onClose, onBusy }: { name: string; onSave: (name: string) => Promise<void>; onClose: () => void; onBusy: (busy: boolean) => void }) {
-  const [draft, setDraft] = useState(name);
+type Details = { name: string; email: string; phone: string; nif: string };
+
+/**
+ * Who they are, changed together where it reads (10 November 2026, Dan: one
+ * pencil by Details, not one on every line): their name, email, phone and NIF
+ * as fields, each named at its left, saved by the one tick. A signed-in
+ * student's email is theirs to change, so it is only read here.
+ */
+function DetailsEdit({ student, onSave, onClose, onBusy }: { student: AdminStudent; onSave: (details: Details) => Promise<void>; onClose: () => void; onBusy: (busy: boolean) => void }) {
+  const saved: Details = { name: student.name, email: student.email ?? "", phone: student.phone ?? "", nif: student.nif ?? "" };
+  const [draft, setDraft] = useState(saved);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  return <form className="teacher-inline-edit teacher-inline-edit--name" onKeyDown={event => { if (event.key === "Escape" && !busy) { event.preventDefault(); event.stopPropagation(); onClose(); } }}
+  const field = (key: keyof Details, label: string, input: { type?: "email" | "tel"; inputMode?: "email" | "tel" | "numeric"; placeholder?: string; required?: boolean; autoCapitalize?: string; autoFocus?: boolean }) => <label>
+    <span>{label}</span>
+    <input autoComplete="off" disabled={busy} name={key} onChange={event => setDraft({ ...draft, [key]: event.target.value })} spellCheck={false} type="text" value={draft[key]} {...input} />
+  </label>;
+  return <form className="teacher-details-edit" onKeyDown={event => { if (event.key === "Escape" && !busy) { event.preventDefault(); event.stopPropagation(); onClose(); } }}
     onSubmit={async event => {
       event.preventDefault();
       if (busy) return;
-      if (draft.trim() === name) { onClose(); return; }
+      const next: Details = { name: draft.name.trim(), email: draft.email.trim(), phone: draft.phone.trim(), nif: draft.nif.trim() };
+      if ((Object.keys(next) as (keyof Details)[]).every(key => next[key] === saved[key])) { onClose(); return; }
       setBusy(true); onBusy(true); setError("");
-      try { await onSave(draft.trim()); onClose(); }
-      catch (caught) { setError(caught instanceof Error ? caught.message : "Their name couldn’t be saved."); }
+      try { await onSave(next); onClose(); }
+      catch (caught) { setError(caught instanceof Error ? caught.message : "Their details couldn’t be saved."); }
       finally { setBusy(false); onBusy(false); }
     }}>
-    <input aria-label="Full name" autoCapitalize="words" autoComplete="off" autoFocus disabled={busy} name="name" onChange={event => setDraft(event.target.value)} required spellCheck={false} type="text" value={draft} />
-    <EditActions busy={busy} onCancel={onClose} />
-    {error ? <span className="teacher-inline-error teacher-inline-edit__error" role="alert">{error}</span> : null}
+    {field("name", "Name", { required: true, autoCapitalize: "words", autoFocus: true })}
+    {student.signedIn
+      ? <><span>Email</span><span className="teacher-details-edit__read">{student.email || "No email"}</span></>
+      : field("email", "Email", { type: "email", inputMode: "email", placeholder: "name@example.com", required: Boolean(student.email) })}
+    {field("phone", "Phone", { type: "tel", inputMode: "tel" })}
+    {field("nif", "NIF", { inputMode: "numeric", placeholder: "For receipts" })}
+    <EditActions busy={busy} onCancel={onClose} saveLabel="Save details" />
+    {error ? <p className="teacher-inline-error" role="alert">{error}</p> : null}
   </form>;
 }
 
@@ -116,8 +134,8 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
   const paneId = `teacher-setup-${student.id}`;
   const disabled = busy || locked || sending === student.id;
   const open = (panel: StudentPanel | null) => { setNotice(""); setProblem(""); onSelect(panel); };
-  // Their name is changed where it stands, in the card's top row.
-  const [renaming, setRenaming] = useState(false);
+  // Details and Price each open where they read, from the one pencil by their name.
+  const [editing, setEditing] = useState<{ details: boolean; price: boolean }>({ details: false, price: false });
   const close = () => {
     returnFocus.current = row.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]') ?? nameControl.current;
     onSelect(null);
@@ -161,14 +179,14 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
     if (bounds.top < top || body.current.getBoundingClientRect().bottom > window.innerHeight - 16)
       window.scrollBy({ top: bounds.top - top, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
   }, [step, date, time]);
-  // Renamed or not, focus goes back to the name's pencil.
-  const renamed = useRef(false);
+  // Saved or cancelled, focus goes back to the pencil that opened it.
+  const wasEditing = useRef(editing);
   useEffect(() => {
-    if (renaming) { renamed.current = true; return; }
-    if (!renamed.current) return;
-    renamed.current = false;
-    row.current?.querySelector<HTMLElement>('[data-edit="name"]')?.focus({ preventScroll: true });
-  }, [renaming]);
+    for (const section of ["details", "price"] as const) {
+      if (wasEditing.current[section] && !editing[section]) row.current?.querySelector<HTMLElement>(`[data-edit="${section}"]`)?.focus({ preventScroll: true });
+    }
+    wasEditing.current = editing;
+  }, [editing]);
 
   // The sheet grows around its contents; the name stays still at its top.
   useLayoutEffect(() => {
@@ -251,23 +269,12 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
       ...(!hasLessons(student) ? ["No lessons added yet."] : []),
       student.awaitingWelcome ? "Lesson emails wait for the welcome email." : "Lessons to come email the student.",
     ] : step === "come-back" ? ["Ends with a button to sign in and book.", comeBackSent ? `Last sent ${comeBackSent}.` : "Not sent yet."] : [];
-  // A fact she can change is its own button, with a tiny pencil at its end
-  // (9 November 2026, Dan); one still empty offers itself in place, as Add.
-  // Pressed, it becomes its field right there (10 November 2026, Dan).
-  const label = (what: string, empty = false) => `${empty ? "Add" : "Change"} ${what} for ${student.name}`;
-  async function saveDetail(field: "name" | "email" | "phone" | "nif", value: string) {
+  async function saveDetails(details: Details) {
     setNotice(""); setProblem("");
-    const { student: updated } = await updateStudentDetails(token, student.id, {
-      name: student.name, email: student.email, phone: student.phone, nif: student.nif ?? "", [field]: value,
-    });
+    const { student: updated } = await updateStudentDetails(token, student.id, details);
     onChanged?.(updated);
     setNotice("Their details are saved.");
   }
-  const detail = (field: "email" | "phone" | "nif", what: string, shown: string, placeholder: string, extra: Partial<Parameters<typeof InlineEdit>[0]> = {}) => {
-    const value = (field === "nif" ? student.nif : student[field]) ?? "";
-    return <InlineEdit disabled={disabled} empty={!value} field={field} inputLabel={what === "NIF" ? "NIF" : what[0].toUpperCase() + what.slice(1)}
-      label={label(what, !value)} onBusy={setBusy} onSave={next => saveDetail(field, next)} placeholder={placeholder} value={value} {...extra}>{shown}</InlineEdit>;
-  };
   const tool = (panel: StudentPanel, label: string, Icon: typeof Euro) => <button
     aria-controls={paneId}
     className="button button--outline button--small"
@@ -292,15 +299,10 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
 
   return <li ref={row} data-student-id={student.id} className={`teacher-setup teacher-setup--inline teacher-student teacher-student--inline${step ? " is-open" : ""}`}>
     <div className="teacher-setup__header" ref={header} data-homework-exit>
-      {/* Opening and closing their card is the name's button; changing the
-          name is its own pencil beside it, never a button inside one. */}
+      {/* Opening and closing their card is the name's button; the name is
+          changed with their other details, from the pencil by Details. */}
       <div className="teacher-setup__who">
-        {renaming ? <><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><NameEdit
-          name={student.name}
-          onBusy={setBusy}
-          onClose={() => setRenaming(false)}
-          onSave={next => saveDetail("name", next)}
-        /></> : <><button
+        <button
           className="teacher-setup__profile"
           aria-controls={paneId}
           aria-expanded={profile}
@@ -310,7 +312,6 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
           onClick={() => open(profile ? null : "history")}
           type="button"
         ><AccountAvatar mark={student.mark || defaultStudentMark(student.id)} name={student.name} /><span className="teacher-setup__identity"><strong>{student.name}</strong>{student.dormant ? <span className="teacher-student__label">Dormant</span> : null}</span></button>
-        <EditPencil disabled={disabled} field="name" label={`Change name for ${student.name}`} onEdit={() => setRenaming(true)} /></>}
       </div>
       {/* Open, how far they have got and what she can do sit in this one row
           (9 November 2026, Dan: "more consolidate and simple"): their checks
@@ -359,21 +360,30 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
           onBusy={setBusy}
           onPaidChanged={() => onChanged?.()}
           facts={<>
-            {/* A signed-in student's email is theirs to change, so it is only read here. */}
-            <FactRow label="Details">
-              {student.signedIn
-                ? <span className="teacher-fact__line">{student.email || "No email"}</span>
-                : detail("email", "email", student.email || "Add email", "name@example.com", { type: "email", inputMode: "email", required: Boolean(student.email) })}
-              {detail("phone", "phone", student.phone || "Add phone", "Phone", { type: "tel", inputMode: "tel" })}
-              {detail("nif", "NIF", student.nif ? `NIF ${student.nif}` : "Add NIF", "NIF, for receipts", { inputMode: "numeric" })}
+            {/* One pencil by each name (10 November 2026, Dan); what is not
+                yet known is left out, and its field waits under the pencil. */}
+            <FactRow label="Details"
+              edit={editing.details ? null : <EditPencil disabled={disabled} field="details" label={`Change details for ${student.name}`} onEdit={() => setEditing(now => ({ ...now, details: true }))} />}>
+              {editing.details ? <DetailsEdit
+                onBusy={setBusy}
+                onClose={() => setEditing(now => ({ ...now, details: false }))}
+                onSave={saveDetails}
+                student={student}
+              /> : <>
+                <span className={`teacher-fact__line${student.email ? "" : " teacher-fact__empty"}`}>{student.email || "No email yet"}</span>
+                {student.phone ? <span className="teacher-fact__line">{student.phone}</span> : null}
+                {student.nif ? <span className="teacher-fact__line">NIF {student.nif}</span> : null}
+              </>}
             </FactRow>
-            <FactRow label="Price" labelId={`${paneId}-price-label`}>
+            <FactRow label="Price" labelId={`${paneId}-price-label`}
+              edit={editing.price ? null : <EditPencil disabled={disabled} field="price" label={`Change price for ${student.name}`} onEdit={() => setEditing(now => ({ ...now, price: true }))} />}>
               <StudentPrice
-                disabled={disabled}
+                editing={editing.price}
                 idPrefix={`${paneId}-price`}
                 labelledBy={`${paneId}-price-label`}
                 onBusy={setBusy}
                 onChanged={updated => onChanged?.(updated)}
+                onClose={() => setEditing(now => ({ ...now, price: false }))}
                 student={student}
                 token={token}
               />

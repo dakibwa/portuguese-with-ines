@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { EditActions, EditValue } from "@/components/teacher/EditControls";
+import { EditActions } from "@/components/teacher/EditControls";
 import { setStudentPrices, type AdminStudent, type StudentPrices } from "@/lib/admin-api";
 import { formatPriceCents } from "@/lib/booking-api";
 import { lessonProducts } from "@/lib/lesson-products";
@@ -115,34 +115,48 @@ export function PriceFields({ draft, disabled, idPrefix, invalid, onChange }: {
 /**
  * Her price for one student, in their profile's Price row (13 October 2026,
  * Dan): it prices every lesson of theirs at that length, and lessons to come
- * that nothing is settled on follow it. Each length's pencil opens both
- * fields right there, on its own (10 November 2026).
+ * that nothing is settled on follow it. The one pencil beside Price opens
+ * both fields where the prices read (10 November 2026).
  */
-export function StudentPrice({ token, student, onChanged, idPrefix = "teacher-price", labelledBy, disabled, onBusy }: {
+export function StudentPrice({ token, student, onChanged, idPrefix = "teacher-price", labelledBy, editing, onClose, onBusy }: {
   token: string;
   student: AdminStudent;
   onChanged: (student: AdminStudent) => void;
   idPrefix?: string;
   /** The row's label. */
   labelledBy: string;
-  disabled?: boolean;
+  /** Open from the Price pencil. */
+  editing: boolean;
+  /** Saved or cancelled: the fields close, and focus goes back to the pencil. */
+  onClose: () => void;
   onBusy?: (busy: boolean) => void;
 }) {
-  const [editing, setEditing] = useState<Length | null>(null);
+  const [saved, setSaved] = useState("");
+  return (
+    <section className="teacher-price" aria-labelledby={labelledBy}>
+      {editing
+        ? <PriceEdit idPrefix={idPrefix} onBusy={onBusy} onCancel={() => { setSaved(""); onClose(); }} onChanged={onChanged} onSaved={message => { setSaved(message); onClose(); }} student={student} token={token} />
+        : LENGTHS.map((minutes) => <span className="teacher-fact__line" key={minutes}>{priceLabel(student, minutes)}</span>)}
+      {!editing && saved ? <p className="teacher-inline-success" role="status"><CheckCircle2 size={18} aria-hidden="true" />{saved}</p> : null}
+    </section>
+  );
+}
+
+/** Both prices as fields, starting on what she has set; the tick saves them together. */
+function PriceEdit({ token, student, idPrefix, onChanged, onSaved, onCancel, onBusy }: {
+  token: string;
+  student: AdminStudent;
+  idPrefix: string;
+  onChanged: (student: AdminStudent) => void;
+  /** With what the new price reached, said once the fields close. */
+  onSaved: (message: string) => void;
+  onCancel: () => void;
+  onBusy?: (busy: boolean) => void;
+}) {
   const [draft, setDraft] = useState<PriceDraft>(() => priceDraft(student));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState("");
-  const section = useRef<HTMLElement>(null);
-  // Opened from its pencil, the price field takes focus; saved or cancelled,
-  // focus goes back to that pencil rather than to the page.
-  const back = useRef<Length | null>(null);
-  useEffect(() => {
-    if (editing) document.getElementById(`${idPrefix}-${editing}`)?.focus();
-    else if (back.current) section.current?.querySelector<HTMLElement>(`[data-edit="price-${back.current}"]`)?.focus();
-    if (!editing) back.current = null;
-  }, [editing, idPrefix]);
-  const close = () => { back.current = editing; setEditing(null); setDraft(priceDraft(student)); setError(""); };
+  useEffect(() => { document.getElementById(`${idPrefix}-60`)?.focus(); }, [idPrefix]);
 
   async function save() {
     if (busy) return;
@@ -157,10 +171,8 @@ export function StudentPrice({ token, student, onChanged, idPrefix = "teacher-pr
     try {
       const result = await setStudentPrices(token, student.id, prices);
       onChanged(result.student);
-      back.current = editing;
-      setEditing(null);
       const lessons = (count: number) => `${count} ${count === 1 ? "lesson" : "lessons"}`;
-      setSaved([
+      onSaved([
         "Saved.",
         result.updated ? `${lessons(result.updated)} to come ${result.updated === 1 ? "is" : "are"} on the new price.` : "",
         // A price raised from free reaches lessons booked from now on only.
@@ -174,22 +186,14 @@ export function StudentPrice({ token, student, onChanged, idPrefix = "teacher-pr
     }
   }
 
-  return (
-    <section className="teacher-price" ref={section} aria-labelledby={labelledBy}>
-      {editing ? (
-        <form className="teacher-form" noValidate onKeyDown={(event) => { if (event.key === "Escape" && !busy) { event.preventDefault(); event.stopPropagation(); close(); } }} onSubmit={(event) => { event.preventDefault(); void save(); }}>
-          <div className="teacher-price__row">
-            <PriceFields draft={draft} disabled={busy} idPrefix={idPrefix} invalid={error === PRICE_RANGE_ERROR} onChange={setDraft} />
-            <EditActions busy={busy} onCancel={close} saveLabel="Save price" />
-          </div>
-          <p className="teacher-price__hint">Empty is the standard price, and an empty 90 follows their 60. 0 is free, with no card needed.</p>
-        </form>
-      ) : (
-        LENGTHS.map((minutes) => <EditValue disabled={disabled} field={`price-${minutes}`} key={minutes} label={`Change ${minutes}-minute price for ${student.name}`}
-          onEdit={() => { setDraft(priceDraft(student)); setEditing(minutes); setSaved(""); }}>{priceLabel(student, minutes)}</EditValue>)
-      )}
-      {error ? <p className="teacher-inline-error" id={`${idPrefix}-error`} role="alert">{error}</p> : null}
-      {saved ? <p className="teacher-inline-success" role="status"><CheckCircle2 size={18} aria-hidden="true" />{saved}</p> : null}
-    </section>
-  );
+  return <>
+    <form className="teacher-form" noValidate onKeyDown={(event) => { if (event.key === "Escape" && !busy) { event.preventDefault(); event.stopPropagation(); onCancel(); } }} onSubmit={(event) => { event.preventDefault(); void save(); }}>
+      <div className="teacher-price__row">
+        <PriceFields draft={draft} disabled={busy} idPrefix={idPrefix} invalid={error === PRICE_RANGE_ERROR} onChange={setDraft} />
+        <EditActions busy={busy} onCancel={onCancel} saveLabel="Save price" />
+      </div>
+      <p className="teacher-price__hint">Empty is the standard price, and an empty 90 follows their 60. 0 is free, with no card needed.</p>
+    </form>
+    {error ? <p className="teacher-inline-error" id={`${idPrefix}-error`} role="alert">{error}</p> : null}
+  </>;
 }
