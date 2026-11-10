@@ -4132,6 +4132,11 @@ textarea,
   box-shadow: inset 0 0 0 1px var(--rule);
 }
 
+.unified-calendar__legend .is-online-only {
+  margin-right: -0.1rem;
+  background: var(--online-only);
+}
+
 /*
  * Your lessons is one calendar card. Its header names the view, explains it
  * behind the question mark and offers booking at the top right; the next
@@ -5181,6 +5186,25 @@ p.lesson-when > span {
   margin-top: 0.75rem;
 }
 
+/* In Porto, a day's online-only times: one quiet line, its words and globe
+   kept together, the chip beside them or whole on the next line. */
+.online-only-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+  margin: 0.75rem 0 0;
+  color: var(--lavender-ink);
+  font: 600 0.82rem/1.3 var(--ui);
+}
+
+.online-only-line > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
 .unified-calendar__prompt {
   margin: 1rem 0 0;
   border-top: 1px solid var(--rule-soft);
@@ -5521,6 +5545,21 @@ p.lesson-when > span {
   font-weight: 700;
 }
 
+/* In Porto, a day free only online: the sky tint and its globe, never the
+   tint alone. It opens like any day, to say so. */
+.calendar-week button.is-online-only {
+  background: var(--online-only);
+  color: var(--green-deep);
+  font-weight: 700;
+}
+
+.calendar-week__online {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  opacity: 0.8;
+}
+
 /* The grid rolls forward from this week rather than showing a calendar month,
    so the 1st is labelled to make the crossing into the next month legible. */
 .calendar-week button em {
@@ -5600,7 +5639,9 @@ p.lesson-when > span {
    marker beside it repeated what three other signals were saying. */
 
 .calendar-week button.has-availability:hover,
-.calendar-week button.has-availability:focus-visible {
+.calendar-week button.has-availability:focus-visible,
+.calendar-week button.is-online-only:hover,
+.calendar-week button.is-online-only:focus-visible {
   background: var(--green);
   color: var(--paper);
 }
@@ -5645,6 +5686,20 @@ p.lesson-when > span {
   border-color: var(--green);
   background: var(--green);
   color: var(--paper);
+}
+
+/* Shown, not chosen: the online-only tint, until Switch to online. */
+.slot-grid .slot-grid__online-only {
+  display: grid;
+  min-height: 48px;
+  place-items: center;
+  border-radius: var(--squiggle-chip);
+  padding: 0.45rem 0.4rem;
+  background: var(--online-only);
+  color: var(--green-deep);
+  font-family: var(--ui);
+  font-size: 0.94rem;
+  font-weight: 700;
 }
 
 .slot-grid button small {

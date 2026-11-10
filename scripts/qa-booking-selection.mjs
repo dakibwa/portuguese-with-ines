@@ -134,11 +134,24 @@ try {
     await choose("2026-09-14");
     await page.getByRole("radio", { name: "In Porto", exact: true }).check();
     await expect.poll(() => availabilityPlaces.includes("porto")).toBe(true);
-    await expect(page.locator('button[data-date-key="2026-09-14"]')).toBeDisabled();
-    await page.getByRole("radio", { name: "Online", exact: true }).check();
-    await expect(page.locator('button[data-date-key="2026-09-14"]')).toBeEnabled();
+    // In Porto the day is marked online only and its times are shown, not offered.
+    await expect(page.locator('button[data-date-key="2026-09-14"]')).toHaveAttribute("aria-label", /, online only, 4 times$/);
+    await page.getByText("Online only on this day", { exact: true }).waitFor();
+    await choosePart("10:00");
+    assert.equal(await page.getByRole("button", { name: "10:00", exact: true }).count(), 0, "An online-only time cannot be chosen in Porto");
+    // Switch to online is pressing Online: the place changes, the day stays.
+    await page.getByRole("button", { name: "Switch to online", exact: true }).click();
+    await expect(page.getByRole("radio", { name: "Online", exact: true })).toBeChecked();
+    await choosePart("10:00");
+    await page.getByRole("button", { name: "10:00", exact: true }).click();
     assert.deepEqual(requests, [], "Switching places never submits an unavailable lesson");
-    onlineOnly = false;
+    await page.getByRole("button", { name: "Agree to terms & privacy", exact: true }).click();
+    await page.getByRole("button", { name: "Book lesson & agree to pay", exact: true }).click();
+    await page.getByRole("heading", { name: "You’re booked in.", exact: true }).waitFor();
+    assert.deepEqual(Object.keys(requests.at(-1)).sort(), ["expectedPriceCents", "lessonType", "location", "notes", "paymentConsent", "startAt", "timezone"]);
+    assert.equal(requests.at(-1).location, "online");
+    assert.equal(requests.at(-1).startAt, "2026-09-14T09:00:00.000Z");
+    onlineOnly = false; bookings = []; series = [];
     await start();
     await choose("2026-09-14");
     await page.getByRole("button", { name: /Add another lesson/ }).click();
