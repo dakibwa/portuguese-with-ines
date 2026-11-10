@@ -3332,12 +3332,14 @@
 .teacher-lesson-inline__head .teacher-lesson-row__when::after { content: none; }
 .teacher-lesson-inline__head .teacher-lesson-row__when:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: var(--squiggle-chip); }
 /* Her actions are one wrapping row of their own; the plain wrappers inside
-   let their controls flow as its items. Already paid and No-show end it, as
-   Already paid ends a closed row. */
+   let their controls flow as its items. Where the row is one line, Already
+   paid and No-show end it, under the closed rows' own; where the chips wrap
+   they flow with the rest and use the space as the others do (10 November
+   2026, Dan). */
 .teacher-lesson-dialog--inline .teacher-lesson-inline__head > .teacher-dialog-actions { display: flex; flex: 1 1 16rem; flex-wrap: wrap; align-items: center; gap: 0.4rem; min-width: 0; margin: 0; }
 .teacher-lesson-dialog--inline .teacher-lesson-inline__head :is(.teacher-lesson-record, .teacher-no-show) { display: contents; }
 .teacher-lesson-inline__head :is(.teacher-quiet, .paid-tick--plain) { flex: 0 0 auto; justify-content: center; }
-.teacher-lesson-inline__head .teacher-dialog-actions > .teacher-lesson-record > :first-child { margin-left: auto; }
+@container lessons (min-width: 40rem) { .teacher-lesson-inline__head .teacher-dialog-actions > .teacher-lesson-record > :first-child { margin-left: auto; } }
 .teacher-lesson-inline__head .teacher-no-show__hint { order: 1; flex: 1 1 100%; margin: 0; }
 /* The call is the first of her actions and their size: the one filled pill
    among the quiet chips, answering in coral as every Meet pill does. */
