@@ -46,11 +46,22 @@ export function EditValue({ label, field, controls, disabled, empty, onEdit, chi
  * a narrow column and never take a row of their own (10 November 2026, Dan).
  * The tick submits the form it is in.
  */
-export function EditActions({ busy, saveLabel = "Save", onCancel }: { busy?: boolean; saveLabel?: string; onCancel: () => void }) {
+export function EditActions({ busy, saveLabel = "Save", saveDisabled, onCancel }: {
+  busy?: boolean;
+  saveLabel?: string;
+  /** Nothing to save yet: the tick waits as a quiet outline. */
+  saveDisabled?: boolean;
+  onCancel: () => void;
+}) {
   return <span className="teacher-edit-actions">
-    <button aria-label={busy ? "Saving…" : saveLabel} className="teacher-edit-save" disabled={busy} title={saveLabel} type="submit"><Check size={15} strokeWidth={3} aria-hidden="true" /></button>
-    <button aria-label="Cancel" className="teacher-pencil" disabled={busy} onClick={onCancel} title="Cancel" type="button"><X size={15} strokeWidth={2.4} aria-hidden="true" /></button>
+    <button aria-label={busy ? "Saving…" : saveLabel} className="teacher-edit-save" disabled={busy || saveDisabled} title={saveLabel} type="submit"><Check size={15} strokeWidth={3} aria-hidden="true" /></button>
+    <CancelEdit disabled={busy} onCancel={onCancel} />
   </span>;
+}
+
+/** The quiet cross that closes whatever is open in place, changing nothing. */
+export function CancelEdit({ disabled, onCancel }: { disabled?: boolean; onCancel: () => void }) {
+  return <button aria-label="Cancel" className="teacher-pencil" disabled={disabled} onClick={onCancel} title="Cancel" type="button"><X size={15} strokeWidth={2.4} aria-hidden="true" /></button>;
 }
 
 /**

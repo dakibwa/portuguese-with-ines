@@ -3044,10 +3044,6 @@
 .teacher-account h2 { margin: 0; color: var(--ink); font: 600 1.05rem/1.35 var(--ui); }
 .teacher-account__heading { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem 1rem; }
 .teacher-account__heading p { margin: 0.1rem 0 0; color: var(--lavender-ink); font-size: 0.8rem; line-height: 1.6; overflow-wrap: anywhere; }
-/* Password has no value to show, so its button keeps the row's end. */
-.teacher-account .my-lessons__fact[data-field="password"] > .my-lessons__change { grid-column: -2; grid-row: 1; }
-/* The open field and its buttons stand the same 44 px. */
-.teacher-account .my-lessons__edit-actions .button { min-height: 44px; padding: 0.4rem 1.1rem; }
 @media (max-width: 760px) { .teacher-account-layout { grid-template-columns: minmax(0, 1fr); } }
 
 /* Getting started: each step opens its work within the student's row. */
@@ -3199,14 +3195,6 @@
 .teacher-inline-edit--name { flex: 1 1 10rem; width: auto; margin: 0; }
 .teacher-inline-edit--name > input { font-size: 1rem; font-weight: 700; }
 @media (pointer: coarse) { .teacher-inline-edit > input { min-height: 44px; } }
-/* Save and cancel, at the end of whatever is being edited: a coral tick and
-   a quiet cross, the pencil's size. */
-.teacher-edit-actions { display: inline-flex; flex: none; align-items: center; gap: 0.25rem; }
-.teacher-edit-save { position: relative; display: inline-grid; flex: none; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--squiggle-chip); background: var(--coral-action); color: var(--paper-light); cursor: pointer; transition: background var(--motion-surface) var(--motion-ease); }
-@media (hover: hover) { .teacher-edit-save:hover:not(:disabled) { background: var(--coral-pressed); } }
-.teacher-edit-save:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.teacher-edit-save:disabled { opacity: 0.55; cursor: default; }
-@media (pointer: coarse) { .teacher-edit-save::after { content: ""; position: absolute; inset: -7px; } }
 .teacher-price__row { display: flex; align-items: end; gap: 0.5rem; }
 .teacher-price__row > .teacher-price-fields { flex: 1 1 auto; min-width: 0; }
 .teacher-price__row > .teacher-edit-actions { min-height: 44px; }
@@ -3362,18 +3350,6 @@
 .teacher-lesson-row > :is(.teacher-history-lesson__note, .teacher-notes__text) { margin: 0.15rem 0 0; }
 .teacher-lesson-row .teacher-homework { margin-top: 0.5rem; }
 .teacher-history-earlier.teacher-quiet { justify-self: start; }
-/* The one secondary button on Students, inline and in the lesson list: soft
-   lilac, dark blue words in sentence case, the site's organic edge. Hover
-   deepens the lilac, focus outlines it, and it keeps a comfortable press
-   area. Coral stays for a save, a confirmed cancel and the single next step on
-   a closed student's card. */
-.teacher-quiet { display: inline-flex; flex: none; align-items: center; gap: 0.3rem; min-height: 32px; margin: 0; padding: 0.25rem 0.8rem; border: 0; border-radius: var(--squiggle-chip); background: var(--lavender-soft); color: var(--blue-deep); cursor: pointer; font: 600 0.78rem/1.3 var(--ui); letter-spacing: 0; text-transform: none; white-space: nowrap; transition: background var(--motion-surface) var(--motion-ease); }
-@media (hover: hover) { .teacher-quiet:hover:not(:disabled) { background: var(--lavender); } }
-.teacher-quiet:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.teacher-quiet:disabled { cursor: default; opacity: 0.55; }
-.teacher-quiet svg { flex: none; }
-@media (pointer: coarse) { .teacher-quiet { min-height: 40px; } }
-@media (prefers-reduced-motion: reduce) { .teacher-quiet { transition: none; } }
 /* Already paid, and the no-show beside it, on Students: a small soft capsule
    in the same organic edge with a little checkbox in front; strong blue once
    checked. */

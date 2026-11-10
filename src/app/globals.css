@@ -7117,18 +7117,47 @@ p.lesson-when > span {
 }
 
 /* No rules between them: the names in small capitals and the space do the
-   grouping. Each value's pencil follows it (10 November 2026, Dan: one way
-   to edit, on a student's side and on Inês's). */
+   grouping. Each value is its own button with a small pencil at its end,
+   and its field opens in the value's place while its name stays put (10
+   November 2026, Dan: one way to edit, on a student's side and on Inês's). */
 .my-lessons__fact {
   display: grid;
   min-height: 44px;
-  grid-template-columns: 9rem fit-content(100%) auto;
-  justify-content: start;
+  grid-template-columns: 9rem minmax(0, 1fr);
   align-items: center;
-  gap: 0.2rem 0.6rem;
+  gap: 0.15rem 1rem;
 }
 
-.my-lessons__fact > .my-lessons__fact-label { margin-right: 0.4rem; }
+/* What closes or undoes an open detail follows it: the cross after the
+   splat's choices, Remove card beside the card's terms. */
+.my-lessons__fact:not([data-field="password"]):has(> :is(.teacher-pencil, .teacher-quiet)) {
+  grid-template-columns: 9rem fit-content(100%) auto;
+  justify-content: start;
+}
+
+/* The splat's pencil stands level with it. */
+.my-lessons__fact[data-field="mark"] .teacher-edit {
+  align-items: center;
+}
+
+.my-lessons__fact[data-field="mark"] .teacher-edit > svg {
+  margin-top: 0;
+}
+
+/* Open, a detail's name stays level with its field, whatever follows it. */
+.my-lessons__fact:has(> .my-lessons__edit) {
+  align-items: start;
+}
+
+.my-lessons__fact:has(> .my-lessons__edit) > .my-lessons__fact-label {
+  margin-top: 0.85rem;
+}
+
+/* A detail with no value to show (a password) has its action where the
+   value would be. */
+.my-lessons__fact[data-field="password"] > .teacher-quiet {
+  justify-self: start;
+}
 
 /* Editing in place (9 November 2026, Dan: tiny pencils, not big buttons): a
    pencil alone beside a name, or a value that is the button with its pencil at
@@ -7152,6 +7181,28 @@ p.lesson-when > span {
   .teacher-edit { padding-block: 0.5rem; }
 }
 @media (prefers-reduced-motion: reduce) { .teacher-pencil, .teacher-edit { transition: none; } }
+/* Save and cancel, at the end of whatever is being edited: a coral tick and
+   a quiet cross, the pencil's size. */
+.teacher-edit-actions { display: inline-flex; flex: none; align-items: center; gap: 0.25rem; }
+.teacher-edit-save { position: relative; display: inline-grid; flex: none; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--squiggle-chip); background: var(--coral-action); color: var(--paper-light); cursor: pointer; transition: background var(--motion-surface) var(--motion-ease); }
+@media (hover: hover) { .teacher-edit-save:hover:not(:disabled) { background: var(--coral-pressed); } }
+.teacher-edit-save:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* With nothing to save yet it waits as the site's quiet outline, never a
+   faded fill. */
+.teacher-edit-save:disabled { box-shadow: inset 0 0 0 1.5px var(--outline-edge); background: transparent; color: var(--ink); opacity: 0.55; cursor: default; }
+@media (pointer: coarse) { .teacher-edit-save::after { content: ""; position: absolute; inset: -7px; } }
+/* The one secondary button beside the thing it acts on (Show weeks, Record
+   refund, Remove card), on Inês's side and a student's: soft lilac, dark
+   blue words in sentence case, the site's organic edge. Hover deepens the
+   lilac, focus outlines it, and it keeps a comfortable press area. Coral
+   stays for a save, a confirmed cancel and the single next step. */
+.teacher-quiet { display: inline-flex; flex: none; align-items: center; gap: 0.3rem; min-height: 32px; margin: 0; padding: 0.25rem 0.8rem; border: 0; border-radius: var(--squiggle-chip); background: var(--lavender-soft); color: var(--blue-deep); cursor: pointer; font: 600 0.78rem/1.3 var(--ui); letter-spacing: 0; text-transform: none; white-space: nowrap; transition: background var(--motion-surface) var(--motion-ease); }
+@media (hover: hover) { .teacher-quiet:hover:not(:disabled) { background: var(--lavender); } }
+.teacher-quiet:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.teacher-quiet:disabled { cursor: default; opacity: 0.55; }
+.teacher-quiet svg { flex: none; }
+@media (pointer: coarse) { .teacher-quiet { min-height: 40px; } }
+@media (prefers-reduced-motion: reduce) { .teacher-quiet { transition: none; } }
 
 
 .my-lessons__fact-label {
@@ -7181,12 +7232,11 @@ p.lesson-when > span {
   margin: 0;
 }
 
-/* The small outline button every other card's Change is: the same edge, cut
-   and 14px label as the times panel's Change and a lesson row's. Sign out and
-   Have a code from Inês? take it too, so Your details speaks at one size
-   (27 October 2026, Dan). */
-.my-lessons__change,
-.my-lessons__code summary {
+/* The small outline button for an action that is not an edit: Sign out,
+   Send reset link, a card's Not now. The same edge, cut and 14px label as
+   the times panel's Change and a lesson row's (27 October 2026, Dan). What
+   changes a value is its pencil, never this. */
+.my-lessons__change {
   min-height: 44px;
   justify-self: end;
   border: 1.5px solid var(--outline-edge);
@@ -7220,21 +7270,29 @@ p.lesson-when > span {
   opacity: 0.5;
 }
 
-/* Open, a detail is its field with Save and Cancel beside it. Where the
-   pair does not fit beside a field wide enough to read an address in (a
-   narrow card, or Inês's Profile beside Google Meet), it wraps beneath the
-   field, whole, rather than squeezing it (9 November 2026). */
+/* Open, a detail is its field in the value's place, ending in a tick and a
+   cross (or the words of an action a tick cannot say, such as Send
+   confirmation link). They share the field's line, and wrap beneath it,
+   whole, only where the field would be too narrow to read an address in. */
 .my-lessons__edit {
   display: flex;
   flex-wrap: wrap;
-  grid-column: 1 / -1;
-  align-items: flex-end;
-  gap: 0.6rem 0.8rem;
+  align-items: center;
+  min-width: 0;
+  gap: 0.5rem;
 }
 
-.my-lessons__edit > label {
-  flex: 1 1 15rem;
-  max-width: 26rem;
+.my-lessons__edit > input {
+  flex: 1 1 11rem;
+  width: auto;
+  min-width: 0;
+  max-width: 24rem;
+}
+
+.my-lessons__edit > .teacher-edit-actions .button {
+  width: auto;
+  min-height: 44px;
+  white-space: nowrap;
 }
 
 .my-lessons__edit-actions {
@@ -7265,11 +7323,6 @@ p.lesson-when > span {
    width when they don't, so Cancel never dangles alone under Send
    confirmation link or Agree & add card. */
 @container booking (max-width: 519.98px) {
-  .my-lessons__edit > :is(label, .my-lessons__edit-actions) {
-    flex: 1 1 100%;
-    max-width: none;
-  }
-
   .my-lessons__edit-actions > :is(.button, .my-lessons__change) {
     flex: 1 1 0;
     min-width: fit-content;
@@ -7278,27 +7331,35 @@ p.lesson-when > span {
 
 .my-lessons__edit > .my-lessons__details-note {
   flex: 0 0 100%;
+  max-width: none;
   margin: 0;
 }
 
-/* On a phone the detail's name sits above its value, its pencil after it. */
+/* On a phone the detail's name sits above its value. */
 @container booking (max-width: 519.98px) {
   .my-lessons__fact {
-    grid-template-columns: fit-content(100%) auto;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.1rem;
   }
 
-  .my-lessons__fact-label {
-    grid-column: 1 / -1;
+  .my-lessons__fact:not([data-field="password"]):has(> :is(.teacher-pencil, .teacher-quiet)) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-content: stretch;
   }
 
-  .my-lessons__fact-value {
-    grid-column: 1;
+  .my-lessons__fact:has(> .my-lessons__edit) > .my-lessons__fact-label {
+    margin-top: 0;
   }
 
-  .my-lessons__fact > .my-lessons__change {
+  /* The cross that closes the splats, and Remove card, end their name's line. */
+  .my-lessons__fact:not([data-field="password"]) > :is(.teacher-pencil, .teacher-quiet) {
     grid-column: 2;
-    grid-row: 1 / span 2;
-    justify-self: end;
+    grid-row: 1;
+  }
+
+  .my-lessons__edit > input {
+    max-width: none;
   }
 }
 
@@ -7425,17 +7486,36 @@ p.lesson-when > span {
   display: grid;
   margin: 0;
   padding: 0;
-  gap: 0.4rem;
+  gap: 0.6rem;
   list-style: none;
 }
 
+/* A saved price is a detail like the rest: its name in small capitals, then
+   what it is, in the same two columns (one on a phone). */
 .my-lessons__rates-list li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.15rem 1rem;
-  font-size: 0.92rem;
+  display: grid;
+  min-height: 44px;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.1rem 1rem;
+  font-size: 1rem;
   line-height: 1.5;
+}
+
+.my-lessons__rates-list li > span {
+  color: var(--lavender-ink);
+  font-family: var(--ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@container booking (max-width: 519.98px) {
+  .my-lessons__rates-list li {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .my-lessons__rates-list strong {
@@ -7751,10 +7831,19 @@ p.lesson-when > span {
 
 /* The code's disclosure is a small outline button like the site's others,
    never an underlined line (27 October 2026, Dan). */
+/* Only some students have a code, so asking is a quiet line of text, never
+   a button among the details (10 November 2026). */
 .my-lessons__code summary {
   display: inline-flex;
   align-items: center;
+  min-height: 44px;
+  color: var(--lavender-ink);
+  cursor: pointer;
+  font-size: 0.84rem;
   list-style: none;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 0.25em;
 }
 
 .my-lessons__code summary::-webkit-details-marker {
@@ -7764,12 +7853,18 @@ p.lesson-when > span {
 .my-lessons__code summary:hover,
 .my-lessons__code summary:focus-visible,
 .my-lessons__code[open] > summary {
-  border-color: var(--ink);
-  background: var(--hover-wash);
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+
+.my-lessons__code summary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: var(--squiggle-chip);
 }
 
 .my-lessons__code[open] > summary {
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.3rem;
 }
 
 .booking-payment {
@@ -9979,7 +10074,7 @@ dialog[open]::backdrop {
 }
 
 .my-lessons__fact[data-field="card"] > .card-row-open {
-  grid-column: 2 / -1;
+  grid-column: 2;
 }
 
 @container booking (max-width: 519.98px) {

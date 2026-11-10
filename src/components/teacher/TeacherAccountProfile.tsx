@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
-import { EditPencil } from "@/components/teacher/EditControls";
+import { CancelEdit, EditValue } from "@/components/teacher/EditControls";
 import { confirmEmailChange, readSession, requestEmailChange, requestPasswordReset, type Student } from "@/lib/auth-api";
 
 /** Her sign-in details use the same verified email and reset links as an account. */
@@ -116,9 +116,10 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
     <section className="teacher-account my-lessons__details" aria-labelledby="teacher-account-title">
       {/* Her sign-in details are a student's Your details (9 November 2026,
           Dan: one way for each thing): a short list of what is saved, each
-          with its small button at the right; a detail opens in place with its
-          action and Cancel; good news and failures are the site's own panels.
-          Sign out waits at the top right (27 October 2026, Dan). */}
+          value its own button with a small pencil; a detail opens in the
+          value's place with its action and a cross; good news and failures
+          are the site's own panels. Sign out waits at the top right (27
+          October 2026, Dan). */}
       <div className="teacher-account__heading">
         <div>
           <h2 id="teacher-account-title">Your profile</h2>
@@ -128,34 +129,31 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
       </div>
       <div className="my-lessons__facts">
         <div className="my-lessons__fact" data-field="email">
+          <span className="my-lessons__fact-label">Sign-in email</span>
           {editingEmail ? (
             <form className="my-lessons__edit" onSubmit={changeEmail}>
-              <label>
-                <span>Sign-in email</span>
-                <input autoCapitalize="none" autoComplete="email" autoCorrect="off" autoFocus disabled={locked} onChange={event => { setEmail(event.target.value); setError(""); }} required spellCheck={false} type="email" value={email} />
-              </label>
-              <div className="my-lessons__edit-actions">
-                <button className="button button--blue" disabled={locked || !email.trim() || email.trim().toLowerCase() === student.email.toLowerCase()} type="submit">{busy === "email" ? "Sending…" : "Send confirmation link"}</button>
-                <button className="my-lessons__change" disabled={locked} onClick={() => setEditingEmail(false)} type="button">Cancel</button>
-              </div>
+              <input aria-label="Sign-in email" autoCapitalize="none" autoComplete="email" autoCorrect="off" autoFocus disabled={locked} onChange={event => { setEmail(event.target.value); setError(""); }} required spellCheck={false} type="email" value={email} />
+              <span className="teacher-edit-actions">
+                <button className="button button--blue button--small" disabled={locked || !email.trim() || email.trim().toLowerCase() === student.email.toLowerCase()} type="submit">{busy === "email" ? "Sending…" : "Send confirmation link"}</button>
+                <CancelEdit disabled={locked} onCancel={() => setEditingEmail(false)} />
+              </span>
               <p className="my-lessons__details-note">It changes once you open the link we send to the new address.</p>
             </form>
           ) : (
-            <>
-              <span className="my-lessons__fact-label">Sign-in email</span>
-              <span className="my-lessons__fact-value">
-                {/* A long address breaks after its @, never mid-word. */}
+            <span className="my-lessons__fact-value">
+              {/* A long address breaks after its @, never mid-word. */}
+              <EditValue disabled={locked} field="email" label="Change email" onEdit={() => { setEditingEmail(true); setEmail(student.email); setError(""); setNote(""); }}>
                 <span>{at < 0 ? student.email : <>{student.email.slice(0, at)}@<wbr />{student.email.slice(at + 1)}</>}</span>
-                {emailPending ? <small className="my-lessons__details-note" role="status">Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.</small> : null}
-              </span>
-              <EditPencil disabled={locked} field="email" label="Change email" onEdit={() => { setEditingEmail(true); setEmail(student.email); setError(""); setNote(""); }} />
-            </>
+              </EditValue>
+              {emailPending ? <small className="my-lessons__details-note" role="status">Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.</small> : null}
+            </span>
           )}
         </div>
         <div className="my-lessons__fact" data-field="password">
-          {/* Nothing to show for a password: its button says what happens. */}
+          {/* Nothing to show for a password: its quiet button, where the value
+              would be, says what happens. */}
           <span className="my-lessons__fact-label">Password</span>
-          <button className="my-lessons__change" disabled={locked} onClick={() => void changePassword()} type="button">{busy === "password" ? "Sending…" : "Send reset link"}</button>
+          <button className="teacher-quiet" disabled={locked} onClick={() => void changePassword()} type="button">{busy === "password" ? "Sending…" : "Send reset link"}</button>
         </div>
       </div>
       {busy === "confirm" ? <p className="my-lessons__details-note" role="status">Confirming your sign-in email…</p> : null}
