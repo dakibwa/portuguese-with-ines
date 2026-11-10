@@ -2572,8 +2572,8 @@
 :is(.teacher-history-lesson__facts, .teacher-lesson-dialog--inline .teacher-lesson-facts, .teacher-fact__dabs).booking-payment-facts li:nth-child(n)::before { top: calc((1lh - 0.9em) / 2); width: 0.9em; background: var(--lavender); rotate: none; }
 /* Her message and their note read as the emails show a message: a lilac
    edge, a small label above. */
-.teacher-history-lesson__note { margin: 0.65rem 0 0; padding-left: 0.75rem; border-left: 3px solid var(--lavender); white-space: pre-wrap; overflow-wrap: anywhere; font: 400 0.75rem/1.5 var(--ui); }
-.teacher-history-lesson__note > span { display: block; color: var(--lavender-ink); font: 700 0.6rem/1.5 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; }
+.teacher-history-lesson__note { margin: 0; color: var(--lavender-ink); white-space: pre-wrap; overflow-wrap: anywhere; font: 400 0.75rem/1.5 var(--ui); }
+.teacher-history-lesson__note > span { font-weight: 600; }
 .teacher-history-empty { font-size: 0.85rem; }
 
 /* Onboarding (13 October 2026, Dan): Add a student leads the Students tab,
@@ -3382,7 +3382,8 @@
 .teacher-lesson-dialog--inline .teacher-lesson-inline__head .teacher-dialog-actions > .teacher-card-link:not(.teacher-card-link--trigger) { order: 1; flex: 1 1 100%; padding-top: 0; border-top: 0; }
 .teacher-lesson-row__side { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.25rem 0.4rem; }
 .teacher-lesson-row > :is(.teacher-notes__text, .teacher-history-lesson__note, .teacher-inline-error, .teacher-homework) { position: relative; z-index: 1; }
-.teacher-lesson-row > .teacher-inline-error, .teacher-lesson-row > .teacher-history-lesson__note { margin: 0; }
+.teacher-lesson-row > .teacher-inline-error { margin: 0; }
+.teacher-lesson-row > :is(.teacher-history-lesson__note, .teacher-notes__text) { margin: 0.15rem 0 0; }
 .teacher-lesson-row .teacher-homework { margin-top: 0.5rem; }
 .teacher-history-earlier.teacher-quiet { justify-self: start; }
 /* The one secondary button on Students, inline and in the lesson list: soft

@@ -230,7 +230,8 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     // The day, status and level summary. Open in place, the row's own copy is
     // hidden (it stays here so the opener is still connected and returns after
     // Close) and the same summary leads the details' header.
-    const summary = (hiddenCopy: boolean) => (
+    const status = pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null;
+    const summary = (hiddenCopy: boolean, withStatus = true) => (
       <div className="teacher-lesson-row__what" hidden={hiddenCopy}>
         {/* "Tue 5 Jan" reads the same with a year or without. The time
             shares its line on a wide row and has its own, without the
@@ -240,7 +241,7 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
           {" "}<span className="teacher-history-lesson__time"><i aria-hidden="true">· </i><span className="visually-hidden">, </span>{formatSlotTime(booking.starts_at)}–{formatSlotTime(booking.ends_at)}</span>
           <span className="visually-hidden">, open lesson</span>
         </button>
-        {pill ? <span className={`teacher-history-status${live ? "" : " is-muted"}`}>{pill}</span> : null}
+        {withStatus ? status : null}
         {note?.level && note.level !== level ? <span className="teacher-notes__level">{note.level}</span> : null}
       </div>
     );
@@ -256,8 +257,10 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     return (
       <li className={`teacher-history-lesson teacher-lesson-row${cancelled || noShow ? " is-cancelled" : ""}${opened ? " is-open" : ""}${selected ? " is-selected" : ""}`} key={booking.id}>
         <div className="teacher-lesson-row__line">
-          {summary(selected && Boolean(openDetails))}
-          {notesButton || (note && state) ? <div className="teacher-lesson-row__side">
+          {/* In the row its status ends the line, where what she does sits. */}
+          {summary(selected && Boolean(openDetails), false)}
+          {!openDetails && (status || notesButton || (note && state)) ? <div className="teacher-lesson-row__side">
+            {status}
             {note && state ? <span className={`teacher-notes__state is-${note.homework}`}>{state}</span> : null}
             {notesButton}
           </div> : null}
@@ -270,8 +273,9 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
         </div> : null}
         {paidError?.id === booking.id ? <p className="teacher-inline-error" role="alert">{paidError.message}</p> : null}
         {note?.notes.trim() && !opened ? <p className="teacher-notes__text">{note.notes.trim()}</p> : null}
-        {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>Your message</span>{booking.cancellation_message}</p> : null}
-        {booking.notes && !openDetails ? <p className="teacher-history-lesson__note"><span>Their note</span>{booking.notes}</p> : null}
+        {/* What was said about it, as one quiet line each, with who said it. */}
+        {booking.cancellation_message ? <p className="teacher-history-lesson__note"><span>You:</span> “{booking.cancellation_message}”</p> : null}
+        {booking.notes && !openDetails ? <p className="teacher-history-lesson__note"><span>{booking.student_name.split(" ")[0]}:</span> “{booking.notes}”</p> : null}
         {opened ? <TeacherHomework key={`${booking.id}-${token}`} bookingId={booking.id} token={token} onBusy={onBusy} /> : null}
       </li>
     );
