@@ -438,16 +438,13 @@ palette. Keep expressive type in the page/section headings and clear Montserrat
 type in dates, times and lesson details. Use colour to distinguish booked lessons,
 usual lesson starts and days off; avoid a wall of administration forms.
 
-The Timetable's `Online only` control (10 November 2026) opens the same style
-of dialog as hours off. She selects an inclusive date range and either All day
-or daily From/Until hours, adds another period if needed, and saves explicitly.
-The control shows how many current or upcoming periods are set; reopening it
-edits or removes them. A failed save retains her choices. Use the existing
-field, dialog and button styles, and keep the date and time pairs usable on a
-phone. These periods affect new student choices: usual hours and time off
-still apply, and already booked lessons keep their place and time. The
-student's Where choice refreshes free times and removes selected times that
-cannot be booked in the new place.
+Online only (10 November 2026): Inês labels days as online only where she
+takes days off, on the Time off month and its card, never in a dialog and
+never from the Timetable, which only shows it. The details are under "Online
+only, in one colour" in the 10 November section below. Labelled time affects
+new student choices alone: usual hours and time off still apply, and already
+booked lessons keep their place and time. The student's Where choice refreshes
+free times and removes selected times that cannot be booked in the new place.
 
 - Open on the current Porto week with booked lessons placed at their actual
   times. One calendar holds everything: clicking or dragging a time on a date
@@ -506,9 +503,9 @@ cannot be booked in the new place.
   editor retains control of off-grid windows.
 - `Time off` is a month beside one card, with one way to choose: tap days,
   one or several, across months and tabs (13 October 2026, Dan). The card
-  starts `Tap the days you want off`; with days chosen it reads the same for
+  starts `Tap the days you want off, or online only`; with days chosen it reads the same for
   one as for many (14 October 2026, Dan: "rather than it be different if its
-  one or two days"): `1 day chosen` / `3 days chosen` with `Clear`, over a
+  one or two days"): `1 day chosen` / `3 days chosen` with a quiet `Clear`, over a
   removable chip for every chosen day. Beneath the chips, a single day also
   shows what it already holds (`A day off`, `Off 10:00–11:30`); under
   `Already booked`, each lesson on the chosen days is a booked-lesson card with
@@ -526,7 +523,8 @@ cannot be booked in the new place.
   sideways, and on a tablet, it sits beside the month (beneath it on the
   smallest), never over it. The upright sticky card has a half-screen maximum
   height and scrolls inside when several booked lessons fill it.
-  The month marks whole days off and booked lessons, without repeating weekly
+  The month marks whole days off, online-only days, booked lessons and today
+  (see "Calendar marks" in the 10 November section), without repeating weekly
   unavailability or partial blocks from the timetable.
   Time off prevents new bookings; existing lessons stay until she changes them.
 - A booked lesson in her way (outside new weekly hours, or on days she is
@@ -695,8 +693,9 @@ cannot be booked in the new place.
   existing reads; there is nothing new to store or dismiss.
 - Each date has one compact header cell: weekday and bold date centred together
   on one line (`Mon 7`), today's number in a filled blue lozenge with cream
-  type. On a phone, where one day shows at a time, a booked dot marks the
-  days with lessons without shifting the date; the whole week has none, since
+  type. On a phone, where one day shows at a time, the booked hatch marks the
+  tabs of days with lessons (10 November 2026; it was a coral dot) without
+  shifting the date; the whole week has none, since
   its lessons are in view beneath. Its Day off switch sits at the
   right, moving to a second short line inside the cell when the column cannot
   fit both. It has a 44px hit area and keeps its full dated accessible name.
@@ -2384,7 +2383,8 @@ same job, they use the same piece, on a student's side and on Inês's:
   card and moving a lesson lose the month beside each week, at every width
   and while loading.
 - Every calendar key is the one small capital hand; the Time off month's key
-  joins the Timetable's and a student's. Its swatches stay its own days'.
+  joins the Timetable's and a student's. Each swatch is a small copy of the
+  day or cell it explains (10 November 2026; some were dots).
 - Every sign-in card is the one card. Inês's is no longer wider, and its
   heading is in the display hand.
 - On the Timetable, `Edit weekly hours` sits beside the month and the pager
@@ -2514,6 +2514,71 @@ for).
   kind, only where places meet an action (`Sign out`).
 - Money terms are dabs, never small-capital headings in a box (the invite's
   owed-now and not-owed-yet lines).
+
+**Calendar marks.**
+
+Dan: "the underline and dot is ugly it doesn't fit our styling ... add it to
+the legend, do this across the entire site", then, of a first crosshatch,
+"a bit strong" and "distinct ways of showing it while being simple". A
+calendar's marks are drawn in the site's own hand, one way on every calendar
+(Inês's Timetable, Time off month and Add a lesson month; a student's booking
+and lessons calendars; the loading placeholder), and never an underline, a
+dot, or a word under the number:
+
+- Today is its date in the deep blue blob (the squiggle pill her Timetable
+  has always used, `.today-pill`). It marks the number alone, so it never
+  reads as a chosen day; on a day already filled in a deep colour (chosen,
+  the next lesson, a pressed day) the blob is paper. It keeps its strength
+  on a day that cannot be pressed.
+- A day off is hatched in lilac, with `Off`, as it always was.
+- A day with a lesson booked, on her side, takes one fine, faint hatch
+  leaning the other way (`--hatch-booked`), over whatever else the day is: a
+  day that is both shows both hatches. On her phone Timetable the same hatch
+  marks the tabs of days with lessons. A student's own booked day keeps its
+  tint with the lesson's time.
+- Online-only time is the one sky blue with a globe (below).
+- A cream day has times free; a day without lies flat. In Add a lesson a flat
+  day can still be pressed, since she can add a lesson at any time; until the
+  month's times are known every day keeps its cream.
+- A key lists every mark on its calendar and no other, today included (the
+  blob holding today's own date beside `Today`). Each swatch is a small copy
+  of the day or cell it explains.
+
+**Online only, in one colour.**
+
+Dan: "label days as online only", "can we use a different colour on the
+timetable if it's online only", "can it also be obvious for her students when
+they try and book", "even if they book for in person can it show the days
+where there is online only as they may still buy in that case", and of the
+first editor (a button above the Timetable opening a dialog of date boxes,
+with a band across the page afterwards) "this is ugly".
+
+- One colour, `--online-only`, a soft sky blue, means online-only time on
+  every calendar. It is never the only signal: a small globe sits with it,
+  and the key names it.
+- Inês labels days the way she takes them off: she taps them on the Time off
+  month and presses the quiet `Online only` chip on the card, which fills
+  with the colour while every chosen day is online only (so the chip is its
+  own key) and takes the label off when pressed again. Days already online
+  only at set hours keep them when others are added.
+- The chosen days' hours are one value under the chips, `All day` (or
+  `12:00–16:00`, or `Different hours`), edited where it stands: `All day |
+  Some hours` on the site's slider, two time fields, the tick and the cross.
+- Her Time off month tints online-only days; her Timetable draws weekly hours
+  inside online-only time in the colour, puts a globe after the date of a day
+  that is online only all day, and names it in the key while the week has
+  some. The Timetable shows it and does not edit it.
+- What happened is said on the card's status line (`Tue 15 Sept is online
+  only.`, `3 selected days can be booked in Porto again.`), never a band
+  across the page. A failed save keeps her days chosen and says why.
+- For a student who has chosen In Porto, in booking and in `Choose a new date
+  and time`: a day free only online is tinted with its globe and can be
+  pressed, where it used to be blank. Pressed, it says `Online only on this
+  day` beside a quiet `Switch to online` chip and shows its times tinted, as
+  a list that cannot be chosen. A day with both kinds keeps its Porto times
+  and adds one line, `More times online`, with the same chip.
+- `Switch to online` is exactly pressing Online in Where. A student's place
+  never changes unless they press something that says so.
 
 **One layout for one kind of thing.**
 

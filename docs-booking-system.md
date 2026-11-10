@@ -1680,12 +1680,27 @@ get wrong:
 
 ### Time and availability
 
-**Online-only periods** (10 November 2026). The Timetable's `Online only`
-control opens a date-range editor. Each period includes both dates, and is
-either all day or the same From/Until hours each day, on the teaching clock.
-`00:00` as Until means the end of that day. Periods can be added, edited and
-removed; Save is explicit and a failed save keeps the draft. Expired periods
-are left out of the editor and pruned on its next save.
+**Online-only periods** (10 November 2026). Inês labels days as online only
+on the Time off month: she taps days and presses `Online only` on the card,
+and edits their hours in place (`All day`, or the same From/Until hours each
+day, on the teaching clock). The service stores periods, not days: each
+includes both dates and is either all day or one daily window, with `00:00`
+as Until meaning the end of that day. The website converts between the two
+(`labelOnlineOnly`, `onlineOnlyHours` in `src/lib/teacher-calendar.ts`, proved
+in `scripts/test-teacher-calendar.mjs`): neighbouring days with the same
+hours are one period, a period splits around days taken out of it, and each
+save sends the whole list with periods wholly in the past left out. A failed
+save keeps her days chosen. Her Time off month and Timetable show
+online-only time; the Timetable does not edit it.
+
+A student who has chosen In Porto is shown which days could still be had
+online. The calendar reads the online availability beside the Porto one (the
+same `GET /availability` request the Online choice makes, from the same
+cache), and a time free online but absent from the Porto reply is drawn as
+online only. It is a read alone: such a time cannot be chosen or sent while
+In Porto is chosen, a failed read leaves the calendar as it was, and no
+booking, move or preview request changes. `Switch to online` is the Where
+control's own change of place.
 
 These periods restrict the place of new student bookings, without adding
 teaching hours or overriding time off, notice, gaps or clashes. A lesson whose
