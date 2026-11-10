@@ -582,8 +582,8 @@ who isn't on the site is refused ("Add them as a student first.", 404), and
 students come from `POST /admin/students`. Each student's card is their profile
 from their first invite to regular use (14 October 2026, Dan; 2 November 2026).
 Its name opens their details, prices and all-time lesson history in place;
-the student fills the Students view, and `All students` returns to the lanes.
-Editing details, price and lesson creation use the same card. A past lesson she
+the student fills the Students view, and the card's Close returns to the lanes.
+Each detail and price is edited where it stands; lesson creation uses the same card. A past lesson she
 added and nothing charged can be ticked paid there (`POST
 /admin/bookings/:id/paid`), which takes it out of `unpaidPast`. A new student or a
 free timetable time can start in the creation/student-choice dialog, then opens

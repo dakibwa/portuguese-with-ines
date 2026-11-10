@@ -557,8 +557,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   absent when they are all set. A dormant card shows no checks, only lilac
   `Come-back email` (or `Invite back` with no email). The card she opens is
   taken out of its lane and shown once at full width as the focused student
-  view. The board and its toolbar wait until she returns with `All students`
-  or Close. A paid lesson or newly sent link never moves the open card; on
+  view. The board and its toolbar wait until she returns with Close. A paid lesson or newly sent link never moves the open card; on
   return its current lane, saved search and notices appear, with focus on its
   name (or search when a renamed name no longer matches).
   Their name opens their dashboard in the same card (9 November 2026, Dan: "a
@@ -744,8 +743,8 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - Opening and closing gently changes the sheet's height. Its contents fade
     into place, and scrolling keeps the student's name visible. Reduced-motion
     users get the same result without animation.
-  - Details contains full name, email, phone and NIF, with one Save details
-    action. A student who has signed in changes their own email. A missing
+  - Name, email, phone and NIF are each edited where they stand, from their
+    own pencil (10 November 2026). A student who has signed in changes their own email. A missing
     lesson never locks the email field (16 October 2026, Inês). Price uses the same editable rate form as onboarding.
   - Their lessons read Upcoming, then Past & cancelled. A weekly run's weeks
     still to come are one tile (9 November 2026, Dan: "just have them
@@ -764,8 +763,7 @@ usual lesson starts and days off; avoid a wall of administration forms.
   - The Students toolbar stays on one row: Find a student on the left and
     Add a student on the right. Opening a student makes them the whole screen
     (9 November 2026, Dan): the board, toolbar and progress give way to that one
-    full-width card, with a compact `All students` button (or the card's Close)
-    to go back. Search, notices and focus come back with the board; the site's
+    full-width card, whose Close goes back. Search, notices and focus come back with the board; the site's
     navigation stays as it is, and it is not a modal. A completed student's closed card has a
     stretched name-button hit area; its section controls keep their own actions.
   - Add a student opens a short creation dialog with name, optional email,
@@ -2390,6 +2388,41 @@ same job, they use the same piece, on a student's side and on Inês's:
   on a tablet), and the field keeps its 26 rem.
 - The account's failure notice is laid out as booking's: across a wide page
   the message and `Try again` share one row.
+
+## Edit where it stands, and fewer lines — 10 November 2026
+
+Dan: "the edit button should let you edit it from that interface and not bring
+up a new one", "all instances of weird buttons taking up entire rows is bad",
+"do we need the dividers", and of the whole: "simple, intuitive, feels unique
+in its design and fun to use". These hold on a student's side and on Inês's,
+and replace the earlier bullets they contradict (the 14 px `Change`, the
+two-across lesson tiles, `All students`, the rules between details):
+
+- One way to change a value: its small pencil. Pressed, the value becomes its
+  own field right there, ending in a small coral tick (save) and a quiet
+  cross (cancel), each the pencil's size. Enter saves, Escape cancels, focus
+  returns to the value. Nothing opens a second panel to edit what is already
+  on the screen. A student's Your details and Inês's Profile use the same
+  pencil; where saving does something a tick cannot say (`Send confirmation
+  link`, `Agree & add card`), the open field keeps its words.
+- A button is as wide as its words. It shares a line with the thing it acts
+  on, at that line's end, and never takes a row to itself; when it must wrap
+  it keeps its own width at the right. The exceptions are the one main action
+  of a step (booking's Confirm) and a dialog's paired buttons on a phone.
+- A control that repeats another is removed, not moved: `All students` went
+  because an open student's Close already returns to the board.
+- Space and the small-capital labels group things; a rule is drawn only where
+  two different kinds of thing meet (a card's header and its body). Lists of
+  facts carry no rules between their rows.
+- Things of one kind share one layout. A student's lessons on Inês's page are
+  a ledger, one row each: day and time, facts, then status, notes pencil and
+  `Already paid` at the row's end, in columns that line up down the list. A
+  weekly run is a row of the same kind with `Show weeks` at its end. Where
+  the list is narrow a row folds in two (day and pencil, then facts and
+  money). What was said about a lesson is one quiet quoted line with who said
+  it (`You: “…”`), never a labelled block.
+- Explanations shrink to what the control cannot say: the price editor's
+  three hints are one line.
 
 ## One schedule for students — 9 November 2026
 

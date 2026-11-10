@@ -1,5 +1,6 @@
 "use client";
 
+import { EditPencil } from "@/components/teacher/EditControls";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Mail } from "lucide-react";
 import { AccountAvatar, AccountMenu, type AccountSection } from "@/components/AccountMenu";
@@ -634,9 +635,7 @@ export function MyLessons({
               {openField === "mark" ? (
                 <button className="my-lessons__change" onClick={() => setOpenField(null)} type="button">Cancel</button>
               ) : (
-                <button className="my-lessons__change" onClick={() => openDetail("mark")} type="button">
-                  Change<span className="visually-hidden"> splat</span>
-                </button>
+                <EditPencil field="mark" label="Change splat" onEdit={() => openDetail("mark")} />
               )}
             </div>
           ) : null}
@@ -675,9 +674,7 @@ export function MyLessons({
               <>
                 <span className="my-lessons__fact-label">Your name</span>
                 <span className="my-lessons__fact-value">{student.name}</span>
-                <button className="my-lessons__change" onClick={() => openDetail("name")} type="button">
-                  Change<span className="visually-hidden"> name</span>
-                </button>
+                <EditPencil field="name" label="Change name" onEdit={() => openDetail("name")} />
               </>
             )}
           </div>
@@ -731,9 +728,7 @@ export function MyLessons({
                     </small>
                   ) : null}
                 </span>
-                <button className="my-lessons__change" onClick={() => openDetail("email")} type="button">
-                  {student.email ? <>Change<span className="visually-hidden"> email</span></> : "Add email"}
-                </button>
+                <EditPencil field="email" label={student.email ? "Change email" : "Add email"} onEdit={() => openDetail("email")} />
               </>
             )}
           </div>
@@ -786,9 +781,7 @@ export function MyLessons({
                   <span className={`my-lessons__fact-value${student.cardForAllLessons ? "" : " my-lessons__fact-value--empty"}`}>
                     {student.cardForAllLessons ? "Saved" : student.hasCard ? "Saved for lessons you book" : "Not added"}
                   </span>
-                  <button className="my-lessons__change" onClick={() => openDetail("card")} type="button">
-                    {student.cardForAllLessons ? <>Change<span className="visually-hidden"> card</span></> : "Add card"}
-                  </button>
+                  <EditPencil field="card" label={student.cardForAllLessons ? "Change card" : "Add card"} onEdit={() => openDetail("card")} />
                 </>
               )}
             </div>
@@ -832,9 +825,7 @@ export function MyLessons({
                 <span className={`my-lessons__fact-value${student.nif ? "" : " my-lessons__fact-value--empty"}`}>
                   {student.nif || "Not added"}
                 </span>
-                <button className="my-lessons__change" onClick={() => openDetail("nif")} type="button">
-                  {student.nif ? <>Change<span className="visually-hidden"> NIF</span></> : "Add NIF"}
-                </button>
+                <EditPencil field="nif" label={student.nif ? "Change NIF" : "Add NIF"} onEdit={() => openDetail("nif")} />
               </>
             )}
           </div>

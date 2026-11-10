@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { EditPencil } from "@/components/teacher/EditControls";
 import { confirmEmailChange, readSession, requestEmailChange, requestPasswordReset, type Student } from "@/lib/auth-api";
 
 /** Her sign-in details use the same verified email and reset links as an account. */
@@ -147,9 +148,7 @@ export function TeacherAccountProfile({ token, student, disabled, onBusyChange, 
                 <span>{at < 0 ? student.email : <>{student.email.slice(0, at)}@<wbr />{student.email.slice(at + 1)}</>}</span>
                 {emailPending ? <small className="my-lessons__details-note" role="status">Waiting for you to confirm <strong>{emailPending}</strong> from the link we sent.</small> : null}
               </span>
-              <button className="my-lessons__change" disabled={locked} onClick={() => { setEditingEmail(true); setEmail(student.email); setError(""); setNote(""); }} type="button">
-                Change<span className="visually-hidden"> email</span>
-              </button>
+              <EditPencil disabled={locked} field="email" label="Change email" onEdit={() => { setEditingEmail(true); setEmail(student.email); setError(""); setNote(""); }} />
             </>
           )}
         </div>

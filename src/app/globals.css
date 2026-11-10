@@ -7113,18 +7113,46 @@ p.lesson-when > span {
  */
 .my-lessons__facts {
   display: grid;
-  border-top: 1px solid var(--rule-soft);
+  gap: 0.6rem;
 }
 
+/* No rules between them: the names in small capitals and the space do the
+   grouping. Each value's pencil follows it (10 November 2026, Dan: one way
+   to edit, on a student's side and on Inês's). */
 .my-lessons__fact {
   display: grid;
-  min-height: 64px;
-  grid-template-columns: 9rem minmax(0, 1fr) auto;
+  min-height: 44px;
+  grid-template-columns: 9rem fit-content(100%) auto;
+  justify-content: start;
   align-items: center;
-  border-bottom: 1px solid var(--rule-soft);
-  padding: 0.75rem 0;
-  gap: 0.35rem 1rem;
+  gap: 0.2rem 0.6rem;
 }
+
+.my-lessons__fact > .my-lessons__fact-label { margin-right: 0.4rem; }
+
+/* Editing in place (9 November 2026, Dan: tiny pencils, not big buttons): a
+   pencil alone beside a name, or a value that is the button with its pencil at
+   its end. The pencil is small to see and, where a finger is the pointer,
+   reaches 44 px. */
+.teacher-pencil, .teacher-edit { position: relative; border: 0; background: none; color: var(--lavender-ink); cursor: pointer; font: inherit; transition: background var(--motion-surface) var(--motion-ease), color var(--motion-surface) var(--motion-ease); }
+.teacher-pencil { display: inline-grid; flex: none; place-items: center; width: 28px; height: 28px; padding: 0; border-radius: var(--squiggle-chip); }
+.teacher-edit { display: inline-flex; align-items: flex-start; gap: 0.4rem; max-width: 100%; margin-inline: -0.4rem; padding: 0.2rem 0.4rem; border-radius: var(--squiggle-chip); color: var(--ink); text-align: left; line-height: 1.5; }
+.teacher-edit.is-empty { color: var(--lavender-ink); }
+.teacher-edit__value { display: grid; gap: 0.05rem; min-width: 0; overflow-wrap: anywhere; }
+.teacher-edit > svg { flex: none; margin-top: 0.3em; color: var(--lavender-ink); }
+@media (hover: hover) {
+  .teacher-pencil:hover:not(:disabled), .teacher-edit:hover:not(:disabled) { background: var(--hover-wash); color: var(--blue-deep); }
+  .teacher-edit:hover:not(:disabled) > svg { color: var(--blue-deep); }
+}
+.teacher-pencil:focus-visible, .teacher-edit:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.teacher-pencil[aria-expanded="true"] { background: var(--blue-deep); color: var(--paper-light); }
+.teacher-pencil:disabled, .teacher-edit:disabled { opacity: 0.55; }
+@media (pointer: coarse) {
+  .teacher-pencil::after { content: ""; position: absolute; inset: -8px; }
+  .teacher-edit { padding-block: 0.5rem; }
+}
+@media (prefers-reduced-motion: reduce) { .teacher-pencil, .teacher-edit { transition: none; } }
+
 
 .my-lessons__fact-label {
   color: var(--lavender-ink);
@@ -7253,14 +7281,14 @@ p.lesson-when > span {
   margin: 0;
 }
 
-/* On a phone the detail's name sits above its value, Change to the right. */
+/* On a phone the detail's name sits above its value, its pencil after it. */
 @container booking (max-width: 519.98px) {
   .my-lessons__fact {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: fit-content(100%) auto;
   }
 
   .my-lessons__fact-label {
-    grid-column: 1;
+    grid-column: 1 / -1;
   }
 
   .my-lessons__fact-value {
@@ -7270,6 +7298,7 @@ p.lesson-when > span {
   .my-lessons__fact > .my-lessons__change {
     grid-column: 2;
     grid-row: 1 / span 2;
+    justify-self: end;
   }
 }
 
