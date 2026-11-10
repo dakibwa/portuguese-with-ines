@@ -458,6 +458,34 @@ export function bookingSegments(
   });
 }
 
+/**
+ * A lesson to come that her time off or an online-only label has left
+ * standing (10 November 2026, Dan: "display the clashes somewhere suitable
+ * in a clean simple way"): booked on a day off, inside hours off, or in
+ * person inside online-only hours. Nothing moves or cancels it but her.
+ */
+export type TimeOffClash = { booking: AdminBooking; reason: "day off" | "hours off" | "online only" };
+
+export function timeOffClashes(
+  bookings: AdminBooking[],
+  exceptions: AvailabilityException[],
+  onlineOnly: OnlineOnlyPeriod[],
+  now: Date,
+): TimeOffClash[] {
+  const off = daysOff(exceptions);
+  const clashes: TimeOffClash[] = [];
+  for (const booking of bookings) {
+    if (booking.status !== "confirmed" || Date.parse(booking.starts_at) <= now.getTime()) continue;
+    const segments = bookingSegments([booking], mondayOf(dateKey(new Date(booking.starts_at))));
+    const reason = segments.some(({ date }) => off.has(date)) ? "day off"
+      : segments.some(({ date, start, end }) => overlapsSpan(dateBlocks(exceptions, date), start, end)) ? "hours off"
+      : booking.location !== "online" && segments.some(({ date, start, end }) => overlapsSpan(onlineOnlyHours(onlineOnly, date), start, end)) ? "online only"
+      : null;
+    if (reason) clashes.push({ booking, reason });
+  }
+  return clashes.sort((a, b) => Date.parse(a.booking.starts_at) - Date.parse(b.booking.starts_at));
+}
+
 /** How long a change or cancellation by a student stays in Needs you. */
 export const NEEDS_YOU_RECENT_HOURS = 72;
 /** How close a lesson must be for its first-lesson note to show. */

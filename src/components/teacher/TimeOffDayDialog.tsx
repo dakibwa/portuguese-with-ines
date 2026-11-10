@@ -12,8 +12,8 @@ import { bookingSegments, dateBlocks, dateLabel, mergeSpans, minuteLabel, monday
 
 /**
  * Some hours off on one day: one or more breaks, in Porto time. A whole day
- * off is the card's own button, so this asks only for the hours. Nothing is
- * saved until she presses Save.
+ * off is the month's own `Off` chip, so this asks only for the hours. Nothing
+ * is saved until she presses Save.
  */
 export function TimeOffDayDialog({ date, exceptions, bookings, onSave, onClose }: {
   date: string;

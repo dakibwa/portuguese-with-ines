@@ -577,7 +577,7 @@ export function TeacherSchedule() {
     for (const date of dates) {
       if (offAlready.has(date) !== off) changeDay(date, { dayOff: off }, "");
     }
-    // The card above already shows any lessons on them as Already booked.
+    // Any lessons left standing on them are listed beside the month as Clashes.
     setDayNote({
       error: false,
       text: off
@@ -932,6 +932,7 @@ export function TeacherSchedule() {
       <div className="teacher-tab-view" hidden={activeTab !== "time-off"}>
         <TimeOffCalendar
           today={today}
+          now={now}
           exceptions={shownExceptions}
           onlineOnly={onlineOnlyPeriods}
           bookings={bookings}

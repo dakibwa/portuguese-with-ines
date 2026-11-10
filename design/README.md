@@ -501,28 +501,36 @@ free times and removes selected times that cannot be booked in the new place.
   mixed state; clearing it removes its selected starts, and enabling an empty
   cell enables both. Dragging includes the final cell, and the exact-time
   editor retains control of off-grid windows.
-- `Time off` is a month beside one card, with one way to choose: tap days,
-  one or several, across months and tabs (13 October 2026, Dan). The card
-  starts `Tap the days you want off, or online only`; with days chosen it reads the same for
-  one as for many (14 October 2026, Dan: "rather than it be different if its
-  one or two days"): `1 day chosen` / `3 days chosen` with a quiet `Clear`, over a
-  removable chip for every chosen day. Beneath the chips, a single day also
-  shows what it already holds (`A day off`, `Off 10:00–11:30`); under
-  `Already booked`, each lesson on the chosen days is a booked-lesson card with
-  its date. Then `Take the day off` / `Take 3 days off` in coral, counting only
-  the days not already off,
-  `Take some hours off` (one day, because hours belong to one date) in soft
-  lilac, and `Make available` only when a
-  chosen day is off. Some hours opens a small dialog of one or more breaks in
-  Porto time, saved only with `Save hours off`; a failed save keeps the draft.
-  `Remove hours off` clears that date's breaks. Making days available removes
-  only the whole-day block and keeps their hours off and weekly rules. On a
-  phone held upright the card rides at the foot of the screen once a day is
-  chosen, its chips in one row that scrolls sideways (the month behind it is
-  mostly hidden, so it still names the days without growing taller); held
-  sideways, and on a tablet, it sits beside the month (beneath it on the
-  smallest), never over it. The upright sticky card has a half-screen maximum
-  height and scrolls inside when several booked lessons fill it.
+- `Time off` is a month with one way to choose: tap days, one or several,
+  across months and tabs (13 October 2026, Dan). The choice is one line at
+  the month's foot, and no second card opens (10 November 2026, Dan: "can you
+  literally just click 3 days then the option is there to mark as online only
+  or off?"). Before a day is chosen the line reads `Tap the days you want
+  off, or online only`. With days chosen it reads the same for one as for
+  many (14 October 2026, Dan: "rather than it be different if its one or two
+  days"): `1 day` / `3 days`, the chips `Off` and `Online only`, and a quiet
+  cross that lets the days go. The month itself names the days, so there is
+  no chip for each. A chip wears the swatch of the day it makes, as the key
+  does, and is the deep blue of a chosen tab while every chosen day is
+  already that, so the same press takes it back; `Off` takes only the days
+  not already off. Hours are the exception and come after: once the days are
+  off or online only, `All day` stands beneath the chips behind the same
+  swatch, with its pencil. A day off's hours open a small dialog of one or
+  more breaks in Porto time, saved only with `Save hours off`; a failed save
+  keeps the draft, and `Remove hours off` clears that date's breaks. `Off`
+  means a whole day, as the month draws it: a day with only some hours off
+  shows those hours beneath and leaves the chip unpressed, and opening a day
+  again removes only the whole-day block and keeps its hours off and weekly
+  rules.
+  Beside the month (beneath it on a phone) one card always says what is set:
+  `Clashes` first, when there are any (10 November 2026, Dan: "display the
+  clashes somewhere suitable in a clean simple way"), then `Coming up`. A
+  clash is a lesson to come that her time off left standing: booked on a day
+  off, inside hours off, or in person inside online-only hours. Each is a
+  booked-lesson card with its date and the reason in two words (`day off`,
+  `hours off`, `online only`), and its `Change` opens the lesson. Nothing
+  here moves or cancels a lesson on its own. What was saved shows on the
+  month, so only a failure is written out beneath the choice.
   The month marks whole days off, online-only days, booked lessons and today
   (see "Calendar marks" in the 10 November section), without repeating weekly
   unavailability or partial blocks from the timetable.
@@ -886,8 +894,8 @@ free times and removes selected times that cannot be booked in the new place.
   actions share a row rather than stacking full width (a student card's blue
   `Add lesson` beside its coral `Send welcome email`, a lesson's `Move` beside
   `Cancel`), and coral marks the one thing still to do. A quieter constructive
-  choice is the palette's soft lilac (`Take some hours off`, `Make
-  available`, `Open Google Calendar`, a booked lesson's `Change`; 13 October
+  choice is the palette's soft lilac (`Off`, `Online only`, `Open Google
+  Calendar`, a booked lesson's `Change`; 13 October
   2026, Dan: "just the subtle lilac"), since 10 November 2026 as the quiet
   chip in sentence case at its own width rather than the capital-letter
   site button; a way out
@@ -2286,9 +2294,11 @@ gave an email, and only two had ever signed in.
   email row reads `Not added` with `Add email`.
 - Students' cards on a wide list each keep their own height, packed in
   columns, so a short card never leaves a hole under it.
-- `Time off`'s card lists what is `Coming up` (consecutive whole days as one
-  line, `Wed 25 Nov – Fri 27 Nov` / `3 days off`; hours as `Off 09:00–12:00`),
-  the next few and `And 3 more later on`; tapping one chooses it.
+- Beside the `Time off` month, `Coming up` lists what is set (consecutive
+  whole days as one line, `Wed 25 Nov – Fri 27 Nov` / `3 days off`; hours as
+  `Off 09:00–12:00`; an online-only stretch as `3 days online only`), the
+  next few and `And 3 more later on`; tapping one chooses it. With nothing
+  ahead it reads `Nothing off ahead`, and on a phone it is left out.
 - `Receipts` opens on last month during the first ten days of a month when
   last month still has receipts to issue and this one has none yet.
 - Notes and empty states speak at the hint size, never a paragraph's:
@@ -2477,11 +2487,10 @@ for).
 - On Inês's tabs the capital-letter filled lilac site button is retired for
   lesser actions: the quiet chip is the third weight everywhere (`Edit
   weekly hours`, `This week`, `Set exact hours`, a notice's `View`, `Download
-  CSV`, `Take some hours off`). A disclosure is that chip with a chevron
-  that turns, never a fill when open. Where a step's main action takes the
-  card's width (`Take the day off`), its lesser choices sit beneath it as
-  chips at their own width. On a phone `Discard` and `Save` wrap together
-  as a pair.
+  CSV`, Time off's `Off` and `Online only`). A disclosure is that chip with a
+  chevron that turns, never a fill when open. A chip that is a state and not
+  a step (`Off`, `Online only`) is the deep blue of a chosen tab while it
+  holds. On a phone `Discard` and `Save` wrap together as a pair.
 - An alert's way on (`Try again`, `Message Inês`) keeps its own width at the
   alert's end, on a phone as across a wide page.
 
@@ -2559,21 +2568,24 @@ with a band across the page afterwards) "this is ugly".
   legend what the colour means?"): the globe is kept for a lesson that is
   online. The colour is not the only way to learn it: a day's spoken name
   says "online only", pressing an online-only day says so in words, and her
-  card shows the chip pressed.
+  chip is pressed.
 - Inês labels days the way she takes them off: she taps them on the Time off
-  month and presses the quiet `Online only` chip on the card, which fills
-  with the colour while every chosen day is online only (so the chip is its
-  own key) and takes the label off when pressed again. Days already online
-  only at set hours keep them when others are added.
+  month and presses `Online only` on the line at its foot, beside `Off`. The
+  chip wears the colour as its swatch (so it is its own key), is pressed
+  while every chosen day is online only, and takes the label off when
+  pressed again. Days already online only at set hours keep them when others
+  are added.
 - The chosen days' hours are one value under the chips, `All day` (or
   `12:00–16:00`, or `Different hours`), edited where it stands: `All day |
   Some hours` on the site's slider, two time fields, the tick and the cross.
 - Her Time off month tints online-only days; her Timetable draws weekly hours
   inside online-only time in the colour and names it in the key while the
   week has some. The Timetable shows it and does not edit it.
-- What happened is said on the card's status line (`Tue 15 Sept is online
-  only.`, `3 selected days can be booked in Porto again.`), never a band
-  across the page. A failed save keeps her days chosen and says why.
+- What happened shows on the month, the chip and `Coming up`, and is said to
+  a screen reader (`Tue 15 Sept is online only.`, `3 selected days can be
+  booked in Porto again.`), never a band across the page. A failed save
+  keeps her days chosen and says why beneath the choice. A lesson already
+  booked in person inside the hours is listed under `Clashes`.
 - For a student who has chosen In Porto, in booking and in `Choose a new date
   and time`: a day free only online is tinted and can be pressed, where it
   used to be blank. Pressed, it says `Online only on this

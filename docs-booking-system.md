@@ -512,16 +512,23 @@ The week itself is where Inês takes time off. Choosing a free time offers
 `Add a lesson here` or `Take this time off`; dragging across times on a date
 blocks them all for that date only, and choosing a blocked time reopens it.
 The `Day off` switch above each date blocks the whole day. The `Time off`
-tab shows a month calendar beside one card. Tapping dates chooses them, one or
-several, across months; chosen dates survive tab changes. The card offers
-`Take the day off` / `Take N days off`, `Take some hours off` for a single
-date, and `Make available` when a chosen date is off. Some hours opens a draft
-of one or more timed breaks; in the time picker, `00:00` means the end of that
-day (stored as minute 1440). That draft saves explicitly through the same
+tab shows a month calendar. Tapping dates chooses them, one or several, across
+months; chosen dates survive tab changes. One line at the month's foot then
+offers `Off` and `Online only` (10 November 2026): `Off` takes the chosen
+dates not already off as whole days, and pressed again opens them, removing
+only the whole-day block. A single date that is off shows its hours beneath
+(`All day`, or its breaks), whose pencil opens a draft of one or more timed
+breaks; in the time picker, `00:00` means the end of that day (stored as
+minute 1440). That draft saves explicitly through the same
 `/admin/exceptions/day` endpoint; saving breaks removes that date's whole-day
 block, and `Remove hours off` clears its breaks. Weekly blocks and extra hours
 stay. The month marks whole days off and booked lessons, without displaying
-weekly unavailability or partial blocks from the week.
+weekly unavailability or partial blocks from the week. Beside the month,
+`Clashes` lists each lesson to come that time off left standing: booked on a
+day off, inside hours off, or in person inside online-only hours
+(`timeOffClashes` in `src/lib/teacher-calendar.ts`, proved in
+`scripts/test-teacher-calendar.mjs`). It is a read of what the page already
+holds; no lesson is moved or cancelled by taking time off.
 Booked lessons on the chosen dates are listed as cards whose `Change` opens
 that lesson's own move/cancel dialog, and unavailable booking data must be
 retried before applying changes. Each bulk-selected date uses the same queue;
@@ -1681,7 +1688,7 @@ get wrong:
 ### Time and availability
 
 **Online-only periods** (10 November 2026). Inês labels days as online only
-on the Time off month: she taps days and presses `Online only` on the card,
+on the Time off month: she taps days and presses `Online only` at its foot,
 and edits their hours in place (`All day`, or the same From/Until hours each
 day, on the teaching clock). The service stores periods, not days: each
 includes both dates and is either all day or one daily window, with `00:00`

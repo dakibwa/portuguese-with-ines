@@ -1,9 +1,9 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CalendarCheck, CalendarOff, Clock, Globe } from "lucide-react";
+import { X } from "lucide-react";
 import type { AdminBooking, AvailabilityException, OnlineOnlyPeriod } from "@/lib/admin-api";
-import { ALL_DAY, dateBlocks, dateKey, dateLabel, daysOff, minuteLabel, mondayOf, onlineOnlyHours, onlineOnlyLabel, parseMinute, shiftDate, spanLabel, WEEKDAYS, type Span } from "@/lib/teacher-calendar";
+import { ALL_DAY, dateBlocks, dateKey, dateLabel, daysOff, minuteLabel, mondayOf, onlineOnlyHours, onlineOnlyLabel, parseMinute, shiftDate, spanLabel, timeOffClashes, WEEKDAYS, type Span } from "@/lib/teacher-calendar";
 import { MonthLabel, TeacherPager } from "@/components/teacher/TeacherPager";
 import { TimeOffDayDialog } from "@/components/teacher/TimeOffDayDialog";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
@@ -25,19 +25,23 @@ function lessonsOn(bookings: AdminBooking[], date: string) {
 
 /**
  * Time off as one month (13 October 2026, Dan): she taps the days she means,
- * one or several, and the card beside the month says what she can do with
- * them. One way to choose, no modes. The card reads the same for one day as
- * for many (14 October 2026, Dan: "rather than it be different if its one or
- * two days"): `N days chosen` over a removable chip for each, and a single
- * day's own details and hours beneath. Booked lessons are never moved or
- * cancelled from here; the card names any that stay.
+ * one or several, and the choice is there at the month's foot (10 November
+ * 2026, Dan: "can you literally just click 3 days then the option is there to
+ * mark as online only or off?"): how many days, `Off`, `Online only`, and a
+ * cross to let them go. No second card opens, and the month itself names the
+ * days. Each chip is pressed when every chosen day already is that, so the
+ * same press takes it back.
  *
- * Online only is the same kind of statement about days (10 November 2026,
- * Dan: "label days as online only"), so it is a quiet chip on the same card,
- * its hours edited in place beneath it, and the month tints those days.
+ * Hours are the exception, so they come after: once days are off or online
+ * only, `All day` stands under the chips with its pencil. `Off` is a whole
+ * day, as the month draws it; a day with only some hours off shows those
+ * hours and leaves the chip unpressed. Booked lessons are never moved or
+ * cancelled from here; any her time off leaves standing are listed beside
+ * the month as Clashes, each opening its lesson.
  */
-export function TimeOffCalendar({ today, exceptions, onlineOnly, bookings, bookingsLoading, bookingsError, onReloadBookings, busy, status, onChange, onOnlineOnly, onSaveDay, onOpenBooking }: {
+export function TimeOffCalendar({ today, now, exceptions, onlineOnly, bookings, bookingsLoading, bookingsError, onReloadBookings, busy, status, onChange, onOnlineOnly, onSaveDay, onOpenBooking }: {
   today: string;
+  now: Date;
   exceptions: AvailabilityException[];
   onlineOnly: OnlineOnlyPeriod[];
   bookings: AdminBooking[];
@@ -46,6 +50,7 @@ export function TimeOffCalendar({ today, exceptions, onlineOnly, bookings, booki
   onReloadBookings: () => void;
   busy: boolean;
   status: ReactNode;
+  /** Takes `dates` off as whole days, or opens them again; hours off within a day stay. */
   onChange: (dates: string[], off: boolean) => void;
   /**
    * Labels `dates` online only for `hours` each day, or clears them when
@@ -63,12 +68,13 @@ export function TimeOffCalendar({ today, exceptions, onlineOnly, bookings, booki
   const [hoursFor, setHoursFor] = useState<string | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const monthTitleRef = useRef<HTMLHeadingElement>(null);
-  const hoursButtonRef = useRef<HTMLButtonElement>(null);
+  const choiceRef = useRef<HTMLDivElement>(null);
   const reopenedHours = useRef(false);
+  // Closing the hours puts focus back on their value, or on Off once they are gone.
   useLayoutEffect(() => {
     if (hoursFor || !reopenedHours.current) return;
     reopenedHours.current = false;
-    hoursButtonRef.current?.focus({ preventScroll: true });
+    (choiceRef.current?.querySelector<HTMLElement>('[data-edit="hours-off"]') ?? choiceRef.current?.querySelector<HTMLElement>("[data-day-choice]"))?.focus({ preventScroll: true });
   }, [hoursFor]);
   const off = useMemo(() => daysOff(exceptions), [exceptions]);
   const onlineOn = (date: string) => onlineOnlyHours(onlineOnly, date);
@@ -79,38 +85,46 @@ export function TimeOffCalendar({ today, exceptions, onlineOnly, bookings, booki
   for (let date = start; date <= end; date = shiftDate(date, 1)) dates.push(date);
   const chosen = [...selected].filter(date => date >= today).sort();
   const one = chosen.length === 1 ? chosen[0] : null;
-  const booked = bookings.filter(booking => booking.status === "confirmed" && chosen.some(date => lessonsOn([booking], date).length))
-    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
   const hoursOff = one && !off.has(one) ? dateBlocks(exceptions, one) : [];
-  // Days already off aren't taken again, so the button counts only the rest.
-  const toTake = chosen.filter(date => !off.has(date)).length;
+  // Off is a whole day, as the month draws it; some hours off are its hours beneath.
+  const allOff = chosen.length > 0 && chosen.every(date => off.has(date));
   const firstFocus = dates.includes(focused) && focused >= today ? focused : dates.find(date => date >= today && date.startsWith(month.slice(0, 7)));
   const unchecked = bookingsLoading || Boolean(bookingsError);
   const online = chosen.map(date => onlineOnlyLabel(onlineOn(date)));
   const allOnline = chosen.length > 0 && online.every(Boolean);
   const onlineValue = online.every(label => label === online[0]) ? online[0] : "Different hours";
-  // With nothing chosen the card lists what is already off (2 November 2026):
-  // consecutive days off read as one stretch, and tapping one chooses its days.
+  const clashes = useMemo(() => bookingsLoading || bookingsError ? [] : timeOffClashes(bookings, exceptions, onlineOnly, now),
+    [bookings, bookingsLoading, bookingsError, exceptions, onlineOnly, now]);
+  // What is already set, ahead (2 November 2026): consecutive days read as
+  // one stretch, and tapping one chooses its days.
   const upcoming = useMemo(() => {
-    const dates = [...new Set(exceptions
+    const blocked = [...new Set(exceptions
       .filter(exception => exception.kind === "blocked" && exception.weekday == null && exception.date && exception.date >= today)
       .map(exception => exception.date as string))].sort();
     const rows: { dates: string[]; detail: string; note: string }[] = [];
-    for (const date of dates) {
+    for (const date of blocked) {
       const last = rows.at(-1);
       if (off.has(date) && last && last.detail !== "hours" && shiftDate(last.dates.at(-1)!, 1) === date) { last.dates.push(date); continue; }
       rows.push({ dates: [date], detail: off.has(date) ? "day" : "hours", note: off.get(date) ?? "" });
     }
-    return rows.map(row => ({
-      ...row,
-      label: row.dates.length > 1
-        ? `${shortDate(row.dates[0])} – ${shortDate(row.dates.at(-1)!)}`
-        : shortDate(row.dates[0]),
-      detail: row.detail === "hours"
-        ? `Off ${dateBlocks(exceptions, row.dates[0]).map(spanLabel).join(", ")}`
-        : row.dates.length > 1 ? `${row.dates.length} days off` : "Day off",
-    }));
-  }, [exceptions, off, today]);
+    const stretch = (dates: string[]) => dates.length > 1 ? `${shortDate(dates[0])} – ${shortDate(dates.at(-1)!)}` : shortDate(dates[0]);
+    return [
+      ...rows.map(row => ({
+        dates: row.dates,
+        label: stretch(row.dates),
+        detail: [row.detail === "hours"
+          ? `Off ${dateBlocks(exceptions, row.dates[0]).map(spanLabel).join(", ")}`
+          : row.dates.length > 1 ? `${row.dates.length} days off` : "Day off", row.note]
+          .filter((part, index, parts) => part && parts.findIndex(other => other.toLowerCase() === part.toLowerCase()) === index).join(" · "),
+      })),
+      ...onlineOnly.filter(period => period.toDate >= today).map(period => {
+        const dates: string[] = [];
+        for (let date = period.fromDate < today ? today : period.fromDate; date <= period.toDate; date = shiftDate(date, 1)) dates.push(date);
+        const hours = onlineOnlyLabel([{ start: period.startMinute, end: period.endMinute }]);
+        return { dates, label: stretch(dates), detail: `${dates.length > 1 ? `${dates.length} days online only` : "Online only"}${hours === "All day" ? "" : `, ${hours}`}` };
+      }),
+    ].sort((a, b) => a.dates[0].localeCompare(b.dates[0]));
+  }, [exceptions, onlineOnly, off, today]);
 
   function moveMonth(amount: number) {
     const next = shiftMonth(month, amount);
@@ -188,103 +202,87 @@ export function TimeOffCalendar({ today, exceptions, onlineOnly, bookings, booki
             <span><i className="is-online" aria-hidden="true" /> Online only</span>
             <span><i className="is-booked" aria-hidden="true" /> Lesson booked</span>
           </div>
+          {chosen.length ? (
+            <div className="teacher-day-choices" ref={choiceRef} role="group" aria-label="Chosen days">
+              <strong aria-live="polite">{chosen.length} {chosen.length === 1 ? "day" : "days"}</strong>
+              {/* Each chip wears the swatch of the day it makes, as the key does. */}
+              <button aria-pressed={allOff} className="teacher-quiet teacher-day-choice" data-day-choice disabled={busy || unchecked} onClick={() => onChange(chosen, !allOff)} type="button">
+                <i className="teacher-swatch is-off" aria-hidden="true" />
+                Off
+              </button>
+              {/* Days already online only keep their hours; the rest are labelled all day. */}
+              <button
+                aria-pressed={allOnline}
+                className="teacher-quiet teacher-day-choice"
+                disabled={busy}
+                onClick={() => void onOnlineOnly(chosen, allOnline ? chosen : chosen.filter(date => !onlineOn(date).length), allOnline ? null : ALL_DAY).catch(() => {})}
+                type="button"
+              >
+                <i className="teacher-swatch is-online" aria-hidden="true" />
+                Online only
+              </button>
+              <button aria-label="Clear chosen days" className="teacher-pencil" disabled={busy} onClick={() => setSelected(new Set())} title="Clear chosen days" type="button"><X size={15} strokeWidth={2.4} aria-hidden="true" /></button>
+              {/* Hours come after the choice: one day's hours off, or the chosen days' online-only hours. */}
+              {(one && (off.has(one) || hoursOff.length)) || allOnline ? (
+                <div className="teacher-day-hours">
+                  {one && (off.has(one) || hoursOff.length) ? (
+                    <EditValue disabled={busy || unchecked} field="hours-off" label="Change hours off" onEdit={() => setHoursFor(one)}>
+                      <span><i className="teacher-swatch is-off" aria-hidden="true" /> {off.has(one) ? "All day" : hoursOff.map(spanLabel).join(", ")}</span>
+                    </EditValue>
+                  ) : null}
+                  {allOnline ? (
+                    <OnlineHours
+                      busy={busy}
+                      hours={chosen.map(onlineOn)}
+                      key={chosen.join()}
+                      onSave={hours => onOnlineOnly(chosen, chosen, hours)}
+                      value={onlineValue}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="teacher-day-hint">Tap the days you want off, or online only</p>
+          )}
+          {status}
         </div>
 
-        <div className={`teacher-timeoff-selection${chosen.length ? " has-days" : upcoming.length ? " has-upcoming" : ""}`}>
-          <div className="teacher-timeoff-selection-heading">
-            {/* The empty card is where she learns what the month is for, online only included. */}
-            <h3 aria-live="polite">{chosen.length ? `${chosen.length} ${chosen.length === 1 ? "day" : "days"} chosen` : "Tap the days you want off, or online only"}</h3>
-            {chosen.length ? <button className="teacher-quiet" disabled={busy} onClick={() => setSelected(new Set())} type="button">Clear</button> : null}
-          </div>
-          {!chosen.length && upcoming.length ? (
-            <div className="teacher-timeoff-upcoming">
-              <p className="teacher-eyebrow">Coming up</p>
+        <div className={`teacher-timeoff-ahead${clashes.length || upcoming.length || bookingsError ? " has-rows" : ""}`}>
+          {bookingsError ? (
+            <div className="teacher-inline-error" role="alert">
+              <p>Booked lessons couldn’t be checked.</p>
+              <button className="button button--outline button--small" onClick={onReloadBookings} type="button">Try again</button>
+            </div>
+          ) : null}
+          {clashes.length ? (
+            <div className="teacher-timeoff-lessons">
+              <p className="teacher-eyebrow">Clashes</p>
+              <ul className="teacher-lesson-cards">
+                {clashes.map(({ booking, reason }) => <BookedLessonCard booking={booking} disabled={busy} key={booking.id} note={reason} onOpen={onOpenBooking} />)}
+              </ul>
+            </div>
+          ) : null}
+          <div className="teacher-timeoff-upcoming">
+            <p className="teacher-eyebrow">Coming up</p>
+            {upcoming.length ? (
               <ul>
                 {upcoming.slice(0, 6).map(row => (
-                  <li key={row.dates[0]}>
+                  <li key={`${row.dates[0]} ${row.detail}`}>
                     <button
                       disabled={busy}
                       onClick={() => { setMonth(monthStart(row.dates[0])); setFocused(row.dates[0]); setSelected(new Set(row.dates)); }}
                       type="button"
                     >
                       <strong>{row.label}</strong>
-                      <span>{[row.detail, row.note].filter((part, index, parts) => part && parts.findIndex(other => other.toLowerCase() === part.toLowerCase()) === index).join(" · ")}</span>
+                      <span>{row.detail}</span>
                     </button>
                   </li>
                 ))}
               </ul>
-              {upcoming.length > 6 ? <p className="teacher-timeoff-upcoming__more">And {upcoming.length - 6} more later on</p> : null}
-            </div>
-          ) : null}
-          {chosen.length ? (
-            <ul className="teacher-selected-days">
-              {chosen.map(date => <li key={date}><button aria-label={`Remove ${dateLabel(date)}`} disabled={busy} onClick={() => toggle(date)} type="button">{dateLabel(date, { day: "numeric", month: "short" })}<span aria-hidden="true">×</span></button></li>)}
-            </ul>
-          ) : null}
-          {(one && off.has(one)) || hoursOff.length || (chosen.length && bookingsLoading) ? (
-            <ul className="booking-payment-facts teacher-timeoff-facts">
-              {one && off.has(one) ? <li>A day off</li> : null}
-              {hoursOff.length ? <li>Off {hoursOff.map(spanLabel).join(", ")}</li> : null}
-              {chosen.length && bookingsLoading ? <li role="status">Checking booked lessons…</li> : null}
-            </ul>
-          ) : null}
-          {!bookingsLoading && !bookingsError && booked.length ? (
-            <div className="teacher-timeoff-lessons">
-              <p className="teacher-eyebrow">Already booked</p>
-              <ul className="teacher-lesson-cards">
-                {booked.map(booking => <BookedLessonCard booking={booking} disabled={busy} key={booking.id} onOpen={onOpenBooking} />)}
-              </ul>
-            </div>
-          ) : null}
-          {bookingsError && chosen.length ? (
-            <div className="teacher-inline-error" role="alert">
-              <p>Booked lessons couldn’t be checked.</p>
-              <button className="button button--outline button--small" onClick={onReloadBookings} type="button">Try again</button>
-            </div>
-          ) : null}
-          {chosen.length ? (
-            <div className="teacher-timeoff-selection-actions">
-              {toTake ? (
-                <button className="button button--coral" disabled={busy || unchecked} onClick={() => onChange(chosen, true)} type="button">
-                  <CalendarOff size={16} aria-hidden="true" />
-                  {one ? "Take the day off" : `Take ${toTake} ${toTake === 1 ? "day" : "days"} off`}
-                </button>
-              ) : null}
-              {one ? (
-                <button className="teacher-quiet" disabled={busy || unchecked} onClick={() => setHoursFor(one)} ref={hoursButtonRef} type="button">
-                  <Clock size={16} aria-hidden="true" />
-                  {hoursOff.length ? "Change hours off" : "Take some hours off"}
-                </button>
-              ) : null}
-              {chosen.some(date => off.has(date)) ? (
-                <button className="teacher-quiet" disabled={busy || unchecked} onClick={() => onChange(chosen, false)} type="button">
-                  <CalendarCheck size={16} aria-hidden="true" />
-                  Make available
-                </button>
-              ) : null}
-              {/* Days already online only keep their hours; the rest are labelled all day. */}
-              <button
-                aria-pressed={allOnline}
-                className="teacher-quiet teacher-online-chip"
-                disabled={busy}
-                onClick={() => void onOnlineOnly(chosen, allOnline ? chosen : chosen.filter(date => !onlineOn(date).length), allOnline ? null : ALL_DAY).catch(() => {})}
-                type="button"
-              >
-                <Globe size={16} aria-hidden="true" />
-                Online only
-              </button>
-            </div>
-          ) : null}
-          {allOnline ? (
-            <OnlineHours
-              busy={busy}
-              hours={chosen.map(onlineOn)}
-              key={chosen.join()}
-              onSave={hours => onOnlineOnly(chosen, chosen, hours)}
-              value={onlineValue}
-            />
-          ) : null}
-          {status}
+            ) : <p className="teacher-timeoff-upcoming__more">Nothing off ahead</p>}
+            {upcoming.length > 6 ? <p className="teacher-timeoff-upcoming__more">And {upcoming.length - 6} more later on</p> : null}
+          </div>
         </div>
       </div>
       {hoursFor ? (
@@ -368,7 +366,7 @@ function OnlineHours({ value, hours, busy, onSave }: {
         </form>
       ) : (
         <EditValue disabled={busy} field="online-hours" label="Change online-only hours" onEdit={open}>
-          <span><Globe size={13} strokeWidth={2.4} aria-hidden="true" /> {value}</span>
+          <span><i className="teacher-swatch is-online" aria-hidden="true" /> {value}</span>
         </EditValue>
       )}
     </div>

@@ -27,6 +27,7 @@ import {
   paintHours,
   removeSpan,
   shiftDate,
+  timeOffClashes,
   weeklyBlocks,
   withDayChanges,
 } from "../src/lib/teacher-calendar.ts";
@@ -594,4 +595,34 @@ test("online only: her labelled days become the Worker's periods and back", () =
   assert.throws(() => labelOnlineOnly([], [...alternate, "2027-06-01"], allDay, today, id), /at most 100/);
   // Its own ids are real UUIDs unless told otherwise.
   assert.match(labelOnlineOnly([], ["2026-09-14"], allDay, today)[0].id, /^[0-9a-f-]{36}$/);
+});
+
+test("clashes: a lesson to come on a day off, in hours off, or in person in online-only hours, and nothing else", () => {
+  // Porto is an hour ahead of UTC in September: 09:00Z is 10:00 there.
+  const hourOf = (hour) => String(hour).padStart(2, "0");
+  const at = (id, day, hour, location = "online") => ({ id, status: "confirmed", location,
+    starts_at: `2026-09-${day}T${hourOf(hour)}:00:00Z`, ends_at: `2026-09-${day}T${hourOf(hour + 1)}:00:00Z` });
+  const blocked = { kind: "blocked", weekday: null, note: "" };
+  const exceptions = [
+    { ...blocked, id: 1, date: "2026-09-21", start_minute: null, end_minute: null },
+    { ...blocked, id: 2, date: "2026-09-22", start_minute: 600, end_minute: 690 },
+    // Weekly lunch is her hours, not time off.
+    { ...blocked, id: 3, date: null, weekday: 3, start_minute: 780, end_minute: 840 },
+  ];
+  const onlineOnly = [{ id: "away", fromDate: "2026-09-23", toDate: "2026-09-24", startMinute: 720, endMinute: 960 }];
+  const bookings = [
+    at("in-porto-online-hours", 23, 12, "porto"),
+    at("on-day-off", 21, 15),
+    at("in-hours-off", 22, 10),
+    at("beside-hours-off", 22, 11),
+    at("online-in-online-hours", 23, 13),
+    at("in-porto-outside-hours", 24, 9, "porto"),
+    at("weekly-lunch", 23, 12),
+    { ...at("cancelled", 21, 9), status: "cancelled" },
+    at("already-had", 21, 8),
+  ];
+  assert.deepEqual(
+    timeOffClashes(bookings, exceptions, onlineOnly, new Date("2026-09-21T09:30:00Z")).map(({ booking, reason }) => [booking.id, reason]),
+    [["on-day-off", "day off"], ["in-hours-off", "hours off"], ["in-porto-online-hours", "online only"]],
+  );
 });

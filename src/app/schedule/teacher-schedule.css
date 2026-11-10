@@ -2253,8 +2253,7 @@
   gap: 0.5rem 1rem;
   margin-bottom: 1rem;
 }
-.teacher-month-heading h3,
-.teacher-timeoff-selection h3 {
+.teacher-month-heading h3 {
   margin: 0;
   font: 600 1rem/1.5 var(--ui);
   letter-spacing: -0.02em;
@@ -2372,8 +2371,10 @@
   align-items: center;
   gap: 0.35rem;
 }
-/* Each swatch is a small copy of the day it explains. */
-.teacher-month-key i {
+/* Each swatch is a small copy of the day it explains; a chip that makes a
+   day one wears the same swatch. */
+.teacher-month-key i,
+.teacher-swatch {
   width: 12px;
   height: 12px;
   flex: none;
@@ -2384,10 +2385,12 @@
   border-color: var(--blue-deep);
   background: var(--blue-deep);
 }
-.teacher-month-key .is-off {
+.teacher-month-key .is-off,
+.teacher-swatch.is-off {
   background: repeating-linear-gradient(-45deg, transparent 0 2px, var(--lavender) 2px 3px), var(--lavender-soft);
 }
-.teacher-month-key .is-online {
+.teacher-month-key .is-online,
+.teacher-swatch.is-online {
   background: var(--online-only);
 }
 .teacher-month-key .is-booked {
@@ -2396,90 +2399,105 @@
 .teacher-month-key .is-free {
   background: var(--raised);
 }
-/* The chosen days' card sits beside the month, the same sheet and edge. */
-.teacher-timeoff-selection {
-  display: grid;
-  gap: var(--gap-card);
-  border: 1px solid var(--rule);
-  border-radius: var(--squiggle-panel);
-  padding: var(--pad-card);
-  background: var(--sheet);
-}
-/* As tall as the month's heading with its arrows beside it, so the two
-   cards' titles sit on one line. */
-.teacher-timeoff-selection-heading {
+/* The choice sits at the month's foot (10 November 2026, Dan: "can you
+   literally just click 3 days then the option is there to mark as online
+   only or off?"): how many days, the two things a day can be, and a cross to
+   let them go. Before a day is chosen the same line says what the month is
+   for, so the card never changes height by more than the hours beneath. */
+.teacher-day-choices,
+.teacher-day-hint {
   display: flex;
-  min-height: 42px;
-  justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
+  min-height: 44px;
+  margin: 0.85rem 0 0;
 }
-.teacher-selected-days {
-  display: flex;
+.teacher-day-choices {
   flex-wrap: wrap;
-  gap: 0.4rem;
-  max-height: 190px;
-  overflow: auto;
-  /* Room inside the scroll area for a focus ring, taken back from the margin. */
-  margin: -4px;
-  padding: 4px;
-  list-style: none;
+  gap: 0.4rem 0.5rem;
 }
-.teacher-selected-days li {
-  flex: none;
+.teacher-day-choices > strong {
+  margin-right: 0.15rem;
+  font: 600 0.88rem/1.3 var(--ui);
+  white-space: nowrap;
 }
-.teacher-selected-days button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.65rem;
-  min-height: 40px;
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--squiggle-pill);
-  padding: 0.4rem 0.7rem;
-  background: var(--paper-light);
-  color: var(--ink);
-  font: 600 0.75rem/1.3 var(--ui);
-  cursor: pointer;
+.teacher-day-choices > .teacher-pencil {
+  margin-left: auto;
 }
-.teacher-selected-days button span {
+.teacher-day-hint {
   color: var(--lavender-ink);
-  font-size: 1.1rem;
+  font: 400 0.82rem/1.4 var(--ui);
 }
-/* The coral step is the card's one main action and takes its width; the
-   lesser choices (some hours off, making days available) are quiet chips at
-   their own width on the line beneath (10 November 2026). */
-.teacher-timeoff-selection-actions {
+/* On the narrowest phone the count and its cross keep the first line and the
+   two chips take the second, so the cross never drops alone beneath them. */
+@media (max-width: 359px) {
+  .teacher-day-choices > strong { flex: 1 1 calc(100% - 3rem); }
+  .teacher-day-choices > .teacher-pencil { order: 1; margin-left: 0; }
+  .teacher-day-choices > .teacher-day-choice { order: 2; }
+  .teacher-day-choices > .teacher-day-hours { order: 3; }
+}
+/* Pressed, a chip is the deep blue of a chosen tab: every chosen day is that. */
+.teacher-day-choice[aria-pressed="true"],
+.teacher-day-choice[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--blue-deep);
+  color: var(--paper-light);
+}
+/* Hours are the exception, so they come after and beneath: each a value
+   with its pencil, behind the swatch of what it is the hours of. */
+.teacher-day-hours {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem 0.5rem;
-}
-.teacher-timeoff-selection-actions > .button {
   flex: 1 1 100%;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.1rem;
+  min-width: 0;
 }
-/* Pressed, the Online only chip is filled with the colour it gives the month. */
-.teacher-online-chip[aria-pressed="true"],
-.teacher-online-chip[aria-pressed="true"]:hover:not(:disabled) {
-  background: var(--online-only);
-}
-/* The chosen days' online-only hours: a value with its pencil, opening in place. */
-.teacher-online-hours { display: flex; min-width: 0; margin-top: -0.35rem; }
-.teacher-online-hours .teacher-edit { margin-inline: 0; font: 600 0.82rem/1.5 var(--ui); }
-.teacher-online-hours .teacher-edit__value > span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.teacher-day-hours .teacher-edit { margin-inline: 0; font: 600 0.82rem/1.5 var(--ui); }
+.teacher-day-hours .teacher-edit > svg { margin-top: 0.4em; }
+.teacher-day-hours .teacher-edit__value > span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.teacher-online-hours { display: flex; min-width: 0; }
+.teacher-online-hours:has(> form) { flex: 1 1 100%; }
 .teacher-online-hours__edit { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; width: 100%; min-width: 0; }
 .teacher-online-hours__edit .teacher-manual-choice { flex: 1 1 100%; }
 .teacher-online-hours__times { display: grid; flex: 1 1 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; min-width: 0; }
 .teacher-online-hours__edit > .teacher-edit-actions { min-height: 44px; margin-left: auto; }
 .teacher-online-hours__edit > .teacher-inline-edit__error { flex: 1 1 100%; }
-/* With nothing chosen and nothing off ahead it is only a hint, not a card. */
-.teacher-timeoff-selection:not(.has-days):not(.has-upcoming) {
+/* What was saved shows on the month itself, so only a failure is written
+   out; the rest is still said to a screen reader. */
+.teacher-month > .teacher-save-state {
+  justify-content: flex-start;
+  min-height: 0;
+  margin: 0.4rem 0 0;
+  text-align: left;
+}
+.teacher-month > .teacher-save-state:not(.is-error) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.teacher-month > .teacher-save-state:empty {
+  display: none;
+}
+/* Beside the month, always: any lessons her time off left standing, then the
+   time off ahead, each stretch a cream row like a booked lesson's (2 November
+   2026). Tapping one chooses its days. The same sheet and edge as the month. */
+.teacher-timeoff-ahead {
+  display: grid;
+  gap: var(--gap-card);
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--squiggle-panel);
+  padding: var(--pad-card);
+  background: var(--sheet);
+}
+/* With nothing ahead it is only a quiet line, not a card. */
+.teacher-timeoff-ahead:not(.has-rows) {
   border-color: transparent;
   background: transparent;
 }
-/* With nothing chosen the card lists the time off ahead, each stretch a cream
-   row like a booked lesson's, so the column beside the month is never empty
-   (2 November 2026). Tapping one chooses its days. */
 .teacher-timeoff-upcoming {
   display: grid;
   gap: 0.45rem;
@@ -2508,16 +2526,6 @@
 .teacher-timeoff-upcoming strong { font: 600 0.88rem/1.35 var(--ui); }
 .teacher-timeoff-upcoming span { color: var(--lavender-ink); font: 400 0.75rem/1.4 var(--ui); }
 .teacher-timeoff-upcoming__more { margin: 0; color: var(--lavender-ink); font: 400 0.75rem/1.4 var(--ui); }
-/* What changed reads from the left with its tick, as under the week. */
-.teacher-timeoff-selection .teacher-save-state {
-  justify-content: flex-start;
-  min-height: 0;
-  margin: 0;
-  text-align: left;
-}
-.teacher-timeoff-selection .teacher-save-state:empty {
-  display: none;
-}
 @media (max-width: 900px) {
   .teacher-tools-header { gap: 0.75rem; }
   /* Compact labels keep the tools readable on smaller tablets. */
@@ -2557,30 +2565,9 @@
 @media (max-width: 639px) {
   .teacher-timeoff-layout { grid-template-columns: minmax(0, 1fr); }
 }
-/* On a phone held upright the card rides at the foot of the screen once a
-   day is chosen, so its buttons are in reach without scrolling past the
-   month. A screen too short for both keeps it beneath the month instead. */
-@media (max-width: 639px) and (min-height: 501px) {
-  .teacher-timeoff-selection.has-days {
-    position: sticky;
-    bottom: 0.75rem;
-    max-height: 50dvh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    z-index: 2;
-    /* The same lilac, made solid, so the month never shows through. */
-    background: var(--dialog-surface);
-    box-shadow: 0 10px 30px rgba(36, 64, 133, 0.18);
-  }
-  /* The month behind the card is mostly hidden, so the card still names the
-     days, in one row that scrolls sideways rather than growing taller. */
-  .teacher-timeoff-selection.has-days .teacher-selected-days {
-    flex-wrap: nowrap;
-    max-height: none;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
-  }
+/* On a phone an empty list of what is ahead says nothing worth a line. */
+@media (max-width: 639px) {
+  .teacher-timeoff-ahead:not(.has-rows) { display: none; }
 }
 @media (max-width: 480px) {
   .teacher-month { padding: 0.8rem; }
