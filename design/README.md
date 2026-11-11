@@ -626,7 +626,8 @@ free times and removes selected times that cannot be booked in the new place.
   - Their facts as rows, each its small-capitals name and its value
     beneath: `Details` (email or `No email`, phone, NIF), `Price` (each
     length), `Every lesson` (the facts all their lessons share, such as `In
-    Porto · Added by you`, so no lesson repeats them) and `Plan`, her plan
+    Porto · Added by you`, so no lesson repeats them; never how long they
+    are, which each lesson's row says for itself) and `Plan`, her plan
     for them with their latest level as a chip beside its name. Nothing here
     is changed with a big `Change`, `Edit details` or `Write` button (9
     November 2026, Dan), and there is one tiny lucide pencil for each thing,
@@ -662,11 +663,21 @@ free times and removes selected times that cannot be booked in the new place.
     no dashed outline and no separator above its toolbar. At the end of that
     same line, a small soft `Already paid` toggle (same words and state: organic
     capsule, small checkbox, strong blue once checked) on a past lesson she
-    added, and its notes as a small pencil named `Add notes`, `Notes` or, while
-    open, `Close`, with its homework chip beside it (`Draft`, `With them`,
-    `To review`, `Done`); on a narrow row those wrap together beneath. While a
-    lesson's details are open the date row is its disclosure and the pencil
-    steps aside, as Homework is among those details. Its own facts are the
+    added, and a small pencil named `Change lesson`, which opens that lesson
+    in place on its change form, as every pencil on her pages edits the thing
+    beside it (11 November 2026, Dan, of a pencil that opened notes and
+    homework: "the arrow opens homework which we removed?"); on a narrow row
+    those wrap together beneath. While a lesson's details are open the date
+    row is its disclosure and the pencil steps aside, as `Change` is among
+    those details.
+    Homework and lesson notes are hidden for now, on her pages and
+    students' (11 November 2026, Dan: "Hide homework for now"): no `Homework`
+    button in an opened lesson, no homework chip or `Homework to review`, and
+    a student's past lessons neither show nor ask for homework. Nothing is
+    deleted; `features.homework` in the tutor's record brings it back, and
+    what follows about homework describes it as it then is: reached from an
+    opened lesson's `Homework`, with its chip (`Draft`, `With them`, `To
+    review`, `Done`) on the lesson's row. Its own facts are the
     second line, one wrapping line after the site's small lilac paint dab, as
     the shared facts are; `Cancelled`, `No-show` and `Happening now` are bold
     words in that line, not pills. Every secondary action here (`Show weeks`,
@@ -686,10 +697,10 @@ free times and removes selected times that cannot be booked in the new place.
     (`Sam’s lesson, Tue 22 Sept, 09:30–10:30`) with no scrim, scroll lock or
     focus trap and nothing else closed: focus moves to it, `Esc` or its close
     returns focus to the lesson, a saved change says so in the dashboard's
-    live message. Its notes and its details are never open at once. The pencil
-    opens the homework steps in the row, which then spans the list. Eight
+    live message. Its notes and its details are never open at once. Eight
     past lessons show, the rest behind `12 earlier lessons`. Homework to
-    review opens that lesson's row.
+    review opens the homework steps in that lesson's row, which then spans
+    the list.
   No duplicate To do list or separate student profile popup.
   Student cards sit side by side according to the list's available width,
   with one column on phones. An opened card spans the whole list so details,
@@ -917,7 +928,11 @@ free times and removes selected times that cannot be booked in the new place.
   A fact every one of their lessons shares, such as `In Porto` or `Added by
   you`, is said once on the dashboard's `Every lesson` row, and each lesson
   keeps only what is its own (9 November 2026, Dan: "we don't need all the
-  information repeating"). With a single lesson, its row says it all.
+  information repeating"). With a single lesson, its row says it all. How
+  long a lesson is always stays on its row, `60 mins` or `90 mins`, even when
+  every lesson is the same length (11 November 2026, Dan: "why doesn't it
+  show her time of lesson here? 60 or 90"): one can be 60 and the next 90,
+  and she can correct either.
   Each section uses a responsive grid of lesson rows: three across where
   14.5 rem tiles fit, two as the card narrows, one column on phones, packed so
   a short row leaves no hole under it while still reading in date order (9
@@ -2236,16 +2251,22 @@ Thursdays at 16:00`, `They become 90 minutes, €35 each`, `They move online`,
 which stay as they are and why, `Tue 1 Dec stays as it is: it's already
 paid`, and that one email goes), and `Save changes` waits as the quiet
 outline until something differs. Where the form has room, date sits beside
-time and length beside place. Every week means every later lesson takes the
+time and length beside place, and the buttons sit at the right of the dabs,
+level with the last of them, never on a row of their own beneath
+(11 November 2026, Dan: "there's space on the right so the buttons can go
+there"); on a phone they follow the dabs. Every week means every later lesson takes the
 new day and time in its own week, so the dab is what happens. A lesson
 already had is corrected in the same form (11 November 2026, Dan: "Ines
 should be able to change previous lessons to like from 60 to 90 too"):
 with nothing of it on a card it offers date, time, length and place with
 the same dabs (`Becomes 90 minutes, €30`), no `Every week` choice, a new
-time that stays in the past, and the dab `No email is sent`. One paid,
-ticked `Already paid`, free, a trial or on their card keeps its length and
-place, offers only the date and time, and says why in a dab (`Length and
-place stay: it's on their card`). Both `Change` and
+time that stays in the past, and the dab `No email is sent`. One a card has
+paid, free, a trial or on their card keeps its length and place, offers
+only the date and time, and says why in a dab (`Length and place stay: it's
+on their card`). A lesson ticked `Already paid`, past or to come, is never
+held by its tick ("even if it's already marked as paid Ines should be able
+to change it"): it takes the change and a dab says `Stays marked as paid`.
+Both `Change` and
 `Cancel` start on `This lesson`; cancelling keeps `Cancel this lesson?`, with
 what happens as a dab. Cancelling every week reads `Cancel these lessons?`,
 lists how many and between which days, and confirms with `Yes, cancel 8

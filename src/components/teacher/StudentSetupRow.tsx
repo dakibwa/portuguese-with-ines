@@ -13,6 +13,7 @@ import { setStudentDormant, updateStudentDetails, type AdminStudent } from "@/li
 import { dateKey, dateLabel, hasLessons, type StudentProgress } from "@/lib/teacher-calendar";
 import { formatMoneyCents } from "@/lib/booking-api";
 import { defaultStudentMark } from "@/lib/student-marks";
+import { HOMEWORK } from "@/lib/tutor";
 
 /** Their profile, or one piece of it open in its place. */
 export type StudentPanel = "history" | "lessons" | "invite" | "come-back";
@@ -340,7 +341,7 @@ export function StudentSetupRow({ student, progress, token, step: requestedStep,
       {nextButton}
     </div> : null}
     {attention ? <div className="teacher-setup__attention">{attention}</div> : null}
-    {student.homeworkToReview?.length ? <div className="teacher-homework-return">
+    {HOMEWORK && student.homeworkToReview?.length ? <div className="teacher-homework-return">
       <button type="button" data-homework-exit disabled={disabled} onClick={() => onHomework?.(student.homeworkToReview![0].bookingId)}>
         Homework to review
         <span className="teacher-homework-return__count" aria-label={`${student.homeworkToReview.length} waiting`}>{student.homeworkToReview.length}</span>

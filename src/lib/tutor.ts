@@ -28,3 +28,11 @@ export const LANGUAGE_CODE = record.language.code;
 export const TUTOR_SUBJECT = record.pronouns.subject;
 export const TUTOR_OBJECT = record.pronouns.object;
 export const TUTOR_POSSESSIVE = record.pronouns.possessive;
+/**
+ * Whether lesson homework and lesson notes are offered, on her pages and
+ * students'. Hidden for now (11 November 2026, Dan, of a lesson row's pencil:
+ * "the arrow opens homework which we removed?", then "Hide homework for
+ * now"). Nothing is deleted: the Worker's routes and tables are untouched, and
+ * `features.homework` in the tutor's record brings it all back.
+ */
+export const HOMEWORK = record.features.homework;

@@ -6099,7 +6099,8 @@ await test("Inês changes a weekly run's length from one lesson on, and cancels 
     await drain();
     const rows = () => db.prepare("SELECT * FROM bookings WHERE student_id='lena' ORDER BY starts_at").all();
     const [first, second, third, fourth] = rows();
-    db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(third.id);
+    // A card has paid for the third week, so it keeps its length.
+    db.prepare("UPDATE bookings SET payment_status='paid', stripe_payment_intent='pi_lena_third' WHERE id=?").run(third.id);
     // Bob's lesson straight after the fourth week: 90 minutes would run into it.
     booking("bob-after-lena", { owner: "bob", start: "2026-12-22T11:00:00.000Z", end: "2026-12-22T12:00:00.000Z" });
     sentEmails.length = 0;
@@ -6126,10 +6127,16 @@ await test("Inês changes a weekly run's length from one lesson on, and cancels 
     assert.deepEqual(sentEmails.map((mail) => mail.subject), ["Inês has changed your lessons to 90 minutes — from Tue 8 Dec, 10:00"]);
     assert.match(sentEmails[0].text, /€30/);
 
-    // One lesson on its own, with its own email.
+    // One lesson on its own, with its own email. Ticked "Already paid", it
+    // still changes, and stays ticked at the new length's price (11 November
+    // 2026, Dan: "even if it's already marked as paid Ines should be able to
+    // change it").
+    db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(first.id);
     sentEmails.length = 0;
     const one = await call(`/admin/bookings/${first.id}/length`, { user: "teacher", body: { lessonType: "long", expectedPriceCents: 3000 } });
     assert.deepEqual((await one.json()).changed, ["2026-12-01T10:00:00.000Z"]);
+    assert.deepEqual({ ...db.prepare("SELECT lesson_type_id, amount_cents, payment_status, payment_consent_version FROM bookings WHERE id=?").get(first.id) },
+      { lesson_type_id: "long", amount_cents: 3000, payment_status: "not_required", payment_consent_version: "paid-by-hand" });
     await drain();
     assert.match(sentEmails[0].subject, /^Inês has changed your lesson to 90 minutes/);
 
@@ -6171,7 +6178,8 @@ await test("Inês changes when, how long and where for every week from one, acro
     assert.equal(before.length, 12);
     const [first, second, , fourth] = before;
     const seriesId = first.series_id;
-    db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(fourth.id);
+    // A card has paid for the fourth week, so it cannot take another length.
+    db.prepare("UPDATE bookings SET payment_status='paid', stripe_payment_intent='pi_wendy_fourth' WHERE id=?").run(fourth.id);
     db.prepare("UPDATE bookings SET student_changed_at=? WHERE id=?").run(new Date().toISOString(), second.id);
     // Bob at 21:00 on Thursday 5 November: the fifth week's new 20:00–21:30 would run into it.
     booking("bob-thursday", { owner: "bob", start: "2026-11-05T21:00:00.000Z", end: "2026-11-05T22:00:00.000Z" });
@@ -6359,8 +6367,12 @@ await test("her change corrects a lesson already had, a record included, quietly
     assert.deepEqual(await error(await change("fix-record", { startAt: "2026-12-01T09:00:00.000Z" })), [409, "A lesson already had stays in the past. Add a new lesson instead."]);
     assert.deepEqual(await error(await change("fix-record", { following: true, location: "online" })), [400, "A lesson already had changes on its own."]);
     assert.equal((await length("fix-open", { lessonType: "single", expectedPriceCents: 2000, following: true })).status, 400);
-    // Ticked Already paid, or on their card, it keeps what it is.
-    assert.deepEqual(await error(await change("fix-ticked", { location: "porto" })), [409, "This lesson stays as it was: it's already paid."]);
+    // Ticked Already paid, it is still hers to correct, and stays ticked at
+    // the new length's price (11 November 2026).
+    assert.deepEqual(await (await change("fix-ticked", { ...longer, location: "porto" })).json(), { changed: ["2026-09-04T09:00:00.000Z"], kept: [], emailed: false });
+    assert.deepEqual(row("fix-ticked"), ["2026-09-04T09:00:00.000Z", "2026-09-04T10:30:00.000Z", "long", "porto", 3000, "not_required"]);
+    assert.equal(db.prepare("SELECT payment_consent_version FROM bookings WHERE id='fix-ticked'").get().payment_consent_version, "paid-by-hand");
+    // On their card, it keeps what it is.
     assert.deepEqual(await error(await length("fix-card", longer)), [409, "This lesson keeps its length: it's on their card."]);
     assert.deepEqual(await error(await change("fix-card", { location: "porto" })), [409, "This lesson stays as it was: it's on their card."]);
     assert.deepEqual(row("fix-card").slice(2), ["single", "online", 2000, "scheduled"]);

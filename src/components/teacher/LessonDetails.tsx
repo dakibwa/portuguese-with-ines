@@ -1,6 +1,6 @@
 "use client";
 
-import { IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
+import { HOMEWORK, IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { X, ArrowLeft, Check, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
@@ -49,7 +49,8 @@ type Props = {
   afterChangeFocusRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onChanged: (message: string) => void;
-  initialAction?: "view" | "refund";
+  /** What it opens on: the lesson, its refund, or (from the row's pencil) its change form. */
+  initialAction?: "view" | "refund" | "change";
   /**
    * A modal dialog over the page, as her timetable opens a lesson, or the same
    * details laid out in place within a student's dashboard: no scrim, no page
@@ -84,11 +85,13 @@ function keptLine(kept: KeptLesson[]) {
 
 /**
  * Why a lesson can't take another length, as the Worker decides it, or "".
- * Paid, due or being paid lessons keep theirs; a free one keeps it unless the
- * new length is free too.
+ * One a card has paid, or with a payment due or going through, keeps its
+ * length; a free one keeps it unless the new length is free too. Ticked
+ * "Already paid" never holds her back (11 November 2026, Dan: "even if it's
+ * already marked as paid Ines should be able to change it").
  */
 function lengthHeld(lesson: AdminBooking, cents: number) {
-  if (paidByHand(lesson) || lesson.payment_status === "paid") return "it's already paid";
+  if (lesson.payment_status === "paid") return "it's already paid";
   if (lesson.payment_status === "payment_due") return "it has a payment due";
   if (lesson.payment_status === "processing" || lesson.charge_started_at) return "its payment is going through";
   if (lesson.payment_status === "free" && cents > 0) return "it's free";
@@ -107,7 +110,7 @@ function changeHeld(lesson: AdminBooking, length: "single" | "long" | null, cent
  * decides it, or "": only one with nothing on a card can (11 November 2026).
  */
 function pastHeld(lesson: AdminBooking) {
-  if (paidByHand(lesson) || lesson.payment_status === "paid") return "it's already paid";
+  if (lesson.payment_status === "paid") return "it's already paid";
   if (lesson.payment_status === "payment_due") return "it has a payment due";
   if (lesson.payment_status === "processing" || lesson.charge_started_at) return "its payment is going through";
   if (lesson.payment_status === "free") return "it's free";
@@ -250,6 +253,8 @@ export function LessonDetails({
     }
     if (lengthChanges) dabs.push(`${lead("become", "becomes")} ${lengthMinutes} minutes, ${formatPriceCents(lengthCents)}${many > 1 ? " each" : ""}`);
     if (placeChanges) dabs.push(`${lead("move", "moves")} ${place === "online" ? "online" : `to ${TUTOR_CITY}`}`);
+    // The tick is hers and a change never takes it off (11 November 2026).
+    if (lengthChanges && changing.some(paidByHand)) dabs.push(changing.length > 1 ? "Any marked as paid stay marked as paid" : "Stays marked as paid");
     return dabs;
   })();
   const changeDirty = timeMoves || lengthChanges || placeChanges;
@@ -534,7 +539,7 @@ export function LessonDetails({
   // and in the timetable modal beneath what happened. Both are the quiet chip
   // at their own width (10 November 2026, Dan: one way for each thing); the
   // modal's one filled button is its call.
-  const homeworkTrigger = booking.student_id ? <button className="teacher-quiet teacher-lesson-homework" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null;
+  const homeworkTrigger = HOMEWORK && booking.student_id ? <button className="teacher-quiet teacher-lesson-homework" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null;
   // One way to change a lesson, as a student has, and one to cancel it
   // (10 November 2026, Dan). Each starts on This lesson.
   const defaultActions = (

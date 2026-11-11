@@ -6,7 +6,7 @@ import { readSession, type MyBooking } from "@/lib/auth-api";
 import { clockDiffersFromPorto, formatBookedLessonLabel, formatShortDay, formatSlotTime, formatTimeIn } from "@/lib/booking-api";
 import { BOOKING_TIME_ZONE } from "@/lib/config";
 import { fetchHomework, type HomeworkSummary } from "@/lib/homework-api";
-import { IN_PERSON, LANGUAGE_CODE, TUTOR_NAME } from "@/lib/tutor";
+import { HOMEWORK, IN_PERSON, LANGUAGE_CODE, TUTOR_NAME } from "@/lib/tutor";
 
 /** The latest few, then the rest on request, so a long history stays short. */
 const SHOWN = 6;
@@ -64,7 +64,8 @@ export function PastLessons({ bookings, clock, onOpenHomework, onOpenLesson, zon
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
+    // Hidden, homework is not even asked for.
+    if (!token || !HOMEWORK) return;
     const controller = new AbortController();
     void fetchHomework(token, controller.signal).then(result => {
       if (readSession() !== token) return;

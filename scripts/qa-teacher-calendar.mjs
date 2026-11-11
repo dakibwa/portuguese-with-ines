@@ -1375,6 +1375,16 @@ try {
   await recordedTick.scrollIntoViewIfNeeded();
   const tickBox = await recordedTick.boundingBox();
   assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[role="checkbox"]') !== null, { x: tickBox.x + tickBox.width / 2, y: tickBox.y + tickBox.height / 2 }), true, "Already paid stays pressable over the stretched day button");
+  // Marked as paid, it is still hers to change, and a change leaves it marked
+  // (11 November 2026, Dan: "even if it's already marked as paid Ines should
+  // be able to change it").
+  // The row's pencil opens the lesson straight on its change form, as every
+  // pencil on her pages edits the thing beside it.
+  await recorded.getByRole("button", { name: /^Change lesson · Thu 27 Aug/ }).click();
+  const tickedDetails = recorded.locator(".teacher-lesson-row__details");
+  await tickedDetails.getByRole("radio", { name: "90 mins, €36", exact: true }).check();
+  await expect(tickedDetails).toContainText("Stays marked as paid");
+  await tickedDetails.getByRole("button", { name: "Close lesson details", exact: true }).click();
   // Unticked, a record is open like any past lesson she added: the tick stays,
   // and nothing says it was recorded (11 November 2026, Dan).
   await recordedTick.click();
@@ -1385,6 +1395,8 @@ try {
   const recordDetails = recorded.locator(".teacher-lesson-row__details");
   await expect(recordDetails).toContainText("€24 · to pay you directly");
   await expect(recordDetails).not.toContainText(/recorded/i);
+  // Homework is hidden for now (11 November 2026, Dan), so nothing here opens it.
+  await expect(recordDetails.getByRole("button", { name: "Homework", exact: true })).toHaveCount(0);
   await recordDetails.getByRole("button", { name: "Change lesson", exact: true }).click();
   await expect(recordDetails.getByRole("radio", { name: "This lesson", exact: true })).toHaveCount(0);
   await recordDetails.getByRole("radio", { name: "90 mins, €36", exact: true }).check();
@@ -1672,9 +1684,10 @@ try {
     await expect(history.getByRole("heading", { name: "Upcoming · 5" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 4" })).toBeVisible();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
-    // What every lesson shares is said once above them, not on each card.
-    await expect(history.locator(".teacher-fact").filter({ hasText: "Every lesson" })).toContainText("60 mins");
-    await expect(history.locator(".teacher-history-lesson").filter({ hasText: "60 mins" })).toHaveCount(0);
+    // What every lesson shares is said once above them, not on each card;
+    // how long each one is stays on its row (11 November 2026, Dan: "60 or 90").
+    await expect(history.locator(".teacher-fact").filter({ hasText: "Every lesson" }).filter({ hasText: "60 mins" })).toHaveCount(0);
+    await expect(history.locator(".teacher-history-lesson").filter({ hasText: "60 mins" }).first()).toBeVisible();
     const run = history.locator(".teacher-history-run");
     await expect(run).toContainText("Every Tuesday");
     await expect(run).toContainText("09:30–10:30");
