@@ -1184,7 +1184,8 @@ in place of the header and banner (12 October and 9 November 2026, at Dan's
 request). The banner or bar names the page, so the booking card
 carries no second `Book a lesson` title of its own (its title is kept for
 screen readers): a first-time visitor's card opens on the lesson's choices,
-and a returning one's on `Already booked? Sign in`. Signing in or making an
+and every signed-out visitor's card on `Already booked? Sign in` too.
+Signing in or making an
 account halfway through a booking keeps `Book a Lesson` until Your lessons
 opens, so the banner never changes under the booking being finished (13
 October 2026).
@@ -1358,11 +1359,11 @@ before, is not offered the trial (Inês signing in, or an account made and never
 booked, does not count); that is settled as booking opens, so creating an account at the
 confirmation never takes away the trial being booked. The bar's head offers
 `Your lessons` to a signed-in student and a coral `Already booked? Sign in`
-(`Sign in` alone on a phone) to a returning browser, leading the choices' own
-row wherever both fit. A first-time visitor sees
-no sign-in there, since booking asks for an account only at the confirmation;
-a quiet `Already booked? Sign in` line beneath the calendar still serves a
-student on a new browser. Signing in to view lessons shows the `Your account`
+(`Sign in` alone on a phone) to every visitor who is signed out, a first visit
+included, leading the choices' own row wherever both fit (11 November 2026,
+Dan: "can they just sign in immediately too?"): a student Inês added comes to
+sign in, not to book, so it is never below the calendar. Booking still asks
+for an account only at the confirmation. Signing in to view lessons shows the `Your account`
 card on its own, with no `Back` above it: the header's `Booking` starts
 afresh (27 October 2026, Dan). On wide screens the
 groups carry small `Lesson`, `Where`, `Length` and `Repeat` labels; on a phone,

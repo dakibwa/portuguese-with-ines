@@ -3047,19 +3047,6 @@ textarea,
   margin: 0;
 }
 
-/* The quiet way in for a student booked on another browser: a first visit
-   books first and makes an account at the end. */
-.booking-returning {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem 0.75rem;
-  margin: 1.1rem 0 0;
-  color: var(--lavender-ink);
-  font-size: 0.875rem;
-}
-
 /* Booking decisions animate only what they changed. Page-wide view snapshots
    looked polished in isolation but fought the guided mobile scroll, producing
    a fade, a pause, then a second large movement. The final state exists
@@ -3469,11 +3456,6 @@ textarea,
   margin: 0;
 }
 
-/* With nothing to show but its unseen title, the head takes no row. */
-.booking-bar__head--quiet {
-  display: contents;
-}
-
 .booking-bar__head h2:focus {
   outline: none;
 }
@@ -3487,7 +3469,7 @@ textarea,
   gap: 0.6rem;
 }
 
-/* A returning browser's `Already booked? Sign in` leads the choices' own row
+/* A signed-out visitor's `Already booked? Sign in` leads the choices' own row
    wherever both fit, level with their controls, and keeps a row above them
    where they don't, rather than always taking a line to itself. */
 @media (min-width: 561px) {
