@@ -17,7 +17,7 @@ import { readSession, subscribeToSession } from "@/lib/auth-api";
 
 type NavItem = { href: string; id: SitePage; label: string; note: string; mark: string };
 
-// On a phone the menu says what each page is for, beside its own mark.
+// The menu says what each page is for, beside its own mark.
 const navigation: NavItem[] = [
   { href: "/approach", id: "approach", label: "Approach", note: "How the lessons work", mark: "/visuals/v2-splats/conversation-splat-generated-v2.webp" },
   { href: "/lessons", id: "lessons", label: "Lessons", note: "Prices and lesson lengths", mark: "/visuals/v2-splats/lesson-format-splat-v2.svg" },
@@ -150,8 +150,8 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
 
       {/* The way into an account, in the booking page's bar (11 November
           2026, Dan: "can they just sign in immediately too?"): beside the
-          menu button; on a phone, where there is no room, it leads the menu
-          below. A student's page has their own menu instead. */}
+          menu button where there is room. It is also the last row of every
+          menu, below. A student's page has their own menu instead. */}
       {signInHere ? <a className="site-header__sign-in" href={publicAssetPath("/book/?view=lessons")}>Sign in</a> : null}
 
       <button
@@ -222,21 +222,6 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
             </button>
             {bar ? <AssetMark asset={bar.mark} className="site-header__mark" /> : null}
           </div>
-          {signInHere ? <div className="nav-mobile__account">
-            <a
-              aria-describedby="nav-mobile-note-account"
-              aria-label="Sign in"
-              className="nav-mobile__link nav-mobile__link--account"
-              href={publicAssetPath("/book/?view=lessons")}
-              onClick={() => setOpen(false)}
-            >
-              <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="nav-mobile__mark" lands />
-              <span className="nav-mobile__text">
-                <span className="nav-mobile__label">Sign in</span>
-                <span className="nav-mobile__note" id="nav-mobile-note-account">See or change your lessons</span>
-              </span>
-            </a>
-          </div> : null}
           <div className="nav-mobile__links">
             {navigation.map((item) => {
               const Destination = item.id === "book" ? "a" : Link;
@@ -256,6 +241,23 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
                 </span>
               </Destination>;
             })}
+            {/* Sign in closes the list on every page, at every width, for
+                anyone not signed in (11 November 2026, Dan: "can we add sign
+                in to the list permanently too please?"). Signed in, Booking
+                is already their lessons, so the list keeps its four places. */}
+            {signedIn ? null : <a
+              aria-describedby="nav-mobile-note-account"
+              aria-label="Sign in"
+              className="nav-mobile__link"
+              href={publicAssetPath("/book/?view=lessons")}
+              onClick={() => setOpen(false)}
+            >
+              <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="nav-mobile__mark" lands />
+              <span className="nav-mobile__text">
+                <span className="nav-mobile__label">Sign in</span>
+                <span className="nav-mobile__note" id="nav-mobile-note-account">See or change your lessons</span>
+              </span>
+            </a>}
           </div>
           <div className="nav-mobile__cta">
             <p>One to one, online or in {TUTOR_CITY}.</p>

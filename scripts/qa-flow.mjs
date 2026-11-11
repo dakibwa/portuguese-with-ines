@@ -262,7 +262,7 @@ for (const route of routes) {
 
     if (route.id === "booking") {
       // A visitor's way in: Sign in beside the menu button where the bar has
-      // room. On a phone it leads the menu instead, checked with the menu below.
+      // room. It also closes every menu's list, checked with the menu below.
       const signIn = page.locator(".site-header.is-bar .site-header__sign-in");
       if ((await signIn.isVisible()) !== (viewport.id === "desktop") || !(await signIn.getAttribute("href")).endsWith("/book/?view=lessons")) {
         throw new Error(`${viewport.id}: booking's bar should show Sign in where it has room, opening Your lessons.`);
@@ -538,13 +538,13 @@ if (bookingCalendar) {
   if (lockedOverflow.body !== "hidden" || lockedOverflow.html !== "hidden") {
     throw new Error(`The mobile menu should lock both scroll roots: ${JSON.stringify(lockedOverflow)}.`);
   }
-  if ((await page.locator("#site-nav-mobile .nav-mobile__links .nav-mobile__link").count()) !== 4) {
-    throw new Error("The mobile menu should contain the four primary destinations once each.");
-  }
-  // On a phone the bar has no room for it, so a visitor's Sign in leads the menu.
-  const menuSignIn = page.locator("#site-nav-mobile").getByRole("link", { name: "Sign in", exact: true });
-  if (!await menuSignIn.isVisible() || !(await menuSignIn.getAttribute("href")).endsWith("/book/?view=lessons")) {
-    throw new Error("On a phone the booking page's menu should lead with Sign in.");
+  // The four places once each, then Sign in, which closes every menu's list
+  // for anyone not signed in (11 November 2026).
+  const menuRows = page.locator("#site-nav-mobile .nav-mobile__links .nav-mobile__link");
+  const menuSignIn = menuRows.last();
+  if ((await menuRows.count()) !== 5 || (await menuSignIn.getAttribute("aria-label")) !== "Sign in" ||
+      !await menuSignIn.isVisible() || !(await menuSignIn.getAttribute("href")).endsWith("/book/?view=lessons")) {
+    throw new Error("A visitor's menu should hold the four places once each, then Sign in opening Your lessons.");
   }
   await page.getByRole("button", { name: "Close menu", exact: true }).click();
   await page.waitForTimeout(250);
