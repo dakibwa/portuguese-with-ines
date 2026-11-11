@@ -367,13 +367,16 @@ type Account = {
   minimumNoticeHours?: number;
   /** Whether a card can be saved from the account just now. */
   cardsAccepted?: boolean;
+  /** Lessons Inês added that they have had and a card can still pay for, oldest first; absent means none. */
+  outstandingLessons?: string[];
 };
 
 function isAccount(data: unknown): data is Account {
   return isApiRecord(data) && validStudent(data.student) && Array.isArray(data.bookings) && data.bookings.every(isApiLesson) &&
     (data.series === undefined || (Array.isArray(data.series) && data.series.every((series) =>
       isApiRecord(series) && typeof series.id === "string" && Boolean(series.id)
-    )));
+    ))) &&
+    (data.outstandingLessons === undefined || (Array.isArray(data.outstandingLessons) && data.outstandingLessons.every((id) => typeof id === "string" && Boolean(id))));
 }
 
 /** The account this session last read here, if it is recent enough to show while asking again. */

@@ -163,6 +163,72 @@ try {
     assert.deepEqual(combined.errors, []);
     await combined.page.close();
 
+    // Signing in asks for what is outstanding without any link naming it
+    // (11 November 2026, Dan); one paid in cash can be left out.
+    const preview = (body, savedCardKey = "") => ({ json: {
+      booking: approvedBookings[0], bookings: approvedBookings.filter(lesson => body.bookingIds.includes(lesson.id)),
+      savedCardKey, sameDayFeeCents: 500, minimumNoticeHours: 14 } });
+    const owedIds = approvedBookings.map(lesson => lesson.id);
+    const owed = await open(width, "/book/?signin=qa-owed-link", {
+      now: "2026-10-27T20:00:00Z",
+      reply: (endpoint, body) => {
+        if (endpoint === "/auth/email-link/confirm") return { json: { student, session: "qa-owed-session" } };
+        if (endpoint === "/me" && !body) return { json: { student, bookings: [added, weekly], series: [weeklyRun], sameDayFeeCents: 500, cardsAccepted: true, outstandingLessons: owedIds } };
+        if (endpoint === "/me/card/preview") return preview(body);
+        if (endpoint === "/me/card") return { json: { checkoutUrl: "https://checkout.stripe.com/c/pay/qa-owed" } };
+        return null;
+      }
+    });
+    await owed.page.getByRole("button", { name: "See my lessons", exact: true }).click({ timeout: 15000 });
+    const owedStep = owed.page.locator(".card-prompt");
+    await expect(owedStep.locator(".card-terms__total")).toHaveText("Charged now€30", { timeout: 15000 });
+    await expect(owedStep.locator(".card-terms__lessons--then")).toHaveText("Every Tuesday, 17:00€15");
+    await expect(owedStep.getByText("Already paid Inês for one? Tap it to leave it out.")).toBeVisible();
+    assert.deepEqual(owed.posts.find(post => post.endpoint === "/me/card/preview")?.body, { bookingIds: owedIds });
+    await owedStep.screenshot({ path: `tmp/qa/transition-kit/owed-${width}.png` });
+    const owedTiles = owedStep.locator(".card-terms__lesson--choice");
+    await owedTiles.first().click();
+    await expect(owedTiles.first()).toHaveAttribute("aria-pressed", "false");
+    await expect(owedStep.locator(".card-terms__total")).toHaveText("Charged now€15");
+    await owedStep.getByRole("button", { name: "I authorise card payments for this and future lessons" }).click();
+    assert.ok(await noOverflow(owed.page));
+    await owedStep.screenshot({ path: `tmp/qa/transition-kit/owed-left-out-${width}.png` });
+    await owedStep.getByRole("button", { name: "Agree & confirm payments" }).click();
+    await owed.page.waitForURL(/checkout\.stripe\.com/);
+    assert.deepEqual(owed.posts.find(post => post.endpoint === "/me/card")?.body, { consent: true, bookings: [approvedBookings[1]], bookingConsent: true });
+    assert.deepEqual(owed.errors, []);
+    await owed.page.close();
+
+    // A standing card is asked too; with its one lesson left out, the step
+    // is only their lessons, and this tab does not ask again.
+    const standing = await open(width, "/book/?view=lessons", {
+      session: "qa-standing-session",
+      now: "2026-10-27T20:00:00Z",
+      reply: (endpoint, body) => {
+        if (endpoint === "/me" && !body) return { json: { student: { ...student, hasCard: true, cardForAllLessons: true }, bookings: [{ ...added, paymentStatus: "scheduled" }],
+          series: [], sameDayFeeCents: 500, cardsAccepted: true, outstandingLessons: [owedIds[0]] } };
+        if (endpoint === "/me/card/preview") return preview(body, "qa-saved-card");
+        return null;
+      }
+    });
+    const standingStep = standing.page.locator(".card-prompt");
+    await expect(standingStep.getByRole("button", { name: "Authorise payments" })).toBeDisabled({ timeout: 15000 });
+    await expect(standing.page.locator(".lesson-overview")).toBeHidden();
+    await standingStep.screenshot({ path: `tmp/qa/transition-kit/standing-${width}.png` });
+    await standingStep.locator(".card-terms__lesson--choice").click();
+    await expect(standingStep.locator(".card-terms__agreement")).toHaveCount(0);
+    await expect(standingStep.getByRole("button", { name: "Authorise payments" })).toHaveCount(0);
+    await standingStep.screenshot({ path: `tmp/qa/transition-kit/standing-left-out-${width}.png` });
+    await standingStep.getByRole("button", { name: "See your lessons", exact: true }).click();
+    await expect(standingStep).toHaveCount(0);
+    await expect(standing.page.locator(".lesson-overview")).toBeVisible();
+    await standing.page.reload();
+    await expect(standing.page.locator(".lesson-overview")).toBeVisible({ timeout: 15000 });
+    await expect(standingStep).toHaveCount(0);
+    assert.equal(standing.posts.filter(post => post.endpoint === "/me/card").length, 0);
+    assert.deepEqual(standing.errors, []);
+    await standing.page.close();
+
     // A link may finish after another tab has signed in. Its one-time reply
     // must preserve that newer session; leaving a card request behind must
     // also leave the visitor on the page they chose, rather than Stripe.

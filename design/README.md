@@ -1549,7 +1549,24 @@ Preserve these desktop and mobile states:
   reads `these and future lessons`. The dabs stay few (2 November 2026,
   Dan: the list was too long, but "I liked the bullets they are cute"): three
   sit over the capsule, `Future lessons are charged at the end of each lesson`
-  always first (10 November 2026), then the fee's two. Inês gets the same tick list from an unpaid
+  always first (10 November 2026), then the fee's two. The same step opens
+  by itself at every sign-in for a student with lessons already had that are
+  still owed (11 November 2026, Dan: "really obvious … when they sign in it
+  prompts them to add their card for their recurring lessons and pay for any
+  outstanding lessons", "even if they are already a user too"), whatever card
+  they have. There nobody ticked the lessons, so each `Outstanding lessons`
+  tile is a toggle: pressed, it will be paid; pressed again, it is left out,
+  dimmed as a disabled control is with its price struck through, and one
+  quiet line under them reads `Already paid Inês for one? Tap it to leave it
+  out.` (`Already paid Inês? …` for a single lesson). `Charged now`, the
+  caption and the capsule follow the lessons still in, and pressing a tile
+  clears the capsule's tick, since what is agreed has changed. With none left
+  in, the step is the plain card ask (`Agree & add card`) where lessons to
+  come still need a card; where nothing else is asked, the terms and the
+  capsule go and one quiet `See your lessons` closes it for the visit. What
+  was left out is not asked about again in that visit; a new visit asks
+  again. Lessons from Inês's own link stay fixed, with no toggles and no
+  line, since she ticked only what is still owed. Inês gets the same tick list from an unpaid
   lesson's dialog (`Create payment link`, small outline, the opened lesson
   ticked) and from a student's card on Students (`Payment link`, nothing
   ticked): `Tick what Jess still owes` and `Their future lessons then go on

@@ -10587,6 +10587,28 @@ dialog[open]::backdrop {
   background: var(--weekly);
   color: var(--blue);
 }
+/* An outstanding lesson from their own account is a toggle (11 November
+   2026: some were paid to Inês in cash). Pressed, it is paid; left out, it
+   takes the site's disabled look and its price is struck through, since it
+   no longer counts. */
+.card-terms__lesson--choice {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 160ms var(--motion-ease), opacity 160ms var(--motion-ease);
+}
+@media (hover: hover) {
+  .card-terms__lesson--choice:hover:not(:disabled) { border-color: var(--ink); }
+}
+.card-terms__lesson--choice:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.card-terms__lesson--choice:disabled { cursor: default; }
+.card-terms__lesson--choice.is-left-out { opacity: 0.5; }
+.card-terms__lesson--choice.is-left-out .card-terms__price { text-decoration: line-through; }
 /* When a lesson not yet due is charged, quietly under its total. */
 .card-terms__note {
   margin: 0;
