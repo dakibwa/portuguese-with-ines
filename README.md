@@ -179,12 +179,17 @@ but neither a server nor a network: it proves the real SQLite booking and
 payment state (charges, refunds, webhooks, clashes, clock changes, NIF, rates,
 permissions), with Stripe and email isolated. `test:teacher-calendar` proves
 Porto times across the clock changes and how hours and time off are stored.
+`test:reply-validation` proves the site refuses a reply from the Worker that
+it cannot read (a bad lesson, date, weekly run or saved hours) rather than
+showing it or reporting a change as done.
 
 The release then runs fourteen customer journeys against the built export it
 publishes, at desktop and phone widths, shared between four machines so they
 take about two minutes: `qa-flow`
-(public pages and a real booking, move and cancel), `qa-workspace-navigation`,
-`qa-booking-selection`, `qa-payment-recovery`, `qa-teacher-calendar` (Inês's
+(public pages, the booking page against the live Worker, and a student's
+account: moving, cancelling and weekly lessons), `qa-workspace-navigation`
+(the account's places and old links), `qa-booking-selection` (choosing lessons,
+agreeing and booking them), `qa-payment-recovery`, `qa-teacher-calendar` (Inês's
 schedule), `qa-homework`, `qa-transition-kit` (sign-in links and saving a card),
 `qa-meet-links`, `qa-student-nif`, `qa-profile-rates`, `qa-request-recovery`
 (paying lands on Stripe; a checkout return stays pending until confirmed),
@@ -192,8 +197,17 @@ schedule), `qa-homework`, `qa-transition-kit` (sign-in links and saving a card),
 price posted and the card form after booking) and `qa-expression-translations`
 (translation review and preserving unfinished expression edits). Each expects a static or
 development server at `QA_BASE_URL` (default `http://localhost:3000`); all but
-`qa-flow`'s booking use isolated API replies. A new check earns its place only
-by protecting a student, Inês or money in a way these don't already.
+`qa-flow`'s booking page use isolated API replies. A new check earns its place
+only by protecting a student, Inês or money in a way these don't already.
+
+The journeys were trimmed on 11 November 2026 (Dan: "can we check to see if
+all the tests associated with this site are still required or they've become
+cumbersome accidentaly"). Each path through the UI is now walked once, at one
+desktop and one phone width; what the site does with a malformed reply is
+proven in `test:reply-validation` with a few cases kept in the browser; and
+checks of pure looks (a colour, an alignment, a screenshot nobody compared)
+went, while anything about fitting on a phone, opening in view or being
+reachable stayed.
 
 ## Security maintenance
 
@@ -392,7 +406,7 @@ domains serve. There is no GitHub Pages preview any more: it needed the root of
 `dakibwa/dakibwa.github.io` to `dakibwa/portuguese-with-ines` on
 17 September 2026.
 
-A release takes about four minutes (11 November 2026, Dan: "I like fast
+A release takes about three minutes (11 November 2026, Dan: "I like fast
 relsases"; it had grown to ten). Three things start together: the booking
 Worker's tests and its deploy, the build, and the types, lint and unit tests.
 Once the Worker is live, its health is checked and the customer journeys run

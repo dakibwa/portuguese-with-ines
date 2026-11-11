@@ -208,10 +208,10 @@ jobs:
       fail-fast: false
       matrix:
         checks:
-          - qa-flow qa-workspace-navigation check-portfolio-banner
-          - qa-teacher-calendar qa-auth-recovery qa-payment-recovery
-          - qa-selection-calendar-recovery qa-meet-links qa-homework
-          - qa-transition-kit qa-request-recovery qa-booking-selection qa-expression-translations qa-profile-rates qa-student-nif
+          - qa-teacher-calendar qa-meet-links
+          - qa-flow qa-request-recovery qa-payment-recovery
+          - qa-selection-calendar-recovery qa-transition-kit qa-student-nif
+          - qa-homework qa-auth-recovery qa-workspace-navigation qa-expression-translations qa-booking-selection qa-profile-rates check-portfolio-banner
     steps:
       - name: Checkout
         uses: actions/checkout@v4
