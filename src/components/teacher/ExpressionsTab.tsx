@@ -11,9 +11,10 @@ import { ExpressionEditor } from "@/components/teacher/ExpressionEditor";
 import { TranslationsReview } from "@/components/teacher/TranslationsReview";
 import { deleteExpression, fetchExpressions, publishExpression, reorderExpressions, saveExpression } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
+import { forgetTranslations } from "@/lib/expression-translations-api";
 import { searchExpression, type Expression, type ExpressionInput } from "@/lib/expressions";
 
-export function ExpressionsTab({ token, accountId }: { token: string; accountId: string }) {
+export function ExpressionsTab({ token, accountId, onEditingChange, onReveal }: { token: string; accountId: string; onEditingChange?: (editing: boolean) => void; onReveal?: () => void }) {
   const [expressions, setExpressions] = useState<Expression[] | null>(null);
   /** Whether students can see expressions yet (the Worker's switch); unknown until the collection loads. */
   const [openToStudents, setOpenToStudents] = useState<boolean | null>(null);
@@ -33,6 +34,12 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
   const [refocus, setRefocus] = useState<string | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
+
+  // Keep the editor alive if she briefly visits another schedule tab.
+  useEffect(() => {
+    onEditingChange?.(editing !== null);
+    return () => onEditingChange?.(false);
+  }, [editing, onEditingChange]);
 
   useEffect(() => {
     active.current = true;
@@ -82,6 +89,7 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
   async function publish(item: Expression) {
     const saved = await publishExpression(token, item, item.published ? 0 : 1);
     if (canUpdate()) {
+      forgetTranslations(item.id);
       replace(saved);
       setNotice(!saved.published ? "Moved back to draft." : openToStudents
         ? "Published. Your students can now pick this expression."
@@ -99,8 +107,9 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
   const query = searchExpression(search.trim());
   const rows = expressions ?? [];
   const themes = [...new Set(rows.flatMap((row) => row.tags))].sort((a, b) => a.localeCompare(b, "pt"));
-  const visible = rows.filter((row) => (!theme || (theme === "__unthemed" ? !row.tags.length : row.tags.includes(theme))) &&
-    (!query || searchExpression([row.expression, row.meaningPt, row.meaningEn, row.literalEn, ...row.examples, row.notes, ...row.tags].join(" ")).includes(query)));
+  // A filter may hide a reading card, but never unmount a card she is writing.
+  const visible = rows.filter((row) => row.id === editing || ((!theme || (theme === "__unthemed" ? !row.tags.length : row.tags.includes(theme))) &&
+    (!query || searchExpression([row.expression, row.meaningPt, row.meaningEn, row.literalEn, ...row.examples, row.notes, ...row.tags].join(" ")).includes(query))));
   const filtered = Boolean(query || theme);
 
   return (
@@ -114,7 +123,7 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
           <Link className="teacher-quiet" href="/idioms/">
             View page
           </Link>
-          <button className="button button--coral button--small" ref={addButton} type="button" disabled={!expressions || busy || editing === "new"}
+          <button className="button button--coral button--small" ref={addButton} type="button" disabled={!expressions || busy || editing !== null}
             onClick={() => open("new")}>
             <Plus size={17} aria-hidden="true" />
             Add an expression
@@ -145,14 +154,14 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
       <div className="teacher-expressions__list" ref={list}>
         {editing === "new" ? (
           <div className="teacher-expression is-editing" data-expression-id="new">
-            <ExpressionEditor expression={null} onSave={(input) => save(input, null)} onDelete={async () => {}} onClose={() => close("new")} />
+            <ExpressionEditor expression={null} onReveal={onReveal} onSave={(input) => save(input, null)} onDelete={async () => {}} onClose={() => close("new")} />
           </div>
         ) : null}
         {visible.map((item) => {
           const index = rows.findIndex((row) => row.id === item.id);
           if (editing === item.id) return (
             <div className="teacher-expression is-editing" data-expression-id={item.id} key={item.id}>
-              <ExpressionEditor expression={item} onSave={(input) => save(input, item)} onDelete={() => remove(item)} onClose={() => close(item.id)} />
+              <ExpressionEditor expression={item} onReveal={onReveal} onSave={(input) => save(input, item)} onDelete={() => remove(item)} onClose={() => close(item.id)} />
             </div>
           );
           return (
@@ -165,7 +174,7 @@ export function ExpressionsTab({ token, accountId }: { token: string; accountId:
                   <button className="teacher-icon-button" type="button" disabled={busy || filtered || index === rows.length - 1} aria-label={`Move ${item.expression} down`} onClick={() => void change(() => move(index, 1))}><ArrowDown size={18} aria-hidden="true" /></button>
                 </div>
               </div>
-              <ExpressionCard expression={item} edit={<EditPencil field="expression" label="Edit" disabled={busy} onEdit={() => open(item.id)} />} />
+              <ExpressionCard expression={item} edit={<EditPencil field="expression" label="Edit" disabled={busy || editing !== null} onEdit={() => open(item.id)} />} />
             </div>
           );
         })}

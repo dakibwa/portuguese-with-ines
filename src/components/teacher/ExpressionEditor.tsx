@@ -13,11 +13,12 @@ import { EMPTY_EXPRESSION, expressionInput, type Expression, type ExpressionInpu
  * is the same card, empty. Escape cancels; what cannot be saved is said at
  * its foot and the card stays open.
  */
-export function ExpressionEditor({ expression, onSave, onDelete, onClose }: {
+export function ExpressionEditor({ expression, onSave, onDelete, onClose, onReveal }: {
   expression: Expression | null;
   onSave: (input: ExpressionInput) => Promise<void>;
   onDelete: () => Promise<void>;
   onClose: () => void;
+  onReveal?: () => void;
 }) {
   const original = expressionInput(expression ?? EMPTY_EXPRESSION);
   const [draft, setDraft] = useState(original);
@@ -31,11 +32,39 @@ export function ExpressionEditor({ expression, onSave, onDelete, onClose }: {
   const lastField = useRef<HTMLElement | null>(null);
   const discardButton = useRef<HTMLButtonElement>(null);
   const backToEditing = useRef(false);
+  const destination = useRef<string | null>(null);
+  const discarded = useRef(false);
   const id = useId();
   const form = useRef<HTMLFormElement>(null);
   // The tick is disabled while it saves; a refusal hands focus back to it, so Escape still reaches the card.
   useEffect(() => { if (error && !busy) form.current?.querySelector<HTMLElement>(".teacher-edit-save, .button--coral")?.focus(); }, [error, busy]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(original) || themes !== original.tags.join(", ");
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      if (discarded.current) return;
+      event.preventDefault(); event.returnValue = "";
+    };
+    // Next's links can leave without unloading the document. Use the card's
+    // existing discard choice, including when the draft is on another tab.
+    const followLink = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!link || link.hasAttribute("download") || link.hasAttribute("data-terms-privacy") || (link.target && link.target !== "_self")) return;
+      const next = new URL(link.href);
+      if (!/^https?:$/.test(next.protocol) || (next.origin === location.origin && next.pathname === location.pathname && next.search === location.search && next.hash)) return;
+      event.preventDefault();
+      destination.current = next.href;
+      setConfirm("discard"); setError("");
+      onReveal?.();
+    };
+    window.addEventListener("beforeunload", warn);
+    document.addEventListener("click", followLink, true);
+    return () => {
+      window.removeEventListener("beforeunload", warn);
+      document.removeEventListener("click", followLink, true);
+    };
+  }, [dirty, onReveal]);
   useEffect(() => {
     if (confirm === "discard") discardButton.current?.focus();
     else if (!confirm && backToEditing.current) {
@@ -44,8 +73,15 @@ export function ExpressionEditor({ expression, onSave, onDelete, onClose }: {
     }
   }, [confirm]);
   // Typed text is never thrown away by one stray key: with changes, cancelling asks first.
-  const cancel = () => { if (dirty) { setConfirm("discard"); setError(""); } else onClose(); };
-  const back = () => { backToEditing.current = true; setConfirm(null); setError(""); };
+  const cancel = () => { destination.current = null; if (dirty) { setConfirm("discard"); setError(""); } else onClose(); };
+  const back = () => { destination.current = null; backToEditing.current = true; setConfirm(null); setError(""); };
+  const discard = () => {
+    discarded.current = true;
+    const next = destination.current;
+    destination.current = null;
+    onClose();
+    if (next) window.location.assign(next);
+  };
 
   async function act(remove = false) {
     if (pending.current) return;
@@ -115,7 +151,7 @@ export function ExpressionEditor({ expression, onSave, onDelete, onClose }: {
           <CancelEdit disabled={busy} onCancel={back} />
         </> : confirm === "discard" ? <>
           <span className="teacher-expression__confirm">Discard your changes?</span>
-          <button className="button button--coral button--small" ref={discardButton} type="button" onClick={onClose}>Discard</button>
+          <button className="button button--coral button--small" ref={discardButton} type="button" onClick={discard}>Discard</button>
           <CancelEdit onCancel={back} />
         </> : <>
           {expression ? <button className="teacher-quiet" type="button" disabled={busy} onClick={() => { setConfirm("delete"); setError(""); }}>Delete expression</button> : null}
