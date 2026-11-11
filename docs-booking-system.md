@@ -257,8 +257,12 @@ status:
   before it is charged and it is billed as it would be booked now: her lesson
   goes on the card if the student's standing agreement covers it, otherwise
   it is to be paid to her directly (`not_required`, unmarked); a lesson the
-  student booked goes back on their card only if it was on one when ticked
-  (under `PAYMENT_CONSENT_VERSION`). Its price is the student's current one,
+  student booked goes back on their card only if it was on one when ticked,
+  on the wording it had: its run's, or the one in force when they agreed, so a
+  lesson booked on the earlier lesson-day terms never comes back on stricter
+  ones. Unticked after it happened, a lesson of hers is open again as it
+  stood, `not_required` at its own price and off the card, as a record is: one
+  already had goes on a card only when a link names it. Its price is the student's current one,
   never above what they agreed at checkout, and €0 makes it free.
 - Offered only where nothing is settled by card: `scheduled` or
   `not_required` with no charge started, or `recorded`. A free lesson has
@@ -675,7 +679,9 @@ never signed in, every `student_*` email about them is held at the one sending
 point (lessons added, moved or cancelled, the Meet link, charges); her Google
 Calendar, the blocked time and the lesson's NIF are unaffected, and her own
 copy says they weren't emailed. Lesson, move and cancel replies carry
-`emailed: false` so her page says so. `POST /admin/students/:id/welcome` sends
+`emailed: false` so her page says so, and they carry it too for a student with
+no address at all: one who has signed in from her WhatsApp link is no longer
+held for a welcome, and still has nowhere to be emailed. `POST /admin/students/:id/welcome` sends
 their upcoming lessons and prices (below) and the one-click way in, then clears
 the flag, after which emails reach them as usual. Signing in themselves also
 ends the hold. Students made before this keep `awaiting_welcome = 0`, so
@@ -755,7 +761,10 @@ in and requests the usual `/me/email` confirmation link, and Your lessons asks
 again, before anything else and with nothing beneath it, if that request
 failed or the link had no hint. A link made before an address change stops
 working, as a welcome's does.
-`POST /admin/students/:id/details` sets name, phone, NIF and splat at any time.
+`POST /admin/students/:id/details` sets name, phone, NIF and splat at any time,
+and writes only the fields it is sent, as a student's own save does: her page
+sends the ones she changed, so a NIF or phone the student has saved since her
+list was read is never put back to what it was.
 It sets or corrects the email only while the student has never signed in (no
 password, Google link or sign-in); after that it answers 409 and the student
 changes it from their account. A changed address clears `email_verified_at`
@@ -843,12 +852,19 @@ recent changes, Inês's setup work, first lessons, waiting students, then ready
 students. The Students badge counts each actionable student once, plus general
 notices; it excludes waiting on student sign-in or cards. Returning after five minutes away reloads lessons and
 students, quietly: if the read fails, the lessons on screen stay and no error
-replaces them. Nothing polls.
+replaces them. It reloads her weekly hours, time off and online-only periods
+too, unless she has hours unsaved or a save under way: each save sends the
+whole week, or a date's whole set, as the page holds it, so a page that read
+them hours ago would put back what she has since changed on another device. An
+open student card reads its lessons again whenever her list is read. Nothing polls.
 
 The views add no endpoint or stored setup flags. A first welcome uses
 `{ "onlyIfWaiting": true }`: the Worker answers 409 `Their welcome has already
 been sent.` before spending the rate limit once the student has been welcomed
-or signed in. The Students card can still re-send deliberately.
+or signed in. The Students card can still re-send deliberately. First welcomes
+share one durable send per student, address and Porto day, so a racing press
+sends nothing twice and a send that failed and ran out of retries does not stop
+a later day's press.
 
 Inline setup uses the pure `gettingStarted()` selector over the same read:
 Email, Price, Lessons, Welcome, Signed in and Card. Checks mark completed
@@ -1275,6 +1291,11 @@ while validation runs. Inês's explicit calendar additions retain their override
   stranger reaching in and taking a slot months out; a student keeping their own
   standing time is the case it is meant to allow. Even at the current 84 days,
   a run starting a few weeks out would otherwise quietly lose its last weeks.
+- **A recipe is never swept while it is being written.** The housekeeping on
+  an availability read removes a recipe with no lessons (an abandoned card
+  setup's, once its 35-minute holds lapse) only when it is more than ten
+  minutes old: a recipe is written a moment before its first lesson is tied
+  to it, and taking it then failed that booking part way.
 - **One initial email each way, carrying every current lesson in one calendar
   file**, each event under its own booking's UID so a later change to one week
   still matches the entry already in her calendar. Twelve lessons must not mean
@@ -1299,7 +1320,12 @@ while validation runs. Inês's explicit calendar additions retain their override
   same compact change-booking controls, under `Change` set to `Every week`. It
   starts on the run's first lesson outside the notice window, the anchor the
   Worker lays the run out from, so keeping that time keeps every week in
-  place; a later lesson opened never shifts the earlier ones. Every proposed week is checked before
+  place; a later lesson opened never shifts the earlier ones. Each lesson
+  takes the new day and time in its own week of the run (the week it sits
+  nearest, counted from that anchor as her every-week change counts them, and
+  never two in one week), so a week the student cancelled, or one skipped when
+  the run was booked, stays out, and `filled_to` keeps its week too, so the
+  top-up never adds again a week it had already considered. Every proposed week is checked before
   one guarded database update moves the run and its series recipe; a newly
   claimed slot or concurrent individual change moves none of it. Each planned
   occurrence is guarded by its sequence as well as its prior slot.
@@ -1312,7 +1338,10 @@ while validation runs. Inês's explicit calendar additions retain their override
   the rest of the run moves; the new weekly time may not overlap it, and the
   response lists its start under `kept`. Each booking keeps its
   calendar UID, increments its sequence, and the student receives one combined
-  updated calendar email. Inês's copy follows the existing development pause.
+  updated calendar email, for every move: its `email_log` key names the run,
+  the lesson the move began from and that lesson's sequence, since a run's
+  sequences begin again at 0 with each week the top-up adds. Inês's copy
+  follows the existing development pause.
 - **Inês can change the length of, or cancel, a weekly lesson and every later
   week of its run in one go** (9 November 2026, Dan: "change recurring ones
   from 60 to 90 and they all change and she can cancel them all too"). Both
@@ -1429,9 +1458,12 @@ while validation runs. Inês's explicit calendar additions retain their override
   link sitting in the old mailbox would otherwise stay valid for its hour — and
   future lessons are re-addressed, as are past ones whose lesson payment or late
   change fee is still to settle: a card is charged after the lesson, so its
-  receipt or pay-now email goes to the new address. Other past and cancelled
-  lessons keep the address they were taken under, which is the record of what
-  happened.
+  receipt or pay-now email goes to the new address. Still to settle includes a
+  lesson already had and open to pay Inês (`not_required` or `recorded`, not
+  ticked `Already paid`), since a link of hers can put it on a card. A lesson
+  still holding the no-email stand-in always takes the address. Other past and
+  cancelled lessons keep the address they were taken under, which is the record
+  of what happened.
 - The confirming browser saves the renewed session without closing this
   account's profile editor. Confirmation updates the verified email while
   preserving newer drafts and independently saved name/NIF fields. The link's
@@ -1731,9 +1763,12 @@ and [Resend's delivered-message guidance](https://resend.com/docs/knowledge-base
     gets none.
 - A lesson booked, added or moved less than 36 hours before it starts gets no
   reminder: the confirmation or change email has just told the student. (Read
-  from `bookings.created_at` and the `student:rescheduled:` and
-  `student:series-moved:` keys in `email_log`, so a card saved or an address
-  changed does not suppress it.)
+  from `bookings.created_at` and the `student:rescheduled:`,
+  `student:series-moved:` and `student:series-length:` keys in `email_log`, so
+  a card saved or an address changed does not suppress it.) A whole-run email
+  counts only for the weeks it told of: those from the lesson it began from
+  (its `booking_id`) on. An earlier week her change from a later week never
+  touched keeps its reminder.
 - One reminder per version of a lesson (`student:reminder:<id>:<sequence>` in
   `email_log`). A lesson moved earlier is reminded at its new time; a cancelled
   one never is, and the row is read again just before sending.
@@ -2298,7 +2333,11 @@ cancelling.
   and calendar UID at SEQUENCE 0, so the invitation and the Google event are
   clean; the cancelled row is not changed. It keeps the same time, place,
   notes and student, and stays in its weekly run while that run is still
-  going (a stopped run's lesson stands on its own).
+  going (a stopped run's lesson stands on its own). Its name, email, phone and
+  clock are the account's as they are now, not the cancelled row's, which
+  keeps the address it was taken under: the new lesson's emails and manage
+  link go where the student now reads them. A cancelled trial is offered only
+  while it would still be their first lesson, as booking one is.
 - **Claimed like any booking.** The atomic slot claim decides: nothing
   overlapping, with no gap for a lesson Inês added and the usual gap for one
   the student booked, the availability revision, the notice window and the
@@ -2591,6 +2630,14 @@ slot reserved and surface in the teacher diary. A scheduled reconciliation
 retrieves a known refund id, or retries the same request for at most 23 hours
 when the response/id was lost. Only a succeeded refund marks the booking
 cancelled/refunded; never manually retry money without first checking Stripe.
+Stripe's plain refusal of a new refund (400, 402 or 404) is its last word, so
+the claim is not left waiting on it: a payment already refunded in full
+(`charge_already_refunded`, as after a refund made in Stripe's dashboard)
+cancels the lesson as refunded, and any other refusal gives the lesson back
+booked and paid and tells whoever asked. A key Stripe rejects (401, 403) is
+still retried. Her cancellation of a paid lesson also waives a late change fee
+still owed on it, once its payment page can take nothing, as her cancellation
+of an unpaid one does.
 Teacher creation uses the same atomic slot claim as student creation, and all
 move paths ignore expired setup holds. Whole-series duration changes require
 the displayed new price; unchanged-duration rows retain each agreed snapshot.
@@ -2857,7 +2904,9 @@ that connection. The existing Google sign-in client remains separate.
 - The student’s booking/manage views and Inês’s lesson details show **Join Google
   Meet** for online lessons. Confirmation and change emails include the link when
   ready; delayed links get a short follow-up email, and the day-before reminder
-  carries the link again when it is ready. The minute sweep also fills
+  carries the link again when it is ready. A week the nightly top-up adds is
+  told to nobody, so its link has no follow-up email either: the reminder and
+  the student's page carry it. The minute sweep also fills
   existing future lessons after connection.
 - Moving a lesson updates the same event. Changing to Porto removes the event’s
   conference; changing to online requests one. Cancelling cancels that event.

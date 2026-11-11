@@ -207,12 +207,14 @@ export function WeeklyTimetable({
   useLayoutEffect(() => {
     if (!pendingFocus.current) return;
     pendingFocus.current = false;
-    gridRef.current
-      ?.querySelector<HTMLButtonElement>(
-        `[data-slot-day="${focus.day}"][data-slot-minute="${focus.minute}"]`,
-      )
-      ?.focus();
-  }, [focus, mobileDay]);
+    const cell = (minute: number) => gridRef.current?.querySelector<HTMLButtonElement>(
+      `[data-slot-day="${focus.day}"][data-slot-minute="${minute}"]`,
+    );
+    // Taking a block outside her usual hours off the day shortens the grid as
+    // it is drawn, and the time she pressed goes with it: the nearest time
+    // still drawn takes focus, which otherwise fell to the page.
+    (cell(focus.minute) ?? cell(focusMinute))?.focus();
+  }, [focus, focusMinute, mobileDay]);
 
   /**
    * On a phone the day scrolls inside its box. It opens at her first teaching

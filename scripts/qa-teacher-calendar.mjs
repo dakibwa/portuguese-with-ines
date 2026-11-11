@@ -339,7 +339,8 @@ async function fixture(width, options = {}) {
         target.dormantEmailedAt = "2026-09-07T10:15:00.000Z";
         return route.fulfill({ json: { ok: true, student: target } });
       }
-      if (studentRoute[2] === "details") Object.assign(target, { name: data.name, email: data.email, phone: data.phone, nif: data.nif });
+      // Only the details she changed arrive, and only those are written.
+      if (studentRoute[2] === "details") Object.assign(target, Object.fromEntries(["name", "email", "phone", "nif"].filter(key => key in data).map(key => [key, data[key]])));
       if (studentRoute[2] === "prices") {
         target.ownPrices = Object.fromEntries(Object.entries(data.prices).filter(([, cents]) => cents !== null));
         const sixty = target.ownPrices[60];
@@ -1336,7 +1337,7 @@ try {
   const savedStudents = page.waitForResponse(isStudentRead);
   await noraProfile.getByRole("button", { name: "Save details", exact: true }).click();
   await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/nora/details").at(-1)?.data).toEqual(
-    { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "" });
+    { email: "nora@example.invalid" });
   await expect(nora.locator(".teacher-setup__notice")).toHaveText("Their details are saved.");
   await (await savedStudents).finished();
   const olderStudents = page.waitForResponse(isStudentRead);
@@ -1739,12 +1740,13 @@ try {
     assert.equal(await open.locator("button").count(), 0, "The name's button holds no other button");
     await detailsPencil.click();
     // The student chooses their splat elsewhere while this unrelated editor
-    // still holds its older account snapshot. Saving a phone never sends it.
+    // still holds its older account snapshot. Saving a phone sends the phone
+    // alone, so nothing they have saved since (a splat, a NIF) is put back.
     state.students.find(student => student.id === "sam").mark = "bloom";
     await history.getByLabel("Phone", { exact: true }).fill("+351 922 222 222");
     await history.getByRole("button", { name: "Save details", exact: true }).click();
     await expect.poll(() => state.writes.at(-1)?.path).toBe("/admin/students/sam/details");
-    assert.equal(Object.hasOwn(state.writes.at(-1).data, "mark"), false);
+    assert.deepEqual(state.writes.at(-1).data, { phone: "+351 922 222 222" });
     assert.equal(state.students.find(student => student.id === "sam").mark, "bloom");
     // Saved, the lines read again with focus on the pencil; closing returns her to their name.
     await expect(samRow.locator(".teacher-setup__notice")).toHaveText("Their details are saved.");

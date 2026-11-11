@@ -310,6 +310,18 @@ export function TeacherSchedule() {
     };
   }, [authAttempt]);
 
+  const showSchedule = useCallback((schedule: Awaited<ReturnType<typeof fetchSchedule>>) => {
+    const hours = hoursFromRules(schedule.rules);
+    setSavedHours(hours);
+    setDraftHours(hours);
+    setExceptions(schedule.exceptions);
+    savedPeriods.current = schedule.settings?.onlineOnlyPeriods ?? [];
+    wantedPeriods.current = null;
+    onlineRevision.current = schedule.settings?.onlineOnlyRevision ?? "0";
+    setOnlineOnlyPeriods(savedPeriods.current);
+    setIntervalMinutes(schedule.settings?.slotIntervalMinutes ?? 30);
+  }, []);
+
   useEffect(() => {
     if (!token || renewedSession.current === token) return;
     let active = true;
@@ -317,15 +329,7 @@ export function TeacherSchedule() {
     fetchSchedule(token)
       .then((schedule) => {
         if (!active || readSession() !== token) return;
-        const hours = hoursFromRules(schedule.rules);
-        setSavedHours(hours);
-        setDraftHours(hours);
-        setExceptions(schedule.exceptions);
-        savedPeriods.current = schedule.settings?.onlineOnlyPeriods ?? [];
-        wantedPeriods.current = null;
-        onlineRevision.current = schedule.settings?.onlineOnlyRevision ?? "0";
-        setOnlineOnlyPeriods(savedPeriods.current);
-        setIntervalMinutes(schedule.settings?.slotIntervalMinutes ?? 30);
+        showSchedule(schedule);
         setInitialised(true);
       })
       .catch((caught) => {
@@ -339,7 +343,24 @@ export function TeacherSchedule() {
     return () => {
       active = false;
     };
-  }, [token, scheduleAttempt]);
+  }, [token, scheduleAttempt, showSchedule]);
+
+  // Her hours and time off as another device may have left them. A save sends
+  // the whole week, or a date's whole set, as this page holds it, so a page
+  // that read them this morning would put back hours she has since closed on
+  // her phone. Never over anything she has not saved, or is saving, here; a
+  // read that fails is left for the next return.
+  const scheduleUnsaved = useRef(false);
+  scheduleUnsaved.current = hoursDirty || dayChanges.size > 0 || savingOnline || savingHours || savingDays;
+  const refreshSchedule = useCallback(async () => {
+    if (!token || readSession() !== token || scheduleUnsaved.current) return;
+    try {
+      const schedule = await fetchSchedule(token);
+      if (readSession() === token && !scheduleUnsaved.current) showSchedule(schedule);
+    } catch {
+      // Nothing to say: what she sees is what she had.
+    }
+  }, [token, showSchedule]);
 
   const reloadStudents = useCallback(async () => {
     if (!token || readSession() !== token) return;
@@ -422,10 +443,11 @@ export function TeacherSchedule() {
       setNow(new Date());
       void reloadBookings(true);
       void reloadStudents();
+      void refreshSchedule();
     };
     document.addEventListener("visibilitychange", returned);
     return () => document.removeEventListener("visibilitychange", returned);
-  }, [reloadBookings, reloadStudents]);
+  }, [reloadBookings, reloadStudents, refreshSchedule]);
 
   /** A notice that only tells her something, gone at once; a failed save puts it back and says so. */
   async function dismissNotice(key: string) {
@@ -825,7 +847,7 @@ export function TeacherSchedule() {
             setActiveTab("profile");
           }}
           onWelcome={(student) => void sendWelcome(student)}
-          onStudent={student => openStudent(student, "lessons")}
+          onStudent={(student, panel = "lessons") => openStudent(student, panel)}
           onDismiss={key => void dismissNotice(key)}
           onSeeAll={() => { setActiveTab("students"); document.getElementById("teacher-tab-students")?.focus({ preventScroll: true }); }}
         />

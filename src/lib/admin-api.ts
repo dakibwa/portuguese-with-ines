@@ -499,8 +499,8 @@ export function addStudent(token: string, input: StudentDetailsInput & { prices?
   }).then(data => studentReply(data));
 }
 
-/** Their details, all at once. Their email can change only until they first sign in. */
-export function updateStudentDetails(token: string, studentId: string, input: Omit<StudentDetailsInput, "mark">) {
+/** Their details: the ones she changed, the rest left as they are. Their email can change only until they first sign in. */
+export function updateStudentDetails(token: string, studentId: string, input: Partial<Omit<StudentDetailsInput, "mark">>) {
   return adminRequest<{ student: AdminStudent }>(token, `/admin/students/${encodeURIComponent(studentId)}/details`, {
     method: "POST",
     body: JSON.stringify(input),

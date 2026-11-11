@@ -1257,6 +1257,13 @@ That action reloads the account without repeating the change. Disable change
 controls while their save is pending. A payment form that fails to load offers
 `Try again` using the same held booking and checkout.
 Availability failures also offer `Try again` while retaining the selection.
+So does a failed read of the lessons on offer: until it succeeds the page does
+not know how lessons are paid, so a priced lesson cannot be confirmed and no
+payment terms are promised. An account read that succeeds only on `Try again`
+opens `Your lessons` as the first read would have, never an empty page.
+Coming back from Stripe's payment page with the browser's Back leaves the
+lesson's dialog usable. Changing a lesson's place keeps the chosen time's day
+on the clock that place is read on.
 When a longer lesson makes selected times overlap or removes the required gap,
 keep the earliest compatible times and explain which later times came off.
 Apply that check when retry completes while adding or changing a lesson, and

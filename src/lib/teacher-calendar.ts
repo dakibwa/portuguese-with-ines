@@ -922,16 +922,21 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
   for (const group of grouped(changedRows, (row) => row.series_id ? `${row.series_id}|${row.student_changed_at}` : row.id)) {
     const [booking] = group;
     for (const row of group) shown.add(row.id);
-    timed.push({ time: Date.parse(booking.starts_at), changed: Date.parse(booking.student_changed_at!), item: { kind: "changed", key: `changed:${booking.id}`, dismiss: `changed:${booking.id}:${Date.parse(booking.student_changed_at!)}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
+    timed.push({ time: Date.parse(booking.starts_at), changed: Date.parse(booking.student_changed_at!), item: { kind: "changed", key: `changed:${booking.id}`, dismiss: `changed:${booking.series_id ?? booking.id}:${Date.parse(booking.student_changed_at!)}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
   }
   // Booked again since (10 November 2026): their confirmed lesson at that start settles it.
   const bookedAgain = (row: AdminBooking) => lessons.some((other) => other.status === "confirmed" &&
     (other.student_id ?? other.student_email) === (row.student_id ?? row.student_email) && Date.parse(other.starts_at) === Date.parse(row.starts_at));
-  const cancelledRows = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at) && ahead(row.starts_at) && !bookedAgain(row));
+  const recentCancelled = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at));
+  const cancelledRows = recentCancelled.filter((row) => ahead(row.starts_at) && !bookedAgain(row));
   for (const group of grouped(cancelledRows, (row) => row.series_id || row.id)) {
     const [booking] = group;
-    const latest = Math.max(...group.map(row => Date.parse(row.cancelled_at!)));
-    timed.push({ time: Date.parse(booking.starts_at), changed: latest, item: { kind: "cancelled", key: `cancelled:${booking.id}`, dismiss: `cancelled:${booking.id}:${latest}`, booking, count: group.length } });
+    // What she dismisses is the run's notice, as of its latest cancellation:
+    // named for the next lesson still ahead, it changed as each week's time
+    // passed, and a notice she had dismissed came back.
+    const run = booking.series_id || booking.id;
+    const latest = Math.max(...recentCancelled.filter(row => (row.series_id || row.id) === run).map(row => Date.parse(row.cancelled_at!)));
+    timed.push({ time: Date.parse(booking.starts_at), changed: latest, item: { kind: "cancelled", key: `cancelled:${booking.id}`, dismiss: `cancelled:${run}:${latest}`, booking, count: group.length } });
   }
   for (const booking of confirmed) {
     if (booking.first_lesson && !booking.added_by_teacher && soon(booking.starts_at) && !shown.has(booking.id))

@@ -483,6 +483,21 @@ test("a dismissed change stays gone until the student changes that lesson again"
   const [once] = keys("2026-09-07T20:00:00Z");
   assert.deepEqual(keys("2026-09-07T20:00:00Z", new Set([once])), []);
   assert.deepEqual(keys("2026-09-08T09:00:00Z", new Set([once])), [`changed:l1:${Date.parse("2026-09-08T09:00:00Z")}`], "a second change is new");
+
+  // A weekly run's notice is the run's: named for its next lesson, it came
+  // back as each week's time passed.
+  const week = (id, day, extra) => ({ id, series_id: "run", student_name: "Roman", student_email: "roman@example.invalid",
+    starts_at: `2026-09-${day}T18:00:00Z`, ends_at: `2026-09-${day}T19:00:00Z`, ...extra });
+  const moved = { status: "confirmed", student_changed_at: "2026-09-07T20:00:00Z" };
+  const gone = { status: "cancelled", cancelled_by: "student", cancelled_at: "2026-09-07T20:00:00Z" };
+  for (const [kind, lessons, cancellations] of [
+    ["changed", [week("m1", "09", moved), week("m2", "16", moved)], []],
+    ["cancelled", [], [week("c1", "09", gone), week("c2", "16", gone)]]
+  ]) {
+    const notices = (at, dismissed) => needsYou({ now: new Date(at), meet: null, payments: [], students: [], lessons, cancellations, dismissed }).map((item) => item.dismiss);
+    const [dismissedOnce] = notices("2026-09-08T10:00:00Z");
+    assert.deepEqual(notices("2026-09-09T19:00:00Z", new Set([dismissedOnce])), [], `${kind}: still dismissed once the first week has passed`);
+  }
 });
 
 test("each student has three checks and one next step, grouped by whose move it is", () => {

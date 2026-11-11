@@ -1,12 +1,13 @@
 "use client";
 
-import { LANGUAGE_CODE } from "@/lib/tutor";
+import { LANGUAGE_CODE, TUTOR_TIME_ZONE } from "@/lib/tutor";
 import { useEffect, useRef, useState } from "react";
 import { fetchTranslationsToReview, reviewTranslation, type AdminTranslation, type TranslationStatus } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
 import { forgetTranslations } from "@/lib/expression-translations-api";
 
-const dateLabel = (value: string) => new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+// On her own clock, like every other date on her pages, wherever the device is.
+const dateLabel = (value: string) => new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: TUTOR_TIME_ZONE });
 
 /**
  * Students' translations waiting for Inês. Nothing a student writes is shown

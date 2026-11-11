@@ -90,8 +90,8 @@ export function StudentList({ token, students, workspace, error, sending, reques
   }, [expanded, busyStudent]);
   const noticeProps = {
     sending, onMeet, onWelcome, onDismiss,
-    onStudent: (student: AdminStudent) => {
-      if (!busyStudent) setExpanded({ studentId: student.id, panel: "lessons" });
+    onStudent: (student: AdminStudent, panel: "lessons" | "history" = "lessons") => {
+      if (!busyStudent) setExpanded({ studentId: student.id, panel });
     },
   };
 
