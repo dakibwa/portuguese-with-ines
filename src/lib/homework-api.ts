@@ -74,13 +74,8 @@ export async function teacherHomeworkRequest(token: string, id: string, action =
     (data.updatedAt !== null && typeof data.updatedAt !== "string") || (data.publishedAt !== null && typeof data.publishedAt !== "string")) throw invalid();
   return data;
 }
-/** The Worker reads up to this many photos in one request (HOMEWORK_PHOTO_LIMIT). */
+/** The Worker reads up to this many pictures with the notes (HOMEWORK_PHOTO_LIMIT). */
 export const HOMEWORK_PHOTO_LIMIT = 3;
-export async function transcribeHomeworkPhotos(token: string, id: string, images: string[], updatedAt: string | null, signal?: AbortSignal): Promise<{ notes: string; uncertain: string[] }> {
-  const data = await request(token, `/admin/lessons/${encodeURIComponent(id)}/homework/transcribe`, { images, updatedAt }, signal);
-  if (typeof data.notes !== "string" || !Array.isArray(data.uncertain) || !data.uncertain.every((s: unknown) => typeof s === "string")) throw invalid();
-  return data;
-}
 export async function fetchHomework(token: string, signal?: AbortSignal): Promise<HomeworkSummary[]> {
   const data = await request(token, "/me/homework", undefined, signal);
   if (!Array.isArray(data.homework) || !data.homework.every((h: HomeworkSummary) => h && typeof h.bookingId === "string" && typeof h.title === "string" && typeof h.lessonAt === "string")) throw invalid();
@@ -97,24 +92,24 @@ export async function saveHomeworkAnswers(token: string, id: string, progress: H
   return data.progress;
 }
 
-/** Canvas normalises orientation and strips the photo's original metadata. */
+/** Canvas normalises orientation and strips the picture's original metadata. */
 export async function prepareHomeworkPhoto(file: File): Promise<string> {
-  if (!file.type.startsWith("image/") || file.size > 20 * 1024 * 1024) throw new Error("Choose a photo smaller than 20 MB.");
+  if (!file.type.startsWith("image/") || file.size > 20 * 1024 * 1024) throw new Error("Choose a picture smaller than 20 MB.");
   let bitmap: ImageBitmap;
   try { bitmap = await createImageBitmap(file); }
-  catch { throw new Error("This photo format could not be opened. Try a JPEG, PNG or a screenshot of the photo."); }
+  catch { throw new Error("This picture could not be opened. Try a JPEG, a PNG or a screenshot of it."); }
   try {
-    if (bitmap.width * bitmap.height > 64_000_000) throw new Error("Choose a smaller photo of the lesson notes.");
+    if (bitmap.width * bitmap.height > 64_000_000) throw new Error("Choose a smaller picture of the lesson notes.");
     const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(bitmap.width * scale);
     canvas.height = Math.round(bitmap.height * scale);
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("This photo could not be opened. Try another one.");
+    if (!context) throw new Error("This picture could not be opened. Try another one.");
     context.fillStyle = "white"; context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     const data = canvas.toDataURL("image/jpeg", 0.86);
-    if (data.length > 2800000) throw new Error("This photo is too large. Crop it to just the lesson notes.");
+    if (data.length > 2800000) throw new Error("This picture is too large. Crop it to just the lesson notes.");
     return data;
   } finally { bitmap.close(); }
 }

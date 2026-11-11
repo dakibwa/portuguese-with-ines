@@ -48,7 +48,7 @@ processes. Avoid blunt reassurance, sales language and unnecessary jargon.
 
 Lesson homework stays attached to its lesson: for Inês on that lesson's row
 in the student's dashboard and in the lesson's details, for the student at the
-end of that lesson's row beneath their calendar on Your lessons. Photo notes and
+end of that lesson's row beneath their calendar on Your lessons. Her notes, pictures and
 drafts stay private until Inês reviews and publishes the sheet. Use short,
 level-appropriate European Portuguese instructions, recall and useful practice,
 with answers separate from questions. Offer Do online and Print worksheet.
@@ -58,17 +58,18 @@ belongs in the relevant student row, as a coral prompt with its count.
 Leaving a student's sheet saves their answers first. If saving fails, the site
 menu closes and focus goes to the error beside their answers so they can retry.
 Reading Terms & privacy opens its dialog without leaving or saving the sheet.
-Inês's new sheet is the booking journey's step structure, one decision per
-step (15 October 2026, Dan: "far too much text"): **What did you work on?**
-with one large lilac `Take a photo` blob (a coral dab carrying the camera, a
-splat cropped into its corner; it opens the phone camera) and small cream
-`Gallery` and `Type it` blobs; then **Level** and **Length** as booking's time
-blobs, the student's last level and 15 minutes already blue. Each tap moves on,
-taken decisions fold into booking's summary rows with `Change`, `Back` steps
-back, and the last step is one coral `Generate homework`. Each step's question
-is Beth Ellen under a small splat on the booking panel, and steps dissolve in
-as booking's do. While Claude works, a progress card says what is happening
-(`Reading your notes`, then `Writing the homework`) under the turning loading
+Inês's new sheet is one box and one button (11 November 2026, Dan: "it should
+be very simple, Inês should be able to paste in text or pictures and then it
+generates"; the four steps of 15 October asked her for a photo or typed notes,
+a level and a length before it would start). On the booking panel, under a
+small splat and the Beth Ellen question **What did you work on?**, sits one
+tall cream field whose placeholder is its only instruction: `Paste the chat,
+your notes or a picture`. Pictures she pastes, drops or adds wait beneath it
+as small squiggle tiles, each with a blue cross, beside a cream `Add a
+picture` blob; then one coral `Generate homework`. Nothing is chosen first:
+the level and length appear only afterwards, folded with her notes above the
+draft, as small blobs with the current one blue. While Claude works, a
+progress card says `Writing the homework` under the turning loading
 splat, with a coral line that fills quickly, then ever more slowly. No
 explanatory sentences: privacy is a lock icon whose words are on hover and for
 screen readers. The draft is a preview first, with `Fine-tune` (a dab that

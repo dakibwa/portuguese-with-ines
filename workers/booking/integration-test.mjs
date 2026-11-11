@@ -5430,13 +5430,13 @@ await test("homework defaults: a new sheet starts at the student's latest earlie
   assert.equal((await (await call(`/admin/lessons/${firstSheet}/homework`, { user: "teacher", method: "GET" })).json()).level, "A1", "a student's first sheet starts at A1");
 });
 
-await test("homework AI: bounded photo upload, reviewed notes, provider failure and shared usage ceiling", async () => {
+await test("homework AI: notes and pictures in one bounded request, the level judged once, provider failure and shared usage ceiling", async () => {
   const id = linkedBooking("homework-ai");
   const route = `/admin/lessons/${id}/homework`;
   const beforeFetch = globalThis.fetch;
-  let requests = 0, broken = false, refused = false, chatty = false, markingBody, revokeTeacherDuringAi = false;
+  let requests = 0, broken = false, markingBody, revokeTeacherDuringAi = false, asked;
   const image = `data:image/jpeg;base64,${btoa("\xff\xd8\xff" + "x".repeat(40000))}`;
-  env.HOMEWORK_AI_ENABLED = "1"; env.ANTHROPIC_API_KEY = "isolated-ai-key"; env.HOMEWORK_AI_MONTHLY_LIMIT = "4";
+  env.HOMEWORK_AI_ENABLED = "1"; env.ANTHROPIC_API_KEY = "isolated-ai-key"; env.HOMEWORK_AI_MONTHLY_LIMIT = "3";
   db.prepare("DELETE FROM homework_ai_usage").run();
   const reply = (name, input) => Response.json({ type: "message", role: "assistant", stop_reason: "tool_use",
     content: [{ type: "thinking", thinking: "", signature: "isolated" }, { type: "tool_use", id: "toolu_isolated", name, input }] });
@@ -5456,6 +5456,10 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     assert.equal(input.tools[0].strict, true);
     assert.equal(input.tool_choice.type, "auto", "current models reject forced tool choice");
     const name = input.tools[0].name;
+    if (name === "lesson_homework") {
+      const content = input.messages[0].content;
+      asked = { images: content.filter(part => part.type === "image"), ...JSON.parse(content.at(-1).text) };
+    }
     if (broken) return Response.json({ error: "private provider diagnostic" }, { status: 500 });
     if (name === "homework_marking") {
       assert.ok(!JSON.stringify(input.messages).includes("private teacher-only note"), "grading uses questions and answers, not private notes");
@@ -5469,51 +5473,49 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
       db.prepare("UPDATE students SET session_version = session_version + 1 WHERE id = 'alice'").run();
       return reply(name, { marks: [{ id: "q1", status: "correct", feedback: "O teu pedido está correto." }] });
     }
-    if (name === "lesson_transcription") {
-      if (revokeTeacherDuringAi) db.prepare("UPDATE students SET session_version=session_version+1 WHERE id='teacher'").run();
-      const images = input.messages[0].content.filter(part => part.type === "image");
-      assert.equal(images.length, 2, "several photos share one paid request");
-      assert.equal(images[0].source.type, "base64");
-      assert.equal(images[0].source.media_type, "image/jpeg");
-      assert.ok(!images[0].source.data.startsWith("data:"), "the data URL prefix is not sent as image data");
-    }
-    if (name === "lesson_homework" && refused) return Response.json({ type: "message", stop_reason: "refusal", content: [] });
-    if (name === "lesson_homework" && chatty) return Response.json({ type: "message", stop_reason: "end_turn", content: [{ type: "text", text: "Here is a sheet: …" }] });
-    return reply(name, name === "lesson_transcription" ? { notes: "No café: queria um café, por favor.", uncertain: ["Last word is unclear."] } : {
+    if (revokeTeacherDuringAi) db.prepare("UPDATE students SET session_version=session_version+1 WHERE id='teacher'").run();
+    return reply(name, {
+      photoNotes: "No café: queria um café, por favor.", level: "A2",
       title: "No café", objective: "Pedir no café.", reminder: "Recorda amanhã.",
       sections: [{ title: "Pratica", instruction: "Faz um pedido.", example: "", questions: [{ prompt: "Pede um café.", answer: "Queria um café, por favor.", explanation: "" }] }],
     });
   };
   try {
-    const raw = JSON.stringify({ images: [image, image], updatedAt: null });
-    assert.equal((await call(`${route}/transcribe`, { user: "bob", raw, headers: { "Content-Length": String(raw.length) } })).status, 401);
+    const usual = (await (await call(route, { user: "teacher", method: "GET" })).json()).level;
+    const input = { notes: "Pedidos no café.", level: usual, minutes: 10, updatedAt: null };
+    const raw = JSON.stringify({ ...input, images: [image, image] });
+    assert.equal((await call(`${route}/generate`, { user: "bob", raw, headers: { "Content-Length": String(raw.length) } })).status, 401);
     assert.equal(requests, 0, "unauthorised uploads never call a paid provider");
-    assert.equal((await call(`${route}/transcribe`, { user: "teacher", body: { image: "https://private.example/photo", updatedAt: null } })).status, 400, "an older tab's single photo is still validated");
-    assert.equal((await call(`${route}/transcribe`, { user: "teacher", body: { images: [image, image, image, image], updatedAt: null } })).status, 400, "four photos are too many");
-    assert.equal((await call(`${route}/transcribe`, { user: "teacher", body: { images: [image, "https://private.example/photo"], updatedAt: null } })).status, 400, "every photo is checked");
-    assert.equal(requests, 0, "rejected photos never reach the provider");
+    assert.equal((await call(`${route}/generate`, { user: "teacher", body: { ...input, images: [image, image, image, image] } })).status, 400, "four pictures are too many");
+    assert.equal((await call(`${route}/generate`, { user: "teacher", body: { ...input, images: [image, "https://private.example/photo"] } })).status, 400, "every picture is checked");
+    assert.equal((await call(`${route}/generate`, { user: "teacher", body: { ...input, notes: "" } })).status, 400, "nothing to read is nothing to write from");
+    assert.equal(requests, 0, "rejected material never reaches the provider");
     beforeRun = sql => {
       if (!sql.startsWith("INSERT INTO homework_ai_usage")) return;
       beforeRun = null;
       db.prepare("UPDATE students SET session_version=session_version+1 WHERE id='teacher'").run();
     };
-    assert.equal((await call(`${route}/transcribe`, { user: "teacher", raw })).status, 401);
+    assert.equal((await call(`${route}/generate`, { user: "teacher", raw })).status, 401);
     assert.equal(requests, 0, "ending a teacher session before the usage claim prevents paid AI work");
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM homework_ai_usage").get().n, 0);
     sessions.teacher = await createSession("teacher", env.BOOKING_TOKEN_SECRET, db.prepare("SELECT session_version FROM students WHERE id='teacher'").get().session_version);
-    const read = await call(`${route}/transcribe`, { user: "teacher", raw, headers: { "Content-Length": String(raw.length) } });
-    assert.equal(read.status, 200, await read.clone().text());
-    assert.equal((await read.json()).uncertain.length, 1);
-    const input = { notes: "Queria um café, por favor. Pedidos no café.", level: "A1", minutes: 10, updatedAt: null };
-    const generated = await call(`${route}/generate`, { user: "teacher", body: input });
+    const generated = await call(`${route}/generate`, { user: "teacher", raw, headers: { "Content-Length": String(raw.length) } });
     assert.equal(generated.status, 200, await generated.clone().text());
     const draft = await generated.json();
+    assert.equal(requests, 1, "her notes and both pictures share one paid request");
+    assert.equal(asked.images.length, 2);
+    assert.equal(asked.images[0].source.type, "base64");
+    assert.equal(asked.images[0].source.media_type, "image/jpeg");
+    assert.ok(!asked.images[0].source.data.startsWith("data:"), "the data URL prefix is not sent as image data");
+    assert.deepEqual([asked.level, asked.previousLevel ?? "A1", asked.lessonNotes], [null, usual, input.notes], "she is not asked for a level: a first draft's is judged, starting from the student's last");
+    assert.deepEqual([draft.level, draft.notes], ["A2", `${input.notes}\n\nNo café: queria um café, por favor.`], "the judged level, and what the pictures said, are saved with her notes");
     assert.equal(draft.publishedAt, null);
     assert.equal((await call(`/me/homework/${id}`, { method: "GET" })).status, 404);
     broken = true;
-    const failed = await call(`${route}/generate`, { user: "teacher", body: { ...input, updatedAt: draft.updatedAt } });
+    const failed = await call(`${route}/generate`, { user: "teacher", body: { ...input, level: "B1", updatedAt: draft.updatedAt } });
     assert.equal(failed.status, 503);
     assert.ok(!(await failed.text()).includes("private provider diagnostic"));
+    assert.deepEqual([asked.level, asked.images.length], ["B1", 0], "once a draft exists, the level on it is her choice");
     assert.equal((await (await call(route, { user: "teacher", method: "GET" })).json()).updatedAt, draft.updatedAt, "a failed generation leaves the draft alone");
     broken = false;
     const published = await call(`${route}/publish`, { user: "teacher", body: { ...input, notes: "private teacher-only note", sheet: draft.sheet, updatedAt: draft.updatedAt, reviewed: true } });
@@ -5531,7 +5533,7 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     assert.equal((await call(`/me/homework/${id}/submit`, { body: markingBody })).status, 200, "lost-response retry is idempotent");
     const secondLesson = linkedBooking("homework-ai-limit");
     assert.equal((await call(`/admin/lessons/${secondLesson}/homework/generate`, { user: "teacher", body: input })).status, 429);
-    assert.equal(requests, 4, "the monthly ceiling covers transcription, generation, marking and failed requests");
+    assert.equal(requests, 3, "the monthly ceiling covers generation, marking and failed requests");
     const manual = await call(`/admin/lessons/${secondLesson}/homework`, { user: "teacher", body: { ...input, sheet: draft.sheet } });
     const manualDraft = await manual.json();
     assert.equal((await call(`/admin/lessons/${secondLesson}/homework/publish`, { user: "teacher", body: { ...input, sheet: draft.sheet, updatedAt: manualDraft.updatedAt, reviewed: true } })).status, 200);
@@ -5540,14 +5542,15 @@ await test("homework AI: bounded photo upload, reviewed notes, provider failure 
     const fallback = await (await call(`/admin/lessons/${secondLesson}/homework`, { user: "teacher", method: "GET" })).json();
     assert.equal(fallback.progress.submission.marks.q1.status, "review");
     assert.equal(fallback.progress.submission.state, "submitted");
-    assert.equal(requests, 4, "manual review needs no paid retry");
-    assert.equal((await call(`${route}/transcribe`, { user: "teacher", raw, headers: { "Content-Length": "8402000" } })).status, 413);
+    assert.equal(requests, 3, "manual review needs no paid retry");
+    assert.equal((await call(`${route}/generate`, { user: "teacher", raw, headers: { "Content-Length": "9500000" } })).status, 413);
     const afterRecovery = linkedBooking("homework-ai-teacher-recovery");
     db.prepare("DELETE FROM homework_ai_usage").run();
     revokeTeacherDuringAi = true;
-    const ended = await call(`/admin/lessons/${afterRecovery}/homework/transcribe`, { user: "teacher", raw });
-    assert.equal(ended.status, 401, "a provider response cannot disclose private transcription after teacher recovery");
+    const ended = await call(`/admin/lessons/${afterRecovery}/homework/generate`, { user: "teacher", raw });
+    assert.equal(ended.status, 401, "a provider response cannot disclose a private draft after teacher recovery");
     assert.ok(!(await ended.text()).includes("No café"));
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM lesson_homework WHERE booking_id=?").get(afterRecovery).n, 0, "nor save one");
     sessions.teacher = await createSession("teacher", env.BOOKING_TOKEN_SECRET, db.prepare("SELECT session_version FROM students WHERE id='teacher'").get().session_version);
   } finally {
     beforeRun = null;

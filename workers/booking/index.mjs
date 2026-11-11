@@ -2141,8 +2141,8 @@ async function answer(request, env, ctx) {
       if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
         return fail("Send a JSON request.", 415, request, env);
       }
-      const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
-        : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path) ? 1048576
+      const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/(?:generate|transcribe)$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
+        : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:publish|return))?$/.test(path) ? 1048576
         : /^\/me\/homework\/[^/]+(?:\/submit)?$/.test(path) ? 262144
         : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
       if (Number(request.headers.get("Content-Length") || 0) > bodyLimit) return fail("Request too large.", 413, request, env);
@@ -7044,8 +7044,8 @@ async function handleAdmin(request, env, ctx, url, path) {
   if (!admin) return fail("Not authorised.", 401, request, env);
   // Authenticate before accepting photos, then recheck once the entire bounded
   // body has arrived. A request paused during logout cannot keep its authority.
-  const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/transcribe$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
-    : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:generate|publish|return))?$/.test(path) ? 1048576
+  const bodyLimit = /^\/admin\/lessons\/[^/]+\/homework\/(?:generate|transcribe)$/.test(path) ? HOMEWORK_PHOTO_BODY_LIMIT
+    : /^\/admin\/lessons\/[^/]+\/homework(?:\/(?:publish|return))?$/.test(path) ? 1048576
     : path === "/admin/expressions" || path.startsWith("/admin/expressions/") ? 131072 : 32768;
   const adminBody = request.method === "POST" ? await readJson(request, bodyLimit) : {};
   const authorization = await adminAuthorization(request, env, admin);

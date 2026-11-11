@@ -374,8 +374,8 @@ bounded to 128 KiB, including both ID lists when reordering up to 500 entries.
 Unknown fields, wrong types, empty list items and invalid publication values
 are rejected. Drafts may be incomplete; published entries must stay complete.
 
-Lesson homework has a private photo-to-notes flow and reviewed
-publication. Its student access, AI setup, limits and print format are described
+Lesson homework is drafted in private from the notes and pictures Inês pastes,
+and published only after her review. Its student access, AI setup, limits and print format are described
 in [Lesson homework](docs/lesson-homework.md). Online submissions get automatic
 marking for Inês to check, edit and approve before returning feedback, and
 email Inês once per submission (no answers or marks) with a link to its review.
