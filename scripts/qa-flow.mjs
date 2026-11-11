@@ -351,7 +351,7 @@ for (const route of routes) {
       // the bar where there is room, and leads the menu on a phone.
       const bar = page.locator(".site-header.is-bar");
       const titles = bar.locator(".site-header__title span:visible");
-      const signIn = bar.getByRole("link", { name: "Sign in", exact: true });
+      const signIn = bar.locator(".site-header__sign-in");
       const band = await page.locator(".booking-intro").boundingBox();
       if ((await titles.count()) !== 1 || (await titles.innerText()).trim() !== "Book a Lesson" ||
           (await signIn.isVisible()) !== (viewport.id === "desktop") || !(await signIn.getAttribute("href")).endsWith("/book/?view=lessons") ||
