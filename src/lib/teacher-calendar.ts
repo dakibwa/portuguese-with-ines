@@ -724,15 +724,16 @@ export type StudentNext = "invite" | "card" | "pay";
 /**
  * How far a student has got with the website (2 November 2026, Dan: "get
  * everyone logged in, pay for previous lessons and able to book their own
- * lessons"). Three checks, not six steps: signed in, a card for her lessons,
- * and nothing still open. Price, lessons and email are never steps; a card
- * and what is open only count where cards are taken and they pay something.
+ * lessons"). Three checks, not six steps: signed in, a card with her lessons
+ * to come on it, and nothing still open. Price, lessons and email are never
+ * steps; a card and what is open only count where cards are taken and they
+ * pay something.
  */
 export type StudentProgress = {
   signedIn: boolean;
-  /** Null when there is no card to ask for. */
+  /** A card saved with every lesson of hers to come on it. Null when there is no card to ask for. */
   card: boolean | null;
-  /** A card saved that her lessons are not on yet. */
+  /** A card saved, whether or not her lessons are on it yet. */
   cardSaved: boolean;
   /** Lessons she added that have begun and no card or tick has settled. */
   openLessons: number;
@@ -746,12 +747,15 @@ export type StudentProgress = {
 export function studentProgress(student: AdminStudent, cardsAccepted: boolean): StudentProgress {
   const cardAsked = cardsAccepted && !paysNothing(student);
   const signedIn = Boolean(student.signedIn);
-  // Already paying by card (9 November 2026, Dan: "don't have a button for
-  // ask for card if they are already paying? like roman"): a saved card and
-  // nothing she added still to be paid needs nothing more. A saved card with
-  // her lessons to come not on it still asks for them.
-  const cardSaved = Boolean(student.hasCard);
-  const card = cardAsked ? Boolean(student.cardForAllLessons || (cardSaved && !student.unpaidUpcoming)) : null;
+  // All set is "fully set up on the website just paying for their own
+  // lessons" (11 November 2026, Dan): a card saved, and every lesson to come
+  // that she added on it. Someone who books and pays for their own, with
+  // nothing of hers waiting, is there already (9 November 2026, Dan: "don't
+  // have a button for ask for card if they are already paying? like roman").
+  // Having agreed to the card for her lessons is not enough by itself: one
+  // still off the card keeps them out of All set until it is on it.
+  const cardSaved = Boolean(student.hasCard || student.cardForAllLessons);
+  const card = cardAsked ? cardSaved && !student.unpaidUpcoming : null;
   const openLessons = cardAsked ? student.unpaidPast ?? 0 : 0;
   const openCents = openLessons ? student.unpaidPastCents ?? 0 : 0;
   const invitedAt = student.invitedAt ?? null;

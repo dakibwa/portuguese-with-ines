@@ -17,7 +17,7 @@ const GROUPS: { key: Exclude<Group, "dormant">; title: string; hint?: string }[]
   { key: "needs", title: "Needs you" },
   { key: "todo", title: "To do", hint: "Send each their link." },
   { key: "waiting", title: "Waiting on them", hint: "Link sent. They haven’t finished yet." },
-  { key: "set", title: "All set", hint: "Signed in, card saved, nothing open." },
+  { key: "set", title: "All set", hint: "Fully set up and paying for their own lessons." },
 ];
 
 /**
