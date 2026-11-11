@@ -378,11 +378,17 @@ Dan's 22 September review tightened the public pages:
   full-width rule beneath it. Opening a question is one motion: the answer grows and fades in while the
   plus makes a half turn into a minus; where a browser cannot animate to the
   answer's height it simply appears;
-- the phone menu gives each of the four destinations its mark and a short note
-  of what the page is for, then a small blue card with `Book a lesson` and
-  `Message on WhatsApp`; a large splat is cropped into the foot of the screen
-  so the menu never reads as an empty page. Links are named by destination,
-  with the note as their description;
+- the menu gives each of the four destinations its mark and a short note
+  of what the page is for, then `Sign in` (`See or change your lessons`, with
+  the sign-in card's mark), which closes the list on every page and at every
+  width for anyone not signed in (11 November 2026, Dan: "can we add sign in
+  to the list permanently too please?"). Signed in, the list keeps its four
+  places: `Booking` is already their lessons. Then a small blue card with
+  `Book a lesson` and `Message on WhatsApp`; a large splat is cropped into
+  the foot of the screen so the menu never reads as an empty page. Links are
+  named by destination, with the note as their description. On a sideways
+  phone the places sit two across, or three across with `Sign in`, so the
+  list stays two rows and the card's buttons stay in view;
 - the FAQ shows one section at a time. The index switches sections in place,
   fading the chosen one in without scrolling the page, and the address keeps
   `#faq-<section>` so links open the right section; on phones, where the index
@@ -1378,8 +1384,9 @@ in immediately too?", then of a coral `Already booked? Sign in` in the card:
 cream button in the site's hand-cut shape, as `Join Meet` is on her blue
 card ("can this be a stylised button"), turning coral when pointed at. A phone's bar has
 no room for it, and a row of its own under the button was "very ugly", so
-there it is the menu's first row, drawn as the menu's places are with the
-sign-in card's mark and `See or change your lessons`. It opens
+there the way in is the menu's: `Sign in` is the last row of every menu's
+list, on every page (see the menu above), drawn as the menu's places are
+with the sign-in card's mark and `See or change your lessons`. Both open
 `/book/?view=lessons`, and the open menu's heading carries what the bar
 does so nothing moves. A student's page has their own menu instead. Booking still asks for an account only at the confirmation.
 Signing in to view lessons shows the `Your account`
