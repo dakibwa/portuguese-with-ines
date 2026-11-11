@@ -742,7 +742,9 @@
   border-radius: 4px 5px 4px 6px;
   border: 1px solid transparent;
 }
-.teacher-key-starts {
+/* Extra hours are drawn as weekly hours are, so the choice's chip wears this too. */
+.teacher-key-starts,
+.teacher-swatch.is-extra {
   background: rgba(170, 164, 230, 0.22);
   border-color: var(--lavender) !important;
 }
@@ -2081,6 +2083,9 @@
 .teacher-slot-menu__kinds .teacher-quiet { min-height: 40px; gap: 0.4rem; }
 .teacher-slot-menu__hours > .teacher-slot-menu__item { margin-inline: -0.4rem; }
 .teacher-slot-menu__error { margin: 0; font-size: 0.75rem; }
+/* Extra hours' one dab under the times: when lessons can start. */
+.teacher-slot-menu__starts { font-size: 0.75rem; }
+.teacher-slot-menu__starts[hidden] { display: none; }
 
 /* A lesson she added herself reads apart from the students' own bookings:
    pencilled in, lilac with a dashed edge, and says so. */

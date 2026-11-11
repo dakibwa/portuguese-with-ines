@@ -44,9 +44,11 @@ import {
   bookingSegments,
   bookingsAffectedByHours,
   dateBlocks,
+  dateExtras,
   dateKey,
   daysOff,
   dateLabel,
+  extraSpan,
   hoursFromRules,
   chooseHours,
   hoursProblem,
@@ -58,16 +60,18 @@ import {
   setOnlineOnlyHours,
   shiftDate,
   spanLabel,
+  startsLabel,
   withDayChanges,
-  type HoursKind,
+  type HoursBlock,
+  type HoursChoice,
   type Span,
   type WeekHours,
 } from "@/lib/teacher-calendar";
 
 const emptyWeek = hoursFromRules([]);
 
-/** A date's time off as last chosen, until the Worker confirms it. */
-type DayChange = { dayOff?: boolean; blocks?: Span[]; version: number };
+/** A date's time off and extra hours as last chosen, until the Worker confirms them. */
+type DayChange = { dayOff?: boolean; blocks?: Span[]; extra?: Span[]; version: number };
 
 function shortDate(date: string) {
   return dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
@@ -174,8 +178,8 @@ export function TeacherSchedule() {
     studentRequestGeneration.current += 1;
   }, []);
   const shownExceptions = useMemo(
-    () => withDayChanges(exceptions, dayChanges),
-    [exceptions, dayChanges],
+    () => withDayChanges(exceptions, dayChanges, interval),
+    [exceptions, dayChanges, interval],
   );
   const hoursDirty = serialiseHours(savedHours) !== serialiseHours(draftHours);
   const invalidHours = hoursProblem(draftHours);
@@ -677,19 +681,26 @@ export function TeacherSchedule() {
 
   /**
    * What she chose for some hours of one date, at the times themselves:
-   * time off, online only, or open again (`kind` null). `original` is the
-   * block she pressed, which these hours replace.
+   * time off, online only, extra hours, open again (`kind` null) or not
+   * working. `original` is the block she pressed, which these hours replace.
+   * Time off and extra hours change together, in one save of the date.
    */
-  function chooseTimes(date: string, original: { kind: HoursKind; span: Span } | null, kind: HoursKind | null, span: Span) {
-    const current = { off: dateBlocks(shownExceptions, date), online: onlineOnlyHours(latestPeriods(), date) };
+  function chooseTimes(date: string, original: HoursBlock | null, kind: HoursChoice, chosen: Span) {
+    // Extra hours are lesson starts, so they cover the times their starts do.
+    const span = kind === "extra" ? extraSpan(chosen, interval) : chosen;
+    const current = { off: dateBlocks(shownExceptions, date), online: onlineOnlyHours(latestPeriods(), date), extra: dateExtras(shownExceptions, date, interval) };
     const next = chooseHours(current, original, kind, span);
     const same = (a: Span[], b: Span[]) => JSON.stringify(a) === JSON.stringify(b);
     const when = `${spanLabel(span)} on ${shortDate(date)}`;
     const text = kind === "off" ? `${when} is off.${stayBooked(lessonsDuring(date, span))}`
-      : kind === "online" ? `${when} is online only.` : `${when} is open again.`;
+      : kind === "online" ? `${when} is online only.`
+      : kind === "extra" ? `Lessons can start ${startsLabel(span, interval)} on ${shortDate(date)}.`
+      : kind === "not working" ? `Not working ${when}.` : `${when} is open again.`;
     if (!same(next.online, current.online) &&
       !changeOnlineOnly(() => setOnlineOnlyHours(latestPeriods(), date, next.online, today), shortDate(date))) return;
-    if (!same(next.off, current.off)) changeDay(date, { blocks: next.off }, text);
+    const blocks = same(next.off, current.off) ? undefined : next.off;
+    const extra = same(next.extra, current.extra) ? undefined : next.extra;
+    if (blocks || extra) changeDay(date, { ...(blocks ? { blocks } : {}), ...(extra ? { extra } : {}) }, text);
     setDayNote({ error: false, text });
   }
 
@@ -982,6 +993,7 @@ export function TeacherSchedule() {
             bookings={bookings}
             exceptions={shownExceptions}
             onlineOnly={onlineOnlyPeriods}
+            interval={interval}
             now={now}
             today={today}
             weekStart={weekStart}

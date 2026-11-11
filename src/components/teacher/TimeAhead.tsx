@@ -15,10 +15,12 @@ const SHOWN = 4;
  * `Coming up`, what she has set that is not on the week in view, each
  * turning the Timetable to its week. Each is left out when it is empty.
  */
-export function TimeAhead({ bookings, exceptions, onlineOnly, now, today, weekStart, onOpenBooking, onGoTo }: {
+export function TimeAhead({ bookings, exceptions, onlineOnly, interval, now, today, weekStart, onOpenBooking, onGoTo }: {
   bookings: AdminBooking[];
   exceptions: AvailabilityException[];
   onlineOnly: OnlineOnlyPeriod[];
+  /** Her booking interval, which says what times a date's extra hours cover. */
+  interval: number;
   now: Date;
   today: string;
   weekStart: string;
@@ -27,8 +29,8 @@ export function TimeAhead({ bookings, exceptions, onlineOnly, now, today, weekSt
 }) {
   const clashes = useMemo(() => timeOffClashes(bookings, exceptions, onlineOnly, now), [bookings, exceptions, onlineOnly, now]);
   const weekEnd = shiftDate(weekStart, 6);
-  const ahead = useMemo(() => timeAhead(exceptions, onlineOnly, today)
-    .filter(row => row.dates[0] > weekEnd || row.dates.at(-1)! < weekStart), [exceptions, onlineOnly, today, weekStart, weekEnd]);
+  const ahead = useMemo(() => timeAhead(exceptions, onlineOnly, today, interval)
+    .filter(row => row.dates[0] > weekEnd || row.dates.at(-1)! < weekStart), [exceptions, onlineOnly, today, interval, weekStart, weekEnd]);
   if (!clashes.length && !ahead.length) return null;
   return (
     <div className="teacher-ahead">

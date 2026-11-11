@@ -264,6 +264,61 @@ export function dateBlocks(
   );
 }
 
+/**
+ * Extra hours on one date (11 November 2026, Dan: "can Ines also have the
+ * option to add in working hours too against her normal weekly hours"):
+ * times a lesson can start, exactly as her weekly hours are. On the Timetable
+ * they are a span of times; the Worker keeps their first start and their
+ * last, the last booking-interval step before the span ends, so 15:00–17:00
+ * at 30 minutes starts 15:00 to 16:30.
+ */
+export function lastStartIn(span: Span, interval: number) {
+  return span.start + Math.max(0, Math.ceil((span.end - span.start) / interval) - 1) * interval;
+}
+
+/** The times extra hours cover: from their first start to their last start's end. */
+export function extraSpan(span: Span, interval: number): Span {
+  return { start: span.start, end: Math.min(1440, lastStartIn(span, interval) + interval) };
+}
+
+/** `15:00–16:30`, or `15:00` alone: when lessons can start within `span`. */
+export function startsLabel(span: Span, interval: number) {
+  const last = lastStartIn(span, interval);
+  return last > span.start ? `${minuteLabel(span.start)}–${minuteLabel(last)}` : minuteLabel(span.start);
+}
+
+/**
+ * One date's own extra hours as the Worker keeps them, first and last start;
+ * no times means the whole day, as availability reads it. Weekly extra rows
+ * are not hers to change here, so they are left out.
+ */
+export function dateExtraWindows(exceptions: AvailabilityException[], date: string): TeachingWindow[] {
+  return exceptions
+    .filter((exception) => exception.kind === "extra" && exception.weekday == null && exception.date === date)
+    .map((exception) => ({ start: exception.start_minute ?? 0, lastStart: exception.end_minute ?? 1440 }))
+    .sort((a, b) => a.start - b.start);
+}
+
+/** The same as the times they cover on the Timetable, merged. */
+export function dateExtras(exceptions: AvailabilityException[], date: string, interval: number): Span[] {
+  return mergeSpans(dateExtraWindows(exceptions, date).map((window) => ({ start: window.start, end: Math.min(1440, window.lastStart + interval) })));
+}
+
+/**
+ * Whether the choice offers `Extra hours` for `span`: only where they would
+ * let a lesson start where none could yet, some start in it (each interval
+ * step from its start) outside every window of starts she already has that
+ * day, weekly or extra. Times inside her hours gain nothing. Never for the
+ * whole day, which the Worker refuses as it refuses a whole day of time off:
+ * pressed on a day online only from end to end, the choice opens on all of it.
+ */
+export function offersExtraHours(windows: TeachingWindow[], span: Span, interval: number) {
+  if (!(interval >= 1) || (span.start <= 0 && span.end >= 1440)) return false;
+  for (let minute = span.start; minute < span.end; minute += interval)
+    if (!windows.some((window) => window.start <= minute && minute <= window.lastStart)) return true;
+  return false;
+}
+
 /** Time blocked every week on this weekday, such as lunch. */
 export function weeklyBlocks(
   exceptions: AvailabilityException[],
@@ -384,28 +439,61 @@ export function spanAround(spans: Span[], start: number, end: number) {
   return spans.find((span) => span.start < end && start < span.end) ?? null;
 }
 
-export type HoursKind = "off" | "online";
+export type HoursKind = "off" | "online" | "extra";
 
 /**
- * One date's hours off and online-only hours after she chooses what `span`
- * is, from the times on her Timetable: `off`, `online`, or `null` to open it
- * again. `original` is the block she pressed, which a kind replaces; opening
- * again opens just `span`, so she can shorten a block. Hours are never both:
- * making them one kind takes them out of the other.
+ * Some hours of a date that are already a kind. `online` marks extra hours
+ * with online-only hours at exactly the same times: one block, which opens
+ * on `Extra hours`.
+ */
+export type HoursBlock = { kind: HoursKind; span: Span; online?: boolean };
+
+/** A kind; `null` opens the times again (`Open again`); `"not working"` takes their extra hours away. */
+export type HoursChoice = HoursKind | null | "not working";
+
+/**
+ * One date's hours off, online-only hours and extra hours after she chooses
+ * what `span` is, from the times on her Timetable. `original` is the block
+ * she pressed, which a kind replaces; opening again or not working takes only
+ * `span`, so she can shorten a block. Time off is never online only or extra
+ * hours: making hours one takes them out of the others. Online only labels
+ * time that can be booked, so it and extra hours never replace each other,
+ * and extra hours online only at the same times keep the label as they move
+ * and lose it when they go.
  */
 export function chooseHours(
-  current: { off: Span[]; online: Span[] },
-  original: { kind: HoursKind; span: Span } | null,
-  kind: HoursKind | null,
+  current: { off: Span[]; online: Span[]; extra: Span[] },
+  original: HoursBlock | null,
+  kind: HoursChoice,
   span: Span,
 ) {
-  let { off, online } = current;
-  // A kind chosen replaces the block pressed; opening again opens only the times set.
-  if (kind && original?.kind === "off") off = removeSpan(off, original.span);
-  if (kind && original?.kind === "online") online = removeSpan(online, original.span);
-  off = kind === "off" ? addSpan(off, span) : removeSpan(off, span);
-  online = kind === "online" ? addSpan(online, span) : removeSpan(online, span);
-  return { off: mergeSpans(off), online: mergeSpans(online) };
+  let { off, online, extra } = current;
+  const was = (of: HoursKind) => original?.kind === of || (of === "online" && Boolean(original?.online));
+  // A kind chosen replaces the block pressed; opening again and not working take only the times set.
+  if (original && kind && kind !== "not working") {
+    if (was("off")) off = removeSpan(off, original.span);
+    if (was("online") && (kind !== "extra" || original.online)) online = removeSpan(online, original.span);
+    if (was("extra") && kind !== "online") extra = removeSpan(extra, original.span);
+  }
+  if (kind === "off") {
+    off = addSpan(off, span);
+    online = removeSpan(online, span);
+    extra = removeSpan(extra, span);
+  } else if (kind === "online") {
+    online = addSpan(online, span);
+    off = removeSpan(off, span);
+  } else if (kind === "extra") {
+    extra = addSpan(extra, span);
+    off = removeSpan(off, span);
+    if (original?.online) online = addSpan(online, span);
+  } else if (kind === "not working") {
+    extra = removeSpan(extra, span);
+    if (original?.online) online = removeSpan(online, span);
+  } else {
+    off = removeSpan(off, span);
+    online = removeSpan(online, span);
+  }
+  return { off: mergeSpans(off), online: mergeSpans(online), extra: mergeSpans(extra) };
 }
 
 /** `Tue 8 Sept`, as the week's notes name a date. */
@@ -416,15 +504,17 @@ export function shortDateLabel(date: string) {
 export type TimeAheadRow = { dates: string[]; label: string; detail: string };
 
 /**
- * What she has set from `from` on (2 November 2026): days off, hours off and
- * online-only stretches. Consecutive whole days off read as one stretch, as
- * does each online-only period; rows are in date order.
+ * What she has set from `from` on (2 November 2026): days off, hours off,
+ * extra hours and online-only stretches. Consecutive whole days off read as
+ * one stretch, as does each online-only period; a day off lists no extra
+ * hours, since it has none to give. Rows are in date order.
  */
-export function timeAhead(exceptions: AvailabilityException[], onlineOnly: OnlineOnlyPeriod[], from: string): TimeAheadRow[] {
+export function timeAhead(exceptions: AvailabilityException[], onlineOnly: OnlineOnlyPeriod[], from: string, interval: number): TimeAheadRow[] {
   const off = daysOff(exceptions);
-  const blocked = [...new Set(exceptions
-    .filter((exception) => exception.kind === "blocked" && exception.weekday == null && exception.date && exception.date >= from)
+  const ahead = (kind: AvailabilityException["kind"]) => [...new Set(exceptions
+    .filter((exception) => exception.kind === kind && exception.weekday == null && exception.date && exception.date >= from)
     .map((exception) => exception.date as string))].sort();
+  const blocked = ahead("blocked");
   const rows: { dates: string[]; hours: boolean; note: string }[] = [];
   for (const date of blocked) {
     const last = rows.at(-1);
@@ -440,6 +530,11 @@ export function timeAhead(exceptions: AvailabilityException[], onlineOnly: Onlin
         ? `Off ${dateBlocks(exceptions, row.dates[0]).map(spanLabel).join(", ")}`
         : row.dates.length > 1 ? `${row.dates.length} days off` : "Day off", row.note]
         .filter((part, index, parts) => part && parts.findIndex((other) => other.toLowerCase() === part.toLowerCase()) === index).join(" · "),
+    })),
+    ...ahead("extra").filter((date) => !off.has(date)).map((date) => ({
+      dates: [date],
+      label: shortDateLabel(date),
+      detail: `Extra ${dateExtras(exceptions, date, interval).map(spanLabel).join(", ")}`,
     })),
     ...onlineOnly.filter((period) => period.toDate >= from).map((period) => {
       const dates: string[] = [];
@@ -465,12 +560,14 @@ function localMinute(value: string) {
 
 /**
  * The calendar's view of the Worker's rows while a date's change is still
- * saving, with the same rules the Worker applies: a day off and the hours
- * blocked within it are replaced independently, weekly blocks never.
+ * saving, with the same rules the Worker applies: a day off, the hours
+ * blocked within it and its extra hours (kept as the starts they give) are
+ * replaced independently, weekly rows never.
  */
 export function withDayChanges(
   exceptions: AvailabilityException[],
-  changes: Map<string, { dayOff?: boolean; blocks?: Span[] }>,
+  changes: Map<string, { dayOff?: boolean; blocks?: Span[]; extra?: Span[] }>,
+  interval: number,
 ) {
   let rows = exceptions;
   for (const [date, change] of changes) {
@@ -486,6 +583,11 @@ export function withDayChanges(
         ...rows.filter((row) => !oneOff(row) || isWholeDayOff(row)),
         ...change.blocks.map((span) => oneOffRow(date, span.start, span.end)),
       ];
+    if (change.extra)
+      rows = [
+        ...rows.filter((row) => !(row.date === date && row.weekday == null && row.kind === "extra")),
+        ...change.extra.map((span) => oneOffRow(date, span.start, lastStartIn(span, interval), "extra")),
+      ];
   }
   return rows;
 }
@@ -494,12 +596,13 @@ function oneOffRow(
   date: string,
   start: number | null,
   end: number | null,
+  kind: AvailabilityException["kind"] = "blocked",
 ): AvailabilityException {
   return {
     id: 0,
     date,
     weekday: null,
-    kind: "blocked",
+    kind,
     note: "",
     start_minute: start,
     end_minute: end,

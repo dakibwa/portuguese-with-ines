@@ -2279,8 +2279,9 @@ await test("weekly hours refuse malformed replacements without erasing or partly
       .run(row.id, row.weekday, row.start_minute, row.last_start_minute, row.active);
   }
 });
-await test("the teacher calendar replaces one date's time off without touching weekly blocks, extra hours or the day off", async () => {
+await test("the teacher calendar replaces one date's time off and extra hours, each only its own one-off rows", async () => {
   const at = new Date().toISOString();
+  const interval = db.prepare("SELECT value FROM settings WHERE key = 'slot_interval_minutes'").get().value;
   const lunch = db.prepare("INSERT INTO availability_exceptions (weekday,kind,start_minute,end_minute,note,created_at) VALUES (1,'blocked',750,810,'Lunch',?)").run(at).lastInsertRowid;
   db.prepare("INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,created_at) VALUES ('2026-09-14','extra',1200,1200,?)").run(at);
   db.prepare("INSERT INTO availability_exceptions (date,kind,note,created_at) VALUES ('2026-09-14','blocked','Holiday',?)").run(at);
@@ -2327,8 +2328,63 @@ await test("the teacher calendar replaces one date's time off without touching w
     assert.ok(schedule.exceptions.some((row) => row.weekday === 1 && row.note === "Lunch"), "weekly blocks reach the calendar");
     assert.equal((await call("/admin/exceptions", { user: "teacher", body: { date: "2026-09-15", startMinute: 900, endMinute: 840 } })).status, 400);
     assert.equal((await call("/admin/exceptions", { user: "teacher", body: { date: "2026-09-15", startMinute: "x" } })).status, 400);
+
+    // Extra hours on a Saturday, which has no weekly hours: sent as the times
+    // she chose, kept as the starts they give at her interval.
+    const saturday = "2026-09-12";
+    db.prepare("UPDATE settings SET value = '30' WHERE key = 'slot_interval_minutes'").run();
+    const weekly = db.prepare("INSERT INTO availability_exceptions (date,weekday,kind,start_minute,end_minute,created_at) VALUES (?,6,'extra',420,420,?)").run(saturday, at).lastInsertRowid;
+    db.prepare("INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,created_at) VALUES (?,'extra',600,600,?)").run(saturday, at);
+    db.prepare("INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,created_at) VALUES ('2026-09-13','extra',600,600,?)").run(at);
+    const extra = (body, user = "teacher") => call("/admin/exceptions/day", { user, headers: { "CF-Connecting-IP": "198.51.100.93" }, body: { date: saturday, ...body } });
+    const extras = (date = saturday) => db.prepare("SELECT start_minute AS s, end_minute AS e FROM availability_exceptions WHERE date = ? AND weekday IS NULL AND kind = 'extra' ORDER BY s")
+      .all(date).map((row) => `${row.s}-${row.e}`);
+    const revision = () => Number(db.prepare("SELECT value FROM settings WHERE key = 'availability_revision'").get()?.value ?? 0);
+    const before = revision();
+    for (const user of [null, "alice"]) assert.equal((await extra({ extra: [{ startMinute: 900, endMinute: 1020 }] }, user)).status, 401, String(user));
+    for (const spans of [null, "15:00-17:00", [{ startMinute: 900, endMinute: 900 }], [{ startMinute: "900", endMinute: 1020 }],
+      [{ startMinute: -30, endMinute: 60 }], [{ startMinute: 900, endMinute: 1441 }], Array.from({ length: 97 }, (_, minute) => ({ startMinute: minute, endMinute: minute + 1 })),
+      // A whole day of starts, midnight to midnight, is refused as a whole day of time off is.
+      [{ startMinute: 0, endMinute: 720 }, { startMinute: 720, endMinute: 1440 }]]) {
+      assert.equal((await extra({ blocks: [{ startMinute: 480, endMinute: 540 }], extra: spans })).status, 400, JSON.stringify(spans));
+    }
+    const blocked = () => db.prepare("SELECT COUNT(*) AS n FROM availability_exceptions WHERE date = ? AND kind = 'blocked'").get(saturday).n;
+    assert.deepEqual([extras(), blocked(), revision()], [["600-600"], 0, before], "a refused request writes nothing, its time off included");
+    // Her authority is checked inside the write: signed out as it runs, nothing changes.
+    const hash = await sessionHash(sessions.teacher);
+    beforeRun = (sql) => {
+      if (!sql.startsWith("DELETE FROM availability_exceptions WHERE date = ? AND weekday IS NULL AND kind = 'extra'")) return;
+      beforeRun = null;
+      db.prepare("INSERT INTO revoked_sessions(token_hash,expires_at) VALUES (?,?)").run(hash, Date.now() + 86400000);
+    };
+    try {
+      assert.equal((await extra({ extra: [{ startMinute: 900, endMinute: 1020 }] })).status, 401);
+    } finally {
+      beforeRun = null;
+      db.prepare("DELETE FROM revoked_sessions WHERE token_hash = ?").run(hash);
+    }
+    assert.deepEqual([extras(), revision()], [["600-600"], before]);
+
+    const replaced = await extra({ extra: [{ startMinute: 960, endMinute: 1000 }, { startMinute: 600, endMinute: 660 }, { startMinute: 900, endMinute: 960 }] });
+    assert.equal(replaced.status, 200);
+    assert.deepEqual(extras(), ["600-630", "900-990"], "sorted, merged, and each kept as its first and last start");
+    assert.equal(revision(), before + 1);
+    assert.deepEqual((await replaced.json()).exceptions.filter((row) => row.kind === "extra").map((row) => [row.start_minute, row.end_minute]), [[600, 630], [900, 990]]);
+    assert.deepEqual(extras("2026-09-13"), ["600-600"], "another date keeps its extra hours");
+    assert.ok(db.prepare("SELECT 1 FROM availability_exceptions WHERE id = ?").get(weekly), "weekly extra hours are never replaced");
+    // Exactly those starts can be booked, beside the weekly 07:00 (Porto is UTC+1).
+    const saturdayStarts = async () => ((await (await call(`/availability?lessonType=single&from=${saturday}&to=${saturday}`, { method: "GET", user: null })).json())
+      .slotsByDate[saturday] ?? []).map((slot) => slot.startAt.slice(11, 16));
+    assert.deepEqual(await saturdayStarts(), ["06:00", "09:00", "09:30", "14:00", "14:30", "15:00", "15:30"]);
+    // The interval is read from her settings; an empty list takes them all away.
+    db.prepare("UPDATE settings SET value = '15' WHERE key = 'slot_interval_minutes'").run();
+    assert.equal((await extra({ extra: [{ startMinute: 900, endMinute: 960 }] })).status, 200);
+    assert.deepEqual(extras(), ["900-945"]);
+    assert.equal((await extra({ extra: [] })).status, 200);
+    assert.deepEqual(await saturdayStarts(), ["06:00"]);
   } finally {
-    db.prepare("DELETE FROM availability_exceptions WHERE date = '2026-09-14' OR id = ?").run(lunch);
+    db.prepare("UPDATE settings SET value = ? WHERE key = 'slot_interval_minutes'").run(interval);
+    db.prepare("DELETE FROM availability_exceptions WHERE date IN ('2026-09-12', '2026-09-13', '2026-09-14') OR id = ?").run(lunch);
   }
 });
 await test("login reserves each attempt atomically and a success cannot reopen the window", async () => {
