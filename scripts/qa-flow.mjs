@@ -562,6 +562,15 @@ await page.goBack();
 await page.locator(".faq-group:not([hidden])").first().waitFor();
 await page.waitForFunction(() => !window.location.hash && document.querySelector(".faq-group")?.hidden === false);
 
+// Choosing the page already open closes the phone menu without losing the
+// keyboard position inside its now-inert links.
+const beforeMenuViewport = page.viewportSize();
+await page.setViewportSize({ width: 390, height: 844 });
+await page.locator(".nav-toggle").click();
+await page.locator("#site-nav-mobile").getByRole("link", { name: "FAQ", exact: true }).click();
+await page.waitForFunction(() => document.activeElement?.classList.contains("nav-toggle"), null, { timeout: 3000 });
+await page.setViewportSize(beforeMenuViewport);
+
 // Public navigation and FAQ answers remain usable before any enhancement.
 const plainPage = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
 await plainPage.goto(`${base}/faq/`, { waitUntil: "domcontentloaded" });

@@ -4,7 +4,7 @@ import { LANGUAGE_CODE, TUTOR_NAME } from "@/lib/tutor";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { AuthApiError, readSession } from "@/lib/auth-api";
-import { fetchTranslations, loadedTranslations, prefetchTranslations, sendTranslation, TRANSLATION_LIMITS, type ExpressionTranslation } from "@/lib/expression-translations-api";
+import { forgetTranslations, loadedTranslations, prefetchTranslations, sendTranslation, subscribeToTranslations, TRANSLATION_LIMITS, type ExpressionTranslation } from "@/lib/expression-translations-api";
 
 /** Who is reading: a student can add their own; Inês, trying it out, is pointed to her review. */
 export type TranslationsViewer = { token: string; viewer: "student" | "teacher" };
@@ -40,11 +40,14 @@ export function ExpressionTranslations({ expressionId, viewer }: { expressionId:
   const [loadError, setLoadError] = useState("");
   const [unpublished, setUnpublished] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  useEffect(() => subscribeToTranslations(expressionId, () => setAttempt((value) => value + 1)), [expressionId]);
   useEffect(() => {
     let current = true;
     setLoadError("");
+    setUnpublished(false);
+    setRows(loadedTranslations(expressionId));
     // Usually already loaded while the expression painted; "Try again" asks afresh.
-    (attempt ? fetchTranslations(expressionId) : prefetchTranslations(expressionId)).then((value) => { if (current) setRows(value); }).catch((caught) => {
+    prefetchTranslations(expressionId).then((value) => { if (current) setRows(value); }).catch((caught) => {
       if (!current) return;
       if (caught instanceof AuthApiError && caught.status === 404) setUnpublished(true);
       else setLoadError(caught instanceof Error ? caught.message : "The translations couldn’t be loaded.");
@@ -59,7 +62,7 @@ export function ExpressionTranslations({ expressionId, viewer }: { expressionId:
       {unpublished ? <p>Students’ own versions appear here once this expression is published.</p> : loadError ? (
         <div className="expression-translations__error" role="alert">
           <p>{loadError}</p>
-          <button className="button button--outline button--compact" type="button" onClick={() => setAttempt((value) => value + 1)}>Try again</button>
+          <button className="button button--outline button--compact" type="button" onClick={() => forgetTranslations(expressionId)}>Try again</button>
         </div>
       ) : !rows ? <p role="status">Loading…</p> : rows.length ? (
         <ul className="expression-translations__list">

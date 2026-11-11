@@ -90,6 +90,8 @@ export function TeacherSchedule() {
   const [dayControlHost, setDayControlHost] = useState<HTMLDivElement | null>(null);
   const [exactHost, setExactHost] = useState<HTMLDivElement | null>(null);
   const [activeTab, setActiveTab] = useState<TeacherTab>("week");
+  const [expressionEditing, setExpressionEditing] = useState(false);
+  const revealExpressionDraft = useCallback(() => setActiveTab("expressions"), []);
   const [editingHours, setEditingHours] = useState(false);
   const editing = activeTab === "week" && editingHours;
   // Her Google Meet connection, read in Profile and listed in Needs you when it needs her.
@@ -181,6 +183,7 @@ export function TeacherSchedule() {
     setMe(null);
     setInitialised(false);
     setActiveTab("week");
+    setExpressionEditing(false);
     setEditingHours(false);
     setMeet(null);
     setSelectedBooking(null);
@@ -982,7 +985,7 @@ export function TeacherSchedule() {
         </div>
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "expressions"}>
-        {activeTab === "expressions" ? <ExpressionsTab accountId={me?.id ?? "teacher"} token={token} /> : null}
+        {activeTab === "expressions" || expressionEditing ? <ExpressionsTab accountId={me?.id ?? "teacher"} key={token} onEditingChange={setExpressionEditing} onReveal={revealExpressionDraft} token={token} /> : null}
       </div>
       </div>
       {studentPicker ? <StudentPicker

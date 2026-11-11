@@ -193,7 +193,7 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
               aria-label={`${BRAND}, home`}
               className="site-header__brand"
               href="/"
-              onClick={() => setOpen(false)}
+              onClick={() => { if (currentPage === "home") close(); else setOpen(false); }}
             >
               <BrandWordmark className="header-wordmark" />
             </Link>
@@ -219,7 +219,7 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
                 className="nav-mobile__link"
                 href={item.id === "book" ? publicAssetPath(item.href) : item.href}
                 key={item.id}
-                onClick={() => setOpen(false)}
+                onClick={() => { if (currentPage === item.id) close(); else setOpen(false); }}
               >
                 <AssetMark asset={item.mark} className="nav-mobile__mark" lands />
                 <span className="nav-mobile__text">

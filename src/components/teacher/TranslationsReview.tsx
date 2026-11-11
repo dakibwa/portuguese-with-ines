@@ -4,6 +4,7 @@ import { LANGUAGE_CODE } from "@/lib/tutor";
 import { useEffect, useRef, useState } from "react";
 import { fetchTranslationsToReview, reviewTranslation, type AdminTranslation, type TranslationStatus } from "@/lib/admin-api";
 import { readSession } from "@/lib/auth-api";
+import { forgetTranslations } from "@/lib/expression-translations-api";
 
 const dateLabel = (value: string) => new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
@@ -40,6 +41,7 @@ export function TranslationsReview({ token, initialPending }: { token: string; i
     try {
       await reviewTranslation(token, row.id, action);
       if (readSession() !== token) return;
+      forgetTranslations(row.expressionId);
       setNotice(action === "approve" ? "Approved. Everyone reading it can now see this translation." : action === "reject" ? "Rejected. It won’t be shown." : "Translation deleted.");
       setAttempt((value) => value + 1);
     } catch (caught) {

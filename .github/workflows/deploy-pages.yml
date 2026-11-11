@@ -143,7 +143,7 @@ jobs:
             curl -sf http://localhost:3000/ > /dev/null && break
             sleep 1
           done
-          for check in qa-flow qa-workspace-navigation qa-booking-selection qa-payment-recovery qa-teacher-calendar qa-homework qa-transition-kit qa-meet-links qa-student-nif qa-profile-rates qa-request-recovery qa-auth-recovery qa-selection-calendar-recovery; do
+          for check in qa-flow qa-workspace-navigation qa-booking-selection qa-payment-recovery qa-teacher-calendar qa-homework qa-transition-kit qa-meet-links qa-student-nif qa-profile-rates qa-request-recovery qa-auth-recovery qa-selection-calendar-recovery qa-expression-translations; do
             echo "::group::$check"
             QA_BASE_URL=http://localhost:3000 node "scripts/$check.mjs"
             echo "::endgroup::"

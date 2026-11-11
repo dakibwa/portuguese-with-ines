@@ -995,6 +995,10 @@ opening `/idioms/` with the same signed-in account.
   place (`Discard your changes?`, `Delete “…”?`, a small coral button and
   the cross); with nothing changed the cross and Escape close at once. Stale
   versions never overwrite an edit.
+  Filters and a visit to another schedule tab keep an open editor and its
+  draft; another card's pencil and Add an expression wait until she finishes
+  or cancels that edit. Reloading with an unfinished draft warns before leaving;
+  following a link asks in the card before discarding it.
 - Students' own versions (30 October 2026; moved 7 November 2026, Dan: "get
   rid of the notes and translations at the bottom, they can go in main
   bullets"): `Noutras línguas` is one of the painted reading's facts, after
