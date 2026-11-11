@@ -2081,29 +2081,32 @@ try {
   assert.deepEqual(accountState.errors, []);
   await accountPage.close();
 
-  // A notice that only tells her something (11 November 2026, Dan): inside
-  // the student's card it does not say their name again, View and the cross
-  // end its first line, and the cross takes it away for all her devices.
+  // A notice that only tells her something (11 November 2026, Dan): it says
+  // it all, a first lesson's note too, so its one button is the cross; inside
+  // the student's card it does not say their name again, the cross ends its
+  // first line, and it takes the notice away for all her devices.
   for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
     state.students.push({ id: "roman", name: "Roman", email: "roman@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: "2026-09-09T17:00:00.000Z", upcoming: 1, unpaidUpcoming: 0, weekly: 0, hasLessons: true });
     state.bookings.push({ ...lesson("roman-moved", "Roman", "2026-09-09T17:00:00Z", "porto", 90), student_id: "roman", student_changed_at: "2026-09-06T20:00:00Z", previous_starts_at: "2026-09-08T17:00:00Z" });
+    state.bookings.push({ ...lesson("lia-first", "Lia", "2026-09-10T15:00:00Z"), first_lesson: 1, notes: "Beginner, keen on speaking" });
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator(".teacher-needs-you:visible .teacher-notice").filter({ hasText: "Roman changed their lesson" })).toBeVisible();
+    const first = page.locator(".teacher-needs-you:visible .teacher-notice").filter({ hasText: "Lia’s first lesson" });
+    await expect(first.locator(".teacher-notice__note")).toHaveText("Their note Beginner, keen on speaking");
+    assert.deepEqual(await first.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))), ["Dismiss: Lia’s first lesson"]);
     await page.getByRole("tab", { name: /^Students/ }).click();
     const notice = studentRow(page, "Roman").locator(".teacher-notice");
     await expect(notice.locator(".teacher-notice__title")).toHaveText("Changed their lesson");
     const cross = notice.getByRole("button", { name: "Dismiss: Roman changed their lesson", exact: true });
-    // Each is centred on the title's first line, at its right, and clear of
-    // the notice's top edge ("it's weirdly close to the edge?").
+    // No View: the notice already says it all. The cross is centred on the
+    // title's first line, at its right, and clear of the notice's top edge.
+    await expect(notice.getByRole("button", { name: /^View/ })).toHaveCount(0);
     const title = await notice.locator(".teacher-notice__title").boundingBox();
     const edge = await notice.boundingBox();
-    const firstLine = title.y + 9.5;
-    for (const action of [notice.getByRole("button", { name: /^View/ }), cross]) {
-      const box = await action.boundingBox();
-      assert.ok(Math.abs(box.y + box.height / 2 - firstLine) <= 2 && box.x >= title.x + 60, `${width}: View and the cross end the notice's first line`);
-      assert.ok(box.y - edge.y >= 6, `${width}: View and the cross stand clear of the notice's top edge`);
-    }
+    const box = await cross.boundingBox();
+    assert.ok(Math.abs(box.y + box.height / 2 - (title.y + 9.5)) <= 2 && box.x >= title.x + 60, `${width}: the cross ends the notice's first line`);
+    assert.ok(box.y - edge.y >= 6, `${width}: the cross stands clear of the notice's top edge`);
     await cross.click();
     await expect(notice).toHaveCount(0);
     assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/needs-you/dismiss").map((entry) => entry.data),
