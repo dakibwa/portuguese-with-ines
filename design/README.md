@@ -311,7 +311,8 @@ the same identity or action:
   gesture to start and finish outside the dialog; dragging from its content or
   fields preserves it. An open account menu leaves Escape to the top modal and
   preserves the modal's original return target. The old `/terms`,
-  `/booking-terms` and `/privacy` pages redirect into booking; there is no
+  `/booking-terms` and `/privacy` pages redirect into booking. Old `/terms`
+  bookmarks retain their policy section; there is no
   separate legal-page hero, index or marketing treatment. Payment wording follows
   the method shown at booking and never implies every booking saves or charges a card.
   When after-lesson charging is active, every booking presents a short
