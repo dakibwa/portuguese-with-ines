@@ -30,10 +30,43 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# The site's public configuration. The build bakes it in, and the check of the
+# live Worker reads the same values, so the two can never be compared against
+# different ones.
+env:
+  # Booking is served by the ines-booking Worker. The `booking` job below fails
+  # the release if it is missing or unhealthy, so a release can never quietly
+  # ship a dead calendar.
+  NEXT_PUBLIC_BOOKING_API_BASE_URL: ${{ vars.NEXT_PUBLIC_BOOKING_API_BASE_URL }}
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+  # Production must never mount a sandbox Checkout client secret. The
+  # release gate compares this with both the Worker and publishable key.
+  NEXT_PUBLIC_STRIPE_EXPECTED_MODE: live
+  # Public by design: it identifies the app, and the Worker verifies every
+  # Google token against it. Absent simply hides the Google button.
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+  LESSON_PRICE_CENTS: ${{ vars.LESSON_PRICE_CENTS || '2500' }}
+  LESSON_CURRENCY: ${{ vars.LESSON_CURRENCY || 'eur' }}
+  NEXT_PUBLIC_LESSON_DURATION_MINUTES: ${{ vars.NEXT_PUBLIC_LESSON_DURATION_MINUTES || '60' }}
+  NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS: ${{ vars.NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS || '500' }}
+
+# How a release runs (11 November 2026, Dan: "I like fast relsases"). Until then
+# everything ran in one line, and the customer journeys alone, one after
+# another on one machine, had grown past seven minutes of a ten-minute release.
+# Now only what truly depends on something else waits for it:
+#
+#   worker ──┬── booking ───────────┐
+#            └── journeys (four) ───┼── publish
+#   build ───────┘                  │
+#   checks ─────────────────────────┘
+#
+# The Worker still ships first, and nothing is published unless every job here
+# passes.
+
 jobs:
   # The booking Worker ships first, from the same commit, once its own tests
-  # pass, so the site below is always built and checked against the Worker it
-  # will talk to. Until October 2026 this was a manual `npm run worker:deploy`
+  # pass, so the site below is always checked against the Worker it will talk
+  # to. Until October 2026 this was a manual `npm run worker:deploy`
   # after each merge, which was easy to forget: a release could publish a site
   # expecting Worker changes that were not live yet.
   #
@@ -80,25 +113,10 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config workers/booking/wrangler.jsonc
 
-  build:
+  # Types, lint and the unit tests. They need neither the Worker nor the built
+  # site, so they run beside both, and the publish waits for them all the same.
+  checks:
     runs-on: ubuntu-latest
-    needs: worker
-    env:
-      # Booking is served by the ines-booking Worker. The check:booking step
-      # below fails the build if it is missing or unhealthy, so a release can
-      # never quietly ship a dead calendar.
-      NEXT_PUBLIC_BOOKING_API_BASE_URL: ${{ vars.NEXT_PUBLIC_BOOKING_API_BASE_URL }}
-      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
-      # Production must never mount a sandbox Checkout client secret. The
-      # release gate compares this with both the Worker and publishable key.
-      NEXT_PUBLIC_STRIPE_EXPECTED_MODE: live
-      # Public by design: it identifies the app, and the Worker verifies every
-      # Google token against it. Absent simply hides the Google button.
-      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
-      LESSON_PRICE_CENTS: ${{ vars.LESSON_PRICE_CENTS || '2500' }}
-      LESSON_CURRENCY: ${{ vars.LESSON_CURRENCY || 'eur' }}
-      NEXT_PUBLIC_LESSON_DURATION_MINUTES: ${{ vars.NEXT_PUBLIC_LESSON_DURATION_MINUTES || '60' }}
-      NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS: ${{ vars.NEXT_PUBLIC_SAME_DAY_RESCHEDULE_FEE_CENTS || '500' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -112,12 +130,107 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The worker job has just run the booking tests; without it, run them here.
+      # The worker job runs the booking tests when it deploys; without it, run them here.
       - name: Run fast check
         run: npm run ${{ vars.DEPLOY_WORKER == 'true' && 'check:site' || 'check:fast' }}
 
-      - name: Run release check
-        run: npm run check:release
+  # The export this release publishes, built once. Building asks nothing of the
+  # Worker (the pages call it from the browser), so it does not wait for it.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the site
+        run: npm run build
+
+      # The plain directory the journeys check and the Cloudflare deploy needs.
+      # Hidden files are kept because the export carries dotfiles the deploy
+      # would otherwise lose; _headers is not one of them, but it does have to
+      # survive the round trip, since it is the whole cache policy.
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: out
+          include-hidden-files: true
+          retention-days: 1
+
+  # The live Worker, once this release's own has shipped: it answers, has
+  # lessons to offer, sends real email, and its Stripe mode matches the key the
+  # site was built with. The script uses nothing but Node, so nothing is
+  # installed.
+  booking:
+    name: Check the live booking Worker
+    runs-on: ubuntu-latest
+    needs: worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check the booking Worker is healthy
+        run: npm run check:booking
+
+  # The customer journeys, against the built export this release publishes and
+  # the Worker it will talk to. They once ran only locally and rotted silently,
+  # so a broken journey blocks the release. Kept lean (13 October 2026, Dan:
+  # "always be as lean as possible"): focused checks of what protects students
+  # and Inês (booking, paying, signing in, her schedule), at one desktop and
+  # one phone width. Money, clashes and clock changes are proven by the Worker
+  # and calendar unit tests, not repeated here.
+  #
+  # Each line below is one machine's share, run one after another on a machine
+  # of its own, so the journeys keep the quiet conditions they were written
+  # for. (Run side by side on one machine, the teacher's journey lost a race
+  # with itself.) The shares are balanced by how long each journey takes, which
+  # every run lists on its summary page: when one grows, move a journey to a
+  # lighter line. A journey that is on no line is never run.
+  journeys:
+    runs-on: ubuntu-latest
+    needs: [worker, build]
+    strategy:
+      # Every share runs to its end, so one release shows everything broken.
+      fail-fast: false
+      matrix:
+        checks:
+          - qa-flow qa-workspace-navigation check-portfolio-banner
+          - qa-teacher-calendar qa-auth-recovery qa-payment-recovery
+          - qa-selection-calendar-recovery qa-meet-links qa-homework
+          - qa-transition-kit qa-request-recovery qa-booking-selection qa-expression-translations qa-profile-rates qa-student-nif
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Kept between releases, so most only confirm the browser is there.
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       # The browser alone, from Playwright's own store. `--with-deps` asked
       # Ubuntu's servers for nine fallback font packages and nothing else: the
@@ -127,49 +240,52 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install chromium
 
-      - name: Check Akibwa portfolio entry
-        run: npm run test:portfolio-banner
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: out
 
-      # The customer journeys, against the built export this release publishes.
-      # They once ran only locally and rotted silently, so a broken journey
-      # blocks the release. Kept lean (13 October 2026, Dan: "always be as lean
-      # as possible"): focused checks of what protects students and Inês
-      # (booking, paying, signing in, her schedule), at desktop and phone
-      # widths, about three minutes. Money, clashes and clock changes are
-      # proven by the Worker and calendar unit tests, not repeated here.
       - name: Check customer journeys against the built site
+        env:
+          CHECKS: ${{ matrix.checks }}
         run: |
           # localhost, not 127.0.0.1: the browser sends the host it was given as
           # the Origin, and the Worker's allow-list carries localhost:3000.
-          python3 -m http.server 3000 --bind 127.0.0.1 --directory out &
+          python3 -m http.server 3000 --bind 127.0.0.1 --directory out > /dev/null 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID' EXIT
           for _ in $(seq 1 20); do
             curl -sf http://localhost:3000/ > /dev/null && break
             sleep 1
           done
-          for check in qa-flow qa-workspace-navigation qa-booking-selection qa-payment-recovery qa-teacher-calendar qa-homework qa-transition-kit qa-meet-links qa-student-nif qa-profile-rates qa-request-recovery qa-auth-recovery qa-selection-calendar-recovery qa-expression-translations; do
+          {
+            echo "| Journey | Result | Seconds |"
+            echo "| --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          failed=""
+          for check in $CHECKS; do
             echo "::group::$check"
-            QA_BASE_URL=http://localhost:3000 node "scripts/$check.mjs"
+            start=$SECONDS
+            if QA_BASE_URL=http://localhost:3000 node "scripts/$check.mjs"; then
+              result="passed"
+            else
+              result="FAILED"
+              failed="$failed $check"
+            fi
             echo "::endgroup::"
+            echo "$check $result in $((SECONDS - start))s"
+            echo "| $check | $result | $((SECONDS - start)) |" >> "$GITHUB_STEP_SUMMARY"
           done
-
-      # The plain directory the Cloudflare deploy needs. Hidden files are kept
-      # because the export carries dotfiles the deploy would otherwise lose;
-      # _headers is not one of them, but it does have to survive the round trip,
-      # since it is the whole cache policy.
-      - name: Upload build for Cloudflare
-        uses: actions/upload-artifact@v4
-        with:
-          name: site
-          path: out
-          include-hidden-files: true
-          retention-days: 1
+          if [ -n "$failed" ]; then
+            echo "::error::Failed:$failed. Each journey's output is in its group above."
+            exit 1
+          fi
 
   publish-cloudflare:
     name: Publish to Cloudflare Pages (live)
     runs-on: ubuntu-latest
-    needs: build
+    needs: [checks, build, booking, journeys]
     steps:
       - name: Check Cloudflare credentials are configured
         env:
