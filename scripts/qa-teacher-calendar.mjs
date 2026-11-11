@@ -290,14 +290,14 @@ async function fixture(width, options = {}) {
       }
       // Hers are marked as hers, and wait for the student's card.
       const owner = [state.added, ...state.students].find((entry) => entry?.id === data.studentId);
-      // One already had is only recorded, with no price.
+      // One already had is recorded, at the price she was shown.
       const past = Date.parse(data.startAt) <= Date.parse("2026-09-07T10:15:00Z");
       if (owner) Object.assign(owner, { hasLessons: true, ...(past ? {} : { nextLessonAt: data.startAt, upcoming: (owner.upcoming ?? 0) + 1 }) });
       state.bookings.push({
         ...lesson(`manual-${state.bookings.length}`, owner?.name ?? "Sam Known", data.startAt, data.location, data.lessonType === "long" ? 90 : data.lessonType === "trial" ? 30 : 60),
         student_id: owner?.id,
         payment_status: past ? "recorded" : "not_required",
-        amount_cents: past && !data.paid ? null : 2400,
+        amount_cents: 2400,
         // Ticked "Already paid" as she adds it.
         ...(data.paid ? { payment_consent_version: "paid-by-hand" } : {}),
         ...(past ? { meeting_url: null } : {}),
@@ -428,7 +428,8 @@ async function fixture(width, options = {}) {
           });
           changed.push(start);
         }
-        return route.fulfill({ json: { changed, kept, emailed: true } });
+        // A lesson already had is corrected with nothing sent.
+        return route.fulfill({ json: { changed, kept, emailed: Date.parse(opened.starts_at) > Date.parse("2026-09-07T10:15:00Z") } });
       } else if (match[2] === "cancel") {
         if (state.failCancel-- > 0) return fail("The booking system is busy. Please try again.");
         booking.status = "cancelled";
@@ -1271,10 +1272,9 @@ try {
   // Any quarter hour, weekly hours or not; then only its length and adding it.
   await picker.getByRole("button", { name: "09:30 Porto time, already past", exact: true }).click();
   await expect(noraProfile.getByRole("radio", { name: "Weekly", exact: true })).toHaveCount(0);
-  // A record shows only its lengths, never a price; where it was, and whether
+  // A record carries its price (11 November 2026); where it was, and whether
   // it is already paid, are hers to say (16 October 2026).
-  await expect(noraProfile.getByRole("radio", { name: "60 mins", exact: true })).toBeVisible();
-  await expect(noraProfile.locator(".teacher-manual-price")).toHaveCount(0);
+  await expect(noraProfile.getByRole("radio", { name: "60 mins, €24", exact: true })).toBeVisible();
   await noraProfile.getByRole("radio", { name: "In Porto", exact: true }).check();
   const pastTick = noraProfile.getByRole("checkbox", { name: "Already paid", exact: true });
   await expect(pastTick).toHaveAttribute("aria-checked", "false");
@@ -1367,6 +1367,25 @@ try {
   await recordedTick.scrollIntoViewIfNeeded();
   const tickBox = await recordedTick.boundingBox();
   assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[role="checkbox"]') !== null, { x: tickBox.x + tickBox.width / 2, y: tickBox.y + tickBox.height / 2 }), true, "Already paid stays pressable over the stretched day button");
+  // Unticked, a record is open like any past lesson she added: the tick stays,
+  // and nothing says it was recorded (11 November 2026, Dan).
+  await recordedTick.click();
+  await expect(recordedTick).toHaveAttribute("aria-checked", "false");
+  await expect(recorded).not.toContainText("Recorded");
+  // Opened, it reads as any past lesson, and its length changes in one request.
+  await recorded.getByRole("button", { name: /^Thu 27 Aug/ }).click();
+  const recordDetails = recorded.locator(".teacher-lesson-row__details");
+  await expect(recordDetails).toContainText("€24 · to pay you directly");
+  await expect(recordDetails).not.toContainText(/recorded/i);
+  await recordDetails.getByRole("button", { name: "Change lesson", exact: true }).click();
+  await expect(recordDetails.getByRole("radio", { name: "This lesson", exact: true })).toHaveCount(0);
+  await recordDetails.getByRole("radio", { name: "90 mins, €36", exact: true }).check();
+  await expect(recordDetails).toContainText("Becomes 90 minutes, €36");
+  await expect(recordDetails).toContainText("No email is sent");
+  const recordId = state.bookings.find(entry => entry.student_id === "nora" && entry.payment_status === "recorded").id;
+  await recordDetails.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect.poll(() => state.writes.at(-1)).toEqual({ path: `/admin/bookings/${recordId}/change`, data: { lessonType: "long", expectedPriceCents: 3600, following: false } });
+  await expect(noraProfile).toContainText("Lesson changed.");
   await nora.getByRole("button", { name: "Close", exact: true }).click();
 
   await showLessons(page);

@@ -59,8 +59,9 @@ function addedLine(
  * loose lessons), so there is no address to type, and none is needed: a
  * student with no email yet has lessons like anyone else (14 October 2026,
  * Dan). Lessons for a student still awaiting their welcome are added quietly.
- * One already had is only recorded: date, time, length, place, add; never
- * announced, charged or owed (15 October 2026, Dan). "Already paid" marks one
+ * One already had is recorded: date, time, length, place, add; never
+ * announced (15 October 2026, Dan), and at their price, open until paid like
+ * any lesson she added (11 November 2026, Dan). "Already paid" marks one
  * lesson, past or to come, as paid to her by hand (16 October 2026, Dan).
  */
 export function LessonForm({
@@ -150,7 +151,7 @@ export function LessonForm({
               startAt,
               location: lesson.location,
               notes: "",
-              ...(!past || (tickable && paid) ? { expectedPriceCents: cents } : {}),
+              expectedPriceCents: cents,
               ...(weekly ? { repeat: lesson.repeat as Exclude<Repeat, "once"> } : {}),
               ...(tickable && paid ? { paid: true } : {}),
             });
@@ -190,7 +191,7 @@ export function LessonForm({
               {([["trial", "Trial", trialPrice], ["single", "60 mins", priceFor(student, 60)], ["long", "90 mins", priceFor(student, 90)]] as const).map(([value, label, cents]) => (
                 <label className={lesson.lessonType === value ? "is-active" : ""} key={value}>
                   <input
-                    aria-label={past ? label : `${label}, ${formatPriceCents(cents)}`}
+                    aria-label={`${label}, ${formatPriceCents(cents)}`}
                     checked={lesson.lessonType === value}
                     disabled={busy}
                     name={`${idPrefix}-lesson`}
@@ -201,8 +202,7 @@ export function LessonForm({
                   {/* Named "60 mins, €20"; the dot between them is drawn,
                       and on a phone the price sits under the length. */}
                   <span>{label}</span>
-                  {/* A record carries no price (15 October 2026, Dan). */}
-                  {past ? null : <span className="teacher-manual-price">{formatPriceCents(cents)}</span>}
+                  <span className="teacher-manual-price">{formatPriceCents(cents)}</span>
                 </label>
               ))}
             </div>

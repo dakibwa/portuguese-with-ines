@@ -18,8 +18,10 @@ function paymentLabel(booking: AdminBooking) {
     case "processing": return "Payment processing";
     case "scheduled": return "Payment scheduled";
     case "pending": return "Payment pending";
-    case "recorded": return "Recorded";
     case "free": return "Free";
+    // A lesson she added after it happened reads as any other she added
+    // (11 November 2026, Dan: "why are they different").
+    case "recorded":
     case "not_required": return addedByTeacher(booking) && booking.status !== "cancelled" ? "Payment arranged directly" : "No lesson charge";
     default: return "";
   }
@@ -78,11 +80,13 @@ const lessonLength = (booking: AdminBooking) => formatBookedLessonLabel({ id: bo
 /*
  * A lesson she added that has been and is still open: paid in cash, she
  * ticks it here, so what they still owe reads true (2 November 2026,
- * Dan: everyone pays what is open). Ticked, it can be unticked again.
+ * Dan: everyone pays what is open). Ticked, it can be unticked again. One
+ * she added after it happened is open too (11 November 2026); at €0 none is.
  */
 function settles(booking: AdminBooking, now: number) {
   return booking.status !== "cancelled" && Date.parse(booking.starts_at) <= now && addedByTeacher(booking) &&
-    booking.attendance_status === "expected" && (paidByHand(booking) || (booking.payment_status === "not_required" && !booking.charge_started_at));
+    booking.attendance_status === "expected" && (paidByHand(booking) ||
+      ((booking.payment_status === "not_required" || booking.payment_status === "recorded") && !booking.charge_started_at && booking.amount_cents !== 0));
 }
 
 /** A lesson's quiet facts: where, how long, payment, who added it, moves. */
