@@ -2311,7 +2311,12 @@ await test("weekly hours refuse malformed replacements without erasing or partly
     const saved = await save([valid]);
     assert.equal(saved.status, 200);
     assert.equal((await saved.json()).count, 1);
-    assert.equal((await save([])).status, 200, "an intentional empty timetable is allowed");
+    // A page names the week it last read. One that has not seen a change made
+    // on another device is refused, and writes nothing.
+    const read = (rules, expected) => call("/admin/availability", { user: "teacher", body: { rules, expected } });
+    assert.equal((await read([], [{ ...valid, lastStartMinute: 1080 }])).status, 409);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM availability_rules").get().n, 1);
+    assert.equal((await read([], [valid])).status, 200, "an intentional empty timetable is allowed");
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM availability_rules").get().n, 0);
   } finally {
     db.exec("DELETE FROM availability_rules");
@@ -2346,10 +2351,14 @@ await test("the teacher calendar replaces one date's time off and extra hours, e
     const saved = await day({ blocks: [{ startMinute: 870, endMinute: 900 }, { startMinute: 840, endMinute: 870 }, { startMinute: 600, endMinute: 630 }] });
     assert.equal(saved.status, 200);
     assert.deepEqual(rows(), ["blocked:-:Holiday", "blocked:600-630", "blocked:840-900", "extra:1200-1200"]);
-    assert.equal((await saved.json()).exceptions.length, 4, "returns the date's rows so the calendar can reconcile");
+    const { exceptions: held } = await saved.json();
+    assert.equal(held.length, 4, "returns the date's rows so the calendar can reconcile");
     assert.deepEqual(await starts(), [], "the day off still wins");
 
-    assert.equal((await day({ dayOff: false })).status, 200);
+    // A page that last read the date before another device changed it is refused, and writes nothing.
+    assert.equal((await day({ dayOff: false, expectedIds: held.slice(1).map((row) => row.id) })).status, 409);
+    assert.deepEqual(rows(), ["blocked:-:Holiday", "blocked:600-630", "blocked:840-900", "extra:1200-1200"]);
+    assert.equal((await day({ dayOff: false, expectedIds: held.map((row) => row.id) })).status, 200);
     assert.deepEqual(rows(), ["blocked:600-630", "blocked:840-900", "extra:1200-1200"], "reopening the day keeps its blocked hours");
     const open = await starts();
     // 14:00-15:00 Porto (UTC+1) is off: a 60-minute lesson may not start at 13:30 or 14:30, but may at 15:00.
@@ -3763,6 +3772,37 @@ await test("the nightly top-up keeps Inês's weekly slot hers, outside her hours
   } finally {
     beforeRun = null;
     forgetStudent(email);
+  }
+});
+await test("a student's own weekly run she moves outside her hours goes on being extended, and is theirs again once they move it", async () => {
+  await drain();
+  db.exec("DELETE FROM booking_refunds; DELETE FROM bookings; DELETE FROM booking_series; DELETE FROM stripe_events; DELETE FROM email_log;");
+  const at = new Date().toISOString();
+  // Their own open-ended run, Mondays at 10:00, so far booked to 21 September.
+  db.prepare("INSERT INTO booking_series (id,student_id,lesson_type_id,weekday,minute_of_day,filled_to,created_at,updated_at) VALUES ('placed-run','alice','single',1,600,'2026-09-21',?,?)").run(at, at);
+  booking("placed-1", { series: "placed-run", payment: "not_required", start: "2026-09-14T09:00:00.000Z", end: "2026-09-14T10:00:00.000Z" });
+  booking("placed-2", { series: "placed-run", payment: "not_required", start: "2026-09-21T09:00:00.000Z", end: "2026-09-21T10:00:00.000Z" });
+  const weeks = () => db.prepare("SELECT starts_at, added_by_teacher FROM bookings WHERE series_id='placed-run' AND status='confirmed' ORDER BY starts_at").all();
+  const placed = () => JSON.parse(db.prepare("SELECT value FROM settings WHERE key='teacher_placed_runs'").get()?.value ?? "[]");
+  const nightly = async () => { await worker.scheduled({ cron: "* * * * *", scheduledTime: Date.parse("2026-09-06T03:10:00.000Z") }, env, ctx); await drain(); };
+  try {
+    // She moves every week to Saturdays at 09:00, when she publishes no hours.
+    const moved = await call("/admin/bookings/placed-1/change", { user: "teacher", body: { startAt: "2026-09-19T08:00:00.000Z", following: true } });
+    assert.equal(moved.status, 200, await moved.clone().text());
+    await drain();
+    assert.deepEqual(placed(), ["placed-run"]);
+    await nightly();
+    // Planned by the student's rules, every new week was skipped and the run ran out.
+    assert.ok(weeks().length >= 10, `the run grows to its horizon: ${weeks().length} weeks`);
+    assert.ok(weeks().every((week) => week.added_by_teacher === 0 && new Date(week.starts_at).getUTCDay() === 6), "on Saturdays, still the student's own lessons");
+
+    // Their own move puts it back on a time they chose within her hours.
+    const theirs = await call("/series/placed-run/reschedule", { body: { startAt: "2026-09-21T09:00:00.000Z" } });
+    assert.equal(theirs.status, 200, await theirs.clone().text());
+    await drain();
+    assert.deepEqual(placed(), []);
+  } finally {
+    db.exec("DELETE FROM bookings WHERE series_id='placed-run'; DELETE FROM booking_series WHERE id='placed-run'; DELETE FROM settings WHERE key='teacher_placed_runs';");
   }
 });
 await test("a saved card can authorise the named lessons and repeats without entering card details or charging early", async () => {

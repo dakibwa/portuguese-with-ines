@@ -629,6 +629,19 @@ time students cannot book.
 hours. Invalid ranges or more than 100 ranges return 400 without changing the
 timetable; an explicitly empty array closes the usual weekly hours.
 
+Both saves replace a whole set with what one page holds, so each page says
+what it last read and is refused (409) once that is no longer so: a save made
+over a change from another device would undo it. `POST /admin/availability`
+takes `expected`, the week's ranges as the page last read or saved them, and
+`POST /admin/exceptions/day` takes `expectedIds`, the ids of that date's
+one-off rows; a refused hours save says to reload, and after a refused date
+her page reads her days again and shows them as they are. Both fields are
+optional, so a page opened before the Worker took them saves as it always did.
+On her Timetable, taking a stretch out of a date's extra hours (`Not working`,
+or time off over them) takes the lesson starts inside it and leaves every
+other start where it was, so times typed off her start grid never shift the
+hours left or add a later start.
+
 The Timetable's `Edit weekly hours` control edits the usual weekly pattern in
 the same calendar with click/drag, touch or keyboard input. `View lessons`
 returns to the chosen week and day. Neither switching mode nor leaving the
@@ -1385,7 +1398,16 @@ while validation runs. Inês's explicit calendar additions retain their override
   UID with a higher sequence, counts as a move and never takes a fee. With
   `following` the recipe takes the new weekday, time, length and place, and
   `filled_to` moves to the new day in its own week inside the same guarded
-  batch, so later top-ups follow. A place change is handled as a student's:
+  batch, so later top-ups follow. They follow by her rules: an every-week
+  change of day, time or place records the run in the `teacher_placed_runs`
+  setting (a list of run ids, pruned to runs still going each time one is
+  added, so no migration), and the nightly top-up plans a run in it as it
+  plans one she added: held only by her days off and her other lessons, with
+  no gap and no notice. Without that, a student's own run she had moved
+  outside her published hours had every new week skipped and ran out with
+  nobody told. Its weeks stay the student's own in how they are paid
+  (`added_by_teacher` is unchanged), and the student moving the whole run
+  themselves takes it off the list. A place change is handled as a student's:
   the new sequence makes the Meet sync patch the one Google event, adding or
   removing its room. She is held only by overlap, never by her hours, time
   off or online-only periods. One email tells the student (`Inês has changed
@@ -2906,7 +2928,14 @@ that connection. The existing Google sign-in client remains separate.
   ready; delayed links get a short follow-up email, and the day-before reminder
   carries the link again when it is ready. A week the nightly top-up adds is
   told to nobody, so its link has no follow-up email either: the reminder and
-  the student's page carry it. The minute sweep also fills
+  the student's page carry it. The same goes for a lesson its student was
+  never emailed about, added while they awaited their welcome or had no
+  address: once they can be emailed, its link waits for its day-before
+  reminder (no `student_booked`, `student_rescheduled` or run email is on
+  record for it, it starts more than the reminder's 24 hours away, and it was
+  made at least 36 hours before it starts). One too near for a reminder gets
+  its link by itself. A student just welcomed to a weekly slot is therefore
+  not sent a link email for every week at once. The minute sweep also fills
   existing future lessons after connection.
 - Moving a lesson updates the same event. Changing to Porto removes the event’s
   conference; changing to online requests one. Cancelling cancels that event.

@@ -2351,7 +2351,7 @@ function sweep(event, env, ctx) {
   ctx.waitUntil(retryPaymentRecovery(env));
   ctx.waitUntil(retryRefunds(env));
   ctx.waitUntil(resendFailedEmails(env));
-  ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row)));
+  ctx.waitUntil(syncPendingMeetings(env, row => notifyMeetingReady(env, row), { leadHours: REMINDER_LEAD_HOURS, quietHours: REMINDER_QUIET_HOURS }));
   ctx.waitUntil(sendLessonReminders(env));
   // Homework whose marking was interrupted, or whose notice failed to send.
   ctx.waitUntil(homeworkNotices(env));
@@ -3761,6 +3761,26 @@ async function insertOccurrence(env, { series, key, student, lessonType, timezon
  * a skipped week is never reconsidered on the next top-up and the run cannot
  * stall on it forever.
  */
+/**
+ * The weekly runs Inês has placed herself: a student's own run whose day,
+ * time or place she has since changed for every week. Kept as a list of run
+ * ids in settings, as online-only periods are, so no database needs a
+ * migration; it is rewritten with only the runs still going each time one is
+ * added. `added_by_teacher` cannot say this: it says who pays how.
+ */
+const TEACHER_PLACED_RUNS = "teacher_placed_runs";
+
+async function placedByTeacher(env, seriesId) {
+  try {
+    return Boolean(await env.DB.prepare(
+      `SELECT 1 FROM settings s, json_each(s.value) placed
+       WHERE s.key = '${TEACHER_PLACED_RUNS}' AND json_valid(s.value) AND placed.value = ? LIMIT 1`
+    ).bind(seriesId).first());
+  } catch {
+    return false;
+  }
+}
+
 async function fillSeries(env, { series, student, lessonType, fromKey, count, now, paymentState = "none", holdExpiresAt = null, sessionIdentity = null, priceSnapshot = null, authorization = null, availabilityRevision = null }) {
   // New bookings retain the quote already accepted. A nightly extension takes
   // a fresh price, then binds it to both its occurrence and its bookmark.
@@ -3769,6 +3789,12 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
     priceSnapshot = lessonPriceSnapshot(student.id, lessonType);
   }
   const teacher = Boolean(series.added_by_teacher);
+  // A run she placed is planned as one she added is: held only by her days
+  // off and her other lessons. A student's own run she had moved outside her
+  // published hours, or next to another lesson, was still planned by the
+  // student's rules, so every new week was skipped and the run ran out with
+  // nobody told. Its weeks stay the student's own in how they are paid.
+  const hers = teacher || await placedByTeacher(env, series.id);
   const checkedSettings = await loadSettings(env);
   const { lessonBufferMinutes } = checkedSettings;
   availabilityRevision ??= checkedSettings.availabilityRevision;
@@ -3779,7 +3805,7 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
     count,
     lessonType,
     now,
-    teacher
+    teacher: hers
   });
 
   const rows = [];
@@ -3812,9 +3838,9 @@ async function fillSeries(env, { series, student, lessonType, fromKey, count, no
       paymentConsentVersion: series.payment_consent_version ?? null,
       // Her own weekly slot keeps the spacing she chose, as a single lesson
       // she adds does.
-      bufferMinutes: teacher ? 0 : lessonBufferMinutes,
+      bufferMinutes: hers ? 0 : lessonBufferMinutes,
       teacher,
-      sessionIdentity, priceSnapshot, authorization, availabilityRevision, minimumNoticeHours: teacher ? null : checkedSettings.minimumNoticeHours
+      sessionIdentity, priceSnapshot, authorization, availabilityRevision, minimumNoticeHours: hers ? null : checkedSettings.minimumNoticeHours
     });
 
     if (!current) break;
@@ -4287,7 +4313,13 @@ async function handleRescheduleSeries(request, env, ctx, seriesId) {
     planned.length
   );
 
-  const [bookingResult, seriesResult] = await env.DB.batch([moveBookings, updateSeries]);
+  // Moved by the student, the run is on a time they chose within her hours
+  // again, so it is no longer one she placed (see `fillSeries`).
+  const forgetPlaced = env.DB.prepare(
+    `UPDATE settings SET value = (SELECT json_group_array(placed.value) FROM json_each(settings.value) placed WHERE placed.value != ?)
+     WHERE key = '${TEACHER_PLACED_RUNS}' AND json_valid(value) AND changes() = 1`
+  ).bind(seriesId);
+  const [bookingResult, seriesResult] = await env.DB.batch([moveBookings, updateSeries, forgetPlaced]);
   if (
     (bookingResult?.meta?.changes ?? 0) !== planned.length ||
     (seriesResult?.meta?.changes ?? 0) !== 1
@@ -7085,6 +7117,18 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
       lessonType?.id ?? null, location, nowIso,
       row.series_id, planned.length, ...authorization.values
     ));
+    // Where and when it is are now hers, so the weeks added later are planned
+    // by her rules (`fillSeries`). Written with the recipe or not at all.
+    if (timeMoves || location) {
+      statements.push(env.DB.prepare(
+        `INSERT INTO settings (key, value)
+         SELECT '${TEACHER_PLACED_RUNS}', (SELECT json_group_array(s.id) FROM booking_series s WHERE s.status = 'active'
+           AND (s.id = ? OR s.id IN (SELECT value FROM json_each(COALESCE(
+             (SELECT CASE WHEN json_valid(value) THEN value END FROM settings WHERE key = '${TEACHER_PLACED_RUNS}'), '[]')))))
+         WHERE changes() = 1 AND (${authorization.sql})
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      ).bind(row.series_id, ...authorization.values));
+    }
   }
   const [changed] = await env.DB.batch(statements);
   if ((changed?.meta?.changes ?? 0) !== planned.length) {
@@ -7336,6 +7380,20 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const body = adminBody;
     if (!Array.isArray(body.rules)) return fail("Expected a rules array.", 400, request, env);
     if (body.rules.length > 100) return fail("Use at most 100 weekly time ranges.", 400, request, env);
+    // This replaces the whole week with what one page holds. A page says
+    // which hours it last read (`expected`), and is refused if they are no
+    // longer the hours: her phone may have closed an afternoon since her
+    // laptop read them, and the laptop's next save would open it again. A
+    // page from before this sends none and saves as it always did.
+    if (body.expected !== undefined) {
+      if (!Array.isArray(body.expected)) return fail("Invalid weekly time range. No hours were changed.", 400, request, env);
+      const { results: held } = await env.DB.prepare("SELECT weekday, start_minute, last_start_minute FROM availability_rules").all();
+      const week = (rules) => rules.map((rule) => rule.join(":")).sort().join("|");
+      if (week((held ?? []).map((rule) => [rule.weekday, rule.start_minute, rule.last_start_minute])) !==
+          week(body.expected.map((rule) => [rule?.weekday, rule?.startMinute, rule?.lastStartMinute]))) {
+        return fail("Your weekly hours have changed since this page read them, on another device. Reload the page to see them before saving again.", 409, request, env);
+      }
+    }
 
     const statements = [env.DB.prepare(`DELETE FROM availability_rules WHERE (${authorization.sql})`).bind(...authorization.values)];
     for (const rule of body.rules) {
@@ -7402,6 +7460,19 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     const extra = "extra" in body ? extraStartRanges(body.extra, (await loadSettings(env)).slotIntervalMinutes) : undefined;
     if (blocks === null || extra === null) return fail("Those times could not be saved. Please reload and try again.", 400, request, env);
     if (dayOff === undefined && blocks === undefined && extra === undefined) return fail("Nothing to change.", 400, request, env);
+    // As with her weekly hours: the date's whole set is replaced by what one
+    // page holds, so the page names the rows it last read for this date
+    // (`expectedIds`) and is refused once another device has changed them.
+    if (body.expectedIds !== undefined) {
+      if (!Array.isArray(body.expectedIds) || !body.expectedIds.every(Number.isInteger)) {
+        return fail("Those times could not be saved. Please reload and try again.", 400, request, env);
+      }
+      const { results: held } = await env.DB.prepare("SELECT id FROM availability_exceptions WHERE date = ? AND weekday IS NULL").bind(body.date).all();
+      const rows = (ids) => [...ids].sort((a, b) => a - b).join(",");
+      if (rows((held ?? []).map((row) => row.id)) !== rows(body.expectedIds)) {
+        return fail("It has changed on another device since this page read it, and is shown as it is now.", 409, request, env);
+      }
+    }
 
     const oneOff = "date = ? AND weekday IS NULL AND kind = 'blocked'";
     const wholeDay = "(start_minute IS NULL OR start_minute <= 0) AND (end_minute IS NULL OR end_minute >= 1440)";

@@ -710,6 +710,12 @@ test("hours chosen on the Timetable: time off is never online only or extra hour
   const later = { start: 1080, end: 1260 };
   assert.deepEqual(chooseHours(both, block, "extra", later), { ...none, online: [later], extra: [later] });
   assert.deepEqual(chooseHours(both, block, "not working", evening), none);
+  // Extra hours are lesson starts on her grid: here 18:00, 18:30, 19:00 and
+  // 19:30. Not working at times typed off that grid takes the start inside
+  // them and leaves the rest where they were. Cut as plain time, the hours
+  // left began at 18:45 and gained a start at 19:45, later than she offered.
+  assert.deepEqual(chooseHours({ ...none, extra: [evening] }, { kind: "extra", span: evening }, "not working", { start: 1095, end: 1125 }, 30).extra,
+    [{ start: 1080, end: 1110 }, { start: 1140, end: 1200 }]);
   assert.deepEqual(chooseHours(both, block, null, evening), { ...none, extra: [evening] }, "Open again takes only the label off");
   // On a day online only from end to end, extra hours never cut the day's label.
   const allDay = { start: 0, end: 1440 };

@@ -468,11 +468,14 @@ async function showLessons(page) {
   const lessons = page.getByRole("button", { name: "View lessons", exact: true });
   if (await lessons.isVisible()) await lessons.click();
 }
+// What she changed on a date. Each save also names that date's rows as her
+// page last read them (`expectedIds`), which one check below follows.
 const dayWrites = (state, date) =>
   state.writes
     .filter((entry) => entry.path === "/admin/exceptions/day")
-    .map((entry) => entry.data)
+    .map(({ data }) => Object.fromEntries(Object.entries(data).filter(([field]) => field !== "expectedIds")))
     .filter((entry) => !date || entry.date === date);
+const dayRowsRead = (state) => state.writes.findLast((entry) => entry.path === "/admin/exceptions/day").data.expectedIds;
 // A time pressed offers a choice at it: a lesson there, or its hours as time
 // off or online only, their times set first. Nothing saves until she chooses.
 const choiceAt = (page) => page.locator(".teacher-slot-menu");
@@ -556,10 +559,14 @@ try {
     await expect(online).toHaveAttribute("aria-checked", "false");
     await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
     assert.deepEqual(dayWrites(state).at(-1), { date: "2026-09-09", dayOff: true });
+    assert.deepEqual(dayRowsRead(state), [], "The date had nothing on it when her page read it");
     await online.click();
     await expect(online).toHaveAttribute("aria-checked", "true");
     await expect(off).toHaveAttribute("aria-checked", "false");
     await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", dayOff: false });
+    // Her next save names the day off the last one made, so the Worker can
+    // refuse a save made over a change from another device.
+    assert.deepEqual(dayRowsRead(state), [state.nextId]);
     await online.click();
     await expect(note).toHaveText("Wed 9 Sept can be booked in Porto again.");
     await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);

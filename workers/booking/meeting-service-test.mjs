@@ -146,6 +146,22 @@ async function test(name, body) {
 }
 
 try {
+  await test("a lesson its student was never emailed about leaves its link to the day-before reminder, unless it is too near for one", async () => {
+    const at = (id, hours) => addBooking(id, { starts_at: iso(hours * 3600000), ends_at: iso((hours + 1) * 3600000), created_at: iso(-3 * 86400000) });
+    // A weekly slot added while the student awaited their welcome: a week off, and tomorrow.
+    for (const lesson of [at("held-far", 7 * 24), at("held-near", 20)]) await prepareMeeting(env, lesson);
+    // One they were told of, whose confirmation went without its link.
+    await prepareMeeting(env, at("told-far", 8 * 24));
+    db.prepare("INSERT INTO email_log (booking_id, kind, recipient, dedupe_key, status, created_at) VALUES ('told-far','student_booked','ana@example.invalid','student:booked:told-far:0','sent',?)").run(iso(0));
+    try {
+      const sent = [];
+      await syncPendingMeetings(env, async booking => { sent.push(booking.id); return true; }, { leadHours: 24, quietHours: 36 });
+      assert.deepEqual(sent.sort(), ["held-near", "told-far"], "a link email for every week at once, after a welcome, was a dozen emails");
+      assert.equal(row("held-far").meeting_notified_at, null, "its reminder carries the link, and marks it sent then");
+    } finally {
+      db.prepare("DELETE FROM email_log").run();
+    }
+  });
   await test("disabled integration never reads provider or exposes connection", async () => {
     const input = addBooking("disabled");
     assert.equal(await prepareMeeting({ ...env, GOOGLE_CALENDAR_ENABLED: "0" }, input), input);

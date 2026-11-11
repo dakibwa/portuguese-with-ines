@@ -71,28 +71,22 @@ bug-free.
 | After `Cancel all booked lessons` the open lesson still read `Booked`, with its Join link. | It reads as it now is. |
 | Focus fell to the page after closing a lesson that had been through `Change`, and after `Email me a sign-in link`. A refused change's error followed the student onto the Cancel step. | Focus stays with the calendar or the dialog; the error goes with its step. |
 
-## Found and not changed
+## Fixed on a second pass
 
-- **A student's own weekly run that Inês moves outside her published hours
-  stops being extended.** Her move uses her own rules; the nightly top-up of a
-  run she did not create still checks her hours and the 15-minute gap, skips
-  every new week and tells nobody. Fixing it needs the recipe to record that
-  she placed it, which is a new column and so a migration applied by hand
-  before the Worker ships.
-- **Two devices saving hours or time off within the same few minutes** can
-  still overwrite one another: the saves carry no revision, as online-only
-  periods do. The page now re-reads on return, which covers a laptop left open.
-- **`Not working` typed at minutes off her start grid** re-grids the extra
-  hours left either side and can add a start later than she offered.
-- **Straight after a first welcome, a student with a weekly online slot gets
-  one `Your online lesson link` email per lesson.** Whether those should be
-  one email, or wait for each day-before reminder, is a product decision.
+Dan, of the four findings first left for a decision: "fix all yeah".
+
+| Defect | Behaviour after the fix |
+| --- | --- |
+| A student's own weekly run that Inês moved outside her published hours, or next to another lesson, stopped being extended: the nightly top-up still planned it by the student's rules, skipped every new week and told nobody. | Her every-week change of day, time or place records the run as one she placed, and the top-up plans it by her rules, as it does a run she added. Its weeks stay the student's own in how they are paid; the student moving the run themselves makes it theirs again. Kept as a list in settings, so there is no migration. |
+| Two devices saving weekly hours, or one date's time off or extra hours, could overwrite one another without either saying so. | Each save says what its page last read and is refused once that has changed. A refused hours save says to reload; after a refused date her page reads her days again and shows them as they are. |
+| `Not working` typed at minutes off her start grid shifted the extra hours left either side and added a start later than she had offered. | Taking a stretch out of extra hours takes the lesson starts inside it and leaves the others where they were. |
+| Straight after a first welcome, a student with a weekly online slot was sent one `Your online lesson link` email for every week. | A lesson its student was never emailed about leaves its link to the day-before reminder. One too near for a reminder still gets its link by itself. |
 
 ## Verification
 
 - `npm run check:fast` passes: types, lint (two existing warnings), 110
-  booking unit, 151 booking integration, 20 series-extension, 33 Google
-  Calendar, 28 meeting-service, 10 tenancy, 5 redirect, 21 teacher-calendar
+  booking unit, 152 booking integration, 20 series-extension, 33 Google
+  Calendar, 29 meeting-service, 10 tenancy, 5 redirect, 21 teacher-calendar
   and 9 reply-validation checks.
 - New or extended Worker checks cover: the untick after a lesson; a refused
   and an already-made refund, with the fee waived; a late cancellation's own
@@ -101,13 +95,18 @@ bug-free.
   past lessons following a new address; the reminder for an untouched week;
   `emailed` for a student with no address; a partial details save. Each was
   seen to fail with its fix undone. The teacher-calendar unit test covers the
-  dismissed run notice.
+  dismissed run notice. The second pass added: a run she placed growing to its
+  horizon and becoming the student's again; a refused hours save and a
+  refused date; whole starts taken out of extra hours; and a never-announced
+  lesson's link waiting for its reminder.
 - The reviewers' own reproductions, re-run against the fixed Worker and, for
   the pages, in Chromium against a build of the fixed site, no longer
   reproduce.
 - Fourteen of the fifteen customer journeys pass against that build, at the
   widths they are written for, including the teacher's journey with its
-  details save now expecting only the field she changed. `qa-student-nif`
+  details save now expecting only the field she changed. After the second
+  pass the teacher's journey was run again, and passes with each date save
+  naming the rows her page last read. `qa-student-nif`
   stopped on a page error thrown inside Google's own sign-in script
   (`gis is not defined`), which this machine loads with a made-up client ID;
   built with no Google client ID, it passes. Nothing here touches Google

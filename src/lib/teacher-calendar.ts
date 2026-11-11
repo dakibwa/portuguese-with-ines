@@ -235,6 +235,28 @@ export function removeSpan(spans: Span[], cut: Span) {
   );
 }
 
+/**
+ * Extra hours are lesson starts, a step of her booking interval apart from
+ * each block's first. Taking a stretch out of them takes the starts inside it
+ * and leaves every other start where it was. Cut as plain time, a stretch at
+ * minutes off that grid left hours beginning at the cut, and the Worker,
+ * which keeps a block as its first and last start, stepped new starts from
+ * there: off her grid, and one later than any she had offered.
+ */
+export function removeStarts(spans: Span[], cut: Span, interval: number) {
+  return spans.flatMap((span) => {
+    if (cut.end <= span.start || cut.start >= span.end) return [span];
+    const kept: Span[] = [];
+    for (let start = span.start; start < span.end; start += interval) {
+      if (start >= cut.start && start < cut.end) continue;
+      const before = kept.at(-1);
+      if (before && before.end === start) before.end = Math.min(1440, start + interval);
+      else kept.push({ start, end: Math.min(1440, start + interval) });
+    }
+    return kept;
+  });
+}
+
 export function overlapsSpan(spans: Span[], start: number, end: number) {
   return spans.some((span) => span.start < end && start < span.end);
 }
@@ -466,19 +488,22 @@ export function chooseHours(
   original: HoursBlock | null,
   kind: HoursChoice,
   span: Span,
+  /** Her booking interval, so extra hours lose whole starts (`removeStarts`). */
+  interval?: number,
 ) {
   let { off, online, extra } = current;
   const was = (of: HoursKind) => original?.kind === of || (of === "online" && Boolean(original?.online));
+  const withoutExtra = (cut: Span) => interval ? removeStarts(extra, cut, interval) : removeSpan(extra, cut);
   // A kind chosen replaces the block pressed; opening again and not working take only the times set.
   if (original && kind && kind !== "not working") {
     if (was("off")) off = removeSpan(off, original.span);
     if (was("online") && (kind !== "extra" || original.online)) online = removeSpan(online, original.span);
-    if (was("extra") && kind !== "online") extra = removeSpan(extra, original.span);
+    if (was("extra") && kind !== "online") extra = withoutExtra(original.span);
   }
   if (kind === "off") {
     off = addSpan(off, span);
     online = removeSpan(online, span);
-    extra = removeSpan(extra, span);
+    extra = withoutExtra(span);
   } else if (kind === "online") {
     online = addSpan(online, span);
     off = removeSpan(off, span);
@@ -487,7 +512,7 @@ export function chooseHours(
     off = removeSpan(off, span);
     if (original?.online) online = addSpan(online, span);
   } else if (kind === "not working") {
-    extra = removeSpan(extra, span);
+    extra = withoutExtra(span);
     if (original?.online) online = removeSpan(online, span);
   } else {
     off = removeSpan(off, span);
