@@ -39,21 +39,24 @@ Inês on /schedule                     (her own account, role=teacher)
   → GET/POST /admin/availability, /admin/exceptions
   → POST /admin/online-only                          online-only date ranges and daily hours
   → GET  /admin/lesson-availability                 teacher lesson picker
-  → POST /admin/exceptions/day                       one date's day off and blocked hours
+  → POST /admin/exceptions/day                       one date's day off, blocked hours and extra hours
   → GET  /admin/bookings, /admin/students            her lessons; her students and how far
                                                      each is onto the site
   → POST /admin/bookings                             add a lesson, or a weekly slot, for someone
                                                      (marked `added_by_teacher`, shown as
                                                      `Added by you`; charged to a card only
                                                      once the student saved one from their
-                                                     account); one already started is only
-                                                     recorded (`payment_status = 'recorded'`)
+                                                     account); one already started is
+                                                     recorded (`payment_status = 'recorded'`):
+                                                     nobody is told, and it is open at the
+                                                     student's price until it is paid
   → POST /admin/students                             set a student up (details, optional prices); nothing emailed
   → POST /admin/students/:id/details                 their name, email, phone, NIF and splat; email only
                                                      until they first sign in
   → POST /admin/students/:id/prices                  her price for a student per length; null is standard, 0 is free
   → GET  /admin/receipts?month=YYYY-MM               every amount paid or due for a Porto month's lessons,
                                                      with the NIF to issue to (her Receipts tab and automation)
+  → POST /admin/needs-you/dismiss                    dismiss one Needs you notice that only informs, on all her devices
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
   → POST /admin/students/:id/invite-link             make a sign-in link for her to send on WhatsApp;
                                                      nothing emailed (ten an hour per student)
@@ -119,38 +122,63 @@ for 14 days, once) instead of the manage link, and it says how adding a card
 works; the invitation still carries the manage link. Her own copy says
 `You added a lesson`.
 
-**Recording a lesson already had** (15 October 2026, Dan: purely for the
-record). A `startAt` at or before now is a lesson she is recording, not
-booking. It is checked for clashes only, like any lesson she adds (weekly
+**Recording a lesson already had** (15 October 2026, Dan; owed like any
+lesson she added from 11 November 2026). A `startAt` at or before now is a
+lesson she is recording, not booking. It is checked for clashes only, like any lesson she adds (weekly
 hours, time off and the notice window don't apply), and the same student at
 the same start answers 409 `They already have this lesson.` Nothing else a
 booking does happens: no email to the student or to her, so no calendar
-invitation; no sign-in link; no card, charge or payment link; no reminder
-(those look only ahead); and no Google Calendar event or Meet. One still
+invitation; no sign-in link; nothing put on a card or charged by adding it,
+whatever the student has agreed to; no reminder (those look only ahead); and
+no Google Calendar event or Meet. One still
 running when she records it carries `meeting_retry_at = ends_at`, so the Meet
 sweep never reaches it. It cannot repeat weekly (400). The reply is
 `emailed: false`. Its place, `online` or `porto`, is hers to give (16 October
 2026, Dan) and is stored for the record only: a past lesson never has a Meet,
 a calendar event or an email, whichever it is.
 
-It is stored as `payment_status = 'recorded'` with no `amount_cents` (no
-migration: the column has no CHECK constraint). No existing combination was
-neutral: `not_required` on an ended lesson is Receipts' `Paid by hand`, ready
-to issue, and saving a card turns a `not_required` lesson Inês added into a
-charge; `payment_due` sends a Stripe payment link. Every charge, recovery,
-repricing, card-transition and receipt query names the statuses it acts on,
-and none names `recorded`, so it is never charged, chased or put forward as
-paid or owed. It is **not in Receipts**: a record says nothing about money, so
-there is nothing to issue a fatura-recibo for; if she was paid for it, that is
-hers to note outside the site. Her history shows `Recorded`, as does the
-lesson's dialog; the student sees it under Past lessons on Your lessons as
-a plain row, with no price, like any other past lesson. Homework is set on it
-as usual.
+It is stored as `payment_status = 'recorded'` (no migration: the column has
+no CHECK constraint), the mark that it was added afterwards. Until
+11 November 2026 it was kept for the record only, with no price. Then Dan
+sent a student's card with one past lesson open and two saying `Recorded`:
+"this is weird why are they different Ines needs to send a link for all
+three and the future lessons too". So, for money, a record is now any past
+lesson she added:
+
+- It carries the student's price for its length in `amount_cents`, quoted
+  and guarded as any lesson she adds is (`expectedPriceCents`, the price
+  snapshot), ticked `Already paid` or not.
+- It is **open** until a card pays it or she ticks `Already paid`: it counts
+  in `unpaidPast` and `unpaidPastCents`, and her tick lists (the invite's and
+  the payment link's) offer it. One at €0 is never open.
+- It goes on a card only by being named in a link the student reviews
+  (below): it becomes `scheduled` at the amount they agreed to and is charged
+  as any ended lesson on a card is. From then it is an ordinary lesson on a
+  card. Saving a card, the standing agreement and the charge sweep never
+  take a record no link named.
+- Records kept before that date have no `amount_cents`. Their price is the
+  student's price for that length now (their own rate, a 90 derived from
+  their 60, else the standard price). One expression, `lessonCentsSql`, reads
+  what a lesson she added costs wherever the open rule reads an amount, so
+  the count, the tick lists, the review and the approval never disagree. An
+  old record's amount is written onto its row only when a tick, an approval
+  or a correction touches it.
+- It is still **not in Receipts** while it is open: an unticked record has no
+  line. Ticked, it is paid by hand; paid by card, it is a card payment.
+
+Her pages no longer say `Recorded` ("why do they appear different it should
+be consistent?"): in a student's card it has the `Already paid` tick like any
+open past lesson, and opened it reads `€20 · to pay you directly`. The
+student sees it under Past lessons on Your lessons as a plain row, like any
+other past lesson. Homework is set on it as usual.
 
 Moving it to another past time, or cancelling it, is as quiet, since the
 student was never told of it. It cannot be moved into the future (409 `A
-recorded lesson stays in the past. Add a new lesson instead.`), so a record
-never becomes an unannounced lesson to come.
+recorded lesson stays in the past. Add a new lesson instead.`, or through her
+one change `A lesson already had stays in the past. Add a new lesson
+instead.`), so a record never becomes an unannounced lesson to come. Its
+length and place are corrected as any lesson already had is (see her one
+change, below).
 An unproven account with a password is still reclaimed first (below), because
 the lesson and its homework must not reach whoever registered the address;
 with no confirmation sent, the mailbox's owner gets back in with Google or a
@@ -166,8 +194,8 @@ named in both emails.
 
 **Paying for the lessons she adds** (migration 0023, 12 October 2026, Dan).
 A lesson Inês adds records its price and `added_by_teacher = 1`. One she
-records after it has happened is only a record (`recorded`, above) and is never
-charged. A lesson to come is paid to
+records after it has happened is a record (`recorded`, above): it goes on a
+card only when a link names it. A lesson to come is paid to
 her as before (`payment_status = 'not_required'`) until the student saves a card
 from their own account (`POST /me/card`, Stripe's hosted setup page,
 `client_reference_id = student:<id>`, `metadata.purpose = student_card`). That
@@ -179,8 +207,9 @@ SetupIntent, the card is saved, every lesson she added that has not yet started
 becomes `scheduled` (charged after it ends, on the same change and no-show terms
 as a lesson the student books), her weekly slots for them turn on
 `automatic_payment`, and anything she adds afterwards is `scheduled` from the
-start. A lesson already had, or one the student booked themselves, is never
-changed. A card saved at one booking's checkout agreed to that booking only and
+start. A lesson already had is changed only if the link named it (see the
+approval link, below), and one the student booked themselves never is. A card
+saved at one booking's checkout agreed to that booking only and
 does not count, and only a proven address (see *Accounts*) can save one: a card
 someone registered first never pays for the owner's lessons, and taking an
 unproven account back clears its agreement. `Your lessons` asks once, above
@@ -215,12 +244,16 @@ status:
 - A lesson to come is `not_required` with the mark. Card saving, card removal,
   charging, recovery, chasers and repricing all skip the mark, so it is never
   charged, linked, chased or moved onto a card (the `not_required` pitfall
-  does not reach it), and a student cannot change its length (409). The
+  does not reach it), and a student cannot change its length (409). Inês can
+  (11 November 2026): her change of time, place or length goes through, past
+  or to come, and the lesson stays ticked at the price of what it now is. The
   agreement it carried stays on it, so unticking can restore it.
 - A lesson she records after it happened stays `recorded`, with the mark and
   its price in `amount_cents`, so it keeps every record rule (no email, no
-  Meet, no move into the future). Unticked, it is a plain record again: no
-  price, not in Receipts.
+  Meet, no move into the future). Ticking one kept before records carried a
+  price writes the student's price for its length now. Unticked, it stays a
+  record with that price still on it and is open again (11 November 2026);
+  it has no line in Receipts until it is ticked or paid.
 - Ticked lessons are in **Receipts as paid by hand, ready**, from the moment
   they are ticked (the money is in), including after cancellation. Untick a lesson to come
   before it is charged and it is billed as it would be booked now: her lesson
@@ -255,12 +288,19 @@ card and the standing agreement, their next lesson, how many lessons to come are
 still paid by hand, and any weekly slot. It also gives `unpaidPast` and
 `unpaidPastCents`, the past lessons she added that a payment link can still
 ask for (the same rule `GET …/card-link` lists them by: confirmed, expected,
-nothing charged, not ticked paid, a price above €0), and `invitedAt`, when the
+nothing charged, not ticked paid, a price above €0; a lesson she recorded
+after it happened is one of them), and `invitedAt`, when the
 newest of their sign-in links still unspent and unexpired was made (`null`
 once each is used or expired), so her list can say `Link sent 5 Sept` (2
 November 2026). `Students` on `/schedule` groups them by whose move it is:
 `To do` (her link to send), `Waiting on them` (a link out, not yet used) and
-`All set` (signed in, card saved, nothing open), after `Needs you`. Her link is
+`All set`, after `Needs you`. All set is a student fully set up and paying for
+their own lessons (11 November 2026, Dan): signed in, nothing open from the
+past, and a card saved with no lesson she added to come still paid by hand.
+The standing agreement does not stand in for that last part: while
+`unpaidUpcoming` is above zero they are not all set, whatever they have agreed
+to. Someone who books and pays for their own lessons, with none of hers
+waiting, is all set without it (9 November 2026). Her link is
 a WhatsApp message, or for someone with an email `Email instead`, which is the
 welcome email (`POST /admin/students/:id/welcome`, three an hour per
 student). It is only ever sent by her press: nothing sends it on its own.
@@ -514,35 +554,45 @@ Migration `0024-cancellation-message.sql` adds that nullable booking field and
 must be applied to each database before deploying this Worker. Her existing
 no-fee cancellation and automatic refund rules remain the same.
 
-The week itself is where Inês takes time off. Choosing a free time offers
-`Add a lesson here` or `Take this time off`; dragging across times on a date
-blocks them all for that date only, and choosing a blocked time reopens it.
-The `Day off` switch above each date blocks the whole day. The `Time off`
-tab shows a month calendar. Tapping dates chooses them, one or several, across
-months; chosen dates survive tab changes. One line at the month's foot then
-offers `Off` and `Online only` (10 November 2026): `Off` takes the chosen
-dates not already off as whole days, and pressed again opens them, removing
-only the whole-day block. A single date that is off shows its hours beneath
-(`All day`, or its breaks), whose pencil opens a draft of one or more timed
-breaks; in the time picker, `00:00` means the end of that day (stored as
-minute 1440). That draft saves explicitly through the same
-`/admin/exceptions/day` endpoint; saving breaks removes that date's whole-day
-block, and `Remove hours off` clears its breaks. Weekly blocks and extra hours
-stay. The month marks whole days off and booked lessons, without displaying
-weekly unavailability or partial blocks from the week. Beside the month,
-`Clashes` lists each lesson to come that time off left standing: booked on a
-day off, inside hours off, or in person inside online-only hours
-(`timeOffClashes` in `src/lib/teacher-calendar.ts`, proved in
-`scripts/test-teacher-calendar.mjs`). It is a read of what the page already
-holds; no lesson is moved or cancelled by taking time off.
-Booked lessons on the chosen dates are listed as cards whose `Change` opens
-that lesson's own move/cancel dialog, and unavailable booking data must be
-retried before applying changes. Each bulk-selected date uses the same queue;
-already-matching days require no write. Reopening a day removes only its
-whole-day block, retaining partial time off and weekly hours. Each change
-saves one request at a time, so quick clicks coalesce
-into the date's latest choice. A failed older save keeps a newer choice queued;
-failure of the latest choice puts that date back as saved and says so.
+The week itself is where Inês takes time off, labels online-only time and
+adds extra hours; there is no separate Time off tab (11 November 2026).
+Pressing a free time, or dragging over several on one date, opens a small
+choice at them: `Add a lesson here` (for a single time), `From` and `Until`
+to the minute, then `Time off`, `Online only` or `Extra hours`. Nothing is
+written until she chooses. Extra hours are lesson starts for that one date,
+read exactly as weekly hours are: every booking interval from `From` while
+before `Until` (16:00–18:00 at 30 minutes starts 16:00 to 17:30). They are
+offered only where they add a start (`offersExtraHours`: outside her weekly
+and extra hours' ranges, never a whole day, a day off or a past date), drawn
+with the weekly hours' wash and labelled `Extra hours 16:00–18:00`. Pressing
+hours already off, online only or extra opens that whole block with its kind
+pressed: another kind switches it, changed times save, `Open again` opens
+only the times in the fields from time off and online only, and `Not
+working` takes only those times out of the extra hours. Time off is never
+online only or extra hours: setting one takes the span out of the others.
+Online only labels bookable time, so extra hours can be online only too; a
+block that is both, at the same times, opens on `Extra hours`, keeps its
+label as its times change and loses it with `Not working` (`chooseHours` in
+`src/lib/teacher-calendar.ts`). In the time fields `00:00` as Until means the
+end of that day (stored as minute 1440). Each date has a `Day off` switch,
+which blocks the whole day and takes away its online-only hours, and an
+`Online only` switch, which labels the whole day and reopens a day off,
+keeping its hours off. Hours off and extra hours save through
+`/admin/exceptions/day`, in one request when both change; weekly blocks and
+weekly extra rows stay. Under the week, `Clashes` lists
+each lesson to come that time off or online-only hours left standing: booked
+on a day off, inside hours off, or in person inside online-only hours
+(`timeOffClashes`, proved in `scripts/test-teacher-calendar.mjs`). It is a
+read of what the page already holds; no lesson is moved or cancelled by
+taking time off. Each is a card whose `Change` opens that lesson's own
+move/cancel dialog. `Coming up` beside it lists what is set beyond the week
+in view (`timeAhead`; extra hours as `Extra 16:00–18:00`, not on a day off),
+and pressing one turns to that week. Reopening a day
+removes only its whole-day block, retaining partial time off and weekly
+hours. Each date's change saves one request at a time, so quick clicks
+coalesce into the date's latest choice. A failed older save keeps a newer
+choice queued; failure of the latest choice puts that date back as saved and
+says so.
 
 Weekly-hours drafts warn when changed lesson start times overlap an existing
 confirmed lesson in Porto time, including ongoing and future lessons. Saving
@@ -559,11 +609,17 @@ weekly blocks such as lunch are shown but not toggled.
 Existing lessons are never cancelled by time off — they stay on the calendar
 and need their own move or cancel.
 
-`POST /admin/exceptions/day` takes `{ date, dayOff?, blocks? }`. The two parts
-are independent and each replaces only its own one-off rows in one batch:
-switching the day off never discards the hours blocked within it, reopening it
-brings them back, and an existing day off keeps its note. Weekly blocks and
-extra hours are never touched there. Malformed or whole-day `blocks`, and past
+`POST /admin/exceptions/day` takes `{ date, dayOff?, blocks?, extra? }`. The
+three parts are independent and each replaces only its own one-off rows in one
+batch, each write guarded by the teacher check and the availability revision
+bumped once: switching the day off never discards the hours blocked within it,
+reopening it brings them back, and an existing day off keeps its note. `extra`
+is the date's extra hours as spans of times in the same `{ startMinute,
+endMinute }` terms as `blocks` (end exclusive); each is stored as a `kind =
+'extra'` row whose `start_minute` is its first start and whose `end_minute` is
+its last start, the last step of `slot_interval_minutes` before the span ends,
+as availability reads an extra window. Weekly blocks and weekly extra rows are
+never touched there. Malformed or whole-day `blocks` or `extra`, and past
 dates, are refused rather than partly saved. `GET /admin/availability` returns
 weekly blocks alongside the upcoming one-off rows so the calendar shows every
 time students cannot book.
@@ -581,8 +637,9 @@ time. Precise existing windows remain available through `Set exact hours` and
 are not rounded by the grid. Drafts survive week/view changes and booking
 actions, and validation prevents the API from silently dropping invalid rows.
 
-The tools bar groups `Students`, `Timetable`, `Time off`,
-`Receipts`, `Expressions` and `Profile`, opening on `Timetable`.
+The tools bar groups `Students`, `Timetable`,
+`Receipts`, `Expressions` and `Profile`, opening on `Timetable`. An old
+`?tab=time-off` link opens Timetable.
 Profile holds her sign-in email change, password reset link, Google Meet
 connection and Sign out. Email changes use the existing new-address confirmation
 flow; password changes use the existing reset email. Google callbacks open Profile
@@ -747,9 +804,9 @@ student with no email, whose Add email opens their inline details editor; a
 student with no confirmed lessons, whose Add a lesson opens the inline lesson
 form; a lesson a
 student changed in the last 72 hours (one card per weekly run and stamp); a
-lesson a student cancelled in the last 72 hours (one card per weekly run,
-View opens it read-only; the time is already open to students); and a new
-student's first lesson
+lesson a student cancelled in the last 72 hours (one card per weekly run;
+the time is already open to students); and a new
+student's first lesson, with their booking note in full,
 in the next 7 days (a student's own booking with no earlier confirmed lesson of
 theirs, matching older rows without a `student_id` by email; a lesson Inês added
 never reads as a first lesson, even after the student moves it). The
@@ -764,9 +821,24 @@ still `payment_due`, listed with the payments until it is paid, `Open` going to
 the student) and `cardAdded` (for `CARD_ADDED_NOTICE_DAYS`, 7, after a card is
 saved: the lessons she added that it now pays for, so one already paid by hand
 can be ticked `Already paid`; lessons a student put on a card from a lesson's
-own link are listed the same way, from when they agreed). Declined cards also stay in Receipts. Nothing is dismissed: items clear
+own link are listed the same way, from when they agreed). Declined cards also stay in Receipts. Items clear
 when done, after 72 hours, or once the lesson begins; the windows are
-`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. `studentWorkspace()` groups operational notices by student ID, or an
+`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. The four that only tell
+Inês something (a student changed or cancelled a lesson, a student's first
+lesson, a student added a card) can also be dismissed with a small cross
+(11 November 2026, Dan: "can Inês have a dismiss button on these
+notifications"); work still to do (Google Meet, a payment to check, a declined
+card, no lessons, a welcome not sent) cannot. `POST /admin/needs-you/dismiss`
+with `{ key }` (teacher only, the authorisation checked inside the write)
+keeps the key in one `settings` row, `needs_you_dismissed`, a JSON object of
+key to time, added and pruned in a single statement so two quick presses
+cannot lose one (entries older than 30 days go; at most the newest 100 stay);
+`loadSettings` does not read that row. `GET /admin/students` returns the keys
+as `dismissed`, so her phone and her laptop agree. A key names what happened
+and when (`changed:<booking>:<changed at>`, `cancelled:<booking>:<cancelled
+at>`, `first:<booking>:<starts at>`, `card:<student>:<added at>`), so a second
+change to the same lesson is a new notice. A dismissed notice no longer counts
+on the Students badge. `studentWorkspace()` groups operational notices by student ID, or an
 unambiguous real email for legacy bookings. Payments match through their
 booking ID; unmatched notices and Meet remain above the list. It ranks payments,
 recent changes, Inês's setup work, first lessons, waiting students, then ready
@@ -1221,11 +1293,15 @@ while validation runs. Inês's explicit calendar additions retain their override
   `cancelRemaining` cancels them too. It applies the same payment policy as an
   individual cancellation: a future paid lesson is refunded, an uncharged one
   is never charged, and a lesson inside the 14-hour window remains booked. A selected
-  weekly lesson exposes `Manage weekly lessons`, keeps both outcomes visibly
-  distinct, and asks for confirmation before calling the stop endpoint.
+  weekly lesson's `Cancel`, set to `Every week`, offers `Cancel all booked
+  lessons` (`cancelRemaining: true`) and a quiet `Stop repeating` (`false`);
+  the step states what each does and is itself the confirmation.
 - **Moving a recurrence moves every future confirmed occurrence together.**
   The student chooses the new weekly anchor, length, and location through the
-  same compact change-booking controls. Every proposed week is checked before
+  same compact change-booking controls, under `Change` set to `Every week`. It
+  starts on the run's first lesson outside the notice window, the anchor the
+  Worker lays the run out from, so keeping that time keeps every week in
+  place; a later lesson opened never shifts the earlier ones. Every proposed week is checked before
   one guarded database update moves the run and its series recipe; a newly
   claimed slot or concurrent individual change moves none of it. Each planned
   occurrence is guarded by its sequence as well as its prior slot.
@@ -1242,15 +1318,19 @@ while validation runs. Inês's explicit calendar additions retain their override
 - **Inês can change the length of, or cancel, a weekly lesson and every later
   week of its run in one go** (9 November 2026, Dan: "change recurring ones
   from 60 to 90 and they all change and she can cancel them all too"). Both
-  start from the lesson she opened, which must still be to come; lessons
-  before it, and every lesson already had, are never touched.
+  start from the lesson she opened, which must still be to come to take the
+  weeks after it too; lessons before it are never touched, and a lesson
+  already had changes only on its own (see correcting one, below).
   `POST /admin/bookings/:id/length` takes `lessonType` (`single` or `long`),
   the displayed `expectedPriceCents` (the student's own price for that length,
-  a 90 derived as 1.5× their 60) and `following`. A lesson paid by card or by
-  hand, with a payment due or going through, a free one going to a priced
-  length, or one the longer lesson would run into another lesson, keeps its
-  length and comes back under `kept` with a short reason; her own lessons keep
-  no gap, as when she adds one. The rest change in one JSON-backed write that
+  a 90 derived as 1.5× their 60) and `following`. A lesson a card has paid,
+  with a payment due or going through, a free one going to a priced length,
+  or one the longer lesson would run into another lesson, keeps its length
+  and comes back under `kept` with a short reason; her own lessons keep no
+  gap, as when she adds one. One ticked `Already paid` is no longer held
+  (11 November 2026, Dan: "even if it's already marked as paid Ines should be
+  able to change it"): it changes like any other and stays ticked, at the
+  price of the new length. A student still cannot change the length of one. The rest change in one JSON-backed write that
   checks each row's sequence, length, payment state and price snapshot, that
   the run has gained or lost no lesson since the read, and that nothing
   overlaps: all of them or none. Each keeps its calendar UID with a higher
@@ -1262,9 +1342,9 @@ while validation runs. Inês's explicit calendar additions retain their override
   Dan: "allow her malleability to change wholesale recurring stuff from 60 to
   90, 90 to 60, the dates, the in porto or online etc"). `POST
   /admin/bookings/:id/change` takes any of `startAt`, `lessonType` with
-  `expectedPriceCents`, and `location`, plus `following`. It starts from a
-  lesson still to come (not a record), and a new time must be to come too. A
-  length alone is exactly `/length`. Otherwise the lesson she opened takes
+  `expectedPriceCents`, and `location`, plus `following`. For a lesson still
+  to come a new time must be to come too (a lesson already had is corrected
+  within the past, below). A length alone is exactly `/length`. Otherwise the lesson she opened takes
   the new instant, and with `following` every later lesson takes the new day
   and Porto time in its own week: the week of the run it sits nearest,
   counted from the lesson she opened and stepped by date keys, so clock
@@ -1287,8 +1367,28 @@ while validation runs. Inês's explicit calendar additions retain their override
   off or online-only periods. One email tells the student (`Inês has changed
   your lesson` / `Inês has changed your weekly lessons`), naming any week
   that stayed; a time-only move of one lesson keeps the words it always had.
-  Her page still corrects a lesson already had, or a record, to another time
-  through `/reschedule`.
+- **Inês can correct a lesson already had** (11 November 2026, Dan: "Ines
+  should be able to change previous lessons to like from 60 to 90 too").
+  `/change` and `/length` take a lesson that has started, a record included,
+  while nothing of it is on a card: `not_required` or `recorded`, no charge
+  started, ticked `Already paid` or not (a ticked one stays ticked, at the
+  price of what it now is). It takes 60 or 90 minutes at the
+  student's price for the new length now (`expectedPriceCents` checked as for
+  a lesson to come), online or in person, and a new day and time that is
+  still in the past. It changes on its own: `following: true` answers 400 `A
+  lesson already had changes on its own.`, and a time to come answers 409 `A
+  lesson already had stays in the past. Add a new lesson instead.` Another
+  lesson in the way refuses it. The write is the same guarded one, with the
+  row required to be still past and still off any card. Nobody is emailed
+  and nothing goes to Google Calendar or Meet (`emailed: false`); one still
+  running is held out of the Meet sweep until its new end. A past lesson
+  that cannot take the change says why in the same words as one to come
+  (`it's already paid`, `it has a payment due`, `its payment is going
+  through`, `it's free`, `it's a trial lesson`, `it would run into another
+  lesson`), plus `it's on their card` for one scheduled on a card and not
+  yet charged: what a card is about to be charged for is never changed
+  behind the student's back. Her page uses `/reschedule` only for a past lesson that keeps
+  its length and place for one of those reasons, to move its time as before.
   `POST /admin/bookings/:id/cancel` with `following: true` ends the run first,
   so the nightly top-up cannot add a week, then cancels each confirmed lesson
   from this one on exactly as her single cancellation does: a card payment is
@@ -1446,7 +1546,9 @@ while validation runs. Inês's explicit calendar additions retain their override
   lesson appears only if money moved; a lesson still to come only once paid.
   One ticked `Already paid` is paid by hand, ready, past or to come. A free
   lesson (`free`, €0) and an unticked record (`recorded`) never have a line:
-  there is nothing to issue for either (16 October 2026, Dan).
+  there is nothing to issue for either (16 October 2026, Dan). That holds
+  now a record is open until paid (11 November 2026): it gets its line when
+  it is ticked or a card pays it.
   Her Receipts tab shows the same lines and downloads them as CSV, so her
   automation can work from the JSON, the CSV or the table and remember each
   `id` it has issued. The rules live in `workers/booking/receipts.mjs`.
@@ -1540,10 +1642,17 @@ different students were confirmed into the same lesson in testing.
   explicit colour so a client that inverts backgrounds cannot leave it unreadable.
 - Customer emails use short introductions and one action button. HTML keeps
   the complete action link in that button; the plain-text alternative includes
-  the URL. The price row carries payment timing and the footer keeps the
-  applicable cancellation/no-show rules without repeating payment timing, or
-  a fee or refund the note above it already states (a late move on a saved
-  card ends `This fee applies once per lesson.`). A cancellation names its
+  the URL. A lesson's facts are bullets (11 November 2026): its place,
+  length and amount on one line (`Online · 60 minutes · €25`), how it is paid
+  on the next (the `priceValue` terms), the Meet link as its own. The footer
+  keeps the applicable change rule in the site's words (FeeFacts) without
+  repeating payment timing, or a fee or refund the note above it already
+  states (a late move on a saved card ends `This fee applies once per
+  lesson.`). Receipts and declined-card emails state the amount once, in the
+  introduction and on the button; Inês's copies of a move show what changed
+  under `Before`. Her payment-received emails keep their subject, heading,
+  preheader, Portal das Finanças note and `Lesson`, `Reference` and `NIF`
+  rows exactly, because her records read them. A cancellation names its
   place rather than linking its call, and an automatic notice ends `Sent
   automatically by the booking system.` above the site's link.
   Amounts are written as the site writes them: whole euros bare (€25), anything
@@ -1731,18 +1840,20 @@ get wrong:
 
 ### Time and availability
 
-**Online-only periods** (10 November 2026). Inês labels days as online only
-on the Time off month: she taps days and presses `Online only` at its foot,
-and edits their hours in place (`All day`, or the same From/Until hours each
-day, on the teaching clock). The service stores periods, not days: each
+**Online-only periods** (10 November 2026; on the Timetable from 11
+November 2026). Inês labels a whole day with its `Online only` switch, and
+some hours from the choice at the times, on the teaching clock. A date may
+hold several online-only spans. The service stores periods, not days: each
 includes both dates and is either all day or one daily window, with `00:00`
 as Until meaning the end of that day. The website converts between the two
-(`labelOnlineOnly`, `onlineOnlyHours` in `src/lib/teacher-calendar.ts`, proved
-in `scripts/test-teacher-calendar.mjs`): neighbouring days with the same
-hours are one period, a period splits around days taken out of it, and each
-save sends the whole list with periods wholly in the past left out. A failed
-save keeps her days chosen. Her Time off month and Timetable show
-online-only time; the Timetable does not edit it.
+(`labelOnlineOnly`, `setOnlineOnlyHours`, `onlineOnlyHours` in
+`src/lib/teacher-calendar.ts`, proved in `scripts/test-teacher-calendar.mjs`):
+neighbouring days with the same hours are one period, a period splits around
+days taken out of it, a date's further spans are periods of their own, and
+each save sends the whole list against the revision it was read at, with
+periods wholly in the past left out. Online only saves as she chooses it,
+one save at a time, quick changes coalescing into the latest list; a failure
+puts the list back as saved and says so under the week.
 
 A student who has chosen In Porto is shown which days could still be had
 online. The calendar reads the online availability beside the Porto one (the
@@ -2347,7 +2458,8 @@ day one was saved. Now:
   several dates or a weekly run), a lesson or weekly run Inês adds (card on
   file or not), and every week a run adds while the price is €0. No existing
   status was neutral: `not_required` is Receipts' `Paid by hand` and a card
-  saved later charges it; `recorded` is a past-only record nobody is told of.
+  saved later charges it; `recorded` is a past lesson nobody was told of,
+  open until paid.
   `bookings.payment_status` has no CHECK constraint, so `free` needs no
   migration.
 - Booking at €0 asks for no agreement and opens no card setup; the Worker
@@ -2856,7 +2968,8 @@ Provider references: [Calendar scopes](https://developers.google.com/workspace/c
 From an unpaid lesson's details, Inês can create a payment approval link
 (**Create payment link**). `GET /admin/bookings/:id/card-link` lists what she
 can tick into it: the lesson she opened and that student's other unpaid
-lessons she added that have already started, newest first, at most 20. The
+lessons she added that have already started, records included (11 November
+2026), newest first, at most 20. The
 lesson she opened starts ticked; every other one only when she ticks it,
 because many past lessons were paid to her by hand without being marked
 **Already paid**. When nothing else is unpaid there is no list and the link

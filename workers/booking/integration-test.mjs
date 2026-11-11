@@ -528,6 +528,30 @@ await test("student cannot use teacher routes and forged manage links disclose n
   assert.equal((await call("/admin/bookings", { method: "GET" })).status, 401);
   assert.equal((await call("/bookings/forged", { method: "GET" })).status, 404);
 });
+await test("a dismissed Needs you notice stays dismissed for the teacher alone, and two dismissals both stay", async () => {
+  const dismiss = (key, options = {}) => call("/admin/needs-you/dismiss", { user: "teacher", body: { key }, ...options });
+  const listed = async () => (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).dismissed;
+  assert.deepEqual(await listed(), []);
+  const changed = "changed:lesson-1:1788000000000";
+  assert.equal((await dismiss(changed, { user: "alice" })).status, 401, "a student cannot dismiss");
+  assert.equal((await dismiss(changed, { user: null })).status, 401, "nor can a signed-out caller");
+  for (const key of ["payment:p1", "changed:lesson-1", "changed:lesson 1:1", `changed:${"a".repeat(65)}:1`, 7])
+    assert.equal((await dismiss(key)).status, 400, `${key} is refused`);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM settings WHERE key = 'needs_you_dismissed'").get().n, 0, "nothing kept by a refusal");
+  // Two presses at once (her phone and her laptop) both stay.
+  const [first, second] = await Promise.all([dismiss(changed), dismiss("cancelled:lesson-2:1788000000000", { token: env.ADMIN_TOKEN })]);
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.deepEqual(new Set(await listed()), new Set([changed, "cancelled:lesson-2:1788000000000"]));
+  // A month on, old dismissals give way to new ones; the row never grows for ever.
+  clock += 31 * 86400000;
+  try {
+    assert.deepEqual((await (await dismiss("card:alice:1788000000000")).json()).dismissed, ["card:alice:1788000000000"]);
+  } finally {
+    clock -= 31 * 86400000;
+    db.prepare("DELETE FROM settings WHERE key = 'needs_you_dismissed'").run();
+  }
+});
 await test("the student's own price snapshots onto every occurrence and a one-off; tampering is refused", async () => {
   const payload = { lessonType: "single", startAt: "2026-09-08T09:00:00.000Z", repeat: 4, expectedPriceCents: 1500 };
   const result = await call("/bookings", { body: payload });
@@ -2255,8 +2279,9 @@ await test("weekly hours refuse malformed replacements without erasing or partly
       .run(row.id, row.weekday, row.start_minute, row.last_start_minute, row.active);
   }
 });
-await test("the teacher calendar replaces one date's time off without touching weekly blocks, extra hours or the day off", async () => {
+await test("the teacher calendar replaces one date's time off and extra hours, each only its own one-off rows", async () => {
   const at = new Date().toISOString();
+  const interval = db.prepare("SELECT value FROM settings WHERE key = 'slot_interval_minutes'").get().value;
   const lunch = db.prepare("INSERT INTO availability_exceptions (weekday,kind,start_minute,end_minute,note,created_at) VALUES (1,'blocked',750,810,'Lunch',?)").run(at).lastInsertRowid;
   db.prepare("INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,created_at) VALUES ('2026-09-14','extra',1200,1200,?)").run(at);
   db.prepare("INSERT INTO availability_exceptions (date,kind,note,created_at) VALUES ('2026-09-14','blocked','Holiday',?)").run(at);
@@ -2303,8 +2328,63 @@ await test("the teacher calendar replaces one date's time off without touching w
     assert.ok(schedule.exceptions.some((row) => row.weekday === 1 && row.note === "Lunch"), "weekly blocks reach the calendar");
     assert.equal((await call("/admin/exceptions", { user: "teacher", body: { date: "2026-09-15", startMinute: 900, endMinute: 840 } })).status, 400);
     assert.equal((await call("/admin/exceptions", { user: "teacher", body: { date: "2026-09-15", startMinute: "x" } })).status, 400);
+
+    // Extra hours on a Saturday, which has no weekly hours: sent as the times
+    // she chose, kept as the starts they give at her interval.
+    const saturday = "2026-09-12";
+    db.prepare("UPDATE settings SET value = '30' WHERE key = 'slot_interval_minutes'").run();
+    const weekly = db.prepare("INSERT INTO availability_exceptions (date,weekday,kind,start_minute,end_minute,created_at) VALUES (?,6,'extra',420,420,?)").run(saturday, at).lastInsertRowid;
+    db.prepare("INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,created_at) VALUES (?,'extra',600,600,?)").run(saturday, at);
+    db.prepare("INSERT INTO availability_exceptions (date,kind,start_minute,end_minute,created_at) VALUES ('2026-09-13','extra',600,600,?)").run(at);
+    const extra = (body, user = "teacher") => call("/admin/exceptions/day", { user, headers: { "CF-Connecting-IP": "198.51.100.93" }, body: { date: saturday, ...body } });
+    const extras = (date = saturday) => db.prepare("SELECT start_minute AS s, end_minute AS e FROM availability_exceptions WHERE date = ? AND weekday IS NULL AND kind = 'extra' ORDER BY s")
+      .all(date).map((row) => `${row.s}-${row.e}`);
+    const revision = () => Number(db.prepare("SELECT value FROM settings WHERE key = 'availability_revision'").get()?.value ?? 0);
+    const before = revision();
+    for (const user of [null, "alice"]) assert.equal((await extra({ extra: [{ startMinute: 900, endMinute: 1020 }] }, user)).status, 401, String(user));
+    for (const spans of [null, "15:00-17:00", [{ startMinute: 900, endMinute: 900 }], [{ startMinute: "900", endMinute: 1020 }],
+      [{ startMinute: -30, endMinute: 60 }], [{ startMinute: 900, endMinute: 1441 }], Array.from({ length: 97 }, (_, minute) => ({ startMinute: minute, endMinute: minute + 1 })),
+      // A whole day of starts, midnight to midnight, is refused as a whole day of time off is.
+      [{ startMinute: 0, endMinute: 720 }, { startMinute: 720, endMinute: 1440 }]]) {
+      assert.equal((await extra({ blocks: [{ startMinute: 480, endMinute: 540 }], extra: spans })).status, 400, JSON.stringify(spans));
+    }
+    const blocked = () => db.prepare("SELECT COUNT(*) AS n FROM availability_exceptions WHERE date = ? AND kind = 'blocked'").get(saturday).n;
+    assert.deepEqual([extras(), blocked(), revision()], [["600-600"], 0, before], "a refused request writes nothing, its time off included");
+    // Her authority is checked inside the write: signed out as it runs, nothing changes.
+    const hash = await sessionHash(sessions.teacher);
+    beforeRun = (sql) => {
+      if (!sql.startsWith("DELETE FROM availability_exceptions WHERE date = ? AND weekday IS NULL AND kind = 'extra'")) return;
+      beforeRun = null;
+      db.prepare("INSERT INTO revoked_sessions(token_hash,expires_at) VALUES (?,?)").run(hash, Date.now() + 86400000);
+    };
+    try {
+      assert.equal((await extra({ extra: [{ startMinute: 900, endMinute: 1020 }] })).status, 401);
+    } finally {
+      beforeRun = null;
+      db.prepare("DELETE FROM revoked_sessions WHERE token_hash = ?").run(hash);
+    }
+    assert.deepEqual([extras(), revision()], [["600-600"], before]);
+
+    const replaced = await extra({ extra: [{ startMinute: 960, endMinute: 1000 }, { startMinute: 600, endMinute: 660 }, { startMinute: 900, endMinute: 960 }] });
+    assert.equal(replaced.status, 200);
+    assert.deepEqual(extras(), ["600-630", "900-990"], "sorted, merged, and each kept as its first and last start");
+    assert.equal(revision(), before + 1);
+    assert.deepEqual((await replaced.json()).exceptions.filter((row) => row.kind === "extra").map((row) => [row.start_minute, row.end_minute]), [[600, 630], [900, 990]]);
+    assert.deepEqual(extras("2026-09-13"), ["600-600"], "another date keeps its extra hours");
+    assert.ok(db.prepare("SELECT 1 FROM availability_exceptions WHERE id = ?").get(weekly), "weekly extra hours are never replaced");
+    // Exactly those starts can be booked, beside the weekly 07:00 (Porto is UTC+1).
+    const saturdayStarts = async () => ((await (await call(`/availability?lessonType=single&from=${saturday}&to=${saturday}`, { method: "GET", user: null })).json())
+      .slotsByDate[saturday] ?? []).map((slot) => slot.startAt.slice(11, 16));
+    assert.deepEqual(await saturdayStarts(), ["06:00", "09:00", "09:30", "14:00", "14:30", "15:00", "15:30"]);
+    // The interval is read from her settings; an empty list takes them all away.
+    db.prepare("UPDATE settings SET value = '15' WHERE key = 'slot_interval_minutes'").run();
+    assert.equal((await extra({ extra: [{ startMinute: 900, endMinute: 960 }] })).status, 200);
+    assert.deepEqual(extras(), ["900-945"]);
+    assert.equal((await extra({ extra: [] })).status, 200);
+    assert.deepEqual(await saturdayStarts(), ["06:00"]);
   } finally {
-    db.prepare("DELETE FROM availability_exceptions WHERE date = '2026-09-14' OR id = ?").run(lunch);
+    db.prepare("UPDATE settings SET value = ? WHERE key = 'slot_interval_minutes'").run(interval);
+    db.prepare("DELETE FROM availability_exceptions WHERE date IN ('2026-09-12', '2026-09-13', '2026-09-14') OR id = ?").run(lunch);
   }
 });
 await test("login reserves each attempt atomically and a success cannot reopen the window", async () => {
@@ -2674,7 +2754,7 @@ await test("emails keep an agreed rate's cents instead of rounding to whole euro
     delete env.RESEND_API_KEY;
   }
   const email = sentEmails.find((sent) => sent.to[0] === "cents-rate@example.invalid");
-  assert.match(email.text, /^Price: €22\.50 a lesson · charged to your saved card at the end of each lesson$/m);
+  assert.match(email.text, /^Online · 60 minutes · €22\.50 a lesson\nCharged to your saved card at the end of each lesson$/m);
 });
 
 await test("moving a recurrence leaves a lesson inside 14 hours where it is and moves the rest together", async () => {
@@ -2991,7 +3071,7 @@ await test("the day-before reminder goes once per lesson version, on its own clo
     assert.equal(meetMore.length, 0, "once");
     assert.equal(meet.subject, "Your lesson is coming up — Tue 3 Nov, 09:00");
     for (const part of ["09:00 · Los Angeles time", "Join Google Meet: https://meet.google.com/abc-defg-hij", "Change or cancel this lesson: https://lesson.example/book/?manage=",
-      "Free to change or cancel until Mon 2 Nov, 19:00. After that, there’s a €5 late change fee."]) {
+      "Free to change or cancel until Mon 2 Nov, 19:00. €5 to move or cancel later."]) {
       assert.ok(meet.text.includes(part), part);
     }
     assert.ok(meet.text.indexOf("Join Google Meet") < meet.text.indexOf("Change or cancel this lesson"), "joining is the button, changing the quiet link");
@@ -3001,7 +3081,7 @@ await test("the day-before reminder goes once per lesson version, on its own clo
 
     const [coming, ...comingMore] = remindersFor("rem-nolink");
     assert.equal(comingMore.length, 0);
-    assert.ok(coming.text.includes("Its Google Meet link isn’t ready yet; we’ll email it to you as soon as it is."));
+    assert.ok(coming.text.includes("\nWe’ll email you its Google Meet link as soon as it’s ready\n"));
     assert.equal(coming.text.match(/Change or cancel this lesson/g).length, 1, "the button, with no quiet link beside it");
     assert.ok(!coming.text.includes("Join Google Meet"));
     // A lesson moved since is a new version, reminded at its own time.
@@ -3011,7 +3091,7 @@ await test("the day-before reminder goes once per lesson version, on its own clo
 
     const [porto, ...portoMore] = remindersFor("rem-retry");
     assert.equal(portoMore.length, 0);
-    for (const part of ["Where: In Porto", "15:00 · Porto time", "Free to change or cancel until Tue 3 Nov, 01:00. After that, it can’t be changed or refunded."]) assert.ok(porto.text.includes(part), part);
+    for (const part of ["\nIn Porto · 60 minutes\n", "15:00 · Porto time", "Free to change or cancel until Tue 3 Nov, 01:00. After that, it can’t be changed or refunded."]) assert.ok(porto.text.includes(part), part);
     assert.equal(porto.text.match(/Change or cancel this lesson/g).length, 1);
     assert.ok(!porto.text.includes("Google Meet"));
     assert.equal(db.prepare("SELECT status FROM email_log WHERE dedupe_key='student:reminder:rem-retry:2'").get().status, "sent");
@@ -3621,6 +3701,8 @@ await test("a saved card can authorise the named lessons and repeats without ent
   const ticked = linkedBooking("saved-card-ticked", { owner: id, payment: "not_required", start: "2026-08-25T17:00:00.000Z", end: "2026-08-25T18:00:00.000Z" });
   const otherPast = linkedBooking("saved-card-older", { owner: id, payment: "not_required", start: "2026-08-18T17:00:00.000Z", end: "2026-08-18T18:00:00.000Z" });
   db.prepare("UPDATE bookings SET added_by_teacher=1 WHERE student_id=?").run(id);
+  // One ticked is a record kept with no amount: the standard €25 now.
+  db.prepare("UPDATE bookings SET payment_status='recorded', amount_cents=NULL WHERE id=?").run(ticked);
   const ownToken = await createSession(id, env.BOOKING_TOKEN_SECRET);
   const tokenHash = await sessionHash(ownToken);
   try {
@@ -3635,11 +3717,14 @@ await test("a saved card can authorise the named lessons and repeats without ent
     const body = { consent: true, bookingConsent: true, bookings: preview.bookings, savedCardKey: preview.savedCardKey };
     const setupCount = checkoutRequests.length, chargeCount = charges.length;
     assert.equal((await call("/me/card", { token: ownToken, body: { ...body, savedCardKey: "stale-card" } })).status, 409);
-    for (const race of ["paid", "changed-card", "signed-out"]) {
+    assert.deepEqual(preview.bookings.map((lesson) => lesson.amountCents), [2500, 1500]);
+    for (const race of ["paid", "repriced", "changed-card", "signed-out"]) {
       beforeRun = sql => {
         if (!sql.startsWith("UPDATE students SET card_consent_at = ?")) return;
         // Either ticked lesson changing refuses the whole approval.
         if (race === "paid") db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(ticked);
+        // The record's price is theirs now, so a new one is not what they reviewed.
+        if (race === "repriced") db.prepare("INSERT INTO student_recurring_rates (student_id,duration_minutes,amount_cents,redeemed_at) VALUES (?,60,2000,?)").run(id, new Date().toISOString());
         if (race === "changed-card") db.prepare("UPDATE students SET stripe_payment_method='pm_replaced' WHERE id=?").run(id);
         if (race === "signed-out") db.prepare("INSERT INTO revoked_sessions (token_hash,expires_at) VALUES (?,?)").run(tokenHash, Date.now() + 86400000);
       };
@@ -3648,6 +3733,7 @@ await test("a saved card can authorise the named lessons and repeats without ent
       assert.equal(db.prepare("SELECT card_consent_at FROM students WHERE id=?").get(id).card_consent_at, null);
       assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND payment_status='scheduled'").get(id).n, 0);
       db.prepare("UPDATE bookings SET payment_consent_version=NULL WHERE id=?").run(ticked);
+      db.prepare("DELETE FROM student_recurring_rates WHERE student_id=?").run(id);
       db.prepare("UPDATE students SET stripe_payment_method=? WHERE id=?").run(`pm_${id}`, id);
       db.prepare("DELETE FROM revoked_sessions WHERE token_hash=?").run(tokenHash);
     }
@@ -3657,7 +3743,8 @@ await test("a saved card can authorise the named lessons and repeats without ent
     assert.equal(checkoutRequests.length, setupCount, "no new card form or setup session for a saved card");
     assert.equal(charges.length, chargeCount, "only the normal due-payment scheduler takes payment");
     assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(selected).payment_status, "scheduled");
-    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(ticked).payment_status, "scheduled");
+    assert.deepEqual({ ...db.prepare("SELECT payment_status, amount_cents FROM bookings WHERE id=?").get(ticked) }, { payment_status: "scheduled", amount_cents: 2500 },
+      "the record goes on the card at the amount reviewed");
     assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(otherPast).payment_status, "not_required", "an unticked past lesson is untouched");
     assert.equal(db.prepare("SELECT automatic_payment FROM booking_series WHERE student_id=?").get(id).automatic_payment, 1);
     assert.equal((await call("/me/card", { token: ownToken, body })).status, 409, "a repeat press cannot consent or charge twice");
@@ -3675,6 +3762,9 @@ await test("a prepared card link needs the student's approval and covers exactly
   const otherPast = linkedBooking("combined-oldest", { owner: id, payment: "not_required", start: "2026-10-13T17:00:00.000Z", end: "2026-10-13T18:00:00.000Z" });
   const someoneElse = linkedBooking("combined-alice", { owner: "alice", payment: "not_required", start: "2026-10-20T09:00:00.000Z", end: "2026-10-20T10:00:00.000Z" });
   db.prepare("UPDATE bookings SET added_by_teacher=1 WHERE student_id=? OR id=?").run(id, someoneElse);
+  // The older one is a record she kept before records carried a price: the
+  // standard €25 now.
+  db.prepare("UPDATE bookings SET payment_status='recorded', amount_cents=NULL WHERE id=?").run(ticked);
   try {
     const series = await call("/admin/bookings", { user: "teacher", body: {
       email, name: "Combined Student", lessonType: "single", startAt: "2026-11-03T03:30:00.000Z", repeat: "open"
@@ -3697,7 +3787,7 @@ await test("a prepared card link needs the student's approval and covers exactly
     const listed = async () => (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).students.find((entry) => entry.id === id);
     db.prepare("DELETE FROM sign_in_links WHERE student_id=?").run(id);
     const before = await listed();
-    assert.deepEqual([before.unpaidPast, before.unpaidPastCents], [3, 4500], "her card counts the lessons a link could ask for");
+    assert.deepEqual([before.unpaidPast, before.unpaidPastCents], [3, 5500], "her card counts the lessons a link could ask for, the record included");
     assert.equal((await call(`/admin/bookings/${selected}/card-link`, { user: "teacher", body: { bookingIds: [selected, someoneElse] } })).status, 409,
       "another student's lesson cannot ride along");
     const prepared = await call(`/admin/bookings/${selected}/card-link`, { user: "teacher", body: { bookingIds: [selected, ticked] } });
@@ -3717,16 +3807,18 @@ await test("a prepared card link needs the student's approval and covers exactly
     const preview = await call("/me/card/preview", { token: ownToken, body: { bookingIds: url.searchParams.get("cardBooking").split(",") } });
     assert.equal(preview.status, 200);
     const reviewed = (await preview.json()).bookings;
-    assert.deepEqual(reviewed.map((lesson) => lesson.amountCents), [1500, 1500]);
+    assert.deepEqual(reviewed.map((lesson) => lesson.amountCents), [2500, 1500]);
     assert.equal((await call("/me/card", { token: ownToken, body: { bookings: reviewed, bookingConsent: true } })).status, 400);
     assert.equal((await call("/me/card", { token: ownToken, body: { consent: true, bookings: reviewed } })).status, 400);
-    assert.equal((await call("/me/card", { token: ownToken, body: { consent: true, bookingConsent: true, bookings: [reviewed[0], { ...reviewed[1], amountCents: 1 }] } })).status, 409);
+    assert.equal((await call("/me/card", { token: ownToken, body: { consent: true, bookingConsent: true, bookings: [{ ...reviewed[0], amountCents: 1500 }, reviewed[1]] } })).status, 409,
+      "a record's amount that no longer matches is refused");
+    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(ticked).payment_status, "recorded", "and nothing changes");
     assert.equal((await call("/me/card", { token: ownToken, body: { consent: true, bookingConsent: true, bookings: reviewed } })).status, 200);
     const setup = new URLSearchParams(checkoutRequests.at(-1).body);
     const metadata = Object.fromEntries([...setup].filter(([key]) => key.startsWith("metadata[")).map(([key, value]) => [key.slice(9, -1), value]));
     assert.equal(setup.get("mode"), "setup");
     assert.equal(new URL(setup.get("cancel_url")).searchParams.get("cardBooking"), `${ticked},${selected}`, "cancelling Stripe preserves the named lessons for retry");
-    assert.equal(metadata.approved_booking_1, `${ticked} 2026-10-20T17:00:00.000Z 2026-10-20T18:00:00.000Z 1500`);
+    assert.equal(metadata.approved_booking_1, `${ticked} 2026-10-20T17:00:00.000Z 2026-10-20T18:00:00.000Z 2500`);
     assert.equal(metadata.approved_booking_2, `${selected} 2026-10-27T17:00:00.000Z 2026-10-27T18:00:00.000Z 1500`);
     assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(selected).payment_status, "not_required");
     assert.equal(charges.length, chargeCount, "approval still waits for Stripe's completed card setup");
@@ -3737,8 +3829,11 @@ await test("a prepared card link needs the student's approval and covers exactly
     assert.equal((await webhook(event)).status, 200);
     assert.equal((await webhook(event)).status, 200);
     assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(selected).payment_status, "scheduled");
-    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(ticked).payment_status, "scheduled");
+    assert.deepEqual({ ...db.prepare("SELECT payment_status, amount_cents FROM bookings WHERE id=?").get(ticked) }, { payment_status: "scheduled", amount_cents: 2500 },
+      "the record goes on the card at the amount reviewed");
     assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(otherPast).payment_status, "not_required", "an unticked past lesson is untouched");
+    assert.ok(db.prepare("SELECT payment_status FROM bookings WHERE student_id=? AND starts_at > ?").all(id, new Date().toISOString()).every((row) => row.payment_status === "scheduled"),
+      "their lessons to come are on the card too");
     assert.equal(db.prepare("SELECT automatic_payment FROM booking_series WHERE student_id=?").get(id).automatic_payment, 1);
     assert.equal(charges.length, chargeCount, "the webhook schedules; it does not take a payment");
     // The lesson has ended, so the next sweep takes it (charged at the end
@@ -3746,7 +3841,7 @@ await test("a prepared card link needs the student's approval and covers exactly
     await chargeDueLessons(env, new Date("2026-10-27T18:30:00Z"));
     await chargeDueLessons(env, new Date("2026-10-27T18:31:00Z"));
     assert.deepEqual(charges.filter(charge => charge.key.includes(selected)).map(charge => charge.amount), [1500], "exactly the authorised amount, once");
-    assert.deepEqual(charges.filter(charge => charge.key.includes(ticked)).map(charge => charge.amount), [1500], "each ticked lesson is its own charge");
+    assert.deepEqual(charges.filter(charge => charge.key.includes(ticked)).map(charge => charge.amount), [2500], "each ticked lesson is its own charge, the record once");
 
     for (const change of ["paid", "moved", "repriced", "cancelled"]) {
       const changedId = linkedBooking(`combined-${change}`, { owner: id, payment: "not_required", start: "2026-10-26T17:00:00.000Z", end: "2026-10-26T18:00:00.000Z" });
@@ -3818,7 +3913,7 @@ await test("a card saved from the account pays for the lessons Inês added from 
 
     const saved = db.prepare("SELECT * FROM students WHERE id=?").get(id);
     assert.deepEqual([saved.stripe_customer_id, saved.stripe_payment_method, Boolean(saved.card_consent_at)], ["cus_card_later", "pm_card_later", true]);
-    assert.equal(statusOf("2026-09-01T09:00:00.000Z"), "recorded", "a lesson already had is not charged");
+    assert.equal(statusOf("2026-09-01T09:00:00.000Z"), "recorded", "a lesson already had goes on a card only when a link names it");
     assert.equal(statusOf("2026-10-05T02:00:00.000Z"), "not_required", "only lessons Inês added change");
     const future = db.prepare("SELECT * FROM bookings WHERE student_id=? AND added_by_teacher=1 AND starts_at > ?").all(id, new Date().toISOString());
     assert.ok(future.length > 2);
@@ -3842,7 +3937,7 @@ await test("a card saved from the account pays for the lessons Inês added from 
     assert.equal(later.status, 201);
     assert.equal(statusOf("2026-10-09T02:00:00.000Z"), "scheduled", "a lesson she adds now is on the card from the start");
     assert.equal((await add("2026-09-02T09:00:00.000Z")).status, 201);
-    assert.equal(statusOf("2026-09-02T09:00:00.000Z"), "recorded", "a lesson she records after it happened is never charged");
+    assert.equal(statusOf("2026-09-02T09:00:00.000Z"), "recorded", "a lesson she records after it happened is not put on the card");
 
     // One the student already paid her for comes off the card, and stays off.
     const handPaid = db.prepare("SELECT id FROM bookings WHERE student_id=? AND starts_at='2026-10-09T02:00:00.000Z'").get(id).id;
@@ -4227,7 +4322,7 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     const rows = () => db.prepare("SELECT student_email, amount_cents FROM bookings WHERE student_id=?").all(student.id);
     assert.equal(rows().length, 7);
     assert.deepEqual([...new Set(rows().map((row) => row.student_email))], [`no-email:${student.id}`], "the stand-in is the lessons' key and goes no further");
-    assert.deepEqual(rows().filter((row) => row.amount_cents !== 2000).map((row) => row.amount_cents).sort(), [3000, null], "her price, 1.5 times it for 90 minutes, and none on the one recorded");
+    assert.deepEqual(rows().filter((row) => row.amount_cents !== 2000).map((row) => row.amount_cents).sort(), [3000], "her price on each, the one recorded included, and 1.5 times it for 90 minutes");
 
     // Nothing is addressed to it, nothing names it, no calendar file invites it. Her own copies read "No email yet".
     const everything = sentEmails.flatMap((sent) => [sent.to.join(), sent.reply_to?.join() ?? "", sent.subject, sent.text, sent.html,
@@ -4491,7 +4586,7 @@ await test("her price for a student prices their lessons, and only lessons nothi
     forgetStudent("priced@example.invalid");
   }
 });
-await test("a lesson Inês records after it happened is only a record: no one is told, nothing is charged or owed", async () => {
+await test("a lesson Inês records after it happened: no one is told, it carries their price and is open until paid", async () => {
   db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
   captureEmail();
   Object.assign(env, { TEACHER_EMAIL: "ines@example.invalid", TEACHER_NOTIFICATIONS_ENABLED: "1" });
@@ -4499,10 +4594,13 @@ await test("a lesson Inês records after it happened is only a record: no one is
   // Welcomed, with a card that pays for her lessons, so only the past decides.
   db.prepare(`INSERT INTO students (id,email,name,password_hash,created_at,email_verified_at,stripe_customer_id,stripe_payment_method,card_consent_at)
     VALUES ('recorded',?,'Rui Recorded','',?,?,'cus_recorded','pm_recorded',?)`).run(email, new Date().toISOString(), new Date().toISOString(), new Date().toISOString());
+  // His own price: €22 for 60 minutes, so €33 for 90.
+  db.prepare("INSERT INTO student_recurring_rates (student_id,duration_minutes,amount_cents,redeemed_at) VALUES ('recorded',60,2200,?)").run(new Date().toISOString());
   const add = (startAt, extra = {}) => call("/admin/bookings", { user: "teacher", body: { studentId: "recorded", lessonType: "single", startAt, ...extra } });
   const row = (startAt) => db.prepare("SELECT * FROM bookings WHERE student_id='recorded' AND starts_at=?").get(startAt);
   try {
-    const had = await add("2026-08-03T09:00:00.000Z");
+    assert.equal((await add("2026-08-03T09:00:00.000Z", { expectedPriceCents: 2500 })).status, 409, "a record's price is quoted as any lesson's");
+    const had = await add("2026-08-03T09:00:00.000Z", { expectedPriceCents: 2200 });
     assert.equal(had.status, 201, await had.clone().text());
     assert.equal((await had.json()).emailed, false);
     // Started ten minutes ago and still running.
@@ -4511,15 +4609,40 @@ await test("a lesson Inês records after it happened is only a record: no one is
     assert.deepEqual(sentEmails, [], "no email to the student or to her, and so no invitation");
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sign_in_links WHERE student_id='recorded'").get().n, 0, "no sign-in link is made");
     const lesson = row("2026-08-03T09:00:00.000Z");
-    assert.deepEqual([lesson.payment_status, lesson.amount_cents, lesson.payment_consent_at, lesson.meeting_url], ["recorded", null, null, null], "a record, never on the card");
+    assert.deepEqual([lesson.payment_status, lesson.amount_cents, lesson.payment_consent_at, lesson.meeting_url], ["recorded", 2200, null, null],
+      "a record at his price, not put on his card by the agreement he has");
     assert.equal(row("2026-09-05T09:50:00.000Z").meeting_retry_at, "2026-09-05T10:50:00.000Z", "the Meet sweep leaves a running one alone");
+
+    // Records kept before they carried a price are at his price now; one at
+    // €0 and one ticked Already paid are not open.
+    const old = (id, start, type, amount) => db.prepare(`INSERT INTO bookings (id,reference,lesson_type_id,student_id,student_name,student_email,student_phone,
+      student_timezone,location,notes,starts_at,ends_at,status,sequence,created_at,updated_at,payment_status,amount_cents,added_by_teacher)
+      VALUES (?,?,?,'recorded','Rui Recorded',?,'','Europe/Lisbon','online','',?,?,'confirmed',0,?,?,'recorded',?,1)`)
+      .run(id, id, type, email, `${start}T09:00:00.000Z`, `${start}T${type === "long" ? "10:30" : "10:00"}:00.000Z`, new Date().toISOString(), new Date().toISOString(), amount);
+    old("rec-old-60", "2026-07-01", "single", null);
+    old("rec-old-90", "2026-07-08", "long", null);
+    old("rec-zero", "2026-07-15", "single", 0);
+    assert.equal((await add("2026-07-22T09:00:00.000Z", { paid: true, expectedPriceCents: 2200 })).status, 201);
+    const listed = async () => (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).students.find((entry) => entry.id === "recorded");
+    assert.deepEqual([(await listed()).unpaidPast, (await listed()).unpaidPastCents], [4, 2200 + 2200 + 2200 + 3300], "the two added now and the two kept before");
+    const choices = await (await call("/admin/students/recorded/card-link", { method: "GET", user: "teacher" })).json();
+    assert.deepEqual(choices.lessons.map((entry) => [entry.startAt.slice(0, 10), entry.amountCents]),
+      [["2026-09-05", 2200], ["2026-08-03", 2200], ["2026-07-08", 3300], ["2026-07-01", 2200]], "her tick list offers each at its price");
+
+    // Ticked and unticked, a record keeps its price and is open again.
+    const tick = (id, paid) => call(`/admin/bookings/${id}/paid`, { user: "teacher", body: { paid } });
+    assert.equal((await tick("rec-old-60", true)).status, 200);
+    assert.equal((await tick("rec-old-60", false)).status, 200);
+    const unticked = db.prepare("SELECT payment_status, amount_cents, payment_consent_version FROM bookings WHERE id='rec-old-60'").get();
+    assert.deepEqual({ ...unticked }, { payment_status: "recorded", amount_cents: 2200, payment_consent_version: null });
+    assert.equal((await listed()).unpaidPast, 4);
 
     // Weekly hours don't apply, but the same lesson twice, an overlap or a weekly run are refused.
     assert.deepEqual(await (await add("2026-08-03T09:00:00.000Z")).json(), { error: "They already have this lesson." });
     assert.equal((await add("2026-08-03T09:30:00.000Z")).status, 409, "an overlap");
     assert.equal((await add("2026-08-10T09:00:00.000Z", { repeat: 4 })).status, 400);
 
-    // Nothing charges, chases or receipts it.
+    // Nothing charges or chases it off a card it was never put on, and no receipt is drawn up for it.
     await chargeDueLessons(env, new Date("2026-09-06T12:00:00.000Z"));
     await retryPaymentRecovery(env);
     assert.equal(charges.filter((charge) => charge.key.includes(lesson.id)).length, 0);
@@ -4649,16 +4772,17 @@ await test("Already paid: ticked lessons are never billed or put on a card, show
     // Past lessons keep the place she chose, with no Meet; ticked, they are paid by hand.
     assert.equal((await add(pastPaid, { paid: true, expectedPriceCents: 1 })).status, 409, "a paid past record still needs the price she reviewed");
     assert.equal((await add(pastPaid, { paid: true, location: "porto" })).status, 201);
-    assert.equal((await add(pastPlain, { location: "porto", expectedPriceCents: 1 })).status, 201, "an unticked past record has no payment quote to enforce");
+    assert.equal((await add(pastPlain, { location: "porto", expectedPriceCents: 1 })).status, 409, "an unticked past record is quoted too");
+    assert.equal((await add(pastPlain, { location: "porto" })).status, 201);
     assert.deepEqual([...terms(pastPaid), row(pastPaid).location, row(pastPaid).meeting_url], ["recorded", 2500, "paid-by-hand", "porto", null]);
-    assert.deepEqual([...terms(pastPlain), row(pastPlain).location], ["recorded", null, null, "porto"]);
+    assert.deepEqual([...terms(pastPlain), row(pastPlain).location], ["recorded", 2500, null, "porto"]);
 
     // Ticked and unticked from her lesson (an /admin/ route, behind her sign-in).
     assert.equal((await tick(unticked, true)).status, 200);
     assert.deepEqual(terms(unticked), ["not_required", 2500, "paid-by-hand"]);
     assert.equal((await tick(pastPlain, true)).status, 200);
     assert.equal((await tick(pastPlain, false)).status, 200);
-    assert.deepEqual(terms(pastPlain), ["recorded", null, null], "unticked, a record is only a record");
+    assert.deepEqual(terms(pastPlain), ["recorded", 2500, null], "unticked, a record keeps its price and is open again");
     booking("paid-tick-card", { owner: id, payment: "paid", start: "2026-10-09T16:00:00.000Z", end: "2026-10-09T17:00:00.000Z" });
     assert.equal((await tick("2026-10-09T16:00:00.000Z", true)).status, 409, "already paid by card");
     booking("paid-tick-free", { owner: id, payment: "free", start: "2026-10-10T16:00:00.000Z", end: "2026-10-10T17:00:00.000Z" });
@@ -5832,7 +5956,8 @@ await test("Inês changes a weekly run's length from one lesson on, and cancels 
     await drain();
     const rows = () => db.prepare("SELECT * FROM bookings WHERE student_id='lena' ORDER BY starts_at").all();
     const [first, second, third, fourth] = rows();
-    db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(third.id);
+    // A card has paid for the third week, so it keeps its length.
+    db.prepare("UPDATE bookings SET payment_status='paid', stripe_payment_intent='pi_lena_third' WHERE id=?").run(third.id);
     // Bob's lesson straight after the fourth week: 90 minutes would run into it.
     booking("bob-after-lena", { owner: "bob", start: "2026-12-22T11:00:00.000Z", end: "2026-12-22T12:00:00.000Z" });
     sentEmails.length = 0;
@@ -5859,10 +5984,16 @@ await test("Inês changes a weekly run's length from one lesson on, and cancels 
     assert.deepEqual(sentEmails.map((mail) => mail.subject), ["Inês has changed your lessons to 90 minutes — from Tue 8 Dec, 10:00"]);
     assert.match(sentEmails[0].text, /€30/);
 
-    // One lesson on its own, with its own email.
+    // One lesson on its own, with its own email. Ticked "Already paid", it
+    // still changes, and stays ticked at the new length's price (11 November
+    // 2026, Dan: "even if it's already marked as paid Ines should be able to
+    // change it").
+    db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(first.id);
     sentEmails.length = 0;
     const one = await call(`/admin/bookings/${first.id}/length`, { user: "teacher", body: { lessonType: "long", expectedPriceCents: 3000 } });
     assert.deepEqual((await one.json()).changed, ["2026-12-01T10:00:00.000Z"]);
+    assert.deepEqual({ ...db.prepare("SELECT lesson_type_id, amount_cents, payment_status, payment_consent_version FROM bookings WHERE id=?").get(first.id) },
+      { lesson_type_id: "long", amount_cents: 3000, payment_status: "not_required", payment_consent_version: "paid-by-hand" });
     await drain();
     assert.match(sentEmails[0].subject, /^Inês has changed your lesson to 90 minutes/);
 
@@ -5904,7 +6035,8 @@ await test("Inês changes when, how long and where for every week from one, acro
     assert.equal(before.length, 12);
     const [first, second, , fourth] = before;
     const seriesId = first.series_id;
-    db.prepare("UPDATE bookings SET payment_consent_version='paid-by-hand' WHERE id=?").run(fourth.id);
+    // A card has paid for the fourth week, so it cannot take another length.
+    db.prepare("UPDATE bookings SET payment_status='paid', stripe_payment_intent='pi_wendy_fourth' WHERE id=?").run(fourth.id);
     db.prepare("UPDATE bookings SET student_changed_at=? WHERE id=?").run(new Date().toISOString(), second.id);
     // Bob at 21:00 on Thursday 5 November: the fifth week's new 20:00–21:30 would run into it.
     booking("bob-thursday", { owner: "bob", start: "2026-11-05T21:00:00.000Z", end: "2026-11-05T22:00:00.000Z" });
@@ -5955,7 +6087,7 @@ await test("Inês changes when, how long and where for every week from one, acro
 
     await drain();
     assert.deepEqual(sentEmails.map((mail) => mail.subject), ["Inês has changed your weekly lessons — from Thu 15 Oct, 20:00"]);
-    assert.match(sentEmails[0].text, /Inês has changed the lessons below: they’re now on Thursdays at 20:00, 90 minutes and in person in Porto\. 2 lessons stay as they were\./);
+    assert.match(sentEmails[0].text, /Inês has changed your weekly lessons: they’re now on Thursdays at 20:00, 90 minutes and in person in Porto\. 2 lessons stay as they were\./);
     const ics = Buffer.from(sentEmails[0].attachments[0].content, "base64").toString("utf8").replace(/\r\n /g, "");
     assert.ok(ics.includes(`UID:booking-${second.id}@`) && /SEQUENCE:1\r?\n/.test(ics), "the same calendar entry, one version on");
     assert.ok(!ics.includes(`UID:booking-${fourth.id}@`), "a kept week's entry is not resent");
@@ -6010,7 +6142,7 @@ await test("Inês changes one lesson's time and place together; a paid lesson mo
     assert.equal(charges.length, chargesBefore, "nothing is charged");
     await drain();
     assert.deepEqual(sentEmails.map((mail) => mail.subject), ["Inês has changed your lesson — Fri 9 Oct, 10:00"]);
-    assert.match(sentEmails[0].text, /Inês has changed your lesson: it’s now at the time below and in person in Porto\./);
+    assert.match(sentEmails[0].text, /Inês has changed your lesson: it’s now at a new time and in person in Porto\./);
 
     // Back online at the same time: her words say so.
     sentEmails.length = 0;
@@ -6047,16 +6179,65 @@ await test("Inês changes one lesson's time and place together; a paid lesson mo
   }
 });
 
-await test("her change refuses a lesson had, recorded or cancelled, a trial length, and nothing to change", async () => {
-  booking("change-past", { start: "2026-09-01T09:00:00.000Z", end: "2026-09-01T10:00:00.000Z" });
-  booking("change-recorded", { start: "2026-09-02T09:00:00.000Z", end: "2026-09-02T10:00:00.000Z", payment: "recorded" });
+await test("her change corrects a lesson already had, a record included, quietly within the past, and refuses what it can't", async () => {
+  student("pastfix");
+  db.prepare("INSERT INTO student_recurring_rates (student_id,duration_minutes,amount_cents,redeemed_at) VALUES ('pastfix',60,2000,?)").run(new Date().toISOString());
+  const theirs = (id, start, payment, extra = "") => {
+    booking(id, { owner: "pastfix", start: `${start}T09:00:00.000Z`, end: `${start}T10:00:00.000Z`, payment });
+    db.prepare(`UPDATE bookings SET added_by_teacher=1, amount_cents=2000${extra} WHERE id=?`).run(id);
+  };
+  theirs("fix-open", "2026-09-01", "not_required");
+  // A record kept before records carried a price.
+  theirs("fix-record", "2026-09-02", "recorded", ", amount_cents=NULL");
+  theirs("fix-card", "2026-09-03", "scheduled");
+  theirs("fix-ticked", "2026-09-04", "not_required", ", payment_consent_version='paid-by-hand'");
+  booking("fix-bob", { owner: "bob", start: "2026-09-01T10:15:00.000Z", end: "2026-09-01T11:15:00.000Z" });
   booking("change-cancelled", { start: "2026-12-07T09:00:00.000Z", end: "2026-12-07T10:00:00.000Z" });
   db.prepare("UPDATE bookings SET status='cancelled' WHERE id='change-cancelled'").run();
   booking("change-future", { start: "2026-12-08T09:00:00.000Z", end: "2026-12-08T10:00:00.000Z" });
+  captureEmail();
+  const emailsBefore = db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n;
   try {
     const change = (id, body) => call(`/admin/bookings/${id}/change`, { user: "teacher", body: { following: false, ...body } });
-    assert.equal((await change("change-past", { location: "porto" })).status, 409);
-    assert.equal((await change("change-recorded", { location: "porto" })).status, 409);
+    const length = (id, body) => call(`/admin/bookings/${id}/length`, { user: "teacher", body: { following: false, ...body } });
+    const error = async (response) => [response.status, (await response.json()).error];
+    const row = (id) => { const { starts_at, ends_at, lesson_type_id, location, amount_cents, payment_status } = db.prepare("SELECT * FROM bookings WHERE id=?").get(id);
+      return [starts_at, ends_at, lesson_type_id, location, amount_cents, payment_status]; };
+    const longer = { lessonType: "long", expectedPriceCents: 3000 };
+
+    // Another lesson in the way keeps it as it was.
+    assert.deepEqual(await error(await length("fix-open", longer)), [409, "This lesson keeps its length: it would run into another lesson."]);
+    // Length, place and time together, at their price for 90 minutes, in one write.
+    const fixed = await change("fix-open", { ...longer, startAt: "2026-08-31T09:00:00.000Z", location: "porto" });
+    assert.equal(fixed.status, 200, await fixed.clone().text());
+    assert.deepEqual(await fixed.json(), { changed: ["2026-08-31T09:00:00.000Z"], kept: [], emailed: false });
+    assert.deepEqual(row("fix-open"), ["2026-08-31T09:00:00.000Z", "2026-08-31T10:30:00.000Z", "long", "porto", 3000, "not_required"]);
+
+    // A record: its length (it takes the price) and then its place and time, and stays a record.
+    assert.equal((await length("fix-record", { lessonType: "long", expectedPriceCents: 1 })).status, 409, "the price she saw is checked");
+    assert.deepEqual(await (await length("fix-record", longer)).json(), { changed: ["2026-09-02T09:00:00.000Z"], kept: [], emailed: false });
+    assert.equal((await change("fix-record", { startAt: "2026-09-02T08:00:00.000Z", location: "porto" })).status, 200);
+    assert.deepEqual(row("fix-record"), ["2026-09-02T08:00:00.000Z", "2026-09-02T09:30:00.000Z", "long", "porto", 3000, "recorded"]);
+    assert.ok(db.prepare("SELECT meeting_retry_at FROM bookings WHERE id='fix-record'").get().meeting_retry_at >= "2026-09-02T09:30:00.000Z", "the Meet sweep leaves it alone");
+
+    // Never into the time to come, never with the weeks after it.
+    assert.deepEqual(await error(await change("fix-record", { startAt: "2026-12-01T09:00:00.000Z" })), [409, "A lesson already had stays in the past. Add a new lesson instead."]);
+    assert.deepEqual(await error(await change("fix-record", { following: true, location: "online" })), [400, "A lesson already had changes on its own."]);
+    assert.equal((await length("fix-open", { lessonType: "single", expectedPriceCents: 2000, following: true })).status, 400);
+    // Ticked Already paid, it is still hers to correct, and stays ticked at
+    // the new length's price (11 November 2026).
+    assert.deepEqual(await (await change("fix-ticked", { ...longer, location: "porto" })).json(), { changed: ["2026-09-04T09:00:00.000Z"], kept: [], emailed: false });
+    assert.deepEqual(row("fix-ticked"), ["2026-09-04T09:00:00.000Z", "2026-09-04T10:30:00.000Z", "long", "porto", 3000, "not_required"]);
+    assert.equal(db.prepare("SELECT payment_consent_version FROM bookings WHERE id='fix-ticked'").get().payment_consent_version, "paid-by-hand");
+    // On their card, it keeps what it is.
+    assert.deepEqual(await error(await length("fix-card", longer)), [409, "This lesson keeps its length: it's on their card."]);
+    assert.deepEqual(await error(await change("fix-card", { location: "porto" })), [409, "This lesson stays as it was: it's on their card."]);
+    assert.deepEqual(row("fix-card").slice(2), ["single", "online", 2000, "scheduled"]);
+    await drain();
+    assert.deepEqual(sentEmails, [], "nobody is emailed");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_log").get().n, emailsBefore, "nor is anything queued");
+
+    // A lesson to come is changed as before.
     assert.equal((await change("change-cancelled", { location: "porto" })).status, 404);
     assert.equal((await change("change-future", { lessonType: "trial", expectedPriceCents: 2000 })).status, 400);
     assert.equal((await change("change-future", { location: "Lisbon" })).status, 400);
@@ -6067,7 +6248,9 @@ await test("her change refuses a lesson had, recorded or cancelled, a trial leng
     assert.match((await nothing.json()).error, /^Nothing to change/);
     assert.equal(db.prepare("SELECT sequence FROM bookings WHERE id='change-future'").get().sequence, 0);
   } finally {
-    db.prepare("DELETE FROM bookings WHERE id LIKE 'change-%'").run();
+    releaseEmail();
+    db.prepare("DELETE FROM bookings WHERE id LIKE 'change-%' OR id = 'fix-bob'").run();
+    forgetStudent("pastfix@example.invalid");
   }
 });
 
@@ -6157,7 +6340,7 @@ await test("a student Inês set up books their cancelled weekly lesson again: a 
     const toInes = sentEmails.filter((mail) => mail.to[0] === "ines@example.invalid");
     assert.deepEqual([toStudent.length, toInes.length], [1, 1]);
     assert.match(toStudent[0].subject, /^Your Portuguese lesson is booked — /);
-    assert.match(toStudent[0].text, /€25 · pay Inês as usual/);
+    assert.match(toStudent[0].text, /^Online · 60 minutes · €25\nPay Inês as usual$/m);
     assert.match(toInes[0].subject, /^Booked again after cancelling — Hana Hand, /);
     assert.match(toInes[0].text, /Hana Hand cancelled this lesson and has booked it again\./);
     const ics = Buffer.from(toStudent[0].attachments[0].content, "base64").toString("utf8").replace(/\r\n /g, "");

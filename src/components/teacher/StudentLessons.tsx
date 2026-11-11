@@ -18,8 +18,10 @@ function paymentLabel(booking: AdminBooking) {
     case "processing": return "Payment processing";
     case "scheduled": return "Payment scheduled";
     case "pending": return "Payment pending";
-    case "recorded": return "Recorded";
     case "free": return "Free";
+    // A lesson she added after it happened reads as any other she added
+    // (11 November 2026, Dan: "why are they different").
+    case "recorded":
     case "not_required": return addedByTeacher(booking) && booking.status !== "cancelled" ? "Payment arranged directly" : "No lesson charge";
     default: return "";
   }
@@ -78,11 +80,13 @@ const lessonLength = (booking: AdminBooking) => formatBookedLessonLabel({ id: bo
 /*
  * A lesson she added that has been and is still open: paid in cash, she
  * ticks it here, so what they still owe reads true (2 November 2026,
- * Dan: everyone pays what is open). Ticked, it can be unticked again.
+ * Dan: everyone pays what is open). Ticked, it can be unticked again. One
+ * she added after it happened is open too (11 November 2026); at €0 none is.
  */
 function settles(booking: AdminBooking, now: number) {
   return booking.status !== "cancelled" && Date.parse(booking.starts_at) <= now && addedByTeacher(booking) &&
-    booking.attendance_status === "expected" && (paidByHand(booking) || (booking.payment_status === "not_required" && !booking.charge_started_at));
+    booking.attendance_status === "expected" && (paidByHand(booking) ||
+      ((booking.payment_status === "not_required" || booking.payment_status === "recorded") && !booking.charge_started_at && booking.amount_cents !== 0));
 }
 
 /** A lesson's quiet facts: where, how long, payment, who added it, moves. */
@@ -109,12 +113,16 @@ function lessonFacts(booking: AdminBooking, now: number) {
  * What every one of their lessons shares, such as `In Porto · Added by you`,
  * is said once beside their details, and each lesson keeps only what is its
  * own (9 November 2026, Dan: "we don't need all the information repeating").
- * With a single lesson, its row says it all.
+ * With a single lesson, its row says it all. How long a lesson is never
+ * leaves its row (11 November 2026, Dan, of rows with no length: "why
+ * doesn't it show her time of lesson here? 60 or 90"): one lesson can be 60
+ * and the next 90, and she can now correct either.
  */
 export function sharedFacts(bookings: AdminBooking[], now: number) {
   if (bookings.length < 2) return [];
   const lists = bookings.map(booking => lessonFacts(booking, now));
-  return lists[0].filter(fact => lists.every(facts => facts.includes(fact)));
+  const lengths = new Set(bookings.map(lessonLength));
+  return lists[0].filter(fact => !lengths.has(fact) && lists.every(facts => facts.includes(fact)));
 }
 
 const homeworkState: Record<NoteHomework, string> = { none: "", draft: "Draft", published: "With them", review: "To review", done: "Done" };
@@ -131,7 +139,7 @@ const PAST_SHOWN = 8;
  * past and cancelled, newest first, with her notes beneath (Dan: "a homework
  * page for each student … it can build up over time").
  */
-export function StudentLessons({ bookings, notes, level, error, now, token, busy, selectedId, details, openNotes, onOpenNotes, onCloseNotes, onBusy, onRetry, onOpenLesson, onCloseLesson, onRecordRefund, onPaid }: {
+export function StudentLessons({ bookings, notes, level, error, now, token, busy, selectedId, details, openNotes, onChangeLesson, onCloseNotes, onBusy, onRetry, onOpenLesson, onCloseLesson, onRecordRefund, onPaid }: {
   token: string;
   /** The lesson whose details are open in place, and those details. */
   selectedId: string | null;
@@ -145,9 +153,10 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
   error: string;
   now: number;
   busy: boolean;
-  /** The lesson whose notes and homework are open. */
+  /** The lesson whose notes and homework are open in its row, from Homework to review. */
   openNotes: string | null;
-  onOpenNotes: (bookingId: string) => void;
+  /** The row's pencil: open this lesson in place on its change form. */
+  onChangeLesson: (booking: AdminBooking) => void;
   onCloseNotes: () => void;
   onBusy: (busy: boolean) => void;
   onRetry: () => void;
@@ -210,7 +219,6 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     // Open, its details carry Already paid and the refund themselves.
     const settle = settles(booking, now) && selectedId !== booking.id;
     const note = noteFor.get(booking.id);
-    const written = Boolean(note && (note.notes.trim() || note.homework !== "none"));
     const opened = Boolean(note) && openNotes === booking.id;
     const selected = selectedId === booking.id;
     const detailsId = `teacher-lesson-details-${booking.id}`;
@@ -218,14 +226,19 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     const refund = cancelled && paidByHand(booking) && booking.payment_status !== "refunded" && selectedId !== booking.id;
     const label = day(booking);
     const facts = factList(lessonFacts(booking, now), inherited);
-    // Notes are a small pencil (9 November 2026, Dan), named as the button
-    // it replaced was: Add notes, Notes, or Close while its homework is open.
-    const notesLabel = opened ? "Close homework" : written ? `Notes, ${label}` : `Add notes · ${label}`;
-    // Open in place, the date row is the disclosure and its details carry
-    // Homework, so the pencil would only repeat it.
-    const notesButton = note && (!selected || opened) ? <button className="teacher-pencil" type="button" aria-expanded={opened} aria-label={notesLabel} data-homework-exit disabled={busy}
-      title={opened ? "Close" : written ? "Notes" : "Add notes"} onClick={() => opened ? onCloseNotes() : onOpenNotes(booking.id)}>
-      {opened ? <X size={14} aria-hidden="true" /> : <Pencil size={13} strokeWidth={2.4} aria-hidden="true" />}
+    // The row's pencil changes the lesson, in place, as every pencil on her
+    // pages edits the thing beside it (11 November 2026, Dan, of a pencil
+    // that opened notes and homework: "the arrow opens homework which we
+    // removed?"). Open in place, the lesson's own Change is there, so the
+    // pencil would only repeat it. While a lesson's homework is open in its
+    // row (from Homework to review), the same place holds its close.
+    const changeable = booking.status === "confirmed" && booking.payment_status !== "processing" && booking.same_day_fee_status !== "processing";
+    const rowButton = opened ? <button className="teacher-pencil" type="button" aria-expanded aria-label="Close homework" data-homework-exit disabled={busy}
+      title="Close" onClick={onCloseNotes}>
+      <X size={14} aria-hidden="true" />
+    </button> : changeable && !selected ? <button className="teacher-pencil" type="button" aria-label={`Change lesson · ${label}`} data-homework-exit disabled={busy}
+      title="Change" onClick={() => onChangeLesson(booking)}>
+      <Pencil size={13} strokeWidth={2.4} aria-hidden="true" />
     </button> : null;
     // The day, status and level summary. Open in place, the row's own copy is
     // hidden (it stays here so the opener is still connected and returns after
@@ -248,7 +261,7 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
     const openDetails = selected && details ? details(summary(false)) : null;
     // Every lesson is one row of a ledger, laid out alike (10 November 2026,
     // Dan: "not unified"): its day and time, its facts, then at the row's end
-    // its homework chip, notes pencil and Already paid or Record refund, so
+    // its homework chip, its pencil and Already paid or Record refund, so
     // dates read down the left and what she does lines up down the right. A
     // narrow row folds in two: day and pencil, then facts and money. The day
     // and time button stretches over the whole row; the controls sit above it.
@@ -265,10 +278,10 @@ export function StudentLessons({ bookings, notes, level, error, now, token, busy
         <div className="teacher-lesson-row__line">
           {/* In the row its status ends the line, where what she does sits. */}
           {summary(selected && Boolean(openDetails), false)}
-          {!openDetails && (status || notesButton || (note && state)) ? <div className="teacher-lesson-row__side">
+          {!openDetails && (status || rowButton || (note && state)) ? <div className="teacher-lesson-row__side">
             {status}
             {note && state ? <span className={`teacher-notes__state is-${note.homework}`}>{state}</span> : null}
-            {notesButton}
+            {rowButton}
           </div> : null}
         </div>
         {openDetails ? <div className="teacher-lesson-row__details" id={detailsId}>{openDetails}</div> : null}

@@ -52,14 +52,24 @@ export async function studentLessonType(env, studentId, lessonType) {
   return { ...lessonType, price_cents: rates[lessonType.duration_minutes] ?? lessonType.price_cents };
 }
 
+/**
+ * A student's price for a lesson type now, as SQL, as `studentLessonType`
+ * reads it: their own rate, a 90 derived from their 60, else the standard
+ * price; a trial keeps its own. `type` is a lesson_types alias and `student`
+ * SQL for the student's id (a column, or `?`, bound twice).
+ */
+export function studentTypePriceSql(type, student) {
+  return `(CASE WHEN ${type}.id = 'trial' THEN ${type}.price_cents ELSE COALESCE(
+      (SELECT amount_cents FROM student_recurring_rates WHERE student_id = ${student} AND duration_minutes = ${type}.duration_minutes),
+      CASE WHEN ${type}.duration_minutes = 90 THEN
+        (SELECT ROUND(amount_cents * 1.5) FROM student_recurring_rates WHERE student_id = ${student} AND duration_minutes = 60)
+      END, ${type}.price_cents) END)`;
+}
+
 /** A new lesson may use its quote only while that effective price still holds. */
 export function lessonPriceSnapshotSql() {
   return `EXISTS (SELECT 1 FROM lesson_types quoted_type WHERE quoted_type.id = ?
-    AND (CASE WHEN quoted_type.id = 'trial' THEN quoted_type.price_cents ELSE COALESCE(
-      (SELECT amount_cents FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = quoted_type.duration_minutes),
-      CASE WHEN quoted_type.duration_minutes = 90 THEN
-        (SELECT ROUND(amount_cents * 1.5) FROM student_recurring_rates WHERE student_id = ? AND duration_minutes = 60)
-      END, quoted_type.price_cents) END) = ?)`;
+    AND ${studentTypePriceSql("quoted_type", "?")} = ?)`;
 }
 
 export function lessonPriceSnapshot(studentId, lessonType) {

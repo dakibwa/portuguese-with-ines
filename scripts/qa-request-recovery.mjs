@@ -12,6 +12,7 @@ async function openLessonsFromBooking(page) {
   await head.getByRole("button", { name: /^Your lessons/ }).click();
 }
 const base = (process.env.QA_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+// Chromium in a release; another browser by hand, when a fault is that browser's.
 const engine = process.env.QA_BROWSER ?? "chromium";
 const browserType = { chromium, firefox, webkit }[engine];
 if (!browserType) throw new Error(`Unknown QA_BROWSER: ${engine}`);
@@ -142,7 +143,8 @@ try {
       assert.deepEqual(state.errors, []);
     } finally { await state.context.close(); }
   }
-  for (const width of [390]) {
+  {
+    const width = 390;
     // Dismiss a loading lesson, then deliver both a success and a failure.
     // Neither reply may reopen it or leave the page's scroll lock behind.
     for (const status of [200, 503]) {
@@ -227,7 +229,7 @@ try {
         await expect(dialog.getByText("Not confirmed", { exact: true })).toBeVisible();
         await expect(dialog).toContainText("This lesson isn’t booked yet, as your card wasn’t saved.");
         await expect(dialog.getByText("Booked", { exact: true })).toHaveCount(0);
-        await expect(dialog.getByRole("button", { name: /^(Change|Cancel|Manage weekly lessons)$/ })).toHaveCount(0);
+        await expect(dialog.getByRole("button", { name: /^(Change|Cancel)$/ })).toHaveCount(0);
         await expect(state.page.locator(".calendar-week button.has-booking")).toHaveCount(0);
         await dialog.getByRole("button", { name: "Book a lesson", exact: true }).click();
         await expect(dialog).toHaveCount(0);
@@ -364,9 +366,13 @@ try {
         ? { json: { student, bookings: account ?? [], series: [], sameDayFeeCents: 500 } } : null);
       try {
         if (account === null) await state.page.addInitScript(key => localStorage.removeItem(key), sessionKey);
+        await state.page.clock.install({ time: new Date("2026-09-14T10:00:00Z") });
         await state.page.goto(`${base}/book/?card=saved&view=lessons`);
         await expect(state.page.locator(".booking-card-return--confirming")).toBeVisible();
-        await state.page.waitForTimeout(1500);
+        // Let its first check (600 ms after arriving) and the next run, rather
+        // than waiting for them on the wall clock.
+        await state.page.clock.runFor(3_500);
+        await state.page.waitForLoadState("networkidle");
         await expect(state.page.locator(".booking-card-return--confirmed")).toHaveCount(0);
         await expect(state.page.locator(".booking-card-return")).not.toContainText("Your confirmation email is on its way");
         assert.deepEqual(state.errors, []);
@@ -578,7 +584,7 @@ try {
       } finally { await state.context.close(); }
     }
   }
-  console.log(`Request recovery passed in ${engine} at 320/390/1280px: dismiss/reopen, stale replies and mutations, decision focus, pending lesson/history status, payment redirects, session replacement, cross-tab sign-out and truthful card-return status.`);
+  console.log(`Request recovery passed in ${engine} at 1280 and 390px: dismiss/reopen, stale replies and mutations, decision focus, pending lesson/history status, payment redirects, session replacement, cross-tab sign-out and truthful card-return status.`);
 } finally {
   await browser.close();
 }

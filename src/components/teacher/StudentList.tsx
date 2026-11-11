@@ -5,7 +5,7 @@ import { Check, Mail, UserPlus } from "lucide-react";
 import { DefaultComeBackEmail } from "@/components/teacher/DormantEmail";
 import { NeedsYou } from "@/components/teacher/NeedsYou";
 import { StudentSetupRow, type StudentRowSelection } from "@/components/teacher/StudentSetupRow";
-import type { AdminBooking, AdminStudent } from "@/lib/admin-api";
+import type { AdminStudent } from "@/lib/admin-api";
 import type { StudentSection, StudentWorkspaceRow, studentWorkspace } from "@/lib/teacher-calendar";
 
 export type StudentOpenRequest = StudentRowSelection & { key: number };
@@ -17,7 +17,7 @@ const GROUPS: { key: Exclude<Group, "dormant">; title: string; hint?: string }[]
   { key: "needs", title: "Needs you" },
   { key: "todo", title: "To do", hint: "Send each their link." },
   { key: "waiting", title: "Waiting on them", hint: "Link sent. They haven’t finished yet." },
-  { key: "set", title: "All set", hint: "Signed in, card saved, nothing open." },
+  { key: "set", title: "All set", hint: "Fully set up and paying for their own lessons." },
 ];
 
 /**
@@ -29,7 +29,7 @@ const GROUPS: { key: Exclude<Group, "dormant">; title: string; hint?: string }[]
  * one card, in one lane; the one she opens is that card taken out of its lane
  * and shown once, across the whole width, above the board.
  */
-export function StudentList({ token, students, workspace, error, sending, request, onAddStudent, onStudentsChanged, onWelcome, onMeet, onView, onRetry }: {
+export function StudentList({ token, students, workspace, error, sending, request, onAddStudent, onStudentsChanged, onWelcome, onMeet, onDismiss, onRetry }: {
   token: string;
   students: AdminStudent[] | null;
   workspace: ReturnType<typeof studentWorkspace>;
@@ -41,7 +41,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
   /** Resolves true once their email has gone. */
   onWelcome: (student: AdminStudent, again?: boolean) => Promise<boolean> | void;
   onMeet: () => void;
-  onView: (booking: AdminBooking) => void;
+  onDismiss: (key: string) => void;
   onRetry: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -89,7 +89,7 @@ export function StudentList({ token, students, workspace, error, sending, reques
     (name ?? search.current)?.focus({ preventScroll: true });
   }, [expanded, busyStudent]);
   const noticeProps = {
-    sending, onMeet, onView, onWelcome,
+    sending, onMeet, onWelcome, onDismiss,
     onStudent: (student: AdminStudent) => {
       if (!busyStudent) setExpanded({ studentId: student.id, panel: "lessons" });
     },

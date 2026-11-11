@@ -10,7 +10,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "check:fast": "npm run test:booking && npm run check:site",
-    "check:site": "node scripts/harden-braces.mjs --check && npm run typecheck && npm run lint && npm run test:www-redirect && npm run test:teacher-calendar",
+    "check:site": "node scripts/harden-braces.mjs --check && npm run typecheck && npm run lint && npm run test:www-redirect && npm run test:teacher-calendar && npm run test:reply-validation",
     "check:release": "npm run check:booking && npm run build",
     "check:booking": "node scripts/check-booking-link.mjs",
     "test:portfolio-banner": "node scripts/check-portfolio-banner.mjs",
@@ -32,13 +32,14 @@
     "worker:www:deploy": "wrangler deploy --config workers/www-redirect/wrangler.jsonc",
     "test:www-redirect": "node workers/www-redirect/test.mjs",
     "test:teacher-calendar": "node --experimental-strip-types --test scripts/test-teacher-calendar.mjs",
+    "test:reply-validation": "node --test scripts/test-reply-validation.mjs",
     "build:email-banner": "node scripts/build-email-banner.mjs",
     "build:email-icons": "node scripts/build-email-icons.mjs",
     "build:og-image": "node scripts/build-og-image.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.14.0",
-    "next": "16.3.8",
+    "next": "16.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
@@ -48,8 +49,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.6",
     "typescript": "^5",
-    "wrangler": "^4.145.0"
+    "wrangler": "^4.160.0"
   }
 }

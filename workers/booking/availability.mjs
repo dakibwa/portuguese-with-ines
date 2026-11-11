@@ -40,6 +40,8 @@ export function availabilityRevisionSql() {
  * rather than being dropped, so the calendar never shows time off that was not
  * saved. A span covering the whole day is refused too — that is a day off, and
  * stored as a partial block it would outlive the next change to the day's times.
+ * Extra hours' spans are held to the same rules: a whole day of lesson starts,
+ * midnight to midnight, is never what she means.
  */
 export function normaliseBlockedSpans(blocks) {
   if (!Array.isArray(blocks) || blocks.length > 96) return null;
@@ -57,6 +59,19 @@ export function normaliseBlockedSpans(blocks) {
     else merged.push(span);
   }
   return merged.some((span) => span.start === 0 && span.end === 1440) ? null : merged;
+}
+
+/**
+ * Extra hours on one date arrive as the span of times she chose and are kept
+ * as the start ranges her weekly hours are: the first start and the last, the
+ * last booking-interval step before the span ends. At 30 minutes 15:00–17:00
+ * starts 15:00 to 16:30, so a 90-minute lesson may begin at 16:30 as it may at
+ * a weekly last start.
+ */
+export function extraStartRanges(extra, interval) {
+  const spans = normaliseBlockedSpans(extra);
+  if (!spans || !Number.isInteger(interval) || interval < 1) return null;
+  return spans.map((span) => ({ start: span.start, lastStart: span.start + (Math.ceil((span.end - span.start) / interval) - 1) * interval }));
 }
 
 /** Date ranges are inclusive; the same real span of teaching-clock time applies each day. */
@@ -159,7 +174,8 @@ export async function inTimeOff(env, startAt, endAt) {
 }
 
 export async function loadSettings(env) {
-  const { results } = await env.DB.prepare("SELECT key, value FROM settings").all();
+  // Her dismissed notices are read only where Needs you is (GET /admin/students).
+  const { results } = await env.DB.prepare("SELECT key, value FROM settings WHERE key <> 'needs_you_dismissed'").all();
   const settings = Object.fromEntries((results ?? []).map((row) => [row.key, row.value]));
   const onlineOnlyPeriods = normaliseOnlineOnlyPeriods(JSON.parse(settings.online_only_periods ?? "[]"));
   if (!onlineOnlyPeriods) throw new Error("Online-only availability could not be read.");

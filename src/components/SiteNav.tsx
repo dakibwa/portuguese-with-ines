@@ -1,7 +1,7 @@
 "use client";
 
 import { BRAND, TUTOR_CITY } from "@/lib/tutor";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { X } from "lucide-react";
@@ -10,12 +10,14 @@ import { BrandWordmark } from "@/components/BrandWordmark";
 import { AssetMark } from "@/components/BrandMarks";
 import { CONTACT_WHATSAPP_URL } from "@/lib/config";
 import type { SitePage } from "@/components/SiteHeader";
+import { BarTitle } from "@/components/BarTitle";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { publicAssetPath } from "@/lib/paths";
+import { readSession, subscribeToSession } from "@/lib/auth-api";
 
 type NavItem = { href: string; id: SitePage; label: string; note: string; mark: string };
 
-// On a phone the menu says what each page is for, beside its own mark.
+// The menu says what each page is for, beside its own mark.
 const navigation: NavItem[] = [
   { href: "/approach", id: "approach", label: "Approach", note: "How the lessons work", mark: "/visuals/v2-splats/conversation-splat-generated-v2.webp" },
   { href: "/lessons", id: "lessons", label: "Lessons", note: "Prices and lesson lengths", mark: "/visuals/v2-splats/lesson-format-splat-v2.svg" },
@@ -29,7 +31,7 @@ const navigation: NavItem[] = [
  * menu's heading repeats the bar, name, splat and all, so nothing in it
  * moves: the menu button turns into the close where it stands.
  */
-export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { title: string; mark: string; when: "always" | "account" } }) {
+export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { title: string; bookTitle?: string; mark: string; when: "always" | "account" } }) {
   const [open, setOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
   const [ready, setReady] = useState(false);
@@ -40,6 +42,8 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
   const openerRef = useRef<HTMLElement | null>(null);
   const pathname = usePathname();
   const previousPathname = useRef(pathname);
+  const signedIn = useSyncExternalStore(subscribeToSession, () => Boolean(readSession()), () => false);
+  const signInHere = bar?.when === "account" && !signedIn;
 
   useEffect(() => { setReady(true); }, []);
 
@@ -100,7 +104,8 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
         setOpen(false);
         requestAnimationFrame(() => openerRef.current?.focus({ preventScroll: true }));
       } else if (event.key === "Tab") {
-        const controls = [...menuRef.current?.querySelectorAll<HTMLButtonElement | HTMLAnchorElement>("button, a[href]") ?? []];
+        const controls = [...menuRef.current?.querySelectorAll<HTMLButtonElement | HTMLAnchorElement>("button:not([disabled]), a[href]") ?? []]
+          .filter((element) => element.getClientRects().length > 0);
         const current = controls.indexOf(document.activeElement as HTMLButtonElement | HTMLAnchorElement);
         const next = event.shiftKey ? (current <= 0 ? controls.length - 1 : current - 1) : (current + 1) % controls.length;
         event.preventDefault();
@@ -127,7 +132,7 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
 
   return (
     <>
-      {bar?.when === "always" ? null : <nav className="site-nav" aria-label="Main navigation">
+      {bar ? null : <nav className="site-nav" aria-label="Main navigation">
         {navigation.map((item) => {
           const Destination = item.id === "book" ? "a" : Link;
           return <Destination
@@ -142,6 +147,12 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
           </Destination>;
         })}
       </nav>}
+
+      {/* The way into an account, in the booking page's bar (11 November
+          2026, Dan: "can they just sign in immediately too?"): beside the
+          menu button where there is room. It is also the last row of every
+          menu, below. A student's page has their own menu instead. */}
+      {signInHere ? <a className="site-header__sign-in" href={publicAssetPath("/book/?view=lessons")}>Sign in</a> : null}
 
       <button
         aria-controls={hasOpened ? "site-nav-mobile" : undefined}
@@ -176,7 +187,7 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
       {/* On a wide screen an account's menu is a sheet at the right, and a
           press on the page beside it closes it. */}
       {ready && hasOpened ? createPortal(<div
-        className={`nav-mobile${open ? " is-open" : ""}${bar ? (bar.when === "always" ? " is-bar" : " is-account-bar") : ""}`}
+        className={`nav-mobile${open ? " is-open" : ""}${bar ? " is-bar" : ""}`}
         onClick={(event) => { if (event.target === event.currentTarget) close(); }}
         style={{ top: menuTop }}
         id="site-nav-mobile"
@@ -193,11 +204,13 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
               aria-label={`${BRAND}, home`}
               className="site-header__brand"
               href="/"
-              onClick={() => setOpen(false)}
+              onClick={() => { if (currentPage === "home") close(); else setOpen(false); }}
             >
               <BrandWordmark className="header-wordmark" />
             </Link>
-            {bar ? <p aria-hidden="true" className="site-header__title">{bar.title}</p> : null}
+            {bar ? <p aria-hidden="true" className="site-header__title"><BarTitle bar={bar} /></p> : null}
+            {/* The same way in, where the bar has it, so nothing moves as the menu opens. */}
+            {signInHere ? <a className="site-header__sign-in" href={publicAssetPath("/book/?view=lessons")} onClick={() => setOpen(false)}>Sign in</a> : null}
             <button
               aria-label="Close menu"
               className="nav-mobile__close"
@@ -219,7 +232,7 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
                 className="nav-mobile__link"
                 href={item.id === "book" ? publicAssetPath(item.href) : item.href}
                 key={item.id}
-                onClick={() => setOpen(false)}
+                onClick={() => { if (currentPage === item.id) close(); else setOpen(false); }}
               >
                 <AssetMark asset={item.mark} className="nav-mobile__mark" lands />
                 <span className="nav-mobile__text">
@@ -228,6 +241,23 @@ export function SiteNav({ currentPage, bar }: { currentPage: SitePage; bar?: { t
                 </span>
               </Destination>;
             })}
+            {/* Sign in closes the list on every page, at every width, for
+                anyone not signed in (11 November 2026, Dan: "can we add sign
+                in to the list permanently too please?"). Signed in, Booking
+                is already their lessons, so the list keeps its four places. */}
+            {signedIn ? null : <a
+              aria-describedby="nav-mobile-note-account"
+              aria-label="Sign in"
+              className="nav-mobile__link"
+              href={publicAssetPath("/book/?view=lessons")}
+              onClick={() => setOpen(false)}
+            >
+              <AssetMark asset="/visuals/v2-splats/built-around-you-splat-v2.svg" className="nav-mobile__mark" lands />
+              <span className="nav-mobile__text">
+                <span className="nav-mobile__label">Sign in</span>
+                <span className="nav-mobile__note" id="nav-mobile-note-account">See or change your lessons</span>
+              </span>
+            </a>}
           </div>
           <div className="nav-mobile__cta">
             <p>One to one, online or in {TUTOR_CITY}.</p>

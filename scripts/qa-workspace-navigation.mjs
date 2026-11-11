@@ -1,14 +1,37 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 
 const base = (process.env.QA_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const out = "tmp/qa/navigation";
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1920, height: 1100 }, timezoneId: "Europe/Lisbon" });
+// The release's static server does not apply Pages rules. Honour its exact
+// redirects here too, so a rule that overwrites an old fragment fails locally.
+if (["localhost", "127.0.0.1"].includes(new URL(base).hostname)) {
+  const redirects = (await readFile(new URL("../public/_redirects", import.meta.url), "utf8"))
+    .split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith("#"))
+    .map(line => line.split(/\s+/));
+  const origin = new URL(base).origin;
+  for (const [source, destination, status = 302] of redirects) {
+    await context.route(url => url.origin === origin && url.pathname === source,
+      route => route.fulfill({ status: Number(status), headers: { location: new URL(destination, base).href } }));
+  }
+}
 const student = { id: "navigation-preview", name: "Ana Martins", email: "preview@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "student" };
 const lessonType = { id: "single-60", name: "Single lesson", durationMinutes: 60, priceCents: 2500 };
+// Public calendar reads are fixtures too, so navigation can be checked without
+// depending on live availability or sending a request from a test account.
+async function calendarFixtures(context) {
+  await context.route("**/lesson-types", route => route.fulfill({ json: { lessonTypes: [
+    { id: "trial", name: "Trial lesson", duration_minutes: 60, price_cents: 2000 },
+    { id: "single-60", name: "Single lesson", duration_minutes: 60, price_cents: 2500 },
+    { id: "single-90", name: "Long lesson", duration_minutes: 90, price_cents: 3500 },
+  ], postpay: false, paymentReady: true } }));
+  await context.route("**/availability?*", route => route.fulfill({ json: { slotsByDate: {}, horizonDays: 84, timeZone: "Europe/Lisbon" } }));
+}
+await calendarFixtures(context);
 let bookings = Array.from({ length: 12 }, (_, index) => ({
   reference: `PREVIEW-${index}`, status: "cancelled", location: "online", notes: "",
   startAt: new Date(Date.UTC(2026, 8, 4 - index, 16)).toISOString(),
@@ -112,7 +135,21 @@ try {
     assert.ok(layout.book.top < layout.calendar.top + 120 && layout.book.right <= layout.calendar.right + 1,
       `Book a lesson sits at the calendar's top right at ${width}`);
     layouts.push(layout);
-    if ([1920, 390].includes(width)) await page.screenshot({ path: `${out}/upcoming-${width}.png`, fullPage: true });
+    // On a wide account menu the home link is hidden. Keyboard wrapping must
+    // use the visible controls, in both directions, without getting stuck on it.
+    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    const accountSiteMenu = page.getByRole("dialog", { name: "Site navigation" });
+    await page.waitForFunction(() => document.activeElement?.classList.contains("nav-mobile__close"));
+    const controls = accountSiteMenu.locator("button:visible, a[href]:visible");
+    await controls.last().focus();
+    await page.keyboard.press("Tab");
+    assert.equal(await controls.first().evaluate(element => element === document.activeElement), true, `Tab wraps to the first visible menu control at ${width}`);
+    await controls.first().focus();
+    await page.keyboard.press("Shift+Tab");
+    assert.equal(await controls.last().evaluate(element => element === document.activeElement), true, `Shift+Tab wraps to the last visible menu control at ${width}`);
+    await page.keyboard.press("Escape");
+    await accountSiteMenu.waitFor({ state: "hidden" });
+    await settle();
   }
 
   // Past lessons sit beneath the calendar on the same card: the latest few,
@@ -122,7 +159,6 @@ try {
   const history = page.locator("#lesson-calendar #account-past-lessons");
   await history.getByRole("button", { name: "6 earlier lessons", exact: true }).click();
   await settle();
-  await page.screenshot({ path: `${out}/history-desktop.png`, fullPage: true });
   for (const width of [1920, 390]) {
     await page.setViewportSize({ width, height: width < 500 ? 844 : 1100 });
     assert.deepEqual(await history.locator(".past-lesson time").evaluateAll(times => times.map(time => new Date(time.dateTime).toISOString())), expectedHistory,
@@ -134,7 +170,6 @@ try {
   await page.getByRole("button", { name: "Change name", exact: true }).waitFor();
   assert.equal(await page.locator("#lesson-calendar, #account-past-lessons").count(), 0);
   await settle();
-  await page.screenshot({ path: `${out}/profile-desktop.png`, fullPage: true });
   await accountAction("Done editing");
   await accountAction("Your lessons");
   await accountAction("Your lessons");
@@ -179,15 +214,12 @@ try {
   // Every booked day is marked on the calendar and the nearest one leads.
   assert.equal(await page.locator("#lesson-calendar .calendar-week button.has-booking").count(), 8);
   assert.match(await page.locator(".lesson-overview__next").innerText(), /Monday, 7 September 2026/);
-  await page.screenshot({ path: `${out}/upcoming-long-desktop.png`, fullPage: true });
 
-  for (const width of [390]) {
-    await page.setViewportSize({ width, height: 844 });
-    await page.goto(`${base}/`);
-    await openMenuWithStationaryHeader(`${width}px header`);
-    await page.keyboard.press("Escape");
-    await settle();
-  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${base}/`);
+  await openMenuWithStationaryHeader("390px header");
+  await page.keyboard.press("Escape");
+  await settle();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${base}/faq/`);
@@ -213,7 +245,6 @@ try {
   assert.equal(await page.evaluate(() => document.activeElement.textContent.trim()), "Message on WhatsApp (opens in a new tab)");
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement.getAttribute("aria-label")), "Português com a Inês, home");
-  await page.screenshot({ path: `${out}/menu-mobile.png` });
   await page.keyboard.press("Escape");
   await menu.waitFor({ state: "hidden" });
   await settle();
@@ -249,7 +280,6 @@ try {
   await page.setViewportSize({ width: 390, height: 420 });
   await page.goto(`${base}/faq/?from=akibwa`);
   await openMenuWithStationaryHeader("Portfolio header");
-  await page.screenshot({ path: `${out}/menu-with-portfolio-mobile.png` });
   await menu.getByRole("link", { name: "Booking", exact: true }).click();
   await page.locator("#booking-title").waitFor();
   const bookingUrl = page.url();
@@ -270,14 +300,23 @@ try {
   await page.locator(".site-footer__legal").getByRole("link", { name: "Terms & privacy", exact: true }).click();
   await page.locator("#terms-privacy[open]").waitFor();
 
-  // Old policy links open the same combined dialog inside booking.
-  for (const [oldPath, section] of [["booking-terms/", "booking"], ["privacy/", "privacy"], ["terms/#privacy", "privacy"], ["terms/", "terms-privacy"], ["book/#booking", "booking"], ["book/#change-booking", "change-booking"]]) {
+  // Old policy links, and the fragments emailed links carry, open the same
+  // combined dialog inside booking; closing it leaves the address clean.
+  for (const [oldPath, section] of [["booking-terms/", "booking"], ["privacy/", "privacy"], ["terms/#privacy", "privacy"], ["terms/", "terms-privacy"], ["book/#booking", "booking"], ["book/#change-booking", "change-booking"], ["book/#terms-privacy", "terms-privacy"], ["book/#privacy", "privacy"]]) {
     await page.goto(`${base}/${oldPath}`);
     await page.waitForURL(`**/book/#${section}`);
     await page.locator("#terms-privacy[open]").waitFor();
+    if (oldPath.startsWith("book/#")) {
+      await page.getByRole("button", { name: "Close terms & privacy", exact: true }).click();
+      await page.waitForFunction(() => !window.location.hash);
+    }
   }
+  // An old emailed management address lands on booking.
+  await page.goto(`${base}/booking`);
+  await page.waitForFunction(() => window.location.pathname === "/book/");
 
   const legacy = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await calendarFixtures(legacy.context());
   await legacy.goto(`${base}/my-lessons/`);
   await legacy.getByRole("heading", { name: "Your account", exact: true }).waitFor();
   assert.ok(legacy.url().includes("/book/?view=lessons"));
@@ -289,6 +328,7 @@ try {
   // time, the next lesson's, and Porto's while a lesson there is hovered. A
   // narrow card keeps the row.
   const abroad = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: "America/Los_Angeles" });
+  await calendarFixtures(abroad);
   await abroad.addInitScript(() => localStorage.setItem("ines-student-session", "navigation-abroad"));
   const abroadLesson = (reference, location, startAt) => ({
     reference, status: "confirmed", location, notes: "", startAt, endAt: new Date(Date.parse(startAt) + 3_600_000).toISOString(),
@@ -334,7 +374,6 @@ try {
   assert.match((await portoTip.textContent()).replace(/\s+/g, " "), /^Wednesday,? 16 September 2026, 10:00 Porto time ?60 mins · In Porto$/);
   await abroadPage.waitForFunction(() => getComputedStyle(document.querySelector(".calendar-zone__porto")).opacity === "1");
   assert.equal(await shownClock(), "Porto time");
-  await abroadPage.screenshot({ path: `${out}/lesson-hover-porto-desktop.png` });
   await abroadPage.mouse.move(1, 1);
   await abroadPage.waitForFunction(() => getComputedStyle(document.querySelector(".calendar-zone__own")).opacity === "1");
   assert.equal(await shownClock(), "Los Angeles time");
@@ -342,7 +381,7 @@ try {
   await abroadPage.locator(".lesson-overview__next").waitFor({ state: "visible" });
   await abroad.close();
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ok: true, layouts, screenshots: out }, null, 2));
+  console.log(JSON.stringify({ ok: true, layouts }, null, 2));
 } catch (error) {
   // What the page was doing, read without waiting on a frame: a page that has
   // stopped drawing still answers script.

@@ -1,5 +1,17 @@
 # Lesson homework
 
+**Hidden for now** (11 November 2026, Dan: "Hide homework for now").
+`features.homework` in `tutors/ines/tutor.json` is `false`, so the site shows
+no way into homework or lesson notes, on Inês's pages or students', and a
+student's Your lessons does not ask the Worker for homework at all. Nothing
+is deleted: the Worker's routes and tables are as described below, no
+homework had been saved on the live site when it was hidden, and setting the
+flag to `true` brings everything back. With it on, the row's **Add notes**
+pencil described below is gone: the pencil on a lesson's row now changes the
+lesson, and homework opens from **Homework** in the opened lesson.
+`scripts/qa-homework.mjs` is off the release while the flag is false; build
+with it true and run that journey before turning homework back on.
+
 Inês opens **Homework** on a lesson from the timetable, or with **Add notes**
 or **Notes** on that lesson's row in the student's dashboard, where each
 lesson that has been shows her notes and where its homework is, beside her

@@ -1,6 +1,6 @@
 "use client";
 
-import { IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
+import { HOMEWORK, IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { X, ArrowLeft, Check, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
@@ -34,6 +34,9 @@ import { TeacherHomework } from "@/components/homework/TeacherHomework";
 import { PaidTick } from "@/components/teacher/PaidTick";
 import { CardApprovalLink } from "@/components/teacher/CardApprovalLink";
 import { priceFor } from "@/components/teacher/StudentPrice";
+import { lessonProducts } from "@/lib/lesson-products";
+
+const trialPrice = lessonProducts.find((product) => product.id === "trial")?.priceCents ?? 0;
 
 type Props = {
   booking: AdminBooking;
@@ -46,7 +49,8 @@ type Props = {
   afterChangeFocusRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onChanged: (message: string) => void;
-  initialAction?: "view" | "refund";
+  /** What it opens on: the lesson, its refund, or (from the row's pencil) its change form. */
+  initialAction?: "view" | "refund" | "change";
   /**
    * A modal dialog over the page, as her timetable opens a lesson, or the same
    * details laid out in place within a student's dashboard: no scrim, no page
@@ -81,11 +85,13 @@ function keptLine(kept: KeptLesson[]) {
 
 /**
  * Why a lesson can't take another length, as the Worker decides it, or "".
- * Paid, due or being paid lessons keep theirs; a free one keeps it unless the
- * new length is free too.
+ * One a card has paid, or with a payment due or going through, keeps its
+ * length; a free one keeps it unless the new length is free too. Ticked
+ * "Already paid" never holds her back (11 November 2026, Dan: "even if it's
+ * already marked as paid Ines should be able to change it").
  */
 function lengthHeld(lesson: AdminBooking, cents: number) {
-  if (paidByHand(lesson) || lesson.payment_status === "paid") return "it's already paid";
+  if (lesson.payment_status === "paid") return "it's already paid";
   if (lesson.payment_status === "payment_due") return "it has a payment due";
   if (lesson.payment_status === "processing" || lesson.charge_started_at) return "its payment is going through";
   if (lesson.payment_status === "free" && cents > 0) return "it's free";
@@ -97,6 +103,20 @@ function changeHeld(lesson: AdminBooking, length: "single" | "long" | null, cent
   if (lesson.payment_status === "processing" || lesson.charge_started_at || lesson.same_day_fee_status === "processing") return "its payment is going through";
   if (!length || lesson.lesson_type_id === length) return "";
   return lesson.lesson_type_id === "trial" ? "it's a trial lesson" : lengthHeld(lesson, cents);
+}
+
+/**
+ * Why a lesson already had can't take a new length or place, as the Worker
+ * decides it, or "": only one with nothing on a card can (11 November 2026).
+ */
+function pastHeld(lesson: AdminBooking) {
+  if (lesson.payment_status === "paid") return "it's already paid";
+  if (lesson.payment_status === "payment_due") return "it has a payment due";
+  if (lesson.payment_status === "processing" || lesson.charge_started_at) return "its payment is going through";
+  if (lesson.payment_status === "free") return "it's free";
+  if (lesson.payment_status === "scheduled") return "it's on their card";
+  if (lesson.payment_status === "not_required" || lesson.payment_status === "recorded") return "";
+  return "its payment is going through";
 }
 
 /**
@@ -192,16 +212,20 @@ export function LessonDetails({
   const later = booking.series_id ? (weekly ?? [])
     .filter(lesson => lesson.series_id === booking.series_id && lesson.status === "confirmed" && lesson.starts_at >= booking.starts_at)
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at)) : [];
-  const toCome = booking.status === "confirmed" && !recorded && now < new Date(booking.starts_at);
+  const toCome = booking.status === "confirmed" && now < new Date(booking.starts_at);
   const repeats = toCome && later.length > 1;
   const everyWeek = following && repeats;
   const lengthMinutes = length === "long" ? 90 : 60;
   const lengthCents = priceFor(student, lengthMinutes);
-  // Length and place are hers to change on a lesson to come; one had, or a
-  // record, can still be corrected to another time, as before.
-  const lengthOffered = toCome && booking.lesson_type_id !== "trial";
+  // One already had, a record included, is corrected as one to come is
+  // changed, length and place too, while nothing is on a card (11 November
+  // 2026, Dan); otherwise only its time, as before.
+  const past = booking.status === "confirmed" && !toCome;
+  const pastReason = past ? pastHeld(booking) : "";
+  const editable = toCome || (past && !pastReason);
+  const lengthOffered = editable && booking.lesson_type_id !== "trial";
   const lengthChanges = lengthOffered && length !== ownLength;
-  const placeChanges = toCome && place !== booking.location;
+  const placeChanges = editable && place !== booking.location;
   const differs = (lesson: AdminBooking) => timeMoves || (lengthChanges && lesson.lesson_type_id !== length) || (placeChanges && lesson.location !== place);
   const changeScope = (everyWeek ? later : [booking]).filter(differs);
   const changing = changeScope.filter(lesson => !changeHeld(lesson, lengthChanges ? length : null, lengthCents));
@@ -209,7 +233,7 @@ export function LessonDetails({
     .map(lesson => ({ startsAt: lesson.starts_at, reason: changeHeld(lesson, lengthChanges ? length : null, lengthCents) }));
   // What will happen, a dab each: the first names how many, the rest say "They".
   const changeDabs = (() => {
-    if (!toCome || !changing.length) return [];
+    if (!editable || !changing.length) return [];
     const many = everyWeek ? changing.length : 0;
     const dabs: string[] = [];
     // "3 lessons move", then "They become"; for one lesson "Moves", "Becomes".
@@ -223,11 +247,17 @@ export function LessonDetails({
     }
     if (lengthChanges) dabs.push(`${lead("become", "becomes")} ${lengthMinutes} minutes, ${formatPriceCents(lengthCents)}${many > 1 ? " each" : ""}`);
     if (placeChanges) dabs.push(`${lead("move", "moves")} ${place === "online" ? "online" : `to ${TUTOR_CITY}`}`);
+    // The tick is hers and a change never takes it off (11 November 2026).
+    if (lengthChanges && changing.some(paidByHand)) dabs.push(changing.length > 1 ? "Any marked as paid stay marked as paid" : "Stays marked as paid");
     return dabs;
   })();
   const changeDirty = timeMoves || lengthChanges || placeChanges;
   // Its price and how it is paid, one dab: "€25 · paid by card". A
-  // cancelled lesson's money matters only if some moved.
+  // cancelled lesson's money matters only if some moved. A record reads as
+  // any lesson she added; one kept before records carried a price is at the
+  // student's price for its length now, as the Worker asks for it.
+  const cents = booking.amount_cents ?? (!recorded ? null
+    : booking.lesson_type_id === "trial" ? trialPrice : priceFor(student, minutes >= 90 ? 90 : 60));
   const ticked = paidByHand(booking);
   const canRecordRefund = booking.status === "cancelled" && ticked && booking.payment_status !== "refunded";
   const paid = ticked && booking.payment_status !== "refunded" ? "paid to you by hand" : {
@@ -238,18 +268,18 @@ export function LessonDetails({
     scheduled: `charged to their card ${CHARGED}`,
     pending: "waiting for their card",
     not_required: "to pay you directly",
-    recorded: "recorded",
+    recorded: "to pay you directly",
     // Its price is €0, so "Free" alone says it.
     free: "free",
   }[booking.payment_status];
   // "Already paid" is offered wherever nothing has been charged or settled by
   // card: a lesson to come not yet charging, or one she recorded. Not on a free
   // lesson, which has nothing to pay, nor on one paid, due or charging by card.
-  const tickable = booking.status === "confirmed" && (ticked || booking.payment_status === "recorded" ||
+  const tickable = booking.status === "confirmed" && (ticked || (booking.payment_status === "recorded" && cents !== 0) ||
     (["scheduled", "not_required"].includes(booking.payment_status) && !booking.charge_started_at));
   const money = booking.status === "cancelled" && !ticked && !["paid", "refunded"].includes(booking.payment_status)
     ? ""
-    : booking.amount_cents ? `${formatMoneyCents(booking.amount_cents)} · ${paid}` : paid.charAt(0).toUpperCase() + paid.slice(1);
+    : cents ? `${formatMoneyCents(cents)} · ${paid}` : paid.charAt(0).toUpperCase() + paid.slice(1);
   const backdropHandlers = useDialogBackdrop(() => { if (!busy) onClose(); });
 
   useLayoutEffect(() => {
@@ -333,8 +363,8 @@ export function LessonDetails({
     setBusy(true);
     setError("");
     try {
-      if (action === "change" && !toCome) {
-        // A lesson had, or a record, is corrected to another time, as before.
+      if (action === "change" && !editable) {
+        // A lesson had with something on a card is corrected to another time, as before.
         const moved = await rescheduleBookingAs(
           token,
           booking.id,
@@ -458,9 +488,7 @@ export function LessonDetails({
                 ? "Marked as already paid. It won’t be charged, and it’s in Receipts as paid by hand."
                 : updated.payment_status === "scheduled"
                   ? `No longer marked paid. It’s charged to their card ${CHARGED}.`
-                  : updated.payment_status === "recorded"
-                    ? "No longer marked paid. It stays as a record only."
-                    : updated.payment_status === "free"
+                  : updated.payment_status === "free"
                       ? "No longer marked paid. It’s free."
                       : "No longer marked paid. It’s to be paid to you directly.");
             } catch (caught) {
@@ -498,14 +526,14 @@ export function LessonDetails({
     </div>
   ) : null;
   const approvalBlock = !ticked && addedByTeacher(booking) && booking.status === "confirmed" &&
-    booking.payment_status === "not_required" && !noShow && !locked && !booking.charge_started_at && Boolean(booking.amount_cents && booking.amount_cents > 0) ? (
+    (booking.payment_status === "not_required" || recorded) && !noShow && !locked && !booking.charge_started_at && Boolean(cents && cents > 0) ? (
     <CardApprovalLink booking={booking} token={token} busy={busy} onBusy={setBusy} onError={setError} quiet={inline} />
   ) : null;
   // The default actions, rendered once: in the inline header beside the date,
   // and in the timetable modal beneath what happened. Both are the quiet chip
   // at their own width (10 November 2026, Dan: one way for each thing); the
   // modal's one filled button is its call.
-  const homeworkTrigger = booking.student_id ? <button className="teacher-quiet teacher-lesson-homework" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null;
+  const homeworkTrigger = HOMEWORK && booking.student_id ? <button className="teacher-quiet teacher-lesson-homework" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null;
   // One way to change a lesson, as a student has, and one to cancel it
   // (10 November 2026, Dan). Each starts on This lesson.
   const defaultActions = (
@@ -672,7 +700,7 @@ export function LessonDetails({
                   </div>
                 </fieldset>
               ) : null}
-              {toCome ? (
+              {editable ? (
                 <fieldset className="teacher-manual-choice">
                   <legend>Where</legend>
                   <div className={`segmented${place === "porto" ? " segmented--second" : ""}`}>
@@ -694,9 +722,15 @@ export function LessonDetails({
                 </fieldset>
               ) : null}
               <ul className="booking-payment-facts teacher-confirm-facts">
-                {!toCome ? (
-                  <li>{recorded ? "This past lesson stays a record only; no email is sent" : awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets an email with the new time`}</li>
-                ) : changeDirty ? <>
+                {past && pastReason ? <>
+                  <li>Length and place stay: {pastReason}</li>
+                  <li>{recorded ? "No email is sent" : awaiting ? `${firstName} isn’t emailed until ${noEmail ? "you add their email and send" : "you send"} their welcome` : `${firstName} gets an email with the new time`}</li>
+                </> : past ? <>
+                  {changeDabs.map(dab => <li key={dab}>{dab}</li>)}
+                  {changeDirty && !changing.length ? <li>Nothing to change</li> : null}
+                  {changeKept.length ? <li>{keptLine(changeKept).trim().replace(/\.$/, "")}</li> : null}
+                  <li>No email is sent</li>
+                </> : changeDirty ? <>
                   {changeDabs.map(dab => <li key={dab}>{dab}</li>)}
                   {!changing.length ? <li>Nothing to change</li> : null}
                   {changeKept.length ? <li>{keptLine(changeKept).trim().replace(/\.$/, "")}</li> : null}
@@ -706,7 +740,7 @@ export function LessonDetails({
                 </> : null}
               </ul>
               <div className="teacher-dialog-actions">
-                <button className="button button--coral" type="submit" disabled={busy || !changeDirty || (toCome && !changing.length)}>
+                <button className="button button--coral" type="submit" disabled={busy || !changeDirty || (editable && !changing.length)}>
                   {busy ? "Saving…" : "Save changes"}
                 </button>
                 {backToLesson}
@@ -739,7 +773,7 @@ export function LessonDetails({
                   <>
                     <li>
                       {recorded
-                        ? "This past lesson stays a record only; no email is sent"
+                        ? "No email is sent"
                         : awaiting
                         ? `${firstName} isn’t emailed: they haven’t had their welcome yet`
                         : `${firstName} gets an email saying you’ve cancelled, with an update for their calendar`}

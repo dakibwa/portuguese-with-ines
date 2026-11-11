@@ -4,6 +4,12 @@ import { chromium, expect } from "@playwright/test";
 
 // One UI journey, with synthetic lesson material and an isolated AI response.
 // Real SQL, ownership, publication and provider failures are tested in the Worker suite.
+//
+// Homework is hidden for now (11 November 2026, Dan: "Hide homework for now"),
+// so the release does not run this: a build with `features.homework` false in
+// the tutor's record has no way in for it to follow. Set it true, build, and
+// run this before homework comes back, then put it back on a journeys line in
+// .github/workflows/deploy-pages.yml.
 const base = process.env.QA_BASE_URL;
 if (!base) throw new Error("Supply QA_BASE_URL explicitly.");
 const output = "tmp/qa/homework";
@@ -102,13 +108,11 @@ try {
     await page.goto(`${base}/schedule/`);
     await page.getByRole("tab", { name: /^Students/ }).click();
     await page.getByRole("button", { name: "Open Ana Martins’s profile", exact: true }).click();
-    // Homework is written from the lesson's own row on their profile.
-    // Notes are a small pencil that sits above the lesson's stretched day button.
-    const notesPencil = page.getByRole("button", { name: /^Add notes · / });
-    await notesPencil.scrollIntoViewIfNeeded();
-    const pencilBox = await notesPencil.boundingBox();
-    assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest("button")?.getAttribute("aria-label")?.startsWith("Add notes"), { x: pencilBox.x + pencilBox.width / 2, y: pencilBox.y + pencilBox.height / 2 }), true, "The notes pencil is pressable over the lesson tile");
-    await notesPencil.click();
+    // Homework is written from the lesson itself: its row on their profile
+    // opens it, and Homework is one of the things she does with it. (The
+    // row's pencil changes the lesson, 11 November 2026.)
+    await page.getByRole("button", { name: /^Wed 14 Oct/ }).click();
+    await page.getByRole("button", { name: "Homework", exact: true }).click();
     const editor = page.locator(".teacher-homework");
     const shot = name => editor.screenshot({ path: `${output}/teacher-${name}-${width}.png` });
     const heading = name => expect(editor.locator(".homework-step__head h4")).toHaveText(name);
@@ -143,8 +147,8 @@ try {
     await heading("Ready");
     await expect(editor.locator(".homework-summary")).toHaveCount(3);
     await shot("04-ready");
-    // Both the notes close and the student card's Close protect unread photos.
-    for (const exit of [page.getByRole("button", { name: "Close homework", exact: true }), page.locator(".teacher-setup__close").getByRole("button", { name: "Close", exact: true })]) {
+    // Both the lesson's close and the student card's Close protect unread photos.
+    for (const exit of [page.getByRole("button", { name: "Close lesson details", exact: true }), page.locator(".teacher-setup__close").getByRole("button", { name: "Close", exact: true })]) {
       page.once("dialog", dialog => dialog.dismiss());
       await exit.click();
       await expect(editor.locator(".homework-summary").first()).toContainText("2 photos");
@@ -285,8 +289,24 @@ try {
     await backToLessons();
     await expect(page.locator(".student-homework [role=alert]")).toContainText("Answers could not be saved");
     await expect(page.locator(".student-homework textarea").nth(2)).toHaveValue("café");
-    answerSaveFails = false;
     // A student's bar keeps the site's pages behind its menu at every width.
+    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    await page.getByRole("dialog", { name: "Site navigation" }).getByRole("link", { name: "Approach", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Site navigation" })).toBeHidden();
+    await expect(page.locator(".student-homework [role=alert]")).toBeVisible();
+    await expect(page.locator(".student-homework [role=alert]")).toBeFocused();
+    await expect(page.locator(".student-homework textarea").nth(2)).toHaveValue("café");
+    await page.locator(".my-lessons__homework").screenshot({ path: `${output}/student-save-error-${width}.png` });
+    // Reading the terms is an in-page dialog and must not trigger a save or
+    // leave the unfinished worksheet, even while the service is unavailable.
+    const homeworkUrl = page.url();
+    await page.getByRole("link", { name: "Terms & privacy", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Terms & privacy", exact: true })).toBeVisible();
+    assert.equal(page.url(), homeworkUrl);
+    assert.equal(homework.progress.answers.q3, "cafe", "Reading terms has not saved the unfinished answer");
+    await page.getByRole("button", { name: "Close terms & privacy", exact: true }).click();
+    await expect(page.locator(".student-homework textarea").nth(2)).toHaveValue("café");
+    answerSaveFails = false;
     await page.getByRole("button", { name: "Open menu", exact: true }).click();
     await page.getByRole("dialog", { name: "Site navigation" }).getByRole("link", { name: "Approach", exact: true }).click();
     await page.waitForURL("**/approach/");

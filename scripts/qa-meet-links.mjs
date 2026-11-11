@@ -192,7 +192,7 @@ try {
         // booking snapshot must not put the lesson back on the original date.
         await oldPollStarted.promise;
         await dialog.getByRole("button", { name: "Change", exact: true }).click();
-        const change = page.getByRole("dialog", { name: "Choose a new date and time", exact: true });
+        const change = page.getByRole("dialog", { name: "Change your lesson", exact: true });
         await change.locator('button[data-date-key="2026-09-18"]').click();
         await change.getByRole("button", { name: "15:00", exact: true }).click();
         await change.getByRole("button", { name: "Change to 15:00", exact: true }).click();

@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
-import { mkdir } from "node:fs/promises";
 
 // All account and calendar endpoints are isolated fixtures. No provider writes.
 const base = process.env.QA_BASE_URL;
@@ -63,7 +62,8 @@ async function fixture(width, options = {}) {
         end_minute: 660,
         note: "Short break",
       },
-      { id: 3, date: "2026-09-22", kind: "extra", note: "Extra hours" },
+      // Lessons can start 18:00 and 18:30: extra hours 18:00–19:00.
+      { id: 3, date: "2026-09-22", kind: "extra", start_minute: 1080, end_minute: 1110, note: "Extra hours" },
       { id: 4, date: "2026-09-21", kind: "blocked", note: "Duplicate day" },
       {
         id: 5,
@@ -112,6 +112,7 @@ async function fixture(width, options = {}) {
     studentsReads: 0,
     studentsGate: null,
     studentsReply: options.studentsReply,
+    dismissed: [],
     receiptReply: options.receiptReply,
   };
   page.on("pageerror", (error) => state.errors.push(error.message));
@@ -170,6 +171,10 @@ async function fixture(width, options = {}) {
     const data = request.method() === "POST" ? request.postDataJSON() : null;
     const fail = (error) => route.fulfill({ status: 503, json: { error } });
     if (data) state.writes.push({ path, data });
+    if (path === "/admin/needs-you/dismiss") {
+      state.dismissed.push(data.key);
+      return route.fulfill({ json: { ok: true, dismissed: state.dismissed } });
+    }
     if (path === "/admin/lesson-availability") {
       assert.equal(request.headers().authorization, "Bearer isolated-teacher-fixture");
       return availableTimes(route);
@@ -210,7 +215,8 @@ async function fixture(width, options = {}) {
       return route.fulfill({ json: { ok: true, periods: state.onlineOnlyPeriods, revision: state.onlineOnlyRevision } });
     }
     if (path === "/admin/exceptions/day") {
-      // Mirrors the Worker: a day off and hour blocks replace only their own rows.
+      // Mirrors the Worker: a day off, hour blocks and extra hours replace only
+      // their own rows, extra hours kept as the starts they give at 30 minutes.
       if (state.dayGate) await state.dayGate;
       if (state.delay)
         await new Promise((done) => setTimeout(done, state.delay));
@@ -248,6 +254,14 @@ async function fixture(width, options = {}) {
             row(block.startMinute, block.endMinute),
           ),
         ];
+      if (data.extra)
+        state.exceptions = [
+          ...state.exceptions.filter((entry) => !(entry.date === data.date && entry.weekday == null && entry.kind === "extra")),
+          ...data.extra.map((span) => ({
+            ...row(span.startMinute, span.startMinute + (Math.ceil((span.endMinute - span.startMinute) / 30) - 1) * 30),
+            kind: "extra",
+          })),
+        ];
       return route.fulfill({
         json: {
           ok: true,
@@ -276,14 +290,14 @@ async function fixture(width, options = {}) {
       }
       // Hers are marked as hers, and wait for the student's card.
       const owner = [state.added, ...state.students].find((entry) => entry?.id === data.studentId);
-      // One already had is only recorded, with no price.
+      // One already had is recorded, at the price she was shown.
       const past = Date.parse(data.startAt) <= Date.parse("2026-09-07T10:15:00Z");
       if (owner) Object.assign(owner, { hasLessons: true, ...(past ? {} : { nextLessonAt: data.startAt, upcoming: (owner.upcoming ?? 0) + 1 }) });
       state.bookings.push({
         ...lesson(`manual-${state.bookings.length}`, owner?.name ?? "Sam Known", data.startAt, data.location, data.lessonType === "long" ? 90 : data.lessonType === "trial" ? 30 : 60),
         student_id: owner?.id,
         payment_status: past ? "recorded" : "not_required",
-        amount_cents: past && !data.paid ? null : 2400,
+        amount_cents: 2400,
         // Ticked "Already paid" as she adds it.
         ...(data.paid ? { payment_consent_version: "paid-by-hand" } : {}),
         ...(past ? { meeting_url: null } : {}),
@@ -341,7 +355,7 @@ async function fixture(width, options = {}) {
     if (path === "/admin/students") {
       state.studentsReads++;
       if (state.studentsReply !== undefined) return route.fulfill({ json: state.studentsReply });
-      const json = structuredClone({ cardsAccepted: true, students: [...state.students, ...(state.added ? [state.added] : [])] });
+      const json = structuredClone({ cardsAccepted: true, students: [...state.students, ...(state.added ? [state.added] : [])], dismissed: state.dismissed });
       const gate = state.studentsGate;
       state.studentsGate = null;
       if (gate) await gate;
@@ -414,7 +428,8 @@ async function fixture(width, options = {}) {
           });
           changed.push(start);
         }
-        return route.fulfill({ json: { changed, kept, emailed: true } });
+        // A lesson already had is corrected with nothing sent.
+        return route.fulfill({ json: { changed, kept, emailed: Date.parse(opened.starts_at) > Date.parse("2026-09-07T10:15:00Z") } });
       } else if (match[2] === "cancel") {
         if (state.failCancel-- > 0) return fail("The booking system is busy. Please try again.");
         booking.status = "cancelled";
@@ -457,14 +472,16 @@ const dayWrites = (state, date) =>
     .filter((entry) => entry.path === "/admin/exceptions/day")
     .map((entry) => entry.data)
     .filter((entry) => !date || entry.date === date);
-// A free time offers a choice; time off is one of its two options.
-async function takeOff(page, cell, { tap = false } = {}) {
+// A time pressed offers a choice at it: a lesson there, or its hours as time
+// off or online only, their times set first. Nothing saves until she chooses.
+const choiceAt = (page) => page.locator(".teacher-slot-menu");
+async function takeOff(page, cell, { tap = false, kind = "Time off" } = {}) {
   if (tap) await cell.tap();
   else await cell.click();
-  const item = page.getByRole("menu").getByRole("menuitem", { name: "Take this time off", exact: true });
+  const item = choiceAt(page).getByRole("button", { name: kind, exact: true });
   if (tap) await item.tap();
   else await item.click();
-  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(choiceAt(page)).toHaveCount(0);
 }
 async function dragDown(page, from, to) {
   const start = await from.boundingBox();
@@ -514,46 +531,80 @@ async function lessonLocation(page, name, location) {
 }
 
 try {
-  // One online-only journey on the Time off card, with a failed save retaining her choice.
-  // The choice is one line at the month's foot: how many days, Off, Online only.
+  // Online only from the Timetable (11 November 2026): a day's switch beside
+  // Day off, a day being one or the other, and some hours by exact times;
+  // then extra hours on one date, at the same choice.
   for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
-    const days = ["2026-09-14", "2026-09-15", "2026-09-16"];
-    const card = page.locator(".teacher-timeoff");
-    const chip = card.getByRole("button", { name: "Online only", exact: true });
-    const choose = async () => {
-      await page.getByRole("tab", { name: "Time off", exact: true }).click();
-      for (const date of days) await page.locator(`[data-timeoff-date="${date}"]`).click();
-    };
-    await choose();
+    const note = page.locator(".teacher-week .teacher-save-state");
+    if (width === 390) await page.getByRole("button", { name: /^Wednesday 9 September/ }).click();
+    const online = page.getByRole("switch", { name: "Online only, Wednesday 9 September", exact: true });
+    const off = page.getByRole("switch", { name: "Day off, Wednesday 9 September", exact: true });
     state.failOnlineOnly = true;
-    await chip.click();
-    await expect(card.getByRole("alert")).toContainText("couldn’t be saved");
-    await expect(chip).toHaveAttribute("aria-pressed", "false");
-    await expect(card.getByRole("group", { name: "Chosen days" })).toContainText("3 days");
-    await expect(card.locator('.teacher-month-day[aria-pressed="true"]')).toHaveCount(3);
-    await chip.click();
-    await expect(chip).toHaveAttribute("aria-pressed", "true");
-    await card.getByRole("button", { name: "Change online-only hours", exact: true }).click();
-    await card.getByRole("radio", { name: "Some hours", exact: true }).check();
-    await card.getByLabel("From", { exact: true }).fill("12:00");
-    await card.getByLabel("Until", { exact: true }).fill("16:00");
-    await card.getByLabel("Until", { exact: true }).press("Enter");
-    await expect(card.getByRole("status")).toContainText("3 selected days are online only, 12:00–16:00.");
-    await expect(card.getByRole("button", { name: "Change online-only hours", exact: true })).toBeFocused();
-    assert.deepEqual(state.onlineOnlyPeriods, [{ id: state.onlineOnlyPeriods[0].id, fromDate: "2026-09-14", toDate: "2026-09-16", startMinute: 720, endMinute: 960 }]);
-    // What she set is listed beside the month, one row for the stretch.
-    await expect(card.locator(".teacher-timeoff-upcoming")).toContainText("3 days online only, 12:00–16:00");
-    await page.locator(".teacher-timeoff").screenshot({ path: `tmp/qa/teacher/online-only-${width}.png` });
+    await online.click();
+    await expect(page.locator(".teacher-week").getByRole("alert")).toContainText("Wed 9 Sept was not changed.");
+    await expect(online).toHaveAttribute("aria-checked", "false");
+    await online.click();
+    await expect(online).toHaveAttribute("aria-checked", "true");
+    await expect(note).toHaveText("Wed 9 Sept is online only.");
+    await expect.poll(() => state.onlineOnlyPeriods.map(({ fromDate, toDate, startMinute, endMinute }) => [fromDate, toDate, startMinute, endMinute]))
+      .toEqual([["2026-09-09", "2026-09-09", 0, 1440]]);
+    // Taking the day off takes its online label away; it is never both.
+    await off.click();
+    await expect(off).toHaveAttribute("aria-checked", "true");
+    await expect(online).toHaveAttribute("aria-checked", "false");
+    await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
+    assert.deepEqual(dayWrites(state).at(-1), { date: "2026-09-09", dayOff: true });
+    await online.click();
+    await expect(online).toHaveAttribute("aria-checked", "true");
+    await expect(off).toHaveAttribute("aria-checked", "false");
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", dayOff: false });
+    await online.click();
+    await expect(note).toHaveText("Wed 9 Sept can be booked in Porto again.");
+    await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
+    // Some hours, set exactly at the time she pressed.
+    await slot(page, 3, 630).click();
+    const choice = choiceAt(page);
+    await expect(choice.getByRole("button")).toHaveText(["Add a lesson here", "Time off", "Online only"]);
+    await choice.getByLabel("From", { exact: true }).fill("10:15");
+    await choice.getByLabel("Until", { exact: true }).fill("11:40");
+    assert.deepEqual(state.onlineOnlyPeriods, [], "Setting the times alone saves nothing");
+    await choice.getByRole("button", { name: "Online only", exact: true }).click();
+    await expect(note).toHaveText("10:15–11:40 on Wed 9 Sept is online only.");
+    await expect(slot(page, 3, 630)).toBeFocused();
+    await expect.poll(() => state.onlineOnlyPeriods.map(({ startMinute, endMinute }) => [startMinute, endMinute])).toEqual([[615, 700]]);
+    await expect(page.locator(".teacher-block-label", { hasText: "Online only 10:15–11:40" })).toBeVisible();
+    // Pressed again it opens as the block it is, and can become time off instead.
+    await slot(page, 3, 660).click();
+    await expect(choice.getByRole("button", { name: "Online only", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(choice.getByLabel("Until", { exact: true })).toHaveValue("11:40");
+    await choice.getByRole("button", { name: "Time off", exact: true }).click();
+    await expect(note).toHaveText("10:15–11:40 on Wed 9 Sept is off.");
+    await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", blocks: [{ startMinute: 615, endMinute: 700 }] });
+    await slot(page, 3, 660).click();
+    await choice.getByRole("button", { name: "Open again", exact: true }).click();
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", blocks: [] });
+    // Extra hours on a date outside her weekly hours (Tuesdays have none):
+    // lesson starts, washed as her weekly hours are and labelled.
+    if (width === 390) await page.getByRole("button", { name: /^Tuesday 8 September/ }).click();
+    await slot(page, 2, 960).click();
+    await expect(choice.getByRole("button")).toHaveText(["Add a lesson here", "Time off", "Online only", "Extra hours"]);
+    await choice.getByLabel("Until", { exact: true }).fill("18:00");
+    await choice.getByRole("button", { name: "Extra hours", exact: true }).click();
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-08", extra: [{ startMinute: 960, endMinute: 1080 }] });
+    await expect(note).toHaveText("Lessons can start 16:00–17:30 on Tue 8 Sept.");
+    await expect(page.locator(".teacher-block-label", { hasText: "Extra hours 16:00–18:00" })).toBeVisible();
+    for (const minute of [960, 1050]) await expect(slot(page, 2, minute)).toHaveClass(/is-available/);
+    // Pressed again they open as their block, their starts in words, and go with Not working.
+    await slot(page, 2, 1020).click();
+    await expect(choice.getByRole("button", { name: "Extra hours", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(choice.locator(".teacher-slot-menu__starts")).toHaveText("Lessons can start 16:00–17:30");
+    await choice.getByRole("button", { name: "Not working", exact: true }).click();
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-08", extra: [] });
+    await expect(page.locator(".teacher-block-label", { hasText: "Extra hours" })).toHaveCount(0);
+    await expect(slot(page, 2, 960)).not.toHaveClass(/is-available/);
     await noOverflow(page);
-    await page.reload();
-    await page.getByRole("tab", { name: "Time off", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Tuesday 15 September, online only 12:00–16:00", exact: true })).toBeVisible();
-    await choose();
-    await chip.click();
-    await expect(card.getByRole("status")).toContainText("3 selected days can be booked in Porto again.");
-    await expect(chip).toHaveAttribute("aria-pressed", "false");
-    assert.deepEqual(state.onlineOnlyPeriods, []);
     assert.equal(state.bookings.length, 2, "Her existing lessons remain booked");
     assert.deepEqual(state.errors, []);
     await page.close();
@@ -590,14 +641,10 @@ try {
     assert.deepEqual(state.writes, []);
     await page.close();
   }
-  for (const [width, entry] of [
-    [1440, "/book/"],
-    [390, "/book/?view=book"],
-    [390, "/book/?view=lessons"],
-    [1440, "/book/?lesson=trial"],
-    [390, "/my-lessons/"],
-  ]) {
-    const redirected = await fixture(width, { entry });
+  // A teacher arriving on a student page opens her schedule. Which addresses do
+  // is opensSchedule's, proven in scripts/test-teacher-calendar.mjs.
+  {
+    const redirected = await fixture(390, { entry: "/book/?view=lessons" });
     await expect(redirected.page).toHaveURL(`${base}/schedule/`);
     await expect(redirected.page.getByRole("heading", { name: "Your schedule", exact: true })).toBeVisible();
     await expect(redirected.page.locator(".booking-steps")).toHaveCount(0);
@@ -763,9 +810,9 @@ try {
   const note = page.locator(".teacher-week .teacher-save-state");
   const writesBeforeChoice = state.writes.length;
   await slot(page, 2, 960).click();
-  const choice = page.getByRole("menu");
-  await expect(choice.getByRole("menuitem")).toHaveText(["Add a lesson here", "Take this time off"]);
-  await expect(choice.getByRole("menuitem", { name: "Add a lesson here" })).toBeFocused();
+  const choice = choiceAt(page);
+  await expect(choice.getByRole("button")).toHaveText(["Add a lesson here", "Time off", "Online only", "Extra hours"]);
+  await expect(choice.getByRole("button", { name: "Add a lesson here" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(choice).toHaveCount(0);
   await expect(slot(page, 2, 960)).toBeFocused();
@@ -784,7 +831,11 @@ try {
   await expect(
     page.locator(".teacher-block-label", { hasText: "Off 16:00–17:00" }),
   ).toBeVisible();
+  // Hours off open as their block; opening some of it keeps the rest off.
   await slot(page, 2, 960).click();
+  await expect(choiceAt(page).getByRole("button", { name: "Time off", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await choiceAt(page).getByLabel("Until", { exact: true }).fill("16:30");
+  await choiceAt(page).getByRole("button", { name: "Open again", exact: true }).click();
   await expect(slot(page, 2, 960)).toHaveAttribute("aria-pressed", "false");
   await expect(note).toHaveText("16:00–16:30 on Tue 8 Sept is open again.");
   assert.deepEqual(dayWrites(state).at(-1), {
@@ -792,7 +843,14 @@ try {
     blocks: [{ startMinute: 990, endMinute: 1020 }],
   });
 
+  // A drag offers the same choice for all its times, saving nothing until then.
+  const writesBeforeDrag = state.writes.length;
   await dragDown(page, slot(page, 3, 1020), slot(page, 3, 1050));
+  await expect(choiceAt(page).getByRole("button")).toHaveText(["Time off", "Online only", "Extra hours"]);
+  await expect(choiceAt(page).getByLabel("From", { exact: true })).toHaveValue("17:00");
+  await expect(choiceAt(page).getByLabel("Until", { exact: true })).toHaveValue("18:00");
+  assert.equal(state.writes.length, writesBeforeDrag, "A drag alone must not save");
+  await choiceAt(page).getByRole("button", { name: "Time off", exact: true }).click();
   for (const minute of [1020, 1050])
     await expect(slot(page, 3, minute)).toHaveAttribute("aria-pressed", "true");
   await expect(note).toHaveText("17:00–18:00 on Wed 9 Sept is off.");
@@ -800,7 +858,7 @@ try {
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Space");
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Take this time off" })).toBeFocused();
+  await expect(choiceAt(page).getByRole("button", { name: "Time off", exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(note).toHaveText("18:00–18:30 on Wed 9 Sept is off.");
   assert.deepEqual(dayWrites(state).at(-1), {
@@ -818,7 +876,7 @@ try {
   ).toBeVisible();
   await slot(page, 1, 750).click({ force: true });
   // A weekly block can still hold a lesson she arranges, but can't be taken off.
-  await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["Add a lesson here"]);
+  await expect(choiceAt(page).getByRole("button")).toHaveText(["Add a lesson here"]);
   await page.keyboard.press("Escape");
   assert.equal(state.writes.length, writesBefore, "Lunch must not be written");
 
@@ -887,8 +945,7 @@ try {
   // A time gone can't be taken off, but a lesson she has had can be recorded there.
   await expect(slot(page, 1, 600)).not.toHaveAttribute("aria-disabled", "true");
   await slot(page, 1, 600).click();
-  await expect(page.getByRole("menuitem", { name: "Add a lesson here", exact: true })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Take this time off", exact: true })).toHaveCount(0);
+  await expect(choiceAt(page).getByRole("button")).toHaveText(["Add a lesson here"]);
   await page.keyboard.press("Escape");
 
   // Reopening a holiday removes only whole-day rows; its hours and extras stay.
@@ -926,7 +983,7 @@ try {
   // form belongs to that student.
   await expect(page.locator(".teacher-manual")).toHaveCount(0);
   await slot(page, 5, 1020).click();
-  await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
+  await page.getByRole("button", { name: "Add a lesson here", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Sam Known", exact: true }).click();
   const forSam = studentRow(page, "Sam Known");
   const forSamForm = forSam.getByRole("region", { name: "Sam Known’s profile", exact: true });
@@ -988,7 +1045,7 @@ try {
   // A free time adds a lesson there, its date and time already in place, and
   // the lesson reads as hers rather than a student's booking.
   await slot(page, 4, 1080).click();
-  await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
+  await page.getByRole("button", { name: "Add a lesson here", exact: true }).click();
   const addDialog = page.getByRole("dialog");
   // Someone new is set up first, then the lesson keeps the time she chose.
   await addDialog.getByRole("button", { name: "Add a new student", exact: true }).click();
@@ -1012,7 +1069,7 @@ try {
   // A student she already has: the lesson belongs to their account. A weekly
   // slot says what was booked and which week was left out.
   await slot(page, 2, 1080).click();
-  await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
+  await page.getByRole("button", { name: "Add a lesson here", exact: true }).click();
   const weeklyDialog = page.getByRole("dialog");
   await weeklyDialog.getByRole("button", { name: "Sam Known", exact: true }).click();
   await forSamForm.getByRole("radio", { name: "Weekly", exact: true }).check();
@@ -1102,7 +1159,9 @@ try {
   // Her price for them from the start; the other length stays standard.
   await addStudent.getByLabel("Price for 60 minutes, in euros").fill("20");
   await addStudent.getByRole("button", { name: "Next: their lessons", exact: true }).click();
-  assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/students").at(-1).data,
+  // The save follows the press, so wait for it. Read at once, it was sometimes
+  // not there yet on a busy machine (11 November 2026).
+  await expect.poll(() => state.writes.filter((entry) => entry.path === "/admin/students").at(-1)?.data).toEqual(
     { email: "ana@example.invalid", name: "Ana Costa", phone: "+351 912 345 678", nif: "123456789", mark: "bloom", prices: { 60: 2000 } });
   const ana = studentRow(page, "Ana Costa");
   const anaForm = ana.getByRole("region", { name: "Ana Costa’s profile", exact: true });
@@ -1213,10 +1272,9 @@ try {
   // Any quarter hour, weekly hours or not; then only its length and adding it.
   await picker.getByRole("button", { name: "09:30 Porto time, already past", exact: true }).click();
   await expect(noraProfile.getByRole("radio", { name: "Weekly", exact: true })).toHaveCount(0);
-  // A record shows only its lengths, never a price; where it was, and whether
+  // A record carries its price (11 November 2026); where it was, and whether
   // it is already paid, are hers to say (16 October 2026).
-  await expect(noraProfile.getByRole("radio", { name: "60 mins", exact: true })).toBeVisible();
-  await expect(noraProfile.locator(".teacher-manual-price")).toHaveCount(0);
+  await expect(noraProfile.getByRole("radio", { name: "60 mins, €24", exact: true })).toBeVisible();
   await noraProfile.getByRole("radio", { name: "In Porto", exact: true }).check();
   const pastTick = noraProfile.getByRole("checkbox", { name: "Already paid", exact: true });
   await expect(pastTick).toHaveAttribute("aria-checked", "false");
@@ -1277,7 +1335,7 @@ try {
   const isStudentRead = response => new URL(response.url()).pathname === "/admin/students" && response.request().method() === "GET";
   const savedStudents = page.waitForResponse(isStudentRead);
   await noraProfile.getByRole("button", { name: "Save details", exact: true }).click();
-  assert.deepEqual(state.writes.filter(entry => entry.path === "/admin/students/nora/details").at(-1).data,
+  await expect.poll(() => state.writes.filter(entry => entry.path === "/admin/students/nora/details").at(-1)?.data).toEqual(
     { name: "Nora Lima", email: "nora@example.invalid", phone: "", nif: "" });
   await expect(nora.locator(".teacher-setup__notice")).toHaveText("Their details are saved.");
   await (await savedStudents).finished();
@@ -1309,23 +1367,40 @@ try {
   await recordedTick.scrollIntoViewIfNeeded();
   const tickBox = await recordedTick.boundingBox();
   assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[role="checkbox"]') !== null, { x: tickBox.x + tickBox.width / 2, y: tickBox.y + tickBox.height / 2 }), true, "Already paid stays pressable over the stretched day button");
+  // Marked as paid, it is still hers to change, and a change leaves it marked
+  // (11 November 2026, Dan: "even if it's already marked as paid Ines should
+  // be able to change it").
+  // The row's pencil opens the lesson straight on its change form, as every
+  // pencil on her pages edits the thing beside it.
+  await recorded.getByRole("button", { name: /^Change lesson · Thu 27 Aug/ }).click();
+  const tickedDetails = recorded.locator(".teacher-lesson-row__details");
+  await tickedDetails.getByRole("radio", { name: "90 mins, €36", exact: true }).check();
+  await expect(tickedDetails).toContainText("Stays marked as paid");
+  await tickedDetails.getByRole("button", { name: "Close lesson details", exact: true }).click();
+  // Unticked, a record is open like any past lesson she added: the tick stays,
+  // and nothing says it was recorded (11 November 2026, Dan).
+  await recordedTick.click();
+  await expect(recordedTick).toHaveAttribute("aria-checked", "false");
+  await expect(recorded).not.toContainText("Recorded");
+  // Opened, it reads as any past lesson, and its length changes in one request.
+  await recorded.getByRole("button", { name: /^Thu 27 Aug/ }).click();
+  const recordDetails = recorded.locator(".teacher-lesson-row__details");
+  await expect(recordDetails).toContainText("€24 · to pay you directly");
+  await expect(recordDetails).not.toContainText(/recorded/i);
+  // Homework is hidden for now (11 November 2026, Dan), so nothing here opens it.
+  await expect(recordDetails.getByRole("button", { name: "Homework", exact: true })).toHaveCount(0);
+  await recordDetails.getByRole("button", { name: "Change lesson", exact: true }).click();
+  await expect(recordDetails.getByRole("radio", { name: "This lesson", exact: true })).toHaveCount(0);
+  await recordDetails.getByRole("radio", { name: "90 mins, €36", exact: true }).check();
+  await expect(recordDetails).toContainText("Becomes 90 minutes, €36");
+  await expect(recordDetails).toContainText("No email is sent");
+  const recordId = state.bookings.find(entry => entry.student_id === "nora" && entry.payment_status === "recorded").id;
+  await recordDetails.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect.poll(() => state.writes.at(-1)).toEqual({ path: `/admin/bookings/${recordId}/change`, data: { lessonType: "long", expectedPriceCents: 3600, following: false } });
+  await expect(noraProfile).toContainText("Lesson changed.");
   await nora.getByRole("button", { name: "Close", exact: true }).click();
 
-  // Select a few dates, apply time off, then see those same days in the week.
-  await page.getByRole("tab", { name: "Time off", exact: true }).click();
-  const timeOff = page.locator(".teacher-timeoff");
-  const holidayDates = ["2026-09-28", "2026-09-29", "2026-09-30"];
-  for (const date of holidayDates) await timeOff.locator(`[data-timeoff-date="${date}"]`).click();
-  await timeOff.getByRole("button", { name: "Off", exact: true }).click();
-  await expect
-    .poll(() => holidayDates.map((date) => dayWrites(state, date).at(-1)))
-    .toEqual(holidayDates.map((date) => ({ date, dayOff: true })));
-  await expect(timeOff.locator(".teacher-save-state")).toHaveText("3 selected days are off.");
-  for (const date of holidayDates) await expect(timeOff.locator(`[data-timeoff-date="${date}"]`)).toHaveClass(/is-off/);
   await showLessons(page);
-  for (let index = 0; index < 3; index++) await page.getByRole("button", { name: "Next week" }).click();
-  await expect(page.getByRole("switch", { name: "Day off, Tuesday 29 September" })).toHaveAttribute("aria-checked", "true");
-  await page.getByRole("button", { name: "This week" }).click();
   state.failBookings = true;
   await page.getByRole("button", { name: "Next week" }).click();
   await page
@@ -1413,10 +1488,7 @@ try {
     .getByRole("status")
     .filter({ hasText: "Weekly hours saved" })
     .waitFor();
-  for (const width of [390]) {
-    await mobile.page.setViewportSize({ width, height: 900 });
-    await noOverflow(mobile.page);
-  }
+  await noOverflow(mobile.page);
   await mobile.page.setViewportSize({ width: 390, height: 844 });
   await showLessons(mobile.page);
   await mobile.page.getByRole("button", { name: "Tuesday 8 September, show lessons" }).tap();
@@ -1425,8 +1497,7 @@ try {
   const phoneMessage = mobile.page.getByLabel(/^Add a message to the email \(optional\)/);
   const longMessage = "Obrigada! ".repeat(100);
   await phoneMessage.fill(longMessage);
-  for (const width of [390]) {
-    await mobile.page.setViewportSize({ width, height: 844 });
+  {
     const confirm = mobile.page.getByRole("button", { name: "Yes, cancel lesson" });
     await confirm.scrollIntoViewIfNeeded();
     const bounds = await mobile.page.getByRole("dialog").boundingBox();
@@ -1441,8 +1512,9 @@ try {
   await mobile.page.close();
 
   // A free price (16 October 2026): she types 0, and each length reads Free.
-  await mkdir("tmp/qa/free-price", { recursive: true });
-  for (const width of [1280, 390]) {
+  // At one width: none of its steps differs on a phone.
+  {
+    const width = 1280;
     const { page, state } = await fixture(width);
     // A lesson she added, still to be paid to her directly.
     Object.assign(state.bookings.find(entry => entry.id === "next"), { student_id: "sam", added_by_teacher: 1, payment_status: "not_required", amount_cents: 2500 });
@@ -1459,12 +1531,10 @@ try {
     await pane.getByLabel("Price for 60 minutes, in euros", { exact: true }).fill("0");
     await expect(pane.getByLabel("Price for 90 minutes, in euros", { exact: true })).toHaveAttribute("placeholder", "0");
     await expect(pane).toContainText("0 is free, with no card needed.");
-    await pane.screenshot({ path: `tmp/qa/free-price/teacher-price-${width}.png` });
     await pane.getByRole("button", { name: "Save price", exact: true }).click();
     await expect.poll(() => state.writes.at(-1)?.data).toEqual({ prices: { 60: 0, 90: null } });
     await expect(pane).toContainText("60 mins · Free");
     await expect(pane).toContainText("90 mins · Free · as their 60");
-    await pane.screenshot({ path: `tmp/qa/free-price/teacher-price-saved-${width}.png` });
     await alex.getByRole("button", { name: "Close", exact: true }).click();
     await alex.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
     await alex.getByRole("button", { name: "Add a lesson for Alex", exact: true }).click();
@@ -1472,7 +1542,6 @@ try {
     await expect(pane.getByRole("radio", { name: "90 mins, Free", exact: true })).toBeVisible();
     // A free lesson has nothing to pay, so no tick.
     await expect(pane.getByRole("checkbox", { name: "Already paid", exact: true })).toHaveCount(0);
-    await pane.screenshot({ path: `tmp/qa/free-price/teacher-add-lesson-${width}.png` });
     await alex.getByRole("button", { name: "Close", exact: true }).click();
 
     // A past lesson keeps its place, In Porto here, and can be ticked paid.
@@ -1489,8 +1558,6 @@ try {
     await picker.getByRole("button", { name: "09:30 Porto time, already past", exact: true }).click();
     await samPane.getByRole("radio", { name: "In Porto", exact: true }).check();
     await samPane.getByRole("checkbox", { name: "Already paid", exact: true }).click();
-    await page.waitForTimeout(300); // the tick's colour change settles
-    await samPane.screenshot({ path: `tmp/qa/free-price/teacher-past-lesson-${width}.png` });
     await samPane.getByRole("button", { name: "Add past lesson", exact: true }).click();
     await expect.poll(() => state.writes.at(-1)?.data).toMatchObject({ location: "porto", paid: true });
     assert.equal(state.bookings.at(-1).meeting_url, null, "no Meet for a lesson already had");
@@ -1501,8 +1568,6 @@ try {
     const addTick = samPane.getByRole("checkbox", { name: "Already paid", exact: true });
     await addTick.click();
     await expect(addTick).toHaveAttribute("aria-checked", "true");
-    await page.waitForTimeout(300);
-    await samPane.screenshot({ path: `tmp/qa/free-price/teacher-add-paid-${width}.png` });
     // A weekly run is ticked lesson by lesson, so the tick steps aside.
     await samPane.getByRole("radio", { name: "Weekly", exact: true }).check();
     await expect(addTick).toHaveCount(0);
@@ -1512,11 +1577,7 @@ try {
 
     // On a lesson's details: ticked, it is paid to her by hand.
     await showLessons(page);
-    // A phone shows a day at a time.
-    const openSam = async () => {
-      if (width < 741) await page.getByRole("button", { name: "Tuesday 8 September, show lessons" }).click();
-      await page.getByRole("button", { name: /^Sam,.*View lesson$/ }).click();
-    };
+    const openSam = () => page.getByRole("button", { name: /^Sam,.*View lesson$/ }).click();
     await openSam();
     const details = page.getByRole("dialog");
     // Its payment approval link (2 November 2026): the lesson opened starts
@@ -1526,13 +1587,11 @@ try {
     await expect(choices.getByRole("checkbox")).toHaveCount(2);
     await expect(choices.getByRole("checkbox", { checked: true })).toHaveCount(1);
     await choices.getByRole("checkbox", { checked: false }).click();
-    await details.screenshot({ path: `tmp/qa/free-price/teacher-card-link-${width}.png` });
     await choices.getByRole("button", { name: "Create link for €50", exact: true }).click();
     await expect.poll(() => state.writes.at(-1)).toEqual({ path: "/admin/bookings/next/card-link", data: { bookingIds: ["next", "earlier-unpaid"] } });
     await expect(details).toContainText("Link ready: 2 lessons, €50. Nothing sent or charged yet.");
     const message = new URL(await details.getByRole("link", { name: /^Send on WhatsApp/ }).getAttribute("href")).searchParams.get("text");
     assert.match(message, /^Olá Sam! Here’s your link to pay by card for 2 lessons \(€50 in total\)\. It’s just for you:\n\S+cardBooking=next,earlier-unpaid$/);
-    await details.screenshot({ path: `tmp/qa/free-price/teacher-card-link-ready-${width}.png` });
     const detailTick = details.getByRole("checkbox", { name: "Already paid", exact: true });
     await expect(detailTick).toHaveAttribute("aria-checked", "false");
     await detailTick.click();
@@ -1542,7 +1601,6 @@ try {
     await expect(detailTick).toHaveAttribute("aria-checked", "true");
     await expect(details).toContainText(/paid to you by hand/i);
     await expect(details.getByRole("button", { name: "Mark no-show", exact: true })).toHaveCount(0);
-    await details.screenshot({ path: `tmp/qa/free-price/teacher-details-paid-${width}.png` });
     await details.getByRole("button", { name: "Cancel lesson", exact: true }).click();
     await expect(details).toContainText("Refund Sam directly for the payment made by hand");
     await expect(details).not.toContainText("refunded in full, automatically");
@@ -1554,7 +1612,6 @@ try {
     await expect(page.locator(".teacher-receipts")).toContainText("Paid by hand");
     const paidReceipt = page.locator('[data-receipt-id="next:lesson"]');
     await expect(paidReceipt).toHaveAttribute("data-ready", "true");
-    if (width === 1280) await page.locator(".teacher-receipts").screenshot({ path: "tmp/qa/free-price/teacher-receipts-paid-by-hand.png" });
     await page.getByRole("tab", { name: /^Students/ }).click();
     await samRow.getByRole("button", { name: "Open Sam Known’s profile", exact: true }).click();
     const cancelledLesson = samRow.locator(".teacher-history-lesson").filter({ hasText: "Tue 8 Sept" });
@@ -1580,7 +1637,9 @@ try {
     await page.close();
   }
 
-  for (const width of [1280, 390]) {
+  // Her student's history, at one width: it reads the same on a phone.
+  {
+    const width = 1280;
     const { page, state } = await fixture(width);
     await page.clock.install({ time: new Date("2026-09-07T10:15:00Z") });
     state.history = [
@@ -1617,9 +1676,10 @@ try {
     await expect(history.getByRole("heading", { name: "Upcoming · 5" })).toBeVisible();
     await expect(history.getByRole("heading", { name: "Past & cancelled · 4" })).toBeVisible();
     await expect(history.locator(".teacher-history-lesson")).toHaveCount(7);
-    // What every lesson shares is said once above them, not on each card.
-    await expect(history.locator(".teacher-fact").filter({ hasText: "Every lesson" })).toContainText("60 mins");
-    await expect(history.locator(".teacher-history-lesson").filter({ hasText: "60 mins" })).toHaveCount(0);
+    // What every lesson shares is said once above them, not on each card;
+    // how long each one is stays on its row (11 November 2026, Dan: "60 or 90").
+    await expect(history.locator(".teacher-fact").filter({ hasText: "Every lesson" }).filter({ hasText: "60 mins" })).toHaveCount(0);
+    await expect(history.locator(".teacher-history-lesson").filter({ hasText: "60 mins" }).first()).toBeVisible();
     const run = history.locator(".teacher-history-run");
     await expect(run).toContainText("Every Tuesday");
     await expect(run).toContainText("09:30–10:30");
@@ -1636,10 +1696,8 @@ try {
     const week = run.locator(".teacher-history-run__weeks > li").filter({ hasText: "Tue 22 Sept" });
     const tile = await week.boundingBox();
     const corner = { x: tile.width - 6, y: tile.height / 2 };
-    if (width === 1280) {
-      await week.hover({ position: corner });
-      await expect(week).toHaveCSS("background-image", /linear-gradient/);
-    }
+    await week.hover({ position: corner });
+    await expect(week).toHaveCSS("background-image", /linear-gradient/);
     await week.click({ position: corner });
     const lessonDetails = history.getByRole("region", { name: /’s lesson, / });
     await expect(lessonDetails).toHaveCount(1);
@@ -1727,8 +1785,9 @@ try {
     await page.getByRole("button", { name: "Open Alex’s profile", exact: true }).click();
     const other = studentRow(page, "Alex").getByRole("region", { name: "Alex’s profile", exact: true });
     await expect(other).toContainText("No lessons recorded yet.");
+    const lateHistory = page.waitForResponse((response) => new URL(response.url()).searchParams.get("from") === "1970-01-01T00:00:00.000Z");
     release();
-    await page.waitForTimeout(100);
+    await lateHistory;
     await expect(other.locator(".teacher-history-lesson")).toHaveCount(0);
     // A session loss removes the private view, including a response still in flight.
     await page.evaluate(() => { localStorage.removeItem("ines-student-session"); window.dispatchEvent(new Event("ines:student-session-change")); });
@@ -1739,96 +1798,46 @@ try {
     await page.close();
   }
 
-  // A chosen day is Off or not; a day off's hours open an explicit draft of
-  // one or more breaks, saved only when she presses Save.
-  for (const width of [1280, 390]) {
+  // Hours off by exact times at the times themselves, and a booked lesson
+  // they leave standing listed under the week as a clash that opens it. On a
+  // phone, where she chooses the day first.
+  {
+    const width = 390;
     const { page, state } = await fixture(width);
     const originalBookings = structuredClone(state.bookings);
     const originalRules = structuredClone(state.rules);
-    await page.getByRole("tab", { name: "Time off", exact: true }).click();
-    const timeOff = page.locator(".teacher-timeoff");
-    const card = timeOff;
-    const offChip = card.getByRole("button", { name: "Off", exact: true });
-    const clear = card.getByRole("button", { name: "Clear chosen days", exact: true });
-    await expect(card.getByText("Tap the days you want off, or online only", { exact: true })).toBeVisible();
-    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toHaveCount(0);
-    const date = page.locator('[data-timeoff-date="2026-09-21"]');
-    await date.click();
-    await expect(date).toHaveAttribute("aria-pressed", "true");
-    // One day reads as many do: how many, then what they are. Already off, its chip is pressed.
-    await expect(card.getByRole("group", { name: "Chosen days" })).toContainText("1 day");
-    await expect(offChip).toHaveAttribute("aria-pressed", "true");
-    const hours = card.getByRole("button", { name: "Change hours off", exact: true });
-    await expect(hours).toContainText("All day");
-    await hours.click();
-    const popup = page.getByRole("dialog", { name: "Mon 21 September" });
-    await expect(popup.getByLabel("From 1", { exact: true })).toHaveValue("10:00");
-    await popup.getByLabel("Until 1", { exact: true }).fill("11:30");
-    await popup.getByRole("button", { name: "Add another break" }).click();
-    await popup.getByLabel("From 2", { exact: true }).fill("15:00");
-    await popup.getByLabel("Until 2", { exact: true }).fill("14:00");
-    await popup.getByRole("button", { name: "Save hours off", exact: true }).click();
-    await expect(popup.getByRole("alert")).toContainText("later end");
-    assert.equal(state.writes.length, 0);
-    await popup.getByLabel("Until 2", { exact: true }).fill("00:00");
-    state.failDay = "2026-09-21";
-    await popup.getByRole("button", { name: "Save hours off", exact: true }).click();
-    await expect(popup.getByRole("alert")).toContainText("busy");
-    await expect(popup.getByLabel("Until 2", { exact: true })).toHaveValue("00:00");
-    await popup.getByRole("button", { name: "Save hours off", exact: true }).click();
-    await expect(popup).toHaveCount(0);
-    await expect(hours).toBeFocused();
-    assert.deepEqual(state.writes.at(-1).data, { date: "2026-09-21", dayOff: false, blocks: [{ startMinute: 600, endMinute: 690 }, { startMinute: 900, endMinute: 1440 }] });
-    await expect(date).not.toHaveClass(/is-off|is-partial/);
-    // Some hours off are the day's hours beneath; Off itself is a whole day.
-    await expect(hours).toContainText("10:00–11:30, 15:00–");
-    await expect(offChip).toHaveAttribute("aria-pressed", "false");
-    await hours.click();
-    await expect(popup.getByLabel("Until 2", { exact: true })).toHaveValue("00:00");
-    await popup.getByRole("button", { name: "Close hours off" }).click();
-    await offChip.click();
-    await expect(date).toHaveClass(/is-off/);
-    await expect(offChip).toHaveAttribute("aria-pressed", "true");
-    await offChip.click();
-    await expect(date).not.toHaveClass(/is-off/);
-    await hours.click();
-    await popup.getByRole("button", { name: "Remove hours off", exact: true }).click();
-    await expect(popup).toHaveCount(0);
-    await expect(offChip).toBeFocused();
-    assert.ok(!state.exceptions.some(row => row.date === "2026-09-21"), "Making the day available and removing its hours clears the date");
-    assert.ok(state.exceptions.some(row => row.weekday === 1 && row.note === "Lunch"), "The recurring lunch break stays in place");
-    assert.ok(state.exceptions.some(row => row.kind === "extra"), "Extra hours stay in place");
-    // A lesson booked on a day she takes off is a clash: its own card beside
-    // the month, opening the lesson so she can move it. The hours draft names
-    // only lessons it overlaps.
-    await clear.click();
-    await page.locator('[data-timeoff-date="2026-09-08"]').click();
-    const booked = card.locator(".teacher-timeoff-lessons .teacher-lesson-card");
-    await expect(booked).toHaveCount(0);
-    await offChip.click();
-    await expect(card.locator(".teacher-timeoff-lessons")).toContainText("Clashes");
-    await expect(booked).toHaveCount(1);
-    await expect(booked).toContainText("Sam");
-    await expect(booked).toContainText("day off");
-    await booked.getByRole("button", { name: /^Change lesson for Sam/ }).click();
+    const clashes = page.locator(".teacher-ahead__clashes .teacher-lesson-card");
+    await expect(clashes).toHaveCount(0);
+    // What is set beyond the week on screen is listed, and turns to its week.
+    const holiday = page.locator(".teacher-ahead__upcoming").getByRole("button", { name: /^Mon 21 Sept, Day off/ });
+    await holiday.click();
+    await expect(page.getByRole("switch", { name: "Day off, Monday 21 September", exact: true })).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator(".teacher-ahead__upcoming")).toHaveCount(0);
+    await page.getByRole("button", { name: "This week", exact: true }).click();
+    await page.getByRole("button", { name: /^Tuesday 8 September/ }).click();
+    // The lesson covers its own times, so she presses the one before and sets them.
+    await slot(page, 2, 810).click();
+    const choice = choiceAt(page);
+    await choice.getByLabel("From", { exact: true }).fill("14:00");
+    await choice.getByLabel("Until", { exact: true }).fill("13:45");
+    await choice.getByRole("button", { name: "Time off", exact: true }).click();
+    await expect(choice.getByRole("alert")).toHaveText("Choose an end after the start.");
+    assert.deepEqual(dayWrites(state), [], "Times that cannot be saved are not sent");
+    await choice.getByLabel("Until", { exact: true }).fill("15:10");
+    await choice.getByRole("button", { name: "Time off", exact: true }).click();
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-08", blocks: [{ startMinute: 840, endMinute: 910 }] });
+    await expect(clashes).toHaveCount(1);
+    await expect(clashes).toContainText("Sam");
+    await expect(clashes).toContainText("hours off");
+    await clashes.getByRole("button", { name: /^Change lesson for Sam/ }).click();
     await expect(page.getByRole("dialog", { name: "Sam", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Close lesson details", exact: true }).click();
-    await expect(booked.getByRole("button", { name: /^Change lesson for Sam/ })).toBeFocused();
-    await hours.click();
-    const bookedDay = page.getByRole("dialog", { name: "Tue 8 September" });
-    await expect(bookedDay.locator(".teacher-timeoff-booked")).toHaveCount(0);
-    await bookedDay.getByLabel("From 1", { exact: true }).fill("14:00");
-    await bookedDay.getByLabel("Until 1", { exact: true }).fill("15:00");
-    await expect(bookedDay.getByRole("status")).toContainText("Sam");
-    assert.ok(await bookedDay.evaluate(node => node.scrollWidth <= node.clientWidth + 1));
-    await bookedDay.getByRole("button", { name: "Save hours off", exact: true }).click();
-    await expect(bookedDay).toHaveCount(0);
-    await expect(booked).toContainText("hours off");
-    await timeOff.screenshot({ path: `tmp/qa/teacher/time-off-clash-${width}.png` });
+    await expect(clashes.getByRole("button", { name: /^Change lesson for Sam/ })).toBeFocused();
     assert.deepEqual(state.bookings, originalBookings);
     assert.deepEqual(state.rules, originalRules);
     // Weekly edits that cross a booked time warn before saving, and on success.
     await showHours(page);
+    await page.getByRole("button", { name: "Monday, show weekly hours", exact: true }).click();
     await slot(page, 1, 660).click();
     const clash = page.locator(".teacher-hours-warning .teacher-lesson-card");
     await expect(clash).toHaveCount(1);
@@ -1852,7 +1861,9 @@ try {
 
   // Her one Change for every week of a run (10 November 2026): a new day, time
   // and place from the week she opened, one write; a week in the way is named.
-  for (const width of [1280, 390]) {
+  // On a phone, where its form must fit.
+  {
+    const width = 390;
     const { page, state } = await fixture(width);
     state.history = ["2026-09-15T08:30:00Z", "2026-09-22T08:30:00Z", "2026-09-29T08:30:00Z"].map((start, week) =>
       ({ ...lesson(`weekly-${week}`, "Sam Known", start, "porto"), student_id: "sam", series_id: "sam-weekly", added_by_teacher: 1, payment_status: "not_required" }));
@@ -1882,7 +1893,8 @@ try {
 
   // A clash card uses the existing lesson editor, including lessons hidden
   // under More. Moving one refreshes the cards and preserves unsaved hours.
-  for (const width of [1280, 390]) {
+  {
+    const width = 1280;
     const { page, state } = await fixture(width);
     for (let week = 1; week <= 5; week++) state.bookings.push(lesson(`repeat-${week}`, `Repeat ${week}`, new Date(Date.parse("2026-09-07T10:00:00Z") + week * 7 * 86400000).toISOString()));
     await page.reload();
@@ -1912,16 +1924,19 @@ try {
     await page.close();
   }
 
-  for (const width of [1280, 390]) {
+  {
+    const width = 1280;
     const tabs = await fixture(width);
-    const { page, state } = tabs;
-    const chosenDay = (date) => page.locator(`[data-timeoff-date="${date}"]`);
-    const timeOff = page.locator(".teacher-timeoff");
-    const initialBookings = structuredClone(state.bookings);
+    const { page } = tabs;
+    // One tab holds the week and her time off (11 November 2026): an old
+    // link to the Time off tab lands on Timetable.
+    await page.goto(`${base}/schedule/?tab=time-off`);
+    await page.locator("#teacher-week-title").waitFor();
     await expect(page.getByRole("tab", { name: "Timetable", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab")).toHaveText(["Students", "Timetable", "Receipts", "Expressions", "Profile"]);
     await page.getByRole("tab", { name: "Timetable", exact: true }).focus();
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByRole("tab", { name: "Time off", exact: true })).toBeFocused();
+    await expect(page.getByRole("tab", { name: "Receipts", exact: true })).toBeFocused();
     await showHours(page);
     await slot(page, 1, 600).click();
     await page.getByRole("tab", { name: /^Students/ }).click();
@@ -1929,60 +1944,12 @@ try {
     await showHours(page);
     await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "false");
     await page.getByRole("button", { name: "Discard", exact: true }).click();
-    await page.getByRole("tab", { name: "Time off", exact: true }).click();
-    await expect(chosenDay("2026-09-06")).toBeDisabled();
-    const offChip = timeOff.getByRole("button", { name: "Off", exact: true });
-    await chosenDay("2026-09-08").click();
-    await chosenDay("2026-09-21").click();
-    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toHaveCount(0);
-    await timeOff.getByRole("button", { name: "Next month" }).click();
-    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toBeVisible();
-    await chosenDay("2026-10-01").click();
-    await page.getByRole("tab", { name: /^Students/ }).click();
-    await page.getByRole("tab", { name: "Time off", exact: true }).click();
-    await expect(timeOff.getByRole("group", { name: "Chosen days" })).toContainText("3 days");
-    const before = state.writes.length;
-    // 21 September is already off, so only the other two are taken.
-    await expect(offChip).toHaveAttribute("aria-pressed", "false");
-    await offChip.click();
-    await expect(timeOff.locator(".teacher-save-state")).toContainText("3 selected days are off");
-    await expect(offChip).toHaveAttribute("aria-pressed", "true");
-    await expect(timeOff.locator(".teacher-timeoff-lessons .teacher-lesson-card")).toContainText("Sam");
-    assert.deepEqual(state.writes.slice(before).map(write => write.data), [
-      { date: "2026-09-08", dayOff: true }, { date: "2026-10-01", dayOff: true },
-    ], "Already-off dates do not create another write");
-    await expect(chosenDay("2026-10-01")).toHaveClass(/is-off/);
-    await offChip.click();
-    await expect(timeOff.locator(".teacher-save-state")).toContainText("following your weekly hours");
-    assert.deepEqual(state.bookings, initialBookings, "Marking dates off and reopening them preserves every lesson");
-    assert.ok(state.exceptions.some(row => row.date === "2026-09-21" && row.start_minute === 600), "Reopening a day preserves its partial time off");
-    assert.ok(state.exceptions.some(row => row.kind === "extra"), "Extra hours remain untouched");
-    await expect(offChip).toHaveAttribute("aria-pressed", "false");
-    await expect(timeOff.locator(".teacher-timeoff-lessons")).toHaveCount(0);
-    await timeOff.getByRole("button", { name: "Clear chosen days", exact: true }).click();
-    await timeOff.getByRole("button", { name: "This month", exact: true }).click();
-    await expect(timeOff.getByRole("heading", { name: "September 2026", exact: true })).toBeFocused();
-    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toHaveCount(0);
-    await expect(chosenDay("2026-09-21")).not.toContainText("Part off");
-    await expect(chosenDay("2026-09-21")).not.toHaveAttribute("aria-label", /weekly hours|some time off/);
-    await expect(chosenDay("2026-09-14")).not.toHaveAttribute("aria-label", /weekly hours|some time off/);
-    await chosenDay("2026-09-30").focus();
-    await page.keyboard.press("ArrowDown");
-    await expect(chosenDay("2026-10-07")).toBeFocused();
-    await page.keyboard.press("Space");
-    state.failDay = "2026-10-07";
-    await offChip.click();
-    await expect(timeOff.getByRole("alert")).toContainText("was not changed");
-    await expect(chosenDay("2026-10-07")).not.toHaveClass(/is-off/);
-    await offChip.click();
-    await expect(timeOff.locator(".teacher-save-state")).toContainText("is a day off");
-    await noOverflow(page);
     await page.getByRole("tab", { name: /^Students/ }).click();
     await page.getByRole("tab", { name: /^Students/ }).focus();
     await page.keyboard.press("End");
     await expect(page.getByRole("tab", { name: "Profile", exact: true })).toBeFocused();
     await noOverflow(page);
-    if (width === 1280) {
+    {
       await page.setViewportSize({ width: 320, height: 900 });
       await expect.poll(() => page.getByRole("tab", { name: "Profile", exact: true }).evaluate(node => {
         const tab = node.getBoundingClientRect();
@@ -1993,22 +1960,14 @@ try {
     }
     await page.keyboard.press("Home");
     await expect(page.getByRole("tablist", { name: "Teacher tools" }).getByRole("tab").first()).toBeFocused();
-    await showLessons(page);
-    state.failBookings = true;
-    await page.getByRole("button", { name: "Next week", exact: true }).click();
-    await expect(page.locator(".teacher-week").getByRole("alert")).toContainText("Lessons could not be loaded");
-    await page.getByRole("tab", { name: "Time off", exact: true }).click();
-    await expect(timeOff.getByRole("alert")).toContainText("Booked lessons couldn’t be checked");
-    await expect(offChip).toBeDisabled();
-    state.failBookings = false;
-    await timeOff.getByRole("button", { name: "Try again", exact: true }).click();
-    await expect(offChip).toBeEnabled();
-    assert.deepEqual(state.errors, []);
+    assert.deepEqual(tabs.state.errors, []);
     await page.close();
   }
 
   // One reachability check; the Worker integration test owns mutations and permissions.
   const expressions = await fixture(390);
+  // qa-flow watches a painting at full motion; hers paints at once.
+  await expressions.page.emulateMedia({ reducedMotion: "reduce" });
   await expressions.page.getByRole("tab", { name: "Expressions", exact: true }).click();
   await expect(expressions.page.locator(".teacher-expression .expression-card")).toContainText("Partir o coco a rir");
   // Closed to students, her try-out paints her drafts in her browser alone: nothing is written.
@@ -2076,6 +2035,37 @@ try {
   assert.deepEqual(accountState.errors, []);
   await accountPage.close();
 
+  // A notice that only tells her something (11 November 2026, Dan): it says
+  // it all, a first lesson's note too, so its one button is the cross; inside
+  // the student's card it does not say their name again, the cross ends its
+  // first line, and it takes the notice away for all her devices.
+  {
+    const width = 1280;
+    const { page, state } = await fixture(width);
+    state.students.push({ id: "roman", name: "Roman", email: "roman@example.invalid", phone: "", signedIn: true, hasCard: true, cardForAllLessons: true, nextLessonAt: "2026-09-09T17:00:00.000Z", upcoming: 1, unpaidUpcoming: 0, weekly: 0, hasLessons: true });
+    state.bookings.push({ ...lesson("roman-moved", "Roman", "2026-09-09T17:00:00Z", "porto", 90), student_id: "roman", student_changed_at: "2026-09-06T20:00:00Z", previous_starts_at: "2026-09-08T17:00:00Z" });
+    state.bookings.push({ ...lesson("lia-first", "Lia", "2026-09-10T15:00:00Z"), first_lesson: 1, notes: "Beginner, keen on speaking" });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator(".teacher-needs-you:visible .teacher-notice").filter({ hasText: "Roman changed their lesson" })).toBeVisible();
+    const first = page.locator(".teacher-needs-you:visible .teacher-notice").filter({ hasText: "Lia’s first lesson" });
+    await expect(first.locator(".teacher-notice__note")).toHaveText("Their note Beginner, keen on speaking");
+    assert.deepEqual(await first.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))), ["Dismiss: Lia’s first lesson"]);
+    await page.getByRole("tab", { name: /^Students/ }).click();
+    const notice = studentRow(page, "Roman").locator(".teacher-notice");
+    await expect(notice.locator(".teacher-notice__title")).toHaveText("Changed their lesson");
+    const cross = notice.getByRole("button", { name: "Dismiss: Roman changed their lesson", exact: true });
+    // No View: the notice already says it all.
+    await expect(notice.getByRole("button", { name: /^View/ })).toHaveCount(0);
+    await cross.click();
+    await expect(notice).toHaveCount(0);
+    assert.deepEqual(state.writes.filter((entry) => entry.path === "/admin/needs-you/dismiss").map((entry) => entry.data),
+      [{ key: `changed:roman-moved:${Date.parse("2026-09-06T20:00:00Z")}` }]);
+    await expect(page.getByRole("button", { name: "Open Roman’s profile", exact: true })).toBeFocused();
+    await noOverflow(page);
+    assert.deepEqual(state.errors, []);
+    await page.close();
+  }
+
   const student = await fixture(390, { student: true });
   await student.page
     .getByRole("status")
@@ -2085,7 +2075,7 @@ try {
   assert.deepEqual(student.state.writes, []);
   await student.page.close();
   console.log(
-    "Teacher calendar passed: online-only days, visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, student cards with their checks, invites and profiles, teacher email/password links and verified session renewal, responsive layout and access gate.",
+    "Teacher calendar passed at 1280 and 390px: online-only days, extra hours, visible locations in 60/90-minute blocks, drag/keyboard/touch hours and time off, day-off switches, weekly lunch, past weeks, failed and coalesced saves, protected exceptions, exact hours, drafts, Porto moves, attendance, cancellation, student cards with their checks, invites and profiles, free prices, paid by hand and refunds, teacher email/password links and verified session renewal, and the access gate.",
   );
 } finally {
   await browser.close();

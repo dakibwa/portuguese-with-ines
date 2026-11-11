@@ -4,8 +4,9 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { publicAssetPath } from "@/lib/paths";
 
-// Cloudflare handles these old URLs. The static preview preserves fragments too;
-// the ordinary link remains usable without JavaScript.
+// /terms runs in the browser so old section fragments survive. Cloudflare
+// handles the section-specific defaults; this also works in static previews.
+// The ordinary link remains usable without JavaScript.
 export function PolicyRedirect({ section }: { section?: "booking" | "privacy" }) {
   const destination = `/book/#${section ?? "terms-privacy"}`;
 

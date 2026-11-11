@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 
 /*
@@ -22,7 +21,6 @@ const added = {
   isPast: false, sameDayFeeApplies: false, sameDayFeeAutomatic: false, changeLocked: false,
   paymentStatus: "not_required", seriesId: null, addedByTeacher: true, manageToken: "qa-manage-added",
 };
-await mkdir("tmp/qa/transition-kit", { recursive: true });
 
 function deferred() {
   let resolve;
@@ -84,7 +82,6 @@ try {
     await expect(linked.page.getByRole("heading", { name: "Welcome" })).toBeVisible({ timeout: 15000 });
     assert.ok(!linked.page.url().includes("signin="), "the link leaves the address bar at once");
     assert.equal(linked.posts.filter((post) => post.endpoint === "/auth/email-link/confirm").length, 0, "nothing is spent on arrival");
-    await linked.page.screenshot({ path: `tmp/qa/transition-kit/link-${width}.png`, fullPage: false });
     await linked.page.getByRole("button", { name: "See my lessons", exact: true }).click();
     const prompt = linked.page.locator(".card-prompt");
     // One card, as a payment link's is (2 November 2026, Dan: "one single thing").
@@ -96,14 +93,12 @@ try {
     assert.deepEqual(linked.posts.filter((post) => post.endpoint === "/auth/email-link/confirm").map((post) => post.body), [{ token: "qa-good-link" }]);
     await expect(linked.page.getByRole("heading", { name: "Your account" })).toHaveCount(0);
     assert.ok(await noOverflow(linked.page), `no sideways scroll at ${width}px`);
-    await linked.page.screenshot({ path: `tmp/qa/transition-kit/prompt-${width}.png`, fullPage: false });
 
     const addCard = prompt.getByRole("button", { name: "Agree & add card" });
     await expect(addCard).toBeDisabled();
     // Card first (2 November 2026, Dan): nothing lets them skip it.
     await expect(prompt.getByRole("button", { name: "Not now" })).toHaveCount(0);
     await prompt.getByRole("button", { name: "I authorise card payments for my future lessons" }).click();
-    await linked.page.screenshot({ path: `tmp/qa/transition-kit/terms-${width}.png`, fullPage: false });
     await addCard.click();
     await linked.page.waitForURL(/checkout\.stripe\.com/);
     assert.deepEqual(linked.posts.find((post) => post.endpoint === "/me/card")?.body, { consent: true });
@@ -153,7 +148,6 @@ try {
     await combined.page.getByRole("button", { name: "Close terms & privacy" }).click();
     await expect(agree).toBeDisabled();
     assert.equal(combined.posts.filter(post => post.endpoint === "/me/card").length, 0);
-    await approval.screenshot({ path: `tmp/qa/transition-kit/combined-${width}.png` });
     await approval.getByRole("button", { name: "I authorise card payments for these and future lessons" }).click();
     await expect(agree).toBeEnabled();
     assert.ok(await noOverflow(combined.page));
@@ -358,10 +352,9 @@ try {
     await cardRow.getByRole("button", { name: /Change/ }).click();
     await expect(cardRow.getByRole("button", { name: "Agree & change card" })).toBeVisible();
     // The row eases open to its new height; it ends whole, nothing clipped.
-    await saved.page.waitForTimeout(700);
     await cardRow.scrollIntoViewIfNeeded();
-    assert.ok(await cardRow.evaluate((row) => row.scrollHeight <= row.clientHeight + 1), "the open row shows all of its terms");
-    await saved.page.screenshot({ path: `tmp/qa/transition-kit/details-${width}.png`, fullPage: false });
+    await expect.poll(() => cardRow.evaluate((row) => row.getAnimations({ subtree: true }).every((animation) => animation.playState !== "running") &&
+      row.scrollHeight <= row.clientHeight + 1), { message: "the open row shows all of its terms" }).toBe(true);
     // Removing a card must not undo an independently saved name or close a
     // newer editor opened while that card request was in flight.
     await cardRow.getByRole("button", { name: "Remove card", exact: true }).click();
@@ -417,6 +410,8 @@ try {
       reply: (endpoint) => endpoint === "/admin/expressions" ? { json: { expressions: [draft], openToStudents: false } } : null,
     });
     await expect(painting.page.locator(".site-header")).toBeVisible();
+    // qa-flow watches a painting at full motion; these paint at once.
+    await painting.page.emulateMedia({ reducedMotion: "reduce" });
     await painting.page.getByRole("button", { name: "Paint it", exact: true }).click();
     await painting.page.getByRole("button", { name: "Show meaning", exact: true }).click();
     await expect(painting.page.locator(".expression-card")).toContainText(draft.meaningPt);
@@ -424,8 +419,6 @@ try {
     assert.ok(!painting.reads.includes("/me/expressions"), "a teacher's page must not spend a student pick");
     assert.deepEqual(painting.posts, [], "teacher painting never writes to the Worker");
     assert.ok(await noOverflow(painting.page), `idioms fits at ${width}px`);
-    await painting.page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== "running" || animation.effect?.getTiming().iterations === Infinity));
-    await painting.page.screenshot({ path: `tmp/qa/transition-kit/idioms-${width}.png`, fullPage: false });
     // Signing out in another tab removes the private draft collection here.
     await painting.page.evaluate(() => {
       localStorage.removeItem("ines-student-session");

@@ -23,7 +23,7 @@ export function BookingInformation() {
     releaseScroll.current = null;
     // Keep old shared links working without leaving a stale fragment on close.
     if (policySections.includes(window.location.hash.slice(1))) {
-      window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
     }
     restoreDialogFocus(returnFocus.current);
     returnFocus.current = null;
@@ -47,9 +47,15 @@ export function BookingInformation() {
       if (contentRef.current) contentRef.current.scrollTop = 0;
     }
 
-    function revealLinkedInformation() {
-      if (policySections.includes(window.location.hash.slice(1))) openInformation();
-      else if (dialog?.open) dialog.close();
+    function revealLinkedInformation(event?: HashChangeEvent) {
+      const url = new URL(event?.newURL ?? window.location.href);
+      if (policySections.includes(url.hash.slice(1))) {
+        // Keep the client router in sync with native fragment navigation. A
+        // pending history update from closing the previous notice must not
+        // overwrite the new shared link before its hashchange is handled.
+        if (event) window.history.replaceState(null, "", url);
+        openInformation();
+      } else if (dialog?.open) dialog.close();
     }
 
     function openFromLink(event: MouseEvent) {

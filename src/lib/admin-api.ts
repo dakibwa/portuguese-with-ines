@@ -281,13 +281,15 @@ export function saveOnlineOnlyPeriods(token: string, periods: OnlineOnlyPeriod[]
 }
 
 /**
- * Replaces one date's time off. `dayOff` and `blocks` are independent: each
- * replaces only its own rows, and weekly blocks are never touched.
+ * Replaces one date's time off and extra hours. `dayOff`, `blocks` and
+ * `extra` (the times she chose, which the Worker keeps as lesson starts) are
+ * independent: each replaces only its own rows, and weekly rows are never
+ * touched. A part left out is left as it is.
  */
 export function saveDayOff(
   token: string,
   date: string,
-  change: { dayOff?: boolean; blocks?: { start: number; end: number }[] },
+  change: { dayOff?: boolean; blocks?: { start: number; end: number }[]; extra?: { start: number; end: number }[] },
 ) {
   return adminRequest<{ ok: true; exceptions: AvailabilityException[] }>(
     token,
@@ -300,6 +302,10 @@ export function saveDayOff(
         blocks: change.blocks?.map((block) => ({
           startMinute: block.start,
           endMinute: block.end,
+        })),
+        extra: change.extra?.map((span) => ({
+          startMinute: span.start,
+          endMinute: span.end,
         })),
       }),
     },
@@ -345,11 +351,26 @@ function studentReply<T extends { student: AdminStudent }>(data: T, studentId?: 
   return data;
 }
 
+const dismissedKeys = (value: unknown): value is string[] => Array.isArray(value) && value.every(key => typeof key === "string");
+
+/** `dismissed` names the Needs you notices she has dismissed, on any device. */
 export function fetchStudents(token: string) {
-  return adminRequest<{ students: AdminStudent[]; cardsAccepted?: boolean }>(token, "/admin/students").then(data => {
+  return adminRequest<{ students: AdminStudent[]; cardsAccepted?: boolean; dismissed?: string[] }>(token, "/admin/students").then(data => {
     if (!Array.isArray(data.students) || !data.students.every(validStudent) ||
       new Set(data.students.map(student => student.id)).size !== data.students.length ||
-      (data.cardsAccepted !== undefined && typeof data.cardsAccepted !== "boolean")) throw new Error(BOOKING_REPLY_ERROR);
+      (data.cardsAccepted !== undefined && typeof data.cardsAccepted !== "boolean") ||
+      (data.dismissed !== undefined && !dismissedKeys(data.dismissed))) throw new Error(BOOKING_REPLY_ERROR);
+    return data;
+  });
+}
+
+/** Dismisses one Needs you notice for all her devices; answers with every dismissed key. */
+export function dismissNeedsYou(token: string, key: string) {
+  return adminRequest<{ ok: true; dismissed: string[] }>(token, "/admin/needs-you/dismiss", {
+    method: "POST",
+    body: JSON.stringify({ key }),
+  }).then(data => {
+    if (data.ok !== true || !dismissedKeys(data.dismissed)) throw new Error(BOOKING_REPLY_ERROR);
     return data;
   });
 }

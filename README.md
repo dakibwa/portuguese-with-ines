@@ -179,27 +179,61 @@ but neither a server nor a network: it proves the real SQLite booking and
 payment state (charges, refunds, webhooks, clashes, clock changes, NIF, rates,
 permissions), with Stripe and email isolated. `test:teacher-calendar` proves
 Porto times across the clock changes and how hours and time off are stored.
+`test:reply-validation` proves the site refuses a reply from the Worker that
+it cannot read (a bad lesson, date, weekly run or saved hours) rather than
+showing it or reporting a change as done.
 
 The release then runs thirteen customer journeys against the built export it
-publishes, at desktop and phone widths, in about three minutes: `qa-flow`
-(public pages and a real booking, move and cancel), `qa-workspace-navigation`,
-`qa-booking-selection`, `qa-payment-recovery`, `qa-teacher-calendar` (Inês's
-schedule), `qa-homework`, `qa-transition-kit` (sign-in links and saving a card),
+publishes, at desktop and phone widths, shared between four machines so they
+take about two minutes: `qa-flow`
+(public pages, the booking page against the live Worker, and a student's
+account: moving, cancelling and weekly lessons), `qa-workspace-navigation`
+(the account's places and old links), `qa-booking-selection` (choosing lessons,
+agreeing and booking them), `qa-payment-recovery`, `qa-teacher-calendar` (Inês's
+schedule), `qa-transition-kit` (sign-in links and saving a card),
 `qa-meet-links`, `qa-student-nif`, `qa-profile-rates`, `qa-request-recovery`
 (paying lands on Stripe; a checkout return stays pending until confirmed),
-`qa-auth-recovery` (password reset) and `qa-selection-calendar-recovery` (the
-price posted and the card form after booking). Each expects a static or
+`qa-auth-recovery` (password reset), `qa-selection-calendar-recovery` (the
+price posted and the card form after booking) and `qa-expression-translations`
+(translation review and preserving unfinished expression edits). Each expects a static or
 development server at `QA_BASE_URL` (default `http://localhost:3000`); all but
-`qa-flow`'s booking use isolated API replies. A new check earns its place only
-by protecting a student, Inês or money in a way these don't already.
+`qa-flow`'s booking page use isolated API replies. A new check earns its place
+only by protecting a student, Inês or money in a way these don't already.
+
+A fourteenth, `qa-homework`, waits off the release while homework is hidden
+(11 November 2026, Dan: "Hide homework for now"; `features.homework` in
+`tutors/ines/tutor.json`). A build with it false has no way in for the journey
+to follow. Before homework comes back, set it true, build, run `qa-homework`,
+and put it back on a `journeys` line.
+
+The journeys were trimmed on 11 November 2026 (Dan: "can we check to see if
+all the tests associated with this site are still required or they've become
+cumbersome accidentaly"). Each path through the UI is now walked once, at one
+desktop and one phone width; what the site does with a malformed reply is
+proven in `test:reply-validation` with a few cases kept in the browser; and
+checks of pure looks (a colour, an alignment, a screenshot nobody compared)
+went, while anything about fitting on a phone, opening in view or being
+reachable stayed.
 
 ## Security maintenance
 
-As of 18 October 2026, Next and its ESLint configuration are
-patched to 16.3.8, with compatible Sharp and source-map-js fixes in the lockfile.
-`npm audit --omit=dev` reports zero known vulnerabilities. The full audit still
-reports the development-only Braces/ESLint chain; Braces has no published fix.
-The install script applies a source-checked local mitigation for
+As of 11 November 2026, Next and its ESLint configuration are pinned to
+16.4.6. The lockfile also updates the lint and Wrangler dependencies, clearing
+the reported high-severity development-tool advisories.
+`npm audit --omit=dev` reports zero known vulnerabilities. The full audit has
+no high or critical findings; its seven moderate package warnings come from
+one [Minimatch advisory](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249)
+in TypeScript ESLint. Its current release, 8.72.2, still requires Minimatch 10;
+the upstream fix is in 11. No transitive major-version override is applied.
+
+The Next update includes fixes for
+[image optimization](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw),
+[Server Actions](https://github.com/vercel/next.js/security/advisories/GHSA-p3m5-59mp-jv5r)
+and [`use cache` typed arrays](https://github.com/vercel/next.js/security/advisories/GHSA-673q-mjm6-r5xr).
+Production serves a static export with unoptimized images, no Server Actions
+and no `use cache` functions; those affected Next server paths are not deployed.
+
+The install script also retains a source-checked local mitigation for
 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm):
 Braces rejects nesting beyond 128 levels in its parser and recursive walkers,
 including directly supplied syntax trees. Ordinary patterns retain their
@@ -291,6 +325,8 @@ the page no longer dissolves as one oversized snapshot. Older browsers keep the
 working flow and use a small content fade instead. Orientation scrolling waits
 for the surface change to settle and runs only when less than 160 px of the next
 decision is visible; an already visible desktop choice does not move the page.
+Delayed focus yields to a control the student has already reached, so an account
+menu opened during the handover stays open.
 Interrupted transitions from a quick second choice are treated as normal input,
 not as browser errors.
 
@@ -375,6 +411,17 @@ domains serve. There is no GitHub Pages preview any more: it needed the root of
 `dakibwa.github.io`, which went when the repository was renamed from
 `dakibwa/dakibwa.github.io` to `dakibwa/portuguese-with-ines` on
 17 September 2026.
+
+A release takes about three minutes (11 November 2026, Dan: "I like fast
+relsases"; it had grown to ten). Three things start together: the booking
+Worker's tests and its deploy, the build, and the types, lint and unit tests.
+Once the Worker is live, its health is checked and the customer journeys run
+against the build, shared between four machines. The site publishes only when
+all of it has passed. Each run's summary page lists how long every journey
+took, which is where to look when a release slows down. Installed
+dependencies and the test browser are kept between releases while the
+lockfile is unchanged, because installing afresh took anything from nine
+seconds to a minute.
 
 **Pull requests get a static website preview.** `.github/workflows/preview.yml`
 builds pull requests to `main` from branches in this repository and publishes

@@ -264,6 +264,61 @@ export function dateBlocks(
   );
 }
 
+/**
+ * Extra hours on one date (11 November 2026, Dan: "can Ines also have the
+ * option to add in working hours too against her normal weekly hours"):
+ * times a lesson can start, exactly as her weekly hours are. On the Timetable
+ * they are a span of times; the Worker keeps their first start and their
+ * last, the last booking-interval step before the span ends, so 15:00–17:00
+ * at 30 minutes starts 15:00 to 16:30.
+ */
+export function lastStartIn(span: Span, interval: number) {
+  return span.start + Math.max(0, Math.ceil((span.end - span.start) / interval) - 1) * interval;
+}
+
+/** The times extra hours cover: from their first start to their last start's end. */
+export function extraSpan(span: Span, interval: number): Span {
+  return { start: span.start, end: Math.min(1440, lastStartIn(span, interval) + interval) };
+}
+
+/** `15:00–16:30`, or `15:00` alone: when lessons can start within `span`. */
+export function startsLabel(span: Span, interval: number) {
+  const last = lastStartIn(span, interval);
+  return last > span.start ? `${minuteLabel(span.start)}–${minuteLabel(last)}` : minuteLabel(span.start);
+}
+
+/**
+ * One date's own extra hours as the Worker keeps them, first and last start;
+ * no times means the whole day, as availability reads it. Weekly extra rows
+ * are not hers to change here, so they are left out.
+ */
+export function dateExtraWindows(exceptions: AvailabilityException[], date: string): TeachingWindow[] {
+  return exceptions
+    .filter((exception) => exception.kind === "extra" && exception.weekday == null && exception.date === date)
+    .map((exception) => ({ start: exception.start_minute ?? 0, lastStart: exception.end_minute ?? 1440 }))
+    .sort((a, b) => a.start - b.start);
+}
+
+/** The same as the times they cover on the Timetable, merged. */
+export function dateExtras(exceptions: AvailabilityException[], date: string, interval: number): Span[] {
+  return mergeSpans(dateExtraWindows(exceptions, date).map((window) => ({ start: window.start, end: Math.min(1440, window.lastStart + interval) })));
+}
+
+/**
+ * Whether the choice offers `Extra hours` for `span`: only where they would
+ * let a lesson start where none could yet, some start in it (each interval
+ * step from its start) outside every window of starts she already has that
+ * day, weekly or extra. Times inside her hours gain nothing. Never for the
+ * whole day, which the Worker refuses as it refuses a whole day of time off:
+ * pressed on a day online only from end to end, the choice opens on all of it.
+ */
+export function offersExtraHours(windows: TeachingWindow[], span: Span, interval: number) {
+  if (!(interval >= 1) || (span.start <= 0 && span.end >= 1440)) return false;
+  for (let minute = span.start; minute < span.end; minute += interval)
+    if (!windows.some((window) => window.start <= minute && minute <= window.lastStart)) return true;
+  return false;
+}
+
 /** Time blocked every week on this weekday, such as lunch. */
 export function weeklyBlocks(
   exceptions: AvailabilityException[],
@@ -357,6 +412,139 @@ export function labelOnlineOnly(
   return result;
 }
 
+/**
+ * One date's online-only hours set to exactly `spans` (11 November 2026, Dan:
+ * "when setting exact hours she can set online only times too"); every other
+ * date keeps its own. Empty `spans` takes the label off the date.
+ */
+export function setOnlineOnlyHours(
+  periods: OnlineOnlyPeriod[],
+  date: string,
+  spans: Span[],
+  today: string,
+  newId: () => string = () => crypto.randomUUID(),
+): OnlineOnlyPeriod[] {
+  const [first, ...rest] = mergeSpans(spans);
+  const result = labelOnlineOnly(periods, [date], first ?? null, today, newId);
+  if (!rest.length) return result;
+  const all = [...result, ...rest.map((span) => ({ id: newId(), fromDate: date, toDate: date, startMinute: span.start, endMinute: span.end }))]
+    .sort((a, b) => a.fromDate.localeCompare(b.fromDate) || a.startMinute - b.startMinute);
+  if (all.length > MAX_ONLINE_ONLY_PERIODS)
+    throw new Error(`Online only can cover at most ${MAX_ONLINE_ONLY_PERIODS} separate runs of days.`);
+  return all;
+}
+
+/** The first of `spans` that touches `start`–`end`. */
+export function spanAround(spans: Span[], start: number, end: number) {
+  return spans.find((span) => span.start < end && start < span.end) ?? null;
+}
+
+export type HoursKind = "off" | "online" | "extra";
+
+/**
+ * Some hours of a date that are already a kind. `online` marks extra hours
+ * with online-only hours at exactly the same times: one block, which opens
+ * on `Extra hours`.
+ */
+export type HoursBlock = { kind: HoursKind; span: Span; online?: boolean };
+
+/** A kind; `null` opens the times again (`Open again`); `"not working"` takes their extra hours away. */
+export type HoursChoice = HoursKind | null | "not working";
+
+/**
+ * One date's hours off, online-only hours and extra hours after she chooses
+ * what `span` is, from the times on her Timetable. `original` is the block
+ * she pressed, which a kind replaces; opening again or not working takes only
+ * `span`, so she can shorten a block. Time off is never online only or extra
+ * hours: making hours one takes them out of the others. Online only labels
+ * time that can be booked, so it and extra hours never replace each other,
+ * and extra hours online only at the same times keep the label as they move
+ * and lose it when they go.
+ */
+export function chooseHours(
+  current: { off: Span[]; online: Span[]; extra: Span[] },
+  original: HoursBlock | null,
+  kind: HoursChoice,
+  span: Span,
+) {
+  let { off, online, extra } = current;
+  const was = (of: HoursKind) => original?.kind === of || (of === "online" && Boolean(original?.online));
+  // A kind chosen replaces the block pressed; opening again and not working take only the times set.
+  if (original && kind && kind !== "not working") {
+    if (was("off")) off = removeSpan(off, original.span);
+    if (was("online") && (kind !== "extra" || original.online)) online = removeSpan(online, original.span);
+    if (was("extra") && kind !== "online") extra = removeSpan(extra, original.span);
+  }
+  if (kind === "off") {
+    off = addSpan(off, span);
+    online = removeSpan(online, span);
+    extra = removeSpan(extra, span);
+  } else if (kind === "online") {
+    online = addSpan(online, span);
+    off = removeSpan(off, span);
+  } else if (kind === "extra") {
+    extra = addSpan(extra, span);
+    off = removeSpan(off, span);
+    if (original?.online) online = addSpan(online, span);
+  } else if (kind === "not working") {
+    extra = removeSpan(extra, span);
+    if (original?.online) online = removeSpan(online, span);
+  } else {
+    off = removeSpan(off, span);
+    online = removeSpan(online, span);
+  }
+  return { off: mergeSpans(off), online: mergeSpans(online), extra: mergeSpans(extra) };
+}
+
+/** `Tue 8 Sept`, as the week's notes name a date. */
+export function shortDateLabel(date: string) {
+  return dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
+}
+
+export type TimeAheadRow = { dates: string[]; label: string; detail: string };
+
+/**
+ * What she has set from `from` on (2 November 2026): days off, hours off,
+ * extra hours and online-only stretches. Consecutive whole days off read as
+ * one stretch, as does each online-only period; a day off lists no extra
+ * hours, since it has none to give. Rows are in date order.
+ */
+export function timeAhead(exceptions: AvailabilityException[], onlineOnly: OnlineOnlyPeriod[], from: string, interval: number): TimeAheadRow[] {
+  const off = daysOff(exceptions);
+  const ahead = (kind: AvailabilityException["kind"]) => [...new Set(exceptions
+    .filter((exception) => exception.kind === kind && exception.weekday == null && exception.date && exception.date >= from)
+    .map((exception) => exception.date as string))].sort();
+  const blocked = ahead("blocked");
+  const rows: { dates: string[]; hours: boolean; note: string }[] = [];
+  for (const date of blocked) {
+    const last = rows.at(-1);
+    if (off.has(date) && last && !last.hours && shiftDate(last.dates.at(-1)!, 1) === date) { last.dates.push(date); continue; }
+    rows.push({ dates: [date], hours: !off.has(date), note: off.get(date) ?? "" });
+  }
+  const stretch = (dates: string[]) => dates.length > 1 ? `${shortDateLabel(dates[0])} – ${shortDateLabel(dates.at(-1)!)}` : shortDateLabel(dates[0]);
+  return [
+    ...rows.map((row) => ({
+      dates: row.dates,
+      label: stretch(row.dates),
+      detail: [row.hours
+        ? `Off ${dateBlocks(exceptions, row.dates[0]).map(spanLabel).join(", ")}`
+        : row.dates.length > 1 ? `${row.dates.length} days off` : "Day off", row.note]
+        .filter((part, index, parts) => part && parts.findIndex((other) => other.toLowerCase() === part.toLowerCase()) === index).join(" · "),
+    })),
+    ...ahead("extra").filter((date) => !off.has(date)).map((date) => ({
+      dates: [date],
+      label: shortDateLabel(date),
+      detail: `Extra ${dateExtras(exceptions, date, interval).map(spanLabel).join(", ")}`,
+    })),
+    ...onlineOnly.filter((period) => period.toDate >= from).map((period) => {
+      const dates: string[] = [];
+      for (let date = period.fromDate < from ? from : period.fromDate; date <= period.toDate; date = shiftDate(date, 1)) dates.push(date);
+      const hours = onlineOnlyLabel([{ start: period.startMinute, end: period.endMinute }]);
+      return { dates, label: stretch(dates), detail: `${dates.length > 1 ? `${dates.length} days online only` : "Online only"}${hours === "All day" ? "" : `, ${hours}`}` };
+    }),
+  ].sort((a, b) => a.dates[0].localeCompare(b.dates[0]));
+}
+
 function localMinute(value: string) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: TUTOR_TIME_ZONE,
@@ -372,12 +560,14 @@ function localMinute(value: string) {
 
 /**
  * The calendar's view of the Worker's rows while a date's change is still
- * saving, with the same rules the Worker applies: a day off and the hours
- * blocked within it are replaced independently, weekly blocks never.
+ * saving, with the same rules the Worker applies: a day off, the hours
+ * blocked within it and its extra hours (kept as the starts they give) are
+ * replaced independently, weekly rows never.
  */
 export function withDayChanges(
   exceptions: AvailabilityException[],
-  changes: Map<string, { dayOff?: boolean; blocks?: Span[] }>,
+  changes: Map<string, { dayOff?: boolean; blocks?: Span[]; extra?: Span[] }>,
+  interval: number,
 ) {
   let rows = exceptions;
   for (const [date, change] of changes) {
@@ -393,6 +583,11 @@ export function withDayChanges(
         ...rows.filter((row) => !oneOff(row) || isWholeDayOff(row)),
         ...change.blocks.map((span) => oneOffRow(date, span.start, span.end)),
       ];
+    if (change.extra)
+      rows = [
+        ...rows.filter((row) => !(row.date === date && row.weekday == null && row.kind === "extra")),
+        ...change.extra.map((span) => oneOffRow(date, span.start, lastStartIn(span, interval), "extra")),
+      ];
   }
   return rows;
 }
@@ -401,12 +596,13 @@ function oneOffRow(
   date: string,
   start: number | null,
   end: number | null,
+  kind: AvailabilityException["kind"] = "blocked",
 ): AvailabilityException {
   return {
     id: 0,
     date,
     weekday: null,
-    kind: "blocked",
+    kind,
     note: "",
     start_minute: start,
     end_minute: end,
@@ -493,20 +689,23 @@ export const NEEDS_YOU_AHEAD_DAYS = 7;
 
 /**
  * One thing waiting on Inês (Phase 2, 14 October 2026). Every kind clears
- * itself, so there is nothing stored and nothing to dismiss.
+ * itself. The four that only tell her something (11 November 2026, Dan) can
+ * also be dismissed: their `dismiss` names what happened and when, so a
+ * second change to the same lesson is a new notice. Work still to do never
+ * has one.
  */
 export type NeedsYouItem =
   | { kind: "meet"; key: "meet"; reconnect: boolean }
   | { kind: "payment"; key: string; review: PaymentReview; part: "lesson" | "fee" | "refund" }
   | { kind: "lessons"; key: string; student: AdminStudent }
   | { kind: "welcome"; key: string; student: AdminStudent; at?: string | null }
-  | { kind: "changed"; key: string; booking: AdminBooking; count: number; first: boolean }
-  | { kind: "cancelled"; key: string; booking: AdminBooking; count: number }
-  | { kind: "first"; key: string; booking: AdminBooking }
+  | { kind: "changed"; key: string; dismiss: string; booking: AdminBooking; count: number; first: boolean }
+  | { kind: "cancelled"; key: string; dismiss: string; booking: AdminBooking; count: number }
+  | { kind: "first"; key: string; dismiss: string; booking: AdminBooking }
   /** A saved card was declined; clears once the student pays (16 October 2026: no longer emailed to her). */
   | { kind: "declined"; key: string; student: AdminStudent; payment: NonNullable<AdminStudent["cardDeclined"]>[number] }
   /** A student added a card in the last week; lists the lessons she added that it now pays for. */
-  | { kind: "card"; key: string; student: AdminStudent; added: NonNullable<AdminStudent["cardAdded"]> };
+  | { kind: "card"; key: string; dismiss: string; student: AdminStudent; added: NonNullable<AdminStudent["cardAdded"]> };
 
 /** Students she set up with no email hold this in place of one; nothing is ever shown or sent to it. */
 const NO_EMAIL_YET = "no-email:";
@@ -525,15 +724,16 @@ export type StudentNext = "invite" | "card" | "pay";
 /**
  * How far a student has got with the website (2 November 2026, Dan: "get
  * everyone logged in, pay for previous lessons and able to book their own
- * lessons"). Three checks, not six steps: signed in, a card for her lessons,
- * and nothing still open. Price, lessons and email are never steps; a card
- * and what is open only count where cards are taken and they pay something.
+ * lessons"). Three checks, not six steps: signed in, a card with her lessons
+ * to come on it, and nothing still open. Price, lessons and email are never
+ * steps; a card and what is open only count where cards are taken and they
+ * pay something.
  */
 export type StudentProgress = {
   signedIn: boolean;
-  /** Null when there is no card to ask for. */
+  /** A card saved with every lesson of hers to come on it. Null when there is no card to ask for. */
   card: boolean | null;
-  /** A card saved that her lessons are not on yet. */
+  /** A card saved, whether or not her lessons are on it yet. */
   cardSaved: boolean;
   /** Lessons she added that have begun and no card or tick has settled. */
   openLessons: number;
@@ -547,12 +747,15 @@ export type StudentProgress = {
 export function studentProgress(student: AdminStudent, cardsAccepted: boolean): StudentProgress {
   const cardAsked = cardsAccepted && !paysNothing(student);
   const signedIn = Boolean(student.signedIn);
-  // Already paying by card (9 November 2026, Dan: "don't have a button for
-  // ask for card if they are already paying? like roman"): a saved card and
-  // nothing she added still to be paid needs nothing more. A saved card with
-  // her lessons to come not on it still asks for them.
-  const cardSaved = Boolean(student.hasCard);
-  const card = cardAsked ? Boolean(student.cardForAllLessons || (cardSaved && !student.unpaidUpcoming)) : null;
+  // All set is "fully set up on the website just paying for their own
+  // lessons" (11 November 2026, Dan): a card saved, and every lesson to come
+  // that she added on it. Someone who books and pays for their own, with
+  // nothing of hers waiting, is there already (9 November 2026, Dan: "don't
+  // have a button for ask for card if they are already paying? like roman").
+  // Having agreed to the card for her lessons is not enough by itself: one
+  // still off the card keeps them out of All set until it is on it.
+  const cardSaved = Boolean(student.hasCard || student.cardForAllLessons);
+  const card = cardAsked ? cardSaved && !student.unpaidUpcoming : null;
   const openLessons = cardAsked ? student.unpaidPast ?? 0 : 0;
   const openCents = openLessons ? student.unpaidPastCents ?? 0 : 0;
   const invitedAt = student.invitedAt ?? null;
@@ -656,13 +859,15 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
  * A lesson appears once. `lessons` are her confirmed lessons from yesterday
  * on; `cancellations` the cancelled rows, which the timetable drops.
  */
-export function needsYou({ now, meet, payments, students, lessons, cancellations }: {
+export function needsYou({ now, meet, payments, students, lessons, cancellations, dismissed }: {
   now: Date;
   meet: GoogleMeetConnection | null;
   payments: PaymentReview[];
   students: AdminStudent[];
   lessons: AdminBooking[];
   cancellations: AdminBooking[];
+  /** Dismiss keys she has dismissed, on any of her devices. */
+  dismissed?: ReadonlySet<string>;
 }): NeedsYouItem[] {
   const at = now.getTime();
   const recent = (stamp?: string | null) => {
@@ -708,7 +913,7 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
     if (!hasLessons(student))
       timed.push({ time, changed: 0, item: { kind: "lessons", key: `lessons:${student.id}`, student } });
     if (student.cardAdded && student.hasCard)
-      timed.push({ time, changed: Date.parse(student.cardAdded.at) || 0, item: { kind: "card", key: `card:${student.id}`, student, added: student.cardAdded } });
+      timed.push({ time, changed: Date.parse(student.cardAdded.at) || 0, item: { kind: "card", key: `card:${student.id}`, dismiss: `card:${student.id}:${Date.parse(student.cardAdded.at) || 0}`, student, added: student.cardAdded } });
   }
 
   const confirmed = lessons.filter((row) => row.status === "confirmed" && real(row));
@@ -717,7 +922,7 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
   for (const group of grouped(changedRows, (row) => row.series_id ? `${row.series_id}|${row.student_changed_at}` : row.id)) {
     const [booking] = group;
     for (const row of group) shown.add(row.id);
-    timed.push({ time: Date.parse(booking.starts_at), changed: Date.parse(booking.student_changed_at!), item: { kind: "changed", key: `changed:${booking.id}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
+    timed.push({ time: Date.parse(booking.starts_at), changed: Date.parse(booking.student_changed_at!), item: { kind: "changed", key: `changed:${booking.id}`, dismiss: `changed:${booking.id}:${Date.parse(booking.student_changed_at!)}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
   }
   // Booked again since (10 November 2026): their confirmed lesson at that start settles it.
   const bookedAgain = (row: AdminBooking) => lessons.some((other) => other.status === "confirmed" &&
@@ -725,13 +930,15 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
   const cancelledRows = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at) && ahead(row.starts_at) && !bookedAgain(row));
   for (const group of grouped(cancelledRows, (row) => row.series_id || row.id)) {
     const [booking] = group;
-    timed.push({ time: Date.parse(booking.starts_at), changed: Math.max(...group.map(row => Date.parse(row.cancelled_at!))), item: { kind: "cancelled", key: `cancelled:${booking.id}`, booking, count: group.length } });
+    const latest = Math.max(...group.map(row => Date.parse(row.cancelled_at!)));
+    timed.push({ time: Date.parse(booking.starts_at), changed: latest, item: { kind: "cancelled", key: `cancelled:${booking.id}`, dismiss: `cancelled:${booking.id}:${latest}`, booking, count: group.length } });
   }
   for (const booking of confirmed) {
     if (booking.first_lesson && !booking.added_by_teacher && soon(booking.starts_at) && !shown.has(booking.id))
-      timed.push({ time: Date.parse(booking.starts_at), changed: 0, item: { kind: "first", key: `first:${booking.id}`, booking } });
+      timed.push({ time: Date.parse(booking.starts_at), changed: 0, item: { kind: "first", key: `first:${booking.id}`, dismiss: `first:${booking.id}:${Date.parse(booking.starts_at)}`, booking } });
   }
 
   const name = (item: NeedsYouItem) => "student" in item ? item.student.name : "booking" in item ? item.booking.student_name : "";
-  return [...first, ...timed.sort((a, b) => b.changed - a.changed || a.time - b.time || name(a.item).localeCompare(name(b.item))).map((entry) => entry.item)];
+  return [...first, ...timed.sort((a, b) => b.changed - a.changed || a.time - b.time || name(a.item).localeCompare(name(b.item))).map((entry) => entry.item)]
+    .filter((item) => !("dismiss" in item && dismissed?.has(item.dismiss)));
 }

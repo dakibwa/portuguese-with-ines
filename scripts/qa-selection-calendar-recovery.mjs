@@ -1,16 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
 import { chromium, firefox, webkit, expect } from "@playwright/test";
 
 // All account changes and booking replies are isolated. These tests never
 // create accounts, send emails, change real lessons or contact payment providers.
 const base = (process.env.QA_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+// Chromium in a release; another browser by hand, when a fault is that browser's.
 const engine = process.env.QA_BROWSER ?? "chromium";
 const browserType = { chromium, firefox, webkit }[engine];
 if (!browserType) throw new Error(`Unknown QA_BROWSER: ${engine}`);
 const browser = await browserType.launch({ headless: true });
-const output = `tmp/qa/selection-calendar-recovery/${engine}`;
-await mkdir(output, { recursive: true });
 const student = { id: "continuity", name: "Ana Martins", email: "ana@example.invalid", nif: "", phone: "", timezone: "Europe/Lisbon", role: "student" };
 const types = [
   { id: "trial", name: "Trial lesson", duration_minutes: 60, price_cents: 2000 },
@@ -92,11 +90,7 @@ async function check(state) {
       return rect.width > 0 && (rect.left < -1 || rect.right > innerWidth + 1);
     }).slice(-20).map(element => ({ tag: element.tagName, className: element.className, text: element.textContent?.slice(0, 120) }))
   }));
-  if (layout.scrollWidth > layout.width + 1) {
-    await state.page.screenshot({ path: `${output}/overflow-${layout.width}.png`, fullPage: true });
-    console.log(JSON.stringify(layout));
-  }
-  assert.equal(layout.scrollWidth <= layout.width + 1, true);
+  assert.equal(layout.scrollWidth <= layout.width + 1, true, JSON.stringify(layout));
 }
 
 function bookingDefaults(path) {
@@ -108,7 +102,6 @@ function bookingDefaults(path) {
 const unreadable = "We couldn’t read the booking system’s reply. Please try again.";
 const teacher = { ...student, id: "teacher", name: "Inês", role: "teacher" };
 const rules = [{ id: 1, weekday: 1, start_minute: 600, last_start_minute: 720 }];
-const adminLesson = { id: "lesson", reference: "PT-ACDEFG", status: "confirmed", starts_at: lesson.startAt, ends_at: lesson.endAt, lesson_name: "60 minutes", student_name: student.name, student_email: student.email, student_phone: "", location: "online", notes: "", payment_status: "scheduled", attendance_status: "expected", same_day_change: 0, same_day_fee_status: "not_required", reschedule_count: 0 };
 
 function teacherDefaults(path) {
   if (path === "/me") return { json: { student: teacher, bookings: [], series: [] } };
@@ -117,11 +110,10 @@ function teacherDefaults(path) {
   return null;
 }
 const slot = (page, day, minute) => page.locator(`[data-slot-day="${day}"][data-slot-minute="${minute}"]`);
-// A free time offers a choice; time off is one of its options. A time
-// already off reopens straight away.
+// A free time offers a choice at it; time off is one of its options.
 async function takeOff(page, cell) {
   await cell.click();
-  await page.getByRole("menu").getByRole("menuitem", { name: "Take this time off", exact: true }).click();
+  await page.locator(".teacher-slot-menu").getByRole("button", { name: "Time off", exact: true }).click();
 }
 async function monday(page) {
   await page.goto(`${base}/schedule/`);
@@ -190,7 +182,8 @@ async function confirm(page) {
 
 let cases = 0;
 try {
-  for (const width of [390]) {
+  {
+    const width = 390;
     // A spring gap has no UTC instant for the intended time. Legacy skipped
     // values still identify the correct date; neither their shifted time nor
     // a normal skipped week's time should be invented in the date list.
@@ -213,22 +206,21 @@ try {
         await expect(warning).toContainText("One week is already taken");
         await expect(warning.locator("li [aria-hidden=true]")).toHaveText(skipped.label);
         await expect(warning).not.toContainText(/01:30|02:30/);
-        if (width !== 390) await warning.screenshot({ path: `${output}/weekly-skipped-${skipped.startAt.slice(0, 10)}-${width}.png` });
         await check(state); cases += 1;
       } finally { await state.context.close(); }
     }
-    if (process.env.QA_WEEKLY_SKIP_ONLY === "1") continue;
 
     // A failed older save cannot discard the latest complete date choice.
-    for (const failure of ["server", "network", "malformed"]) {
+    // That a refused, lost or unreadable save each fails alike is proven in
+    // scripts/test-reply-validation.mjs; the queue is proven here once.
+    {
       const started = deferred(), waiting = deferred(), writes = [];
       const state = await fixture(width, async (path, request) => {
         if (path === "/admin/exceptions/day") {
           const body = request.postDataJSON(); writes.push(body);
           if (writes.length === 1) {
             started.resolve(); await waiting.promise;
-            if (failure === "network") return { abort: true };
-            return failure === "malformed" ? { json: {} } : { status: 503, json: { error: "First save interrupted." } };
+            return { json: {} };
           }
           return { json: { ok: true, exceptions: exceptions(body) } };
         }
@@ -239,15 +231,13 @@ try {
         await monday(page);
         await takeOff(page, slot(page, 1, 600)); await started.promise;
         await takeOff(page, slot(page, 1, 630));
-        if (failure === "malformed") {
-          await page.getByRole("switch", { name: "Day off, Monday 5 October", exact: true }).click();
-          await page.getByRole("switch", { name: "Day off, Monday 5 October", exact: true }).click();
-        }
+        await page.getByRole("switch", { name: "Day off, Monday 5 October", exact: true }).click();
+        await page.getByRole("switch", { name: "Day off, Monday 5 October", exact: true }).click();
         waiting.resolve();
         await expect.poll(() => writes.length).toBe(2);
         await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "true");
         await expect(slot(page, 1, 630)).toHaveAttribute("aria-pressed", "true");
-        assert.deepEqual(writes[1], { date: "2026-10-05", ...(failure === "malformed" ? { dayOff: false } : {}), blocks: [{ startMinute: 600, endMinute: 660 }] });
+        assert.deepEqual(writes[1], { date: "2026-10-05", dayOff: false, blocks: [{ startMinute: 600, endMinute: 660 }] });
         await expect(page.locator(".teacher-week .teacher-save-state")).not.toHaveClass(/is-error/);
         await check(state); cases += 1;
       } finally { waiting.resolve(); await state.context.close(); }
@@ -255,10 +245,11 @@ try {
 
     // Rejected save contracts leave the saved calendar intact, without a
     // crash or false success. A new click can retry an idempotent date update.
-    for (const answer of [{}, { ok: true, exceptions: "broken" }, { ok: true, exceptions: [null] }]) {
+    // Each unreadable shape is refused in scripts/test-reply-validation.mjs.
+    {
       let writes = 0;
       const state = await fixture(width, async (path, request) => {
-        if (path === "/admin/exceptions/day") return ++writes === 1 ? { json: answer } : { json: { ok: true, exceptions: exceptions(request.postDataJSON()) } };
+        if (path === "/admin/exceptions/day") return ++writes === 1 ? { json: {} } : { json: { ok: true, exceptions: exceptions(request.postDataJSON()) } };
         return teacherDefaults(path);
       });
       try {
@@ -267,17 +258,16 @@ try {
         await expect(page.locator(".teacher-week .teacher-save-state")).toContainText(unreadable);
         await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "false");
         await check(state);
-        if (width !== 390 && Object.keys(answer).length === 0) await page.screenshot({ path: `${output}/time-off-error-${width}.png`, fullPage: true });
         await takeOff(page, slot(page, 1, 600));
         await expect(page.locator(".teacher-week .teacher-save-state")).not.toHaveClass(/is-error/);
         await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "true");
         await check(state); assert.equal(writes, 2); cases += 1;
       } finally { await state.context.close(); }
     }
-    for (const answer of [{}, { ok: true, count: "not-a-count" }]) {
+    {
       let writes = 0;
       const state = await fixture(width, async (path, request) => {
-        if (path === "/admin/availability" && request.method() === "POST") return ++writes === 1 ? { json: answer } : { json: { ok: true, count: request.postDataJSON().rules.length } };
+        if (path === "/admin/availability" && request.method() === "POST") return ++writes === 1 ? { json: {} } : { json: { ok: true, count: request.postDataJSON().rules.length } };
         return teacherDefaults(path);
       });
       try {
@@ -348,7 +338,6 @@ try {
         await check(state); assert.equal(posts.length, 0);
         if (mode === "forward" || mode === "buffer") {
           await expect(page.locator(".booking-confirm-button")).toHaveCount(0);
-          if (mode === "forward" && width !== 390) await page.screenshot({ path: `${output}/length-conflict-${width}.png`, fullPage: true });
           await page.getByRole("button", { name: "Back to your selection", exact: true }).click();
         }
         await expect(page.locator(".booking-confirm-button")).toHaveText(mode === "chain" ? "Book 2 lessons & agree to pay" : "Book lesson & agree to pay");
@@ -495,7 +484,6 @@ try {
         assert.equal(posts[0].lessonType, "single"); assert.equal(posts[0].location, "online");
         assert.equal(posts[0].expectedPriceCents, 2500); assert.equal(posts[0].repeat, weekly ? 4 : undefined);
         await check(state);
-        if (!weekly && width !== 390) await page.screenshot({ path: `${output}/checkout-choices-${width}.png`, fullPage: true });
         cases += 1;
       } finally { waiting.resolve(); await state.context.close(); }
     }
@@ -559,28 +547,24 @@ try {
 
     // Mutation replies are validated before creating a confirmation or
     // replacing a managed lesson. Preserve the view; do not repeat a write.
-    for (const mode of ["create-date", "create-series", "create-selection", "cancel", "move", "move-series"]) {
+    // Every reply shape is refused in scripts/test-reply-validation.mjs; here
+    // one booking, one cancellation and one weekly move, each with a screen
+    // of its own, show the view kept, nothing reported done and no second write.
+    for (const mode of ["create-date", "cancel", "move-series"]) {
       let writes = 0;
       const weekly = { id: "weekly", weekday: 1, minuteOfDay: 660, occurrences: 4, openEnded: false, upcoming: 1 };
       const current = { ...lesson, ...(mode === "move-series" ? { seriesId: "weekly" } : {}) };
       const state = await fixture(width, async (path, request) => {
         if (path === "/me" && mode === "move-series") return { json: { student, bookings: [current], series: [weekly] } };
         if (path === "/bookings/fixture") return { json: { booking: current, isPast: false, sameDayFeeApplies: false, recurring: mode === "move-series" } };
-        if (path === "/bookings" && request.method() === "POST") {
-          writes += 1;
-          return { json: {
-            booking: mode === "create-date" ? { ...lesson, startAt: "not-a-date" } : lesson,
-            ...(mode === "create-series" ? { series: { id: "weekly", weeks: 4, openEnded: false, booked: [lesson.startAt], skipped: [null] } } : {}),
-            ...(mode === "create-selection" ? { selection: { booked: null, skipped: [], recurring: false, weeks: null, weeklyTimes: 0 } } : {})
-          } };
-        }
-        if (path === "/bookings/fixture/cancel" || path === "/bookings/fixture/reschedule") { writes += 1; return { json: { booking: { ...lesson, lessonType: null }, sameDayFeeApplied: false } }; }
+        if (path === "/bookings" && request.method() === "POST") { writes += 1; return { json: { booking: { ...lesson, startAt: "not-a-date" } } }; }
+        if (path === "/bookings/fixture/cancel") { writes += 1; return { json: { booking: { ...lesson, lessonType: null }, sameDayFeeApplied: false } }; }
         if (path === "/series/weekly/reschedule") { writes += 1; return { json: { ok: true, moved: 1, bookings: [null], kept: [] } }; }
         return bookingDefaults(path);
       });
       try {
         const { page } = state;
-        if (mode.startsWith("create-")) {
+        if (mode === "create-date") {
           await startChoices(page, [at(9)]);
           await page.getByRole("button", { name: "Agree to terms & privacy", exact: true }).click();
           await page.locator(".booking-confirm-button").click();
@@ -592,17 +576,15 @@ try {
           if (mode === "cancel") {
             await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
             await dialog.getByRole("button", { name: "Yes, cancel it", exact: true }).click();
+            await expect(dialog.locator(".lesson-manage-dialog__lesson")).toContainText("Monday, 5 October 2026, 11:00");
           } else {
-            if (mode === "move-series") {
-              await dialog.getByRole("button", { name: "Manage weekly lessons", exact: true }).click();
-              await dialog.getByRole("button", { name: "Move weekly time", exact: true }).click();
-            } else await dialog.getByRole("button", { name: "Change", exact: true }).click();
+            await dialog.getByRole("button", { name: "Change", exact: true }).click();
+            await dialog.getByRole("radio", { name: "Every week", exact: true }).check();
             await choose(page, at(9));
-            await dialog.getByRole("button", { name: mode === "move-series" ? "Move weekly time" : "Change to 10:00", exact: true }).click();
+            await dialog.getByRole("button", { name: "Change every week", exact: true }).click();
+            // The change form names the lesson as it stands in its short form.
+            await expect(dialog.locator(".managed-lesson__current-time")).toContainText("Mondays at 11:00");
           }
-          // The change form names the lesson as it stands in its short form.
-          if (mode === "cancel") await expect(dialog.locator(".lesson-manage-dialog__lesson")).toContainText("Monday, 5 October 2026, 11:00");
-          else await expect(dialog.locator(".managed-lesson__current-time")).toContainText("Mon 5 Oct, 11:00");
           await expect(dialog.getByRole("heading", { name: "All sorted", exact: true })).toHaveCount(0);
         }
         await expect(page.getByRole("alert").filter({ hasText: unreadable })).toBeVisible();
@@ -611,27 +593,24 @@ try {
     }
 
     // Bad rows inside otherwise well-formed containers used to crash a whole
-    // page or invent skipped dates. Recovery retains the active account.
-    for (const malformed of ["account-booking", "account-date", "account-series", "account-nif", "teacher-exception", "teacher-note", "teacher-rule", "teacher-booking", "teacher-name", "teacher-reconciliation", "managed", "preview-skipped", "preview-missing"]) {
+    // page or invent skipped dates. Each bad row is refused in
+    // scripts/test-reply-validation.mjs; here a student's account and Inês's
+    // hours show the alert, keep the account and retry, and a weekly preview
+    // says it could not check rather than inventing a date.
+    for (const malformed of ["account-booking", "teacher-exception", "preview-skipped"]) {
       let recovered = false;
       const state = await fixture(width, async (path, request) => {
         if (!recovered) {
-          if (path === "/me" && malformed.startsWith("account-")) return { json: { student: malformed === "account-nif" ? { ...student, nif: 123456789 } : student, bookings: malformed === "account-booking" ? [null] : malformed === "account-date" ? [{ ...lesson, startAt: "not-a-date" }] : [lesson], series: malformed === "account-series" ? [null] : [] } };
+          if (path === "/me" && malformed === "account-booking") return { json: { student, bookings: [null], series: [] } };
           if (path === "/admin/availability" && malformed === "teacher-exception") return { json: { rules, exceptions: [null] } };
-          if (path === "/admin/availability" && malformed === "teacher-note") return { json: { rules, exceptions: [{ id: 1, date: null, kind: "blocked", weekday: 1, start_minute: 600, end_minute: 630, note: { value: "Malformed lunch label" } }] } };
-          if (path === "/admin/availability" && malformed === "teacher-rule") return { json: { rules: [{ ...rules[0], weekday: 8 }], exceptions: [] } };
-          if (path === "/admin/bookings" && malformed === "teacher-booking") return { json: { bookings: [{ ...adminLesson, starts_at: "not-a-date" }] } };
-          if (path === "/admin/bookings" && malformed === "teacher-name") return { json: { bookings: [{ ...adminLesson, student_name: { value: "Malformed name" } }] } };
-          if (path === "/admin/bookings" && malformed === "teacher-reconciliation") return { json: { bookings: [], manualPaymentReconciliation: [null] } };
-          if (path === "/bookings/fixture" && malformed === "managed") return { json: { booking: { ...lesson, endAt: "not-a-date" }, isPast: false, sameDayFeeApplies: false } };
-          if (path === "/bookings/series/preview") return { json: { bookable: malformed === "preview-missing" ? null : [request.postDataJSON().startAt], skipped: malformed === "preview-skipped" ? [null] : [] } };
+          if (path === "/bookings/series/preview") return { json: { bookable: [request.postDataJSON().startAt], skipped: [null] } };
         }
         if (path === "/bookings/series/preview") return { json: { bookable: [request.postDataJSON().startAt], skipped: [] } };
         return malformed.startsWith("teacher-") ? teacherDefaults(path) : bookingDefaults(path);
       });
       try {
         const { page } = state;
-        if (malformed.startsWith("preview-")) {
+        if (malformed === "preview-skipped") {
           await startChoices(page, [at(9)]);
           await selectRadio(page, "Weekly");
           await expect(page.getByRole("status").filter({ hasText: "We couldn’t check the later weeks just now." })).toBeVisible();
@@ -640,7 +619,7 @@ try {
           await selectRadio(page, "6 weeks");
           await expect(page.getByRole("region", { name: "Weekly lesson availability", exact: true })).toHaveCount(0);
         } else {
-          await page.goto(`${base}${malformed.startsWith("teacher-") ? "/schedule/" : malformed === "managed" ? "/book/?manage=fixture" : "/book/?view=lessons"}`);
+          await page.goto(`${base}${malformed.startsWith("teacher-") ? "/schedule/" : "/book/?view=lessons"}`);
           const warning = page.getByRole("alert").filter({ hasText: malformed.startsWith("account-") ? "account just now" : unreadable });
           await expect(warning).toBeVisible();
           await check(state);
@@ -649,10 +628,6 @@ try {
           if (malformed.startsWith("teacher-")) {
             await page.getByRole("button", { name: "Try again", exact: true }).click();
             await expect(page.getByRole("button", { name: "Edit weekly hours", exact: true })).toBeVisible();
-          } else if (malformed === "managed") {
-            await page.getByRole("button", { name: "Close lesson management", exact: true }).click();
-            await check(state); await page.goto(`${base}/book/?manage=fixture`);
-            await expect(page.getByRole("dialog").getByRole("button", { name: "Change", exact: true })).toBeVisible();
           } else {
             await warning.getByRole("button", { name: "Try again", exact: true }).click();
             await expect(page.locator("#account-menu-button")).toBeAttached();
@@ -662,7 +637,6 @@ try {
         await check(state); cases += 1;
       } finally { await state.context.close(); }
     }
-    console.log(`${engine} selection and teacher recovery passed at ${width}px.`);
   }
-  console.log(`${cases} isolated selection and teacher recovery cases passed in ${engine}.`);
+  console.log(`${cases} isolated selection and teacher recovery cases passed in ${engine} at 390px.`);
 } finally { await browser.close(); }

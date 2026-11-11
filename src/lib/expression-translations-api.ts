@@ -32,26 +32,47 @@ export async function fetchTranslations(expressionId: string): Promise<Expressio
   return data.translations;
 }
 
-const loaded = new Map<string, Promise<ExpressionTranslation[]>>();
+const CACHE_MS = 60_000;
+const CHANGED = "ines:expression-translations-changed";
+const loaded = new Map<string, { request: Promise<ExpressionTranslation[]>; expiresAt: number }>();
 const ready = new Map<string, ExpressionTranslation[]>();
 
+/** A moderation or publishing change retires both the preview and any old request. */
+export function forgetTranslations(expressionId: string) {
+  loaded.delete(expressionId);
+  ready.delete(expressionId);
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(CHANGED, { detail: expressionId }));
+}
+
+export function subscribeToTranslations(expressionId: string, changed: () => void) {
+  const listener = (event: Event) => { if ((event as CustomEvent<string>).detail === expressionId) changed(); };
+  window.addEventListener(CHANGED, listener);
+  return () => window.removeEventListener(CHANGED, listener);
+}
+
 /**
- * Starts loading an expression's approved versions once, while it paints, so
+ * Starts loading an expression's approved versions while it paints, so
  * its reading opens with them in place. A failure is forgotten, so opening the
- * reading asks again.
+ * reading asks again. A later reading checks again after a minute.
  */
 export function prefetchTranslations(expressionId: string) {
-  let pending = loaded.get(expressionId);
-  if (!pending) {
-    pending = fetchTranslations(expressionId);
-    loaded.set(expressionId, pending);
-    pending.then((rows) => { ready.set(expressionId, rows); }, () => { loaded.delete(expressionId); });
-  }
-  return pending;
+  const cached = loaded.get(expressionId);
+  if (cached && cached.expiresAt > Date.now()) return cached.request;
+  ready.delete(expressionId);
+  const request = fetchTranslations(expressionId);
+  const entry = { request, expiresAt: Date.now() + CACHE_MS };
+  loaded.set(expressionId, entry);
+  request.then((rows) => {
+    if (loaded.get(expressionId) === entry) ready.set(expressionId, rows);
+  }, () => {
+    if (loaded.get(expressionId) === entry) loaded.delete(expressionId);
+  });
+  return request;
 }
 
 /** The versions already loaded for this expression, if any. */
-export const loadedTranslations = (expressionId: string) => ready.get(expressionId) ?? null;
+export const loadedTranslations = (expressionId: string) =>
+  (loaded.get(expressionId)?.expiresAt ?? 0) > Date.now() ? ready.get(expressionId) ?? null : null;
 
 /** A student's own translation, which waits for Inês before anyone sees it. */
 export async function sendTranslation(token: string, expressionId: string, input: { language: string; text: string }) {

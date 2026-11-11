@@ -26,6 +26,7 @@ try {
     const context = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: width < 600, reducedMotion: "reduce" });
     await context.addInitScript(() => localStorage.setItem("ines-student-session", "isolated-translation-session"));
     let viewer = student;
+    let collection = [expression];
     const translations = [];
     await context.route("**/*", async route => {
       const request = route.request();
@@ -54,7 +55,7 @@ try {
         translations.push({ id: translations.length + 1, ...body, status: "pending", createdAt: new Date().toISOString() });
         return json({ status: "pending" }, 201);
       }
-      if (path === "/admin/expressions") return json({ expressions: [expression], openToStudents: true, pendingTranslations: pending().length });
+      if (path === "/admin/expressions") return json({ expressions: collection, openToStudents: true, pendingTranslations: pending().length });
       if (path === "/admin/expression-translations") {
         const status = url.searchParams.get("status") ?? "pending";
         return json({ pendingCount: pending().length, translations: translations.filter(row => row.status === status).map(row => ({
@@ -107,11 +108,17 @@ try {
     const item = review.locator(".teacher-translation");
     await expect(item).toContainText("To laugh your head off");
     await expect(item).toContainText("From Ana");
+    // Her preview already has the empty list cached when she approves one.
+    await page.getByRole("button", { name: "Paint it", exact: true }).click();
+    await page.getByRole("button", { name: "Show meaning", exact: true }).click();
+    const preview = page.locator(".student-expressions .expression-translations");
+    await expect(preview).toContainText("None yet.");
     await review.screenshot({ path: `${output}/teacher-review-${width}.png` });
     await item.getByRole("button", { name: /^Approve/ }).click();
-    await expect(review.getByRole("status")).toContainText("Approved.");
+    await expect(review.getByRole("status").filter({ hasText: "Approved." })).toContainText("Approved.");
     await expect(review.locator(".teacher-translations__count")).toHaveCount(0);
     await expect(review).toContainText("Nothing to check just now.");
+    await expect(preview).toContainText("To laugh your head off");
 
     // Back as the student, it now shows, without any name.
     viewer = student;
@@ -121,8 +128,64 @@ try {
     await expect(panel.locator(".expression-translations__list")).not.toContainText("Ana");
     await expect(panel.locator(".expression-translations__list .expression-card__value")).toHaveAttribute("lang", "en");
     await panel.screenshot({ path: `${output}/student-approved-${width}.png` });
+
+    // Filtering, adding, changing tabs or opening another card must not silently
+    // throw away an expression she is still writing.
+    viewer = teacher;
+    collection = [expression, { ...expression, id: "original-2", expression: "Meter os pés pelas mãos" }];
+    await page.goto(`${base}/schedule/?tab=expressions`);
+    const first = page.locator('[data-expression-id="original-1"]');
+    await first.getByRole("button", { name: "Edit", exact: true }).click();
+    const draftTitle = "Partir o coco a rir, com amigos";
+    await first.getByRole("textbox", { name: "Expression", exact: true }).fill(draftTitle);
+    const search = page.getByRole("searchbox", { name: "Search", exact: true });
+    if (await search.isEnabled()) {
+      await search.fill("no expression matches this");
+      await search.fill("");
+    }
+    await expect(first.getByRole("textbox", { name: "Expression", exact: true })).toHaveValue(draftTitle);
+    const otherPencil = page.locator('[data-expression-id="original-2"]').getByRole("button", { name: "Edit", exact: true });
+    if (await otherPencil.isEnabled()) await otherPencil.click();
+    await expect(first.getByRole("textbox", { name: "Expression", exact: true })).toHaveValue(draftTitle);
+    const add = page.getByRole("button", { name: "Add an expression", exact: true });
+    if (await add.isEnabled()) await add.click();
+    await expect(first.getByRole("textbox", { name: "Expression", exact: true })).toHaveValue(draftTitle);
+    await page.getByRole("tab", { name: "Timetable", exact: true }).click();
+    await page.getByRole("tab", { name: "Expressions", exact: true }).click();
+    await expect(first.getByRole("textbox", { name: "Expression", exact: true })).toHaveValue(draftTitle);
+    await first.screenshot({ path: `${output}/teacher-draft-${width}.png` });
+    await first.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(first).toContainText("Discard your changes?");
+    await first.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(first.getByRole("textbox", { name: "Expression", exact: true })).toHaveValue(draftTitle);
+    const leaving = page.waitForEvent("dialog", { timeout: 5000 });
+    const reload = page.reload({ timeout: 3000 }).catch(() => null);
+    const warning = await leaving;
+    assert.equal(warning.type(), "beforeunload");
+    await warning.dismiss();
+    await reload;
+    await expect(first.getByRole("textbox", { name: "Expression", exact: true })).toHaveValue(draftTitle);
+    await page.getByRole("link", { name: "View page", exact: true }).click();
+    await expect(first).toContainText("Discard your changes?", { timeout: 2000 });
+    await first.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(first.getByRole("textbox", { name: "Expression", exact: true })).toHaveValue(draftTitle);
+    await page.getByRole("tab", { name: "Timetable", exact: true }).click();
+    await page.locator(".site-header__brand").click();
+    await expect(page.getByRole("tab", { name: "Expressions", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(first.getByRole("button", { name: "Discard", exact: true })).toBeFocused();
+    await first.getByRole("button", { name: "Cancel", exact: true }).click();
+    await first.getByRole("button", { name: "Cancel", exact: true }).click();
+    await first.getByRole("button", { name: "Discard", exact: true }).click();
+    await expect(first.getByRole("button", { name: "Edit", exact: true })).toBeEnabled();
+    await expect(add).toBeEnabled();
+    await first.getByRole("button", { name: "Edit", exact: true }).click();
+    await first.getByRole("textbox", { name: "Expression", exact: true }).fill(draftTitle);
+    await page.getByRole("link", { name: "View page", exact: true }).click();
+    await first.getByRole("button", { name: "Discard", exact: true }).click();
+    await page.waitForURL("**/idioms/");
+    await expect(page.getByRole("button", { name: "Paint it", exact: true })).toBeVisible();
     assert.deepEqual(errors, []);
     await context.close();
   }
-  console.log("Expression translations passed: a student opens the meaning on the second press, sends their own version from Noutras línguas, Inês sees the waiting count and approves it, and it then shows without a name; desktop and phone.");
+  console.log("Expressions passed: translation approvals update the open preview; filters, tabs, other cards, reloads and navigation preserve drafts until she discards them; desktop and phone.");
 } finally { await browser.close(); }
