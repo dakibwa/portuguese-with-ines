@@ -95,11 +95,24 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+
+      # What was installed last time is put back while the lockfile is
+      # unchanged, here and in every job below. Installing afresh took 9
+      # seconds in one release and 44 to 60 in the next three (11 November
+      # 2026), and a release pays for it twice on its way to publishing: in
+      # this job, then in the journeys. A changed lockfile installs afresh,
+      # as does a change to the script the install runs afterwards.
+      - name: Restore installed dependencies
+        if: vars.DEPLOY_WORKER == 'true'
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json', 'scripts/harden-braces.mjs') }}
 
       - name: Install dependencies
-        if: vars.DEPLOY_WORKER == 'true'
-        run: npm ci
+        if: vars.DEPLOY_WORKER == 'true' && steps.modules.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
 
       - name: Run booking tests
         if: vars.DEPLOY_WORKER == 'true'
@@ -125,10 +138,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+
+      - name: Restore installed dependencies
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json', 'scripts/harden-braces.mjs') }}
 
       - name: Install dependencies
-        run: npm ci
+        if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
 
       # The worker job runs the booking tests when it deploys; without it, run them here.
       - name: Run fast check
@@ -146,10 +166,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+
+      - name: Restore installed dependencies
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json', 'scripts/harden-braces.mjs') }}
 
       - name: Install dependencies
-        run: npm ci
+        if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
 
       - name: Build the site
         run: npm run build
@@ -220,10 +247,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+
+      - name: Restore installed dependencies
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json', 'scripts/harden-braces.mjs') }}
 
       - name: Install dependencies
-        run: npm ci
+        if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
 
       # Kept between releases, so most only confirm the browser is there.
       - name: Cache the Playwright browser

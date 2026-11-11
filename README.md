@@ -412,7 +412,10 @@ Worker's tests and its deploy, the build, and the types, lint and unit tests.
 Once the Worker is live, its health is checked and the customer journeys run
 against the build, shared between four machines. The site publishes only when
 all of it has passed. Each run's summary page lists how long every journey
-took, which is where to look when a release slows down.
+took, which is where to look when a release slows down. Installed
+dependencies and the test browser are kept between releases while the
+lockfile is unchanged, because installing afresh took anything from nine
+seconds to a minute.
 
 **Pull requests get a static website preview.** `.github/workflows/preview.yml`
 builds pull requests to `main` from branches in this repository and publishes
