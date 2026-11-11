@@ -1021,7 +1021,7 @@ async function notifySeriesCancelled(env, { rows, kept = [], lessonType, setting
     const teacherCopy = lessonCancelledTeacher({ tutor: tutorOf(env),
       byTeacher, held, message: cancellationMessage,
       student: { name: first.student_name, email: shownEmail(first.student_email), nif: await studentNif(env, first.student_id) },
-      run: { count, dates: datesOn(homeZone()), kept: keptLessons(kept, homeZone()) }
+      run: { count, zone: zoneName(homeZone()), dates: datesOn(homeZone()), kept: keptLessons(kept, homeZone()) }
     });
     sends.push(
       deliver(env, {

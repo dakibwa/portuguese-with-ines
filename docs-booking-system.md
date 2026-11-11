@@ -1555,10 +1555,17 @@ different students were confirmed into the same lesson in testing.
   explicit colour so a client that inverts backgrounds cannot leave it unreadable.
 - Customer emails use short introductions and one action button. HTML keeps
   the complete action link in that button; the plain-text alternative includes
-  the URL. The price row carries payment timing and the footer keeps the
-  applicable cancellation/no-show rules without repeating payment timing, or
-  a fee or refund the note above it already states (a late move on a saved
-  card ends `This fee applies once per lesson.`). A cancellation names its
+  the URL. A lesson's facts are bullets (11 November 2026): its place,
+  length and amount on one line (`Online · 60 minutes · €25`), how it is paid
+  on the next (the `priceValue` terms), the Meet link as its own. The footer
+  keeps the applicable change rule in the site's words (FeeFacts) without
+  repeating payment timing, or a fee or refund the note above it already
+  states (a late move on a saved card ends `This fee applies once per
+  lesson.`). Receipts and declined-card emails state the amount once, in the
+  introduction and on the button; Inês's copies of a move show what changed
+  under `Before`. Her payment-received emails keep their subject, heading,
+  preheader, Portal das Finanças note and `Lesson`, `Reference` and `NIF`
+  rows exactly, because her records read them. A cancellation names its
   place rather than linking its call, and an automatic notice ends `Sent
   automatically by the booking system.` above the site's link.
   Amounts are written as the site writes them: whole euros bare (€25), anything

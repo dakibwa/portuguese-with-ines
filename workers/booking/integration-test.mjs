@@ -2698,7 +2698,7 @@ await test("emails keep an agreed rate's cents instead of rounding to whole euro
     delete env.RESEND_API_KEY;
   }
   const email = sentEmails.find((sent) => sent.to[0] === "cents-rate@example.invalid");
-  assert.match(email.text, /^Price: €22\.50 a lesson · charged to your saved card at the end of each lesson$/m);
+  assert.match(email.text, /^Online · 60 minutes · €22\.50 a lesson\nCharged to your saved card at the end of each lesson$/m);
 });
 
 await test("moving a recurrence leaves a lesson inside 14 hours where it is and moves the rest together", async () => {
@@ -3015,7 +3015,7 @@ await test("the day-before reminder goes once per lesson version, on its own clo
     assert.equal(meetMore.length, 0, "once");
     assert.equal(meet.subject, "Your lesson is coming up — Tue 3 Nov, 09:00");
     for (const part of ["09:00 · Los Angeles time", "Join Google Meet: https://meet.google.com/abc-defg-hij", "Change or cancel this lesson: https://lesson.example/book/?manage=",
-      "Free to change or cancel until Mon 2 Nov, 19:00. After that, there’s a €5 late change fee."]) {
+      "Free to change or cancel until Mon 2 Nov, 19:00. €5 to move or cancel later."]) {
       assert.ok(meet.text.includes(part), part);
     }
     assert.ok(meet.text.indexOf("Join Google Meet") < meet.text.indexOf("Change or cancel this lesson"), "joining is the button, changing the quiet link");
@@ -3025,7 +3025,7 @@ await test("the day-before reminder goes once per lesson version, on its own clo
 
     const [coming, ...comingMore] = remindersFor("rem-nolink");
     assert.equal(comingMore.length, 0);
-    assert.ok(coming.text.includes("Its Google Meet link isn’t ready yet; we’ll email it to you as soon as it is."));
+    assert.ok(coming.text.includes("\nWe’ll email you its Google Meet link as soon as it’s ready\n"));
     assert.equal(coming.text.match(/Change or cancel this lesson/g).length, 1, "the button, with no quiet link beside it");
     assert.ok(!coming.text.includes("Join Google Meet"));
     // A lesson moved since is a new version, reminded at its own time.
@@ -3035,7 +3035,7 @@ await test("the day-before reminder goes once per lesson version, on its own clo
 
     const [porto, ...portoMore] = remindersFor("rem-retry");
     assert.equal(portoMore.length, 0);
-    for (const part of ["Where: In Porto", "15:00 · Porto time", "Free to change or cancel until Tue 3 Nov, 01:00. After that, it can’t be changed or refunded."]) assert.ok(porto.text.includes(part), part);
+    for (const part of ["\nIn Porto · 60 minutes\n", "15:00 · Porto time", "Free to change or cancel until Tue 3 Nov, 01:00. After that, it can’t be changed or refunded."]) assert.ok(porto.text.includes(part), part);
     assert.equal(porto.text.match(/Change or cancel this lesson/g).length, 1);
     assert.ok(!porto.text.includes("Google Meet"));
     assert.equal(db.prepare("SELECT status FROM email_log WHERE dedupe_key='student:reminder:rem-retry:2'").get().status, "sent");
@@ -5979,7 +5979,7 @@ await test("Inês changes when, how long and where for every week from one, acro
 
     await drain();
     assert.deepEqual(sentEmails.map((mail) => mail.subject), ["Inês has changed your weekly lessons — from Thu 15 Oct, 20:00"]);
-    assert.match(sentEmails[0].text, /Inês has changed the lessons below: they’re now on Thursdays at 20:00, 90 minutes and in person in Porto\. 2 lessons stay as they were\./);
+    assert.match(sentEmails[0].text, /Inês has changed your weekly lessons: they’re now on Thursdays at 20:00, 90 minutes and in person in Porto\. 2 lessons stay as they were\./);
     const ics = Buffer.from(sentEmails[0].attachments[0].content, "base64").toString("utf8").replace(/\r\n /g, "");
     assert.ok(ics.includes(`UID:booking-${second.id}@`) && /SEQUENCE:1\r?\n/.test(ics), "the same calendar entry, one version on");
     assert.ok(!ics.includes(`UID:booking-${fourth.id}@`), "a kept week's entry is not resent");
@@ -6034,7 +6034,7 @@ await test("Inês changes one lesson's time and place together; a paid lesson mo
     assert.equal(charges.length, chargesBefore, "nothing is charged");
     await drain();
     assert.deepEqual(sentEmails.map((mail) => mail.subject), ["Inês has changed your lesson — Fri 9 Oct, 10:00"]);
-    assert.match(sentEmails[0].text, /Inês has changed your lesson: it’s now at the time below and in person in Porto\./);
+    assert.match(sentEmails[0].text, /Inês has changed your lesson: it’s now at a new time and in person in Porto\./);
 
     // Back online at the same time: her words say so.
     sentEmails.length = 0;
@@ -6181,7 +6181,7 @@ await test("a student Inês set up books their cancelled weekly lesson again: a 
     const toInes = sentEmails.filter((mail) => mail.to[0] === "ines@example.invalid");
     assert.deepEqual([toStudent.length, toInes.length], [1, 1]);
     assert.match(toStudent[0].subject, /^Your Portuguese lesson is booked — /);
-    assert.match(toStudent[0].text, /€25 · pay Inês as usual/);
+    assert.match(toStudent[0].text, /^Online · 60 minutes · €25\nPay Inês as usual$/m);
     assert.match(toInes[0].subject, /^Booked again after cancelling — Hana Hand, /);
     assert.match(toInes[0].text, /Hana Hand cancelled this lesson and has booked it again\./);
     const ics = Buffer.from(toStudent[0].attachments[0].content, "base64").toString("utf8").replace(/\r\n /g, "");
