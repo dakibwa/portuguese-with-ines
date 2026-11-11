@@ -183,14 +183,14 @@ Porto times across the clock changes and how hours and time off are stored.
 it cannot read (a bad lesson, date, weekly run or saved hours) rather than
 showing it or reporting a change as done.
 
-The release then runs fourteen customer journeys against the built export it
+The release then runs thirteen customer journeys against the built export it
 publishes, at desktop and phone widths, shared between four machines so they
 take about two minutes: `qa-flow`
 (public pages, the booking page against the live Worker, and a student's
 account: moving, cancelling and weekly lessons), `qa-workspace-navigation`
 (the account's places and old links), `qa-booking-selection` (choosing lessons,
 agreeing and booking them), `qa-payment-recovery`, `qa-teacher-calendar` (Inês's
-schedule), `qa-homework`, `qa-transition-kit` (sign-in links and saving a card),
+schedule), `qa-transition-kit` (sign-in links and saving a card),
 `qa-meet-links`, `qa-student-nif`, `qa-profile-rates`, `qa-request-recovery`
 (paying lands on Stripe; a checkout return stays pending until confirmed),
 `qa-auth-recovery` (password reset), `qa-selection-calendar-recovery` (the
@@ -199,6 +199,12 @@ price posted and the card form after booking) and `qa-expression-translations`
 development server at `QA_BASE_URL` (default `http://localhost:3000`); all but
 `qa-flow`'s booking page use isolated API replies. A new check earns its place
 only by protecting a student, Inês or money in a way these don't already.
+
+A fourteenth, `qa-homework`, waits off the release while homework is hidden
+(11 November 2026, Dan: "Hide homework for now"; `features.homework` in
+`tutors/ines/tutor.json`). A build with it false has no way in for the journey
+to follow. Before homework comes back, set it true, build, run `qa-homework`,
+and put it back on a `journeys` line.
 
 The journeys were trimmed on 11 November 2026 (Dan: "can we check to see if
 all the tests associated with this site are still required or they've become

@@ -1,6 +1,6 @@
 "use client";
 
-import { IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
+import { HOMEWORK, IN_PERSON, TUTOR_CITY } from "@/lib/tutor";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { X, ArrowLeft, Check, CheckCircle2, CircleX, UserX } from "lucide-react";
 import {
@@ -49,7 +49,8 @@ type Props = {
   afterChangeFocusRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onChanged: (message: string) => void;
-  initialAction?: "view" | "refund";
+  /** What it opens on: the lesson, its refund, or (from the row's pencil) its change form. */
+  initialAction?: "view" | "refund" | "change";
   /**
    * A modal dialog over the page, as her timetable opens a lesson, or the same
    * details laid out in place within a student's dashboard: no scrim, no page
@@ -532,7 +533,7 @@ export function LessonDetails({
   // and in the timetable modal beneath what happened. Both are the quiet chip
   // at their own width (10 November 2026, Dan: one way for each thing); the
   // modal's one filled button is its call.
-  const homeworkTrigger = booking.student_id ? <button className="teacher-quiet teacher-lesson-homework" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null;
+  const homeworkTrigger = HOMEWORK && booking.student_id ? <button className="teacher-quiet teacher-lesson-homework" type="button" disabled={busy} onClick={() => setAction("homework")}>Homework</button> : null;
   // One way to change a lesson, as a student has, and one to cancel it
   // (10 November 2026, Dan). Each starts on This lesson.
   const defaultActions = (

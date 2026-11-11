@@ -663,11 +663,21 @@ free times and removes selected times that cannot be booked in the new place.
     no dashed outline and no separator above its toolbar. At the end of that
     same line, a small soft `Already paid` toggle (same words and state: organic
     capsule, small checkbox, strong blue once checked) on a past lesson she
-    added, and its notes as a small pencil named `Add notes`, `Notes` or, while
-    open, `Close`, with its homework chip beside it (`Draft`, `With them`,
-    `To review`, `Done`); on a narrow row those wrap together beneath. While a
-    lesson's details are open the date row is its disclosure and the pencil
-    steps aside, as Homework is among those details. Its own facts are the
+    added, and a small pencil named `Change lesson`, which opens that lesson
+    in place on its change form, as every pencil on her pages edits the thing
+    beside it (11 November 2026, Dan, of a pencil that opened notes and
+    homework: "the arrow opens homework which we removed?"); on a narrow row
+    those wrap together beneath. While a lesson's details are open the date
+    row is its disclosure and the pencil steps aside, as `Change` is among
+    those details.
+    Homework and lesson notes are hidden for now, on her pages and
+    students' (11 November 2026, Dan: "Hide homework for now"): no `Homework`
+    button in an opened lesson, no homework chip or `Homework to review`, and
+    a student's past lessons neither show nor ask for homework. Nothing is
+    deleted; `features.homework` in the tutor's record brings it back, and
+    what follows about homework describes it as it then is: reached from an
+    opened lesson's `Homework`, with its chip (`Draft`, `With them`, `To
+    review`, `Done`) on the lesson's row. Its own facts are the
     second line, one wrapping line after the site's small lilac paint dab, as
     the shared facts are; `Cancelled`, `No-show` and `Happening now` are bold
     words in that line, not pills. Every secondary action here (`Show weeks`,
@@ -687,10 +697,10 @@ free times and removes selected times that cannot be booked in the new place.
     (`Sam’s lesson, Tue 22 Sept, 09:30–10:30`) with no scrim, scroll lock or
     focus trap and nothing else closed: focus moves to it, `Esc` or its close
     returns focus to the lesson, a saved change says so in the dashboard's
-    live message. Its notes and its details are never open at once. The pencil
-    opens the homework steps in the row, which then spans the list. Eight
+    live message. Its notes and its details are never open at once. Eight
     past lessons show, the rest behind `12 earlier lessons`. Homework to
-    review opens that lesson's row.
+    review opens the homework steps in that lesson's row, which then spans
+    the list.
   No duplicate To do list or separate student profile popup.
   Student cards sit side by side according to the list's available width,
   with one column on phones. An opened card spans the whole list so details,

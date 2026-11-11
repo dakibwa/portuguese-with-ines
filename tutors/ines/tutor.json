@@ -38,8 +38,9 @@
     "inPersonKey": "porto"
   },
   "features": {
-    "$comment": "Expressions is an add-on for Inês's site only, not part of the platform (9 November 2026, Dan).",
-    "expressions": true
+    "$comment": "Expressions is an add-on for Inês's site only, not part of the platform (9 November 2026, Dan). Homework and lesson notes are hidden on her pages and students' while homework is false (11 November 2026, Dan: hide homework for now); nothing is deleted, and true brings them back.",
+    "expressions": true,
+    "homework": false
   },
   "contact": {
     "whatsapp": "+351 963 161 134"

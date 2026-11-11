@@ -238,7 +238,9 @@ jobs:
           - qa-teacher-calendar qa-meet-links
           - qa-flow qa-request-recovery qa-payment-recovery
           - qa-selection-calendar-recovery qa-transition-kit qa-student-nif
-          - qa-homework qa-auth-recovery qa-workspace-navigation qa-expression-translations qa-booking-selection qa-profile-rates check-portfolio-banner
+          # qa-homework waits off these lines while homework is hidden (11
+          # November 2026): see the note at the top of scripts/qa-homework.mjs.
+          - qa-auth-recovery qa-workspace-navigation qa-expression-translations qa-booking-selection qa-profile-rates check-portfolio-banner
     steps:
       - name: Checkout
         uses: actions/checkout@v4

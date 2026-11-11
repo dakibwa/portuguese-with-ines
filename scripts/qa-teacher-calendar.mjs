@@ -1370,9 +1370,10 @@ try {
   // Marked as paid, it is still hers to change, and a change leaves it marked
   // (11 November 2026, Dan: "even if it's already marked as paid Ines should
   // be able to change it").
-  await recorded.getByRole("button", { name: /^Thu 27 Aug/ }).click();
+  // The row's pencil opens the lesson straight on its change form, as every
+  // pencil on her pages edits the thing beside it.
+  await recorded.getByRole("button", { name: /^Change lesson · Thu 27 Aug/ }).click();
   const tickedDetails = recorded.locator(".teacher-lesson-row__details");
-  await tickedDetails.getByRole("button", { name: "Change lesson", exact: true }).click();
   await tickedDetails.getByRole("radio", { name: "90 mins, €36", exact: true }).check();
   await expect(tickedDetails).toContainText("Stays marked as paid");
   await tickedDetails.getByRole("button", { name: "Close lesson details", exact: true }).click();
@@ -1386,6 +1387,8 @@ try {
   const recordDetails = recorded.locator(".teacher-lesson-row__details");
   await expect(recordDetails).toContainText("€24 · to pay you directly");
   await expect(recordDetails).not.toContainText(/recorded/i);
+  // Homework is hidden for now (11 November 2026, Dan), so nothing here opens it.
+  await expect(recordDetails.getByRole("button", { name: "Homework", exact: true })).toHaveCount(0);
   await recordDetails.getByRole("button", { name: "Change lesson", exact: true }).click();
   await expect(recordDetails.getByRole("radio", { name: "This lesson", exact: true })).toHaveCount(0);
   await recordDetails.getByRole("radio", { name: "90 mins, €36", exact: true }).check();

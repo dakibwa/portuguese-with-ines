@@ -65,7 +65,7 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
   const [notesAttempt, setNotesAttempt] = useState(0);
   // The lesson open in place, one at a time. Only its id is kept, so what is
   // shown follows the lessons as they reload.
-  const [selected, setSelected] = useState<{ id: string; action: "view" | "refund" } | null>(null);
+  const [selected, setSelected] = useState<{ id: string; action: "view" | "refund" | "change" } | null>(null);
   const [notice, setNotice] = useState("");
   const [openNotes, setOpenNotes] = useState<string | null>(homeworkId ?? null);
   const [plan, setPlan] = useState<string | null>(null);
@@ -215,7 +215,7 @@ export function StudentDashboard({ student, token, facts, homeworkId, homeworkRe
           }}
         /> : null}
         openNotes={openNotes}
-        onOpenNotes={id => { setSelected(current => current?.id === id ? null : current); setOpenNotes(id); }}
+        onChangeLesson={booking => { setNotice(""); setOpenNotes(current => current === booking.id ? null : current); setSelected({ id: booking.id, action: "change" }); }}
         onCloseNotes={() => { setOpenNotes(null); setNotesAttempt(value => value + 1); }}
         onBusy={setBusy}
         onRetry={() => { setHistory(null); setAttempt(value => value + 1); }}
