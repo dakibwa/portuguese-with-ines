@@ -2223,6 +2223,9 @@
 .teacher-notice__title { display: block; font: 600 0.88rem/1.35 var(--ui); overflow-wrap: anywhere; text-wrap: balance; }
 .teacher-notice__facts { display: block; margin-top: 0.1rem; color: var(--lavender-ink); font-size: 0.75rem; text-wrap: pretty; }
 .teacher-notice__facts:empty { display: none; }
+/* A first lesson's note in full, as her lesson's details say it. */
+.teacher-notice__note { display: block; margin-top: 0.3rem; color: var(--ink); font: 400 0.75rem/1.5 var(--ui); white-space: pre-wrap; overflow-wrap: anywhere; }
+.teacher-notice__note > span { color: var(--lavender-ink); font-weight: 600; }
 /* The site's round icon button, small beside the chip; its tap is still 44 px. */
 .teacher-notice .teacher-notice__dismiss { width: 32px; height: 32px; color: var(--blue-deep); }
 .teacher-notice .teacher-notice__dismiss::after { inset: -6px; }

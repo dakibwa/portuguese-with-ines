@@ -748,9 +748,9 @@ student with no email, whose Add email opens their inline details editor; a
 student with no confirmed lessons, whose Add a lesson opens the inline lesson
 form; a lesson a
 student changed in the last 72 hours (one card per weekly run and stamp); a
-lesson a student cancelled in the last 72 hours (one card per weekly run,
-View opens it read-only; the time is already open to students); and a new
-student's first lesson
+lesson a student cancelled in the last 72 hours (one card per weekly run;
+the time is already open to students); and a new
+student's first lesson, with their booking note in full,
 in the next 7 days (a student's own booking with no earlier confirmed lesson of
 theirs, matching older rows without a `student_id` by email; a lesson Inês added
 never reads as a first lesson, even after the student moves it). The

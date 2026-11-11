@@ -559,17 +559,21 @@ free times and removes selected times that cannot be booked in the new place.
   students have got, so nothing is dragged and nothing writes a status. Within
   a group, nearer lessons come first. A notice (11 November 2026, Dan: "can
   Inês have a dismiss button on these notifications and do they need to be
-  this verbose") says what happened in one bold line with its one quiet
-  action at that line's end, at every width, never on a row of its own; the
-  facts flow beneath at full width and break only between facts. The action
-  and any cross are one height, centred on that line, and stand as far from
+  this verbose") says what happened in one bold line; the facts flow beneath
+  at full width and break only between facts. Work still to do has its one
+  quiet action at that line's end (`Connect`, `Open in Stripe`, `Open`, `See
+  lessons`), at every width, never on a row of its own. A notice that only
+  tells her something says it all, a first lesson's note in full too, so it
+  has no action, only its cross (11 November 2026, Dan: "I don't even think
+  the button for view is needed is it? the details are in it?"). The action
+  and the cross are one height, centred on that line, and stand as far from
   the notice's top edge as from its right, never against it (11 November
   2026, Dan: "it's weirdly close to the edge?"). Inside a
   student's own card it does not say their name again (`Changed their
   lesson`, `Cancelled their lesson`, `First lesson`, `Added a card`); outside
   a card, on the Timetable and under `Check first`, the name stays. A notice
-  that only tells her something also has a small round cross beside its
-  action: pressed, the notice goes at once, on every device, and focus moves
+  that only tells her something has a small round cross at that line's end:
+  pressed, the notice goes at once, on every device, and focus moves
   to the next notice or the student's name. Work still to do has no cross and
   clears when done. Above the groups, `6 of 21 students are all set`
   over a thin coral meter counts active students whose checks are all done.
@@ -2538,7 +2542,7 @@ for).
   because an open student's Close already returns to the board.
 - On Inês's tabs the capital-letter filled lilac site button is retired for
   lesser actions: the quiet chip is the third weight everywhere (`Edit
-  weekly hours`, `This week`, `Set exact hours`, a notice's `View`, `Download
+  weekly hours`, `This week`, `Set exact hours`, a notice's `Connect`, `Download
   CSV`, Time off's `Off` and `Online only`). A disclosure is that chip with a
   chevron that turns, never a fill when open. A chip that is a state and not
   a step (`Off`, `Online only`) is the deep blue of a chosen tab while it

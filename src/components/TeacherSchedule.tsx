@@ -793,7 +793,6 @@ export function TeacherSchedule() {
             document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true });
             setActiveTab("profile");
           }}
-          onView={setSelectedBooking}
           onWelcome={(student) => void sendWelcome(student)}
           onStudent={student => openStudent(student, "lessons")}
           onDismiss={key => void dismissNotice(key)}
@@ -989,7 +988,6 @@ export function TeacherSchedule() {
         error={studentsError || bookingsError}
         sending={welcoming}
         onMeet={() => { setActiveTab("profile"); document.getElementById("teacher-tab-profile")?.focus({ preventScroll: true }); }}
-        onView={setSelectedBooking}
         onDismiss={key => void dismissNotice(key)}
         onRetry={() => { void reloadStudents(); void reloadBookings(); }}
         onWelcome={(student, again) => sendWelcome(student, again)}

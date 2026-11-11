@@ -41,18 +41,19 @@ function was(booking: AdminBooking) {
 
 /**
  * What waits on her, said once, under her next lesson (Phase 2, 14 October
- * 2026): each card says what happened and when, with at most one action.
- * Every item clears itself; one that only tells her something also has a
- * cross (11 November 2026, Dan). Its action and cross end the first line, and
- * inside a student's own card the name is not said again. The choosing and
- * the windows live in needsYou(); this only words and renders them.
+ * 2026): each card says what happened and when, and has an action only when
+ * there is something for her to do; one that only tells her something says it
+ * all and has just a cross (11 November 2026, Dan: "I don't even think the
+ * button for view is needed is it? the details are in it?"). The action and
+ * cross end the first line, and inside a student's own card the name is not
+ * said again. The choosing and the windows live in needsYou(); this only
+ * words and renders them.
  */
-export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent, onDismiss, onSeeAll, embedded = false, heading = "Needs you" }: {
+export function NeedsYou({ items, sending, onMeet, onWelcome, onStudent, onDismiss, onSeeAll, embedded = false, heading = "Needs you" }: {
   items: NeedsYouItem[];
   /** The student whose welcome is on its way. */
   sending: string;
   onMeet: () => void;
-  onView: (booking: AdminBooking) => void;
   onWelcome: (student: AdminStudent, again?: boolean) => void;
   onStudent: (student: AdminStudent) => void;
   onDismiss: (key: string) => void;
@@ -93,11 +94,8 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
     let who = "";
     let detail: ReactNode = "";
     let action: ReactNode = null;
-    const view = (booking: AdminBooking) => (
-      <button className="teacher-quiet" type="button" onClick={() => onView(booking)}>
-        View<span className="visually-hidden"> {booking.student_name}’s lesson on {day(booking.starts_at)}</span>
-      </button>
-    );
+    // A first lesson's note is said in the notice, so nothing needs opening.
+    let note = "";
 
     if (item.kind === "meet") {
       who = full = item.reconnect ? "Google Meet needs reconnecting" : "Google Meet isn’t connected";
@@ -149,9 +147,10 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
       detail = count
         ? `${count} ${count === 1 ? "lesson" : "lessons"} you added ${count === 1 ? "is" : "are"} now charged after each one. Paid by hand? Open it and tick “Already paid”`
         : "Lessons you add are now charged to it after each one";
-      action = <button className="teacher-quiet" type="button" onClick={() => onStudent(student)}>
-        {count ? "See lessons" : "Open"}<span className="visually-hidden"> for {student.name}</span>
-      </button>;
+      // Only lessons she may have been paid for by hand give her something to do.
+      action = count ? <button className="teacher-quiet" type="button" onClick={() => onStudent(student)}>
+        See lessons<span className="visually-hidden"> for {student.name}</span>
+      </button> : null;
     } else if (item.kind === "lessons") {
       who = full = `${item.student.name} has no lessons yet`;
       detail = "Add a lesson or their weekly lessons";
@@ -168,22 +167,20 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
       detail = count > 1
         ? facts(`${count} from ${day(booking.starts_at)}`, range(booking), place(booking), was(booking), item.first && "first lesson")
         : facts(day(booking.starts_at), range(booking), place(booking), was(booking), item.first && "first lesson");
-      action = view(booking);
     } else if (item.kind === "cancelled") {
       const { booking, count } = item;
       full = `${booking.student_name} cancelled their ${count > 1 ? "weekly lessons" : "lesson"}`;
       who = embedded ? `Cancelled their ${count > 1 ? "weekly lessons" : "lesson"}` : full;
-      // The time is open again; the cancelled lesson opens read-only.
+      // The time is open again; the notice says all there is to know.
       detail = count > 1
         ? facts(`${count} from ${day(booking.starts_at)}`, range(booking))
         : facts(day(booking.starts_at), range(booking), place(booking));
-      action = view(booking);
     } else {
       const { booking } = item;
       full = `${booking.student_name}’s first lesson`;
       who = embedded ? "First lesson" : full;
-      detail = facts(day(booking.starts_at), range(booking), lessonLength(booking), place(booking), booking.notes?.trim() && "left a note");
-      action = view(booking);
+      detail = facts(day(booking.starts_at), range(booking), lessonLength(booking), place(booking));
+      note = booking.notes?.trim() ?? "";
     }
 
     const dismissKey = "dismiss" in item ? item.dismiss : "";
@@ -191,14 +188,15 @@ export function NeedsYou({ items, sending, onMeet, onView, onWelcome, onStudent,
       <li className="teacher-lesson-card teacher-notice" key={item.key}>
         {/* First, so they float at the end of the first line and the words
             flow round them: the facts take the full width once past them. */}
-        <span className="teacher-notice__actions">
+        {action || dismissKey ? <span className="teacher-notice__actions">
           {action}
           {dismissKey ? <button className="teacher-icon-button teacher-notice__dismiss" type="button" aria-label={`Dismiss: ${full}`} title="Dismiss" onClick={event => dismiss(dismissKey, event)}>
             <X size={15} aria-hidden="true" />
           </button> : null}
-        </span>
+        </span> : null}
         <strong className="teacher-notice__title">{who}</strong>
         <span className="teacher-notice__facts">{detail}</span>
+        {note ? <span className="teacher-notice__note"><span>Their note</span> {note}</span> : null}
       </li>
     );
   }
