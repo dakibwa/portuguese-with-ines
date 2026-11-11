@@ -22,7 +22,7 @@ const LESSON_MARKS = [
  * Dan: "charged at the time of when the lessons ends").
  */
 export const CHARGED_EACH = NO_SHOW_WINDOW_HOURS_AFTER ? "after each lesson" : "at the end of each lesson";
-const CHARGED_IT = NO_SHOW_WINDOW_HOURS_AFTER ? "after it ends" : "when it ends";
+export const CHARGED_IT = NO_SHOW_WINDOW_HOURS_AFTER ? "after it ends" : "when it ends";
 
 /**
  * The change and no-show rule as two dabs, what is free first (2 November
@@ -32,7 +32,7 @@ const CHARGED_IT = NO_SHOW_WINDOW_HOURS_AFTER ? "after it ends" : "when it ends"
 export function FeeFacts({ feeCents, noticeHours, noShow = true }: { feeCents: number; noticeHours: number; noShow?: boolean }) {
   if (!feeCents) return <li>No fee to change or cancel{noShow ? ", or for a missed lesson" : ""}</li>;
   return <>
-    <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours} hours before</li>
+    <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
     <li><strong>{formatMoneyCents(feeCents)}</strong> to move or cancel later{noShow ? ", or if you don’t show up" : ""}</li>
   </>;
 }

@@ -30,6 +30,7 @@ import { AssetMark } from "@/components/BrandMarks";
 import { AccountMenu, AccountSignature, type AccountSection } from "@/components/AccountMenu";
 import { CalendarBookingPrompt } from "@/components/CalendarBookingPrompt";
 import { PastLessons } from "@/components/PastLessons";
+import { CHARGED_EACH, CHARGED_IT, FeeFacts } from "@/components/CardOnFile";
 /*
  * Loaded when it is needed, not before. The sign-in panel — with the Google
  * button, the segmented tabs and the whole account form behind it — is only
@@ -79,6 +80,7 @@ import {
   weekKeyOf,
   previewSeries,
   rebookBooking,
+  startLessonCard,
   rescheduleBooking,
   rescheduleSeries,
   shortMonth,
@@ -1072,6 +1074,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     | "sequence"
     | "confirm-stop-sequence"
     | "confirm-cancel-sequence"
+    | "pay-by-card"
   >("view");
   const [manageLoading, setManageLoading] = useState(false);
   // The lesson as the calendar already knows it, shown while its full details
@@ -1092,6 +1095,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [manageWorking, setManageWorking] = useState(false);
   const [manageError, setManageError] = useState("");
   const [manageOutcome, setManageOutcome] = useState("");
+  // Pay by card from the lesson's link (10 November 2026): which lessons, and,
+  // back from Stripe, the wait for the card to be confirmed.
+  const [cardScope, setCardScope] = useState<"lesson" | "run">("lesson");
+  const [lessonCardReturn, setLessonCardReturn] = useState<{ token: string; weekly: boolean; state: "confirming" | "slow" } | null>(null);
   // The way into the account from an email link, asked for from the lesson (10 November 2026).
   const [lessonSignInLink, setLessonSignInLink] = useState<{ state: "idle" | "sending" | "sent"; error: string }>({ state: "idle", error: "" });
   const [managedCalendarPlaceholderHeight, setManagedCalendarPlaceholderHeight] = useState(0);
@@ -1316,6 +1323,14 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     }
     setHasStoredSession(Boolean(readSession()));
     setStudentZone(browserTimeZone());
+    // Back from Stripe with a card for a lesson from its own link: the lesson
+    // opens from `manage` as usual, and only the marker goes.
+    const lessonCard = params.get("card");
+    if ((lessonCard === "lesson" || lessonCard === "weekly") && params.get("manage")) {
+      setLessonCardReturn({ token: params.get("manage") ?? "", weekly: lessonCard === "weekly", state: "confirming" });
+      params.delete("card");
+      window.history.replaceState({}, "", `/book/?${params}`);
+    }
     const returningFromCard = params.get("card") === "saved";
     if (returningFromCard) {
       setCardReturn({ token: params.get("manage") ?? "", state: "confirming" });
@@ -1580,6 +1595,52 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
       window.clearTimeout(timer);
     };
   }, [cardReturn?.state, cardReturn?.token, refreshStudent, refreshStudentInBackground]);
+
+  /*
+   * Stripe tells the booking system a moment after the student is back, so
+   * the lesson is read again a few times, as the account's own card return
+   * waits, until it reads as on the card.
+   */
+  const lessonCardWaiting = lessonCardReturn?.state === "confirming" && Boolean(managed) && managedToken === lessonCardReturn.token
+    ? lessonCardReturn : null;
+  useEffect(() => {
+    if (!lessonCardWaiting) return;
+    const { token, weekly } = lessonCardWaiting;
+    let active = true;
+    const delays = [600, 2500, 5000, 8000];
+    let timer = 0;
+    const check = async (attempt: number) => {
+      try {
+        const fresh = await fetchBooking(token);
+        if (!active) return;
+        if (fresh.booking.paymentStatus === "scheduled") {
+          transitionBooking(() => {
+            setManaged(fresh);
+            setManageMode("view");
+            setManageOutcome(weekly
+              ? `Card saved. Your weekly lessons are charged ${CHARGED_EACH}.`
+              : `Card saved. This lesson is charged ${CHARGED_IT}.`);
+            setLessonCardReturn(null);
+          });
+          refreshStudentInBackground();
+          return;
+        }
+      } catch {
+        // A dropped request is retried on the next tick.
+      }
+      if (!active) return;
+      if (attempt + 1 >= delays.length) {
+        setLessonCardReturn((current) => current && { ...current, state: "slow" });
+        return;
+      }
+      timer = window.setTimeout(() => void check(attempt + 1), delays[attempt + 1]);
+    };
+    timer = window.setTimeout(() => void check(0), delays[0]);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [lessonCardWaiting, refreshStudentInBackground]);
 
   const availabilityLessonTypeId =
     isManagedReschedule && managed
@@ -1991,6 +2052,11 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const rebookOffered = Boolean(managed && managed.booking.status === "cancelled" && managed.canRebook);
   const offersAccountLink = Boolean(managed && !student && postpay && managed.booking.addedByTeacher &&
     managed.booking.paymentStatus === "not_required" && !managed.booking.paidByHand && managed.booking.studentEmail);
+  // The lesson's own read decides; a lesson changed since on this page is asked again by the press.
+  const lessonCardOffer = managed?.cardOffer && managed.booking.status === "confirmed" && managed.booking.paymentStatus === "not_required"
+    ? managed.cardOffer : null;
+  // Not while a card from Stripe is still being confirmed for it.
+  const offersLessonCard = Boolean(lessonCardOffer) && lessonCardReturn?.state !== "confirming";
   const lessonPreview = manageLoading && managePreview?.manageToken === managedToken ? managePreview : null;
   const regularLessonTypes = lessonTypes.filter((type) => type.id !== "trial");
   const trialLessonType = lessonTypes.find((type) => type.id === "trial") ?? null;
@@ -2490,6 +2556,32 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     }
   }
 
+  /**
+   * Pay by card from the lesson's link (10 November 2026): pressing `Agree &
+   * add card` is the agreement to what the step shows, and Stripe's page takes
+   * the card. Nothing is charged until each lesson ends.
+   */
+  async function startManagedLessonCard() {
+    if (!managedToken || !lessonCardOffer || manageWorking) return;
+    const request = ++managedRequest.current;
+    // As with a payment link: leaving the page retires the request.
+    const page = window.location.pathname;
+    const current = () => request === managedRequest.current && window.location.pathname === page;
+    setManageWorking(true);
+    setManageError("");
+    try {
+      const result = await startLessonCard(managedToken, lessonCardOffer.everyWeek ? cardScope : "lesson", lessonCardOffer.priceCents);
+      if (!current()) return;
+      // The browser's own Back can bring this page back exactly as it was left.
+      window.addEventListener("pageshow", (event) => { if (event.persisted) setManageWorking(false); }, { once: true });
+      window.location.assign(result.url);
+    } catch (caught) {
+      if (!current()) return;
+      setManageError(caught instanceof Error ? caught.message : "We couldn’t open the card form just now. Please try again in a moment.");
+      setManageWorking(false);
+    }
+  }
+
   /** One link into the account for a student who came from an email, to the booking's own address. */
   async function emailLessonSignInLink() {
     const email = managed?.booking.studentEmail;
@@ -2554,6 +2646,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     setManageError("");
     setManageOutcome("");
     setLessonSignInLink({ state: "idle", error: "" });
+    setLessonCardReturn(null);
     setManagedCalendarPlaceholderHeight(0);
     setSelectedSlot("");
     setSelectedDate("");
@@ -3627,6 +3720,8 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                   <h2 id="lesson-manage-heading">
                     {manageMode === "confirm-cancel"
                       ? "Cancel this lesson?"
+                      : manageMode === "pay-by-card"
+                        ? "Pay by card"
                       : manageMode === "confirm-cancel-sequence"
                         ? "Cancel booked lessons?"
                         : manageMode === "sequence" || manageMode === "confirm-stop-sequence"
@@ -3640,6 +3735,12 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     <div className="booking-outcome" role="status">
                       <CheckCircle2 size={20} aria-hidden="true" />
                       <p>{manageOutcome}</p>
+                    </div>
+                  ) : null}
+                  {lessonCardReturn && manageMode === "view" ? (
+                    <div className="booking-outcome" role={lessonCardReturn.state === "slow" ? "alert" : "status"}>
+                      <AlertCircle size={20} aria-hidden="true" />
+                      <p>{lessonCardReturn.state === "confirming" ? "Confirming your card…" : "Your card hasn’t been confirmed yet. You can try again."}</p>
                     </div>
                   ) : null}
                   {manageError ? (
@@ -3672,10 +3773,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                         {managed.rebookPayment === "direct" ? <li>Paid to {TUTOR_NAME} directly</li>
                           : managed.rebookPayment === "card" ? <>
                             <li>Charged to your card at the end of the lesson</li>
-                            {lateFeeCents ? <>
-                              <li><strong className="is-free">Free to change or cancel</strong> a lesson up to {noticeHours}&nbsp;hours before</li>
-                              <li><strong>{formatMoneyCents(lateFeeCents)}</strong> to move or cancel later, or if you don&rsquo;t show up</li>
-                            </> : <li>No fee to change or cancel, or for a missed lesson</li>}
+                            <FeeFacts feeCents={lateFeeCents} noticeHours={noticeHours} />
                           </> : null}
                       </ul>
                       <div className="lesson-manage-dialog__actions">
@@ -3805,6 +3903,58 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     </div>
                   ) : null}
 
+                  {/* Pay by card (10 November 2026): what is agreed as the
+                      dialog's dabs, in the site's words, then one press that
+                      is the agreement and opens Stripe's page. */}
+                  {manageMode === "pay-by-card" && lessonCardOffer ? (
+                    <div className="lesson-manage-dialog__decision">
+                      {lessonCardOffer.everyWeek ? (
+                        <div aria-label="Pay for" className={`segmented segmented--position-${cardScope === "run" ? 1 : 0}`} role="radiogroup">
+                          <span aria-hidden="true" className="segmented__thumb" />
+                          {(["lesson", "run"] as const).map((option) => (
+                            <label className={cardScope === option ? "is-active" : ""} key={option}>
+                              <input
+                                checked={cardScope === option}
+                                disabled={manageWorking}
+                                name="lesson-card-scope"
+                                onChange={() => setCardScope(option)}
+                                type="radio"
+                                value={option}
+                              />
+                              {option === "lesson" ? "This lesson" : "Every week"}
+                            </label>
+                          ))}
+                        </div>
+                      ) : null}
+                      <ul className="booking-payment-facts" id="lesson-card-terms">
+                        {lessonCardOffer.everyWeek && cardScope === "run"
+                          ? <li>{formatMoneyCents(lessonCardOffer.priceCents)} a lesson, charged {CHARGED_EACH}</li>
+                          : <li>{formatMoneyCents(lessonCardOffer.priceCents)}, charged to your card at the end of the lesson</li>}
+                        <FeeFacts feeCents={lateFeeCents} noticeHours={noticeHours} />
+                        {lessonCardOffer.everyWeek && cardScope === "run" ? <li>Weekly lessons carry on until you stop them</li> : null}
+                        {/* One card a student: lessons already on a card are then charged to this one. */}
+                        {lessonCardOffer.replacesCard ? <li>This card replaces the one saved before</li> : null}
+                        <li>
+                          The full rules are in{" "}
+                          <a aria-haspopup="dialog" data-terms-privacy href="#terms-privacy">terms &amp; privacy</a>
+                        </li>
+                      </ul>
+                      <div className="lesson-manage-dialog__actions">
+                        <button aria-describedby="lesson-card-terms" className="button button--coral" disabled={manageWorking} onClick={startManagedLessonCard} type="button">
+                          {manageWorking ? "Opening…" : "Agree & add card"}
+                        </button>
+                        <button
+                          className="button button--quiet"
+                          disabled={manageWorking}
+                          onClick={() => transitionBooking(() => { setManageError(""); setManageMode("view"); })}
+                          type="button"
+                        >
+                          Back
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {activeManagedSeries && manageMode === "sequence" ? (
                     <div className="lesson-manage-dialog__decision">
                       <div className="lesson-manage-dialog__actions lesson-manage-dialog__actions--sequence">
@@ -3872,15 +4022,38 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                     </button>
                   ) : null}
 
+                  {/* A lesson Inês added that is paid to her directly says so,
+                      with the one press that starts paying for it by card
+                      from here (10 November 2026). */}
+                  {offersLessonCard && manageMode === "view" ? (
+                    <div className="lesson-manage-dialog__way-in">
+                      <p>Paid to {TUTOR_NAME} directly</p>
+                      <button
+                        className="teacher-quiet"
+                        onClick={() => transitionBooking(() => {
+                          setCardScope("lesson");
+                          setManageError("");
+                          setLessonCardReturn(null);
+                          setManageMode("pay-by-card");
+                        })}
+                        type="button"
+                      >
+                        Pay by card
+                      </button>
+                    </div>
+                  ) : null}
+
                   {/* From an email link, a lesson Inês added and is paid for
-                      directly: one way into the account, where a card can be
-                      added (10 November 2026). It signs nobody in itself. */}
+                      directly: one way into the account (10 November 2026).
+                      It signs nobody in itself. Where a card can pay for the
+                      lesson from here, the account is only for seeing every
+                      lesson; otherwise it is also where a card is added. */}
                   {offersAccountLink && manageMode === "view" ? (
                     lessonSignInLink.state === "sent" ? (
                       <p className="lesson-manage-dialog__way-in" role="status">{SIGN_IN_LINK_SENT}</p>
                     ) : (
                       <div className="lesson-manage-dialog__way-in">
-                        <p>{lessonSignInLink.error || "See all your lessons and pay by card"}</p>
+                        <p>{lessonSignInLink.error || (lessonCardOffer ? "See all your lessons" : "See all your lessons and pay by card")}</p>
                         <button className="teacher-quiet" disabled={lessonSignInLink.state === "sending"} onClick={emailLessonSignInLink} type="button">
                           {lessonSignInLink.state === "sending" ? "Sending…" : "Email me a sign-in link"}
                         </button>

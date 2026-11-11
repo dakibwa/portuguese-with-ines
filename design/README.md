@@ -2625,6 +2625,31 @@ with a band across the page afterwards) "this is ugly".
   added and is paid to her directly, one quiet line beneath the actions
   reads `See all your lessons and pay by card`, with the chip `Email me a
   sign-in link`. Pressed, it is replaced by the sign-in panel's own words.
+  Where a card can pay for the lesson from the page itself (below), the line
+  reads `See all your lessons`.
+
+**Paying by card from a lesson's link.**
+
+- A lesson Inês added that is paid to her directly, and that a card can pay
+  for from here, says so on one quiet line beneath the dialog's actions:
+  `Paid to Inês directly`, with the chip `Pay by card` at the line's end.
+  The way into the account, where it shows, is the line beneath it, and the
+  two sit as a pair.
+- Pressed, the dialog becomes a step headed `Pay by card`, as cancelling
+  does. For a weekly lesson the site's slider chooses `This lesson | Every
+  week`, starting on `This lesson`. Then the dabs say exactly what is agreed:
+  `€25, charged to your card at the end of the lesson` (or `€25 a lesson,
+  charged at the end of each lesson`), the site's two change-and-fee lines,
+  `Weekly lessons carry on until you stop them` for every week, `This card
+  replaces the one saved before` where the student has a card saved, and the
+  terms link. `Agree & add card` is the step's one filled action and opens
+  Stripe's page; `Back` is its quiet pair. The press is the agreement.
+- Back from Stripe, the dialog says `Confirming your card…` in its outcome
+  place until the lesson reads as on the card, then, under `All sorted`,
+  `Card saved. This lesson is charged when it ends.` (or `Card saved. Your
+  weekly lessons are charged at the end of each lesson.`). If the card has
+  not arrived after a few reads it says `Your card hasn’t been confirmed yet.
+  You can try again.` and the line with its chip is back.
 
 **One layout for one kind of thing.**
 

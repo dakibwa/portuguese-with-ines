@@ -5008,6 +5008,17 @@ p.lesson-when > span {
   margin: 0;
 }
 
+/* How the lesson is paid, then the way into the account: the two quiet lines
+   sit as a pair, closer than the dialog's own gap. */
+.lesson-manage-dialog__way-in + .lesson-manage-dialog__way-in {
+  margin-top: -0.35rem;
+}
+
+/* The Pay by card step's `This lesson | Every week`: the step's own gap spaces it. */
+.lesson-manage-dialog__decision > .segmented {
+  margin-bottom: 0;
+}
+
 /* On a 320px phone the longest label, "Cancel all booked lessons", broke onto
    a second line. The weekly choices give up some side padding (each has the
    row to itself there). */

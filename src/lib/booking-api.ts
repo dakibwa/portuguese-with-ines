@@ -73,6 +73,12 @@ export type ManagedBooking = {
   rebookPriceCents?: number;
   /** How the lesson booked again would be paid. */
   rebookPayment?: "card" | "free" | "direct";
+  /**
+   * A lesson Inês added, paid to her directly, that a card can pay for from
+   * here; `everyWeek` when its run can too, and `replacesCard` when the card
+   * added would take the place of one the student has saved.
+   */
+  cardOffer?: { priceCents: number; everyWeek: boolean; replacesCard: boolean };
 };
 
 export type LessonTypesResponse = {
@@ -462,6 +468,8 @@ export function fetchBooking(token: string) {
       data.booking.addedByTeacher, data.booking.paidByHand]
       .some((value) => value !== undefined && typeof value !== "boolean") ||
       (data.canRebook === true && (!isApiAmount(data.rebookPriceCents) || !["card", "free", "direct"].includes(data.rebookPayment ?? ""))) ||
+      (data.cardOffer !== undefined && (!isRecord(data.cardOffer) || !isApiAmount(data.cardOffer.priceCents) ||
+        data.cardOffer.priceCents <= 0 || typeof data.cardOffer.everyWeek !== "boolean" || typeof data.cardOffer.replacesCard !== "boolean")) ||
       (data.paymentsDue !== undefined && (!isRecord(data.paymentsDue) ||
         ![data.paymentsDue.lesson, data.paymentsDue.sameDayFee].every((amount) => amount === null || isApiAmount(amount)))) ||
       (data.durationPrices !== undefined && (!isRecord(data.durationPrices) || !Object.values(data.durationPrices).every(isApiAmount)))) unreadableReply();
@@ -518,6 +526,21 @@ export function rebookBooking(token: string, expectedPriceCents: number) {
     validateBookingReply(data);
     if (typeof data.manageToken !== "string" || !data.manageToken || typeof data.emailed !== "boolean") unreadableReply();
     return data;
+  });
+}
+
+/**
+ * Pay by card from the lesson's own link (10 November 2026): Stripe's page to
+ * add a card for this lesson or every week, at the price shown. The reply's
+ * address is checked to be Stripe's before the browser is sent to it.
+ */
+export function startLessonCard(token: string, scope: "lesson" | "run", expectedPriceCents: number) {
+  return request<{ url: string }>(
+    `/bookings/${encodeURIComponent(token)}/card`,
+    { method: "POST", body: JSON.stringify({ scope, expectedPriceCents }) }
+  ).then((data) => {
+    if (typeof data.url !== "string") unreadableReply();
+    return { url: stripePaymentUrl(data.url) };
   });
 }
 

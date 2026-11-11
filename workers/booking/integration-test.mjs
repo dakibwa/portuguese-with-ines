@@ -6332,6 +6332,300 @@ await test("a lesson Inês added for a student with a standing card is booked ag
   }
 });
 
+// 10 November 2026, Dan: a student Inês set up by hand can pay by card from
+// the lesson's own page, for that lesson or every week, with no sign-in.
+const forgetLessonCardLimits = () => db.prepare("DELETE FROM request_limits WHERE key LIKE 'lesson-card:%'").run();
+const lessonCardStart = (manage, scope, expectedPriceCents) => call(`/bookings/${manage}/card`, { user: null, body: { scope, expectedPriceCents } });
+const cardOfferOf = async (manage) => (await (await call(`/bookings/${manage}`, { user: null, method: "GET" })).json()).cardOffer;
+/** The setup session the last start sent to Stripe, as Stripe would complete it. */
+function lessonCardCompleted(name, { customer, paymentMethod = `pm_${name}` } = {}) {
+  const sent = new URLSearchParams(checkoutRequests.at(-1).body);
+  const metadata = Object.fromEntries([...sent].filter(([key]) => key.startsWith("metadata[")).map(([key, value]) => [key.slice(9, -1), value]));
+  setupIntents.set(`seti_${name}`, { status: "succeeded", customer, payment_method: paymentMethod });
+  const session = { id: `cs_${name}`, mode: "setup", status: "complete", created: Math.floor(Date.now() / 1000) - 60,
+    client_reference_id: sent.get("client_reference_id"), customer, setup_intent: `seti_${name}`, metadata };
+  return { id: `evt_${name}`, type: "checkout.session.completed", livemode: false, data: { object: session } };
+}
+/** A student Inês set up by hand: never signed in, no card, address unproven, with her weekly lessons. */
+async function handSetUpStudent(id, startAt, repeat = "open", extra = "") {
+  db.prepare(`INSERT INTO students (id,email,name,password_hash,created_at${extra ? ",stripe_customer_id" : ""}) VALUES (?,?,?,'',?${extra ? ",?" : ""})`)
+    .run(id, `${id}@example.invalid`, "Hand Student", new Date().toISOString(), ...(extra ? [extra] : []));
+  const added = await call("/admin/bookings", { user: "teacher", body: { studentId: id, lessonType: "single", startAt, ...(repeat ? { repeat } : {}) } });
+  assert.equal(added.status, 201, await added.clone().text());
+  await drain();
+  return db.prepare("SELECT * FROM bookings WHERE student_id=? ORDER BY starts_at").all(id);
+}
+const lessonCardState = (id) => ({
+  bookings: db.prepare("SELECT * FROM bookings WHERE student_id=? ORDER BY starts_at").all(id).map((row) => ({ ...row })),
+  series: db.prepare("SELECT * FROM booking_series WHERE student_id=?").all(id).map((row) => ({ ...row })),
+  student: { ...db.prepare("SELECT * FROM students WHERE id=?").get(id) }
+});
+
+await test("a hand-set-up student pays for every week by card from a lesson's link: Stripe's page, then the run goes on the card, charged nothing now", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const id = "paula";
+  try {
+    const [first, second, third] = await handSetUpStudent(id, "2026-09-16T10:00:00.000Z");
+    assert.deepEqual([first.added_by_teacher, first.payment_status, first.amount_cents], [1, "not_required", 2500]);
+    const manage = await token(second.id);
+    assert.deepEqual(await cardOfferOf(manage), { priceCents: 2500, everyWeek: true, replacesCard: false });
+
+    const before = lessonCardState(id);
+    const chargeCount = charges.length;
+    const started = await lessonCardStart(manage, "run", 2500);
+    assert.equal(started.status, 200, await started.clone().text());
+    assert.deepEqual(await started.json(), { url: "https://checkout.stripe.com/c/pay/mock" });
+    const sent = new URLSearchParams(checkoutRequests.at(-1).body);
+    assert.deepEqual([sent.get("mode"), sent.get("customer"), sent.get("customer_creation"), sent.get("customer_email"), sent.get("client_reference_id"), sent.get("ui_mode")],
+      ["setup", null, "always", `${id}@example.invalid`, `lesson-card:${second.id}`, null]);
+    assert.deepEqual([sent.get("metadata[purpose]"), sent.get("metadata[booking_id]"), sent.get("metadata[scope]"), sent.get("metadata[series_id]"),
+      sent.get("metadata[student_id]"), sent.get("metadata[starts_at]"), sent.get("metadata[ends_at]"), sent.get("metadata[amount_cents]")],
+    ["lesson_card", second.id, "run", second.series_id, id, second.starts_at, second.ends_at, "2500"]);
+    const success = new URL(sent.get("success_url"));
+    const cancel = new URL(sent.get("cancel_url"));
+    assert.deepEqual([success.pathname, success.searchParams.get("manage"), success.searchParams.get("card")], ["/book/", manage, "weekly"]);
+    assert.deepEqual([cancel.pathname, cancel.searchParams.get("manage"), cancel.searchParams.has("card")], ["/book/", manage, false]);
+    assert.deepEqual(lessonCardState(id), before, "starting writes nothing");
+
+    // Since the page was opened: Inês made the third week dearer.
+    db.prepare("UPDATE bookings SET amount_cents=3000 WHERE id=?").run(third.id);
+    const event = lessonCardCompleted("paula", { customer: "cus_paula_new" });
+    const agreedAt = new Date(event.data.object.created * 1000).toISOString();
+    assert.equal((await webhook({ ...event, id: "evt_paula_other", data: { object: { ...event.data.object, client_reference_id: `lesson-card:${first.id}` } } })).status, 400,
+      "a session naming another lesson than its metadata is refused");
+    assert.equal((await webhook(event)).status, 200);
+    const after = lessonCardState(id);
+    for (const row of after.bookings) {
+      const expected = row.id === third.id ? ["not_required", null, null] : ["scheduled", agreedAt, "2026-09-21-fourteen-hours-v1"];
+      assert.deepEqual([row.payment_status, row.payment_consent_at, row.payment_consent_version], expected, row.starts_at);
+    }
+    const [run] = after.series;
+    assert.deepEqual([run.automatic_payment, run.payment_consent_at, run.payment_consent_version], [1, agreedAt, "2026-09-21-fourteen-hours-v1"]);
+    assert.deepEqual([after.student.stripe_customer_id, after.student.stripe_payment_method], ["cus_paula_new", "pm_paula"]);
+    assert.deepEqual({ ...after.student, stripe_customer_id: null, stripe_payment_method: null }, before.student, "the standing agreement and the address are untouched");
+    assert.equal(charges.length, chargeCount, "nothing is charged");
+    assert.equal(await cardOfferOf(manage), undefined, "on a card now, so not offered again");
+    // Inês's Needs you card, as for a card saved from the account.
+    const listed = (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).students.find((row) => row.id === id);
+    assert.equal(listed.cardAdded.at, agreedAt);
+    assert.deepEqual(listed.cardAdded.lessons.map((lesson) => lesson.bookingId), after.bookings.filter((row) => row.payment_status === "scheduled").map((row) => row.id));
+
+    // Replayed, or the same session delivered again: nothing changes.
+    assert.equal((await webhook(event)).status, 200);
+    assert.equal((await webhook({ ...event, id: "evt_paula_again" })).status, 200);
+    assert.deepEqual(lessonCardState(id), after);
+
+    // A week the top-up adds later is on the card under the run's agreement.
+    const last = after.bookings.at(-1);
+    db.prepare("DELETE FROM bookings WHERE id=?").run(last.id);
+    const previous = new Date(Date.parse(`${run.filled_to}T00:00:00Z`) - 7 * 86400000).toISOString().slice(0, 10);
+    db.prepare("UPDATE booking_series SET filled_to=? WHERE id=?").run(previous, run.id);
+    // A week on, when that week comes inside the run's horizon again.
+    const previousClock = clock;
+    clock = NativeDate.parse("2026-09-12T03:10:00.000Z");
+    try {
+      await worker.scheduled({ scheduledTime: clock }, env, ctx);
+      await drain();
+    } finally { clock = previousClock; }
+    const regrown = db.prepare("SELECT * FROM bookings WHERE series_id=? AND starts_at=?").get(run.id, last.starts_at);
+    assert.deepEqual([regrown.added_by_teacher, regrown.payment_status, regrown.payment_consent_at, regrown.payment_consent_version, regrown.amount_cents],
+      [1, "scheduled", agreedAt, "2026-09-21-fourteen-hours-v1", 2500]);
+    assert.equal(charges.length, chargeCount);
+  } finally {
+    forgetLessonCardLimits();
+    forgetStudent(`${id}@example.invalid`);
+  }
+});
+
+await test("paying by card for this lesson only puts that lesson on the card, with the student's own Stripe customer; the run and its other weeks stay paid to Inês", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const id = "lena";
+  try {
+    const rows = await handSetUpStudent(id, "2026-09-17T10:00:00.000Z", 4, "cus_lena");
+    const manage = await token(rows[1].id);
+    const before = lessonCardState(id);
+    const started = await lessonCardStart(manage, "lesson", 2500);
+    assert.equal(started.status, 200, await started.clone().text());
+    const sent = new URLSearchParams(checkoutRequests.at(-1).body);
+    assert.deepEqual([sent.get("customer"), sent.get("customer_creation"), sent.get("metadata[scope]"), sent.has("metadata[series_id]")], ["cus_lena", null, "lesson", false]);
+    assert.equal(new URL(sent.get("success_url")).searchParams.get("card"), "lesson");
+    assert.equal((await webhook(lessonCardCompleted("lena", { customer: "cus_lena" }))).status, 200);
+    const after = lessonCardState(id);
+    assert.deepEqual(after.bookings.map((row) => row.payment_status), ["not_required", "scheduled", "not_required", "not_required"]);
+    assert.deepEqual(after.series, before.series, "the run is untouched");
+    assert.deepEqual([after.student.stripe_customer_id, after.student.stripe_payment_method, after.student.card_consent_at], ["cus_lena", "pm_lena", null]);
+    // Another week of hers is still offered, on its own and for every week,
+    // and says the card it adds would take the place of the one just saved.
+    assert.deepEqual(await cardOfferOf(await token(rows[2].id)), { priceCents: 2500, everyWeek: true, replacesCard: true });
+  } finally {
+    forgetLessonCardLimits();
+    forgetStudent(`${id}@example.invalid`);
+  }
+});
+
+await test("Pay by card is offered and started only for a lesson of hers to come, paid to her at a price, from a student account while cards are taken; refusals write nothing", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const id = "rhea";
+  const sessionCount = checkoutRequests.length;
+  try {
+    const rows = await handSetUpStudent(id, "2026-10-07T10:00:00.000Z", null);
+    db.prepare("INSERT INTO students (id,email,name,password_hash,created_at,role) VALUES ('rhea-teacher','rhea-teacher@example.invalid','Not A Student','',?,'teacher')").run(new Date().toISOString());
+    const lesson = async (name, patch) => {
+      const lessonId = linkedBooking(`card-${name}`, { owner: id, payment: "not_required", start: "2026-10-08T10:00:00.000Z", end: "2026-10-08T11:00:00.000Z" });
+      db.prepare("UPDATE bookings SET added_by_teacher=1, amount_cents=2500 WHERE id=?").run(lessonId);
+      for (const [column, value] of Object.entries(patch)) db.prepare(`UPDATE bookings SET ${column}=? WHERE id=?`).run(value, lessonId);
+      return token(lessonId);
+    };
+    const refused = [
+      ["on-card", { payment_status: "scheduled", payment_consent_version: "2026-09-21-fourteen-hours-v1" }],
+      ["free", { payment_status: "free", amount_cents: 0 }],
+      ["no-price", { amount_cents: 0 }],
+      ["paid-by-hand", { payment_consent_version: "paid-by-hand" }],
+      ["cancelled", { status: "cancelled", cancelled_by: "teacher" }],
+      ["past", { starts_at: "2026-09-04T10:00:00.000Z", ends_at: "2026-09-04T11:00:00.000Z" }],
+      ["their-own", { added_by_teacher: 0 }],
+      ["charging", { charge_started_at: "2026-09-04T10:00:00.000Z" }],
+      ["charged", { stripe_payment_intent: "pi_already" }],
+      ["not-a-student", { student_id: "rhea-teacher" }]
+    ];
+    for (const [name, patch] of refused) {
+      const manage = await lesson(name, patch);
+      const before = lessonCardState(id);
+      assert.equal(await cardOfferOf(manage), undefined, name);
+      const response = await lessonCardStart(manage, "lesson", patch.amount_cents ?? 2500);
+      assert.equal(response.status, 409, name);
+      assert.match((await response.json()).error, /can't be paid by card here/, name);
+      assert.deepEqual(lessonCardState(id), before, `${name}: nothing is written`);
+      forgetLessonCardLimits();
+    }
+    // A lesson on its own has no every week; the price must be the one shown; the scope must be named.
+    const manage = await token(rows[0].id);
+    assert.deepEqual(await cardOfferOf(manage), { priceCents: 2500, everyWeek: false, replacesCard: false });
+    const before = lessonCardState(id);
+    for (const [body, status, problem] of [
+      [{ scope: "run", expectedPriceCents: 2500 }, 409, /weekly lessons can't be paid by card/],
+      [{ scope: "lesson", expectedPriceCents: 1500 }, 409, /price has changed/],
+      [{ scope: "everything", expectedPriceCents: 2500 }, 400, /Choose this lesson or every week/]
+    ]) {
+      const response = await call(`/bookings/${manage}/card`, { user: null, body });
+      assert.equal(response.status, status, JSON.stringify(body));
+      assert.match((await response.json()).error, problem);
+    }
+    // A card saved from their account, signed in, pays for all her lessons: a link never offers another in its place.
+    db.prepare("UPDATE students SET card_consent_at=?, stripe_customer_id='cus_rhea', stripe_payment_method='pm_rhea' WHERE id=?").run(new Date().toISOString(), id);
+    assert.equal(await cardOfferOf(manage), undefined);
+    const standing = await lessonCardStart(manage, "lesson", 2500);
+    assert.equal(standing.status, 409);
+    assert.match((await standing.json()).error, /can't be paid by card here/);
+    db.prepare("UPDATE students SET card_consent_at=NULL, stripe_customer_id=NULL, stripe_payment_method=NULL WHERE id=?").run(id);
+    // Cards switched off: neither offered nor started.
+    db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','off')").run();
+    assert.equal(await cardOfferOf(manage), undefined);
+    assert.equal((await lessonCardStart(manage, "lesson", 2500)).status, 503);
+    db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+    // Eight presses in fifteen minutes, then a wait, as Book again is limited.
+    for (let press = 5; press < 8; press += 1) assert.equal((await lessonCardStart(manage, "lesson", 1)).status, 409);
+    assert.equal((await lessonCardStart(manage, "lesson", 2500)).status, 429);
+    assert.equal((await lessonCardStart("not-a-token", "lesson", 2500)).status, 404);
+    assert.deepEqual(lessonCardState(id), before);
+    assert.equal(checkoutRequests.length, sessionCount, "no card page was opened");
+  } finally {
+    db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+    forgetLessonCardLimits();
+    db.prepare("DELETE FROM bookings WHERE student_id='rhea-teacher'").run();
+    db.prepare("DELETE FROM students WHERE id='rhea-teacher'").run();
+    forgetStudent(`${id}@example.invalid`);
+  }
+});
+
+await test("a lesson changed while Stripe's page was open is never put on the card, and the card is not kept", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const id = "ciro";
+  try {
+    const [run] = await handSetUpStudent(id, "2026-10-14T10:00:00.000Z", 4);
+    const changes = {
+      cancelled: "status='cancelled', cancelled_by='teacher'",
+      moved: "starts_at='2026-10-08T11:00:00.000Z', ends_at='2026-10-08T12:00:00.000Z'",
+      repriced: "amount_cents=3000",
+      "paid-by-hand": "payment_consent_version='paid-by-hand'",
+      charged: "charge_started_at='2026-09-05T09:00:00.000Z'"
+    };
+    for (const [change, mutation] of Object.entries(changes)) {
+      const lessonId = linkedBooking(`ciro-${change}`, { owner: id, payment: "not_required", start: "2026-10-08T10:00:00.000Z", end: "2026-10-08T11:00:00.000Z" });
+      db.prepare("UPDATE bookings SET added_by_teacher=1, amount_cents=2500 WHERE id=?").run(lessonId);
+      const started = await lessonCardStart(await token(lessonId), "lesson", 2500);
+      assert.equal(started.status, 200, `${change}: ${await started.clone().text()}`);
+      db.prepare(`UPDATE bookings SET ${mutation} WHERE id=?`).run(lessonId);
+      const before = lessonCardState(id);
+      assert.equal((await webhook(lessonCardCompleted(`ciro-${change}`, { customer: "cus_ciro" }))).status, 200, change);
+      assert.deepEqual(lessonCardState(id), before, `${change}: nothing goes on the card and the card is not kept`);
+      db.prepare("DELETE FROM bookings WHERE id=?").run(lessonId);
+      forgetLessonCardLimits();
+    }
+    // A card saved from their account meanwhile, with its standing agreement, is never replaced from a link.
+    const lessonId = linkedBooking("ciro-standing", { owner: id, payment: "not_required", start: "2026-10-08T10:00:00.000Z", end: "2026-10-08T11:00:00.000Z" });
+    db.prepare("UPDATE bookings SET added_by_teacher=1, amount_cents=2500 WHERE id=?").run(lessonId);
+    assert.equal((await lessonCardStart(await token(lessonId), "lesson", 2500)).status, 200);
+    db.prepare("UPDATE students SET card_consent_at=?, stripe_customer_id='cus_ciro_account', stripe_payment_method='pm_ciro_account' WHERE id=?").run(new Date().toISOString(), id);
+    const withAccountCard = lessonCardState(id);
+    assert.equal((await webhook(lessonCardCompleted("ciro-standing", { customer: "cus_ciro" }))).status, 200);
+    assert.deepEqual(lessonCardState(id), withAccountCard, "the account's card stays and the lesson is not put on the other");
+    db.prepare("UPDATE students SET card_consent_at=NULL, stripe_customer_id=NULL, stripe_payment_method=NULL WHERE id=?").run(id);
+    db.prepare("DELETE FROM bookings WHERE id=?").run(lessonId);
+    forgetLessonCardLimits();
+    // Every week: the run stopped meanwhile, so nothing at all.
+    const started = await lessonCardStart(await token(run.id), "run", 2500);
+    assert.equal(started.status, 200, await started.clone().text());
+    db.prepare("UPDATE booking_series SET status='ended' WHERE id=?").run(run.series_id);
+    const before = lessonCardState(id);
+    assert.equal((await webhook(lessonCardCompleted("ciro-run", { customer: "cus_ciro" }))).status, 200);
+    assert.deepEqual(lessonCardState(id), before);
+  } finally {
+    forgetLessonCardLimits();
+    forgetStudent(`${id}@example.invalid`);
+  }
+});
+
+await test("a lesson put on a card from its link is charged when it ends, or the no-show fee instead; Remove card puts her lessons back to being paid to her", async () => {
+  db.prepare("INSERT OR REPLACE INTO settings VALUES ('payment_mode','postpay')").run();
+  const id = "noor";
+  try {
+    const rows = await handSetUpStudent(id, "2026-09-09T10:00:00.000Z", 4);
+    for (const [index, name] of [[0, "noor-a"], [1, "noor-b"]]) {
+      assert.equal((await lessonCardStart(await token(rows[index].id), "lesson", 2500)).status, 200);
+      assert.equal((await webhook(lessonCardCompleted(name, { customer: "cus_noor", paymentMethod: "pm_noor" }))).status, 200);
+    }
+    // Her own booking on the card, under the same agreement: Remove card leaves it.
+    const own = linkedBooking("noor-own", { owner: id, start: "2026-09-25T10:00:00.000Z", end: "2026-09-25T11:00:00.000Z" });
+    db.prepare("UPDATE bookings SET payment_consent_at=?, payment_consent_version='2026-09-21-fourteen-hours-v1' WHERE id=?").run(new Date().toISOString(), own);
+
+    // C4: the first ends and is charged its price on the saved card; the second is a no-show.
+    db.prepare("UPDATE bookings SET attendance_status='no_show', no_show_marked_at=? WHERE id=?").run(new Date().toISOString(), rows[1].id);
+    await chargeDueLessons(env, new Date("2026-09-16T12:00:00.000Z"));
+    const taken = (bookingId) => charges.filter((charge) => charge.key === `ines:charge:${bookingId}:lesson` || charge.key === `ines:charge:${bookingId}:no-show`);
+    const [lessonCharge] = taken(rows[0].id);
+    assert.equal(taken(rows[0].id).length, 1);
+    assert.equal(lessonCharge.amount, 2500);
+    assert.deepEqual([new URLSearchParams(lessonCharge.body).get("customer"), new URLSearchParams(lessonCharge.body).get("payment_method")], ["cus_noor", "pm_noor"]);
+    assert.deepEqual(taken(rows[1].id).map((charge) => [charge.key.split(":").at(-1), charge.amount]), [["no-show", 500]]);
+    assert.deepEqual(db.prepare("SELECT payment_status FROM bookings WHERE id IN (?,?)").all(rows[0].id, rows[1].id).map((row) => row.payment_status), ["paid", "paid"]);
+
+    // C5: signed in, Remove card.
+    assert.equal((await lessonCardStart(await token(rows[2].id), "lesson", 2500)).status, 200);
+    assert.equal((await webhook(lessonCardCompleted("noor-c", { customer: "cus_noor", paymentMethod: "pm_noor" }))).status, 200);
+    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(rows[2].id).payment_status, "scheduled");
+    const removed = await call("/me/card/remove", { token: await createSession(id, env.BOOKING_TOKEN_SECRET) });
+    assert.equal(removed.status, 200, await removed.clone().text());
+    assert.deepEqual({ ...db.prepare("SELECT payment_status, payment_consent_at, payment_consent_version FROM bookings WHERE id=?").get(rows[2].id) },
+      { payment_status: "not_required", payment_consent_at: null, payment_consent_version: null });
+    assert.equal(db.prepare("SELECT payment_status FROM bookings WHERE id=?").get(own).payment_status, "scheduled", "their own booking is not touched");
+    assert.deepEqual(db.prepare("SELECT payment_status FROM bookings WHERE id IN (?,?)").all(rows[0].id, rows[1].id).map((row) => row.payment_status), ["paid", "paid"]);
+  } finally {
+    forgetLessonCardLimits();
+    forgetStudent(`${id}@example.invalid`);
+  }
+});
+
 console.log(`${passed} booking integration tests passed.`);
 globalThis.fetch = nativeFetch;
 globalThis.Date = NativeDate;
