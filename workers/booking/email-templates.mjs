@@ -35,13 +35,14 @@ export const FREE_LABEL = "Free";
  * A welcome is the first email many students have from this address, so it
  * says who sent it and why, and keeps passwords and cards out of its subject,
  * preheader and button. This makes the invitation clearer; inbox placement
- * still depends on the receiving provider.
+ * still depends on the receiving provider. It says so in as few plain words
+ * as it can (11 November 2026, Dan: "simpler language", "less verbose"):
+ * many of its readers are reading a second language. The site's own link
+ * under every email is the way in once the button has run out.
  */
 const welcomeFooter = (tutor) => [
-  `You’re getting this because ${tutor.shortName} added you as one of ${tutor.pronouns.possessive} students.`,
-  "The button lasts 14 days.",
-  `You can also open ${tutor.site.domain} yourself, press Sign in, then “Email me a sign-in link”.`,
-  `Reply to this email if you have a question for ${tutor.shortName}.`
+  "The button works for 14 days.",
+  `Questions for ${tutor.shortName}? Just reply to this email.`
 ];
 const MANAGE_LABEL = "Change or cancel this lesson";
 const ALL_LESSONS_LABEL = "See all your lessons";
@@ -104,10 +105,10 @@ function policyFooter(policy, { notice, fee, run = false, tutor }) {
 function welcomeSteps(welcome, { book = false } = {}) {
   // With no lesson yet, the last step is theirs: choosing one (16 October 2026, Inês).
   if (book) {
-    const items = ["Press the button below to sign in.", ...(welcome.card ? ["Add your card."] : []), "Choose a day and time for your next lesson."];
+    const items = ["Press the button below.", ...(welcome.card ? ["Add your card."] : []), "Choose a day and time for your next lesson."];
     return { title: items.length === 3 ? "Three quick steps" : "Two quick steps", items };
   }
-  return welcome.card ? { title: "Two quick steps", items: ["Press the button below to sign in.", "Add your card. That’s it."] } : null;
+  return welcome.card ? { title: "Two quick steps", items: ["Press the button below.", "Add your card."] } : null;
 }
 
 function welcomeAction(welcome, { book = false } = {}) {
@@ -687,14 +688,17 @@ export function paymentFailed({ tutor = currentTutor(), first, item, amount, les
  */
 export function welcome({ tutor = currentTutor(), first, welcome, book, free, rows }) {
   return {
-    subject: book ? `Book your next lesson with ${tutor.shortName}` : `Your lessons with ${tutor.shortName}, in one place`,
+    subject: book ? `Book your next lesson with ${tutor.shortName}` : `Your lessons with ${tutor.shortName}`,
     content: {
-      heading: book ? "Book your next lesson" : "Your lessons, in one place",
-      preheader: `${tutor.shortName} has invited you to use ${tutor.pronouns.possessive} website for your ${tutor.language.name} lessons.`,
+      heading: book ? "Book your next lesson" : "Your lessons",
+      preheader: book
+        ? `You can now book your lessons on ${tutor.shortName}’s website.`
+        : `Your lessons are now on ${tutor.shortName}’s website.`,
+      // One sentence: who it is from, why, and the website by name.
       intro: book
-        ? `${hello(first, tutor)} ${tutor.shortName} has invited you to use ${tutor.site.domain} for your ${tutor.language.name} lessons. Choose a time for your next lesson whenever it suits you.`
-        : `${hello(first, tutor)} ${tutor.shortName} has invited you to use ${tutor.site.domain} to manage your ${tutor.language.name} lessons. Your lessons and prices are below; sign in to see or change your bookings.`,
-      callout: free ? `Your lessons with ${tutor.shortName} are free: there’s no card to add and nothing to pay.` : "",
+        ? `${hello(first, tutor)} you can now book your lessons with ${tutor.shortName} on ${tutor.pronouns.possessive} website, ${tutor.site.domain}.`
+        : `${hello(first, tutor)} your lessons with ${tutor.shortName} are now on ${tutor.pronouns.possessive} website, ${tutor.site.domain}.`,
+      callout: free ? "Your lessons are free: there’s no card to add and nothing to pay." : "",
       rows,
       steps: welcomeSteps(welcome, { book }),
       action: welcomeAction(welcome, { book }),

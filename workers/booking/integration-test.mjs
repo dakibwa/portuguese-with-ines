@@ -4121,7 +4121,7 @@ await test("she welcomes a student with no lessons: they are asked to book their
   try {
     const priced = await welcomeOf("booker@example.invalid", { 60: 2500 });
     assert.equal(priced.email.subject, "Book your next lesson with Inês");
-    assert.match(priced.email.text, /choose a time for your next lesson/i);
+    assert.match(priced.email.text, /you can now book your lessons with Inês/);
     assert.ok(priced.email.text.includes("Choose a day and time for your next lesson."));
     assert.ok(!/Lesson · |Weekly · |And more/.test(priced.email.text), "no lesson list");
     assert.ok(priced.email.text.includes("€25 a lesson"), "their own price still shows");
