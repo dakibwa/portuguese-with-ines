@@ -601,7 +601,8 @@ free times and removes selected times that cannot be booked in the new place.
   off the card reads `Lessons not on card` whatever they have agreed to,
   11 November 2026)
   and `Paid up` (or `€70 open` in coral, counting
-  past lessons she added that were neither charged nor ticked paid); a
+  past lessons she added that were neither charged nor ticked paid, one she
+  added after it happened included, 11 November 2026); a
   blue dab marks each one done. Card and paid are omitted when cards are
   unavailable or the student is free at every length. The next button is
   coral when the move is hers (`Invite`, then `Ask to pay`, then `Ask for
@@ -710,13 +711,20 @@ free times and removes selected times that cannot be booked in the new place.
   year for a lesson already had (15 October 2026, Dan). Past days read quieter
   but stay choosable; a past day's times are every quarter hour, as the same
   time blobs, since weekly hours don't bind what has happened. A past lesson
-  is purely a record (15 October 2026, Dan): date, time, length, place, add.
-  A past time hides How often but keeps Where, Online or In Porto, for her
-  records (16 October 2026, Dan); the place is followed by the `Already paid`
+  is recorded (15 October 2026, Dan): date, time, length with its price,
+  place, add. A past time hides How often but keeps Where, Online or In
+  Porto (16 October 2026, Dan); the place is followed by the `Already paid`
   tick and one coral `Add past lesson` (beneath the times on a phone, under
   the settings beside the calendar on a wide row). Nothing is said about
-  email, because nothing is sent or charged; her history reads `Recorded`, or
-  carries the ticked `Already paid` once ticked.
+  email, because nothing is sent.
+  A lesson she added after it happened then reads and behaves as any past
+  lesson she added (11 November 2026, Dan, of a card with one past lesson
+  open and two saying `Recorded`: "why are they different", "it should be
+  consistent"): it is open at the student's price until a card pays it or
+  she ticks `Already paid`, so it carries the tick in her history, never the
+  word `Recorded`, and opened its dab reads `€20 · to pay you directly`.
+  The word survives only in the status line straight after she adds one
+  (`27 Aug, 09:30 · recorded`).
   `Already paid` (16 October 2026, Dan) is one tick, the booking agreement's
   squiggle capsule with a paint dab for its box: pale lavender dab on the
   lilac wash until ticked, then the blue capsule with a coral dab and a cream
@@ -2223,7 +2231,14 @@ paid`, and that one email goes), and `Save changes` waits as the quiet
 outline until something differs. Where the form has room, date sits beside
 time and length beside place. Every week means every later lesson takes the
 new day and time in its own week, so the dab is what happens. A lesson
-already had, or a record, offers only the date and time. Both `Change` and
+already had is corrected in the same form (11 November 2026, Dan: "Ines
+should be able to change previous lessons to like from 60 to 90 too"):
+with nothing of it on a card it offers date, time, length and place with
+the same dabs (`Becomes 90 minutes, €30`), no `Every week` choice, a new
+time that stays in the past, and the dab `No email is sent`. One paid,
+ticked `Already paid`, free, a trial or on their card keeps its length and
+place, offers only the date and time, and says why in a dab (`Length and
+place stay: it's on their card`). Both `Change` and
 `Cancel` start on `This lesson`; cancelling keeps `Cancel this lesson?`, with
 what happens as a dab. Cancelling every week reads `Cancel these lessons?`,
 lists how many and between which days, and confirms with `Yes, cancel 8

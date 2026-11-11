@@ -82,7 +82,7 @@ import { ExpressionProblem, expressionsRequest } from "./expressions.mjs";
 import { approvedTranslations, pendingTranslationCount, submitTranslation, translationsMissing, translationsReview } from "./expression-translations.mjs";
 import { HomeworkProblem, HOMEWORK_PHOTO_BODY_LIMIT, teacherHomework, studentHomework, homeworkReturns, homeworkTablesMissing, notifyHomeworkSubmissions, studentNotes, saveStudentPlan } from "./homework.mjs";
 import { closedExpressions, expressionsOpenToStudents, pickExpression, studentExpressions } from "./student-expressions.mjs";
-import { findRecurringCode, studentRates, studentLessonType, lessonPriceSnapshot, lessonPriceSnapshotSql, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
+import { findRecurringCode, studentRates, studentLessonType, lessonPriceSnapshot, lessonPriceSnapshotSql, studentTypePriceSql, priceForMove, teacherRate, withDerived, rateLimitAddress, takeRateLimit } from "./rates.mjs";
 import { nifProblem, normaliseNif } from "./nif.mjs";
 import { formatEuros } from "./money.mjs";
 import { bookingSelection, claimSelection } from "./selection.mjs";
@@ -1188,11 +1188,29 @@ async function issueWelcome(env, settings, student, { always = false, authorizat
 
 
 /**
- * A lesson Inês records after it happened is kept for the record only
- * (15 October 2026, Dan): `payment_status = 'recorded'`, no price. Nothing
- * that charges, chases, reprices, reminds or issues receipts reads it.
+ * A lesson Inês records after it happened (15 October 2026, Dan):
+ * `payment_status = 'recorded'` marks that it was added afterwards, so nobody
+ * was told of it, it never moves to a time to come, and nothing reminds,
+ * reprices or gives it a Meet. For money it is any past lesson she added
+ * (11 November 2026, Dan: "Ines needs to send a link for all three"): open
+ * until a card pays it or she ticks "Already paid", priced by
+ * `lessonCentsSql`. Named in a link the student agrees to, it goes on their
+ * card and from then is an ordinary lesson on it.
  */
 const RECORDED = "recorded";
+
+/**
+ * What a lesson she added costs, as SQL on the bookings row `alias`: its own
+ * amount, or, for a record kept before records carried one, the student's
+ * price for its length now. Every statement that reads what a past lesson
+ * still owes reads it from here.
+ */
+function lessonCentsSql(alias) {
+  return `COALESCE(${alias}.amount_cents,
+    CASE WHEN ${alias}.payment_status = '${RECORDED}' THEN (SELECT ${studentTypePriceSql("priced_type", `${alias}.student_id`)}
+      FROM lesson_types priced_type WHERE priced_type.id = ${alias}.lesson_type_id) END,
+    (SELECT price_cents FROM lesson_types WHERE id = ${alias}.lesson_type_id))`;
+}
 
 /**
  * A lesson at a price Inês set to €0 (16 October 2026, Dan: "can Inês set a
@@ -1208,12 +1226,13 @@ const FREE = "free";
 
 /**
  * The SET clauses that make a lesson free when its new amount is 0, as a
- * change of length onto a free length does; a priced lesson keeps its status.
- * `amount` is SQL, bound or read three times.
+ * change of length onto a free length does; a priced lesson keeps its status,
+ * and a record stays a record (at €0 it is never open). `amount` is SQL,
+ * bound or read three times.
  */
-const FREE_ON_ZERO = (amount) => `payment_status = CASE WHEN ${amount} = 0 THEN '${FREE}' ELSE payment_status END,
-       payment_consent_at = CASE WHEN ${amount} = 0 THEN NULL ELSE payment_consent_at END,
-       payment_consent_version = CASE WHEN ${amount} = 0 THEN NULL ELSE payment_consent_version END`;
+const FREE_ON_ZERO = (amount) => `payment_status = CASE WHEN ${amount} = 0 AND payment_status != '${RECORDED}' THEN '${FREE}' ELSE payment_status END,
+       payment_consent_at = CASE WHEN ${amount} = 0 AND payment_status != '${RECORDED}' THEN NULL ELSE payment_consent_at END,
+       payment_consent_version = CASE WHEN ${amount} = 0 AND payment_status != '${RECORDED}' THEN NULL ELSE payment_consent_version END`;
 
 /**
  * A free lesson changes length only onto another free one: it was booked with
@@ -1557,7 +1576,7 @@ async function teacherStudentList(env) {
        -- and never ticked, so she reads it as still to settle, not a debt.
        (SELECT COUNT(*) FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
           WHERE b.student_id = s.id AND b.starts_at <= ? AND ${CARD_LESSON_TERMS}) AS unpaid_past,
-       (SELECT COALESCE(SUM(COALESCE(b.amount_cents, l.price_cents)), 0) FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
+       (SELECT COALESCE(SUM(${lessonCentsSql("b")}), 0) FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
           WHERE b.student_id = s.id AND b.starts_at <= ? AND ${CARD_LESSON_TERMS}) AS unpaid_past_cents,
        -- Their newest way in still unspent: a welcome, invite or payment link.
        (SELECT MAX(created_at) FROM sign_in_links sl WHERE sl.student_id = s.id AND sl.expires_at > ?) AS invited_at
@@ -1657,11 +1676,14 @@ async function teacherStudentList(env) {
  * within D1's 100 bound values.
  */
 const MAX_CARD_LESSONS = 20;
-/** A lesson she added that a card can still pay for: `b` the booking, `l` its lesson type. */
+/**
+ * A lesson she added that a card can still pay for: `b` the booking, `l` its
+ * lesson type. A record is one too (11 November 2026), at its price.
+ */
 const CARD_LESSON_TERMS = `b.added_by_teacher = 1 AND b.status = 'confirmed'
-  AND b.payment_status = 'not_required' AND b.charge_started_at IS NULL AND b.attendance_status = 'expected'
+  AND b.payment_status IN ('not_required', '${RECORDED}') AND b.charge_started_at IS NULL AND b.attendance_status = 'expected'
   AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
-  AND COALESCE(b.amount_cents, l.price_cents) > 0`;
+  AND ${lessonCentsSql("b")} > 0`;
 const CARD_LESSON_SQL = `b.student_id = ? AND ${CARD_LESSON_TERMS}`;
 
 /** Distinct booking ids, from a list or a link's comma-separated value; null when any is malformed. */
@@ -1674,7 +1696,7 @@ function cardBookingIds(value) {
 /** Explicitly selected unpaid lessons, including ones that have already ended,
  * in time order. No other past lesson is swept into standing card consent. */
 async function cardBookings(env, studentId, ids) {
-  const { results } = await env.DB.prepare(`SELECT b.*, COALESCE(b.amount_cents, l.price_cents) AS card_amount
+  const { results } = await env.DB.prepare(`SELECT b.*, ${lessonCentsSql("b")} AS card_amount
     FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
     WHERE b.id IN (${ids.map(() => "?").join(", ")}) AND ${CARD_LESSON_SQL}
     ORDER BY b.starts_at`).bind(...ids, studentId).all();
@@ -1689,7 +1711,7 @@ async function cardBooking(env, studentId, bookingId) {
 /** What she can tick into one link: the lesson she opened and the student's
  * other unpaid lessons that have started, newest first. */
 async function cardLessonChoices(env, studentId, openedId) {
-  const { results } = await env.DB.prepare(`SELECT b.*, COALESCE(b.amount_cents, l.price_cents) AS card_amount
+  const { results } = await env.DB.prepare(`SELECT b.*, ${lessonCentsSql("b")} AS card_amount
     FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
     WHERE (b.starts_at <= ? OR b.id = ?) AND ${CARD_LESSON_SQL}
     ORDER BY b.id = ? DESC, b.starts_at DESC LIMIT ${MAX_CARD_LESSONS}`)
@@ -1737,7 +1759,7 @@ async function authoriseSavedCard(request, env, student, bookings) {
   const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const marker = `card-authorisation:${crypto.randomUUID()}`;
   // Every reviewed lesson must still match its snapshot, or none is approved.
-  const reviewed = bookings.map(() => "(b.id = ? AND b.starts_at = ? AND b.ends_at = ? AND COALESCE(b.amount_cents, l.price_cents) = ?)").join(" OR ");
+  const reviewed = bookings.map(() => `(b.id = ? AND b.starts_at = ? AND b.ends_at = ? AND ${lessonCentsSql("b")} = ?)`).join(" OR ");
   const [saved] = await env.DB.batch([
     env.DB.prepare(`UPDATE students SET card_consent_at = ?
       WHERE id = ? AND session_version = ? AND card_setup_version = ?
@@ -1745,7 +1767,7 @@ async function authoriseSavedCard(request, env, student, bookings) {
         AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE token_hash = ?)
         AND (SELECT COUNT(*) FROM bookings b JOIN lesson_types l ON l.id = b.lesson_type_id
           WHERE b.student_id = students.id AND b.added_by_teacher = 1 AND b.status = 'confirmed'
-            AND b.payment_status = 'not_required' AND b.charge_started_at IS NULL AND b.attendance_status = 'expected'
+            AND b.payment_status IN ('not_required', '${RECORDED}') AND b.charge_started_at IS NULL AND b.attendance_status = 'expected'
             AND COALESCE(b.payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
             AND (${reviewed})) = ?`)
       .bind(now, student.id, student.session_version ?? 0, student.card_setup_version ?? 0,
@@ -1753,13 +1775,16 @@ async function authoriseSavedCard(request, env, student, bookings) {
         ...bookings.flatMap((booking) => [booking.id, booking.startAt, booking.endAt, booking.amountCents]), bookings.length),
     env.DB.prepare("INSERT INTO request_limits (key, window, attempts) SELECT ?, ?, 1 WHERE changes() > 0")
       .bind(marker, Math.floor(Date.now() / 900000)),
+    // A record goes on the card only when named, at the amount reviewed.
     env.DB.prepare(`UPDATE bookings SET payment_status = 'scheduled',
-        amount_cents = COALESCE(amount_cents, (SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)),
+        amount_cents = ${lessonCentsSql("bookings")},
         payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
-      WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed' AND payment_status = 'not_required'
-        AND (starts_at > ? OR id IN (${bookings.map(() => "?").join(", ")})) AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
+      WHERE student_id = ? AND added_by_teacher = 1 AND status = 'confirmed'
+        AND ((payment_status = 'not_required' AND (starts_at > ? OR id IN (${bookings.map(() => "?").join(", ")})))
+          OR (payment_status = '${RECORDED}' AND id IN (${bookings.map(() => "?").join(", ")})))
+        AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
         AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`)
-      .bind(now, STUDENT_CARD_CONSENT_VERSION, now, student.id, now, ...bookings.map((booking) => booking.id), marker),
+      .bind(now, STUDENT_CARD_CONSENT_VERSION, now, student.id, now, ...bookings.map((booking) => booking.id), ...bookings.map((booking) => booking.id), marker),
     env.DB.prepare(`UPDATE booking_series SET automatic_payment = 1, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
       WHERE student_id = ? AND added_by_teacher = 1 AND status = 'active' AND automatic_payment = 0
         AND EXISTS (SELECT 1 FROM request_limits WHERE key = ?)`)
@@ -1962,10 +1987,10 @@ async function confirmStudentCard(env, session) {
     ...approved.map((lesson) => env.DB.prepare(`UPDATE bookings SET payment_status = 'scheduled', amount_cents = ?,
         payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
       WHERE id = ? AND student_id = ? AND added_by_teacher = 1 AND status = 'confirmed'
-        AND payment_status = 'not_required' AND charge_started_at IS NULL AND attendance_status = 'expected'
+        AND payment_status IN ('not_required', '${RECORDED}') AND charge_started_at IS NULL AND attendance_status = 'expected'
         AND COALESCE(payment_consent_version, '') != '${PAID_BY_HAND_MARK}'
         AND starts_at = ? AND ends_at = ?
-        AND COALESCE(amount_cents, (SELECT price_cents FROM lesson_types WHERE id = bookings.lesson_type_id)) = ? AND ${current}`)
+        AND ${lessonCentsSql("bookings")} = ? AND ${current}`)
       .bind(lesson.amountCents, consentedAt, STUDENT_CARD_CONSENT_VERSION, now, lesson.id, student.id,
         lesson.startAt, lesson.endAt, lesson.amountCents, student.id, consentedAt, setupVersion, accountVersion)),
     env.DB.prepare(
@@ -6510,7 +6535,9 @@ async function teacherCancelFollowing(request, env, ctx, row, message, authoriza
 
 /** Why a lesson keeps its length when she changes it, in a few words, or "". */
 function lengthKeptReason(row, currentLessonType, lessonType, amountCents) {
-  if (!lessonTypeChangeProblem(row, currentLessonType, lessonType) && !freeLengthProblem(row, amountCents) && !row.charge_started_at) return "";
+  // A record changes length as any lesson paid to her directly does.
+  const terms = row.payment_status === RECORDED ? { ...row, payment_status: "not_required" } : row;
+  if (!lessonTypeChangeProblem(terms, currentLessonType, lessonType) && !freeLengthProblem(terms, amountCents) && !row.charge_started_at) return "";
   if (currentLessonType.id === "trial") return "it's a trial lesson";
   if (row.payment_status === "paid" || row.payment_consent_version === PAID_BY_HAND_MARK) return "it's already paid";
   if (row.payment_status === "payment_due") return "it has a payment due";
@@ -6519,19 +6546,58 @@ function lengthKeptReason(row, currentLessonType, lessonType, amountCents) {
 }
 
 /**
+ * Why a lesson already had can't take her correction, in a few words, or ""
+ * (11 November 2026, Dan: "Ines should be able to change previous lessons to
+ * like from 60 to 90 too"). Only one with nothing on a card can: paid to her
+ * directly or a record, no charge started, not ticked "Already paid". One on
+ * a card and not yet charged keeps what the card is about to be charged for.
+ */
+function pastChangeProblem(row) {
+  if (row.payment_status === "paid" || row.payment_consent_version === PAID_BY_HAND_MARK) return "it's already paid";
+  if (row.payment_status === "payment_due") return "it has a payment due";
+  if (row.payment_status === "processing" || row.charge_started_at) return "its payment is going through";
+  if (row.payment_status === FREE) return "it's free";
+  if (row.payment_status === "scheduled") return "it's on their card";
+  if (row.payment_status === "not_required" || row.payment_status === RECORDED) return "";
+  return "its payment is going through";
+}
+
+/** A lesson already had is corrected on its own, never with the weeks after it. */
+const PAST_FOLLOWING = "A lesson already had changes on its own.";
+/** A lesson already had stays in the past. */
+const PAST_STAYS = "A lesson already had stays in the past. Add a new lesson instead.";
+
+/**
+ * In a correction's guarded write: the lesson as read is still one already
+ * had with nothing on a card (`current`, bound to now once).
+ */
+const PAST_ROW_SQL = `current.starts_at <= ? AND current.payment_status IN ('not_required', '${RECORDED}')
+  AND COALESCE(current.payment_consent_version, '') != '${PAID_BY_HAND_MARK}'`;
+
+/**
+ * A corrected lesson already had may still be running; the Meet sweep leaves
+ * it alone until its new end, after which it never reads it, so nothing goes
+ * to Google for it.
+ */
+const PAST_MEET_HOLD = `, meeting_retry_at = MAX(COALESCE(meeting_retry_at, ''), (SELECT end_at FROM proposed WHERE id = bookings.id))`;
+
+/**
  * Her change of a lesson's length, or of it and every later week of its run
  * (9 November 2026, Dan: "change recurring ones from 60 to 90 and they all
  * change"). Each changes to the student's own price for the new length, in
  * one guarded write: all of them or none. A lesson paid, being paid or free,
  * or one the longer lesson would run into another, keeps its length and is
  * named in the reply. With `following` the run's recipe takes the new length
- * too, so weeks added to it later are booked at it.
+ * too, so weeks added to it later are booked at it. A lesson already had
+ * changes on its own, only with nothing on a card, and nobody is told.
  */
 async function teacherChangeLength(request, env, ctx, bookingId, body, authorization) {
   const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(bookingId).first();
   if (!row || row.status !== "confirmed") return fail("That lesson could not be found.", 404, request, env);
-  if (Date.parse(row.starts_at) <= Date.now()) return fail("A lesson already had keeps its length.", 409, request, env);
+  // One already had is corrected quietly: see `pastChangeProblem`.
+  const past = Date.parse(row.starts_at) <= Date.now();
   const following = body.following === true;
+  if (past && following) return fail(PAST_FOLLOWING, 400, request, env);
   if (following && !row.series_id) return fail("This lesson isn't part of a weekly run.", 400, request, env);
   const lessonType = await loadLessonType(env, cleanText(body.lessonType, 40));
   if (!lessonType || lessonType.id === "trial") return fail("Choose 60 or 90 minutes.", 400, request, env);
@@ -6554,7 +6620,8 @@ async function teacherChangeLength(request, env, ctx, bookingId, body, authoriza
     }
     const endAt = new Date(Date.parse(lesson.starts_at) + lessonType.duration_minutes * 60000).toISOString();
     // Her own lessons keep no gap, as when she adds one: only an overlap stops it.
-    const reason = lengthKeptReason(lesson, types.get(lesson.lesson_type_id), lessonType, amountCents) ||
+    const reason = (past ? pastChangeProblem(lesson) : "") ||
+      lengthKeptReason(lesson, types.get(lesson.lesson_type_id), lessonType, amountCents) ||
       (await env.DB.prepare(
         `SELECT 1 FROM bookings WHERE id != ? AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > ?))
            AND starts_at < ? AND ends_at > ? LIMIT 1`
@@ -6594,13 +6661,14 @@ async function teacherChangeLength(request, env, ctx, bookingId, body, authoriza
      UPDATE bookings
      SET lesson_type_id = ?, ends_at = (SELECT end_at FROM proposed WHERE id = bookings.id),
        amount_cents = ?, ${FREE_ON_ZERO("?")}, sequence = sequence + 1, same_day_change = 0, updated_at = ?
+       ${past ? PAST_MEET_HOLD : ""}
      WHERE id IN (SELECT id FROM proposed)
        AND (SELECT COUNT(*) FROM bookings current JOIN proposed p ON p.id = current.id
               AND p.start_at = current.starts_at AND p.old_sequence = current.sequence
               AND p.old_lesson_type = current.lesson_type_id AND p.old_payment_status = current.payment_status
               AND p.old_amount IS current.amount_cents AND p.old_consent_at IS current.payment_consent_at
               AND p.old_consent_version IS current.payment_consent_version
-            WHERE current.status = 'confirmed' AND current.starts_at > ? AND current.charge_started_at IS NULL
+            WHERE current.status = 'confirmed' AND ${past ? PAST_ROW_SQL : "current.starts_at > ?"} AND current.charge_started_at IS NULL
               AND NOT EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = current.id AND status = 'pending')) = ?
        AND (? IS NULL OR (SELECT COUNT(*) FROM bookings current
             WHERE current.series_id = ? AND current.status = 'confirmed' AND current.starts_at >= ?) = ?)
@@ -6628,6 +6696,8 @@ async function teacherChangeLength(request, env, ctx, bookingId, body, authoriza
   const { results: updated = [] } = await env.DB.prepare(
     "SELECT * FROM bookings WHERE id IN (SELECT value FROM json_each(?)) ORDER BY starts_at"
   ).bind(JSON.stringify(planned.map((entry) => entry.id))).all();
+  // A lesson already had is not news to anyone: no email, invite or Meet.
+  if (past) return json({ changed: updated.map((lesson) => lesson.starts_at), kept, emailed: false }, 200, request, env);
   const settings = await loadSettings(env);
   const manageUrls = {};
   for (const lesson of updated) {
@@ -6675,22 +6745,26 @@ function daysBetweenKeys(fromKey, toKey) {
  * student's own: the new place and a new sequence, after which `notify`
  * reconciles the one Google event and its Meet room. She is held only by
  * overlap, never by her hours, time off or online-only periods, and no fee
- * is ever created.
+ * is ever created. A lesson already had, a record included, is corrected the
+ * same way within the past, on its own and with nothing sent to anyone.
  */
 async function teacherChangeLesson(request, env, ctx, bookingId, body, authorization) {
   const row = await env.DB.prepare("SELECT * FROM bookings WHERE id = ?").bind(bookingId).first();
   if (!row || row.status !== "confirmed") return fail("That lesson could not be found.", 404, request, env);
-  if (row.payment_status === RECORDED) return fail("A recorded lesson stays in the past. Add a new lesson instead.", 409, request, env);
   const nowMs = Date.now();
-  if (Date.parse(row.starts_at) <= nowMs) return fail("A lesson already had stays as it was.", 409, request, env);
+  // One already had (a record included) is corrected within the past, on
+  // its own and quietly: see `pastChangeProblem`.
+  const past = Date.parse(row.starts_at) <= nowMs;
   const following = body.following === true;
+  if (past && following) return fail(PAST_FOLLOWING, 400, request, env);
   if (following && !row.series_id) return fail("This lesson isn't part of a weekly run.", 400, request, env);
 
   let start = null;
   if (body.startAt !== undefined && body.startAt !== null) {
     start = new Date(body.startAt);
     if (typeof body.startAt !== "string" || Number.isNaN(start.getTime())) return fail("That time could not be understood.", 400, request, env);
-    if (start.getTime() <= nowMs) return fail("Choose a time still to come.", 409, request, env);
+    if (past && start.getTime() > nowMs) return fail(PAST_STAYS, 409, request, env);
+    if (!past && start.getTime() <= nowMs) return fail("Choose a time still to come.", 409, request, env);
   }
   const timeMoves = Boolean(start) && start.toISOString() !== row.starts_at;
   let location = null;
@@ -6753,6 +6827,7 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
         await env.DB.prepare("SELECT 1 FROM booking_refunds WHERE booking_id = ? AND status = 'pending'").bind(lesson.id).first()) {
       reason = "its payment is going through";
     }
+    if (past) reason ||= pastChangeProblem(lesson);
     reason ||= lengthChanges ? lengthKeptReason(lesson, currentType, nextType, amountCents) : "";
     if (reason) {
       kept.push({ lesson, reason });
@@ -6825,22 +6900,23 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
        lesson_type_id = (SELECT lesson_type FROM proposed WHERE id = bookings.id),
        location = (SELECT location FROM proposed WHERE id = bookings.id),
        amount_cents = (SELECT amount FROM proposed WHERE id = bookings.id),
-       payment_status = CASE WHEN (SELECT length_changes = 1 AND amount = 0 FROM proposed WHERE id = bookings.id) THEN '${FREE}' ELSE payment_status END,
-       payment_consent_at = CASE WHEN (SELECT length_changes = 1 AND amount = 0 FROM proposed WHERE id = bookings.id) THEN NULL ELSE payment_consent_at END,
-       payment_consent_version = CASE WHEN (SELECT length_changes = 1 AND amount = 0 FROM proposed WHERE id = bookings.id) THEN NULL ELSE payment_consent_version END,
+       payment_status = CASE WHEN payment_status != '${RECORDED}' AND (SELECT length_changes = 1 AND amount = 0 FROM proposed WHERE id = bookings.id) THEN '${FREE}' ELSE payment_status END,
+       payment_consent_at = CASE WHEN payment_status != '${RECORDED}' AND (SELECT length_changes = 1 AND amount = 0 FROM proposed WHERE id = bookings.id) THEN NULL ELSE payment_consent_at END,
+       payment_consent_version = CASE WHEN payment_status != '${RECORDED}' AND (SELECT length_changes = 1 AND amount = 0 FROM proposed WHERE id = bookings.id) THEN NULL ELSE payment_consent_version END,
        previous_starts_at = starts_at, reschedule_count = reschedule_count + 1,
        sequence = sequence + 1, same_day_change = 0, updated_at = ?,
        attendance_status = CASE WHEN payment_status = 'scheduled' AND charge_started_at IS NULL
          AND (SELECT start_at != bookings.starts_at OR end_at != bookings.ends_at FROM proposed WHERE id = bookings.id) THEN 'expected' ELSE attendance_status END,
        no_show_marked_at = CASE WHEN payment_status = 'scheduled' AND charge_started_at IS NULL
          AND (SELECT start_at != bookings.starts_at OR end_at != bookings.ends_at FROM proposed WHERE id = bookings.id) THEN NULL ELSE no_show_marked_at END
+       ${past ? PAST_MEET_HOLD : ""}
      WHERE id IN (SELECT id FROM proposed)
        AND (SELECT COUNT(*) FROM bookings current JOIN proposed p ON p.id = current.id
               AND p.old_start = current.starts_at AND p.old_end = current.ends_at AND p.old_sequence = current.sequence
               AND p.old_lesson_type = current.lesson_type_id AND p.old_location = current.location
               AND p.old_payment_status = current.payment_status AND p.old_amount IS current.amount_cents
               AND p.old_consent_at IS current.payment_consent_at AND p.old_consent_version IS current.payment_consent_version
-            WHERE current.status = 'confirmed' AND current.starts_at > ? AND current.charge_started_at IS NULL
+            WHERE current.status = 'confirmed' AND ${past ? PAST_ROW_SQL : "current.starts_at > ?"} AND current.charge_started_at IS NULL
               AND current.payment_status != 'processing' AND current.same_day_fee_status != 'processing'
               AND NOT EXISTS (SELECT 1 FROM booking_refunds WHERE booking_id = current.id AND status = 'pending')) = ?
        AND (? IS NULL OR (SELECT COUNT(*) FROM bookings current
@@ -6892,6 +6968,8 @@ async function teacherChangeLesson(request, env, ctx, bookingId, body, authoriza
   const { results: updated = [] } = await env.DB.prepare(
     "SELECT * FROM bookings WHERE id IN (SELECT value FROM json_each(?)) ORDER BY starts_at"
   ).bind(JSON.stringify(planned.map((entry) => entry.id))).all();
+  // A lesson already had is not news to anyone: no email, invite or Meet.
+  if (past) return json({ changed: updated.map((lesson) => lesson.starts_at), kept: keptReply, emailed: false }, 200, request, env);
   const settings = await loadSettings(env);
   const manageUrls = {};
   for (const lesson of updated) {
@@ -7622,8 +7700,9 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
 
     /*
      * A lesson that has already started is one she is recording (15 October
-     * 2026, Dan): it is kept for the record, so nobody is told, nothing is
-     * charged or owed and no Meet is made.
+     * 2026, Dan): nobody is told and no Meet is made. It carries the student's
+     * price, quoted as any lesson she adds is, and is open until it is paid
+     * (11 November 2026, Dan).
      */
     const past = start <= new Date();
     if (past && wantsRepeat) return fail("A weekly run starts today or later.", 400, request, env);
@@ -7660,7 +7739,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     if (!student) return fail("Add them as a student first.", 404, request, env);
 
     lessonType = await studentLessonType(env, student.id, lessonType);
-    if ((!past || paid) && body.expectedPriceCents !== undefined && body.expectedPriceCents !== lessonType.price_cents) {
+    if (body.expectedPriceCents !== undefined && body.expectedPriceCents !== lessonType.price_cents) {
       return fail("Their lesson price has changed. Please review it before confirming.", 409, request, env);
     }
 
@@ -7721,7 +7800,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
         now,
         now,
         paymentStatus,
-        past && !paidByHand ? null : lessonType.price_cents,
+        lessonType.price_cents,
         onCard ? student.card_consent_at : null,
         onCard ? STUDENT_CARD_CONSENT_VERSION : paidByHand ? PAID_BY_HAND_MARK : null,
         1,
@@ -7729,7 +7808,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
         past ? endsAt.toISOString() : null
       ], startAt: start.toISOString(), endAt: endsAt.toISOString(),
       standingCardStudent: onCard ? student : null,
-      priceSnapshot: past && !paidByHand ? null : priceSnapshot, authorization
+      priceSnapshot, authorization
     });
     if (!claimed) return fail("That time or their lesson price has changed. Please review before adding it.", 409, request, env);
 
@@ -7976,7 +8055,8 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
    * "Already paid" on any lesson (16 October 2026, Dan). Ticked, it is never
    * charged, linked or chased, never moved onto a card, and is in Receipts as
    * paid by hand. Unticked, a lesson to come goes back to how it would be paid
-   * now (see `untickedTerms`); a record goes back to being only a record.
+   * now (see `untickedTerms`); a record stays a record at the price it was
+   * ticked at, open again (11 November 2026).
    * Nothing is emailed either way.
    */
   const adminPaid = path.match(/^\/admin\/bookings\/([^/]+)\/paid$/);
@@ -7992,9 +8072,11 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
     let changed = { meta: { changes: 1 } };
     if (body.paid && !ticked) {
       const lessonType = await env.DB.prepare("SELECT * FROM lesson_types WHERE id = ?").bind(row.lesson_type_id).first();
-      const price = row.payment_status === RECORDED
+      // What it costs, as the open rule reads it: a record kept with no
+      // amount is at the student's price now.
+      const price = row.amount_cents ?? (row.payment_status === RECORDED
         ? (await studentLessonType(env, row.student_id, lessonType)).price_cents
-        : row.amount_cents ?? lessonType.price_cents;
+        : lessonType.price_cents);
       if (!price) return fail("A free lesson has nothing to pay.", 409, request, env);
       // The agreement it had stays on it, so unticking can restore it.
       changed = await env.DB.prepare(
@@ -8006,7 +8088,7 @@ async function handleAdminAction(request, env, ctx, url, path, admin, adminBody,
       ).bind(price, PAID_BY_HAND_MARK, now, row.id, row.sequence, PAID_BY_HAND_MARK, ...authorization.values).run();
     } else if (!body.paid && ticked) {
       const terms = row.payment_status === RECORDED
-        ? { status: RECORDED, amount: null, consentAt: null, version: null }
+        ? { status: RECORDED, amount: row.amount_cents ?? null, consentAt: null, version: null }
         : await untickedTerms(env, row);
       changed = await env.DB.prepare(
         `UPDATE bookings SET payment_status = ?, amount_cents = ?, payment_consent_at = ?, payment_consent_version = ?, updated_at = ?
