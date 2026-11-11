@@ -29,19 +29,23 @@ export const metadata: Metadata = pageMetadata({
  *   asks for. The calendar uses this answer only if it asks for exactly that.
  *
  * Deliberately tiny and deliberately total: if anything here throws, or a
- * fetch fails, the component simply does what it always did.
+ * fetch fails, the component simply does what it always did. The account and
+ * the free times are handed over as they are, so each also gets an empty
+ * catch here: one that fails before the component has taken it (offline, or
+ * a blocked connection) is then not reported to the browser as an error
+ * nobody handled, and still fails for the component when it asks.
  */
 const primeBooking = BOOKING_API_BASE_URL
   ? `try{(function(b,z){var h={Accept:"application/json"};` +
     `window.__inesLessonTypes=fetch(b+"/lesson-types",{headers:h}).then(function(r){return r.ok?r.json():null}).catch(function(){return null});` +
     `var s="",r="";try{s=localStorage.getItem("ines-student-session")||"";r=localStorage.getItem("ines-returning-student")||""}catch(e){}` +
-    `if(s){window.__inesMe={token:s,response:fetch(b+"/me",{headers:{Accept:"application/json",Authorization:"Bearer "+s}})};return}` +
+    `if(s){var m=fetch(b+"/me",{headers:{Accept:"application/json",Authorization:"Bearer "+s}});m.catch(function(){});window.__inesMe={token:s,response:m};return}` +
     `var q=new URLSearchParams(location.search);` +
     `if(q.get("view")==="lessons"||["manage","token","emailToken","card","signin"].some(function(k){return q.has(k)}))return;` +
     `var l=q.get("lesson"),t=l==="single"||l==="long"?l:r?"single":"trial";` +
     `var d=new Intl.DateTimeFormat("en-CA",{timeZone:z,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()),p=d.split("-");` +
     `var u=b+"/availability?"+new URLSearchParams({lessonType:t,from:d,to:new Date(Date.UTC(+p[0],p[1]-1,+p[2]+140)).toISOString().slice(0,10)});` +
-    `window.__inesAvailability={url:u,response:fetch(u,{headers:h})}` +
+    `var a=fetch(u,{headers:h});a.catch(function(){});window.__inesAvailability={url:u,response:a}` +
     `})(${JSON.stringify(BOOKING_API_BASE_URL)},${JSON.stringify(BOOKING_TIME_ZONE)})}catch(e){}`
   : "";
 

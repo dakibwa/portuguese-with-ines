@@ -150,7 +150,6 @@ try {
     await page.keyboard.press("Escape");
     await accountSiteMenu.waitFor({ state: "hidden" });
     await settle();
-    if ([1920, 390].includes(width)) await page.screenshot({ path: `${out}/upcoming-${width}.png`, fullPage: true });
   }
 
   // Past lessons sit beneath the calendar on the same card: the latest few,
@@ -160,7 +159,6 @@ try {
   const history = page.locator("#lesson-calendar #account-past-lessons");
   await history.getByRole("button", { name: "6 earlier lessons", exact: true }).click();
   await settle();
-  await page.screenshot({ path: `${out}/history-desktop.png`, fullPage: true });
   for (const width of [1920, 390]) {
     await page.setViewportSize({ width, height: width < 500 ? 844 : 1100 });
     assert.deepEqual(await history.locator(".past-lesson time").evaluateAll(times => times.map(time => new Date(time.dateTime).toISOString())), expectedHistory,
@@ -172,7 +170,6 @@ try {
   await page.getByRole("button", { name: "Change name", exact: true }).waitFor();
   assert.equal(await page.locator("#lesson-calendar, #account-past-lessons").count(), 0);
   await settle();
-  await page.screenshot({ path: `${out}/profile-desktop.png`, fullPage: true });
   await accountAction("Done editing");
   await accountAction("Your lessons");
   await accountAction("Your lessons");
@@ -217,15 +214,12 @@ try {
   // Every booked day is marked on the calendar and the nearest one leads.
   assert.equal(await page.locator("#lesson-calendar .calendar-week button.has-booking").count(), 8);
   assert.match(await page.locator(".lesson-overview__next").innerText(), /Monday, 7 September 2026/);
-  await page.screenshot({ path: `${out}/upcoming-long-desktop.png`, fullPage: true });
 
-  for (const width of [390]) {
-    await page.setViewportSize({ width, height: 844 });
-    await page.goto(`${base}/`);
-    await openMenuWithStationaryHeader(`${width}px header`);
-    await page.keyboard.press("Escape");
-    await settle();
-  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${base}/`);
+  await openMenuWithStationaryHeader("390px header");
+  await page.keyboard.press("Escape");
+  await settle();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${base}/faq/`);
@@ -251,7 +245,6 @@ try {
   assert.equal(await page.evaluate(() => document.activeElement.textContent.trim()), "Message on WhatsApp (opens in a new tab)");
   await page.keyboard.press("Tab");
   assert.equal(await page.evaluate(() => document.activeElement.getAttribute("aria-label")), "Português com a Inês, home");
-  await page.screenshot({ path: `${out}/menu-mobile.png` });
   await page.keyboard.press("Escape");
   await menu.waitFor({ state: "hidden" });
   await settle();
@@ -287,7 +280,6 @@ try {
   await page.setViewportSize({ width: 390, height: 420 });
   await page.goto(`${base}/faq/?from=akibwa`);
   await openMenuWithStationaryHeader("Portfolio header");
-  await page.screenshot({ path: `${out}/menu-with-portfolio-mobile.png` });
   await menu.getByRole("link", { name: "Booking", exact: true }).click();
   await page.locator("#booking-title").waitFor();
   const bookingUrl = page.url();
@@ -308,12 +300,20 @@ try {
   await page.locator(".site-footer__legal").getByRole("link", { name: "Terms & privacy", exact: true }).click();
   await page.locator("#terms-privacy[open]").waitFor();
 
-  // Old policy links open the same combined dialog inside booking.
-  for (const [oldPath, section] of [["booking-terms/", "booking"], ["privacy/", "privacy"], ["terms/#privacy", "privacy"], ["terms/", "terms-privacy"], ["book/#booking", "booking"], ["book/#change-booking", "change-booking"]]) {
+  // Old policy links, and the fragments emailed links carry, open the same
+  // combined dialog inside booking; closing it leaves the address clean.
+  for (const [oldPath, section] of [["booking-terms/", "booking"], ["privacy/", "privacy"], ["terms/#privacy", "privacy"], ["terms/", "terms-privacy"], ["book/#booking", "booking"], ["book/#change-booking", "change-booking"], ["book/#terms-privacy", "terms-privacy"], ["book/#privacy", "privacy"]]) {
     await page.goto(`${base}/${oldPath}`);
     await page.waitForURL(`**/book/#${section}`);
     await page.locator("#terms-privacy[open]").waitFor();
+    if (oldPath.startsWith("book/#")) {
+      await page.getByRole("button", { name: "Close terms & privacy", exact: true }).click();
+      await page.waitForFunction(() => !window.location.hash);
+    }
   }
+  // An old emailed management address lands on booking.
+  await page.goto(`${base}/booking`);
+  await page.waitForFunction(() => window.location.pathname === "/book/");
 
   const legacy = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await calendarFixtures(legacy.context());
@@ -374,7 +374,6 @@ try {
   assert.match((await portoTip.textContent()).replace(/\s+/g, " "), /^Wednesday,? 16 September 2026, 10:00 Porto time ?60 mins · In Porto$/);
   await abroadPage.waitForFunction(() => getComputedStyle(document.querySelector(".calendar-zone__porto")).opacity === "1");
   assert.equal(await shownClock(), "Porto time");
-  await abroadPage.screenshot({ path: `${out}/lesson-hover-porto-desktop.png` });
   await abroadPage.mouse.move(1, 1);
   await abroadPage.waitForFunction(() => getComputedStyle(document.querySelector(".calendar-zone__own")).opacity === "1");
   assert.equal(await shownClock(), "Los Angeles time");
@@ -382,7 +381,7 @@ try {
   await abroadPage.locator(".lesson-overview__next").waitFor({ state: "visible" });
   await abroad.close();
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ok: true, layouts, screenshots: out }, null, 2));
+  console.log(JSON.stringify({ ok: true, layouts }, null, 2));
 } catch (error) {
   // What the page was doing, read without waiting on a frame: a page that has
   // stopped drawing still answers script.

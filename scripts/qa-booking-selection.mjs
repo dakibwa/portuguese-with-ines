@@ -1,13 +1,11 @@
 import { chromium } from "playwright";
 import { expect } from "@playwright/test";
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
 
 // Browser choices and request boundaries use isolated fixtures; the matching
 // atomic SQL, signed webhooks and email grouping run in integration-test.mjs.
 const base = (process.env.QA_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const out = "tmp/qa/selection";
-await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const types = [
   { id: "trial", slug: "trial", name: "Trial lesson", description: "", duration_minutes: 60, price_cents: 2000 },
@@ -101,7 +99,9 @@ try {
       await page.getByRole("button", { name: time, exact: true }).click();
       await page.locator("#booking-confirmation-stage").waitFor();
     }
-    async function confirm(count) {
+    // The terms are read over the first confirmation only; qa-flow reads them
+    // again at each width, before and after agreeing.
+    async function confirm(count, { readTerms = false } = {}) {
       const button = page.getByRole("button", { name: `Book ${count} lessons & agree to pay`, exact: true });
       await button.waitFor();
       assert.equal(await button.isDisabled(), true, "Explicit consent is required for the whole selection");
@@ -114,18 +114,19 @@ try {
       assert.equal(await agreement.getAttribute("aria-pressed"), "false", "Agreement can be withdrawn with the keyboard");
       assert.equal(await button.isDisabled(), true);
       await agreement.press("Enter");
+      if (readTerms) await readTheTerms(agreement);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Terms and agreement fit at ${width}px`);
+      await button.click();
+    }
+    async function readTheTerms(agreement) {
       await page.locator(".booking-agreement__control").getByRole("link", { name: "terms & privacy", exact: true }).click();
       await page.locator("#terms-privacy[open]").waitFor();
       assert.equal(await page.locator(".booking-information details").count(), 0);
       assert.equal(await page.getByRole("dialog", { name: "Terms & privacy", exact: true }).count(), 1);
       // The section headings are lilac eyebrows, capitalised by CSS; read the words.
       assert.equal(await page.locator(".policy-information h2").first().textContent(), "Booking");
-      await page.locator("#terms-privacy").screenshot({ path: `${out}/terms-${width}.png` });
       assert.equal(await agreement.getAttribute("aria-pressed"), "true", "Reading the terms keeps the selection and agreement");
       await page.getByRole("button", { name: "Close terms & privacy", exact: true }).click();
-      await page.locator("#booking-confirmation-stage").screenshot({ path: `${out}/agreement-${width}.png` });
-      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Terms and agreement fit at ${width}px`);
-      await button.click();
     }
     async function checkOverflow() {
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `No overflow at ${width}px`);
@@ -180,9 +181,8 @@ try {
     await choose("2026-09-17");
     await checkOverflow();
     await page.locator('.booking-chosen-lessons').scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `${out}/single-${width}.png` });
     rejectNext = true;
-    await confirm(3);
+    await confirm(3, { readTerms: true });
     await page.getByRole("alert").filter({ hasText: "Nothing has been booked" }).waitFor({ timeout: 5000 }).catch(async error => {
       console.error(JSON.stringify({ requests, text: await page.locator("body").innerText(), errors }, null, 2));
       await page.screenshot({ path: `${out}/failure-${width}.png` });
@@ -209,7 +209,6 @@ try {
     assert.equal(await page.getByRole("button", { name: /Add a second weekly time/ }).count(), 0);
     await checkOverflow();
     await page.locator('.booking-chosen-lessons').scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `${out}/recurring-${width}.png` });
     await confirm(8);
     await page.getByRole("heading", { name: "You’re booked in.", exact: true }).waitFor();
     assert.equal(requests.at(-1).startAts.length, 2);
@@ -234,7 +233,6 @@ try {
     assert.equal(await page.locator(".booking-agreement").count(), 0);
     assert.match(await page.locator("#booking-payment-summary").innerText(), /nothing to pay and no card needed/);
     await checkOverflow();
-    await page.screenshot({ path: `${out}/free-confirm-${width}.png` });
     await freeBook.click();
     await page.getByRole("heading", { name: "You’re booked in.", exact: true }).waitFor();
     assert.equal(requests.at(-1).expectedPriceCents, 0);
@@ -247,7 +245,6 @@ try {
     await lessonDialog.getByRole("button", { name: "Change", exact: true }).waitFor();
     await lessonDialog.getByText("60 mins · Online · Free", { exact: true }).waitFor();
     assert.doesNotMatch(await lessonDialog.innerText(), /€|card/i, "Nothing about money on a free lesson");
-    await page.screenshot({ path: `${out}/free-lessons-${width}.png` });
     assert.deepEqual(errors, []);
     await context.close();
 
@@ -284,5 +281,5 @@ try {
     assert.equal(await distantPage.locator(".booking-chosen-lessons li").count(), 2, "Both local weeks can supply weekly times from one Porto week");
     await distant.close();
   }
-console.log("Booking selection, agreement and combined terms checks passed at 320px, 390px and 1280px.");
+console.log("Booking selection, agreement and combined terms checks passed at 390px and 1280px.");
 } finally { await browser.close(); }
