@@ -357,6 +357,99 @@ export function labelOnlineOnly(
   return result;
 }
 
+/**
+ * One date's online-only hours set to exactly `spans` (11 November 2026, Dan:
+ * "when setting exact hours she can set online only times too"); every other
+ * date keeps its own. Empty `spans` takes the label off the date.
+ */
+export function setOnlineOnlyHours(
+  periods: OnlineOnlyPeriod[],
+  date: string,
+  spans: Span[],
+  today: string,
+  newId: () => string = () => crypto.randomUUID(),
+): OnlineOnlyPeriod[] {
+  const [first, ...rest] = mergeSpans(spans);
+  const result = labelOnlineOnly(periods, [date], first ?? null, today, newId);
+  if (!rest.length) return result;
+  const all = [...result, ...rest.map((span) => ({ id: newId(), fromDate: date, toDate: date, startMinute: span.start, endMinute: span.end }))]
+    .sort((a, b) => a.fromDate.localeCompare(b.fromDate) || a.startMinute - b.startMinute);
+  if (all.length > MAX_ONLINE_ONLY_PERIODS)
+    throw new Error(`Online only can cover at most ${MAX_ONLINE_ONLY_PERIODS} separate runs of days.`);
+  return all;
+}
+
+/** The first of `spans` that touches `start`–`end`. */
+export function spanAround(spans: Span[], start: number, end: number) {
+  return spans.find((span) => span.start < end && start < span.end) ?? null;
+}
+
+export type HoursKind = "off" | "online";
+
+/**
+ * One date's hours off and online-only hours after she chooses what `span`
+ * is, from the times on her Timetable: `off`, `online`, or `null` to open it
+ * again. `original` is the block she pressed, which a kind replaces; opening
+ * again opens just `span`, so she can shorten a block. Hours are never both:
+ * making them one kind takes them out of the other.
+ */
+export function chooseHours(
+  current: { off: Span[]; online: Span[] },
+  original: { kind: HoursKind; span: Span } | null,
+  kind: HoursKind | null,
+  span: Span,
+) {
+  let { off, online } = current;
+  // A kind chosen replaces the block pressed; opening again opens only the times set.
+  if (kind && original?.kind === "off") off = removeSpan(off, original.span);
+  if (kind && original?.kind === "online") online = removeSpan(online, original.span);
+  off = kind === "off" ? addSpan(off, span) : removeSpan(off, span);
+  online = kind === "online" ? addSpan(online, span) : removeSpan(online, span);
+  return { off: mergeSpans(off), online: mergeSpans(online) };
+}
+
+/** `Tue 8 Sept`, as the week's notes name a date. */
+export function shortDateLabel(date: string) {
+  return dateLabel(date, { weekday: "short", day: "numeric", month: "short" });
+}
+
+export type TimeAheadRow = { dates: string[]; label: string; detail: string };
+
+/**
+ * What she has set from `from` on (2 November 2026): days off, hours off and
+ * online-only stretches. Consecutive whole days off read as one stretch, as
+ * does each online-only period; rows are in date order.
+ */
+export function timeAhead(exceptions: AvailabilityException[], onlineOnly: OnlineOnlyPeriod[], from: string): TimeAheadRow[] {
+  const off = daysOff(exceptions);
+  const blocked = [...new Set(exceptions
+    .filter((exception) => exception.kind === "blocked" && exception.weekday == null && exception.date && exception.date >= from)
+    .map((exception) => exception.date as string))].sort();
+  const rows: { dates: string[]; hours: boolean; note: string }[] = [];
+  for (const date of blocked) {
+    const last = rows.at(-1);
+    if (off.has(date) && last && !last.hours && shiftDate(last.dates.at(-1)!, 1) === date) { last.dates.push(date); continue; }
+    rows.push({ dates: [date], hours: !off.has(date), note: off.get(date) ?? "" });
+  }
+  const stretch = (dates: string[]) => dates.length > 1 ? `${shortDateLabel(dates[0])} – ${shortDateLabel(dates.at(-1)!)}` : shortDateLabel(dates[0]);
+  return [
+    ...rows.map((row) => ({
+      dates: row.dates,
+      label: stretch(row.dates),
+      detail: [row.hours
+        ? `Off ${dateBlocks(exceptions, row.dates[0]).map(spanLabel).join(", ")}`
+        : row.dates.length > 1 ? `${row.dates.length} days off` : "Day off", row.note]
+        .filter((part, index, parts) => part && parts.findIndex((other) => other.toLowerCase() === part.toLowerCase()) === index).join(" · "),
+    })),
+    ...onlineOnly.filter((period) => period.toDate >= from).map((period) => {
+      const dates: string[] = [];
+      for (let date = period.fromDate < from ? from : period.fromDate; date <= period.toDate; date = shiftDate(date, 1)) dates.push(date);
+      const hours = onlineOnlyLabel([{ start: period.startMinute, end: period.endMinute }]);
+      return { dates, label: stretch(dates), detail: `${dates.length > 1 ? `${dates.length} days online only` : "Online only"}${hours === "All day" ? "" : `, ${hours}`}` };
+    }),
+  ].sort((a, b) => a.dates[0].localeCompare(b.dates[0]));
+}
+
 function localMinute(value: string) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: TUTOR_TIME_ZONE,

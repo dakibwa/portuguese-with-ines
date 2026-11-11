@@ -462,14 +462,16 @@ const dayWrites = (state, date) =>
     .filter((entry) => entry.path === "/admin/exceptions/day")
     .map((entry) => entry.data)
     .filter((entry) => !date || entry.date === date);
-// A free time offers a choice; time off is one of its two options.
-async function takeOff(page, cell, { tap = false } = {}) {
+// A time pressed offers a choice at it: a lesson there, or its hours as time
+// off or online only, their times set first. Nothing saves until she chooses.
+const choiceAt = (page) => page.locator(".teacher-slot-menu");
+async function takeOff(page, cell, { tap = false, kind = "Time off" } = {}) {
   if (tap) await cell.tap();
   else await cell.click();
-  const item = page.getByRole("menu").getByRole("menuitem", { name: "Take this time off", exact: true });
+  const item = choiceAt(page).getByRole("button", { name: kind, exact: true });
   if (tap) await item.tap();
   else await item.click();
-  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(choiceAt(page)).toHaveCount(0);
 }
 async function dragDown(page, from, to) {
   const start = await from.boundingBox();
@@ -519,46 +521,61 @@ async function lessonLocation(page, name, location) {
 }
 
 try {
-  // One online-only journey on the Time off card, with a failed save retaining her choice.
-  // The choice is one line at the month's foot: how many days, Off, Online only.
+  // Online only from the Timetable (11 November 2026): a day's switch beside
+  // Day off, a day being one or the other, and some hours by exact times.
   for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
-    const days = ["2026-09-14", "2026-09-15", "2026-09-16"];
-    const card = page.locator(".teacher-timeoff");
-    const chip = card.getByRole("button", { name: "Online only", exact: true });
-    const choose = async () => {
-      await page.getByRole("tab", { name: "Time off", exact: true }).click();
-      for (const date of days) await page.locator(`[data-timeoff-date="${date}"]`).click();
-    };
-    await choose();
+    const note = page.locator(".teacher-week .teacher-save-state");
+    if (width === 390) await page.getByRole("button", { name: /^Wednesday 9 September/ }).click();
+    const online = page.getByRole("switch", { name: "Online only, Wednesday 9 September", exact: true });
+    const off = page.getByRole("switch", { name: "Day off, Wednesday 9 September", exact: true });
     state.failOnlineOnly = true;
-    await chip.click();
-    await expect(card.getByRole("alert")).toContainText("couldn’t be saved");
-    await expect(chip).toHaveAttribute("aria-pressed", "false");
-    await expect(card.getByRole("group", { name: "Chosen days" })).toContainText("3 days");
-    await expect(card.locator('.teacher-month-day[aria-pressed="true"]')).toHaveCount(3);
-    await chip.click();
-    await expect(chip).toHaveAttribute("aria-pressed", "true");
-    await card.getByRole("button", { name: "Change online-only hours", exact: true }).click();
-    await card.getByRole("radio", { name: "Some hours", exact: true }).check();
-    await card.getByLabel("From", { exact: true }).fill("12:00");
-    await card.getByLabel("Until", { exact: true }).fill("16:00");
-    await card.getByLabel("Until", { exact: true }).press("Enter");
-    await expect(card.getByRole("status")).toContainText("3 selected days are online only, 12:00–16:00.");
-    await expect(card.getByRole("button", { name: "Change online-only hours", exact: true })).toBeFocused();
-    assert.deepEqual(state.onlineOnlyPeriods, [{ id: state.onlineOnlyPeriods[0].id, fromDate: "2026-09-14", toDate: "2026-09-16", startMinute: 720, endMinute: 960 }]);
-    // What she set is listed beside the month, one row for the stretch.
-    await expect(card.locator(".teacher-timeoff-upcoming")).toContainText("3 days online only, 12:00–16:00");
-    await page.locator(".teacher-timeoff").screenshot({ path: `tmp/qa/teacher/online-only-${width}.png` });
+    await online.click();
+    await expect(page.locator(".teacher-week").getByRole("alert")).toContainText("Wed 9 Sept was not changed.");
+    await expect(online).toHaveAttribute("aria-checked", "false");
+    await online.click();
+    await expect(online).toHaveAttribute("aria-checked", "true");
+    await expect(note).toHaveText("Wed 9 Sept is online only.");
+    await expect.poll(() => state.onlineOnlyPeriods.map(({ fromDate, toDate, startMinute, endMinute }) => [fromDate, toDate, startMinute, endMinute]))
+      .toEqual([["2026-09-09", "2026-09-09", 0, 1440]]);
+    // Taking the day off takes its online label away; it is never both.
+    await off.click();
+    await expect(off).toHaveAttribute("aria-checked", "true");
+    await expect(online).toHaveAttribute("aria-checked", "false");
+    await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
+    assert.deepEqual(dayWrites(state).at(-1), { date: "2026-09-09", dayOff: true });
+    await online.click();
+    await expect(online).toHaveAttribute("aria-checked", "true");
+    await expect(off).toHaveAttribute("aria-checked", "false");
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", dayOff: false });
+    await online.click();
+    await expect(note).toHaveText("Wed 9 Sept can be booked in Porto again.");
+    await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
+    // Some hours, set exactly at the time she pressed.
+    await slot(page, 3, 630).click();
+    const choice = choiceAt(page);
+    await expect(choice.getByRole("button")).toHaveText(["Add a lesson here", "Time off", "Online only"]);
+    await choice.getByLabel("From", { exact: true }).fill("10:15");
+    await choice.getByLabel("Until", { exact: true }).fill("11:40");
+    assert.deepEqual(state.onlineOnlyPeriods, [], "Setting the times alone saves nothing");
+    await choice.getByRole("button", { name: "Online only", exact: true }).click();
+    await expect(note).toHaveText("10:15–11:40 on Wed 9 Sept is online only.");
+    await expect(slot(page, 3, 630)).toBeFocused();
+    await expect.poll(() => state.onlineOnlyPeriods.map(({ startMinute, endMinute }) => [startMinute, endMinute])).toEqual([[615, 700]]);
+    await expect(page.locator(".teacher-block-label", { hasText: "Online only 10:15–11:40" })).toBeVisible();
+    await page.locator(".teacher-week").screenshot({ path: `tmp/qa/teacher/online-only-${width}.png` });
+    // Pressed again it opens as the block it is, and can become time off instead.
+    await slot(page, 3, 660).click();
+    await expect(choice.getByRole("button", { name: "Online only", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(choice.getByLabel("Until", { exact: true })).toHaveValue("11:40");
+    await choice.getByRole("button", { name: "Time off", exact: true }).click();
+    await expect(note).toHaveText("10:15–11:40 on Wed 9 Sept is off.");
+    await expect.poll(() => state.onlineOnlyPeriods).toEqual([]);
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", blocks: [{ startMinute: 615, endMinute: 700 }] });
+    await slot(page, 3, 660).click();
+    await choice.getByRole("button", { name: "Open again", exact: true }).click();
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-09", blocks: [] });
     await noOverflow(page);
-    await page.reload();
-    await page.getByRole("tab", { name: "Time off", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Tuesday 15 September, online only 12:00–16:00", exact: true })).toBeVisible();
-    await choose();
-    await chip.click();
-    await expect(card.getByRole("status")).toContainText("3 selected days can be booked in Porto again.");
-    await expect(chip).toHaveAttribute("aria-pressed", "false");
-    assert.deepEqual(state.onlineOnlyPeriods, []);
     assert.equal(state.bookings.length, 2, "Her existing lessons remain booked");
     assert.deepEqual(state.errors, []);
     await page.close();
@@ -768,9 +785,9 @@ try {
   const note = page.locator(".teacher-week .teacher-save-state");
   const writesBeforeChoice = state.writes.length;
   await slot(page, 2, 960).click();
-  const choice = page.getByRole("menu");
-  await expect(choice.getByRole("menuitem")).toHaveText(["Add a lesson here", "Take this time off"]);
-  await expect(choice.getByRole("menuitem", { name: "Add a lesson here" })).toBeFocused();
+  const choice = choiceAt(page);
+  await expect(choice.getByRole("button")).toHaveText(["Add a lesson here", "Time off", "Online only"]);
+  await expect(choice.getByRole("button", { name: "Add a lesson here" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(choice).toHaveCount(0);
   await expect(slot(page, 2, 960)).toBeFocused();
@@ -789,7 +806,11 @@ try {
   await expect(
     page.locator(".teacher-block-label", { hasText: "Off 16:00–17:00" }),
   ).toBeVisible();
+  // Hours off open as their block; opening some of it keeps the rest off.
   await slot(page, 2, 960).click();
+  await expect(choiceAt(page).getByRole("button", { name: "Time off", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await choiceAt(page).getByLabel("Until", { exact: true }).fill("16:30");
+  await choiceAt(page).getByRole("button", { name: "Open again", exact: true }).click();
   await expect(slot(page, 2, 960)).toHaveAttribute("aria-pressed", "false");
   await expect(note).toHaveText("16:00–16:30 on Tue 8 Sept is open again.");
   assert.deepEqual(dayWrites(state).at(-1), {
@@ -797,7 +818,14 @@ try {
     blocks: [{ startMinute: 990, endMinute: 1020 }],
   });
 
+  // A drag offers the same choice for all its times, saving nothing until then.
+  const writesBeforeDrag = state.writes.length;
   await dragDown(page, slot(page, 3, 1020), slot(page, 3, 1050));
+  await expect(choiceAt(page).getByRole("button")).toHaveText(["Time off", "Online only"]);
+  await expect(choiceAt(page).getByLabel("From", { exact: true })).toHaveValue("17:00");
+  await expect(choiceAt(page).getByLabel("Until", { exact: true })).toHaveValue("18:00");
+  assert.equal(state.writes.length, writesBeforeDrag, "A drag alone must not save");
+  await choiceAt(page).getByRole("button", { name: "Time off", exact: true }).click();
   for (const minute of [1020, 1050])
     await expect(slot(page, 3, minute)).toHaveAttribute("aria-pressed", "true");
   await expect(note).toHaveText("17:00–18:00 on Wed 9 Sept is off.");
@@ -805,7 +833,7 @@ try {
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Space");
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Take this time off" })).toBeFocused();
+  await expect(choiceAt(page).getByRole("button", { name: "Time off", exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(note).toHaveText("18:00–18:30 on Wed 9 Sept is off.");
   assert.deepEqual(dayWrites(state).at(-1), {
@@ -823,7 +851,7 @@ try {
   ).toBeVisible();
   await slot(page, 1, 750).click({ force: true });
   // A weekly block can still hold a lesson she arranges, but can't be taken off.
-  await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["Add a lesson here"]);
+  await expect(choiceAt(page).getByRole("button")).toHaveText(["Add a lesson here"]);
   await page.keyboard.press("Escape");
   assert.equal(state.writes.length, writesBefore, "Lunch must not be written");
 
@@ -892,8 +920,7 @@ try {
   // A time gone can't be taken off, but a lesson she has had can be recorded there.
   await expect(slot(page, 1, 600)).not.toHaveAttribute("aria-disabled", "true");
   await slot(page, 1, 600).click();
-  await expect(page.getByRole("menuitem", { name: "Add a lesson here", exact: true })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Take this time off", exact: true })).toHaveCount(0);
+  await expect(choiceAt(page).getByRole("button")).toHaveText(["Add a lesson here"]);
   await page.keyboard.press("Escape");
 
   // Reopening a holiday removes only whole-day rows; its hours and extras stay.
@@ -931,7 +958,7 @@ try {
   // form belongs to that student.
   await expect(page.locator(".teacher-manual")).toHaveCount(0);
   await slot(page, 5, 1020).click();
-  await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
+  await page.getByRole("button", { name: "Add a lesson here", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Sam Known", exact: true }).click();
   const forSam = studentRow(page, "Sam Known");
   const forSamForm = forSam.getByRole("region", { name: "Sam Known’s profile", exact: true });
@@ -993,7 +1020,7 @@ try {
   // A free time adds a lesson there, its date and time already in place, and
   // the lesson reads as hers rather than a student's booking.
   await slot(page, 4, 1080).click();
-  await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
+  await page.getByRole("button", { name: "Add a lesson here", exact: true }).click();
   const addDialog = page.getByRole("dialog");
   // Someone new is set up first, then the lesson keeps the time she chose.
   await addDialog.getByRole("button", { name: "Add a new student", exact: true }).click();
@@ -1017,7 +1044,7 @@ try {
   // A student she already has: the lesson belongs to their account. A weekly
   // slot says what was booked and which week was left out.
   await slot(page, 2, 1080).click();
-  await page.getByRole("menuitem", { name: "Add a lesson here", exact: true }).click();
+  await page.getByRole("button", { name: "Add a lesson here", exact: true }).click();
   const weeklyDialog = page.getByRole("dialog");
   await weeklyDialog.getByRole("button", { name: "Sam Known", exact: true }).click();
   await forSamForm.getByRole("radio", { name: "Weekly", exact: true }).check();
@@ -1316,21 +1343,7 @@ try {
   assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[role="checkbox"]') !== null, { x: tickBox.x + tickBox.width / 2, y: tickBox.y + tickBox.height / 2 }), true, "Already paid stays pressable over the stretched day button");
   await nora.getByRole("button", { name: "Close", exact: true }).click();
 
-  // Select a few dates, apply time off, then see those same days in the week.
-  await page.getByRole("tab", { name: "Time off", exact: true }).click();
-  const timeOff = page.locator(".teacher-timeoff");
-  const holidayDates = ["2026-09-28", "2026-09-29", "2026-09-30"];
-  for (const date of holidayDates) await timeOff.locator(`[data-timeoff-date="${date}"]`).click();
-  await timeOff.getByRole("button", { name: "Off", exact: true }).click();
-  await expect
-    .poll(() => holidayDates.map((date) => dayWrites(state, date).at(-1)))
-    .toEqual(holidayDates.map((date) => ({ date, dayOff: true })));
-  await expect(timeOff.locator(".teacher-save-state")).toHaveText("3 selected days are off.");
-  for (const date of holidayDates) await expect(timeOff.locator(`[data-timeoff-date="${date}"]`)).toHaveClass(/is-off/);
   await showLessons(page);
-  for (let index = 0; index < 3; index++) await page.getByRole("button", { name: "Next week" }).click();
-  await expect(page.getByRole("switch", { name: "Day off, Tuesday 29 September" })).toHaveAttribute("aria-checked", "true");
-  await page.getByRole("button", { name: "This week" }).click();
   state.failBookings = true;
   await page.getByRole("button", { name: "Next week" }).click();
   await page
@@ -1744,96 +1757,45 @@ try {
     await page.close();
   }
 
-  // A chosen day is Off or not; a day off's hours open an explicit draft of
-  // one or more breaks, saved only when she presses Save.
+  // Hours off by exact times at the times themselves, and a booked lesson
+  // they leave standing listed under the week as a clash that opens it.
   for (const width of [1280, 390]) {
     const { page, state } = await fixture(width);
     const originalBookings = structuredClone(state.bookings);
     const originalRules = structuredClone(state.rules);
-    await page.getByRole("tab", { name: "Time off", exact: true }).click();
-    const timeOff = page.locator(".teacher-timeoff");
-    const card = timeOff;
-    const offChip = card.getByRole("button", { name: "Off", exact: true });
-    const clear = card.getByRole("button", { name: "Clear chosen days", exact: true });
-    await expect(card.getByText("Tap the days you want off, or online only", { exact: true })).toBeVisible();
-    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toHaveCount(0);
-    const date = page.locator('[data-timeoff-date="2026-09-21"]');
-    await date.click();
-    await expect(date).toHaveAttribute("aria-pressed", "true");
-    // One day reads as many do: how many, then what they are. Already off, its chip is pressed.
-    await expect(card.getByRole("group", { name: "Chosen days" })).toContainText("1 day");
-    await expect(offChip).toHaveAttribute("aria-pressed", "true");
-    const hours = card.getByRole("button", { name: "Change hours off", exact: true });
-    await expect(hours).toContainText("All day");
-    await hours.click();
-    const popup = page.getByRole("dialog", { name: "Mon 21 September" });
-    await expect(popup.getByLabel("From 1", { exact: true })).toHaveValue("10:00");
-    await popup.getByLabel("Until 1", { exact: true }).fill("11:30");
-    await popup.getByRole("button", { name: "Add another break" }).click();
-    await popup.getByLabel("From 2", { exact: true }).fill("15:00");
-    await popup.getByLabel("Until 2", { exact: true }).fill("14:00");
-    await popup.getByRole("button", { name: "Save hours off", exact: true }).click();
-    await expect(popup.getByRole("alert")).toContainText("later end");
-    assert.equal(state.writes.length, 0);
-    await popup.getByLabel("Until 2", { exact: true }).fill("00:00");
-    state.failDay = "2026-09-21";
-    await popup.getByRole("button", { name: "Save hours off", exact: true }).click();
-    await expect(popup.getByRole("alert")).toContainText("busy");
-    await expect(popup.getByLabel("Until 2", { exact: true })).toHaveValue("00:00");
-    await popup.getByRole("button", { name: "Save hours off", exact: true }).click();
-    await expect(popup).toHaveCount(0);
-    await expect(hours).toBeFocused();
-    assert.deepEqual(state.writes.at(-1).data, { date: "2026-09-21", dayOff: false, blocks: [{ startMinute: 600, endMinute: 690 }, { startMinute: 900, endMinute: 1440 }] });
-    await expect(date).not.toHaveClass(/is-off|is-partial/);
-    // Some hours off are the day's hours beneath; Off itself is a whole day.
-    await expect(hours).toContainText("10:00–11:30, 15:00–");
-    await expect(offChip).toHaveAttribute("aria-pressed", "false");
-    await hours.click();
-    await expect(popup.getByLabel("Until 2", { exact: true })).toHaveValue("00:00");
-    await popup.getByRole("button", { name: "Close hours off" }).click();
-    await offChip.click();
-    await expect(date).toHaveClass(/is-off/);
-    await expect(offChip).toHaveAttribute("aria-pressed", "true");
-    await offChip.click();
-    await expect(date).not.toHaveClass(/is-off/);
-    await hours.click();
-    await popup.getByRole("button", { name: "Remove hours off", exact: true }).click();
-    await expect(popup).toHaveCount(0);
-    await expect(offChip).toBeFocused();
-    assert.ok(!state.exceptions.some(row => row.date === "2026-09-21"), "Making the day available and removing its hours clears the date");
-    assert.ok(state.exceptions.some(row => row.weekday === 1 && row.note === "Lunch"), "The recurring lunch break stays in place");
-    assert.ok(state.exceptions.some(row => row.kind === "extra"), "Extra hours stay in place");
-    // A lesson booked on a day she takes off is a clash: its own card beside
-    // the month, opening the lesson so she can move it. The hours draft names
-    // only lessons it overlaps.
-    await clear.click();
-    await page.locator('[data-timeoff-date="2026-09-08"]').click();
-    const booked = card.locator(".teacher-timeoff-lessons .teacher-lesson-card");
-    await expect(booked).toHaveCount(0);
-    await offChip.click();
-    await expect(card.locator(".teacher-timeoff-lessons")).toContainText("Clashes");
-    await expect(booked).toHaveCount(1);
-    await expect(booked).toContainText("Sam");
-    await expect(booked).toContainText("day off");
-    await booked.getByRole("button", { name: /^Change lesson for Sam/ }).click();
+    const clashes = page.locator(".teacher-ahead__clashes .teacher-lesson-card");
+    await expect(clashes).toHaveCount(0);
+    // What is set beyond the week on screen is listed, and turns to its week.
+    const holiday = page.locator(".teacher-ahead__upcoming").getByRole("button", { name: /^Mon 21 Sept, Day off/ });
+    await holiday.click();
+    await expect(page.getByRole("switch", { name: "Day off, Monday 21 September", exact: true })).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator(".teacher-ahead__upcoming")).toHaveCount(0);
+    await page.getByRole("button", { name: "This week", exact: true }).click();
+    if (width === 390) await page.getByRole("button", { name: /^Tuesday 8 September/ }).click();
+    // The lesson covers its own times, so she presses the one before and sets them.
+    await slot(page, 2, 810).click();
+    const choice = choiceAt(page);
+    await choice.getByLabel("From", { exact: true }).fill("14:00");
+    await choice.getByLabel("Until", { exact: true }).fill("13:45");
+    await choice.getByRole("button", { name: "Time off", exact: true }).click();
+    await expect(choice.getByRole("alert")).toHaveText("Choose an end after the start.");
+    assert.deepEqual(dayWrites(state), [], "Times that cannot be saved are not sent");
+    await choice.getByLabel("Until", { exact: true }).fill("15:10");
+    await choice.getByRole("button", { name: "Time off", exact: true }).click();
+    await expect.poll(() => dayWrites(state).at(-1)).toEqual({ date: "2026-09-08", blocks: [{ startMinute: 840, endMinute: 910 }] });
+    await expect(clashes).toHaveCount(1);
+    await expect(clashes).toContainText("Sam");
+    await expect(clashes).toContainText("hours off");
+    await clashes.getByRole("button", { name: /^Change lesson for Sam/ }).click();
     await expect(page.getByRole("dialog", { name: "Sam", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Close lesson details", exact: true }).click();
-    await expect(booked.getByRole("button", { name: /^Change lesson for Sam/ })).toBeFocused();
-    await hours.click();
-    const bookedDay = page.getByRole("dialog", { name: "Tue 8 September" });
-    await expect(bookedDay.locator(".teacher-timeoff-booked")).toHaveCount(0);
-    await bookedDay.getByLabel("From 1", { exact: true }).fill("14:00");
-    await bookedDay.getByLabel("Until 1", { exact: true }).fill("15:00");
-    await expect(bookedDay.getByRole("status")).toContainText("Sam");
-    assert.ok(await bookedDay.evaluate(node => node.scrollWidth <= node.clientWidth + 1));
-    await bookedDay.getByRole("button", { name: "Save hours off", exact: true }).click();
-    await expect(bookedDay).toHaveCount(0);
-    await expect(booked).toContainText("hours off");
-    await timeOff.screenshot({ path: `tmp/qa/teacher/time-off-clash-${width}.png` });
+    await expect(clashes.getByRole("button", { name: /^Change lesson for Sam/ })).toBeFocused();
+    await page.locator(".teacher-week").screenshot({ path: `tmp/qa/teacher/time-off-clash-${width}.png` });
     assert.deepEqual(state.bookings, originalBookings);
     assert.deepEqual(state.rules, originalRules);
     // Weekly edits that cross a booked time warn before saving, and on success.
     await showHours(page);
+    if (width === 390) await page.getByRole("button", { name: "Monday, show weekly hours", exact: true }).click();
     await slot(page, 1, 660).click();
     const clash = page.locator(".teacher-hours-warning .teacher-lesson-card");
     await expect(clash).toHaveCount(1);
@@ -1919,14 +1881,16 @@ try {
 
   for (const width of [1280, 390]) {
     const tabs = await fixture(width);
-    const { page, state } = tabs;
-    const chosenDay = (date) => page.locator(`[data-timeoff-date="${date}"]`);
-    const timeOff = page.locator(".teacher-timeoff");
-    const initialBookings = structuredClone(state.bookings);
+    const { page } = tabs;
+    // One tab holds the week and her time off (11 November 2026): an old
+    // link to the Time off tab lands on Timetable.
+    await page.goto(`${base}/schedule/?tab=time-off`);
+    await page.locator("#teacher-week-title").waitFor();
     await expect(page.getByRole("tab", { name: "Timetable", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab")).toHaveText(["Students", "Timetable", "Receipts", "Expressions", "Profile"]);
     await page.getByRole("tab", { name: "Timetable", exact: true }).focus();
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByRole("tab", { name: "Time off", exact: true })).toBeFocused();
+    await expect(page.getByRole("tab", { name: "Receipts", exact: true })).toBeFocused();
     await showHours(page);
     await slot(page, 1, 600).click();
     await page.getByRole("tab", { name: /^Students/ }).click();
@@ -1934,54 +1898,6 @@ try {
     await showHours(page);
     await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "false");
     await page.getByRole("button", { name: "Discard", exact: true }).click();
-    await page.getByRole("tab", { name: "Time off", exact: true }).click();
-    await expect(chosenDay("2026-09-06")).toBeDisabled();
-    const offChip = timeOff.getByRole("button", { name: "Off", exact: true });
-    await chosenDay("2026-09-08").click();
-    await chosenDay("2026-09-21").click();
-    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toHaveCount(0);
-    await timeOff.getByRole("button", { name: "Next month" }).click();
-    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toBeVisible();
-    await chosenDay("2026-10-01").click();
-    await page.getByRole("tab", { name: /^Students/ }).click();
-    await page.getByRole("tab", { name: "Time off", exact: true }).click();
-    await expect(timeOff.getByRole("group", { name: "Chosen days" })).toContainText("3 days");
-    const before = state.writes.length;
-    // 21 September is already off, so only the other two are taken.
-    await expect(offChip).toHaveAttribute("aria-pressed", "false");
-    await offChip.click();
-    await expect(timeOff.locator(".teacher-save-state")).toContainText("3 selected days are off");
-    await expect(offChip).toHaveAttribute("aria-pressed", "true");
-    await expect(timeOff.locator(".teacher-timeoff-lessons .teacher-lesson-card")).toContainText("Sam");
-    assert.deepEqual(state.writes.slice(before).map(write => write.data), [
-      { date: "2026-09-08", dayOff: true }, { date: "2026-10-01", dayOff: true },
-    ], "Already-off dates do not create another write");
-    await expect(chosenDay("2026-10-01")).toHaveClass(/is-off/);
-    await offChip.click();
-    await expect(timeOff.locator(".teacher-save-state")).toContainText("following your weekly hours");
-    assert.deepEqual(state.bookings, initialBookings, "Marking dates off and reopening them preserves every lesson");
-    assert.ok(state.exceptions.some(row => row.date === "2026-09-21" && row.start_minute === 600), "Reopening a day preserves its partial time off");
-    assert.ok(state.exceptions.some(row => row.kind === "extra"), "Extra hours remain untouched");
-    await expect(offChip).toHaveAttribute("aria-pressed", "false");
-    await expect(timeOff.locator(".teacher-timeoff-lessons")).toHaveCount(0);
-    await timeOff.getByRole("button", { name: "Clear chosen days", exact: true }).click();
-    await timeOff.getByRole("button", { name: "This month", exact: true }).click();
-    await expect(timeOff.getByRole("heading", { name: "September 2026", exact: true })).toBeFocused();
-    await expect(timeOff.getByRole("button", { name: "This month", exact: true })).toHaveCount(0);
-    await expect(chosenDay("2026-09-21")).not.toContainText("Part off");
-    await expect(chosenDay("2026-09-21")).not.toHaveAttribute("aria-label", /weekly hours|some time off/);
-    await expect(chosenDay("2026-09-14")).not.toHaveAttribute("aria-label", /weekly hours|some time off/);
-    await chosenDay("2026-09-30").focus();
-    await page.keyboard.press("ArrowDown");
-    await expect(chosenDay("2026-10-07")).toBeFocused();
-    await page.keyboard.press("Space");
-    state.failDay = "2026-10-07";
-    await offChip.click();
-    await expect(timeOff.getByRole("alert")).toContainText("was not changed");
-    await expect(chosenDay("2026-10-07")).not.toHaveClass(/is-off/);
-    await offChip.click();
-    await expect(timeOff.locator(".teacher-save-state")).toContainText("is a day off");
-    await noOverflow(page);
     await page.getByRole("tab", { name: /^Students/ }).click();
     await page.getByRole("tab", { name: /^Students/ }).focus();
     await page.keyboard.press("End");
@@ -1998,17 +1914,7 @@ try {
     }
     await page.keyboard.press("Home");
     await expect(page.getByRole("tablist", { name: "Teacher tools" }).getByRole("tab").first()).toBeFocused();
-    await showLessons(page);
-    state.failBookings = true;
-    await page.getByRole("button", { name: "Next week", exact: true }).click();
-    await expect(page.locator(".teacher-week").getByRole("alert")).toContainText("Lessons could not be loaded");
-    await page.getByRole("tab", { name: "Time off", exact: true }).click();
-    await expect(timeOff.getByRole("alert")).toContainText("Booked lessons couldn’t be checked");
-    await expect(offChip).toBeDisabled();
-    state.failBookings = false;
-    await timeOff.getByRole("button", { name: "Try again", exact: true }).click();
-    await expect(offChip).toBeEnabled();
-    assert.deepEqual(state.errors, []);
+    assert.deepEqual(tabs.state.errors, []);
     await page.close();
   }
 

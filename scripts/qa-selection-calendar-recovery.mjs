@@ -117,11 +117,10 @@ function teacherDefaults(path) {
   return null;
 }
 const slot = (page, day, minute) => page.locator(`[data-slot-day="${day}"][data-slot-minute="${minute}"]`);
-// A free time offers a choice; time off is one of its options. A time
-// already off reopens straight away.
+// A free time offers a choice at it; time off is one of its options.
 async function takeOff(page, cell) {
   await cell.click();
-  await page.getByRole("menu").getByRole("menuitem", { name: "Take this time off", exact: true }).click();
+  await page.locator(".teacher-slot-menu").getByRole("button", { name: "Time off", exact: true }).click();
 }
 async function monday(page) {
   await page.goto(`${base}/schedule/`);

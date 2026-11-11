@@ -11,6 +11,7 @@ import {
   bookingSegments,
   bookingsAffectedByHours,
   canPaintHours,
+  chooseHours,
   dateBlocks,
   dateKey,
   daysOff,
@@ -26,7 +27,9 @@ import {
   studentWorkspace,
   paintHours,
   removeSpan,
+  setOnlineOnlyHours,
   shiftDate,
+  timeAhead,
   timeOffClashes,
   weeklyBlocks,
   withDayChanges,
@@ -644,4 +647,45 @@ test("clashes: a lesson to come on a day off, in hours off, or in person in onli
     timeOffClashes(bookings, exceptions, onlineOnly, new Date("2026-09-21T09:30:00Z")).map(({ booking, reason }) => [booking.id, reason]),
     [["on-day-off", "day off"], ["in-hours-off", "hours off"], ["in-porto-online-hours", "online only"]],
   );
+});
+
+test("hours chosen on the Timetable are one kind or the other, and the week lists what is ahead", () => {
+  const morning = { start: 540, end: 720 };
+  // Time off over online-only hours takes them out of the online label, and back.
+  assert.deepEqual(chooseHours({ off: [], online: [morning] }, null, "off", { start: 600, end: 660 }),
+    { off: [{ start: 600, end: 660 }], online: [{ start: 540, end: 600 }, { start: 660, end: 720 }] });
+  // A pressed block switches kind with the times as she set them.
+  assert.deepEqual(chooseHours({ off: [{ start: 600, end: 660 }], online: [] }, { kind: "off", span: { start: 600, end: 660 } }, "online", { start: 600, end: 690 }),
+    { off: [], online: [{ start: 600, end: 690 }] });
+  // Opening it again leaves the rest of the day as it was.
+  assert.deepEqual(chooseHours({ off: [{ start: 600, end: 660 }, { start: 900, end: 960 }], online: [] }, { kind: "off", span: { start: 600, end: 660 } }, null, { start: 600, end: 660 }),
+    { off: [{ start: 900, end: 960 }], online: [] });
+  assert.deepEqual(chooseHours({ off: [{ start: 960, end: 1020 }], online: [] }, { kind: "off", span: { start: 960, end: 1020 } }, null, { start: 960, end: 990 }),
+    { off: [{ start: 990, end: 1020 }], online: [] }, "opening some of a block keeps the rest off");
+
+  let count = 0;
+  const id = () => `new-${++count}`;
+  const week = [{ id: "week", fromDate: "2026-09-14", toDate: "2026-09-18", startMinute: 0, endMinute: 1440 }];
+  // One date's hours change; its neighbours keep the week's label.
+  assert.deepEqual(setOnlineOnlyHours(week, "2026-09-16", [{ start: 900, end: 1020 }, { start: 600, end: 660 }], "2026-09-14", id)
+    .map(({ id, fromDate, toDate, startMinute, endMinute }) => [id === "week", fromDate, toDate, startMinute, endMinute]), [
+    [true, "2026-09-14", "2026-09-15", 0, 1440],
+    [false, "2026-09-16", "2026-09-16", 600, 660],
+    [false, "2026-09-16", "2026-09-16", 900, 1020],
+    [false, "2026-09-17", "2026-09-18", 0, 1440],
+  ]);
+  assert.deepEqual(setOnlineOnlyHours(week, "2026-09-14", [], "2026-09-14", id), [{ ...week[0], fromDate: "2026-09-15" }]);
+
+  const blocked = { kind: "blocked", weekday: null, note: "", start_minute: null, end_minute: null };
+  const ahead = timeAhead([
+    { ...blocked, id: 1, date: "2026-09-28" },
+    { ...blocked, id: 2, date: "2026-09-29" },
+    { ...blocked, id: 3, date: "2026-09-08", start_minute: 840, end_minute: 900 },
+    { ...blocked, id: 4, date: "2026-09-01" },
+  ], [{ id: "a", fromDate: "2026-09-05", toDate: "2026-09-09", startMinute: 900, endMinute: 1020 }], "2026-09-07");
+  assert.deepEqual(ahead.map(({ dates, label, detail }) => [dates.length, label, detail]), [
+    [3, "Mon 7 Sept – Wed 9 Sept", "3 days online only, 15:00–17:00"],
+    [1, "Tue 8 Sept", "Off 14:00–15:00"],
+    [2, "Mon 28 Sept – Tue 29 Sept", "2 days off"],
+  ]);
 });

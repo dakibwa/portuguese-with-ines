@@ -13,7 +13,7 @@ import { StudentList, type StudentOpenRequest } from "@/components/teacher/Stude
 import { NextLesson } from "@/components/teacher/NextLesson";
 import { NeedsYou } from "@/components/teacher/NeedsYou";
 import { MonthLabel, TeacherPager } from "@/components/teacher/TeacherPager";
-import { TimeOffCalendar } from "@/components/teacher/TimeOffCalendar";
+import { TimeAhead } from "@/components/teacher/TimeAhead";
 import { BookedLessonCard } from "@/components/teacher/BookedLessonCard";
 import { TeacherTabs, type TeacherTab } from "@/components/teacher/TeacherTabs";
 import { ScheduleLoading, WeekLoading } from "@/components/teacher/ScheduleLoading";
@@ -40,7 +40,7 @@ import { forgetAvailability, portoTimeToUtc } from "@/lib/booking-api";
 import { BOOKING_CONFIGURED } from "@/lib/config";
 import { SITE_BASE_PATH } from "@/lib/paths";
 import {
-  addSpan,
+  ALL_DAY,
   bookingSegments,
   bookingsAffectedByHours,
   dateBlocks,
@@ -48,16 +48,18 @@ import {
   daysOff,
   dateLabel,
   hoursFromRules,
+  chooseHours,
   hoursProblem,
-  labelOnlineOnly,
   mondayOf,
   needsYou,
+  onlineOnlyHours,
   studentWorkspace,
-  removeSpan,
   serialiseHours,
+  setOnlineOnlyHours,
   shiftDate,
   spanLabel,
   withDayChanges,
+  type HoursKind,
   type Span,
   type WeekHours,
 } from "@/lib/teacher-calendar";
@@ -100,8 +102,15 @@ export function TeacherSchedule() {
   const [savedHours, setSavedHours] = useState<WeekHours>(emptyWeek);
   const [draftHours, setDraftHours] = useState<WeekHours>(emptyWeek);
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
+  // Online only as last chosen; the refs hold what the Worker has confirmed
+  // and the latest choice still to send (see sendOnlineOnly).
   const [onlineOnlyPeriods, setOnlineOnlyPeriods] = useState<OnlineOnlyPeriod[]>([]);
-  const [onlineOnlyRevision, setOnlineOnlyRevision] = useState("0");
+  const savedPeriods = useRef<OnlineOnlyPeriod[]>([]);
+  const wantedPeriods = useRef<OnlineOnlyPeriod[] | null>(null);
+  const onlineRevision = useRef("0");
+  const onlineSubject = useRef("");
+  const sendingOnline = useRef(false);
+  const [savingOnline, setSavingOnline] = useState(false);
   const [dayChanges, setDayChanges] = useState<Map<string, DayChange>>(
     () => new Map(),
   );
@@ -207,7 +216,11 @@ export function TeacherSchedule() {
     setDraftHours(emptyWeek);
     setExceptions([]);
     setOnlineOnlyPeriods([]);
-    setOnlineOnlyRevision("0");
+    savedPeriods.current = [];
+    wantedPeriods.current = null;
+    onlineRevision.current = "0";
+    sendingOnline.current = false;
+    setSavingOnline(false);
     dayChangesRef.current = new Map();
     setDayChanges(new Map());
     sendingDays.current = false;
@@ -304,8 +317,10 @@ export function TeacherSchedule() {
         setSavedHours(hours);
         setDraftHours(hours);
         setExceptions(schedule.exceptions);
-        setOnlineOnlyPeriods(schedule.settings?.onlineOnlyPeriods ?? []);
-        setOnlineOnlyRevision(schedule.settings?.onlineOnlyRevision ?? "0");
+        savedPeriods.current = schedule.settings?.onlineOnlyPeriods ?? [];
+        wantedPeriods.current = null;
+        onlineRevision.current = schedule.settings?.onlineOnlyRevision ?? "0";
+        setOnlineOnlyPeriods(savedPeriods.current);
         setIntervalMinutes(schedule.settings?.slotIntervalMinutes ?? 30);
         setInitialised(true);
       })
@@ -450,7 +465,7 @@ export function TeacherSchedule() {
   }
 
   useEffect(() => {
-    const dirty = hoursDirty || dayChanges.size > 0;
+    const dirty = hoursDirty || dayChanges.size > 0 || savingOnline;
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -458,7 +473,7 @@ export function TeacherSchedule() {
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [hoursDirty, dayChanges]);
+  }, [hoursDirty, dayChanges, savingOnline]);
 
   async function saveHours() {
     if (savingHours || invalidHours || bookingsLoading || bookingsError) return;
@@ -578,7 +593,69 @@ export function TeacherSchedule() {
       : ` The ${count} lessons already booked stay in place.`;
   }
 
+  /** Online only as she last chose it, saved or still on its way. */
+  const latestPeriods = () => wantedPeriods.current ?? savedPeriods.current;
+
+  /**
+   * Online only saves as she chooses it, as time off does: the Worker's whole
+   * list is replaced against the revision it was read at, one save at a time,
+   * and quick changes coalesce into the latest list. A failure puts the list
+   * back as saved and says so beneath the week, never as a band across it.
+   */
+  function changeOnlineOnly(change: () => OnlineOnlyPeriod[], subject: string) {
+    let next: OnlineOnlyPeriod[];
+    try { next = change(); } catch (caught) {
+      setDayNote({ error: true, text: `${subject} was not changed. ${caught instanceof Error ? caught.message : "Please try again."}` });
+      return false;
+    }
+    wantedPeriods.current = next;
+    onlineSubject.current = subject;
+    setOnlineOnlyPeriods(next);
+    void sendOnlineOnly();
+    return true;
+  }
+
+  async function sendOnlineOnly() {
+    if (sendingOnline.current) return;
+    const account = accountGeneration.current;
+    sendingOnline.current = true;
+    setSavingOnline(true);
+    try {
+      while (wantedPeriods.current) {
+        const list = wantedPeriods.current;
+        try {
+          const saved = await saveOnlineOnlyPeriods(token, list, onlineRevision.current);
+          if (account !== accountGeneration.current || readSession() !== token) return;
+          savedPeriods.current = saved.periods;
+          onlineRevision.current = saved.revision;
+          forgetAvailability();
+          if (wantedPeriods.current === list) {
+            wantedPeriods.current = null;
+            setOnlineOnlyPeriods(saved.periods);
+          }
+        } catch (caught) {
+          if (account !== accountGeneration.current) return;
+          // A newer choice was made on top of this one, so it goes too.
+          wantedPeriods.current = null;
+          setOnlineOnlyPeriods(savedPeriods.current);
+          setDayNote({ error: true, text: `${onlineSubject.current} was not changed. ${caught instanceof Error ? caught.message : "Please try again."}` });
+        }
+      }
+    } finally {
+      if (account === accountGeneration.current) {
+        sendingOnline.current = false;
+        setSavingOnline(false);
+      }
+    }
+  }
+
+  /**
+   * A day is open, off or online only, never two (11 November 2026): taking
+   * it off takes its online-only hours away too.
+   */
   function takeDayOff(date: string, off: boolean) {
+    const online = off && onlineOnlyHours(latestPeriods(), date).length > 0;
+    if (online) changeOnlineOnly(() => setOnlineOnlyHours(latestPeriods(), date, [], today), shortDate(date));
     changeDay(
       date,
       { dayOff: off },
@@ -588,89 +665,32 @@ export function TeacherSchedule() {
     );
   }
 
-  function blockTime(date: string, span: Span, blocked: boolean) {
-    const current = dateBlocks(shownExceptions, date);
-    changeDay(
-      date,
-      { blocks: blocked ? addSpan(current, span) : removeSpan(current, span) },
-      blocked
-        ? `${spanLabel(span)} on ${shortDate(date)} is off.${stayBooked(lessonsDuring(date, span))}`
-        : `${spanLabel(span)} on ${shortDate(date)} is open again.`,
-    );
-  }
-
-  /** Selected dates use the calendar's existing, one-at-a-time save path. */
-  function takeTimeOff(dates: string[], off: boolean) {
-    if (savingDays || !dates.length) return;
-    const offAlready = daysOff(shownExceptions);
-    for (const date of dates) {
-      if (offAlready.has(date) !== off) changeDay(date, { dayOff: off }, "");
-    }
-    // Any lessons left standing on them are listed beside the month as Clashes.
+  /** Online only all day; a day off opens again first. Hours off stay. */
+  function makeDayOnline(date: string, on: boolean) {
+    if (!changeOnlineOnly(() => setOnlineOnlyHours(latestPeriods(), date, on ? [ALL_DAY] : [], today), shortDate(date))) return;
+    if (on && daysOff(shownExceptions).has(date)) changeDay(date, { dayOff: false }, "");
     setDayNote({
       error: false,
-      text: off
-        ? `${dates.length === 1 ? `${shortDate(dates[0])} is a day off` : `${dates.length} selected days are off`}.`
-        : `${dates.length === 1 ? `${shortDate(dates[0])} is` : `${dates.length} selected days are`} open again, following your weekly hours.`,
+      text: on ? `${shortDate(date)} is online only.` : `${shortDate(date)} can be booked ${IN_PERSON.replace(/^In /, "in ")} again.`,
     });
   }
 
-  /** The modal keeps its draft until this explicit save is confirmed. */
-  async function saveTimeOffDay(date: string, change: { dayOff: boolean; blocks?: Span[] }) {
-    if (sendingDays.current || bookingsLoading || bookingsError) throw new Error("Please wait until your calendar has finished loading or saving.");
-    const account = accountGeneration.current;
-    sendingDays.current = true;
-    setSavingDays(true);
-    try {
-      const result = await saveDayOff(token, date, change);
-      if (account !== accountGeneration.current) return;
-      setExceptions(current => [...current.filter(row => row.date !== date), ...result.exceptions]);
-      setDayNote({ error: false, text: `Time off updated for ${shortDate(date)}.${stayBooked(lessonsDuring(date))}` });
-    } finally {
-      if (account === accountGeneration.current) {
-        sendingDays.current = false;
-        setSavingDays(false);
-      }
-    }
-  }
-
   /**
-   * Online only replaces the Worker's whole list against the revision it was
-   * read at, then forgets cached student availability. Its outcome is said on
-   * the Time off card, never as a band across the page.
+   * What she chose for some hours of one date, at the times themselves:
+   * time off, online only, or open again (`kind` null). `original` is the
+   * block she pressed, which these hours replace.
    */
-  async function saveOnlineOnly(said: string[], dates: string[], hours: Span | null) {
-    const subject = said.length === 1 ? shortDate(said[0]) : `${said.length} selected days`;
-    const account = accountGeneration.current;
-    try {
-      if (sendingDays.current) throw new Error("Please wait until your calendar has finished saving.");
-      sendingDays.current = true;
-      setSavingDays(true);
-      try {
-        const saved = await saveOnlineOnlyPeriods(token, labelOnlineOnly(onlineOnlyPeriods, dates, hours, today), onlineOnlyRevision);
-        if (account !== accountGeneration.current || readSession() !== token) throw new Error("Your sign-in has changed. Please sign in again.");
-        setOnlineOnlyPeriods(saved.periods);
-        setOnlineOnlyRevision(saved.revision);
-        forgetAvailability();
-      } finally {
-        if (account === accountGeneration.current) {
-          sendingDays.current = false;
-          setSavingDays(false);
-        }
-      }
-      const many = said.length > 1;
-      setDayNote({
-        error: false,
-        text: hours
-          ? `${subject} ${many ? "are" : "is"} online only${hours.start === 0 && hours.end === 1440 ? "" : `, ${spanLabel(hours)}`}.`
-          : `${subject} can be booked ${IN_PERSON.replace(/^In /, "in ")} again.`,
-      });
-    } catch (caught) {
-      if (account === accountGeneration.current) {
-        setDayNote({ error: true, text: `${subject} ${said.length > 1 ? "were" : "was"} not changed. ${caught instanceof Error ? caught.message : "Please try again."}` });
-      }
-      throw caught;
-    }
+  function chooseTimes(date: string, original: { kind: HoursKind; span: Span } | null, kind: HoursKind | null, span: Span) {
+    const current = { off: dateBlocks(shownExceptions, date), online: onlineOnlyHours(latestPeriods(), date) };
+    const next = chooseHours(current, original, kind, span);
+    const same = (a: Span[], b: Span[]) => JSON.stringify(a) === JSON.stringify(b);
+    const when = `${spanLabel(span)} on ${shortDate(date)}`;
+    const text = kind === "off" ? `${when} is off.${stayBooked(lessonsDuring(date, span))}`
+      : kind === "online" ? `${when} is online only.` : `${when} is open again.`;
+    if (!same(next.online, current.online) &&
+      !changeOnlineOnly(() => setOnlineOnlyHours(latestPeriods(), date, next.online, today), shortDate(date))) return;
+    if (!same(next.off, current.off)) changeDay(date, { blocks: next.off }, text);
+    setDayNote({ error: false, text });
   }
 
   const weekEnd = shiftDate(weekStart, 6);
@@ -746,7 +766,7 @@ export function TeacherSchedule() {
     return <ScheduleLoading current={activeTab} onSelect={setActiveTab} weekStart={weekStart} />;
 
   function signOut() {
-    if (savingDays || savingHours || accountBusy) return;
+    if (savingDays || savingOnline || savingHours || accountBusy) return;
     if (hoursDirty && !window.confirm("Sign out and lose the weekly hours you haven’t saved?")) return;
     clearSession();
     resetAccount();
@@ -923,7 +943,7 @@ export function TeacherSchedule() {
                   className={`teacher-save-state ${dayNote?.error ? "is-error" : ""}`}
                   role={dayNote?.error ? "alert" : "status"}
                 >
-                  {savingDays ? (
+                  {savingDays || savingOnline ? (
                     "Saving…"
                   ) : dayNote ? (
                     <>
@@ -942,7 +962,8 @@ export function TeacherSchedule() {
               setStatus("");
             }}
             onDayOff={takeDayOff}
-            onBlockTime={blockTime}
+            onOnlineDay={makeDayOnline}
+            onChooseHours={chooseTimes}
             onAddLesson={(date, minute) => openStudentPicker({ step: "pick", date, minute })}
             onSelectBooking={setSelectedBooking}
           />
@@ -956,30 +977,25 @@ export function TeacherSchedule() {
             {weekEnd < today ? "No lessons that week." : "No lessons booked this week."}
           </p>
         ) : null}
+        {!editing && bookingsShown && !bookingsError ? (
+          <TimeAhead
+            bookings={bookings}
+            exceptions={shownExceptions}
+            onlineOnly={onlineOnlyPeriods}
+            now={now}
+            today={today}
+            weekStart={weekStart}
+            onOpenBooking={setSelectedBooking}
+            onGoTo={date => {
+              setWeekStart(mondayOf(date));
+              setMobileDay((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7);
+              calendarTitleRef.current?.focus({ preventScroll: true });
+              calendarTitleRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            }}
+          />
+        ) : null}
       </section>
       </> : null}
-      <div className="teacher-tab-view" hidden={activeTab !== "time-off"}>
-        <TimeOffCalendar
-          today={today}
-          now={now}
-          exceptions={shownExceptions}
-          onlineOnly={onlineOnlyPeriods}
-          bookings={bookings}
-          bookingsLoading={bookingsLoading}
-          bookingsError={bookingsError}
-          onReloadBookings={() => void reloadBookings()}
-          busy={savingDays}
-          status={
-            <p className={`teacher-save-state ${dayNote?.error ? "is-error" : ""}`} role={dayNote?.error ? "alert" : "status"}>
-              {savingDays ? "Saving…" : dayNote ? <>{dayNote.error ? null : <Check size={15} aria-hidden="true" />}{dayNote.text}</> : null}
-            </p>
-          }
-          onChange={takeTimeOff}
-          onOnlineOnly={saveOnlineOnly}
-          onSaveDay={saveTimeOffDay}
-          onOpenBooking={setSelectedBooking}
-        />
-      </div>
       <div className="teacher-tab-view" hidden={activeTab !== "students"}>
       <StudentList
         token={token}
@@ -1006,7 +1022,7 @@ export function TeacherSchedule() {
       </div>
       <div className="teacher-tab-view" hidden={activeTab !== "profile"}>
         <div className="teacher-account-layout">
-          {me ? <TeacherAccountProfile token={token} student={me} disabled={savingDays || savingHours} onBusyChange={setAccountBusy} onStudentChange={setMe} onSignOut={signOut} /> : null}
+          {me ? <TeacherAccountProfile token={token} student={me} disabled={savingDays || savingOnline || savingHours} onBusyChange={setAccountBusy} onStudentChange={setMe} onSignOut={signOut} /> : null}
           <TeacherMeetConnection token={token} onConnectionChange={setMeet} />
         </div>
       </div>

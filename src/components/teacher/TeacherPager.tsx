@@ -19,8 +19,8 @@ export function MonthLabel({ month }: { month: string }) {
 
 /**
  * The one pager on Inês's pages (14 October 2026, Dan: "there feels
- * inconsistencies here"): the Timetable's week, the Time off month and the
- * Receipts month all turn the same way. The arrows never move. `This week` /
+ * inconsistencies here"): the Timetable's week and the Receipts month
+ * turn the same way. The arrows never move. `This week` /
  * `This month` shows to their left only once she has turned away from the
  * current one, because the heading already says where she is. Its place is
  * held while it is out of sight (hidden, not removed), so on a narrow screen

@@ -5,7 +5,6 @@ import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 const tabs = [
   { id: "students", label: "Students" },
   { id: "week", label: "Timetable" },
-  { id: "time-off", label: "Time off" },
   { id: "receipts", label: "Receipts" },
   { id: "expressions", label: "Expressions" },
   { id: "profile", label: "Profile" },
