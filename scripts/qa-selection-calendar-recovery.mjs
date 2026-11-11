@@ -237,7 +237,8 @@ try {
         await expect.poll(() => writes.length).toBe(2);
         await expect(slot(page, 1, 600)).toHaveAttribute("aria-pressed", "true");
         await expect(slot(page, 1, 630)).toHaveAttribute("aria-pressed", "true");
-        assert.deepEqual(writes[1], { date: "2026-10-05", dayOff: false, blocks: [{ startMinute: 600, endMinute: 660 }] });
+        // Each save names the date's rows as her page last read them: none, the first reply having been unreadable.
+        assert.deepEqual(writes[1], { date: "2026-10-05", expectedIds: [], dayOff: false, blocks: [{ startMinute: 600, endMinute: 660 }] });
         await expect(page.locator(".teacher-week .teacher-save-state")).not.toHaveClass(/is-error/);
         await check(state); cases += 1;
       } finally { waiting.resolve(); await state.context.close(); }

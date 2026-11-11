@@ -102,15 +102,16 @@ Dan, of the four findings first left for a decision: "fix all yeah".
 - The reviewers' own reproductions, re-run against the fixed Worker and, for
   the pages, in Chromium against a build of the fixed site, no longer
   reproduce.
-- Fourteen of the fifteen customer journeys pass against that build, at the
-  widths they are written for, including the teacher's journey with its
-  details save now expecting only the field she changed. After the second
-  pass the teacher's journey was run again, and passes with each date save
-  naming the rows her page last read. `qa-student-nif`
-  stopped on a page error thrown inside Google's own sign-in script
-  (`gis is not defined`), which this machine loads with a made-up client ID;
-  built with no Google client ID, it passes. Nothing here touches Google
-  sign-in.
+- With `main` as it then stood merged in (three later changes, one to the
+  same lesson dialog), every check above passes and so do all fourteen
+  customer journeys the release runs, at the widths they are written for.
+  Two journeys changed with the fixes: the teacher's expects only the detail
+  she changed and reads a date save by what she changed, and the calendar
+  recovery journey expects a date save to name the rows her page last read.
+  `qa-student-nif` passes on a build with no Google client ID; built with a
+  made-up one, as this machine must, it stops on an error thrown inside
+  Google's own sign-in script (`gis is not defined`). Nothing here touches
+  Google sign-in.
 - Not run: `check:release`'s probe of the live Worker, which the release runs.
   The refund refusal follows Stripe's documented error shape and was exercised
   against an isolated reply, not against Stripe.
