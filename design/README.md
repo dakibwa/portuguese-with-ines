@@ -2234,7 +2234,10 @@ Thursdays at 16:00`, `They become 90 minutes, €35 each`, `They move online`,
 which stay as they are and why, `Tue 1 Dec stays as it is: it's already
 paid`, and that one email goes), and `Save changes` waits as the quiet
 outline until something differs. Where the form has room, date sits beside
-time and length beside place. Every week means every later lesson takes the
+time and length beside place, and the buttons sit at the right of the dabs,
+level with the last of them, never on a row of their own beneath
+(11 November 2026, Dan: "there's space on the right so the buttons can go
+there"); on a phone they follow the dabs. Every week means every later lesson takes the
 new day and time in its own week, so the dab is what happens. A lesson
 already had is corrected in the same form (11 November 2026, Dan: "Ines
 should be able to change previous lessons to like from 60 to 90 too"):
