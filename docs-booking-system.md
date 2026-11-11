@@ -54,6 +54,7 @@ Inês on /schedule                     (her own account, role=teacher)
   → POST /admin/students/:id/prices                  her price for a student per length; null is standard, 0 is free
   → GET  /admin/receipts?month=YYYY-MM               every amount paid or due for a Porto month's lessons,
                                                      with the NIF to issue to (her Receipts tab and automation)
+  → POST /admin/needs-you/dismiss                    dismiss one Needs you notice that only informs, on all her devices
   → POST /admin/students/:id/welcome                 email a student a fresh sign-in link
   → POST /admin/students/:id/invite-link             make a sign-in link for her to send on WhatsApp;
                                                      nothing emailed (ten an hour per student)
@@ -764,9 +765,24 @@ still `payment_due`, listed with the payments until it is paid, `Open` going to
 the student) and `cardAdded` (for `CARD_ADDED_NOTICE_DAYS`, 7, after a card is
 saved: the lessons she added that it now pays for, so one already paid by hand
 can be ticked `Already paid`; lessons a student put on a card from a lesson's
-own link are listed the same way, from when they agreed). Declined cards also stay in Receipts. Nothing is dismissed: items clear
+own link are listed the same way, from when they agreed). Declined cards also stay in Receipts. Items clear
 when done, after 72 hours, or once the lesson begins; the windows are
-`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. `studentWorkspace()` groups operational notices by student ID, or an
+`NEEDS_YOU_RECENT_HOURS` and `NEEDS_YOU_AHEAD_DAYS`. The four that only tell
+Inês something (a student changed or cancelled a lesson, a student's first
+lesson, a student added a card) can also be dismissed with a small cross
+(11 November 2026, Dan: "can Inês have a dismiss button on these
+notifications"); work still to do (Google Meet, a payment to check, a declined
+card, no lessons, a welcome not sent) cannot. `POST /admin/needs-you/dismiss`
+with `{ key }` (teacher only, the authorisation checked inside the write)
+keeps the key in one `settings` row, `needs_you_dismissed`, a JSON object of
+key to time, added and pruned in a single statement so two quick presses
+cannot lose one (entries older than 30 days go; at most the newest 100 stay);
+`loadSettings` does not read that row. `GET /admin/students` returns the keys
+as `dismissed`, so her phone and her laptop agree. A key names what happened
+and when (`changed:<booking>:<changed at>`, `cancelled:<booking>:<cancelled
+at>`, `first:<booking>:<starts at>`, `card:<student>:<added at>`), so a second
+change to the same lesson is a new notice. A dismissed notice no longer counts
+on the Students badge. `studentWorkspace()` groups operational notices by student ID, or an
 unambiguous real email for legacy bookings. Payments match through their
 booking ID; unmatched notices and Meet remain above the list. It ranks payments,
 recent changes, Inês's setup work, first lessons, waiting students, then ready

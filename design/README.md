@@ -556,7 +556,18 @@ free times and removes selected times that cannot be booked in the new place.
   26 rem a lane), wrap into fewer on a narrower screen and stack on a phone
   with no sideways scroll; cards stack down a lane. A lane reads how far its
   students have got, so nothing is dragged and nothing writes a status. Within
-  a group, nearer lessons come first. Above the groups, `6 of 21 students are all set`
+  a group, nearer lessons come first. A notice (11 November 2026, Dan: "can
+  Inês have a dismiss button on these notifications and do they need to be
+  this verbose") says what happened in one bold line with its one quiet
+  action at that line's end, at every width, never on a row of its own; the
+  facts flow beneath at full width and break only between facts. Inside a
+  student's own card it does not say their name again (`Changed their
+  lesson`, `Cancelled their lesson`, `First lesson`, `Added a card`); outside
+  a card, on the Timetable and under `Check first`, the name stays. A notice
+  that only tells her something also has a small round cross beside its
+  action: pressed, the notice goes at once, on every device, and focus moves
+  to the next notice or the student's name. Work still to do has no cross and
+  clears when done. Above the groups, `6 of 21 students are all set`
   over a thin coral meter counts active students whose checks are all done.
   Count students needing her attention once, not each task; her own next
   steps are on their cards, never in the badge. Meet and unmatched payment

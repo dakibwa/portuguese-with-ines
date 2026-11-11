@@ -493,20 +493,23 @@ export const NEEDS_YOU_AHEAD_DAYS = 7;
 
 /**
  * One thing waiting on Inês (Phase 2, 14 October 2026). Every kind clears
- * itself, so there is nothing stored and nothing to dismiss.
+ * itself. The four that only tell her something (11 November 2026, Dan) can
+ * also be dismissed: their `dismiss` names what happened and when, so a
+ * second change to the same lesson is a new notice. Work still to do never
+ * has one.
  */
 export type NeedsYouItem =
   | { kind: "meet"; key: "meet"; reconnect: boolean }
   | { kind: "payment"; key: string; review: PaymentReview; part: "lesson" | "fee" | "refund" }
   | { kind: "lessons"; key: string; student: AdminStudent }
   | { kind: "welcome"; key: string; student: AdminStudent; at?: string | null }
-  | { kind: "changed"; key: string; booking: AdminBooking; count: number; first: boolean }
-  | { kind: "cancelled"; key: string; booking: AdminBooking; count: number }
-  | { kind: "first"; key: string; booking: AdminBooking }
+  | { kind: "changed"; key: string; dismiss: string; booking: AdminBooking; count: number; first: boolean }
+  | { kind: "cancelled"; key: string; dismiss: string; booking: AdminBooking; count: number }
+  | { kind: "first"; key: string; dismiss: string; booking: AdminBooking }
   /** A saved card was declined; clears once the student pays (16 October 2026: no longer emailed to her). */
   | { kind: "declined"; key: string; student: AdminStudent; payment: NonNullable<AdminStudent["cardDeclined"]>[number] }
   /** A student added a card in the last week; lists the lessons she added that it now pays for. */
-  | { kind: "card"; key: string; student: AdminStudent; added: NonNullable<AdminStudent["cardAdded"]> };
+  | { kind: "card"; key: string; dismiss: string; student: AdminStudent; added: NonNullable<AdminStudent["cardAdded"]> };
 
 /** Students she set up with no email hold this in place of one; nothing is ever shown or sent to it. */
 const NO_EMAIL_YET = "no-email:";
@@ -656,13 +659,15 @@ export function studentWorkspace(students: AdminStudent[], items: NeedsYouItem[]
  * A lesson appears once. `lessons` are her confirmed lessons from yesterday
  * on; `cancellations` the cancelled rows, which the timetable drops.
  */
-export function needsYou({ now, meet, payments, students, lessons, cancellations }: {
+export function needsYou({ now, meet, payments, students, lessons, cancellations, dismissed }: {
   now: Date;
   meet: GoogleMeetConnection | null;
   payments: PaymentReview[];
   students: AdminStudent[];
   lessons: AdminBooking[];
   cancellations: AdminBooking[];
+  /** Dismiss keys she has dismissed, on any of her devices. */
+  dismissed?: ReadonlySet<string>;
 }): NeedsYouItem[] {
   const at = now.getTime();
   const recent = (stamp?: string | null) => {
@@ -708,7 +713,7 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
     if (!hasLessons(student))
       timed.push({ time, changed: 0, item: { kind: "lessons", key: `lessons:${student.id}`, student } });
     if (student.cardAdded && student.hasCard)
-      timed.push({ time, changed: Date.parse(student.cardAdded.at) || 0, item: { kind: "card", key: `card:${student.id}`, student, added: student.cardAdded } });
+      timed.push({ time, changed: Date.parse(student.cardAdded.at) || 0, item: { kind: "card", key: `card:${student.id}`, dismiss: `card:${student.id}:${Date.parse(student.cardAdded.at) || 0}`, student, added: student.cardAdded } });
   }
 
   const confirmed = lessons.filter((row) => row.status === "confirmed" && real(row));
@@ -717,7 +722,7 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
   for (const group of grouped(changedRows, (row) => row.series_id ? `${row.series_id}|${row.student_changed_at}` : row.id)) {
     const [booking] = group;
     for (const row of group) shown.add(row.id);
-    timed.push({ time: Date.parse(booking.starts_at), changed: Date.parse(booking.student_changed_at!), item: { kind: "changed", key: `changed:${booking.id}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
+    timed.push({ time: Date.parse(booking.starts_at), changed: Date.parse(booking.student_changed_at!), item: { kind: "changed", key: `changed:${booking.id}`, dismiss: `changed:${booking.id}:${Date.parse(booking.student_changed_at!)}`, booking, count: group.length, first: Boolean(booking.first_lesson && !booking.added_by_teacher) } });
   }
   // Booked again since (10 November 2026): their confirmed lesson at that start settles it.
   const bookedAgain = (row: AdminBooking) => lessons.some((other) => other.status === "confirmed" &&
@@ -725,13 +730,15 @@ export function needsYou({ now, meet, payments, students, lessons, cancellations
   const cancelledRows = cancellations.filter((row) => row.cancelled_by === "student" && real(row) && recent(row.cancelled_at) && ahead(row.starts_at) && !bookedAgain(row));
   for (const group of grouped(cancelledRows, (row) => row.series_id || row.id)) {
     const [booking] = group;
-    timed.push({ time: Date.parse(booking.starts_at), changed: Math.max(...group.map(row => Date.parse(row.cancelled_at!))), item: { kind: "cancelled", key: `cancelled:${booking.id}`, booking, count: group.length } });
+    const latest = Math.max(...group.map(row => Date.parse(row.cancelled_at!)));
+    timed.push({ time: Date.parse(booking.starts_at), changed: latest, item: { kind: "cancelled", key: `cancelled:${booking.id}`, dismiss: `cancelled:${booking.id}:${latest}`, booking, count: group.length } });
   }
   for (const booking of confirmed) {
     if (booking.first_lesson && !booking.added_by_teacher && soon(booking.starts_at) && !shown.has(booking.id))
-      timed.push({ time: Date.parse(booking.starts_at), changed: 0, item: { kind: "first", key: `first:${booking.id}`, booking } });
+      timed.push({ time: Date.parse(booking.starts_at), changed: 0, item: { kind: "first", key: `first:${booking.id}`, dismiss: `first:${booking.id}:${Date.parse(booking.starts_at)}`, booking } });
   }
 
   const name = (item: NeedsYouItem) => "student" in item ? item.student.name : "booking" in item ? item.booking.student_name : "";
-  return [...first, ...timed.sort((a, b) => b.changed - a.changed || a.time - b.time || name(a.item).localeCompare(name(b.item))).map((entry) => entry.item)];
+  return [...first, ...timed.sort((a, b) => b.changed - a.changed || a.time - b.time || name(a.item).localeCompare(name(b.item))).map((entry) => entry.item)]
+    .filter((item) => !("dismiss" in item && dismissed?.has(item.dismiss)));
 }

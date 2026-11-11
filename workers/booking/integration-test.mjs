@@ -528,6 +528,30 @@ await test("student cannot use teacher routes and forged manage links disclose n
   assert.equal((await call("/admin/bookings", { method: "GET" })).status, 401);
   assert.equal((await call("/bookings/forged", { method: "GET" })).status, 404);
 });
+await test("a dismissed Needs you notice stays dismissed for the teacher alone, and two dismissals both stay", async () => {
+  const dismiss = (key, options = {}) => call("/admin/needs-you/dismiss", { user: "teacher", body: { key }, ...options });
+  const listed = async () => (await (await call("/admin/students", { method: "GET", user: "teacher" })).json()).dismissed;
+  assert.deepEqual(await listed(), []);
+  const changed = "changed:lesson-1:1788000000000";
+  assert.equal((await dismiss(changed, { user: "alice" })).status, 401, "a student cannot dismiss");
+  assert.equal((await dismiss(changed, { user: null })).status, 401, "nor can a signed-out caller");
+  for (const key of ["payment:p1", "changed:lesson-1", "changed:lesson 1:1", `changed:${"a".repeat(65)}:1`, 7])
+    assert.equal((await dismiss(key)).status, 400, `${key} is refused`);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM settings WHERE key = 'needs_you_dismissed'").get().n, 0, "nothing kept by a refusal");
+  // Two presses at once (her phone and her laptop) both stay.
+  const [first, second] = await Promise.all([dismiss(changed), dismiss("cancelled:lesson-2:1788000000000", { token: env.ADMIN_TOKEN })]);
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.deepEqual(new Set(await listed()), new Set([changed, "cancelled:lesson-2:1788000000000"]));
+  // A month on, old dismissals give way to new ones; the row never grows for ever.
+  clock += 31 * 86400000;
+  try {
+    assert.deepEqual((await (await dismiss("card:alice:1788000000000")).json()).dismissed, ["card:alice:1788000000000"]);
+  } finally {
+    clock -= 31 * 86400000;
+    db.prepare("DELETE FROM settings WHERE key = 'needs_you_dismissed'").run();
+  }
+});
 await test("the student's own price snapshots onto every occurrence and a one-off; tampering is refused", async () => {
   const payload = { lessonType: "single", startAt: "2026-09-08T09:00:00.000Z", repeat: 4, expectedPriceCents: 1500 };
   const result = await call("/bookings", { body: payload });
