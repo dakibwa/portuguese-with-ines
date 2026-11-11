@@ -605,7 +605,11 @@ if (bookingCalendar) {
   assertIncludes(bookingText, "trial", "trial lesson choice");
   assertIncludes(bookingText, "single", "one-off booking choice");
   assertIncludes(bookingText, "weekly", "weekly booking choice");
-  assertIncludes(bookingText, "already booked?", "sign-in route for booked students");
+  // A booked student's way in is the bar's Sign in (checked at each width
+  // above), never a line of its own in the booking card.
+  if ((await page.locator(".site-header .site-header__sign-in").count()) !== 1 || bookingText.includes("already booked?")) {
+    throw new Error("Booking should offer Sign in in its bar, and no sign-in line in the card.");
+  }
   // A student on Porto's clock needs no line saying which clock times are on.
   if (await page.locator(".calendar-zone").count()) {
     throw new Error("Only a student whose clock differs from Porto's should be told which clock the times are on.");
