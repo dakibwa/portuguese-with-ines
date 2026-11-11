@@ -1656,7 +1656,11 @@ Preserve these desktop and mobile states:
   selected-day panel. Choosing a free day while booking keeps the four weeks
   beside its times on desktop; on a phone the times replace the calendar, with
   the date's `Change` returning to it. A free day shows the available times
-  without redundant “no lesson booked” or lesson-summary copy. A day's times
+  without redundant “no lesson booked” or lesson-summary copy. A day with a
+  dozen free times or fewer shows them all together; the halves are only for a
+  day with loads of them (11 November 2026, Dan: "keep it dynamic … I only
+  split them out before because you might end up with loads of times"). Such
+  a day's times
   come in two fixed halves, chosen with a two-way toggle that reads the same
   every day: from Inês's earliest start to 14:00, and from 14:00 to her latest
   (`09:00–14:00`, `14:00–19:00`), taken from her whole calendar rather than
@@ -1664,12 +1668,14 @@ Preserve these desktop and mobile states:
   divide where 14:00 in Porto falls on the student's clock, in their own
   times, or at noon when Inês's day crosses their midnight. A half with nothing free that day
   says so; the half holding a chosen time, or else the first with times, opens
-  first. Never a wall of every quarter hour. When a day mixes start minutes,
-  each half is a small timetable without subheadings: one row per hour, one
-  column per start minute the day offers (four for quarter hours), so a gap
-  reads as a gap and buttons keep an accessible touch target on a phone. When
-  every time starts on the same minute (all on the hour), they simply sit side
-  by side, three to a row, never one per line (13 October 2026, Dan). The date's
+  first. Never a wall of every quarter hour. A half's times sit side by side
+  in order, without subheadings and with no holes: as many to a row as the day
+  has start minutes (four for quarter hours), so a full hour is one row, and a
+  time taken leaves no empty place (11 November 2026, Dan, of one free time
+  standing alone at the end of an otherwise empty row: "this looks weird").
+  Buttons keep an accessible touch target on a phone. When every time starts
+  on the same minute (all on the hour), they sit three to a row, never one per
+  line (13 October 2026, Dan). The date's
   `Change` returns to the four weeks that held the date. Opening any
   lesson keeps the calendar in place and adds a compact overlay asking
   whether to change or cancel it. `Change` keeps the page dimmed and lifts that
