@@ -2094,12 +2094,15 @@ try {
     const notice = studentRow(page, "Roman").locator(".teacher-notice");
     await expect(notice.locator(".teacher-notice__title")).toHaveText("Changed their lesson");
     const cross = notice.getByRole("button", { name: "Dismiss: Roman changed their lesson", exact: true });
-    // Each straddles the title's first line, at its right.
+    // Each is centred on the title's first line, at its right, and clear of
+    // the notice's top edge ("it's weirdly close to the edge?").
     const title = await notice.locator(".teacher-notice__title").boundingBox();
-    const firstLine = title.y + 12;
+    const edge = await notice.boundingBox();
+    const firstLine = title.y + 9.5;
     for (const action of [notice.getByRole("button", { name: /^View/ }), cross]) {
       const box = await action.boundingBox();
-      assert.ok(box.y < firstLine && box.y + box.height > firstLine && box.x >= title.x + 60, `${width}: View and the cross end the notice's first line`);
+      assert.ok(Math.abs(box.y + box.height / 2 - firstLine) <= 2 && box.x >= title.x + 60, `${width}: View and the cross end the notice's first line`);
+      assert.ok(box.y - edge.y >= 6, `${width}: View and the cross stand clear of the notice's top edge`);
     }
     await cross.click();
     await expect(notice).toHaveCount(0);

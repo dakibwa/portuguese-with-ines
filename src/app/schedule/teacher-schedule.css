@@ -2209,9 +2209,15 @@
    end of the first line at every width, and the words flow round them, so the
    facts take the full width once past them and break only between facts. No
    action has a row of its own. */
-.teacher-notice.teacher-lesson-card { display: flow-root; }
-/* The chip and cross reach into the padding rather than heighten the line. */
-.teacher-notice__actions { float: right; display: flex; align-items: center; gap: 0.4rem; margin: -0.3rem 0 -0.3rem 0.5rem; }
+.teacher-notice.teacher-lesson-card { display: flow-root; padding: 0.85rem 0.75rem 0.75rem 0.9rem; }
+/* The chip and cross are one height at every width, centred on the title's
+   first line, and stand as far from the notice's top edge as from its right
+   (11 November 2026, Dan, of a View chip touching the top: "it's weirdly
+   close to the edge?"). The -0.4rem centres 32 px on the 19 px line. */
+.teacher-notice__actions { float: right; display: flex; align-items: center; gap: 0.4rem; margin: -0.4rem -0.3rem 0 0.5rem; }
+/* Its chip is the cross's height on a phone too; its tap is still 44 px. */
+.teacher-notice__actions > .teacher-quiet { position: relative; min-height: 32px; }
+.teacher-notice__actions > .teacher-quiet::after { content: ""; position: absolute; inset: -6px 0; }
 /* A title that wraps breaks evenly ("Jessica Riley / added a card"), never
    leaving two words alone on its second line. */
 .teacher-notice__title { display: block; font: 600 0.88rem/1.35 var(--ui); overflow-wrap: anywhere; text-wrap: balance; }
@@ -3268,7 +3274,8 @@
 .teacher-student__weekly { display: inline-flex; align-items: center; gap: 0.35rem; border-radius: var(--squiggle-thumb); padding: 0.35rem 0.7rem; background: var(--lavender-soft); color: var(--ink); font: 700 0.6rem/1 var(--ui); letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
 .teacher-student__weekly svg { color: var(--blue); }
 .teacher-student-notices { position: relative; z-index: 2; gap: 0.4rem; margin: 0; }
-.teacher-student-notices .teacher-lesson-card { padding: 0.35rem 0.4rem 0.45rem 0.65rem; }
+/* Its words closer in a student's card; the chip still 8 px from each edge. */
+.teacher-student-notices .teacher-lesson-card { padding: 0.85rem 0.75rem 0.65rem 0.65rem; }
 
 /* One card a student (2 November 2026, Dan): their name, three checks and
    the one thing to press next; the name opens their profile in place. */

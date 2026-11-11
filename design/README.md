@@ -560,7 +560,10 @@ free times and removes selected times that cannot be booked in the new place.
   Inês have a dismiss button on these notifications and do they need to be
   this verbose") says what happened in one bold line with its one quiet
   action at that line's end, at every width, never on a row of its own; the
-  facts flow beneath at full width and break only between facts. Inside a
+  facts flow beneath at full width and break only between facts. The action
+  and any cross are one height, centred on that line, and stand as far from
+  the notice's top edge as from its right, never against it (11 November
+  2026, Dan: "it's weirdly close to the edge?"). Inside a
   student's own card it does not say their name again (`Changed their
   lesson`, `Cancelled their lesson`, `First lesson`, `Added a card`); outside
   a card, on the Timetable and under `Check first`, the name stays. A notice
