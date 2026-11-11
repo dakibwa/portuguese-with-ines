@@ -345,25 +345,19 @@ for (const route of routes) {
       }
     }
 
-    if (route.id === "booking" && viewport.id === "desktop") {
-      const bannerArtwork = await page.evaluate(() => {
-        const intro = document.querySelector(".booking-intro")?.getBoundingClientRect();
-        const corner = document.querySelector(".booking-intro__time-window")?.getBoundingClientRect();
-        return {
-          intro: intro ? { top: intro.top, right: intro.right } : null,
-          corner: corner ? { top: corner.top, right: corner.right, width: corner.width } : null,
-          extras: document.querySelectorAll(".booking-intro ul, .booking-intro p").length
-        };
-      });
-      if (
-        !bannerArtwork.intro ||
-        !bannerArtwork.corner ||
-        bannerArtwork.corner.width < 220 ||
-        bannerArtwork.corner.top >= bannerArtwork.intro.top ||
-        bannerArtwork.corner.right <= bannerArtwork.intro.right ||
-        bannerArtwork.extras
-      ) {
-        throw new Error(`The booking banner should be its title and a cropped top-right splat, nothing more: ${JSON.stringify(bannerArtwork)}.`);
+    if (route.id === "booking") {
+      // A visitor's booking page is the one blue bar: the wordmark beside
+      // Book a Lesson and the menu button, with no band. Their Sign in is in
+      // the bar where there is room, and leads the menu on a phone.
+      const bar = page.locator(".site-header.is-bar");
+      const titles = bar.locator(".site-header__title span:visible");
+      const signIn = bar.locator(".site-header__sign-in");
+      const band = await page.locator(".booking-intro").boundingBox();
+      if ((await titles.count()) !== 1 || (await titles.innerText()).trim() !== "Book a Lesson" ||
+          (await signIn.isVisible()) !== (viewport.id === "desktop") || !(await signIn.getAttribute("href")).endsWith("/book/?view=lessons") ||
+          !await bar.getByRole("button", { name: "Open menu", exact: true }).isVisible() ||
+          await page.locator(".site-nav").count() || (band && band.height > 2)) {
+        throw new Error(`${viewport.id}: booking should be headed by the one bar, Book a Lesson with the menu and (wide) Sign in, and no band.`);
       }
     }
 
@@ -611,7 +605,11 @@ if (bookingCalendar) {
   assertIncludes(bookingText, "trial", "trial lesson choice");
   assertIncludes(bookingText, "single", "one-off booking choice");
   assertIncludes(bookingText, "weekly", "weekly booking choice");
-  assertIncludes(bookingText, "already booked?", "sign-in route for booked students");
+  // A booked student's way in is the bar's Sign in (checked at each width
+  // above), never a line of its own in the booking card.
+  if ((await page.locator(".site-header .site-header__sign-in").count()) !== 1 || bookingText.includes("already booked?")) {
+    throw new Error("Booking should offer Sign in in its bar, and no sign-in line in the card.");
+  }
   // A student on Porto's clock needs no line saying which clock times are on.
   if (await page.locator(".calendar-zone").count()) {
     throw new Error("Only a student whose clock differs from Porto's should be told which clock the times are on.");
@@ -639,8 +637,13 @@ if (bookingCalendar) {
   if (lockedOverflow.body !== "hidden" || lockedOverflow.html !== "hidden") {
     throw new Error(`The mobile menu should lock both scroll roots: ${JSON.stringify(lockedOverflow)}.`);
   }
-  if ((await page.locator("#site-nav-mobile .nav-mobile__link").count()) !== 4) {
+  if ((await page.locator("#site-nav-mobile .nav-mobile__links .nav-mobile__link").count()) !== 4) {
     throw new Error("The mobile menu should contain the four primary destinations once each.");
+  }
+  // On a phone the bar has no room for it, so a visitor's Sign in leads the menu.
+  const menuSignIn = page.locator("#site-nav-mobile").getByRole("link", { name: "Sign in", exact: true });
+  if (!await menuSignIn.isVisible() || !(await menuSignIn.getAttribute("href")).endsWith("/book/?view=lessons")) {
+    throw new Error("On a phone the booking page's menu should lead with Sign in.");
   }
   await page.getByRole("button", { name: "Close menu", exact: true }).click();
   await page.waitForTimeout(250);
@@ -1706,7 +1709,7 @@ const desktopAccountLayout = await accountPage.evaluate(() => {
   };
   return {
     composition: bounds(".booking-composition"),
-    bar: bounds(".site-header.is-account-bar .site-header__inner"),
+    bar: bounds(".site-header.is-bar .site-header__inner"),
     provider: bounds(".booking-provider"),
     calendar: bounds("#lesson-calendar .calendar-panel")
   };
@@ -2890,7 +2893,17 @@ if (!(await accountPage.evaluate(() => window.localStorage.getItem("ines-account
 // are already open on wide cards; Sign out is always in Your details.
 await chooseAccountAction("Edit details");
 await accountPanel.locator(".my-lessons__details").getByRole("button", { name: "Sign out", exact: true }).click();
-await accountPage.locator("#lesson-calendar .booking-bar__sign-in").waitFor();
+// Signed out, the way back in is the bar's Sign in again (shown beside the
+// menu button where there is room; this phone-width page has it in the menu).
+const headerSignIn = accountPage.locator(".site-header .site-header__sign-in");
+await headerSignIn.waitFor({ state: "attached" });
+const signInHref = new URL(await headerSignIn.getAttribute("href"), base);
+if (`${signInHref.pathname}${signInHref.search}` !== "/book/?view=lessons") {
+  throw new Error(`The bar's Sign in should open Your lessons: ${signInHref}`);
+}
+if (await accountPage.locator("#lesson-calendar .booking-bar__head").getByRole("button", { name: "Sign in" }).count()) {
+  throw new Error("The booking card should have no sign-in of its own.");
+}
 await accountPanel.waitFor({ state: "detached" });
 if (await accountPage.evaluate(() => window.localStorage.getItem("ines-account-snapshot"))) {
   throw new Error("Signing out should forget the remembered account.");

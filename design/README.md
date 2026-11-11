@@ -350,13 +350,9 @@ Dan's 22 September review tightened the public pages:
   square-cornered blue strip at its right edge, like the wider layouts' blue
   column. The FAQ banner is about 200 px, 150 px on phones, with its question
   splat whole inside the page margin. Stacked, the Approach fan comes in from
-  the right edge halfway down the heading rather than trailing beneath it, and
-  the booking banner keeps
-  its splat at the right in a band of about 124 px, without an editorial rule,
-  its two-line `Book a Lesson` or `Your Lessons` set close as one handwritten
-  block; on a phone turned sideways it keeps the wide screens' one line in a
-  band of about 60 px, so the booking's choices start on the first screen (13
-  October 2026);
+  the right edge halfway down the heading rather than trailing beneath it.
+  Booking has no banner of its own: its one bar names it (11 November 2026),
+  so the booking's choices start on the first screen;
 - the three Lessons cards each have their own squiggle outline, and their own
   splat comes in large from the card's top-right corner, cropped by its edge;
   once landed it moves only to turn a little while its card is pointed at. The
@@ -1177,16 +1173,17 @@ The full source inventory and later-stage feature map are in
 
 ## Wording and confirmation — 13 September 2026
 
-Use `Portuguese Lessons` on the home page. A visitor without an account books
-under the `Book a Lesson` banner. A student, or anyone arriving by a lesson's
-own link or a link to Your lessons, has the account's one bar, `Your Lessons`,
-in place of the header and banner (12 October and 9 November 2026, at Dan's
-request). The banner or bar names the page, so the booking card
-carries no second `Book a lesson` title of its own (its title is kept for
-screen readers): a first-time visitor's card opens on the lesson's choices,
-and a returning one's on `Already booked? Sign in`. Signing in or making an
+Use `Portuguese Lessons` on the home page. Booking is headed by the one bar
+for everyone (11 November 2026, Dan: "like in the other pages where portugues
+com a ines is next to book a lesson in thet singel blue thing"): a visitor
+without an account books under `Book a Lesson`; a student, or anyone arriving
+by a lesson's own link or a link to Your lessons, has `Your Lessons` (12
+October and 9 November 2026, at Dan's request). The bar names the page, so
+the booking card carries no second `Book a lesson` title of its own (its
+title is kept for screen readers) and opens on the lesson's choices; a
+signed-out visitor's way in is the bar's `Sign in`. Signing in or making an
 account halfway through a booking keeps `Book a Lesson` until Your lessons
-opens, so the banner never changes under the booking being finished (13
+opens, so the bar never changes under the booking being finished (13
 October 2026).
 Marketing copy describes Portuguese lessons without repeated European/Portugal
 positioning. The one statement of it is on Approach: Inês teaches European
@@ -1357,12 +1354,18 @@ signed in, or on a browser where a student with a booked lesson has signed in
 before, is not offered the trial (Inês signing in, or an account made and never
 booked, does not count); that is settled as booking opens, so creating an account at the
 confirmation never takes away the trial being booked. The bar's head offers
-`Your lessons` to a signed-in student and a coral `Already booked? Sign in`
-(`Sign in` alone on a phone) to a returning browser, leading the choices' own
-row wherever both fit. A first-time visitor sees
-no sign-in there, since booking asks for an account only at the confirmation;
-a quiet `Already booked? Sign in` line beneath the calendar still serves a
-student on a new browser. Signing in to view lessons shows the `Your account`
+`Your lessons` to a signed-in student and nothing to anyone else. A visitor
+signs in from the page's one bar (11 November 2026, Dan: "can they just sign
+in immediately too?", then of a coral `Already booked? Sign in` in the card:
+"I don't like this"): `Sign in` sits beside the bar's menu button as a small
+cream button in the site's hand-cut shape, as `Join Meet` is on her blue
+card ("can this be a stylised button"), turning coral when pointed at. A phone's bar has
+no room for it, and a row of its own under the button was "very ugly", so
+there it is the menu's first row, drawn as the menu's places are with the
+sign-in card's mark and `See or change your lessons`. It opens
+`/book/?view=lessons`, and the open menu's heading carries what the bar
+does so nothing moves. A student's page has their own menu instead. Booking still asks for an account only at the confirmation.
+Signing in to view lessons shows the `Your account`
 card on its own, with no `Back` above it: the header's `Booking` starts
 afresh (27 October 2026, Dan). On wide screens the
 groups carry small `Lesson`, `Where`, `Length` and `Repeat` labels; on a phone,
@@ -2454,9 +2457,10 @@ same job, they use the same piece, on a student's side and on Inês's:
   too into the same thing?", "with a menu button if they care to go back ?"):
   the cream wordmark leading home, a hairline, the page's name in the display
   hand and the availability splat cut off at the right edge, on blue; 76 px,
-  64 px on a phone. It heads a student's `Your Lessons`, `New password` and
-  Inês's `Your schedule`, with no site header or band above it. A visitor
-  booking keeps the site's header and the `Book a Lesson` band.
+  64 px on a phone. It heads Booking for everyone (`Book a Lesson` for a
+  visitor, with their `Sign in`, 11 November 2026; `Your Lessons` for a
+  student), `New password` and Inês's `Your schedule`, with no site header or
+  band above it.
 - A student's bar holds the site's menu button at every width; Inês's has
   none. It opens the site's one menu, whose heading repeats the bar so the
   button becomes the close where it stands: the whole screen on a phone, a

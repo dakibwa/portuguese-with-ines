@@ -5,7 +5,7 @@ import { MeetingLink } from "@/components/MeetingLink";
 import { LessonsLoading } from "@/components/LessonsLoading";
 import { StudentExpressions } from "@/components/expressions/StudentExpressions";
 
-import { type ComponentType, type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type ComponentType, type CSSProperties, FormEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   AlertCircle,
@@ -1084,7 +1084,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
   const [hasPriorBooking, setHasPriorBooking] = useState(false);
   // Someone who has signed in on this browser before is offered sign-in and
   // no trial; a first-time visitor sees neither until the confirmation.
-  const returningDevice = useSyncExternalStore(subscribeToSession, isReturningDevice, () => false);
 
   // A tab left open overnight moves on to the new day when it is next looked at.
   useEffect(() => {
@@ -3297,7 +3296,7 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
     return (
       <div className={`booking-bar${inConfirmation ? " booking-bar--review" : ""}`}>
         {!inConfirmation ? (
-          <div className={`booking-bar__head${student ? " booking-bar__head--account" : returningDevice ? "" : " booking-bar__head--quiet"}`}>
+          <div className={`booking-bar__head${student ? " booking-bar__head--account" : " booking-bar__head--quiet"}`}>
             {/* Signed in, the account heads booking: its name's menu at every
                 width, which holds the way back to Your lessons. Booking is not
                 one of the account's places, so the places stay folded here
@@ -3315,14 +3314,10 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
                 onSignOut={signOut}
                 upcomingCount={upcomingCount}
               />
-            ) : returningDevice ? (
-              <p className="booking-bar__sign-in">
-                <span className="booking-bar__sign-in-note">Already booked?</span>
-                <button className="button button--coral button--compact" onClick={openLessonsJourney} type="button">
-                  Sign in
-                </button>
-              </p>
             ) : null}
+            {/* Signed out, the way in is the site header's `Sign in`, on every
+                page (11 November 2026, Dan, of a coral `Already booked? Sign
+                in` here: "I don't like this"). */}
           </div>
         ) : null}
         <div className="booking-bar__choices" role="group" aria-label="Your lesson">
@@ -5050,15 +5045,6 @@ export function BookingCalendar({ initialManageToken = "", initialLessonsView = 
           ) : null}
           </div>
           </div>
-        ) : null}
-
-        {/* A first visit books first and makes an account at the end; this is
-            the quiet way in for a student booked on another browser. */}
-        {showWorkflowCalendar && intent === "book" && !managed && !student && !returningDevice && !isConfirmingBooking ? (
-          <p className="booking-returning">
-            Already booked?{" "}
-            <button className="button button--outline button--small" onClick={openLessonsJourney} type="button">Sign in</button>
-          </p>
         ) : null}
 
         {isConfirmingBooking ? (

@@ -38,15 +38,15 @@ export function BookingFlow({ initialView = "book" }: { initialView?: BookingVie
 
   return (
     <>
-      {/* A visitor without an account is here to book, under the site's
-          header and the `Book a Lesson` band. A student, or a lesson's own
-          link, is here for their lessons (12 October 2026, at Dan's request):
-          the header is then their one bar, `Your Lessons`, and the band
-          keeps only its heading, for screen readers (9 November 2026, Dan).
-          The page's script picks one before it paints, from the stored
-          session and the link. */}
+      {/* One bar for everyone (11 November 2026, Dan): a visitor without an
+          account is here to book, and it reads `Book a Lesson` with their
+          `Sign in`; a student, or a lesson's own link, is here for their
+          lessons (12 October 2026, at Dan's request), and it reads `Your
+          Lessons`. The page keeps its heading for screen readers only
+          (9 November 2026, Dan). The page's script picks one before it
+          paints, from the stored session and the link. */}
       <SiteHeader
-        bar={{ title: "Your Lessons", mark: "/visuals/v2-splats/booking-availability-splat-v2.svg", when: "account" }}
+        bar={{ title: "Your Lessons", bookTitle: "Book a Lesson", mark: "/visuals/v2-splats/booking-availability-splat-v2.svg", when: "account" }}
         currentPage="book"
       />
 
