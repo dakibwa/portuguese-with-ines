@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "lucide-react": "^1.14.0",
-    "next": "16.3.8",
+    "next": "16.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
@@ -48,8 +48,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.6",
     "typescript": "^5",
-    "wrangler": "^4.145.0"
+    "wrangler": "^4.160.0"
   }
 }

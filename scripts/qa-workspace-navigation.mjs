@@ -9,6 +9,17 @@ const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1920, height: 1100 }, timezoneId: "Europe/Lisbon" });
 const student = { id: "navigation-preview", name: "Ana Martins", email: "preview@example.invalid", phone: "", timezone: "Europe/Lisbon", role: "student" };
 const lessonType = { id: "single-60", name: "Single lesson", durationMinutes: 60, priceCents: 2500 };
+// Public calendar reads are fixtures too, so navigation can be checked without
+// depending on live availability or sending a request from a test account.
+async function calendarFixtures(context) {
+  await context.route("**/lesson-types", route => route.fulfill({ json: { lessonTypes: [
+    { id: "trial", name: "Trial lesson", duration_minutes: 60, price_cents: 2000 },
+    { id: "single-60", name: "Single lesson", duration_minutes: 60, price_cents: 2500 },
+    { id: "single-90", name: "Long lesson", duration_minutes: 90, price_cents: 3500 },
+  ], postpay: false, paymentReady: true } }));
+  await context.route("**/availability?*", route => route.fulfill({ json: { slotsByDate: {}, horizonDays: 84, timeZone: "Europe/Lisbon" } }));
+}
+await calendarFixtures(context);
 let bookings = Array.from({ length: 12 }, (_, index) => ({
   reference: `PREVIEW-${index}`, status: "cancelled", location: "online", notes: "",
   startAt: new Date(Date.UTC(2026, 8, 4 - index, 16)).toISOString(),
@@ -112,6 +123,21 @@ try {
     assert.ok(layout.book.top < layout.calendar.top + 120 && layout.book.right <= layout.calendar.right + 1,
       `Book a lesson sits at the calendar's top right at ${width}`);
     layouts.push(layout);
+    // On a wide account menu the home link is hidden. Keyboard wrapping must
+    // use the visible controls, in both directions, without getting stuck on it.
+    await page.getByRole("button", { name: "Open menu", exact: true }).click();
+    const accountSiteMenu = page.getByRole("dialog", { name: "Site navigation" });
+    await page.waitForFunction(() => document.activeElement?.classList.contains("nav-mobile__close"));
+    const controls = accountSiteMenu.locator("button:visible, a[href]:visible");
+    await controls.last().focus();
+    await page.keyboard.press("Tab");
+    assert.equal(await controls.first().evaluate(element => element === document.activeElement), true, `Tab wraps to the first visible menu control at ${width}`);
+    await controls.first().focus();
+    await page.keyboard.press("Shift+Tab");
+    assert.equal(await controls.last().evaluate(element => element === document.activeElement), true, `Shift+Tab wraps to the last visible menu control at ${width}`);
+    await page.keyboard.press("Escape");
+    await accountSiteMenu.waitFor({ state: "hidden" });
+    await settle();
     if ([1920, 390].includes(width)) await page.screenshot({ path: `${out}/upcoming-${width}.png`, fullPage: true });
   }
 
@@ -278,6 +304,7 @@ try {
   }
 
   const legacy = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await calendarFixtures(legacy.context());
   await legacy.goto(`${base}/my-lessons/`);
   await legacy.getByRole("heading", { name: "Your account", exact: true }).waitFor();
   assert.ok(legacy.url().includes("/book/?view=lessons"));
@@ -289,6 +316,7 @@ try {
   // time, the next lesson's, and Porto's while a lesson there is hovered. A
   // narrow card keeps the row.
   const abroad = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: "America/Los_Angeles" });
+  await calendarFixtures(abroad);
   await abroad.addInitScript(() => localStorage.setItem("ines-student-session", "navigation-abroad"));
   const abroadLesson = (reference, location, startAt) => ({
     reference, status: "confirmed", location, notes: "", startAt, endAt: new Date(Date.parse(startAt) + 3_600_000).toISOString(),
