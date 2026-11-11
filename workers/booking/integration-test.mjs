@@ -4078,8 +4078,8 @@ await test("she sets a student up and adds their lessons without emailing them, 
     assert.equal(welcome.text, originalWelcome.text, "a retry keeps the original sign-in link and exact provider payload");
     assert.ok(welcome.subject.startsWith("Your lessons with Inês"));
     // The weekly run is one line, the lesson on its own another.
-    assert.equal((welcome.text.match(/Lesson · Online/g) ?? []).length, 1, "the lesson on its own has its own line");
-    assert.equal((welcome.text.match(/Weekly · Online/g) ?? []).length, 1, "a weekly run is one line, not a row of dates");
+    assert.equal((welcome.text.match(/^\w+ \d+ \w+, \d\d:\d\d: /gm) ?? []).length, 1, "the lesson on its own has its own line");
+    assert.equal((welcome.text.match(/^Every \w+, \d\d:\d\d: /gm) ?? []).length, 1, "a weekly run is one line, not a row of dates");
     assert.equal(db.prepare("SELECT awaiting_welcome FROM students WHERE id=?").get(student.id).awaiting_welcome, 0);
     // Needs you asks only while the welcome is owed: a second device pressing later sends nothing.
     const again = await call(`/admin/students/${student.id}/welcome`, { user: "teacher", body: { onlyIfWaiting: true } });
@@ -4123,8 +4123,8 @@ await test("she welcomes a student with no lessons: they are asked to book their
     assert.equal(priced.email.subject, "Book your next lesson with Inês");
     assert.match(priced.email.text, /you can now book your lessons with Inês/);
     assert.ok(priced.email.text.includes("Choose a day and time for your next lesson."));
-    assert.ok(!/Lesson · |Weekly · |And more/.test(priced.email.text), "no lesson list");
-    assert.ok(priced.email.text.includes("€25 a lesson"), "their own price still shows");
+    assert.ok(!/^Lessons|^Every |more lessons? (is|are) on the website/m.test(priced.email.text), "no lesson list");
+    assert.ok(priced.email.text.includes("Your price\n60 minutes: €25"), "their own price still shows");
     assert.equal(priced.email.text.includes("Add your card."), priced.reply.card, "a card is asked for only when one is taken");
 
     const free = await welcomeOf("free-booker@example.invalid", { 60: 0 });
@@ -4277,18 +4277,19 @@ await test("she adds lessons for a student with no email yet: nothing leaves for
     await drain();
     const [welcome] = sentEmails.filter((sent) => sent.to[0] === "dina@example.invalid");
     const lines = welcome.text.split("\n");
+    // Their clock once, over the lessons; each lesson when, then its facts; their prices after.
     for (const line of [
-      "Your price · 60 minutes: €24 a lesson",
-      "Your price · 90 minutes: €36 a lesson",
-      "Weekly · Online: Every Thursday, 10:00 · Los Angeles time",
-      "From 17 September 2026 until 8 October 2026",
-      "60 minutes · €24 a lesson",
-      "Lesson · Online: Tuesday 20 October 2026, 09:00 · Los Angeles time",
-      "60 minutes · €24",
-      "Lesson · Online: Wednesday 28 October 2026, 02:00 · Los Angeles time",
-      "90 minutes · €36"
+      "Lessons · Los Angeles time",
+      "Every Thursday, 10:00: Online · 60 minutes · €24 a lesson",
+      "From 17 September to 8 October",
+      "Tuesday 20 October, 09:00: Online · 60 minutes · €24",
+      "Wednesday 28 October, 02:00: Online · 90 minutes · €36",
+      "Your price",
+      "60 minutes: €24",
+      "90 minutes: €36"
     ]) assert.ok(lines.includes(line), `${line}\n${welcome.text}`);
-    assert.equal(welcome.text.match(/Weekly/g).length, 1, "the run is one line, not four");
+    assert.equal(welcome.text.match(/Every Thursday/g).length, 1, "the run is one line, not four");
+    assert.equal(welcome.text.match(/Los Angeles time/g).length, 1, "their clock is said once");
     assert.ok(!welcome.text.includes("20 August"), "a lesson that has happened is not in it");
   } finally {
     Object.assign(env, { TEACHER_NOTIFICATIONS_ENABLED: "0" });

@@ -1280,10 +1280,16 @@ const WELCOME_LESSON_LINES = 12;
  * lessons and prices already done properly"): a weekly run is one line, its
  * day and time, when it starts and, if it ends, until when, and the weeks it
  * has no lesson; a lesson on its own has its own line. Each carries its
- * length and the price it will be charged or owed, read from the lesson
- * itself, so a price Inês set after adding it, or a lesson that changed
- * length, is right. Times are on the student's own clock, each naming it as
- * every email to them does.
+ * place, its length and the price it will be charged or owed, read from the
+ * lesson itself, so a price Inês set after adding it, or a lesson that
+ * changed length, is right.
+ *
+ * Each is a bullet of two short lines, when and then the facts (11 November
+ * 2026, Dan: "retain all the info easily and clearly and concisely"). Times
+ * are on the student's own clock, named once in the title over the list
+ * when every line shares it ("porto time can just be said once") and on
+ * each line when they differ. A date leaves its year out: every lesson here
+ * is still to come.
  */
 export function welcomeLessonLines(student, lessons, limit = WELCOME_LESSON_LINES) {
   const onTheirClock = (lesson) => lessonZone({ ...lesson, student_timezone: student.timezone });
@@ -1330,13 +1336,24 @@ export function welcomeLessonLines(student, lessons, limit = WELCOME_LESSON_LINE
   items.sort((a, b) => a.at.localeCompare(b.at));
 
   const days = (keys) => keys.length > 1 ? `${keys.slice(0, -1).join(", ")} or ${keys[keys.length - 1]}` : keys[0];
-  const lines = items.slice(0, limit).map((item) => {
+  const shown = items.slice(0, limit);
+  // "15:00 · Porto time": the hour, and the clock it is on.
+  const clockOf = (lesson) => when(lesson).time.split(" · ")[1] ?? "";
+  const clocks = new Set(shown.map((item) => clockOf(item.lessons[0])));
+  const oneClock = clocks.size === 1 ? [...clocks][0] : "";
+  const hour = (lesson) => oneClock ? when(lesson).time.split(" · ")[0] : when(lesson).time;
+  const noYear = (text) => text.replace(/ \d{4}$/, "");
+  const lines = shown.map((item) => {
     const [first] = item.lessons;
-    const { date, time } = when(first);
+    const { date } = when(first);
     if (!item.run) {
       return {
-        label: `${first.lesson_type_id === "trial" ? "Trial lesson" : "Lesson"} · ${placeLabel(first)}`,
-        value: [`${date}, ${time}`, `${length(first)} · ${first.payment_status === "paid" || first.payment_consent_version === PAID_BY_HAND_MARK ? `${price(first)} paid` : price(first)}`].join("\n")
+        lesson: true,
+        label: `${noYear(date)}, ${hour(first)}`,
+        value: [
+          ...(first.lesson_type_id === "trial" ? ["Trial lesson"] : []), placeLabel(first), length(first),
+          first.payment_status === "paid" || first.payment_consent_version === PAID_BY_HAND_MARK ? `${price(first)} paid` : price(first)
+        ].join(" · ")
       };
     }
     // The price still open is the one the run is on; a lesson already paid, or
@@ -1354,21 +1371,22 @@ export function welcomeLessonLines(student, lessons, limit = WELCOME_LESSON_LINE
       if (dated.has(`${first.series_id}|${key}`)) continue;
       const { year, month, day } = parseDateKey(key);
       const instant = zonedToUtc(year, month, day, first.series_minute);
-      missing.push(dayOnly({ ...first, starts_at: instant.toISOString() }).replace(/ \d{4}$/, ""));
+      missing.push(noYear(dayOnly({ ...first, starts_at: instant.toISOString() })));
     }
     return {
-      label: `Weekly · ${placeLabel(first)}`,
+      lesson: true,
+      label: `Every ${date.split(" ")[0]}, ${hour(first)}`,
       value: [
-        `Every ${date.split(" ")[0]}, ${time}`,
-        item.goesOn ? `From ${dayOnly(first)}, until you stop it` : `From ${dayOnly(first)} until ${dayOnly(last)}`,
-        ...(missing.length ? [`No lesson on ${days(missing)}`] : []),
-        `${length(priced)} · ${price(priced)}${priced.payment_status === FREE ? "" : " a lesson"}`
+        `${placeLabel(first)} · ${length(priced)} · ${price(priced)}${priced.payment_status === FREE ? "" : " a lesson"}`,
+        // "Every" already says it goes on; an end is named.
+        item.goesOn ? `From ${noYear(dayOnly(first))}` : `From ${noYear(dayOnly(first))} to ${noYear(dayOnly(last))}`,
+        ...(missing.length ? [`No lesson on ${days(missing)}`] : [])
       ].join("\n")
     };
   });
   const left = items.slice(limit).reduce((total, item) => total + item.lessons.length, 0);
-  if (left) lines.push({ label: "And more", value: `${left} more ${left === 1 ? "lesson" : "lessons"}, all on the website` });
-  return lines;
+  if (left) lines.push({ fact: `${left} more ${left === 1 ? "lesson is" : "lessons are"} on the website` });
+  return lines.length ? [{ title: oneClock ? `Lessons · ${oneClock}` : "Lessons" }, ...lines] : lines;
 }
 
 /** Her upcoming lessons for a student, with what a welcome tells of each. */
@@ -1402,10 +1420,13 @@ async function sendWelcome(env, { student, settings, welcome, lessons = [], dedu
   // Already on the price Inês agreed with them, with no code to type
   // (13 October 2026, Dan).
   const prices = await studentRates(env, student.id).catch(() => ({}));
-  rows.unshift(...[60, 90].filter((minutes) => prices[minutes] !== undefined).map((minutes) => ({
-    label: `Your price · ${minutes} minutes`,
-    value: prices[minutes] === 0 ? FREE_LABEL : `${formatEuros(prices[minutes])} a lesson`
-  })));
+  // After their lessons, each length a short bullet under one title.
+  const priced = [60, 90].filter((minutes) => prices[minutes] !== undefined);
+  if (priced.length) {
+    rows.push({ title: "Your price" }, ...priced.map((minutes) => ({
+      fact: `${minutes} minutes: ${prices[minutes] === 0 ? FREE_LABEL : formatEuros(prices[minutes])}`
+    })));
+  }
   const free = prices[60] === 0 && prices[90] === 0;
   const { subject, content } = welcomeTemplate({ tutor: tutorOf(env), first, welcome, book, free, rows });
   return deliver(env, {

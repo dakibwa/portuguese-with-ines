@@ -799,18 +799,24 @@ free times and removes selected times that cannot be booked in the new place.
   - Sent by `Email instead` from their card, the welcome email is one email
     for everyone, in the site's email design: their lessons and prices, and the
     way in. It shows for someone she still needs to bring in, and only once
-    they have an address. After the two `Your price` dabs (for each length she
-    has priced), each lesson on its own is one dab: `Lesson · Online` (or
-    `Trial lesson`, `In Porto`) over its date and time on the student's own
-    clock, each time naming it as every email to them does (`Tuesday 20 October
-    2026, 17:00 · Porto time`), and its length and the price it will be charged
-    or owed beneath (`60 minutes · €22`, or `· €22 paid` once paid). A weekly
-    run is one dab, never a row of dates: `Weekly · Online` over `Every Tuesday,
-    17:00 · Porto time`, `From 20 October 2026 until 8 December 2026` (or `…,
-    until you stop it` while it is active), any week between with no lesson
-    (`No lesson on 3 November`, so a skipped or cancelled week is never read as
-    a lesson) and `60 minutes · €22 a lesson`. A lesson moved, lengthened or put
-    elsewhere reads as the lesson it now is. Past twelve lines an `And more` dab
+    they have an address. Their lessons come first, under one small title
+    that says their clock once (`Lessons · Porto time`; 11 November 2026, Dan:
+    "porto time can just be said once"). Each lesson is a dab of two short
+    lines (Dan: "retain all the info easily and clearly and concisely"): when
+    it is, in bold and without a year, since every lesson here is still to
+    come (`Tuesday 20 October, 17:00`), then its place, length and the price
+    it will be charged or owed (`Online · 60 minutes · €22`, `· €22 paid` once
+    paid, `Trial lesson · In Porto · …` for the trial). A weekly run is one
+    dab, never a row of dates: `Every Tuesday, 17:00` over `Online · 60
+    minutes · €22 a lesson`, then `From 20 October` (`From 20 October to 8
+    December` when it ends; `Every` already says it goes on) and any week
+    between with no lesson (`No lesson on 3 November`, so a skipped or
+    cancelled week is never read as a lesson). A lesson moved, lengthened or
+    put elsewhere reads as the lesson it now is. Where their lessons are on
+    two clocks (theirs online, Porto's in Porto) the title is `Lessons` and
+    each line names its own (`…, 12:00 · New York time`). Their prices follow
+    under `Your price`, one short dab for each length she has priced (`60
+    minutes: €22`). Past twelve lines one more dab
     says how many lessons are left to the website. Its subject identifies the
     lessons with Inês; card setup is explained in the body. It uses the fewest
     plain words that do the job (11 November 2026, Dan: "simpler language",

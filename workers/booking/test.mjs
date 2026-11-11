@@ -1815,15 +1815,19 @@ await test("a welcome tells a weekly run as one line, its gaps and a changed les
     { ...base, starts_at: at(43, 17) },
     { series_id: null, lesson_type_id: "trial", duration_minutes: 60, amount_cents: 2000, payment_status: "not_required", location: "porto", starts_at: at(5, 9) }
   ];
-  const lines = welcomeLessonLines(porto, lessons);
-  assert.deepEqual(lines.map((line) => line.label), ["Weekly · Online", "Trial lesson · In Porto", "Lesson · Online", "Lesson · Online"]);
-  assert.deepEqual(lines[0].value.split("\n"), ["Every Thursday, 17:00 · Porto time", "From 1 October 2026 until 12 November 2026", "No lesson on 5 November", "60 minutes · €20 a lesson"]);
-  assert.equal(lines[1].value, "Monday 5 October 2026, 10:00 · Porto time\n60 minutes · €20");
-  assert.ok(lines.some((line) => line.value.includes("90 minutes · €30")), "a lesson that changed length shows its own price");
+  // Their clock is said once, over the list; each lesson is when, then its facts.
+  const [title, ...lines] = welcomeLessonLines(porto, lessons);
+  assert.deepEqual(title, { title: "Lessons · Porto time" });
+  assert.ok(lines.every((line) => line.lesson));
+  assert.deepEqual(lines.map((line) => line.label), ["Every Thursday, 17:00", "Monday 5 October, 10:00", "Thursday 15 October, 19:00", "Thursday 22 October, 17:00"]);
+  assert.deepEqual(lines[0].value.split("\n"), ["Online · 60 minutes · €20 a lesson", "From 1 October to 12 November", "No lesson on 5 November"]);
+  assert.equal(lines[1].value, "Trial lesson · In Porto · 60 minutes · €20");
+  assert.equal(lines[3].value, "Online · 90 minutes · €30", "a lesson that changed length shows its own price");
   // Past the limit, the rest are counted, never silently dropped.
   const few = welcomeLessonLines(porto, lessons, 2);
-  assert.equal(few.length, 3);
-  assert.deepEqual(few[2], { label: "And more", value: "2 more lessons, all on the website" });
+  assert.equal(few.length, 4);
+  assert.deepEqual(few[3], { fact: "2 more lessons are on the website" });
+  assert.deepEqual(welcomeLessonLines(porto, []), [], "no lessons, no title");
 
   // A run with no end: one lengthened lesson is a lesson, not a second run; the run's price is the
   // one still open, not a lesson she marked paid by hand; a paid lesson says so; a stopped run does not "go on".
@@ -1833,21 +1837,28 @@ await test("a welcome tells a weekly run as one line, its gaps and a changed les
     { ...open, starts_at: at(22), lesson_type_id: "long", duration_minutes: 90, amount_cents: 3000, payment_status: "paid" },
     { ...open, starts_at: at(29, 17) }
   ];
-  const goingOn = welcomeLessonLines(porto, endless);
-  assert.deepEqual(goingOn.map((line) => line.label), ["Weekly · Online", "Lesson · Online"]);
-  assert.deepEqual(goingOn[0].value.split("\n"), ["Every Thursday, 17:00 · Porto time", "From 15 October 2026, until you stop it", "60 minutes · €20 a lesson"]);
-  assert.equal(goingOn[1].value.split("\n")[1], "90 minutes · €30 paid");
-  const stopped = welcomeLessonLines(porto, endless.map((lesson) => ({ ...lesson, series_status: "ended" })));
-  assert.equal(stopped[0].value.split("\n")[1], "From 15 October 2026 until 29 October 2026");
+  const goingOn = welcomeLessonLines(porto, endless).slice(1);
+  assert.deepEqual(goingOn.map((line) => line.label), ["Every Thursday, 17:00", "Thursday 22 October, 17:00"]);
+  // "Every" says it goes on; only an end is named.
+  assert.deepEqual(goingOn[0].value.split("\n"), ["Online · 60 minutes · €20 a lesson", "From 15 October"]);
+  assert.equal(goingOn[1].value, "Online · 90 minutes · €30 paid");
+  const stopped = welcomeLessonLines(porto, endless.map((lesson) => ({ ...lesson, series_status: "ended" }))).slice(1);
+  assert.equal(stopped[0].value.split("\n")[1], "From 15 October to 29 October");
 
   // On a clock whose summer time ends a week after Porto's, the week in between is its own hour:
   // a lesson of its own, not a gap in the weekly line around it.
   const newYork = welcomeLessonLines({ timezone: "America/New_York" }, [
     { ...base, starts_at: at(22) }, { ...base, starts_at: at(29, 17) }, { ...base, starts_at: at(36, 17) }
   ]);
-  assert.deepEqual(newYork.map((line) => line.label), ["Weekly · Online", "Lesson · Online"]);
-  assert.ok(newYork[0].value.startsWith("Every Thursday, 12:00 · New York time\nFrom 22 October 2026 until 5 November 2026\n60 minutes"), newYork[0].value);
-  assert.ok(newYork[1].value.startsWith("Thursday 29 October 2026, 13:00 · New York time"), newYork[1].value);
+  assert.deepEqual(newYork.map((line) => line.title ?? line.label), ["Lessons · New York time", "Every Thursday, 12:00", "Thursday 29 October, 13:00"]);
+  assert.ok(newYork[1].value.startsWith("Online · 60 minutes · €20 a lesson\nFrom 22 October to 5 November"), newYork[1].value);
+
+  // Two clocks (theirs online, Porto's in Porto): each line names its own, and the title names none.
+  const twoClocks = welcomeLessonLines({ timezone: "America/New_York" }, [
+    { ...base, series_id: null, starts_at: at(22) },
+    { ...base, series_id: null, location: "porto", starts_at: at(23) }
+  ]);
+  assert.deepEqual(twoClocks.map((line) => line.title ?? line.label), ["Lessons", "Thursday 22 October, 12:00 · New York time", "Friday 23 October, 17:00 · Porto time"]);
 });
 
 // --- Report -----------------------------------------------------------------

@@ -39,12 +39,14 @@ const weekly = (extra = {}) => ({
 });
 const weeklyWhen = { when: "Thursday, 3 September 2026 at 17:30, Porto time", shortWhen: "Thu 3 Sept, 17:30" };
 
-const welcomeRows = [
-  { label: "Your price · 60 minutes", value: "€25 a lesson" },
-  { label: "Your price · 90 minutes", value: "€35 a lesson" },
-  { label: "Lesson · Online", value: "Tuesday 20 October 2026, 15:00 · Porto time\n60 minutes · €25" },
-  { label: "Weekly · Online", value: "Every Thursday, 11:00 · Porto time\nFrom 22 October 2026, until you stop it\n60 minutes · €25 a lesson" }
+// As the Worker builds them: their lessons under the clock said once, then their prices.
+const welcomeLessons = [
+  { title: "Lessons · Porto time" },
+  { lesson: true, label: "Tuesday 20 October, 15:00", value: "Online · 60 minutes · €25" },
+  { lesson: true, label: "Every Thursday, 11:00", value: "Online · 60 minutes · €25 a lesson\nFrom 22 October" }
 ];
+const welcomePrices = [{ title: "Your price" }, { fact: "60 minutes: €25" }, { fact: "90 minutes: €35" }];
+const welcomeRows = [...welcomeLessons, ...welcomePrices];
 
 const previews = [
   ["student-booked", "student-books-one-lesson", [1], t.studentBooked({ ...ana, ...lesson, ...studentWhen, ...policy, meetingUrl: meet, byTeacher: false,
@@ -130,9 +132,10 @@ const previews = [
     t.paymentFailed({ ...ana, ...lesson, item, amount, shortWhen: "Sat 5 Sept, 16:00", payUrl: manageUrl })]),
 
   ["welcome", "add-card", [32], t.welcome({ ...ana, welcome: welcomeLink, book: false, card: true, free: false, rows: welcomeRows })],
-  ["welcome", "book-next", [33], t.welcome({ ...ana, welcome: { ...welcomeLink, card: false }, book: true, card: false, free: false, rows: welcomeRows.slice(0, 2) })],
+  ["welcome", "book-next", [33], t.welcome({ ...ana, welcome: { ...welcomeLink, card: false }, book: true, card: false, free: false, rows: welcomePrices })],
   ["welcome", "lessons", [34], t.welcome({ ...ana, welcome: { ...welcomeLink, card: false }, book: false, card: false, free: true,
-    rows: [{ label: "Your price · 60 minutes", value: "Free" }, { label: "Lesson · Online", value: "Tuesday 20 October 2026, 15:00 · Porto time\n60 minutes · Free" }] })],
+    rows: [{ title: "Lessons · Porto time" }, { lesson: true, label: "Tuesday 20 October, 15:00", value: "Online · 60 minutes · Free" },
+      { title: "Your price" }, { fact: "60 minutes: Free" }] })],
 
   ["sign-in-link", "default", [36], t.signInLink({ ...ana, url: `${site}/book/?signin=sample` })],
   ["password-reset", "default", [37], t.passwordReset({ ...ana, url: `${site}/reset-password/?token=sample` })],
