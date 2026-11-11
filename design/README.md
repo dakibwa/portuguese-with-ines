@@ -1208,10 +1208,12 @@ with the chosen lessons. The short payment summary explains payment after each
 lesson and €5 rules, with the full terms available by link.
 
 Use different treatments for neighbouring booking controls instead of two coral
-fills. Selected agreement uses blue beside the coral booking action. Weekly
-lesson management has one filled button, coral `Move weekly time`, with `Stop
-repeating` and `Cancel all booked lessons` as outlines (10 November 2026:
-cancelling all is asked again, in coral, before it happens); profile editing
+fills. Selected agreement uses blue beside the coral booking action. A weekly
+lesson has the same one `Change` and one `Cancel` as any lesson, each starting
+on `This lesson | Every week` (11 November 2026); Cancel's `Every week` has one
+filled `Cancel all booked lessons`, its outline `Keep lessons`, and `Stop
+repeating` as a quiet chip beneath, and the step is the question, so neither
+asks again; profile editing
 ends a name in the coral tick and an email in blue `Send confirmation link`. Keep the existing labels and state indicators so
 colour is never the only way to tell the controls apart. A filled button that
 cannot act yet is drawn as the same quiet outline as the booking's final
@@ -1608,8 +1610,8 @@ Preserve these desktop and mobile states:
   Weekly lessons are lilac on the calendar and one-off lessons coral; a day
   holding both keeps each time in its own colour, and the key names the two
   kinds only when a weekly lesson exists. A weekly lesson opens with a lavender
-  `Weekly lesson` status and `Manage weekly lessons`, which moves, stops or
-  cancels the whole run. Stopping a repeat turns every retained date back into an
+  `Weekly lesson` status, its weekly time as a quiet line, and `Change` and
+  `Cancel`, whose `Every week` moves, resizes, stops or cancels the whole run. Stopping a repeat turns every retained date back into an
   ordinary coral lesson; `Your lessons` counts an active repeat once and each
   retained date on its own. The `?` beside the calendar's month says that a
   booked lesson opens its details, change and cancel choices, and that any
@@ -1806,8 +1808,8 @@ calmer, without new content:
 - the lesson dialog drops the question that repeated its heading and buttons,
   and the rules around the lesson's date. Its pill is `Weekly lesson` only
   while the repeat is running, `Booked` once it stops, and `Cancelled` carries
-  the past lessons' ⊗. `Manage weekly lessons` is a quiet chip at the end of the weekly line (10
-  November 2026; it was a compact outline button on a row of its own).
+  the past lessons' ⊗. The weekly line is a quiet fact; the run's choices
+  are under `Change` and `Cancel` (11 November 2026).
   Cancelling weekly lessons states what happens rather than asking again. A
   decision's pair of actions (`Yes, cancel it` / `Keep lesson` and the like)
   shares a row while both labels fit on one line, and stacks when they don't,
@@ -1822,13 +1824,16 @@ calmer, without new content:
   form, so there is no empty half and no `Show all`; the overlay's heading
   stands alone and `Keep current time` is its one way back, stacked beneath
   the coral action so neither label breaks onto a second line;
-- the change overlay says the date once rather than three times: the heading
-  and a one-line `Currently …` come first, even on a phone, the day above the
-  times reads short, and a phone drops the length and place legends. A day
-  filled coral shows every booked time in white.
+- the change overlay is `Change your lesson` and says the date once rather
+  than three times: the heading, a weekly lesson's `This lesson | Every week`
+  slider and a one-line `Currently …` come first, even on a phone, the day
+  above the times reads short, and a phone drops the length and place
+  legends. A day filled coral shows every booked time in white. What the
+  change will do is a dab each above its one filled button (`Moves to Tue 22
+  Sept at 10:00`, `Becomes 90 mins, €35`), and the quiet way back is as wide
+  as its words.
 - cancelling a one-off lesson doesn't say "only this date", which matters only
-  where other weeks stay booked; `Manage weekly lessons` keeps its own width on a
-  phone; and just past the stacked layout the chosen day's times take close
+  where other weeks stay booked; and just past the stacked layout the chosen day's times take close
   to half the row, so a quarter-hour timetable never squeezes;
 - `Terms & privacy`, a day's list of lessons, the change overlay and Inês's
   lesson dialogs are one family with the lesson dialog: the same hand-cut
@@ -1843,8 +1848,8 @@ calmer, without new content:
   its rows wears the lesson's own mark, as on the calendar. Terms keeps the
   rule under its title, where a long text scrolls beneath it;
 - a lesson that repeats is `weekly` wherever a student reads about it, never
-  `recurring` or a `sequence`: `Weekly lesson`, `Manage weekly lessons`,
-  `Move weekly time`, `Stop repeating`, the `weekly rate`. The run's own line
+  `recurring` or a `sequence`: `Weekly lesson`, `Every week`, `Change every
+  week`, `Stop repeating`, `Cancel all booked lessons`, the `weekly rate`. The run's own line
   in the lesson dialog is simply its weekly time, such as `Thursdays at 18:00
   Porto time` on the lesson's own clock, or `No longer repeating` once stopped;
 - the lessons calendar has one name, `Your lessons`: the account menu's item
@@ -1856,8 +1861,8 @@ calmer, without new content:
 A site-wide pass for things said or drawn two ways. The words:
 
 - a student `change`s or cancels a lesson, in that order, as the `Change`
-  button and the late change fee say; Inês keeps `Move lesson`, and the weekly
-  run keeps `Move weekly time`. The €5 is the `late change fee` wherever it is
+  button and the late change fee say; Inês keeps `Move lesson`, and a weekly
+  run is changed with `Change every week`. The €5 is the `late change fee` wherever it is
   named, and a no-show costs it instead of the `lesson price`. At the confirm
   step each fee is one short line, `€5 to move or cancel less than 14 hours
   before` and `€5 if you don’t show up to a lesson`, with when it is charged
@@ -2541,11 +2546,12 @@ for).
   alert's end, on a phone as across a wide page.
 
 - A form that changes something saves only once something differs from what
-  is saved: a student's `Save changes` on `Choose a new date and time` waits
+  is saved: a student's `Save changes` on `Change your lesson` waits
   as the tick does, so a press never sends a move to the lesson's own time.
 - A set of choices about one thing has one filled button. A destructive
-  choice is an outline when a coral confirmation follows it (`Cancel all
-  booked lessons`, then `Yes, cancel all`).
+  choice the step itself asks about is that step's one filled action, with
+  its way back beside it (`Cancel all booked lessons` / `Keep lessons`), and
+  is never asked again in a second step.
 - A cancelled lesson has no `Done`: its cross closes it.
 
 **Lines, labels and words.**
@@ -2704,6 +2710,12 @@ with a band across the page afterwards) "this is ugly".
   and take a line of their own only on a phone and on a closed card in its
   lane.
 - A saved price in Your details is a row like every other detail.
+- A student's lesson mirrors Inês's (11 November 2026, Dan: "shouldn't a
+  student be able to change their weekly lessons or normal lessons to 90
+  mintues or vice versa too?"): one `Change` and one `Cancel`, with `This
+  lesson | Every week` in each for a weekly lesson. `Every week` starts from
+  the run's first lesson that can still move, so keeping the time keeps every
+  week where it is; changing only the length or place keeps the time chosen.
 
 ## One schedule for students — 9 November 2026
 

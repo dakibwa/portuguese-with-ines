@@ -4943,6 +4943,20 @@ p.lesson-when > span {
   flex: 1 1 100%;
 }
 
+/* Where a long filled label takes the row (Cancel all booked lessons), its
+   pair keeps to its own width beneath rather than stretching after it. */
+.lesson-manage-dialog__actions--lead > .button--quiet {
+  flex: 0 1 auto;
+}
+
+/* On a 320px phone `Cancel all booked lessons` broke onto a second line; it
+   gives up some side padding there, as the weekly choices always have. */
+@media (max-width: 360px) {
+  .lesson-manage-dialog__actions--lead > .button--coral {
+    padding-inline: 0.5rem;
+  }
+}
+
 /* On a phone the booked card's and a day's pair do the same, rather than
    each taking the full width whatever its label. */
 @media (max-width: 560px) {
@@ -4952,9 +4966,8 @@ p.lesson-when > span {
   }
 }
 
-/* The weekly run is one line under the lesson, its Manage weekly lessons a
-   quiet chip at that line's end; where the line is too narrow the chip
-   wraps beneath it at the right, whole. Space sets it apart, not a rule. */
+/* The weekly run is one quiet line under the lesson's Change and Cancel,
+   which hold its choices. Space sets it apart, not a rule. */
 .lesson-manage-dialog__series {
   display: flex;
   flex-wrap: wrap;
@@ -4968,7 +4981,6 @@ p.lesson-when > span {
   flex: none;
 }
 
-/* The weekly time keeps its one line; the chip, not the words, gives way. */
 .lesson-manage-dialog__series > div {
   display: grid;
   flex: 1 0 auto;
@@ -4984,10 +4996,6 @@ p.lesson-when > span {
 .lesson-manage-dialog__series span {
   font-size: 0.7rem;
   line-height: 1.4;
-}
-
-.lesson-manage-dialog__series > .teacher-quiet {
-  margin-left: auto;
 }
 
 /* From an email link, the way into the account: one quiet line beneath the
@@ -5014,18 +5022,44 @@ p.lesson-when > span {
   margin-top: -0.35rem;
 }
 
-/* The Pay by card step's `This lesson | Every week`: the step's own gap spaces it. */
+/* `This lesson | Every week`, in the Pay by card step, in Cancel and at the
+   head of the change screen: the step's own gap spaces it. */
 .lesson-manage-dialog__decision > .segmented {
   margin-bottom: 0;
 }
 
-/* On a 320px phone the longest label, "Cancel all booked lessons", broke onto
-   a second line. The weekly choices give up some side padding (each has the
-   row to itself there). */
-@media (max-width: 360px) {
-  .lesson-manage-dialog__actions--sequence .button {
-    padding-inline: 0.5rem;
-  }
+.lesson-week-choice {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.lesson-week-choice .segmented {
+  margin-bottom: 0;
+}
+
+/* Beneath the heading the slider is clear of the close button, so it takes
+   the card's inner width there rather than the heading's narrower line. */
+.managed-lesson__head > .lesson-week-choice {
+  max-width: 24rem;
+  margin-top: 0.75rem;
+  margin-right: calc(var(--pad-card) - 3.75rem);
+}
+
+.managed-lesson__head > .lesson-week-choice + .managed-lesson__current-time {
+  margin-top: 0.55rem;
+}
+
+/* A closed choice (This lesson, where only the run can change) reads as such. */
+.lesson-week-choice label:has(input:disabled:not(:checked)) {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* What a change will do, as dabs above its button. */
+.unified-calendar__move > .managed-lesson__facts {
+  margin: 0.25rem 0 0;
 }
 
 .lesson-manage-dialog__decision {
@@ -5042,7 +5076,7 @@ p.lesson-when > span {
    at 82% of that and 440px wide, hid its own actions below its fold: Manage
    weekly lessons, Change and Cancel beside the late fee, Done and Pay. There
    it widens and uses the height the screen has, so each pair of buttons keeps
-   its row and the weekly time sits beside Manage weekly lessons. */
+   its row. */
 @media (max-height: 560px) and (orientation: landscape) {
   .lesson-manage-overlay {
     padding: 0.75rem;
@@ -5401,12 +5435,24 @@ p.lesson-when > span {
 
 /* Where the form stacks under the calendar on a wider screen (a phone on its
    side), it has the change overlay's whole width, and the pair shares one row
-   in equal halves, the longest labels included (Move weekly time, Keep
+   in equal halves, the longest labels included (Change every week, Keep
    current schedule). Beside the calendar, and on an upright phone, they stay
    stacked. */
+/* Stacked, the one filled button keeps the panel's width, as the sliders
+   above it do; its quiet way back is as wide as its words (11 November 2026). */
+.unified-calendar__panel .manage-booking__actions > .button--quiet {
+  justify-self: start;
+  width: auto;
+  padding-inline: 1.4rem;
+}
+
 @container booking (min-width: 480px) and (max-width: 699px) {
   .unified-calendar__panel .manage-booking__actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .unified-calendar__panel .manage-booking__actions > .button--quiet {
+    width: 100%;
   }
 }
 
@@ -8415,7 +8461,7 @@ p.lesson-when > span {
 }
 
 /* The same outline as every other secondary action: a quieter name for the
-   same button, so Keep lesson and Manage weekly lessons match in one dialog. */
+   same button, so Keep lesson and Cancel match in one dialog. */
 .button--quiet {
   border: 1.5px solid var(--outline-edge);
   border-radius: var(--squiggle-button-alt);
