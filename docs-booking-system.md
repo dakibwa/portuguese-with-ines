@@ -629,8 +629,9 @@ nothing about them changes.
 The welcome's lessons (14 October 2026, Dan: "all their lessons and prices
 already done properly") are read from the lessons themselves, so they are right
 whenever she added them and whatever she has since changed. Each of a student's
-upcoming confirmed lessons becomes a line, in the site's email design with its
-subject and preheader unchanged: a weekly run is **one** line (`Weekly ·
+upcoming confirmed lessons becomes a line, in the site's email design (its
+words were cut to the fewest plain ones on 11 November 2026; see
+`design/README.md`): a weekly run is **one** line (`Weekly ·
 Online`, `Every Tuesday, 17:00 · Porto time`, `From 20 October 2026 until 8
 December 2026`, or `…, until you stop it` for a run with no end, and `60
 minutes · €22 a lesson`), a lesson on its own is one line (`Lesson · Online`,

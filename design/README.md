@@ -812,10 +812,15 @@ free times and removes selected times that cannot be booked in the new place.
     a lesson) and `60 minutes · €22 a lesson`. A lesson moved, lengthened or put
     elsewhere reads as the lesson it now is. Past twelve lines an `And more` dab
     says how many lessons are left to the website. Its subject identifies the
-    lessons with Inês; card setup is explained in the body. The introduction
-    names her website and the footer explains how to open it directly or reply
-    to Inês. With no lesson to come (16 October 2026, Inês) it is an
-    invitation instead: `Book your next lesson with Inês`, the price dabs, no
+    lessons with Inês; card setup is explained in the body. It uses the fewest
+    plain words that do the job (11 November 2026, Dan: "simpler language",
+    "less verbose"), since many of its readers are reading a second language:
+    the introduction is one sentence naming Inês and her website (`Olá Ana,
+    your lessons with Inês are now on her website, portuguesewithines.com.`),
+    the steps are `Press the button below.` and `Add your card.`, and the
+    footer says only `The button works for 14 days.` and `Questions for Inês?
+    Just reply to this email.` above the site's link. With no lesson to come
+    (16 October 2026, Inês) it is an invitation instead: `Book your next lesson with Inês`, the price dabs, no
     lesson list, and steps ending `Choose a day and time for your next
     lesson.` behind `Choose a time` (`See your lessons` when they have lessons).
     A student free at every length is told there is no card to add and nothing
